@@ -9,6 +9,7 @@ use App\Models\ProductPackage;
 use App\Models\Provider;
 use App\Models\ProviderMapping;
 use App\Models\User;
+use App\Services\CatalogNominalOrder;
 use App\Services\CheckoutPricing;
 use App\Services\CustomerCleanupService;
 use App\Services\DigiflazzCatalogService;
@@ -80,7 +81,7 @@ class AdminPanelRestorationTest extends TestCase
         $this->post('/admin/catalog/mappings/'.$mapping->id.'/sync')->assertRedirect()->assertSessionHasNoErrors();
         $this->assertSame(12000, (int) $mapping->fresh()->cost_idr);
         $this->assertSame(10000, (int) DB::table('digiflazz_catalog_items')->where('id', $item->id)->value('baseline_price_idr'));
-        $this->post('/admin/catalog/products/'.$product->id.'/import', ['item_ids' => [$item->id], 'margin_percent' => 12])->assertSessionHasErrors('item_ids');
+        $this->post('/admin/catalog/products/'.$product->id.'/import', ['item_ids' => [$item->id], 'margin_percent' => 12])->assertSessionHasNoErrors();
         $this->assertSame(1, $product->packages()->count());
     }
 
@@ -182,6 +183,155 @@ class AdminPanelRestorationTest extends TestCase
         ])->assertSessionHasErrors('publish');
         $this->assertSame(0, (int) $provider->fresh()->is_active);
         $this->assertSame(0, $product->packages()->count());
+    }
+
+    public function test_grouped_import_creates_one_numeric_nominal_with_all_matching_sources(): void
+    {
+        $this->login();
+        $rows = [];
+        foreach ([20, 7, 10] as $amount) {
+            foreach (['A', 'B'] as $seller) {
+                $rows[] = $this->row(['buyer_sku_code' => 'group-'.$amount.'-'.$seller, 'product_name' => 'Restore '.$amount.' Diamonds', 'price' => $amount * 1000 + ($seller === 'B' ? 50 : 0)]);
+            }
+        }
+        $this->fakeCatalog($rows);
+        app(DigiflazzCatalogService::class)->sync();
+        Provider::where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
+        $product = $this->product();
+        $product->category->update(['is_active' => true]);
+        $product->fields()->create(['field_key' => 'destination', 'label' => 'ID tujuan', 'type' => 'text', 'is_required' => true, 'sort_order' => 0]);
+        $ids = DB::table('digiflazz_catalog_items')->whereIn('buyer_sku_code', ['group-20-A', 'group-7-A', 'group-10-B'])->pluck('id')->all();
+        $this->post('/admin/catalog/products/'.$product->id.'/import', [
+            'item_ids' => $ids, 'margin_percent' => 10, 'publish' => true,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $packages = $product->packages()->orderBy('sort_order')->get();
+        $this->assertSame([7, 10, 20], $packages->pluck('nominal_value')->map(fn ($value): int => (int) $value)->all());
+        foreach ($packages as $package) {
+            $this->assertSame(2, $package->mappings()->count());
+            $this->assertSame(2, $package->mappings()->where('is_active', true)->count());
+            $this->assertSame((int) $package->nominal_value * 1100, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
+        }
+        $response = $this->get('/catalog/'.$product->slug);
+        $response->assertOk();
+        $response->assertInertia(function (AssertableInertia $page): void {
+            $page->where('packages.0.nominal_value', 7);
+            $page->where('packages.1.nominal_value', 10);
+            $page->where('packages.2.nominal_value', 20);
+        });
+    }
+
+    public function test_automatic_sources_do_not_merge_regions_variants_or_other_product_ownership(): void
+    {
+        $this->login();
+        $this->fakeCatalog([
+            $this->row(['buyer_sku_code' => 'plain', 'product_name' => 'Restore 10 Diamonds']),
+            $this->row(['buyer_sku_code' => 'region', 'product_name' => 'Restore 10 Diamonds', 'type' => 'Global']),
+            $this->row(['buyer_sku_code' => 'bonus', 'product_name' => 'Restore 10 Diamonds + Bonus']),
+        ]);
+        app(DigiflazzCatalogService::class)->sync();
+        $product = $this->product();
+        $ids = DB::table('digiflazz_catalog_items')->whereIn('buyer_sku_code', ['plain', 'region', 'bonus'])->pluck('id')->all();
+        $this->post('/admin/catalog/products/'.$product->id.'/import', [
+            'item_ids' => $ids, 'margin_percent' => 10,
+        ])->assertSessionHasNoErrors();
+        $this->assertSame(3, $product->packages()->count());
+        $other = $this->product();
+        $this->post('/admin/catalog/products/'.$other->id.'/import', [
+            'item_ids' => [$ids[0]], 'margin_percent' => 10,
+        ])->assertSessionHasErrors('item_ids');
+        $this->assertSame(0, $other->packages()->count());
+    }
+
+    public function test_full_sync_attaches_new_matching_sources_and_preserves_disabled_existing_sources(): void
+    {
+        $this->login();
+        $this->fakeCatalog([$this->row(['buyer_sku_code' => 'sync-A']), $this->row(['buyer_sku_code' => 'sync-B', 'price' => 10100])]);
+        app(DigiflazzCatalogService::class)->sync();
+        Provider::where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
+        $product = $this->product();
+        $product->category->update(['is_active' => true]);
+        $product->fields()->create(['field_key' => 'destination', 'label' => 'ID tujuan', 'type' => 'text', 'is_required' => true, 'sort_order' => 0]);
+        $id = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'sync-A')->value('id');
+        $this->post('/admin/catalog/products/'.$product->id.'/import', [
+            'item_ids' => [$id], 'margin_percent' => 10, 'publish' => true,
+        ])->assertSessionHasNoErrors();
+        $package = $product->packages()->firstOrFail();
+        $package->mappings()->where('external_sku', 'sync-B')->update(['is_active' => false]);
+        $this->fakeCatalog([
+            $this->row(['buyer_sku_code' => 'sync-B', 'price' => 10100]),
+            $this->row(['buyer_sku_code' => 'sync-C', 'price' => 10200]),
+            $this->row(['buyer_sku_code' => 'wrong-region', 'type' => 'Global']),
+        ]);
+        app(DigiflazzCatalogService::class)->sync();
+        $this->assertDatabaseHas('provider_mappings', ['product_package_id' => $package->id, 'external_sku' => 'sync-C', 'is_active' => true]);
+        $this->assertDatabaseHas('provider_mappings', ['external_sku' => 'sync-A', 'is_active' => false]);
+        $this->assertDatabaseHas('provider_mappings', ['external_sku' => 'sync-B', 'is_active' => false]);
+        $this->assertDatabaseMissing('provider_mappings', ['external_sku' => 'wrong-region']);
+        $this->assertSame(11220, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
+        $this->fakeCatalog([$this->row(['buyer_sku_code' => 'sync-A']), $this->row(['buyer_sku_code' => 'sync-C', 'price' => 10200])]);
+        app(DigiflazzCatalogService::class)->sync();
+        $this->assertDatabaseHas('provider_mappings', ['external_sku' => 'sync-A', 'is_active' => false]);
+        $this->assertSame(3, $package->mappings()->count());
+    }
+
+    public function test_bulk_auto_sources_upgrades_existing_nominals_and_survives_template_edit(): void
+    {
+        $this->login();
+        $this->fakeCatalog([$this->row(['buyer_sku_code' => 'bulk-A']), $this->row(['buyer_sku_code' => 'bulk-B', 'price' => 10100])]);
+        app(DigiflazzCatalogService::class)->sync();
+        $product = $this->product();
+        $product->fields()->create(['field_key' => 'destination', 'label' => 'ID tujuan', 'type' => 'text', 'is_required' => true, 'sort_order' => 0]);
+        $id = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'bulk-A')->value('id');
+        $this->post('/admin/catalog/products/'.$product->id.'/import', [
+            'item_ids' => [$id], 'margin_percent' => 10, 'auto_sources' => false,
+        ])->assertSessionHasNoErrors();
+        $package = $product->packages()->firstOrFail();
+        $this->assertSame(1, $package->mappings()->count());
+        $this->post('/admin/catalog/products/'.$product->id.'/auto-sources')->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame(2, $package->mappings()->count());
+        $this->post('/admin/catalog/products/'.$product->id.'/auto-sources')->assertSessionHasNoErrors();
+        $this->assertSame(1, $product->packages()->count());
+        $this->assertSame(2, $package->mappings()->count());
+        $mapping = $package->mappings()->firstOrFail();
+        $group = data_get($mapping->fulfillment_config, 'auto_source_group');
+        $this->put('/admin/catalog/mappings/'.$mapping->id, [
+            'priority' => 0, 'is_active' => false, 'customer_no_template' => '{{destination}}',
+        ])->assertSessionHasNoErrors();
+        $this->assertSame($group, data_get($mapping->fresh()->fulfillment_config, 'auto_source_group'));
+        $this->login(['orders.view'], 'ADMIN');
+        $this->post('/admin/catalog/products/'.$product->id.'/auto-sources')->assertForbidden();
+    }
+
+    public function test_thousand_skus_import_as_five_hundred_nominals_with_automatic_backups(): void
+    {
+        $this->login();
+        $rows = [];
+        for ($amount = 1; $amount <= 500; $amount++) {
+            foreach (['A', 'B'] as $seller) {
+                $rows[] = $this->row(['buyer_sku_code' => 'large-'.$amount.'-'.$seller, 'product_name' => 'Restore '.$amount.' Diamonds', 'price' => 10000 + $amount + ($seller === 'B' ? 1 : 0)]);
+            }
+        }
+        $this->fakeCatalog($rows);
+        app(DigiflazzCatalogService::class)->sync();
+        $product = $this->product();
+        $ids = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'like', 'large-%-A')->pluck('id')->all();
+        $this->post('/admin/catalog/products/'.$product->id.'/import', [
+            'item_ids' => $ids, 'margin_percent' => 10,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame(500, $product->packages()->count());
+        $this->assertSame(1000, ProviderMapping::whereIn('product_package_id', $product->packages()->pluck('id'))->count());
+        $this->assertSame(1, (int) $product->packages()->orderBy('sort_order')->firstOrFail()->nominal_value);
+        $this->assertSame(500, (int) $product->packages()->orderByDesc('sort_order')->firstOrFail()->nominal_value);
+        Http::assertSentCount(1);
+    }
+
+    public function test_customer_nominal_order_is_numeric_even_when_imported_values_are_missing(): void
+    {
+        $names = [100, 2000, 10, 200, 20, 7];
+        $items = collect($names)->map(fn (int $value): object => (object) ['id' => $value, 'name' => 'Game '.$value.' Diamonds', 'nominal_value' => null]);
+        $ordered = app(\App\Services\CatalogNominalOrder::class)->sort($items);
+        $this->assertSame([7, 10, 20, 100, 200, 2000], $ordered->pluck('id')->all());
+        $this->assertSame(2000, app(\App\Services\CatalogNominalOrder::class)->value('Game 2.000 Diamonds', 'Game'));
     }
 
     public function test_invalid_provider_response_is_atomic_and_does_not_reprice(): void

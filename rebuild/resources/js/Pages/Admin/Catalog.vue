@@ -85,7 +85,8 @@ const categoryForm = useForm({ name: '', slug: '', icon: 'grid', sort_order: 0 }
 const productForm = useForm({ category_id: '', name: '', slug: '', publisher: '', description: '', fulfillment_mode: 'AUTO_PROVIDER', manual_instructions: '', manual_open_time: '', manual_close_time: '', manual_timezone: 'Asia/Jakarta', margin_percent: props.defaultMargin||0, sort_order: 0 });
 const globalMarginForm = useForm({margin_percent:props.defaultMargin||0});
 const applyGlobalMargin=()=>{if(confirm('Terapkan margin global ke semua produk otomatis? Produk manual dan margin khusus nominal tidak akan diubah.'))globalMarginForm.put('/admin/catalog/margin',{preserveScroll:true});};
-const importForm = useForm({item_ids:[],margin_percent:props.defaultMargin||0,publish:true,customer_no_template:''});
+const autoSourcesForm = useForm({});
+const importForm = useForm({item_ids:[],margin_percent:props.defaultMargin||0,publish:true,auto_sources:true,customer_no_template:''});
 const suggestedTemplate = item => {
     const fields = item.fields || [];
     const previous = item.packages.flatMap(pack => pack.mappings).find(mapping => mapping.provider_code === 'DIGIFLAZZ' && mapping.customer_no_template);
@@ -113,13 +114,14 @@ function openProductImport() {
     showImport.value = true;
     importForm.clearErrors();
     importForm.publish = true;
+    importForm.auto_sources = true;
     importForm.customer_no_template = suggestedTemplate(item);
     importSearch.value = '';
-    importBrand.value = '';
+    importBrand.value = props.digiflazzItems.find(sku=>sku.brand.toLowerCase()===item.name.toLowerCase())?.brand || '';
     importPage.value = 1;
     const requestedSku = Number(new URLSearchParams(page.url.split('?')[1] || '').get('import_sku'));
     const candidate = props.digiflazzItems.find(sku => sku.id === requestedSku && sku.available && !sku.mapped);
-    importForm.item_ids = candidate ? [candidate.id] : [];
+    importForm.item_ids = candidate ? [importMatches.value.find(sku=>sku.source_group===candidate.source_group)?.id || candidate.id] : [];
     showCatalogImport.value = false;
 }
 function toggleImport(item) {
@@ -127,13 +129,26 @@ function toggleImport(item) {
     if (showImport.value) {
         importForm.clearErrors();
         importForm.publish = true;
+        importForm.auto_sources = true;
         importForm.customer_no_template = suggestedTemplate(item);
         importForm.margin_percent = Number(item.margin_percent || 0);
+        importBrand.value = props.digiflazzItems.find(sku=>sku.brand.toLowerCase()===item.name.toLowerCase())?.brand || '';
     }
 }
 
 const importBrands=computed(()=>[...new Set(props.digiflazzItems.map(i=>i.brand))].sort());
-const importMatches=computed(()=>props.digiflazzItems.filter(i=>!i.mapped && i.available && (!importBrand.value||i.brand===importBrand.value) && (!importSearch.value||[i.product_name,i.buyer_sku_code].join(' ').toLowerCase().includes(importSearch.value.toLowerCase()))));
+const importMatches=computed(()=>{
+    const matches=props.digiflazzItems.filter(i=>!i.mapped && i.available && (!importBrand.value||i.brand===importBrand.value) && (!importSearch.value||[i.product_name,i.buyer_sku_code].join(' ').toLowerCase().includes(importSearch.value.toLowerCase())));
+    const groups=new Map();
+    for(const item of matches){
+        const key=importForm.auto_sources ? item.source_group : item.buyer_sku_code;
+        const current=groups.get(key);
+        if(!current || Number(item.price_idr)<Number(current.price_idr))groups.set(key,item);
+    }
+    return [...groups.values()].map(item=>({...item,source_count:props.digiflazzItems.filter(source=>source.source_group===item.source_group && source.available).length}))
+        .sort((a,b)=>(a.nominal_value??Infinity)-(b.nominal_value??Infinity)||a.product_name.localeCompare(b.product_name,'id-ID',{numeric:true}));
+});
+watch(()=>importForm.auto_sources,()=>{importForm.item_ids=[];importPage.value=1;});
 const importItems=computed(()=>importMatches.value.slice((importPage.value-1)*25,importPage.value*25));
 watch([importSearch,importBrand],()=>{importPage.value=1;});
 const sourceSearch=reactive({});
@@ -474,16 +489,20 @@ const deleteNotice = (notice) => {
 
                     </div>
                     <div v-show="editorTab==='nominal'" class="lf-admin-nominals space-y-3 rounded-md bg-slate-950 p-4">
-                        <div class="flex flex-wrap items-center justify-between gap-3"><h3 class="font-semibold">Nominal / paket</h3><Button v-if="item.fulfillment_mode==='AUTO_PROVIDER'" type="button" variant="outline" @click="toggleImport(item)">Impor nominal Digiflazz</Button></div>
+                        <div class="flex flex-wrap items-center justify-between gap-3"><h3 class="font-semibold">Nominal / paket</h3><Button v-if="item.fulfillment_mode==='AUTO_PROVIDER'" type="button" variant="outline" :disabled="autoSourcesForm.processing" @click="autoSourcesForm.post('/admin/catalog/products/'+item.id+'/auto-sources',{preserveScroll:true})">Lengkapi cadangan otomatis</Button><Button v-if="item.fulfillment_mode==='AUTO_PROVIDER'" type="button" variant="outline" @click="toggleImport(item)">Impor nominal Digiflazz</Button></div>
+                        <p v-if="Object.keys(autoSourcesForm.errors).length" role="alert" class="text-sm text-destructive">{{ Object.values(autoSourcesForm.errors).join(' · ') }}</p>
                         <Card v-if="showImport && item.fulfillment_mode==='AUTO_PROVIDER'" class="space-y-3 p-4" data-testid="digiflazz-import">
                             <h4 class="font-semibold">Pilih SKU untuk {{item.name}}</h4>
                             <div class="grid gap-3 md:grid-cols-3"><label class="text-sm">Cari SKU<Input v-model="importSearch" class="mt-1"/></label><label class="text-sm">Merek<select v-model="importBrand" class="mt-1 block w-full rounded border p-2"><option value="">Semua brand</option><option v-for="brand in importBrands" :key="brand">{{brand}}</option></select></label><label class="text-sm">Margin nominal (%)<Input v-model.number="importForm.margin_percent" type="number" min="0" max="1000" step="0.0001" class="mt-1"/></label></div>
                             <p class="text-xs text-slate-500">Pilih SKU tersedia yang belum dipakai, tentukan margin, lalu impor untuk menjual.</p>
+                            <label class="flex items-center gap-2 text-sm"><AdminSwitch v-model="importForm.auto_sources" /> Cadangan otomatis untuk nominal yang sama</label>
+                            <p class="text-sm text-muted-foreground">SKU dengan nama, merek, jenis, dan kategori yang sama menjadi satu nominal. Sumber termurah yang tersedia dipilih lebih dahulu; cadangan baru ditambahkan saat sinkron.</p>
+                            <div class="flex flex-wrap gap-2"><Button type="button" variant="outline" @click="importForm.item_ids=importMatches.map(sku=>sku.id)">Pilih semua hasil filter ({{ importMatches.length }})</Button><Button type="button" variant="outline" @click="importForm.item_ids=[]">Hapus pilihan</Button></div>
                             <label class="flex items-center gap-2 text-sm"><AdminSwitch v-model="importForm.publish" /> Langsung jual setelah impor</label>
                             <label class="block text-sm">Format ID tujuan<Input v-model="importForm.customer_no_template" data-testid="import-customer-template" class="mt-1" placeholder="Pilih kolom pelanggan di bawah" /></label>
                             <div class="flex flex-wrap gap-2"><Button v-for="field in item.fields" :key="field.field_key" type="button" size="sm" variant="outline" @click="importForm.customer_no_template += '{{' + field.field_key + '}}'">{{ field.label }}</Button></div>
                             <p class="text-sm text-muted-foreground">{{ importForm.publish ? 'Produk, nominal, dan sumber Digiflazz diaktifkan bersama. Harga mengikuti margin di atas.' : 'Nominal disimpan sebagai draf dan belum dijual.' }}</p>
-                            <label v-for="sku in importItems" :key="sku.id" :data-sku="sku.buyer_sku_code" class="flex items-start gap-3 rounded border p-2 text-sm"><input v-model="importForm.item_ids" type="checkbox" :value="sku.id"><span>{{sku.product_name}}<small class="block">{{sku.buyer_sku_code}} · Rp{{Number(sku.price_idr).toLocaleString('id-ID')}}</small></span></label>
+                            <label v-for="sku in importItems" :key="sku.id" :data-sku="sku.buyer_sku_code" class="flex items-start gap-3 rounded border p-2 text-sm"><input v-model="importForm.item_ids" type="checkbox" :value="sku.id"><span>{{sku.product_name}}<small class="block">{{sku.buyer_sku_code}} · Rp{{Number(sku.price_idr).toLocaleString('id-ID')}}<span v-if="importForm.auto_sources"> · {{sku.source_count}} sumber otomatis</span></small></span></label>
                             <p v-if="!importMatches.length" class="text-sm">Tidak ada SKU tersedia yang sesuai dengan filter dan belum diimpor. Hapus filter atau sinkronkan daftar harga di menu Digiflazz.</p>
                             <div class="flex flex-wrap items-center gap-2"><Button type="button" variant="outline" :disabled="importPage===1" @click="importPage--">Sebelumnya</Button><span class="text-sm">Halaman {{importPage}} / {{Math.max(1,Math.ceil(importMatches.length/25))}}</span><Button type="button" variant="outline" :disabled="importPage*25>=importMatches.length" @click="importPage++">Berikutnya</Button></div>
                             <p v-if="Object.keys(importForm.errors).length" role="alert" class="text-sm text-destructive">{{ Object.values(importForm.errors).join(' · ') }}</p>

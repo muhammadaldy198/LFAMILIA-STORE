@@ -9,6 +9,7 @@ use App\Models\ProductPackage;
 use App\Models\ProductReview;
 use App\Models\SavedGameAccount;
 use App\Models\StoreAsset;
+use App\Services\CatalogNominalOrder;
 use App\Services\CheckoutPricing;
 use App\Services\PaymentRoutingService;
 use App\Services\StorefrontContentService;
@@ -115,10 +116,10 @@ class CatalogController
             ->whereHas('category', fn ($query) => $query->where('is_active', true))
             ->firstOrFail();
 
-        $packages = ProductPackage::with('media')->where('product_id', $product->id)
+        $packages = app(CatalogNominalOrder::class)->sort(ProductPackage::with('media')->where('product_id', $product->id)
             ->where('is_active', true)
             ->orderByRaw('nominal_value IS NULL')
-            ->orderBy('sort_order')->orderBy('nominal_value')->orderBy('id')->get()
+            ->orderBy('sort_order')->orderBy('nominal_value')->orderBy('id')->get())
             ->map(function (ProductPackage $package) use ($pricing): array {
                 try {
                     $quote = $pricing->forPackage($package->id);

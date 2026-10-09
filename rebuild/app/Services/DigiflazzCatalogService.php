@@ -109,8 +109,12 @@ class DigiflazzCatalogService
                     }
                 }
 
+                if ($sku === null) {
+                    app(DigiflazzAutoSources::class)->sync();
+                }
+
                 return count($clean);
-            });
+            }, 3);
         } finally {
             $lock->release();
         }

@@ -268,6 +268,7 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
             Route::put('/products/{product}/packages/reorder', [AdminCatalogController::class, 'reorderPackages']);
             Route::post('/products/{product}/sync', [AdminDigiflazzController::class, 'syncProduct'])->middleware('throttle:admin-sensitive');
             Route::post('/products/{product}/import', [AdminDigiflazzController::class, 'import']);
+            Route::post('/products/{product}/auto-sources', [AdminDigiflazzController::class, 'autoSources'])->middleware('throttle:admin-sensitive');
             Route::post('/packages/{package}/sources/digiflazz', [AdminDigiflazzController::class, 'attachSource'])->middleware('throttle:admin-sensitive');
             Route::post('/mappings/{mapping}/sync', [AdminDigiflazzController::class, 'syncMapping'])->middleware('throttle:admin-sensitive');
             Route::post('/categories', [AdminCatalogController::class, 'category'])->name('categories.store');
