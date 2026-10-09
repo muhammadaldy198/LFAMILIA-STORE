@@ -143,8 +143,8 @@ class AdminIntegrationController
                 'connection' => $connection,
                 'callback' => $callback,
                 'e2e' => [
-                    'status' => 'DEFERRED',
-                    'label' => 'DEFERRED TO TAHAP 9',
+                    'status' => 'NOT_RECORDED',
+                    'label' => 'Hasil uji alur nyata belum tercatat',
                 ],
                 'readiness' => $readiness,
                 'health' => [
@@ -166,7 +166,16 @@ class AdminIntegrationController
                     ->filter(fn (array $item): bool => $item['is_active'] && $item['connection']['status'] === 'VERIFIED')
                     ->count(),
                 'attention' => $integrations
-                    ->filter(fn (array $item): bool => $item['is_active'] && $item['connection']['status'] !== 'VERIFIED')
+                    ->filter(fn (array $item): bool => $item['is_active'] && (
+                        ! $item['required_complete']
+                        || $item['connection']['status'] === 'FAILED'
+                        || ($item['callback']['status'] ?? null) === 'NOT_READY'
+                    ))->count(),
+                'awaiting_verification' => $integrations
+                    ->filter(fn (array $item): bool => $item['is_active']
+                        && $item['required_complete']
+                        && in_array($item['connection']['status'], ['UNVERIFIED', 'NOT_TESTED'], true)
+                        && ($item['callback']['status'] ?? null) !== 'NOT_READY')
                     ->count(),
                 'configuration_complete' => $integrations->where('required_complete', true)->count(),
             ],
@@ -613,7 +622,7 @@ class AdminIntegrationController
         $label = match ($connectionStatus) {
             'VERIFIED' => 'Connection Verified',
             'FAILED' => 'Koneksi bermasalah',
-            'UNVERIFIED' => 'Belum dapat diverifikasi',
+            'UNVERIFIED' => 'Perlu pengujian nyata',
             'NOT_CONFIGURED' => 'Belum dikonfigurasi',
             default => 'Belum dites',
         };
@@ -649,9 +658,9 @@ class AdminIntegrationController
         }
 
         return match ($connection['status'] ?? null) {
-            'VERIFIED' => ['status' => 'READY_FOR_E2E', 'label' => 'Siap untuk E2E'],
+            'VERIFIED' => ['status' => 'READY_FOR_E2E', 'label' => 'Tes koneksi berhasil; uji alur nyata berikutnya'],
             'FAILED' => ['status' => 'BLOCKED', 'label' => 'Koneksi bermasalah'],
-            'UNVERIFIED' => ['status' => 'CONFIGURED', 'label' => 'Configured — E2E belum diverifikasi'],
+            'UNVERIFIED' => ['status' => 'CONFIGURED', 'label' => 'Kredensial tersimpan; pengujian nyata diperlukan'],
             default => ['status' => 'CONFIGURED_UNTESTED', 'label' => 'Configured — belum dites'],
         };
     }
