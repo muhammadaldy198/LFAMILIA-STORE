@@ -100,6 +100,7 @@ class OneTimeGameNominalImport
                     ->pluck('product_id')->unique();
                 if ($packageProductIds->contains(fn ($id): bool => (int) $id !== (int) $product->id)) {
                     $result['groups_skipped']++;
+
                     continue;
                 }
 
