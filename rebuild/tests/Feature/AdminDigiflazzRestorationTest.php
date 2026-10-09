@@ -239,10 +239,13 @@ class AdminDigiflazzRestorationTest extends TestCase
 
         foreach (['all', 'mapped'] as $scope) {
             foreach (['healthy' => ['price-down'], 'warning' => ['cutoff', 'low-stock', 'price-up'], 'critical' => ['inactive']] as $health => $codes) {
-                $this->get('/admin/digiflazz?scope='.$scope.'&health='.$health.'&per_page=10')->assertOk()->assertInertia(fn (Assert $page) => $page
-                    ->where('items.total', count($codes))
-                    ->where('items.data', fn ($items): bool => collect($items)->pluck('buyer_sku_code')->sort()->values()->all() === $codes)
-                        ->where('items.data', fn ($items): bool => collect($items)->every(fn ($item): bool => $item['health'] === $health)));
+                $response = $this->get('/admin/digiflazz?scope='.$scope.'&health='.$health.'&per_page=10');
+                $response->assertOk();
+                $response->assertInertia(function (Assert $page) use ($codes, $health): void {
+                    $page->where('items.total', count($codes));
+                    $page->where('items.data', fn ($items): bool => collect($items)->pluck('buyer_sku_code')->sort()->values()->all() === $codes);
+                    $page->where('items.data', fn ($items): bool => collect($items)->every(fn ($item): bool => $item['health'] === $health));
+                });
             }
         }
         $this->travelBack();
@@ -268,10 +271,13 @@ class AdminDigiflazzRestorationTest extends TestCase
         $this->assertSame(2, $sync['removed']);
         $this->assertSame(1, $sync['disabled_mappings']);
 
-        $this->get('/admin/digiflazz')->assertOk()->assertInertia(fn (Assert $page) => $page
-            ->where('items.total', 1)
-            ->where('items.data.0.buyer_sku_code', 'retained')
-            ->where('catalogSync.removed', 2));
+        $response = $this->get('/admin/digiflazz');
+        $response->assertOk();
+        $response->assertInertia(function (Assert $page): void {
+            $page->where('items.total', 1);
+            $page->where('items.data.0.buyer_sku_code', 'retained');
+            $page->where('catalogSync.removed', 2);
+        });
 
         $this->fakeCatalog([$this->row(['buyer_sku_code' => 'removed-mapped'])]);
         app(DigiflazzCatalogService::class)->sync();
