@@ -494,6 +494,34 @@ class AdminIntegrationsRestorationTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_unavailable_safe_probe_is_configuration_not_connection_failure(): void
+    {
+        $this->loginSuperAdmin();
+        $this->clearIntegrationState();
+        config(['app.url' => 'https://lfamilia.example.test']);
+        IntegrationCredential::create([
+            'code' => 'doku',
+            'is_active' => true,
+            'config_ciphertext' => [
+                'environment' => 'sandbox',
+                'profiles' => [
+                    'sandbox' => ['client_id' => 'fixture-client', 'secret_key' => 'fixture-secret'],
+                ],
+            ],
+        ]);
+        $this->postJson('/admin/integrations/doku/test')->assertOk();
+        $this->get('/admin/integrations')->assertOk()->assertInertia(
+            fn (Assert $page) => $page->where('integrations', function ($rows): bool {
+                $doku = collect($rows)->firstWhere('code', 'doku');
+
+                return $doku['connection']['status'] === 'CONFIGURED'
+                    && $doku['health']['verified'] === false
+                    && $doku['e2e']['status'] === 'NOT_RECORDED';
+            })->where('summary.attention', 0)
+        );
+        Http::assertNothingSent();
+    }
+
     public function test_callback_readiness_requires_https_route_and_verification_credential(): void
     {
         $this->loginSuperAdmin();
@@ -517,7 +545,7 @@ class AdminIntegrationsRestorationTest extends TestCase
                 return $digiflazz['callback']['required'] === true
                     && $digiflazz['callback']['ready'] === false
                     && $digiflazz['callback']['status'] === 'NOT_READY'
-                    && $digiflazz['e2e']['label'] === 'DEFERRED TO TAHAP 9';
+                    && $digiflazz['e2e']['status'] === 'NOT_RECORDED';
             })
         );
 

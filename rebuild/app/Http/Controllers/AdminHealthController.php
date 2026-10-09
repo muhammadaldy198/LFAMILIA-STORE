@@ -129,7 +129,7 @@ class AdminHealthController
                 ->count();
         $attention = collect($checks)->whereIn('status', ['DEGRADED', 'DOWN', 'UNKNOWN'])->count();
         $integrationAttention = collect($integrations)
-            ->filter(fn (array $item): bool => $item['active'] && $item['status'] !== 'HEALTHY')
+            ->filter(fn (array $item): bool => $item['active'] && ! in_array($item['status'], ['HEALTHY', 'CONFIGURED'], true))
             ->count();
 
         // Midtrans/DOKU maintenance is already represented by their active integration
@@ -366,11 +366,16 @@ class AdminHealthController
                 : 'NOT_CONFIGURED';
             $message = null;
 
+            if ($active && $status === 'DEGRADED'
+                && in_array($stored['reason'] ?? null, ['SAFE_PROBE_UNAVAILABLE', 'PERMISSION_LIMITED'], true)) {
+                $status = 'CONFIGURED';
+            }
+
             if ($active && $status === 'HEALTHY') {
                 $testedAtCarbon = $testedAt !== null ? Carbon::parse($testedAt) : null;
 
-                if ($testedAtCarbon === null || $testedAtCarbon->lt($checkedAt->copy()->subMinutes(15))) {
-                    $status = 'STALE';
+                if ($testedAtCarbon === null) {
+                    $status = 'UNTESTED';
                 } elseif ($testedAtCarbon->gt($checkedAt->copy()->addSeconds(60))) {
                     $status = 'DEGRADED';
                     $message = 'Waktu Tes Koneksi lebih maju dari waktu aplikasi.';
@@ -447,6 +452,7 @@ class AdminHealthController
     {
         return match ($status) {
             'HEALTHY' => 'Tes koneksi terakhir berhasil.',
+            'CONFIGURED' => 'Kredensial tersimpan. Verifikasi memerlukan penggunaan layanan; tes otomatis tidak tersedia.',
             'DEGRADED' => 'Konfigurasi perlu diperiksa atau belum dapat diverifikasi penuh.',
             'DOWN' => 'Tes koneksi terakhir gagal.',
             'STALE' => 'Tes koneksi terakhir sudah lebih dari 15 menit.',

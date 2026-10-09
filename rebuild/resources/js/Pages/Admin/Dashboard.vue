@@ -48,7 +48,7 @@ const clockDate=computed(()=>new Intl.DateTimeFormat('id-ID',{weekday:'long',day
 const clockTime=computed(()=>new Intl.DateTimeFormat('id-ID',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'Asia/Jakarta'}).format(clock.value)+' WIB');
 const maxRevenue=computed(()=>Math.max(1,...(props.chart||[]).map(p=>p.revenue_idr)));
 const maxOrders=computed(()=>Math.max(1,...(props.chart||[]).map(p=>p.orders)));
-const statusLabel=status=>({SUCCESS:'Berhasil',PENDING_PAYMENT:'Pending',PAID:'Dibayar',PROCESSING:'Diproses',FAILED:'Gagal',EXPIRED:'Kedaluwarsa',CANCELLED:'Dibatalkan',HEALTHY:'Terverifikasi',DOWN:'Bermasalah',DEGRADED:'Perlu diperiksa',NOT_CONFIGURED:'Belum dikonfigurasi',UNTESTED:'Belum dites',STALE:'Perlu tes ulang'}[status]||status);
+const statusLabel=status=>({SUCCESS:'Berhasil',PENDING_PAYMENT:'Pending',PAID:'Dibayar',PROCESSING:'Diproses',FAILED:'Gagal',EXPIRED:'Kedaluwarsa',CANCELLED:'Dibatalkan',HEALTHY:'Tes terakhir berhasil',CONFIGURED:'Tersimpan — tes otomatis tidak tersedia',DOWN:'Bermasalah',DEGRADED:'Perlu diperiksa',NOT_CONFIGURED:'Belum dikonfigurasi',UNTESTED:'Belum dites',STALE:'Perlu tes ulang'}[status]||status);
 const integrationNormal=computed(()=>{const active=(props.integrations||[]).filter(i=>i.active);return active.length>0&&active.every(i=>i.status==='HEALTHY');});
 const visibleActivities=computed(()=>props.activities?.length?props.activities:(props.recentOrders||[]).slice(0,5).map(o=>({id:o.id,action:'Pesanan '+statusLabel(o.status),target:o.order_number,created_at:o.created_at,href:'/admin/orders/'+o.id})));
 const markRead=n=>router.post('/admin/notifications/'+n.id+'/read',{}, {preserveScroll:true});

@@ -21,6 +21,7 @@ const refreshing = ref(false);
 
 const statusLabel = (status) => ({
     HEALTHY: 'Normal',
+    CONFIGURED: 'Tersimpan — tes otomatis tidak tersedia',
     DEGRADED: 'Perlu diperiksa',
     DOWN: 'Bermasalah',
     STALE: 'Kedaluwarsa',
@@ -163,7 +164,7 @@ function refresh() {
                                 </TableCell>
                                 <TableCell>{{ item.group }}</TableCell>
                                 <TableCell>
-                                    <Badge :variant="statusVariant(item.status)">{{ statusLabel(item.status) }}</Badge>
+                                    <Badge :variant="statusVariant(item.status)">{{ item.status === 'HEALTHY' ? 'Tes terakhir berhasil' : statusLabel(item.status) }}</Badge>
                                 </TableCell>
                                 <TableCell class="text-xs">{{ formatDate(item.tested_at) }}</TableCell>
                                 <TableCell class="max-w-sm text-xs text-muted-foreground">{{ item.message }}</TableCell>
