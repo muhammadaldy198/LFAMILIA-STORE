@@ -78,7 +78,7 @@ class DigiflazzAutoSources
         }
 
         if ($automatic) {
-            $this->rankAutomaticSources($package, $this->key($first), $request);
+            $this->rankAutomaticSources($package, (int) $provider->id, $this->key($first), $request);
         }
 
         return $package;
@@ -88,9 +88,9 @@ class DigiflazzAutoSources
      * Only sources explicitly managed by automatic grouping are reprioritized.
      * Manual SKU mappings keep their existing priority and enabled state.
      */
-    private function rankAutomaticSources(ProductPackage $package, string $groupKey, Request $request): void
+    private function rankAutomaticSources(ProductPackage $package, int $providerId, string $groupKey, Request $request): void
     {
-        $mappings = $package->mappings()->whereHas('provider', fn ($query) => $query->where('code', 'DIGIFLAZZ'))
+        $mappings = $package->mappings()->where('provider_id', $providerId)
             ->get()
             ->filter(fn (ProviderMapping $mapping): bool => data_get($mapping->fulfillment_config, 'auto_source_group') === $groupKey)
             ->sort(fn (ProviderMapping $a, ProviderMapping $b): int =>
@@ -195,7 +195,7 @@ class DigiflazzAutoSources
                 $added++;
             }
             if ($key) {
-                $this->rankAutomaticSources($package, (string) $key, $request);
+                $this->rankAutomaticSources($package, (int) $provider->id, (string) $key, $request);
             }
         }
 
