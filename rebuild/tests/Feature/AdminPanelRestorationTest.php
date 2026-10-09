@@ -108,9 +108,12 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertTrue($mapping->is_active);
         $this->assertSame('{{user_id}}{{zone_id}}', data_get($mapping->fulfillment_config, 'customer_no_template'));
         $this->assertSame(11200, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
-        $this->get('/catalog/'.$product->slug)->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
-            ->where('packages.0.is_available', true)
-            ->where('packages.0.price_idr', 11200));
+        $response = $this->get('/catalog/'.$product->slug);
+        $response->assertOk();
+        $response->assertInertia(function (AssertableInertia $page): void {
+            $page->where('packages.0.is_available', true);
+            $page->where('packages.0.price_idr', 11200);
+        });
         $this->assertDatabaseHas('audit_logs', ['action' => 'catalog.mapping.updated', 'target_id' => (string) $mapping->id]);
         Http::assertSentCount(1);
     }

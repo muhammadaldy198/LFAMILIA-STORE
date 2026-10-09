@@ -478,7 +478,7 @@ const deleteNotice = (notice) => {
                         <Card v-if="showImport && item.fulfillment_mode==='AUTO_PROVIDER'" class="space-y-3 p-4" data-testid="digiflazz-import">
                             <h4 class="font-semibold">Pilih SKU untuk {{item.name}}</h4>
                             <div class="grid gap-3 md:grid-cols-3"><label class="text-sm">Cari SKU<Input v-model="importSearch" class="mt-1"/></label><label class="text-sm">Merek<select v-model="importBrand" class="mt-1 block w-full rounded border p-2"><option value="">Semua brand</option><option v-for="brand in importBrands" :key="brand">{{brand}}</option></select></label><label class="text-sm">Margin nominal (%)<Input v-model.number="importForm.margin_percent" type="number" min="0" max="1000" step="0.0001" class="mt-1"/></label></div>
-                            <p class="text-xs text-slate-500">Hanya SKU tersedia yang belum dipakai. Nominal hasil impor nonaktif sampai diperiksa.</p>
+                            <p class="text-xs text-slate-500">Pilih SKU tersedia yang belum dipakai, tentukan margin, lalu impor untuk menjual.</p>
                             <label class="flex items-center gap-2 text-sm"><AdminSwitch v-model="importForm.publish" /> Langsung jual setelah impor</label>
                             <label class="block text-sm">Format ID tujuan<Input v-model="importForm.customer_no_template" data-testid="import-customer-template" class="mt-1" placeholder="Pilih kolom pelanggan di bawah" /></label>
                             <div class="flex flex-wrap gap-2"><Button v-for="field in item.fields" :key="field.field_key" type="button" size="sm" variant="outline" @click="importForm.customer_no_template += '{{' + field.field_key + '}}'">{{ field.label }}</Button></div>
