@@ -80,3 +80,13 @@ Pembayaran memisahkan Channel, Gateway, Routing, QRIS Manual, Top Up Saldo, Tamp
 Media menggunakan endpoint Spatie existing. Gambar terpilih dapat dipratinjau sebelum unggah, error unggahan tampil di tempat, dan hapus meminta konfirmasi. Upload favicon otomatis mengaktifkan asset dan memperbarui link favicon Admin/storefront melalui shared props existing.
 
 Audit source/history dan rencana komponen dicatat di `ADMIN-UI-AUDIT.md`.
+
+## Digiflazz: sinkronisasi dan kesegaran katalog
+
+Panel memakai daftar harga buyer dari API Digiflazz. Sinkron lengkap yang berhasil memperbarui harga/status dan otomatis menghapus baris katalog untuk SKU yang tidak ada dalam respons. Mapping SKU yang hilang dinonaktifkan; mapping, nominal lokal, dan snapshot pesanan tetap disimpan untuk menjaga riwayat transaksi. SKU yang kembali muncul tidak otomatis mengaktifkan mapping lama.
+
+Respons gagal, format tidak valid, dan daftar lengkap kosong tidak menghapus data tersimpan. Sinkron satu SKU tidak menghapus SKU lain; respons kosong yang valid untuk SKU tersebut menghapus hanya SKU itu dan menonaktifkan mapping-nya.
+
+Interval API diatur pada Pengaturan monitor & sinkron otomatis (minimal 5 menit). Halaman menampilkan waktu sinkron lengkap dan otomatis memuat ulang data tersimpan setiap 30 detik saat terlihat. Muat ulang layar tidak memanggil daftar harga API. Gunakan Sinkron daftar harga untuk pembaruan API manual. Katalog mengikuti respons API akun buyer, bukan scraping marketplace publik. Dokumentasi Digiflazz: https://developer.digiflazz.com/api/buyer/daftar-harga/.
+
+Filter Normal/Peringatan/Kritis memakai aritmetika desimal pada kolom harga unsigned agar harga turun tidak menyebabkan error MySQL.

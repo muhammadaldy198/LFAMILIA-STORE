@@ -100,6 +100,21 @@ try {
                 }
                 await click('Kembali ke produk');await inspect(width+'-product-return');
             }
+            if(path==='/admin/digiflazz'){
+                for(const health of ['healthy','warning','critical']){
+                    await evaluate(`(()=>{const s=[...document.querySelectorAll('main select')].find(s=>[...s.options].some(o=>o.value==='warning'));s.value=${JSON.stringify(health)};s.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+                    await pointerClick(`[...document.querySelectorAll('main button')].find(b=>b.textContent.trim()==='Terapkan filter')`);
+                    let filtered=false;
+                    for(let i=0;i<50;i++){
+                        await pause(100);
+                        filtered=await evaluate(`(()=>{const p=JSON.parse(document.getElementById('app').dataset.page).props;return p.items.data.length>0&&p.filters.health===${JSON.stringify(health)}&&p.items.data.every(item=>item.health===${JSON.stringify(health)});})()`);
+                        if(filtered)break;
+                    }
+                    if(!filtered)throw Error('Digiflazz health filter failed: '+health);
+                    await inspect(width+'-digiflazz-filter-'+health);
+                }
+                await click('Hapus filter');
+            }
             if(path==='/admin/orders'){
                 await click('Catat pesanan manual'); await inspectDialog(width+'-manual-order');
                 const order=await evaluate(`JSON.parse(document.getElementById('app').dataset.page).props.orders.data[0]?.id`);

@@ -1,7 +1,7 @@
 <script setup>
 import AdminSwitch from '../../Components/AdminSwitch.vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
-import { reactive } from 'vue';
+import { onMounted, onUnmounted, reactive } from 'vue';
 import AdminShell from '../../Components/AdminShell.vue';
 import { Button } from '../../Components/ui/button';
 import { Input } from '../../Components/ui/input';
@@ -18,6 +18,7 @@ const props = defineProps({
     summary: Object,
     connection: Object,
     lastSyncedAt: String,
+    catalogSync: Object,
     mappingCount: Number,
     providerActive: Boolean,
     autoSync: Boolean,
@@ -107,6 +108,26 @@ function baseline(id) {
 function refresh() {
     router.reload({ preserveScroll: true });
 }
+
+let refreshTimer, removeStartListener, removeFinishListener;
+let visitInProgress = false;
+onMounted(() => {
+    removeStartListener = router.on('start', () => { visitInProgress = true; });
+    removeFinishListener = router.on('finish', () => { visitInProgress = false; });
+    refreshTimer = setInterval(() => {
+        if (document.visibilityState === 'visible' && !visitInProgress && !syncForm.processing && !autoSyncForm.processing) {
+            router.reload({
+                only: ['items', 'summary', 'lastSyncedAt', 'catalogSync', 'categories', 'brands', 'products', 'mappingCount'],
+                preserveScroll: true,
+            });
+        }
+    }, 30000);
+});
+onUnmounted(() => {
+    clearInterval(refreshTimer);
+    removeStartListener?.();
+    removeFinishListener?.();
+});
 </script>
 
 <template>
@@ -158,6 +179,11 @@ function refresh() {
         </div>
 
         <Card class="p-4">
+            <div class="mb-3 space-y-1 text-xs text-muted-foreground">
+                <p>Sinkron daftar harga lengkap: {{ date(catalogSync?.at || lastSyncedAt) }} · Sinkron otomatis {{ autoSync ? 'setiap ' + monitorSettings.sync_interval_minutes + ' menit' : 'nonaktif' }}.</p>
+                <p>Daftar di layar dimuat ulang setiap 30 detik. SKU yang sudah tidak ada dihapus setelah sinkron lengkap berhasil.</p>
+                <p v-if="catalogSync?.removed">Sinkron terakhir menghapus {{ catalogSync.removed }} SKU lama.</p>
+            </div>
             <details><summary class="cursor-pointer font-semibold">Pengaturan monitor & sinkron otomatis</summary>
             <form class="grid gap-4 md:grid-cols-2 xl:grid-cols-4" @submit.prevent="autoSyncForm.put('/admin/digiflazz/settings', { preserveScroll: true })">
                 <label class="flex items-center gap-2 text-sm md:col-span-2 xl:col-span-1">
