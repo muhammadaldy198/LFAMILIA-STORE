@@ -51,7 +51,7 @@ const productPosition = (row) => displayPosition(
 );
 const packagePosition = (product, pack) => displayPosition(product.packages, pack, byOrder());
 const sourcePosition = (pack, mapping) => displayPosition(
-    pack.mappings.filter((entry) => entry.is_active && entry.provider_code === mapping.provider_code),
+    pack.mappings.filter((entry) => entry.is_active),
     mapping, bySourcePriority,
 );
 watch(() => props.categories, (items) => { categories.value = items.map((item) => ({ ...item })); });
@@ -276,11 +276,7 @@ const saveMapping = (mapping) => router.put('/admin/catalog/mappings/' + mapping
 const providerLabel = (mapping) => mapping.provider_name || mapping.provider_code || 'Provider';
 const fulfillmentRole = (pack, mapping) => {
     if (!mapping.is_active) return 'Nonaktif';
-    const active = [...pack.mappings]
-        .filter((entry) => entry.provider_code === mapping.provider_code && entry.is_active)
-        .sort((a, b) => Number(a.priority || 0) - Number(b.priority || 0)
-            || Number(a.cost_idr || 0) - Number(b.cost_idr || 0)
-            || Number(a.id) - Number(b.id));
+    const active = pack.mappings.filter((entry) => entry.is_active).sort(bySourcePriority);
     const index = active.findIndex((entry) => Number(entry.id) === Number(mapping.id));
     return index <= 0 ? 'Utama' : 'Cadangan ' + index;
 };
