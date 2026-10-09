@@ -81,6 +81,7 @@ class AdminProviderRestorationTest extends TestCase
                 ->where('mappings.data.0.provider_name', 'Digiflazz Utama')
                 ->where('mappings.data.0.external_sku', 'SAFE-SKU-10')
                 ->where('mappings.data.0.priority', 2)
+                ->where('mappings.data.0.source_position', 1)
                 ->where('summary.mapping_active', fn ($value) => (int) $value >= 1));
 
         $this->get('/admin/catalog')->assertOk()->assertInertia(fn (Assert $page) => $page
@@ -90,6 +91,46 @@ class AdminProviderRestorationTest extends TestCase
                     ->flatMap(fn ($package) => $package['mappings'] ?? [])
                     ->contains(fn ($mapping) => ($mapping['provider_name'] ?? null) === 'Digiflazz Utama');
             }));
+    }
+
+    public function test_supplier_position_is_stable_before_search_and_pagination(): void
+    {
+        $this->login();
+
+        $product = Product::create([
+            'category_id' => Category::where('slug', 'game')->value('id'),
+            'name' => 'Mapping Position Test',
+            'slug' => 'mapping-position-'.bin2hex(random_bytes(4)),
+            'fulfillment_mode' => 'AUTO_PROVIDER',
+            'margin_percent' => 10,
+            'is_active' => true,
+        ]);
+        $package = ProductPackage::create([
+            'product_id' => $product->id, 'code' => 'POSITION-10',
+            'name' => '10 Unit', 'is_active' => true,
+        ]);
+        $provider = Provider::where('code', 'DIGIFLAZZ')->firstOrFail();
+        foreach ([['SKU-FIRST', 0, 11000, true], ['SKU-TARGET', 10, 9000, true], ['SKU-DISABLED', 1, 8000, false]] as [$sku, $priority, $cost, $active]) {
+            ProviderMapping::create([
+                'product_package_id' => $package->id, 'provider_id' => $provider->id,
+                'external_sku' => $sku, 'cost_idr' => $cost,
+                'priority' => $priority, 'is_active' => $active,
+            ]);
+        }
+
+        // Search contains one SKU, but the correct position remains 2 within
+        // the entire package and disabled sources never consume a position.
+        $this->get('/admin/providers?q=SKU-TARGET')->assertOk()->assertInertia(
+            fn (Assert $page) => $page
+                ->has('mappings.data', 1)
+                ->where('mappings.data.0.priority', 10)
+                ->where('mappings.data.0.source_position', 2)
+        );
+        $this->get('/admin/providers?q=SKU-DISABLED')->assertOk()->assertInertia(
+            fn (Assert $page) => $page
+                ->has('mappings.data', 1)
+                ->where('mappings.data.0.source_position', null)
+        );
     }
 
     public function test_provider_settings_are_editable_audited_and_do_not_accept_credentials(): void
