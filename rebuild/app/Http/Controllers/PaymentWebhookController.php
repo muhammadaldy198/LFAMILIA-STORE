@@ -10,6 +10,7 @@ use App\Services\PaymentStateService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class PaymentWebhookController
 {
@@ -36,14 +37,20 @@ class PaymentWebhookController
             (string) $payload['gross_amount'].
             (string) $config['server_key']
         );
-        abort_unless(hash_equals($expected, (string) $payload['signature_key']), 401);
+        if (hash_equals($expected, (string) $payload['signature_key']) === false) {
+            $this->logRejected('MIDTRANS', 'INVALID_SIGNATURE');
+            abort(401);
+        }
 
         $payment = DB::table('payment_transactions')
             ->where('gateway_code', 'MIDTRANS')
             ->where('merchant_reference', (string) $payload['order_id'])
             ->first();
         abort_unless($payment, 404);
-        abort_unless(app(MidtransStatusVerification::class)->amount($payload['gross_amount']) === (int) $payment->amount_idr, 422);
+        if (app(MidtransStatusVerification::class)->amount($payload['gross_amount']) !== (int) $payment->amount_idr) {
+            $this->logRejected('MIDTRANS', 'AMOUNT_MISMATCH', (int) $payment->id);
+            abort(422);
+        }
 
         $eventId = hash('sha256', implode('|', [
             (string) ($payload['transaction_id'] ?? ''),
@@ -63,7 +70,10 @@ class PaymentWebhookController
         }
 
         abort_unless(hash_equals((string) $payment->merchant_reference, (string) $verified['order_id']), 422);
-        abort_unless(app(MidtransStatusVerification::class)->amount($verified['gross_amount']) === (int) $payment->amount_idr, 422);
+        if (app(MidtransStatusVerification::class)->amount($verified['gross_amount']) !== (int) $payment->amount_idr) {
+            $this->logRejected('MIDTRANS', 'VERIFIED_AMOUNT_MISMATCH', (int) $payment->id);
+            abort(422);
+        }
 
         $processed = DB::transaction(function () use ($payment, $eventId, $payload, $verified, $states): bool {
             if (! $this->claimCallback($payment->id, 'MIDTRANS', $eventId, $payload)) {
@@ -105,7 +115,7 @@ class PaymentWebhookController
         abort_unless(preg_match('/^[A-Za-z0-9._:-]{8,128}$/', $requestId) === 1, 400);
         abort_unless($signature->isFreshTimestamp($timestamp), 401);
         abort_unless(hash_equals((string) $config['client_id'], $clientId), 401);
-        abort_unless($signature->verify(
+        if ($signature->verify(
             $headerSignature,
             $clientId,
             $requestId,
@@ -113,7 +123,10 @@ class PaymentWebhookController
             $request->getPathInfo(),
             $raw,
             (string) $config['secret_key']
-        ), 401);
+        ) === false) {
+            $this->logRejected('DOKU', 'INVALID_SIGNATURE');
+            abort(401);
+        }
 
         $merchantReference = data_get($payload, 'order.invoice_number');
         $amount = data_get($payload, 'order.amount');
@@ -125,7 +138,10 @@ class PaymentWebhookController
             ->where('merchant_reference', $merchantReference)
             ->first();
         abort_unless($payment, 404);
-        abort_unless(app(MidtransStatusVerification::class)->amount($amount) === (int) $payment->amount_idr, 422);
+        if (app(MidtransStatusVerification::class)->amount($amount) !== (int) $payment->amount_idr) {
+            $this->logRejected('DOKU', 'AMOUNT_MISMATCH', (int) $payment->id);
+            abort(422);
+        }
 
         $eventId = hash('sha256', $requestId);
         $processed = DB::transaction(function () use (
@@ -157,6 +173,15 @@ class PaymentWebhookController
         });
 
         return response()->json(['status' => $processed ? 'ok' : 'duplicate']);
+    }
+
+    private function logRejected(string $gateway, string $reason, ?int $paymentId = null): void
+    {
+        Log::warning('Payment webhook rejected', [
+            'gateway' => $gateway,
+            'reason' => $reason,
+            'payment_transaction_id' => $paymentId,
+        ]);
     }
 
     /**
