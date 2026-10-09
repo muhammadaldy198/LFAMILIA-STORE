@@ -40,7 +40,7 @@ class AdminDigiflazzController
             'brand' => trim((string) ($filters['brand'] ?? '')),
             'product' => trim((string) ($filters['product'] ?? '')),
             'health' => (string) ($filters['health'] ?? ''),
-            'scope' => (string) ($filters['scope'] ?? 'mapped'),
+            'scope' => (string) ($filters['scope'] ?? 'all'),
             'per_page' => (int) ($filters['per_page'] ?? 25),
         ];
 
