@@ -111,6 +111,7 @@ class OneTimeGameNominalImport
                     ->values();
                 if ($safe->isEmpty()) {
                     $result['groups_skipped']++;
+
                     continue;
                 }
 
