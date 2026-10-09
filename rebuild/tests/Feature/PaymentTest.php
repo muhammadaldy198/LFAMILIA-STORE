@@ -440,6 +440,7 @@ class PaymentTest extends TestCase
     public function test_midtrans_rejects_fake_signature(): void
     {
         $this->catalog();
+        Log::spy();
         IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
             'config_ciphertext' => ['server_key' => 'server-test'],
             'is_active' => true,
@@ -453,6 +454,12 @@ class PaymentTest extends TestCase
             'gross_amount' => '10000.00',
             'signature_key' => 'not-valid',
         ])->assertUnauthorized();
+
+        Log::shouldHaveReceived('warning')->once()->with('Payment webhook rejected', [
+            'gateway' => 'MIDTRANS',
+            'reason' => 'INVALID_SIGNATURE',
+            'payment_transaction_id' => null,
+        ]);
 
         $this->assertSame(0, DB::table('payment_callbacks')
             ->where('gateway_code', 'MIDTRANS')
