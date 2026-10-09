@@ -166,7 +166,7 @@ class AdminIntegrationController
                     ->filter(fn (array $item): bool => $item['is_active'] && $item['connection']['status'] === 'VERIFIED')
                     ->count(),
                 'attention' => $integrations
-                    ->filter(fn (array $item): bool => $item['is_active'] && in_array($item['connection']['status'], ['FAILED', 'NOT_CONFIGURED', 'NOT_TESTED'], true))
+                    ->filter(fn (array $item): bool => $item['is_active'] && in_array($item['connection']['status'], ['FAILED', 'UNVERIFIED', 'NOT_CONFIGURED', 'NOT_TESTED'], true))
                     ->count(),
                 'configuration_complete' => $integrations->where('required_complete', true)->count(),
             ],

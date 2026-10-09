@@ -76,7 +76,7 @@ watch(() => props.integrations, (value) => {
 
 const activeCount = computed(() => items.filter((item) => item.is_active).length);
 const healthyCount = computed(() => items.filter((item) => item.is_active && item.connection?.status === 'VERIFIED').length);
-const attentionCount = computed(() => items.filter((item) => item.is_active && ['FAILED', 'NOT_CONFIGURED', 'NOT_TESTED'].includes(item.connection?.status)).length);
+const attentionCount = computed(() => items.filter((item) => item.is_active && ['FAILED', 'UNVERIFIED', 'NOT_CONFIGURED', 'NOT_TESTED'].includes(item.connection?.status)).length);
 const completeCount = computed(() => items.filter((item) => item.required_complete).length);
 
 const csrf = () => decodeURIComponent(
@@ -393,7 +393,6 @@ async function sendResendTestEmail() {
                             {{ item.callback?.label || 'Belum diketahui' }}
                         </p>
                     </div>
-
                 </div>
 
                 <div
