@@ -116,10 +116,11 @@ class CatalogController
             ->whereHas('category', fn ($query) => $query->where('is_active', true))
             ->firstOrFail();
 
-        $packages = app(CatalogNominalOrder::class)->sort(ProductPackage::with('media')->where('product_id', $product->id)
+        $packageRows = ProductPackage::with('media')->where('product_id', $product->id)
             ->where('is_active', true)
             ->orderByRaw('nominal_value IS NULL')
-            ->orderBy('sort_order')->orderBy('nominal_value')->orderBy('id')->get())
+            ->orderBy('sort_order')->orderBy('nominal_value')->orderBy('id')->get();
+        $packages = app(CatalogNominalOrder::class)->sort($packageRows)
             ->map(function (ProductPackage $package) use ($pricing): array {
                 try {
                     $quote = $pricing->forPackage($package->id);
