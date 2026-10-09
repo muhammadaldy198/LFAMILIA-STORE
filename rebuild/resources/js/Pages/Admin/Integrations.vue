@@ -76,7 +76,12 @@ watch(() => props.integrations, (value) => {
 
 const activeCount = computed(() => items.filter((item) => item.is_active).length);
 const healthyCount = computed(() => items.filter((item) => item.is_active && item.connection?.status === 'VERIFIED').length);
-const attentionCount = computed(() => items.filter((item) => item.is_active && item.connection?.status !== 'VERIFIED').length);
+const requiresAction = (item) => item.is_active && (
+    !item.required_complete || item.connection?.status === 'FAILED' || item.callback?.status === 'NOT_READY'
+);
+const attentionCount = computed(() => items.filter(requiresAction).length);
+const awaitingCount = computed(() => items.filter((item) => item.is_active && !requiresAction(item)
+    && ['UNVERIFIED', 'NOT_TESTED'].includes(item.connection?.status)).length);
 const completeCount = computed(() => items.filter((item) => item.required_complete).length);
 
 const csrf = () => decodeURIComponent(
@@ -85,7 +90,7 @@ const csrf = () => decodeURIComponent(
 
 const statusLabel = (status) => ({
     HEALTHY: 'Terverifikasi',
-    DEGRADED: 'Perlu diperiksa',
+    DEGRADED: 'Perlu pengujian nyata',
     DOWN: 'Bermasalah',
     NOT_CONFIGURED: 'Belum dikonfigurasi',
     UNTESTED: 'Belum dites',
@@ -203,7 +208,7 @@ async function testConnection(item) {
                     : result.status === 'DOWN'
                         ? 'Koneksi bermasalah'
                         : result.status === 'DEGRADED'
-                            ? 'Belum dapat diverifikasi'
+                            ? 'Perlu pengujian nyata'
                             : result.status === 'NOT_CONFIGURED'
                                 ? 'Belum dikonfigurasi'
                                 : 'Belum dites',
@@ -279,11 +284,20 @@ async function sendResendTestEmail() {
                     <p class="text-xs text-muted-foreground">Perlu diperiksa</p>
                     <p class="mt-2 text-2xl font-semibold">{{ attentionCount }}</p>
                 </Card>
+                <Card class="p-4">
+                    <p class="text-xs text-muted-foreground">Menunggu uji lanjutan</p>
+                    <p class="mt-2 text-2xl font-semibold">{{ awaitingCount }}</p>
+                </Card>
                 <Card class="col-span-2 p-4 md:col-span-1">
                     <p class="text-xs text-muted-foreground">Credential wajib lengkap</p>
                     <p class="mt-2 text-2xl font-semibold">{{ completeCount }}/{{ items.length }}</p>
                 </Card>
             </div>
+            <p class="text-xs text-muted-foreground">
+                Perlu diperiksa berarti kredensial/callback belum siap atau koneksi gagal.
+                Menunggu uji lanjutan berarti tes biasa belum dapat membuktikan layanan benar-benar berjalan.
+                Status koneksi bukan bukti transaksi pembeli sudah berhasil.
+            </p>
 
             <Card class="p-4"><details>
                     <summary class="cursor-pointer font-semibold">Callback & Redirect</summary>
@@ -385,8 +399,8 @@ async function sendResendTestEmail() {
                         </p>
                     </div>
                     <div class="p-3">
-                        <p class="text-xs text-muted-foreground">E2E</p>
-                        <p class="mt-1 text-sm font-medium">{{ item.e2e?.label || 'DEFERRED TO TAHAP 9' }}</p>
+                        <p class="text-xs text-muted-foreground">Uji alur pembelian / login</p>
+                        <p class="mt-1 text-sm font-medium">{{ item.e2e?.label || 'Hasil uji alur nyata belum tercatat' }}</p>
                     </div>
                 </div>
 
