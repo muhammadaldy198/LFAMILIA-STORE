@@ -85,7 +85,20 @@ const categoryForm = useForm({ name: '', slug: '', icon: 'grid', sort_order: 0 }
 const productForm = useForm({ category_id: '', name: '', slug: '', publisher: '', description: '', fulfillment_mode: 'AUTO_PROVIDER', manual_instructions: '', manual_open_time: '', manual_close_time: '', manual_timezone: 'Asia/Jakarta', margin_percent: props.defaultMargin||0, sort_order: 0 });
 const globalMarginForm = useForm({margin_percent:props.defaultMargin||0});
 const applyGlobalMargin=()=>{if(confirm('Terapkan margin global ke semua produk otomatis? Produk manual dan margin khusus nominal tidak akan diubah.'))globalMarginForm.put('/admin/catalog/margin',{preserveScroll:true});};
-const importForm = useForm({item_ids:[],margin_percent:props.defaultMargin||0});
+const importForm = useForm({item_ids:[],margin_percent:props.defaultMargin||0,publish:true,customer_no_template:''});
+const suggestedTemplate = item => {
+    const fields = item.fields || [];
+    const previous = item.packages.flatMap(pack => pack.mappings).find(mapping => mapping.provider_code === 'DIGIFLAZZ' && mapping.customer_no_template);
+    if (previous) return previous.customer_no_template;
+    if (fields.length === 1) return '{{' + fields[0].field_key + '}}';
+    if (item.slug === 'mobile-legends') {
+        const keys = fields.map(field => field.field_key);
+        const user = ['user_id', 'destination'].find(key => keys.includes(key));
+        const server = ['zone_id', 'server'].find(key => keys.includes(key));
+        if (user && server) return '{{' + user + '}}{{' + server + '}}';
+    }
+    return '';
+};
 const importSearch=ref(''),importBrand=ref(''),showImport=ref(false);
 const importPage=ref(1);
 const importUrl = new URLSearchParams(page.url.split('?')[1] || '');
@@ -99,6 +112,8 @@ function openProductImport() {
     editorTab.value = 'nominal';
     showImport.value = true;
     importForm.clearErrors();
+    importForm.publish = true;
+    importForm.customer_no_template = suggestedTemplate(item);
     importSearch.value = '';
     importBrand.value = '';
     importPage.value = 1;
@@ -111,6 +126,8 @@ function toggleImport(item) {
     showImport.value = !showImport.value;
     if (showImport.value) {
         importForm.clearErrors();
+        importForm.publish = true;
+        importForm.customer_no_template = suggestedTemplate(item);
         importForm.margin_percent = Number(item.margin_percent || 0);
     }
 }
@@ -461,7 +478,11 @@ const deleteNotice = (notice) => {
                         <Card v-if="showImport && item.fulfillment_mode==='AUTO_PROVIDER'" class="space-y-3 p-4" data-testid="digiflazz-import">
                             <h4 class="font-semibold">Pilih SKU untuk {{item.name}}</h4>
                             <div class="grid gap-3 md:grid-cols-3"><label class="text-sm">Cari SKU<Input v-model="importSearch" class="mt-1"/></label><label class="text-sm">Merek<select v-model="importBrand" class="mt-1 block w-full rounded border p-2"><option value="">Semua brand</option><option v-for="brand in importBrands" :key="brand">{{brand}}</option></select></label><label class="text-sm">Margin nominal (%)<Input v-model.number="importForm.margin_percent" type="number" min="0" max="1000" step="0.0001" class="mt-1"/></label></div>
-                            <p class="text-xs text-slate-500">Hanya SKU tersedia yang belum dipakai. Nominal hasil impor nonaktif sampai diperiksa.</p>
+                            <p class="text-xs text-slate-500">Pilih SKU tersedia yang belum dipakai, tentukan margin, lalu impor untuk menjual.</p>
+                            <label class="flex items-center gap-2 text-sm"><AdminSwitch v-model="importForm.publish" /> Langsung jual setelah impor</label>
+                            <label class="block text-sm">Format ID tujuan<Input v-model="importForm.customer_no_template" data-testid="import-customer-template" class="mt-1" placeholder="Pilih kolom pelanggan di bawah" /></label>
+                            <div class="flex flex-wrap gap-2"><Button v-for="field in item.fields" :key="field.field_key" type="button" size="sm" variant="outline" @click="importForm.customer_no_template += '{{' + field.field_key + '}}'">{{ field.label }}</Button></div>
+                            <p class="text-sm text-muted-foreground">{{ importForm.publish ? 'Produk, nominal, dan sumber Digiflazz diaktifkan bersama. Harga mengikuti margin di atas.' : 'Nominal disimpan sebagai draf dan belum dijual.' }}</p>
                             <label v-for="sku in importItems" :key="sku.id" :data-sku="sku.buyer_sku_code" class="flex items-start gap-3 rounded border p-2 text-sm"><input v-model="importForm.item_ids" type="checkbox" :value="sku.id"><span>{{sku.product_name}}<small class="block">{{sku.buyer_sku_code}} · Rp{{Number(sku.price_idr).toLocaleString('id-ID')}}</small></span></label>
                             <p v-if="!importMatches.length" class="text-sm">Tidak ada SKU tersedia yang sesuai dengan filter dan belum diimpor. Hapus filter atau sinkronkan daftar harga di menu Digiflazz.</p>
                             <div class="flex flex-wrap items-center gap-2"><Button type="button" variant="outline" :disabled="importPage===1" @click="importPage--">Sebelumnya</Button><span class="text-sm">Halaman {{importPage}} / {{Math.max(1,Math.ceil(importMatches.length/25))}}</span><Button type="button" variant="outline" :disabled="importPage*25>=importMatches.length" @click="importPage++">Berikutnya</Button></div>

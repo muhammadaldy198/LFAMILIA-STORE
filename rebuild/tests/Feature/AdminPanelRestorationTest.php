@@ -84,6 +84,106 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertSame(1, $product->packages()->count());
     }
 
+    public function test_publish_import_activates_product_nominal_and_source_with_price_and_destination(): void
+    {
+        $this->login();
+        $this->fakeCatalog([$this->row()]);
+        app(DigiflazzCatalogService::class)->sync();
+        Provider::where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
+        $product = $this->product();
+        $product->category->update(['is_active' => true]);
+        $product->update(['is_active' => false]);
+        foreach (['user_id', 'zone_id'] as $index => $key) {
+            $product->fields()->create(['field_key' => $key, 'label' => $key, 'type' => 'text', 'is_required' => true, 'sort_order' => $index]);
+        }
+        $id = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'restore-sku')->value('id');
+        $this->post('/admin/catalog/products/'.$product->id.'/import', [
+            'item_ids' => [$id], 'margin_percent' => 12, 'publish' => true,
+            'customer_no_template' => '{{user_id}}{{zone_id}}',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $package = $product->packages()->firstOrFail();
+        $mapping = $package->mappings()->firstOrFail();
+        $this->assertTrue($product->fresh()->is_active);
+        $this->assertTrue($package->is_active);
+        $this->assertTrue($mapping->is_active);
+        $this->assertSame('{{user_id}}{{zone_id}}', data_get($mapping->fulfillment_config, 'customer_no_template'));
+        $this->assertSame(11200, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
+        $response = $this->get('/catalog/'.$product->slug);
+        $response->assertOk();
+        $response->assertInertia(function (AssertableInertia $page): void {
+            $page->where('packages.0.is_available', true);
+            $page->where('packages.0.price_idr', 11200);
+        });
+        $this->assertDatabaseHas('audit_logs', ['action' => 'catalog.mapping.updated', 'target_id' => (string) $mapping->id]);
+        Http::assertSentCount(1);
+    }
+
+    public function test_publish_import_uses_the_single_customer_field_without_extra_configuration(): void
+    {
+        $this->login();
+        $this->fakeCatalog([$this->row()]);
+        app(DigiflazzCatalogService::class)->sync();
+        Provider::where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
+        $product = $this->product();
+        $product->category->update(['is_active' => true]);
+        $product->fields()->create(['field_key' => 'destination', 'label' => 'ID tujuan', 'type' => 'text', 'is_required' => true, 'sort_order' => 0]);
+        $id = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'restore-sku')->value('id');
+        $this->post('/admin/catalog/products/'.$product->id.'/import', [
+            'item_ids' => [$id], 'margin_percent' => 5, 'publish' => true,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $package = $product->packages()->firstOrFail();
+        $this->assertSame('{{destination}}', data_get($package->mappings()->firstOrFail()->fulfillment_config, 'customer_no_template'));
+        $this->assertSame(10500, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
+    }
+
+    public function test_publish_import_rejects_invalid_destination_formats_without_partial_activation(): void
+    {
+        $this->login();
+        $this->fakeCatalog([$this->row()]);
+        app(DigiflazzCatalogService::class)->sync();
+        Provider::where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
+        $product = $this->product();
+        $product->category->update(['is_active' => true]);
+        $product->update(['is_active' => false]);
+        foreach (['user_id', 'zone_id'] as $index => $key) {
+            $product->fields()->create(['field_key' => $key, 'label' => $key, 'type' => 'text', 'is_required' => true, 'sort_order' => $index]);
+        }
+        $id = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'restore-sku')->value('id');
+        foreach (['', '{{user_id}}', '{{unknown}}{{zone_id}}', '{{user_id}}{{zone_id}'] as $template) {
+            $this->post('/admin/catalog/products/'.$product->id.'/import', [
+                'item_ids' => [$id], 'margin_percent' => 10, 'publish' => true, 'customer_no_template' => $template,
+            ])->assertSessionHasErrors('customer_no_template');
+            $this->assertSame(0, $product->packages()->count());
+            $this->assertFalse($product->fresh()->is_active);
+        }
+    }
+
+    public function test_publish_import_keeps_batch_atomic_and_does_not_enable_disabled_provider(): void
+    {
+        $this->login();
+        $this->fakeCatalog([$this->row(), $this->row(['buyer_sku_code' => 'restore-unavailable', 'seller_product_status' => false])]);
+        app(DigiflazzCatalogService::class)->sync();
+        $provider = Provider::where('code', 'DIGIFLAZZ')->firstOrFail();
+        $provider->forceFill(['is_active' => true])->save();
+        $product = $this->product();
+        $product->category->update(['is_active' => true]);
+        $product->update(['is_active' => false]);
+        $product->fields()->create(['field_key' => 'destination', 'label' => 'ID tujuan', 'type' => 'text', 'is_required' => true, 'sort_order' => 0]);
+        $ids = DB::table('digiflazz_catalog_items')->whereIn('buyer_sku_code', ['restore-sku', 'restore-unavailable'])->pluck('id')->all();
+        $this->post('/admin/catalog/products/'.$product->id.'/import', [
+            'item_ids' => $ids, 'margin_percent' => 10, 'publish' => true,
+        ])->assertSessionHasErrors('item_ids');
+        $this->assertSame(0, $product->packages()->count());
+        $this->assertFalse($product->fresh()->is_active);
+        $provider->forceFill(['is_active' => false])->save();
+        $id = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'restore-sku')->value('id');
+        $this->post('/admin/catalog/products/'.$product->id.'/import', [
+            'item_ids' => [$id], 'margin_percent' => 10, 'publish' => true,
+        ])->assertSessionHasErrors('publish');
+        $this->assertSame(0, (int) $provider->fresh()->is_active);
+        $this->assertSame(0, $product->packages()->count());
+    }
+
     public function test_invalid_provider_response_is_atomic_and_does_not_reprice(): void
     {
         $this->login();
