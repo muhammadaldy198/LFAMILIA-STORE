@@ -98,8 +98,7 @@ class DigiflazzAutoSources
         $mappings = $package->mappings()->where('provider_id', $providerId)
             ->get()
             ->filter(fn (ProviderMapping $mapping): bool => data_get($mapping->fulfillment_config, 'auto_source_group') === $groupKey)
-            ->sort(fn (ProviderMapping $a, ProviderMapping $b): int =>
-                (int) (! $a->is_active) <=> (int) (! $b->is_active)
+            ->sort(fn (ProviderMapping $a, ProviderMapping $b): int => (int) (! $a->is_active) <=> (int) (! $b->is_active)
                 ?: (int) $a->cost_idr <=> (int) $b->cost_idr
                 ?: strcmp((string) $a->external_sku, (string) $b->external_sku)
                 ?: $a->id <=> $b->id
