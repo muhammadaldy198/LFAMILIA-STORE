@@ -92,7 +92,7 @@ class DokuDirectGateway
             throw new RuntimeException('DOKU_CREATE_UNCERTAIN');
         }
 
-        $public = ['kind' => 'instructions'];
+        $public = ['kind' => $path === '/checkout/v1/payment' ? 'doku_checkout' : 'instructions'];
         foreach ((array) ($route['public_paths'] ?? []) as $name => $dataPath) {
             if (! is_string($name) || ! is_string($dataPath)
                 || ! in_array($name, ['payment_code', 'payment_url', 'qr_string', 'va_number'], true)) {
@@ -128,6 +128,23 @@ class DokuDirectGateway
      */
     private function payload(array $context): array
     {
+        if (($context['route_configuration']['api_path'] ?? '') === '/checkout/v1/payment') {
+            return [
+                'order' => [
+                    'invoice_number' => $context['merchant_reference'],
+                    'amount' => $context['amount_idr'],
+                    'auto_redirect' => ! empty($context['return_url']),
+                    'callback_url_result' => $context['return_url'] ?? null,
+                ],
+                'payment' => ['payment_due_date' => $context['expires_minutes']],
+                'customer' => array_filter([
+                    'name' => $context['customer_name'] ?: 'Customer LFAMILIA',
+                    'email' => $context['customer_email'],
+                    'phone' => $context['customer_phone'],
+                ]),
+            ];
+        }
+
         $template = $context['route_configuration']['request_template'] ?? null;
         if (! is_array($template)) {
             return [

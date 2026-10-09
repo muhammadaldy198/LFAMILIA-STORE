@@ -290,6 +290,9 @@ class PaymentService
         $user = $target->user_id ? DB::table('users')->where('id', $target->user_id)->first() : null;
         $context = [
             'merchant_reference' => $payment->merchant_reference,
+            'return_url' => $payment->order_id
+                ? route('payment.show', ['invoice' => DB::table('orders')->where('id', $payment->order_id)->value('order_number')])
+                : null,
             'finish_url' => $payment->order_id
                 ? route('payment.show', ['invoice' => DB::table('orders')->where('id', $payment->order_id)->value('order_number')])
                 : null,
