@@ -2,19 +2,19 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\SendFulfillmentJob;
 use App\Jobs\SendTransactionalEmailJob;
+use App\Jobs\StartFulfillmentJob;
 use App\Models\Category;
 use App\Models\IntegrationCredential;
 use App\Models\Product;
 use App\Models\StoreAsset;
 use App\Models\User;
+use App\Services\FulfillmentService;
 use App\Services\Payment\DokuSignature;
 use App\Services\PaymentRoutingService;
 use App\Services\PaymentService;
 use App\Services\PaymentStateService;
-use App\Services\FulfillmentService;
-use App\Jobs\StartFulfillmentJob;
-use App\Jobs\SendFulfillmentJob;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Routing\Middleware\ThrottleRequests;
