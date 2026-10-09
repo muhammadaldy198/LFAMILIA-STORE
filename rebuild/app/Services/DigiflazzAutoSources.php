@@ -33,6 +33,7 @@ class DigiflazzAutoSources
         $provider = Provider::where('code', 'DIGIFLAZZ')->firstOrFail();
         $existing = ProviderMapping::where('provider_id', $provider->id)
             ->whereIn('external_sku', $items->pluck('buyer_sku_code'))->lockForUpdate()->get();
+        $existingBySku = $existing->keyBy('external_sku');
         $packageIds = $existing->pluck('product_package_id')->unique();
         if ($packageIds->count() > 1) {
             throw ValidationException::withMessages(['item_ids' => 'Sumber nominal yang sama sudah terpisah di beberapa nominal. Tidak ada sumber yang dipindahkan.']);
@@ -70,7 +71,11 @@ class DigiflazzAutoSources
                 $config['auto_source_group'] = $this->key($item);
             }
             $mapping->update([
-                'is_active' => $publish ?: $mapping->is_active,
+                // Do not silently reactivate an existing disabled SKU when
+                // the owner enables or refreshes auto-managed backups.
+                'is_active' => $automatic && $existingBySku->has($item->buyer_sku_code)
+                    ? (bool) $existingBySku->get($item->buyer_sku_code)->is_active
+                    : ($publish ?: $mapping->is_active),
                 'priority' => $automatic ? 0 : $mapping->priority,
                 'fulfillment_config' => $config ?: null,
             ]);
