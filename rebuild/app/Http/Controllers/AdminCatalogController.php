@@ -13,6 +13,8 @@ use App\Models\ProviderMapping;
 use App\Models\StoreAsset;
 use App\Services\AdminAuditService;
 use App\Services\CatalogAudit;
+use App\Services\CatalogNominalOrder;
+use App\Services\DigiflazzAutoSources;
 use App\Services\DigiflazzCatalogService;
 use App\Services\VoucherStockService;
 use Illuminate\Http\RedirectResponse;
@@ -82,7 +84,9 @@ class AdminCatalogController
 
                 return DB::table('digiflazz_catalog_items')->orderBy('category')->orderBy('brand')->orderBy('product_name')->get()
                     ->map(fn (object $item): array => [...((array) $item), 'available' => app(DigiflazzCatalogService::class)->available($item),
-                        'mapped' => isset($mappedSkus[$item->buyer_sku_code])]);
+                        'mapped' => isset($mappedSkus[$item->buyer_sku_code]),
+                        'source_group' => app(DigiflazzAutoSources::class)->key($item),
+                        'nominal_value' => app(CatalogNominalOrder::class)->value($item->product_name, $item->brand)]);
             })(),
         ]);
     }
@@ -690,8 +694,13 @@ class AdminCatalogController
                 ]);
             }
 
-            $data['fulfillment_config'] = $template === ''
-                ? null : ['customer_no_template' => $template];
+            $config = $mapping->fulfillment_config ?? [];
+            if ($template === '') {
+                unset($config['customer_no_template']);
+            } else {
+                $config['customer_no_template'] = $template;
+            }
+            $data['fulfillment_config'] = $config ?: null;
             unset($data['customer_no_template']);
         }
 

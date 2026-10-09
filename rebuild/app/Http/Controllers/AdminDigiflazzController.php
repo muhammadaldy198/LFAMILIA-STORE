@@ -9,6 +9,7 @@ use App\Models\ProviderMapping;
 use App\Services\AdminAuditService;
 use App\Services\AdminDigiflazzMonitorService;
 use App\Services\AdminPermissionService;
+use App\Services\DigiflazzAutoSources;
 use App\Services\DigiflazzCatalogImport;
 use App\Services\DigiflazzCatalogService;
 use Illuminate\Http\RedirectResponse;
@@ -365,59 +366,43 @@ class AdminDigiflazzController
         return back()->with('status', 'Sumber fulfillment ditambahkan dalam keadaan nonaktif. Periksa prioritas, format tujuan, dan batas harga sebelum mengaktifkannya.');
     }
 
-    public function import(Request $request, Product $product, DigiflazzCatalogService $service, DigiflazzCatalogImport $importer, AdminAuditService $audit): RedirectResponse
+    public function import(Request $request, Product $product, DigiflazzCatalogService $service, AdminAuditService $audit): RedirectResponse
     {
         abort_unless($product->fulfillment_mode === 'AUTO_PROVIDER', 422);
         $data = $request->validate([
-            'item_ids' => ['required', 'array', 'min:1', 'max:200'],
+            'item_ids' => ['required', 'array', 'min:1', 'max:2000'],
             'item_ids.*' => ['required', 'integer', 'distinct', 'exists:digiflazz_catalog_items,id'],
             'margin_percent' => ['required', 'numeric', 'min:0', 'max:1000'],
             'publish' => ['sometimes', 'boolean'],
+            'auto_sources' => ['sometimes', 'boolean'],
             'customer_no_template' => ['nullable', 'string', 'max:500'],
         ]);
-        DB::transaction(function () use ($request, $product, $service, $importer, $audit, $data): void {
+        DB::transaction(function () use ($request, $product, $service, $audit, $data): void {
             $product = $product->lockForUpdate()->findOrFail($product->id);
             $publish = (bool) ($data['publish'] ?? false);
             $template = $this->importCustomerTemplate($product, $data['customer_no_template'] ?? null, $publish);
             if ($publish && (! $product->category->is_active || ! Provider::where('code', 'DIGIFLAZZ')->where('is_active', true)->exists())) {
                 throw ValidationException::withMessages(['publish' => 'Aktifkan kategori produk dan integrasi Digiflazz sebelum menjual.']);
             }
-            $order = (int) $product->packages()->max('sort_order') + 1;
-            foreach (DB::table('digiflazz_catalog_items')->whereIn('id', $data['item_ids'])->lockForUpdate()->get() as $item) {
+            $automatic = (bool) ($data['auto_sources'] ?? true);
+            $selected = DB::table('digiflazz_catalog_items')->whereIn('id', $data['item_ids'])->lockForUpdate()->get();
+            foreach ($selected as $item) {
                 if (! $service->available($item) || now()->diffInHours($item->synced_at, true) > 24) {
                     throw ValidationException::withMessages(['item_ids' => 'SKU tidak tersedia atau data lebih dari 24 jam. Sinkronkan dahulu.']);
                 }
-                if (ProviderMapping::whereIn('provider_id', Provider::where('code', 'DIGIFLAZZ')->pluck('id'))->where('external_sku', $item->buyer_sku_code)->exists()) {
-                    throw ValidationException::withMessages(['item_ids' => 'SKU '.$item->buyer_sku_code.' sudah dipakai nominal lain.']);
+                if ($product->package_tabs_enabled && ! in_array(trim((string) $item->type), $product->package_tabs ?? [], true)) {
+                    throw ValidationException::withMessages(['item_ids' => 'Grup nominal belum tersedia pada tab produk. Tambahkan tab "'.$item->type.'" dahulu.']);
                 }
-                if ($product->package_tabs_enabled) {
-                    $group = trim((string) ($item->type ?? ''));
-                    $tabs = collect($product->package_tabs ?? []);
-                    if ($group === '' || ! $tabs->contains($group)) {
-                        throw ValidationException::withMessages([
-                            'item_ids' => 'Grup SKU '.$item->buyer_sku_code.' belum tersedia pada tab nominal produk. Tambahkan tab "'.($group ?: 'Tanpa grup').'" terlebih dahulu.',
-                        ]);
-                    }
-                }
-                $package = ProductPackage::create([
-                    'product_id' => $product->id, 'code' => 'DF_'.substr(hash('sha256', $item->buyer_sku_code), 0, 20),
-                    'name' => $item->product_name, 'group_name' => $item->type ?: null,
-                    'sort_order' => $order++, 'is_active' => $publish,
-                    'pricing_mode' => 'PERCENT', 'margin_percent' => $data['margin_percent'],
-                ]);
-                try {
-                    $mapping = $importer->upsert($package, $item->buyer_sku_code, (int) $item->price_idr, (int) $item->price_idr);
-                    $before = $mapping->toArray();
-                    $mapping->update([
-                        'is_active' => $publish,
-                        'fulfillment_config' => $template === null ? null : ['customer_no_template' => $template],
-                    ]);
-                    $audit->record($request, 'catalog.mapping.updated', 'provider_mapping', $mapping->id, $before, $mapping->fresh()->toArray());
-                } catch (\InvalidArgumentException $exception) {
-                    throw ValidationException::withMessages(['item_ids' => $exception->getMessage()]);
-                }
-                $audit->record($request, 'catalog.package.imported', 'product_package', $package->id, null, $package->toArray());
             }
+            $sources = app(DigiflazzAutoSources::class);
+            $groups = $automatic
+                ? $selected->groupBy(fn (object $item): string => $sources->key($item))
+                : $selected->groupBy('buyer_sku_code');
+            $catalog = $automatic ? $sources->catalog() : collect();
+            foreach ($groups as $key => $items) {
+                $sources->importGroup($product, $automatic ? $catalog->get($key) : $items, $template, $publish, (string) $data['margin_percent'], $automatic, $request);
+            }
+            $sources->orderProduct($product);
             if ($publish && ! $product->is_active) {
                 $before = $product->toArray();
                 $product->update(['is_active' => true]);
@@ -428,6 +413,14 @@ class AdminDigiflazzController
         return back()->with('status', ($data['publish'] ?? false)
             ? 'Nominal berhasil diimpor dan sudah bisa dipilih di toko.'
             : 'Nominal disimpan sebagai draf.');
+    }
+
+    public function autoSources(Request $request, Product $product, DigiflazzAutoSources $sources): RedirectResponse
+    {
+        abort_unless($product->fulfillment_mode === 'AUTO_PROVIDER', 422);
+        $added = $sources->enableProduct($product, $request);
+
+        return back()->with('status', 'Pelengkapan cadangan selesai. '.$added.' sumber baru ditambahkan untuk nominal produk.');
     }
 
     private function importCustomerTemplate(Product $product, ?string $value, bool $publish): ?string

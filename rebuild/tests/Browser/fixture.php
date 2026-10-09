@@ -137,6 +137,13 @@ DB::transaction(function (): void {
         );
     }
 
+    $alternate = (array) DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'BROWSER-IMPORT-200')->first();
+    unset($alternate['id']);
+    $alternate['buyer_sku_code'] = 'BROWSER-IMPORT-200-B';
+    $alternate['price_idr'] = 20500;
+    $alternate['baseline_price_idr'] = 20500;
+    DB::table('digiflazz_catalog_items')->updateOrInsert(['buyer_sku_code' => $alternate['buyer_sku_code']], $alternate);
+
     foreach (['BROWSER-PRICE-DOWN' => 9000, 'BROWSER-PRICE-UP' => 11000, 'BROWSER-INACTIVE' => 8000] as $sku => $price) {
         DB::table('digiflazz_catalog_items')->updateOrInsert(
             ['buyer_sku_code' => $sku],
