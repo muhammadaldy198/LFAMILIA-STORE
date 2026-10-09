@@ -1,6 +1,6 @@
 <?php
 
-return [
+$routes = [
     [
         'channel' => 'qris',
         'gateway' => 'MIDTRANS',
@@ -49,3 +49,32 @@ return [
         'supports_wallet_topup' => true,
     ],
 ];
+
+// Each bank gets an independent route; the existing generic VA option remains
+// for existing payments and backwards compatibility.
+foreach (require __DIR__.'/payment_bank_channels.php' as $bank) {
+    $routes[] = [
+        'channel' => $bank['code'],
+        'gateway' => 'MIDTRANS',
+        'provider_channel' => $bank['midtrans'],
+        'configuration' => ['enabled_payments' => [$bank['midtrans']]],
+        'priority' => 10,
+        'supports_order' => true,
+        'supports_wallet_topup' => true,
+    ];
+    $routes[] = [
+        'channel' => $bank['code'],
+        'gateway' => 'DOKU',
+        'provider_channel' => 'DOKU_CHECKOUT',
+        'configuration' => [
+            'api_path' => '/checkout/v1/payment',
+            'payment_method_types' => [$bank['doku']],
+            'public_paths' => ['payment_url' => 'response.payment.url'],
+        ],
+        'priority' => 20,
+        'supports_order' => true,
+        'supports_wallet_topup' => true,
+    ];
+}
+
+return $routes;

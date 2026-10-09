@@ -356,13 +356,14 @@ class AdminPaymentController
 
         $this->ensureInternalRoutes();
         $routes = $routeCatalog->sync();
+        $totalCreated = $created + $routes['created_channels'];
         $this->audit($request, 'payment.channels.synced', 'payment_channel', 0, null, [
-            'created_channels' => $created,
+            'created_channels' => $totalCreated,
             'route_catalog' => $routes,
         ]);
 
-        return back()->with('status', $created > 0 || $routes['created'] > 0
-            ? $created.' metode dan '.$routes['created'].' routing bawaan ditambahkan dalam keadaan nonaktif.'
+        return back()->with('status', $totalCreated > 0 || $routes['created'] > 0
+            ? $totalCreated.' metode dan '.$routes['created'].' routing bawaan ditambahkan. Channel bank mengikuti status VA yang sudah ada; gateway yang belum aktif tetap tidak tersedia.'
             : 'Metode dan routing bawaan sudah sinkron dengan source code.');
     }
 

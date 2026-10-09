@@ -129,6 +129,14 @@ class DokuDirectGateway
     private function payload(array $context): array
     {
         if (($context['route_configuration']['api_path'] ?? '') === '/checkout/v1/payment') {
+            $payment = ['payment_due_date' => $context['expires_minutes']];
+            $methods = $context['route_configuration']['payment_method_types'] ?? null;
+            if (is_array($methods) && $methods !== []) {
+                $payment['payment_method_types'] = array_values(array_filter(
+                    $methods, fn ($method): bool => is_string($method) && str_starts_with($method, 'VIRTUAL_ACCOUNT_')
+                ));
+            }
+
             return [
                 'order' => [
                     'invoice_number' => $context['merchant_reference'],
@@ -136,7 +144,7 @@ class DokuDirectGateway
                     'auto_redirect' => ! empty($context['return_url']),
                     'callback_url_result' => $context['return_url'] ?? null,
                 ],
-                'payment' => ['payment_due_date' => $context['expires_minutes']],
+                'payment' => $payment,
                 'customer' => array_filter([
                     'name' => $context['customer_name'] ?: 'Customer LFAMILIA',
                     'email' => $context['customer_email'],
