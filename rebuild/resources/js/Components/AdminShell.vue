@@ -21,9 +21,15 @@ const icon = href => {
  return { panel:'dashboard', content:'content', 'nickname-tools':'nickname', payments:'payments', customers:'customers', vouchers:'vouchers', support:'support', reports:'reports', access:'access', settings:'settings', integrations:'integrations', health:'health', audit:'audit', fulfillment:'fulfillment', catalog:'catalog', orders:'orders', providers:'providers' }[path] || 'dashboard';
 };
 let controller;
+let outsideSearchTimer;
 let searchRequest = 0;
-const dismissSearch = () => { ++searchRequest;controller?.abort();results.value=[];searchError.value='';searching.value=false; };
-const outsideSearch = event => { if(event.target instanceof Element && !event.target.closest('.lf-admin-search')) dismissSearch(); };
+const dismissSearch = () => { ++searchRequest;controller?.abort();if(results.value.length)results.value=[];searchError.value='';searching.value=false; };
+const outsideSearch = event => {
+ if(!(event.target instanceof Element)||event.target.closest('.lf-admin-search')||(!results.value.length&&!searchError.value&&!searching.value))return;
+ // Allow native checkbox activation and its change event to finish before rendering the shell.
+ clearTimeout(outsideSearchTimer);
+ outsideSearchTimer=setTimeout(dismissSearch,0);
+};
 watch([open,accountOpen,notificationOpen], values => { if(values.some(Boolean)) dismissSearch(); });
 const search = async () => {
  const request = ++searchRequest;
@@ -43,7 +49,7 @@ const search = async () => {
 const shortcut = event => { if((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k'){event.preventDefault();searchInput.value?.focus();} if(event.key === 'Escape'){open.value=false;dismissSearch();accountOpen.value=false;notificationOpen.value=false;} };
 watch(() => page.url, () => { open.value=false;dismissSearch();accountOpen.value=false;notificationOpen.value=false; });
 onMounted(() => {window.addEventListener('keydown', shortcut);window.addEventListener('click', outsideSearch);});
-onUnmounted(() => { window.removeEventListener('keydown', shortcut);window.removeEventListener('click', outsideSearch);controller?.abort(); });
+onUnmounted(() => { window.removeEventListener('keydown', shortcut);window.removeEventListener('click', outsideSearch);controller?.abort();clearTimeout(outsideSearchTimer); });
 </script>
 <template>
 <Head>

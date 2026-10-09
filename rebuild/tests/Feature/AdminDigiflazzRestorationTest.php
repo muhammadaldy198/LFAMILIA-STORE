@@ -195,7 +195,7 @@ class AdminDigiflazzRestorationTest extends TestCase
             ->where('summary.healthy', 1)
             ->where('summary.warning', 1)
             ->where('summary.critical', 1)
-            ->where('filters.scope', 'mapped')
+            ->where('filters.scope', 'all')
             ->where('connection.configured', false)
             ->has('items.data', 3));
 
@@ -206,6 +206,24 @@ class AdminDigiflazzRestorationTest extends TestCase
 
         $this->get('/admin/digiflazz?health=invalid')->assertSessionHasErrors('health');
         $this->get('/admin/digiflazz?per_page=500')->assertSessionHasErrors('per_page');
+    }
+
+    public function test_unmapped_supplier_skus_are_visible_by_default_and_mapped_scope_is_optional(): void
+    {
+        $this->login();
+        $this->mappedItem('unmapped-visible-sku');
+        ProviderMapping::where('external_sku', 'unmapped-visible-sku')->delete();
+
+        $this->get('/admin/digiflazz')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('filters.scope', 'all')
+            ->where('mappingCount', 0)
+            ->has('items.data', 1)
+            ->where('items.data.0.buyer_sku_code', 'unmapped-visible-sku')
+            ->where('items.data.0.mapped', false));
+
+        $this->get('/admin/digiflazz?scope=mapped')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('filters.scope', 'mapped')
+            ->has('items.data', 0));
     }
 
     public function test_monitor_thresholds_and_auto_sync_interval_are_editable(): void

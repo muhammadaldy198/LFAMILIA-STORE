@@ -32,7 +32,7 @@ const filters = reactive({
     brand: props.filters?.brand || '',
     product: props.filters?.product || '',
     health: props.filters?.health || '',
-    scope: props.filters?.scope || 'mapped',
+    scope: props.filters?.scope || 'all',
     per_page: props.filters?.per_page || 25,
 });
 const autoSyncForm = useForm({
@@ -89,7 +89,7 @@ function reset() {
         brand: '',
         product: '',
         health: '',
-        scope: 'mapped',
+        scope: 'all',
         per_page: 25,
     });
     search();
@@ -119,6 +119,7 @@ function refresh() {
                 <p class="mt-1 text-sm text-muted-foreground">Monitor harga modal, seller, stok, cut-off, sinkronisasi, dan transaksi Digiflazz.</p>
             </div>
             <div class="flex flex-wrap gap-2">
+                <Link href="/admin/catalog?import=digiflazz" class="inline-flex items-center rounded-md border px-3 py-2 text-sm font-medium">Impor ke produk</Link>
                 <Button variant="outline" :disabled="syncForm.processing" @click="refresh">Muat ulang</Button>
                 <Button :disabled="syncForm.processing" @click="sync()">
                     {{ syncForm.processing ? 'Menyinkronkan…' : 'Sinkron daftar harga' }}
@@ -138,7 +139,7 @@ function refresh() {
                 <p class="mt-1 text-xs text-muted-foreground">{{ canSeeBalance ? date(connection?.balance_checked_at) : 'Saldo tidak ditampilkan untuk Admin.' }}</p>
             </Card>
             <Card class="p-4">
-                <p class="text-xs text-muted-foreground">SKU terhubung</p>
+                <p class="text-xs text-muted-foreground">SKU dalam daftar</p>
                 <p class="mt-2 text-2xl font-semibold">{{ Number(summary?.total || 0).toLocaleString('id-ID') }}</p>
                 <p class="mt-1 text-xs text-muted-foreground">{{ mappingCount }} mapping tersimpan</p>
             </Card>
@@ -289,6 +290,7 @@ function refresh() {
                         </dl>
                         <p v-if="item.alert_reason" class="mt-3 border-t pt-3 text-xs text-muted-foreground">{{ item.alert_reason }}</p>
                         <div class="mt-3 flex gap-2 border-t pt-3">
+                            <Link v-if="!item.mapped && item.available" :href="'/admin/catalog?import_sku=' + item.id" class="inline-flex items-center rounded-md border px-3 py-2 text-sm font-medium">Impor ke produk</Link>
                             <Button class="flex-1" size="sm" variant="outline" :disabled="syncForm.processing" @click="sync(item.id)">Sinkron SKU</Button>
                             <Button class="flex-1" size="sm" variant="outline" @click="baseline(item.id)">Jadikan baseline</Button>
                         </div>
@@ -341,6 +343,7 @@ function refresh() {
                             </TableCell>
                             <TableCell class="align-top">
                                 <div class="flex flex-col gap-2">
+                                    <Link v-if="!item.mapped && item.available" :href="'/admin/catalog?import_sku=' + item.id" class="inline-flex items-center rounded-md border px-3 py-2 text-xs font-medium">Impor ke produk</Link>
                                     <Button size="sm" variant="outline" :disabled="syncForm.processing" @click="sync(item.id)">Sinkron SKU</Button>
                                     <Button size="sm" variant="outline" @click="baseline(item.id)">Jadikan baseline</Button>
                                 </div>
