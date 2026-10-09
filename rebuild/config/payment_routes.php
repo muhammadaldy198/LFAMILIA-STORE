@@ -37,11 +37,11 @@ return [
     [
         'channel' => 'virtual_account',
         'gateway' => 'DOKU',
-        'provider_channel' => 'DOKU_VA',
+        'provider_channel' => 'DOKU_CHECKOUT',
         'configuration' => [
-            'api_path' => '/doku-virtual-account/v2/payment-code',
+            'api_path' => '/checkout/v1/payment',
             'public_paths' => [
-                'va_number' => 'virtual_account_info.virtual_account_number',
+                'payment_url' => 'payment.url',
             ],
         ],
         'priority' => 20,
