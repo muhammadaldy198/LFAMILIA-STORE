@@ -32,9 +32,10 @@ try {
     const navigate=async path=>{await send('Page.navigate',{url:'http://127.0.0.1:8000'+path});for(let i=0;i<60;i++){await pause(100);if(await evaluate(`location.pathname===${JSON.stringify(path.split('?')[0])}&&document.readyState==='complete'&&Boolean(document.querySelector('main'))`))break;}await pause(300);};
     const click=async label=>{const found=await evaluate(`(()=>{const b=[...document.querySelectorAll('.lf-admin-tabs button'),...document.querySelectorAll('button')].find(b=>b.getBoundingClientRect().height>0&&b.textContent.trim()===${JSON.stringify(label)});if(!b)return false;b.click();return true;})()`);if(!found)throw Error('Missing button: '+label);await pause(350);};
     const pointerClick = async expression => {
-        const point = await evaluate(`(()=>{const e=(${expression});if(!e||e.disabled)return null;e.scrollIntoView({block:'center',inline:'nearest'});const r=e.getBoundingClientRect();const x=r.left+r.width/2,y=r.top+r.height/2;return e.contains(document.elementFromPoint(x,y))?{x,y}:null;})()`);
+        const point = await evaluate(`(()=>{const e=(${expression});if(!e||e.disabled)return null;e.scrollIntoView({block:'center',inline:'nearest',behavior:'instant'});const r=e.getBoundingClientRect();const x=r.left+r.width/2,y=r.top+r.height/2;return e.contains(document.elementFromPoint(x,y))?{x,y}:null;})()`);
         if(!point)throw Error('Control disabled or covered: '+expression);
-        await send('Input.dispatchMouseEvent',{type:'mousePressed',...point,button:'left',clickCount:1});
+        await send('Input.dispatchMouseEvent',{type:'mouseMoved',...point});
+        await send('Input.dispatchMouseEvent',{type:'mousePressed',...point,button:'left',buttons:1,clickCount:1});
         await send('Input.dispatchMouseEvent',{type:'mouseReleased',...point,button:'left',clickCount:1});
         await pause(350);
     };
@@ -78,7 +79,7 @@ try {
                     if(tab==='Nominal & Harga'){
                         await pointerClick(`[...document.querySelectorAll('button')].find(b=>b.getBoundingClientRect().height>0&&b.textContent.trim()==='Impor nominal Digiflazz')`);
                         if(!await evaluate(`document.querySelector('[data-testid="digiflazz-import"]')&&[...document.querySelectorAll('[data-testid="digiflazz-import"] button')].find(b=>/^Impor \\d+ nominal$/.test(b.textContent.trim()))?.disabled`))throw Error('Import picker missing or submit enabled without selection');
-                        await pointerClick(`document.querySelector('[data-sku="${importSubmitted?'BROWSER-IMPORT-300':'BROWSER-IMPORT-200'}"] input')`);
+                        await pointerClick(`document.querySelector('[data-sku="${importSubmitted?'BROWSER-IMPORT-300':'BROWSER-IMPORT-200'}"] span')`);
                         if(!await evaluate(`Boolean([...document.querySelectorAll('[data-testid="digiflazz-import"] button')].find(b=>b.textContent.trim()==='Impor 1 nominal'&&!b.disabled))`))throw Error('Selecting supplier SKU did not enable import: '+JSON.stringify(await evaluate(`({checked:document.querySelector('[data-sku="${importSubmitted?'BROWSER-IMPORT-300':'BROWSER-IMPORT-200'}"] input')?.checked,buttons:[...document.querySelectorAll('[data-testid="digiflazz-import"] button')].map(b=>({text:b.textContent.trim(),disabled:b.disabled}))})`)));
                         await inspect(width+'-import-picker');
                         if(!importSubmitted){
