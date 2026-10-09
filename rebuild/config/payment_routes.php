@@ -41,7 +41,7 @@ return [
         'configuration' => [
             'api_path' => '/checkout/v1/payment',
             'public_paths' => [
-                'payment_url' => 'payment.url',
+                'payment_url' => 'response.payment.url',
             ],
         ],
         'priority' => 20,
