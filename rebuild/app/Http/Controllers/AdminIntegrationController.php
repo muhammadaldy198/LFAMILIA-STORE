@@ -88,6 +88,11 @@ class AdminIntegrationController
                         ? (string) ($storedHealth['message'] ?? 'Belum pernah menjalankan Tes Koneksi.')
                         : 'Environment berubah. Tes koneksi sebelumnya tidak berlaku untuk environment ini.'));
 
+            if ($active && $currentProfile['required_complete'] && $healthMatchesEnvironment
+                && ($storedHealth['reason'] ?? null) === 'SAFE_PROBE_UNAVAILABLE') {
+                $message = 'Kredensial tersimpan. Tes koneksi otomatis tidak tersedia; verifikasi dilakukan saat fitur digunakan.';
+            }
+
             $environmentOptions = collect($environments)->map(
                 fn (array $metadata, string $value): array => [
                     'value' => $value,
