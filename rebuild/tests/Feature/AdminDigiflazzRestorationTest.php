@@ -17,6 +17,7 @@ use Illuminate\Http\Client\Factory;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -308,7 +309,7 @@ class AdminDigiflazzRestorationTest extends TestCase
             try {
                 app(DigiflazzCatalogService::class)->sync();
                 $this->fail('Invalid full catalog response must be rejected.');
-            } catch (\Illuminate\Validation\ValidationException) {
+            } catch (ValidationException) {
                 $this->assertDatabaseHas('digiflazz_catalog_items', ['buyer_sku_code' => 'preserved', 'price_idr' => 10000]);
                 $this->assertDatabaseHas('provider_mappings', ['external_sku' => 'preserved', 'is_active' => true]);
                 $this->assertSame(1, DB::table('digiflazz_catalog_items')->count());
