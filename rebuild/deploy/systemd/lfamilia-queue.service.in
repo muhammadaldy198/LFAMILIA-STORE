@@ -1,7 +1,7 @@
 [Unit]
 Description=LFAMILIA STORE Laravel Queue Worker
-After=network-online.target
-Wants=network-online.target
+After=network-online.target mysql.service redis-server.service
+Wants=network-online.target mysql.service redis-server.service
 
 [Service]
 Type=simple
