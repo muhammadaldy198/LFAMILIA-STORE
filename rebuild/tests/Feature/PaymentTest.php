@@ -12,6 +12,9 @@ use App\Services\Payment\DokuSignature;
 use App\Services\PaymentRoutingService;
 use App\Services\PaymentService;
 use App\Services\PaymentStateService;
+use App\Services\FulfillmentService;
+use App\Jobs\StartFulfillmentJob;
+use App\Jobs\SendFulfillmentJob;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Routing\Middleware\ThrottleRequests;
@@ -298,6 +301,128 @@ class PaymentTest extends TestCase
 
         $this->assertSame('PAID', DB::table('orders')->where('id', $row->order_id)->value('status'));
         $this->assertSame('PAID', DB::table('payment_transactions')->where('id', $row->id)->value('status'));
+    }
+
+    /**
+     * Simulate a complete sale without money, production credentials, or provider traffic.
+     */
+    public function test_simulated_checkout_midtrans_paid_and_digiflazz_delivery_complete_once(): void
+    {
+        Queue::fake();
+        $catalog = $this->catalog();
+        $this->route('qris', 'MIDTRANS', 0, 70, 'qris');
+
+        IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
+            'config_ciphertext' => ['server_key' => 'sandbox-e2e-key', 'is_production' => false],
+            'is_active' => true,
+        ]);
+        IntegrationCredential::updateOrCreate(['code' => 'digiflazz'], [
+            'config_ciphertext' => [
+                'username' => 'buyer-e2e-test',
+                'api_key' => 'supplier-e2e-test-key',
+                'webhook_secret' => 'supplier-e2e-webhook-test',
+                'testing' => true,
+                'base_url' => 'https://supplier-e2e.test',
+            ],
+            'is_active' => true,
+        ]);
+
+        $supplierRequests = 0;
+        Http::preventStrayRequests();
+        Http::fake(function ($request) use (&$supplierRequests) {
+            if ($request->url() === 'https://app.sandbox.midtrans.com/snap/v1/transactions') {
+                return Http::response([
+                    'token' => 'e2e-sandbox-token',
+                    'redirect_url' => 'https://payments.example.test/checkout',
+                ]);
+            }
+            if (preg_match('#^https://api\.sandbox\.midtrans\.com/v2/(.+)/status$#', $request->url(), $matches)) {
+                return Http::response([
+                    'transaction_id' => 'midtrans-e2e-simulation',
+                    'transaction_status' => 'settlement',
+                    'status_code' => '200',
+                    'order_id' => rawurldecode($matches[1]),
+                    'gross_amount' => '11077.00',
+                    'fraud_status' => 'accept',
+                ]);
+            }
+            if ($request->url() === 'https://supplier-e2e.test/v1/transaction') {
+                $supplierRequests++;
+                $payload = $request->data();
+                $this->assertSame('buyer-e2e-test', $payload['username']);
+                $this->assertSame('123456', $payload['customer_no']);
+                $this->assertTrue($payload['testing']);
+                $this->assertSame(
+                    md5('buyer-e2e-test'.'supplier-e2e-test-key'.$payload['ref_id']),
+                    $payload['sign']
+                );
+
+                return Http::response(['data' => [
+                    'ref_id' => $payload['ref_id'],
+                    'customer_no' => $payload['customer_no'],
+                    'buyer_sku_code' => $payload['buyer_sku_code'],
+                    'status' => 'Sukses',
+                    'message' => 'Sukses (simulasi)',
+                    'rc' => '00',
+                    'price' => 10000,
+                    'sn' => 'E2E-DELIVERY-TEST',
+                ]]);
+            }
+
+            $this->fail('Unexpected simulated provider URL: '.$request->url());
+        });
+
+        $checkout = $this->postJson('/checkout/orders', $this->guestCheckout(
+            $catalog['package_id'],
+            'qris',
+            'e2e-simulated-order-0001'
+        ))->assertCreated();
+        $this->assertSame(11077, $checkout->json('total_idr'));
+
+        $this->postJson('/payments/orders/'.$checkout->json('order_number'), [
+            'idempotency_key' => 'e2e-simulated-payment-0001',
+            'access_code' => $checkout->json('access_code'),
+        ])->assertOk()->assertJsonPath('instructions.token', 'e2e-sandbox-token');
+
+        $payment = DB::table('payment_transactions')
+            ->where('idempotency_key', 'e2e-simulated-payment-0001')->firstOrFail();
+
+        $notification = [
+            'transaction_id' => 'midtrans-e2e-simulation',
+            'transaction_status' => 'settlement',
+            'status_code' => '200',
+            'order_id' => $payment->merchant_reference,
+            'gross_amount' => '11077.00',
+            'fraud_status' => 'accept',
+        ];
+        $notification['signature_key'] = hash(
+            'sha512',
+            $notification['order_id'].$notification['status_code'].$notification['gross_amount'].'sandbox-e2e-key'
+        );
+        $this->postJson('/api/payments/midtrans/notification', $notification)
+            ->assertOk()->assertJsonPath('status', 'ok');
+        $this->assertSame('PAID', DB::table('orders')->where('id', $payment->order_id)->value('status'));
+        Queue::assertPushed(StartFulfillmentJob::class, 1);
+
+        $fulfillment = app(FulfillmentService::class);
+        $fulfillment->startOrder((int) $payment->order_id);
+        Queue::assertPushed(SendFulfillmentJob::class, 1);
+        $attempt = DB::table('fulfillment_attempts')->where('order_id', $payment->order_id)->firstOrFail();
+        $fulfillment->sendAttempt((int) $attempt->id);
+
+        $this->assertSame('SUCCESS', DB::table('orders')->where('id', $payment->order_id)->value('status'));
+        $this->assertSame('SUCCESS', DB::table('fulfillment_attempts')->where('id', $attempt->id)->value('status'));
+        $this->assertSame(1, $supplierRequests);
+        $this->assertSame(1, DB::table('fulfillment_attempts')->where('order_id', $payment->order_id)->count());
+
+        $this->postJson('/api/payments/midtrans/notification', $notification)
+            ->assertOk()->assertJsonPath('status', 'duplicate');
+        $fulfillment->startOrder((int) $payment->order_id);
+        $fulfillment->sendAttempt((int) $attempt->id);
+        $this->assertSame(1, $supplierRequests);
+        $this->assertSame(1, DB::table('fulfillment_attempts')->where('order_id', $payment->order_id)->count());
+        $this->assertSame(1, DB::table('order_events')->where('order_id', $payment->order_id)
+            ->where('event_type', 'PAYMENT_VERIFIED')->count());
     }
 
     public function test_midtrans_cancel_stays_cancelled_and_stale_pending_cannot_reopen_order(): void
