@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Product;
 use App\Services\OneTimeGameNominalImport;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
@@ -66,7 +67,7 @@ class OneTimeGameNominalImportTest extends TestCase
             ]);
         }
 
-        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-10-09 23:50:00', 'Asia/Jakarta'));
+        $this->travelTo(Carbon::parse('2026-10-09 23:50:00', 'Asia/Jakarta'));
 
         $first = app(OneTimeGameNominalImport::class)->run();
         $this->assertSame(1, $first['games_activated']);
