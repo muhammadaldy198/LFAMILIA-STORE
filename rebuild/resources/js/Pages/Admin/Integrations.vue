@@ -76,7 +76,7 @@ watch(() => props.integrations, (value) => {
 
 const activeCount = computed(() => items.filter((item) => item.is_active).length);
 const healthyCount = computed(() => items.filter((item) => item.is_active && item.connection?.status === 'VERIFIED').length);
-const attentionCount = computed(() => items.filter((item) => item.is_active && item.connection?.status !== 'VERIFIED').length);
+const attentionCount = computed(() => items.filter((item) => item.is_active && ['FAILED', 'NOT_CONFIGURED', 'NOT_TESTED', 'UNVERIFIED'].includes(item.connection?.status)).length);
 const completeCount = computed(() => items.filter((item) => item.required_complete).length);
 
 const csrf = () => decodeURIComponent(
@@ -86,6 +86,7 @@ const csrf = () => decodeURIComponent(
 const statusLabel = (status) => ({
     HEALTHY: 'Terverifikasi',
     DEGRADED: 'Perlu diperiksa',
+    MANUAL_CHECK: 'Tes otomatis tidak tersedia',
     DOWN: 'Bermasalah',
     NOT_CONFIGURED: 'Belum dikonfigurasi',
     UNTESTED: 'Belum dites',
@@ -189,7 +190,9 @@ async function testConnection(item) {
         if (response.ok) {
             item.health = result;
             item.connection = {
-                status: result.verified === true
+                status: result.reason === 'SAFE_PROBE_UNAVAILABLE' && result.status === 'DEGRADED'
+                    ? 'MANUAL_CHECK'
+                    : result.verified === true
                     ? 'VERIFIED'
                     : result.status === 'DOWN'
                         ? 'FAILED'
@@ -198,8 +201,10 @@ async function testConnection(item) {
                             : result.status === 'NOT_CONFIGURED'
                                 ? 'NOT_CONFIGURED'
                                 : 'NOT_TESTED',
-                label: result.verified === true
-                    ? 'Connection Verified'
+                label: result.reason === 'SAFE_PROBE_UNAVAILABLE' && result.status === 'DEGRADED'
+                    ? 'Perlu uji melalui fitur'
+                    : result.verified === true
+                    ? 'Tes koneksi terakhir berhasil'
                     : result.status === 'DOWN'
                         ? 'Koneksi bermasalah'
                         : result.status === 'DEGRADED'
@@ -254,7 +259,8 @@ async function sendResendTestEmail() {
                 <div>
                     <h1 class="text-2xl font-semibold">Integrasi</h1>
                     <p class="mt-1 max-w-3xl text-sm text-muted-foreground">
-                        Kelola provider, environment, dan credential dari satu tempat. Secret disimpan terenkripsi dan tidak pernah dikirim kembali ke browser.
+                        Hubungkan Digiflazz dan metode pembayaran, lalu impor nominal dan atur keuntungan di menu Produk.
+                        Google, Telegram, dan Discord bersifat opsional. Gunakan satu gateway pembayaran yang sesuai.
                     </p>
                 </div>
                 <Button variant="outline" as-child>
@@ -385,8 +391,9 @@ async function sendResendTestEmail() {
                         </p>
                     </div>
                     <div class="p-3">
-                        <p class="text-xs text-muted-foreground">E2E</p>
-                        <p class="mt-1 text-sm font-medium">{{ item.e2e?.label || 'DEFERRED TO TAHAP 9' }}</p>
+                        <p class="text-xs text-muted-foreground">Uji penggunaan</p>
+                        <p class="mt-1 text-sm font-medium">{{ item.e2e?.label || 'Belum ada hasil uji penggunaan' }}</p>
+                        <p class="mt-1 text-xs text-muted-foreground">{{ item.e2e?.message }}</p>
                     </div>
                 </div>
 
@@ -519,7 +526,7 @@ async function sendResendTestEmail() {
                         ? 'text-foreground'
                         : 'text-muted-foreground'"
                 >
-                    <strong>{{ statusLabel(item.result.status) }}</strong>
+                    <strong>{{ item.result.reason === 'SAFE_PROBE_UNAVAILABLE' && item.result.status === 'DEGRADED' ? 'Tes otomatis tidak tersedia' : statusLabel(item.result.status) }}</strong>
                     <span> · {{ item.result.message }}</span>
                 </div>
 

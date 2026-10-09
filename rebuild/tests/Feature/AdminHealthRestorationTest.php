@@ -111,7 +111,7 @@ class AdminHealthRestorationTest extends TestCase
                 ->where('checks.5.status', 'DEGRADED'));
     }
 
-    public function test_old_healthy_integration_check_is_marked_stale(): void
+    public function test_old_successful_integration_check_retains_last_result(): void
     {
         $this->login();
         DB::table('failed_jobs')->delete();
@@ -134,10 +134,9 @@ class AdminHealthRestorationTest extends TestCase
         $response = $this->get('/admin/health')->assertOk();
 
         $response->assertInertia(fn (Assert $page) => $page
-            ->where('summary.overall', 'DEGRADED')
             ->where('integrations.0.code', 'digiflazz')
-            ->where('integrations.0.status', 'STALE')
-            ->where('integrations.0.message', 'Tes koneksi terakhir sudah lebih dari 15 menit.'));
+            ->where('integrations.0.status', 'HEALTHY')
+            ->where('integrations.0.message', 'Tes koneksi terakhir berhasil.'));
 
         $this->assertStringNotContainsString('stale-health-secret', $response->getContent());
     }

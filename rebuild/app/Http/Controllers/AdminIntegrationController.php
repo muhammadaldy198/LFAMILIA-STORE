@@ -80,6 +80,9 @@ class AdminIntegrationController
             $status = ! $active || ! $currentProfile['required_complete']
                 ? 'NOT_CONFIGURED'
                 : ($healthMatchesEnvironment ? (string) ($storedHealth['status'] ?? 'UNTESTED') : 'UNTESTED');
+            if ($status === 'DEGRADED' && ($storedHealth['reason'] ?? null) === 'SAFE_PROBE_UNAVAILABLE') {
+                $status = 'MANUAL_CHECK';
+            }
             $message = ! $active
                 ? 'Integrasi nonaktif.'
                 : (! $currentProfile['required_complete']
@@ -143,8 +146,9 @@ class AdminIntegrationController
                 'connection' => $connection,
                 'callback' => $callback,
                 'e2e' => [
-                    'status' => 'DEFERRED',
-                    'label' => 'DEFERRED TO TAHAP 9',
+                    'status' => 'NOT_RECORDED',
+                    'label' => 'Belum ada hasil uji penggunaan',
+                    'message' => 'Tes koneksi tidak menguji pembelian atau penggunaan fitur sampai selesai. Status ini tidak memblokir transaksi.',
                 ],
                 'readiness' => $readiness,
                 'health' => [
@@ -166,7 +170,7 @@ class AdminIntegrationController
                     ->filter(fn (array $item): bool => $item['is_active'] && $item['connection']['status'] === 'VERIFIED')
                     ->count(),
                 'attention' => $integrations
-                    ->filter(fn (array $item): bool => $item['is_active'] && $item['connection']['status'] !== 'VERIFIED')
+                    ->filter(fn (array $item): bool => $item['is_active'] && ! in_array($item['connection']['status'], ['VERIFIED', 'MANUAL_CHECK'], true))
                     ->count(),
                 'configuration_complete' => $integrations->where('required_complete', true)->count(),
             ],
@@ -297,24 +301,26 @@ class AdminIntegrationController
             $record->save();
         }
 
-        DB::table('system_settings')->updateOrInsert(
-            ['key' => 'integration.health.'.$code],
-            [
-                'value' => json_encode([
-                    'status' => $record->is_active ? 'UNTESTED' : 'NOT_CONFIGURED',
-                    'message' => $record->is_active
-                        ? 'Konfigurasi atau environment berubah. Jalankan Tes Koneksi untuk memverifikasi.'
-                        : 'Integrasi nonaktif.',
-                    'reason' => $record->is_active ? 'CONFIG_CHANGED' : 'INACTIVE',
-                    'verified' => false,
-                    'environment' => $environment,
-                    'tested_at' => null,
-                ], JSON_THROW_ON_ERROR),
-                'updated_by_admin_id' => $request->user('admin')->id,
-                'updated_at' => now(),
-                'created_at' => now(),
-            ]
-        );
+        if ($configWasUnreadable || $config !== $existing || $before['is_active'] !== (bool) $record->is_active) {
+            DB::table('system_settings')->updateOrInsert(
+                ['key' => 'integration.health.'.$code],
+                [
+                    'value' => json_encode([
+                        'status' => $record->is_active ? 'UNTESTED' : 'NOT_CONFIGURED',
+                        'message' => $record->is_active
+                            ? 'Konfigurasi atau environment berubah. Jalankan Tes Koneksi untuk memverifikasi.'
+                            : 'Integrasi nonaktif.',
+                        'reason' => $record->is_active ? 'CONFIG_CHANGED' : 'INACTIVE',
+                        'verified' => false,
+                        'environment' => $environment,
+                        'tested_at' => null,
+                    ], JSON_THROW_ON_ERROR),
+                    'updated_by_admin_id' => $request->user('admin')->id,
+                    'updated_at' => now(),
+                    'created_at' => now(),
+                ]
+            );
+        }
 
         $audit->record($request, 'integration.updated', 'integration_credential', $code, $before, [
             'code' => $code,
@@ -603,6 +609,7 @@ class AdminIntegrationController
     ): array {
         $connectionStatus = match (true) {
             ! $active, ! $credentialComplete, $status === 'NOT_CONFIGURED' => 'NOT_CONFIGURED',
+            $status === 'MANUAL_CHECK' => 'MANUAL_CHECK',
             $status === 'HEALTHY' && $verified => 'VERIFIED',
             $status === 'HEALTHY' => 'UNVERIFIED',
             $status === 'DOWN' => 'FAILED',
@@ -611,7 +618,8 @@ class AdminIntegrationController
         };
 
         $label = match ($connectionStatus) {
-            'VERIFIED' => 'Connection Verified',
+            'VERIFIED' => 'Tes koneksi terakhir berhasil',
+            'MANUAL_CHECK' => 'Perlu uji melalui fitur',
             'FAILED' => 'Koneksi bermasalah',
             'UNVERIFIED' => 'Belum dapat diverifikasi',
             'NOT_CONFIGURED' => 'Belum dikonfigurasi',
@@ -649,9 +657,10 @@ class AdminIntegrationController
         }
 
         return match ($connection['status'] ?? null) {
-            'VERIFIED' => ['status' => 'READY_FOR_E2E', 'label' => 'Siap untuk E2E'],
+            'VERIFIED' => ['status' => 'READY_FOR_E2E', 'label' => 'Konfigurasi dan tes koneksi siap'],
+            'MANUAL_CHECK' => ['status' => 'CONFIGURED', 'label' => 'Tersimpan — tes otomatis tidak tersedia'],
             'FAILED' => ['status' => 'BLOCKED', 'label' => 'Koneksi bermasalah'],
-            'UNVERIFIED' => ['status' => 'CONFIGURED', 'label' => 'Configured — E2E belum diverifikasi'],
+            'UNVERIFIED' => ['status' => 'CONFIGURED', 'label' => 'Tersimpan — koneksi belum terverifikasi'],
             default => ['status' => 'CONFIGURED_UNTESTED', 'label' => 'Configured — belum dites'],
         };
     }

@@ -124,8 +124,11 @@ class AdminDashboardController
                 $active = (bool) ($records->get($code)?->is_active);
                 $test = json_decode($health->get('integration.health.'.$code, '{}'), true) ?: [];
                 $status = $active ? ($test['status'] ?? 'UNTESTED') : 'NOT_CONFIGURED';
-                if ($active && $status === 'HEALTHY' && (empty($test['tested_at']) || Carbon::parse($test['tested_at'])->lt(now()->subMinutes(15)))) {
-                    $status = 'STALE';
+                if ($active && $status === 'HEALTHY' && empty($test['tested_at'])) {
+                    $status = 'UNTESTED';
+                }
+                if ($active && $status === 'DEGRADED' && ($test['reason'] ?? null) === 'SAFE_PROBE_UNAVAILABLE') {
+                    $status = 'MANUAL_CHECK';
                 }
                 $integrations[] = ['code' => $code, 'name' => $definition['name'], 'active' => $active, 'status' => $status, 'tested_at' => $test['tested_at'] ?? null];
             }

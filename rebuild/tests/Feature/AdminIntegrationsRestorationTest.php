@@ -517,7 +517,7 @@ class AdminIntegrationsRestorationTest extends TestCase
                 return $digiflazz['callback']['required'] === true
                     && $digiflazz['callback']['ready'] === false
                     && $digiflazz['callback']['status'] === 'NOT_READY'
-                    && $digiflazz['e2e']['label'] === 'DEFERRED TO TAHAP 9';
+                    && $digiflazz['e2e']['status'] === 'NOT_RECORDED';
             })
         );
 
@@ -736,5 +736,66 @@ class AdminIntegrationsRestorationTest extends TestCase
                 'reason' => 'PERMISSION_LIMITED',
                 'verified' => false,
             ]);
+    }
+
+    public function test_unchanged_save_preserves_success_and_credential_change_invalidates_it(): void
+    {
+        $this->loginSuperAdmin();
+        $this->clearIntegrationState();
+        IntegrationCredential::create([
+            'code' => 'midtrans',
+            'is_active' => true,
+            'config_ciphertext' => [
+                'environment' => 'sandbox',
+                'profiles' => ['sandbox' => ['server_key' => 'fixture-key']],
+            ],
+        ]);
+        $health = [
+            'status' => 'HEALTHY', 'verified' => true, 'environment' => 'sandbox',
+            'tested_at' => now()->subDay()->toIso8601String(),
+        ];
+        DB::table('system_settings')->updateOrInsert(['key' => 'integration.health.midtrans'], [
+            'value' => json_encode($health), 'updated_at' => now(),
+        ]);
+        $this->put('/admin/integrations/midtrans', [
+            'is_active' => true, 'environment' => 'sandbox', 'config' => ['server_key' => ''],
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $saved = json_decode(DB::table('system_settings')->where('key', 'integration.health.midtrans')->value('value'), true);
+        $this->assertSame($health, $saved);
+        $this->put('/admin/integrations/midtrans', [
+            'is_active' => true, 'environment' => 'sandbox', 'config' => ['server_key' => 'changed-fixture-key'],
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $saved = json_decode(DB::table('system_settings')->where('key', 'integration.health.midtrans')->value('value'), true);
+        $this->assertSame('UNTESTED', $saved['status']);
+        $this->assertFalse($saved['verified']);
+    }
+
+    public function test_missing_automatic_probe_is_information_not_failed_connection(): void
+    {
+        $this->loginSuperAdmin();
+        $this->clearIntegrationState();
+        config(['app.url' => 'https://lfamilia.example.test']);
+        IntegrationCredential::create([
+            'code' => 'doku', 'is_active' => true,
+            'config_ciphertext' => [
+                'environment' => 'sandbox',
+                'profiles' => ['sandbox' => ['client_id' => 'fixture-client', 'secret_key' => 'fixture-secret']],
+            ],
+        ]);
+        Http::fake();
+        $this->postJson('/admin/integrations/doku/test')->assertOk();
+        $this->get('/admin/integrations')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('summary.attention', 0)
+            ->where('integrations', function ($rows): bool {
+                $doku = collect($rows)->firstWhere('code', 'doku');
+
+                return $doku['health']['status'] === 'MANUAL_CHECK'
+                    && $doku['connection']['status'] === 'MANUAL_CHECK'
+                    && $doku['health']['verified'] === false
+                    && $doku['e2e']['status'] === 'NOT_RECORDED';
+            }));
+        $this->get('/admin/panel')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('integrations', fn ($rows): bool => collect($rows)->firstWhere('code', 'doku')['status'] === 'MANUAL_CHECK'));
+        Http::assertNothingSent();
     }
 }

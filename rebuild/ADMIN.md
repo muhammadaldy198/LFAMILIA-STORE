@@ -106,3 +106,9 @@ Cadangan otomatis aktif secara default pada impor. Tombol **Pilih semua hasil fi
 Sumber otomatis berprioritas sama; resolver existing memilih biaya terendah yang tersedia, lalu ID. Cadangan tetap tunduk pada batas harga snapshot dan aturan pending/unknown/failure; fitur ini tidak mengirim transaksi atau mengubah aturan failover.
 
 Nilai nominal angka diisi dari nama katalog pada impor. Urutan awal impor dan halaman customer memakai angka dari kecil ke besar (7, 10, 20, 100, 200, 2.000). Nama tanpa nilai angka memakai natural sort. Urutan manual editor tetap dapat disesuaikan, tetapi impor/pelengkapan ulang menyusun urutan awal menurut nominal. Halaman customer selalu memakai urutan nominal angka.
+
+## Status tes integrasi
+
+Hasil Tes Koneksi menunjukkan hasil terakhir, bukan pemantauan koneksi langsung. Hasil berhasil tidak kedaluwarsa setelah 15 menit; waktu tes tetap ditampilkan. Simpan tanpa perubahan mempertahankan hasil tes; perubahan konfigurasi, environment, atau aktivasi membatalkannya. Kegagalan provider/credential tetap ditampilkan.
+
+Layanan dengan reason SAFE_PROBE_UNAVAILABLE ditampilkan sebagai Tes otomatis tidak tersedia, bukan kegagalan koneksi atau peringatan kesehatan sistem. IP whitelist dan izin terbatas tetap perlu diperiksa. Uji penggunaan belum tercatat adalah informasi, bukan pengunci transaksi; panel tidak mengklaim transaksi nyata berhasil. Google/Telegram/Discord opsional, dan tidak perlu mengaktifkan kedua gateway pembayaran.

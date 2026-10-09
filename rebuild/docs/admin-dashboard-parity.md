@@ -17,7 +17,7 @@ Baseline: 45eb340740ef0a72c02eed5fd3933a8bb7d5c176, components/admin-overview.ts
 | Pembayaran Berhasil | Mempertahankan penghitung pesanan fulfillment SUCCESS lama untuk periode dipilih; keterangan memperjelas makna |
 | Grafik penjualan | today/7d/30d/90d, omzet dan jumlah pesanan, hari kosong diisi nol, data tabel dapat dibuka |
 | Aktivitas terbaru | Audit tanpa before/after/secret untuk pemilik; fallback pesanan untuk Admin |
-| Status integrasi | Status tes terakhir, konfigurasi belum dites tidak disebut online; tes lebih dari 15 menit ditandai perlu tes ulang |
+| Status integrasi | Status tes terakhir, konfigurasi belum dites tidak disebut online; hasil berhasil tetap berlaku sebagai hasil tes terakhir tanpa batas 15 menit; perubahan konfigurasi membatalkan hasil; layanan tanpa tes otomatis diberi keterangan tersendiri |
 | Sinkron terakhir | Timestamp snapshot Digiflazz aktual |
 | Webhook | Kesiapan URL aplikasi HTTPS, bukan klaim callback live sudah dites |
 | Pesanan terbaru | Invoice, pelanggan, snapshot produk/nominal, channel/status pembayaran, total Super Admin, status pesanan |
