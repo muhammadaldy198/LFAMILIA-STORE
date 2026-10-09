@@ -528,7 +528,8 @@ class AdminPanelRestorationTest extends TestCase
         ProviderMapping::create(['product_package_id' => $package->id, 'provider_id' => Provider::where('code', 'DIGIFLAZZ')->value('id'), 'external_sku' => 'gone-sku', 'cost_idr' => 10000, 'max_price_idr' => 10000, 'is_active' => true]);
         $this->fakeCatalog([$this->row()]);
         app(DigiflazzCatalogService::class)->sync();
-        $this->assertDatabaseHas('digiflazz_catalog_items', ['buyer_sku_code' => 'gone-sku', 'buyer_active' => false]);
+        $this->assertDatabaseMissing('digiflazz_catalog_items', ['buyer_sku_code' => 'gone-sku']);
+        $this->assertDatabaseHas('provider_mappings', ['external_sku' => 'gone-sku', 'is_active' => false]);
         $this->expectException(ValidationException::class);
         app(CheckoutPricing::class)->forPackage($package->id);
     }

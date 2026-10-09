@@ -34,7 +34,7 @@ class DigiflazzCatalogService
             } catch (\Throwable) {
                 throw ValidationException::withMessages(['sync' => 'Digiflazz tidak merespons. Data sebelumnya tetap tersimpan.']);
             }
-            if (! $response->successful() || ! is_array($rows) || ! array_is_list($rows) || count($rows) === 0) {
+            if (! $response->successful() || ! is_array($rows) || ! array_is_list($rows) || ($sku === null && count($rows) === 0)) {
                 throw ValidationException::withMessages(['sync' => 'Daftar harga Digiflazz kosong atau tidak valid.']);
             }
             $clean = [];
@@ -82,18 +82,31 @@ class DigiflazzCatalogService
                     DB::table('provider_mappings')->where('provider_id', $providerId)->where('external_sku', $row['buyer_sku_code'])
                         ->update(['cost_idr' => $row['price_idr'], 'max_price_idr' => $row['price_idr'], 'updated_at' => now()]);
                 }
-                if ($sku === null) {
-                    foreach (DB::table('provider_mappings')->where('provider_id', $providerId)->whereNotNull('external_sku')
-                        ->whereNotIn('external_sku', array_column($clean, 'buyer_sku_code'))->get() as $missing) {
-                        DB::table('digiflazz_catalog_items')->insertOrIgnore([
-                            'buyer_sku_code' => $missing->external_sku, 'product_name' => $missing->external_sku,
-                            'price_idr' => max(1, (int) $missing->cost_idr), 'baseline_price_idr' => max(1, (int) $missing->cost_idr),
-                            'buyer_active' => false, 'seller_active' => false, 'unlimited_stock' => false, 'multi' => false,
-                            'synced_at' => now(), 'created_at' => now(), 'updated_at' => now(),
+                if ($sku === null || $clean === []) {
+                    $missingMappings = DB::table('provider_mappings')->where('provider_id', $providerId)
+                        ->whereNotNull('external_sku');
+                    $missingItems = DB::table('digiflazz_catalog_items');
+                    if ($sku === null) {
+                        $codes = array_column($clean, 'buyer_sku_code');
+                        $missingMappings->whereNotIn('external_sku', $codes);
+                        $missingItems->whereNotIn('buyer_sku_code', $codes);
+                    } else {
+                        $missingMappings->where('external_sku', $sku);
+                        $missingItems->where('buyer_sku_code', $sku);
+                    }
+                    // Keep order/source history, but prevent deleted SKUs from being sold.
+                    $disabled = $missingMappings->where('is_active', true)
+                        ->update(['is_active' => false, 'updated_at' => now()]);
+                    $removed = $missingItems->delete();
+                    if ($sku === null) {
+                        DB::table('system_settings')->updateOrInsert(['key' => 'digiflazz.last_catalog_sync'], [
+                            'value' => json_encode([
+                                'at' => now()->toIso8601String(), 'count' => count($clean),
+                                'removed' => $removed, 'disabled_mappings' => $disabled,
+                            ], JSON_THROW_ON_ERROR),
+                            'created_at' => now(), 'updated_at' => now(),
                         ]);
                     }
-                    DB::table('digiflazz_catalog_items')->whereNotIn('buyer_sku_code', array_column($clean, 'buyer_sku_code'))
-                        ->update(['buyer_active' => false, 'seller_active' => false, 'updated_at' => now()]);
                 }
 
                 return count($clean);

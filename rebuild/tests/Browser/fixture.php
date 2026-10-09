@@ -137,6 +137,21 @@ DB::transaction(function (): void {
         );
     }
 
+    foreach (['BROWSER-PRICE-DOWN' => 9000, 'BROWSER-PRICE-UP' => 11000, 'BROWSER-INACTIVE' => 8000] as $sku => $price) {
+        DB::table('digiflazz_catalog_items')->updateOrInsert(
+            ['buyer_sku_code' => $sku],
+            [
+                'product_name' => $sku, 'category' => 'Games', 'brand' => 'Health filter regression',
+                'type' => 'Umum', 'seller_name' => 'Seller fixture lokal',
+                'price_idr' => $price, 'baseline_price_idr' => 10000,
+                'buyer_active' => true, 'seller_active' => $sku !== 'BROWSER-INACTIVE',
+                'unlimited_stock' => true, 'stock' => 0, 'multi' => false,
+                'start_cut_off' => '00:00', 'end_cut_off' => '00:00',
+                'synced_at' => now(), 'created_at' => now(), 'updated_at' => now(),
+            ]
+        );
+    }
+
     $largePackage = $product->packages()->updateOrCreate(
         ['code' => 'BROWSER-LARGE'],
         ['name' => 'Paket dengan nama sangat panjang untuk pemeriksaan mobile dan angka rupiah besar',

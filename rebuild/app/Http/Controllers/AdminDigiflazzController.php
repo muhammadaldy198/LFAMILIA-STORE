@@ -140,6 +140,7 @@ class AdminDigiflazzController
             'summary' => $summary,
             'connection' => $connection,
             'lastSyncedAt' => DB::table('digiflazz_catalog_items')->max('synced_at'),
+            'catalogSync' => json_decode((string) DB::table('system_settings')->where('key', 'digiflazz.last_catalog_sync')->value('value'), true),
             'mappingCount' => ProviderMapping::where('provider_id', $providerId ?: 0)->count(),
             'autoSync' => (bool) (json_decode((string) DB::table('system_settings')->where('key', 'digiflazz.auto_sync')->value('value'), true) ?? true),
             'monitorSettings' => $monitorSettings,
@@ -170,7 +171,7 @@ class AdminDigiflazzController
                 $stock->where('items.unlimited_stock', false)
                     ->whereBetween('items.stock', [1, $lowStockThreshold]);
             })->orWhereRaw(
-                'items.baseline_price_idr > 0 AND ((items.price_idr - items.baseline_price_idr) * 100) >= (items.baseline_price_idr * ?)',
+                'items.baseline_price_idr > 0 AND ((CAST(items.price_idr AS DECIMAL(30, 4)) - CAST(items.baseline_price_idr AS DECIMAL(30, 4))) * 100) >= (CAST(items.baseline_price_idr AS DECIMAL(30, 4)) * ?)',
                 [$priceWarningPercent]
             )
                 ->orWhere(function ($cutoff) use ($time): void {
@@ -265,17 +266,21 @@ class AdminDigiflazzController
         $count = $service->sync($sku);
         $audit->record($request, 'digiflazz.catalog.synced', 'provider', 'DIGIFLAZZ', null, ['count' => $count, 'sku' => $sku]);
 
-        return back()->with('status', $count.' SKU berhasil disinkronkan.');
+        return back()->with('status', $sku !== null && $count === 0
+            ? 'SKU sudah tidak ada di Digiflazz dan telah dihapus dari katalog.'
+            : $count.' SKU berhasil disinkronkan. SKU yang sudah tidak ada dihapus dari katalog.');
     }
 
     public function syncMapping(Request $request, ProviderMapping $mapping, DigiflazzCatalogService $service, AdminAuditService $audit): RedirectResponse
     {
         abort_unless(Provider::where('id', $mapping->provider_id)->where('code', 'DIGIFLAZZ')->exists(), 404);
         $before = $mapping->toArray();
-        $service->sync($mapping->external_sku);
+        $count = $service->sync($mapping->external_sku);
         $audit->record($request, 'digiflazz.mapping.synced', 'provider_mapping', $mapping->id, $before, $mapping->fresh()->toArray());
 
-        return back()->with('status', 'Harga nominal berhasil disinkronkan.');
+        return back()->with('status', $count === 0
+            ? 'SKU sudah tidak ada di Digiflazz. Katalog dihapus dan mapping dinonaktifkan.'
+            : 'Harga nominal berhasil disinkronkan.');
     }
 
     public function baseline(Request $request, int $id, AdminAuditService $audit): RedirectResponse
