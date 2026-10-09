@@ -37,7 +37,7 @@ class PaymentWebhookController
             (string) $payload['gross_amount'].
             (string) $config['server_key']
         );
-        if (! hash_equals($expected, (string) $payload['signature_key'])) {
+        if (!hash_equals($expected, (string) $payload['signature_key'])) {
             $this->logRejected('MIDTRANS', 'INVALID_SIGNATURE');
             abort(401);
         }
@@ -115,7 +115,7 @@ class PaymentWebhookController
         abort_unless(preg_match('/^[A-Za-z0-9._:-]{8,128}$/', $requestId) === 1, 400);
         abort_unless($signature->isFreshTimestamp($timestamp), 401);
         abort_unless(hash_equals((string) $config['client_id'], $clientId), 401);
-        if (! $signature->verify(
+        if (!$signature->verify(
             $headerSignature,
             $clientId,
             $requestId,
