@@ -1,7 +1,7 @@
 [Unit]
 Description=LFAMILIA STORE Laravel Scheduler
-After=network-online.target lfamilia-queue.service
-Wants=network-online.target
+After=network-online.target mysql.service redis-server.service lfamilia-queue.service
+Wants=network-online.target mysql.service redis-server.service
 
 [Service]
 Type=simple
