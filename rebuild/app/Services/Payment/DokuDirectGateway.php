@@ -133,6 +133,8 @@ class DokuDirectGateway
                 'order' => [
                     'invoice_number' => $context['merchant_reference'],
                     'amount' => $context['amount_idr'],
+                    'auto_redirect' => ! empty($context['return_url']),
+                    'callback_url_result' => $context['return_url'] ?? null,
                 ],
                 'payment' => ['payment_due_date' => $context['expires_minutes']],
                 'customer' => array_filter([
