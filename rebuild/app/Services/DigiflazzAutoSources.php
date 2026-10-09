@@ -128,6 +128,8 @@ class DigiflazzAutoSources
         }
         $catalog = $this->catalog();
         $packages = ProductPackage::whereHas('mappings', fn ($query) => $query->where('provider_id', $provider->id)->whereNotNull('fulfillment_config->auto_source_group'))->with(['mappings', 'product'])->get();
+        $request = Request::create('/internal/digiflazz-auto-sources', 'POST');
+        $request->setUserResolver(fn ($guard = null) => null);
         $bySku = $catalog->flatten(1)->keyBy('buyer_sku_code');
         $added = 0;
         foreach ($packages as $package) {
@@ -138,7 +140,9 @@ class DigiflazzAutoSources
                 $current = $bySku->get($existing->external_sku);
                 $expected = data_get($existing->fulfillment_config, 'auto_source_group');
                 if ($expected !== null && $current && $this->key($current) !== $expected) {
+                    $before = $existing->toArray();
                     $existing->update(['is_active' => false]);
+                    app(AdminAuditService::class)->record($request, 'catalog.fulfillment_source.identity_changed', 'provider_mapping', $existing->id, $before, $existing->fresh()->toArray());
                 }
             }
             foreach ($items as $item) {
@@ -147,11 +151,13 @@ class DigiflazzAutoSources
                     continue;
                 }
                 $mapping = app(DigiflazzCatalogImport::class)->upsert($package, $item->buyer_sku_code, (int) $item->price_idr, (int) $item->price_idr);
+                $before = $mapping->toArray();
                 $mapping->update([
                     'is_active' => $provider->is_active && $package->is_active && $package->product->is_active,
                     'priority' => 0,
                     'fulfillment_config' => $seed->fulfillment_config,
                 ]);
+                app(AdminAuditService::class)->record($request, 'catalog.fulfillment_source.auto_attached', 'provider_mapping', $mapping->id, $before, $mapping->fresh()->toArray());
                 $added++;
             }
         }

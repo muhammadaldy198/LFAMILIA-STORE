@@ -267,6 +267,7 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertDatabaseHas('provider_mappings', ['external_sku' => 'sync-A', 'is_active' => false]);
         $this->assertDatabaseHas('provider_mappings', ['external_sku' => 'sync-B', 'is_active' => false]);
         $this->assertDatabaseMissing('provider_mappings', ['external_sku' => 'wrong-region']);
+        $this->assertDatabaseHas('audit_logs', ['action' => 'catalog.fulfillment_source.auto_attached']);
         $this->assertSame(11220, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
         $this->fakeCatalog([$this->row(['buyer_sku_code' => 'sync-A']), $this->row(['buyer_sku_code' => 'sync-C', 'price' => 10200])]);
         app(DigiflazzCatalogService::class)->sync();
