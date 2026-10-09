@@ -133,9 +133,9 @@ class IntegrationRegistry
                 ],
             ],
             'doku' => [
-                'name' => 'DOKU Direct API',
+                'name' => 'DOKU Checkout',
                 'group' => 'Pembayaran',
-                'description' => 'Kredensial DOKU Direct API untuk channel yang dirutekan melalui DOKU.',
+                'description' => 'Kredensial DOKU Checkout untuk halaman pembayaran yang dihosting DOKU.',
                 'default_environment' => 'sandbox',
                 'credential_scope' => 'per_environment',
                 'environments' => [
