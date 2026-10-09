@@ -12,7 +12,7 @@ const groups = {
 };
 if (group !== 'all' && !groups[group]) throw Error('Unknown group: '+group);
 const pages = group === 'all' ? Object.values(groups).flat() : groups[group];
-// This suite uses only the isolated local/testing fixtures; external actions are never submitted.
+// This suite uses isolated local/testing fixtures. Catalog imports stay local; provider and payment actions are never submitted.
 const profile = await mkdtemp(join(tmpdir(),'lfamilia-admin-ui-'));
 const chrome = spawn(process.argv[2],['--headless=new','--no-sandbox','--disable-dev-shm-usage','--remote-debugging-port=9228','--user-data-dir='+profile],{stdio:'ignore'});
 const pause = ms => new Promise(resolve=>setTimeout(resolve,ms));
@@ -31,6 +31,13 @@ try {
     const evaluate=async expression=>{const r=await send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(r.exceptionDetails)throw Error(r.exceptionDetails.exception?.description||r.exceptionDetails.text);return r.result.value;};
     const navigate=async path=>{await send('Page.navigate',{url:'http://127.0.0.1:8000'+path});for(let i=0;i<60;i++){await pause(100);if(await evaluate(`location.pathname===${JSON.stringify(path.split('?')[0])}&&document.readyState==='complete'&&Boolean(document.querySelector('main'))`))break;}await pause(300);};
     const click=async label=>{const found=await evaluate(`(()=>{const b=[...document.querySelectorAll('.lf-admin-tabs button'),...document.querySelectorAll('button')].find(b=>b.getBoundingClientRect().height>0&&b.textContent.trim()===${JSON.stringify(label)});if(!b)return false;b.click();return true;})()`);if(!found)throw Error('Missing button: '+label);await pause(350);};
+    const pointerClick = async expression => {
+        const point = await evaluate(`(()=>{const e=(${expression});if(!e||e.disabled)return null;e.scrollIntoView({block:'center',inline:'nearest'});const r=e.getBoundingClientRect();const x=r.left+r.width/2,y=r.top+r.height/2;return e.contains(document.elementFromPoint(x,y))?{x,y}:null;})()`);
+        if(!point)throw Error('Control disabled or covered: '+expression);
+        await send('Input.dispatchMouseEvent',{type:'mousePressed',...point,button:'left',clickCount:1});
+        await send('Input.dispatchMouseEvent',{type:'mouseReleased',...point,button:'left',clickCount:1});
+        await pause(350);
+    };
     const inspect=async label=>{
         const info=await evaluate(`(()=>{const visible=e=>e.getBoundingClientRect().width>0&&e.getBoundingClientRect().height>0;return {width:innerWidth,scroll:document.documentElement.scrollWidth,admin:!!document.querySelector('.lf-admin'),heading:document.querySelector('h1')?.innerText,mobileTables:innerWidth<768?[...document.querySelectorAll('main table')].filter(visible).length:0,broken:[...document.images].filter(i=>visible(i)&&i.complete&&!i.naturalWidth).map(i=>i.getAttribute('src')),outside:[...document.querySelectorAll('main input,main select,main textarea,main button')].filter(e=>visible(e)&&!e.closest('table,.lf-admin-tabs')).filter(e=>{const r=e.getBoundingClientRect();return r.left< -2||r.right>innerWidth+2;}).map(e=>e.textContent||e.tagName)};})()`);
         if(!info.admin||!info.heading||info.scroll>info.width+2||info.mobileTables||info.broken.length||info.outside.length||errors.length)throw Error(JSON.stringify({label,...info,errors}));
@@ -53,17 +60,39 @@ try {
     const login=await evaluate(`(async()=>{const token=document.querySelector('meta[name="csrf-token"]').content;const r=await fetch('/admin/login',{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json','X-CSRF-TOKEN':token},body:JSON.stringify({email:'browser-admin@example.test',password:'Browser-admin-test-password-123'})});return r.status;})()`);
     if(![200,204].includes(login))throw Error('Admin fixture login failed: '+login);
     const sizes=group==='all'?[[360,800],[390,844],[412,915],[430,932],[1024,768],[1280,800],[1440,900],[1920,1080]]:[[390,844],[430,932],[1024,768],[1440,900]];
+    let importSubmitted = false;
     for(const [width,height] of sizes){
         await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:width<768});
         for(const path of pages){
             await navigate(path);await inspect(width+'-'+path);
             if(path==='/admin/catalog'){
                 const editor=await evaluate(`JSON.parse(document.getElementById('app').dataset.page).props.products.find(p=>p.slug==='browser-checkout-game').id`);
+                await pointerClick(`[...document.querySelectorAll('button')].find(b=>b.getBoundingClientRect().height>0&&b.textContent.trim()==='Impor Digiflazz')`);
+                await evaluate(`(()=>{const s=document.querySelector('[data-testid="catalog-import-target"] select');s.value=${editor};s.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+                await pointerClick(`[...document.querySelectorAll('button')].find(b=>b.getBoundingClientRect().height>0&&b.textContent.trim()==='Lanjut pilih SKU')`);
+                if(!await evaluate(`Boolean(document.querySelector('[data-testid="digiflazz-import"]'))`))throw Error('Catalog import action did not open SKU picker');
                 await navigate('/admin/catalog?edit='+editor);
                 if(!await evaluate(`!document.querySelector('input[placeholder="Nama, alamat produk, merek, atau nominal"]')&&!document.querySelector('[role=dialog]')`))throw Error('Product list visible behind editor');
                 for(const tab of ['Informasi','Nominal & Harga','Tampilan Produk','Data Pelanggan','Penanganan']){
                     await click(tab);await inspect(width+'-product-'+tab);
-                    if(tab==='Nominal & Harga'){await click('Edit nominal');await inspect(width+'-nominal-editor');await click('Tutup editor nominal');}
+                    if(tab==='Nominal & Harga'){
+                        await pointerClick(`[...document.querySelectorAll('button')].find(b=>b.getBoundingClientRect().height>0&&b.textContent.trim()==='Impor nominal Digiflazz')`);
+                        if(!await evaluate(`document.querySelector('[data-testid="digiflazz-import"]')&&[...document.querySelectorAll('[data-testid="digiflazz-import"] button')].find(b=>/^Impor \\d+ nominal$/.test(b.textContent.trim()))?.disabled`))throw Error('Import picker missing or submit enabled without selection');
+                        await pointerClick(`document.querySelector('[data-sku="${importSubmitted?'BROWSER-IMPORT-300':'BROWSER-IMPORT-200'}"] input')`);
+                        if(!await evaluate(`[...document.querySelectorAll('[data-testid="digiflazz-import"] button')].find(b=>b.textContent.trim()==='Impor 1 nominal'&&!b.disabled)`))throw Error('Selecting supplier SKU did not enable import');
+                        await inspect(width+'-import-picker');
+                        if(!importSubmitted){
+                            await pointerClick(`[...document.querySelectorAll('[data-testid="digiflazz-import"] button')].find(b=>b.textContent.trim()==='Impor 1 nominal')`);
+                            let done=false;for(let i=0;i<60;i++){await pause(100);done=await evaluate(`!document.querySelector('[data-testid="digiflazz-import"]')`);if(done)break;}
+                            if(!done)throw Error('Local SKU import did not finish');
+                            await navigate('/admin/catalog?edit='+editor);
+                            const safe=await evaluate(`(()=>{const p=JSON.parse(document.getElementById('app').dataset.page).props.products.find(p=>p.slug==='browser-checkout-game');const pack=p.packages.find(p=>p.name==='Browser Import 200 Diamonds');return pack&&!pack.is_active&&pack.mappings.some(m=>m.external_sku==='BROWSER-IMPORT-200'&&!m.is_active);})()`);
+                            if(!safe)throw Error('Import did not persist inactive package and mapping');
+                            importSubmitted=true;await click('Nominal & Harga');
+                            console.log('PASS real click, SKU selection, and isolated catalog import');
+                        }else{await click('Impor nominal Digiflazz');}
+                        await click('Edit nominal');await inspect(width+'-nominal-editor');await click('Tutup editor nominal');
+                    }
                     if(tab==='Data Pelanggan'&&!await evaluate(`Boolean(document.querySelector('input[placeholder="Contoh: User ID"]'))`))throw Error('Customer fields missing from editor');
                 }
                 await click('Kembali ke produk');await inspect(width+'-product-return');
