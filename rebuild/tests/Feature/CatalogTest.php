@@ -52,9 +52,15 @@ class CatalogTest extends TestCase
                 ->has('products.data')
                 ->etc());
 
+        // A real Inertia visit includes the asset version from the initial HTML page.
+        // Omitting it causes the Inertia middleware to return a 409 asset-version redirect.
+        $page = $this->get('/')->viewData('page');
+        $version = (string) ($page['version'] ?? '');
+
         // The homepage tabs ask Inertia for only the filtered product list and filters.
         // Banners, navigation categories and news should remain mounted in the browser.
         $this->withHeaders([
+            'X-Inertia-Version' => $version,
             'X-Inertia' => 'true',
             'X-Inertia-Partial-Component' => 'Catalog/Index',
             'X-Inertia-Partial-Data' => 'products,filters',
