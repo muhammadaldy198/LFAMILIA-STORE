@@ -234,10 +234,25 @@ class PaymentRoutingService
         }
 
         $flat = max(0, (int) $route['fee_flat_idr']);
-        $bps = max(0, min(10000, (int) $route['fee_percent_bps']));
-        $percent = $bps === 0 ? 0 : intdiv(($amountIdr * $bps) + 9999, 10000);
+        $bps = max(0, min(9999, (int) $route['fee_percent_bps']));
 
-        return $flat + $percent;
+        if ($bps === 0) {
+            return $flat;
+        }
+
+        // Percentage gateway fees are deducted from the *total* payment,
+        // not just the item price. Gross up so the merchant retains at
+        // least the requested amount after both percentage and flat fees:
+        // total = ceil((amount + flat) / (1 - rate)).
+        $numeratorBase = $amountIdr + $flat;
+        if ($numeratorBase <= 0 || $numeratorBase > intdiv(PHP_INT_MAX - 9999, 10000)) {
+            throw ValidationException::withMessages(['payment_channel_code' => 'Nilai pembayaran melebihi batas aman.']);
+        }
+
+        $denominator = 10000 - $bps;
+        $total = intdiv(($numeratorBase * 10000) + $denominator - 1, $denominator);
+
+        return $total - $amountIdr;
     }
 
     private function customerFeeIsForbidden(array $route): bool
