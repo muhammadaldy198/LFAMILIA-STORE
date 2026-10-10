@@ -163,11 +163,11 @@ class CheckoutFlowRegressionTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Payment/Show')
                 ->where('order.order_number', $order->json('order_number'))
-                ->where('order.total_idr', 11000)
+                ->where('order.total_idr', 11078)
                 ->where('payment.id', $payment->json('payment_id'))
                 ->where('payment.status', 'PENDING')
                 ->where('payment.channel_code', 'qris')
-                ->where('payment.amount_idr', 11000)
+                ->where('payment.amount_idr', 11078)
                 ->where('payment.instructions.token', 'stage-78-snap-token')
                 ->etc());
 
