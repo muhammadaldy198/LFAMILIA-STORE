@@ -36,8 +36,8 @@ class PaymentRoutingService
                     'group' => $this->publicGroup((string) $channel->method),
                     'description' => $channel->description ?: $this->defaultDescription((string) $channel->method),
                     'logo_url' => $channel->getFirstMediaUrl('logo') ?: null,
-                    'fee_flat_idr' => (int) $channel->fee_flat_idr,
-                    'fee_percent_bps' => (int) $channel->fee_percent_bps,
+                    'fee_flat_idr' => $this->customerFeeIsForbidden($route) ? 0 : (int) $route['fee_flat_idr'],
+                    'fee_percent_bps' => $this->customerFeeIsForbidden($route) ? 0 : (int) $route['fee_percent_bps'],
                     'available' => $route['gateway_code'] !== 'WALLET' || $user !== null,
                 ];
             })->filter()->values()->all();
@@ -70,8 +70,8 @@ class PaymentRoutingService
                     'name' => (string) $channel->name,
                     'description' => $channel->description ?: $this->defaultDescription((string) $channel->method),
                     'logo_url' => $channel->getFirstMediaUrl('logo') ?: null,
-                    'fee_flat_idr' => (int) $channel->fee_flat_idr,
-                    'fee_percent_bps' => (int) $channel->fee_percent_bps,
+                    'fee_flat_idr' => $this->customerFeeIsForbidden($route) ? 0 : (int) $route['fee_flat_idr'],
+                    'fee_percent_bps' => $this->customerFeeIsForbidden($route) ? 0 : (int) $route['fee_percent_bps'],
                 ];
             })->filter()->values()->all();
     }
@@ -115,6 +115,8 @@ class PaymentRoutingService
                 'routes.id as route_id',
                 'routes.provider_channel',
                 'routes.configuration',
+                'routes.fee_flat_idr as route_fee_flat_idr',
+                'routes.fee_percent_bps as route_fee_percent_bps',
                 'gateways.id as gateway_id',
                 'gateways.code as gateway_code',
                 'gateways.kind as gateway_kind'
@@ -134,8 +136,11 @@ class PaymentRoutingService
             'channel_id' => (int) $channel->id,
             'channel_code' => (string) $channel->code,
             'channel_name' => (string) $channel->name,
-            'fee_flat_idr' => (int) $channel->fee_flat_idr,
-            'fee_percent_bps' => (int) $channel->fee_percent_bps,
+            'channel_method' => (string) $channel->method,
+            'fee_flat_idr' => $route->route_fee_flat_idr !== null
+                ? (int) $route->route_fee_flat_idr : (int) $channel->fee_flat_idr,
+            'fee_percent_bps' => $route->route_fee_percent_bps !== null
+                ? (int) $route->route_fee_percent_bps : (int) $channel->fee_percent_bps,
             'route_id' => (int) $route->route_id,
             'gateway_id' => (int) $route->gateway_id,
             'gateway_code' => (string) $route->gateway_code,
@@ -173,9 +178,12 @@ class PaymentRoutingService
                 'routes.id as route_id',
                 'routes.provider_channel',
                 'routes.configuration',
+                'routes.fee_flat_idr as route_fee_flat_idr',
+                'routes.fee_percent_bps as route_fee_percent_bps',
                 'channels.id as channel_id',
                 'channels.code as channel_code',
                 'channels.name as channel_name',
+                'channels.method as channel_method',
                 'channels.fee_flat_idr',
                 'channels.fee_percent_bps',
                 'gateways.id as gateway_id',
@@ -197,8 +205,11 @@ class PaymentRoutingService
             'channel_id' => (int) $row->channel_id,
             'channel_code' => (string) $row->channel_code,
             'channel_name' => (string) $row->channel_name,
-            'fee_flat_idr' => (int) $row->fee_flat_idr,
-            'fee_percent_bps' => (int) $row->fee_percent_bps,
+            'channel_method' => (string) $row->channel_method,
+            'fee_flat_idr' => $row->route_fee_flat_idr !== null
+                ? (int) $row->route_fee_flat_idr : (int) $row->fee_flat_idr,
+            'fee_percent_bps' => $row->route_fee_percent_bps !== null
+                ? (int) $row->route_fee_percent_bps : (int) $row->fee_percent_bps,
             'route_id' => (int) $row->route_id,
             'gateway_id' => (int) $row->gateway_id,
             'gateway_code' => (string) $row->gateway_code,
@@ -216,11 +227,24 @@ class PaymentRoutingService
             throw ValidationException::withMessages(['payment_channel_code' => 'Nilai transaksi tidak valid.']);
         }
 
+        // Paying with LFAMILIA Cash is always free. QRIS MDR cannot be
+        // passed to consumers via a method-specific surcharge.
+        if ($this->customerFeeIsForbidden($route)) {
+            return 0;
+        }
+
         $flat = max(0, (int) $route['fee_flat_idr']);
         $bps = max(0, min(10000, (int) $route['fee_percent_bps']));
         $percent = $bps === 0 ? 0 : intdiv(($amountIdr * $bps) + 9999, 10000);
 
         return $flat + $percent;
+    }
+
+    private function customerFeeIsForbidden(array $route): bool
+    {
+        return in_array(strtoupper((string) ($route['channel_method'] ?? '')), ['WALLET', 'QRIS'], true)
+            || in_array(strtolower((string) ($route['channel_code'] ?? '')), ['saldo', 'qris', 'manual_qris'], true)
+            || in_array(strtoupper((string) ($route['gateway_code'] ?? '')), ['WALLET', 'MANUAL_QRIS'], true);
     }
 
     public function gatewayReady(string $gatewayCode): bool
