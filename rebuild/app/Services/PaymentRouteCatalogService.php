@@ -98,7 +98,7 @@ class PaymentRouteCatalogService
                 'supports_order' => (bool) $generic->supports_order,
                 'supports_wallet_topup' => (bool) $generic->supports_wallet_topup,
                 'sort_order' => (int) $bank['sort_order'],
-                'is_active' => (bool) $generic->is_active,
+                'is_active' => (bool) ($bank['initially_active'] ?? $generic->is_active),
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
