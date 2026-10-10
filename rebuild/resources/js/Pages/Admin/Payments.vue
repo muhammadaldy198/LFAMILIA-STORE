@@ -30,9 +30,9 @@ const props = defineProps({
 
 const tab = ref('methods');
 const tabs = [
-    ['methods', 'Channel'], ['gateways', 'Gateway'], ['routing', 'Routing'],
-    ['qris', 'QRIS Manual'], ['wallet', 'Top Up Saldo'],
-    ['page', 'Tampilan Halaman'], ['transactions', 'Transaksi'],
+    ['methods', 'Metode & Urutan'], ['routing', 'Biaya & Routing'], ['gateways', 'Gateway'],
+    ['wallet', 'Top Up Cash'], ['qris', 'QRIS Manual'],
+    ['transactions', 'Transaksi'], ['page', 'Tampilan'],
 ];
 
 const filters = reactive({
@@ -48,7 +48,8 @@ watch(() => props.gateways, (items) => {
     gateways.splice(0, gateways.length, ...items.map((item) => ({ ...item })));
 }, { deep: true });
 
-const routes = reactive(props.routes.map((item) => ({ ...item })));
+const decorateRoute = (item) => ({ ...item, custom_fee: item.fee_flat_idr !== null || item.fee_percent_bps !== null });
+const routes = reactive(props.routes.map(decorateRoute));
 const methodPosition = (row) => displayPosition(props.channels, row, byOrder());
 const gatewayPosition = (row) => displayPosition(gateways, row, byOrder());
 const routePosition = (row) => displayPosition(
@@ -56,7 +57,7 @@ const routePosition = (row) => displayPosition(
     row, byOrder('priority'),
 );
 watch(() => props.routes, (items) => {
-    routes.splice(0, routes.length, ...items.map((item) => ({ ...item })));
+    routes.splice(0, routes.length, ...items.map(decorateRoute));
 }, { deep: true });
 
 const walletSettings = reactive({
@@ -101,6 +102,17 @@ const selectedTransaction = ref(null);
 const showAdvancedRouting = ref(false);
 const saving = ref('');
 
+const freeMethod = (method, code) => ['WALLET', 'QRIS'].includes(method) || ['saldo', 'qris', 'manual_qris'].includes(code);
+const routeIsFree = (row) => freeMethod(row.channel_method, row.channel_code);
+const routeFeeText = (row) => {
+    if (routeIsFree(row)) return 'Gratis';
+    const flat = row.custom_fee ? Number(row.fee_flat_idr || 0) : Number(row.channel_fee_flat_idr || 0);
+    const pct = row.custom_fee ? Number(row.fee_percent_bps || 0) : Number(row.channel_fee_percent_bps || 0);
+    const parts = [];
+    if (pct) parts.push((pct / 100).toLocaleString('id-ID', { maximumFractionDigits: 2 }) + '%');
+    if (flat) parts.push(money(flat));
+    return parts.join(' + ') || 'Rp0';
+};
 const methodLabel = (value) => ({
     QRIS: 'QRIS',
     VIRTUAL_ACCOUNT: 'Virtual Account',
@@ -229,13 +241,14 @@ function uploadChannelLogo(channelId, file, done = () => {}) {
 function saveChannel() {
     if (!channelEditor.value || saving.value) return;
     const row = channelEditor.value;
+    const free = freeMethod(row.method, row.code);
     const payload = {
         code: String(row.code || '').trim().toLowerCase(),
         method: row.method,
         name: row.name,
         description: row.description || null,
-        fee_flat_idr: Number(row.fee_flat_idr || 0),
-        fee_percent_bps: Math.max(0, Math.min(9999, Math.round(Number(row.fee_percent || 0) * 100))),
+        fee_flat_idr: free ? 0 : Number(row.fee_flat_idr || 0),
+        fee_percent_bps: free ? 0 : Math.max(0, Math.min(9999, Math.round(Number(row.fee_percent || 0) * 100))),
         supports_order: Boolean(row.supports_order),
         supports_wallet_topup: Boolean(row.supports_wallet_topup),
         sort_order: Number(row.sort_order || 0),
@@ -296,6 +309,9 @@ function saveRoute(row) {
         supports_order: Boolean(row.supports_order),
         supports_wallet_topup: Boolean(row.supports_wallet_topup),
         is_active: Boolean(row.is_active),
+        fee_flat_idr: routeIsFree(row) ? 0 : (row.custom_fee ? Number(row.fee_flat_idr || 0) : null),
+        fee_percent_bps: routeIsFree(row) ? 0 : (row.custom_fee
+            ? Math.round(Number(row.fee_percent_bps || 0) * 1) : null),
     }, { preserveScroll: true });
 }
 
@@ -357,7 +373,7 @@ async function copy(value) {
             <div>
                 <h1 class="text-2xl font-semibold">Pembayaran</h1>
                 <p class="mt-1 max-w-3xl text-sm text-muted-foreground">
-                    Kelola metode pembayaran, biaya customer, routing internal, top up saldo, tampilan halaman, dan riwayat transaksi. Nama gateway tidak ditampilkan ke customer.
+                    Kelola nama dan urutan metode, tarif tiap gateway, pembayaran pesanan, top up LFAMILIA Cash, dan transaksi dalam satu tempat.
                 </p>
             </div>
             <Button variant="outline" @click="router.reload({ preserveScroll: true })">Muat ulang</Button>
@@ -377,18 +393,18 @@ async function copy(value) {
 
         <template v-if="tab === 'methods'">                <Card class="min-w-0 p-4">
                     <div class="flex flex-wrap items-start justify-between gap-3">
-                        <div><h2 class="text-lg font-semibold">Metode Pembayaran</h2><p class="mt-1 text-sm text-muted-foreground">Nama, deskripsi, logo, biaya, urutan, penggunaan, dan status dapat dikelola dari sini.</p></div>
+                        <div><h2 class="text-lg font-semibold">Metode Pembayaran & Urutan</h2><p class="mt-1 text-sm text-muted-foreground">Urutan pada tabel mengikuti urutan pilihan pelanggan. Nama dan posisi bisa diubah lewat Edit; tarif khusus Midtrans/DOKU di tab Biaya & Routing.</p></div>
                         <div v-if="isSuperAdmin" class="flex flex-wrap gap-2"><Button size="sm" variant="outline" @click="syncChannels">Pulihkan metode bawaan</Button><Button size="sm" @click="openCreateChannel">Tambah metode</Button></div>
                     </div>
 
                     <div class="mt-4 overflow-x-auto">
                         <AdminResponsiveTable :mobile-columns="[0,3,4,5]">
-                            <TableHeader><TableRow><TableHead>Metode</TableHead><TableHead>Jenis</TableHead><TableHead>Biaya customer</TableHead><TableHead>Kesiapan</TableHead><TableHead>Status</TableHead><TableHead class="text-right">Aksi</TableHead></TableRow></TableHeader>
+                            <TableHeader><TableRow><TableHead>Metode</TableHead><TableHead>Jenis</TableHead><TableHead>Tarif dasar</TableHead><TableHead>Kesiapan</TableHead><TableHead>Status</TableHead><TableHead class="text-right">Aksi</TableHead></TableRow></TableHeader>
                             <TableBody>
                                 <TableRow v-for="channel in channels" :key="channel.id">
                                     <TableCell><div class="flex min-w-[190px] items-center gap-3"><div class="grid size-10 shrink-0 place-items-center overflow-hidden rounded-md border bg-muted"><img v-if="channel.logo_url" :src="channel.logo_url" :alt="channel.name" class="size-full object-contain"><span v-else class="text-xs font-semibold">{{ channel.name.slice(0, 2).toUpperCase() }}</span></div><div><strong class="text-sm">{{ channel.name }}</strong><p class="text-[11px] text-muted-foreground">Posisi {{ methodPosition(channel) }} di pilihan pembayaran</p><p class="mt-0.5 max-w-[260px] text-xs text-muted-foreground">{{ channel.description || channel.code }}</p></div></div></TableCell>
                                     <TableCell>{{ methodLabel(channel.method) }}</TableCell>
-                                    <TableCell><span v-if="Number(channel.fee_percent_bps || 0)">{{ (Number(channel.fee_percent_bps) / 100).toLocaleString('id-ID', { maximumFractionDigits: 2 }) }}%</span><span v-if="Number(channel.fee_percent_bps || 0) && Number(channel.fee_flat_idr || 0)"> + </span><span v-if="Number(channel.fee_flat_idr || 0)">{{ money(channel.fee_flat_idr) }}</span><span v-if="!Number(channel.fee_percent_bps || 0) && !Number(channel.fee_flat_idr || 0)">Rp0</span></TableCell>
+                                    <TableCell><span v-if="freeMethod(channel.method, channel.code)">Gratis</span><template v-else><span v-if="Number(channel.fee_percent_bps || 0)">{{ (Number(channel.fee_percent_bps) / 100).toLocaleString('id-ID', { maximumFractionDigits: 2 }) }}%</span><span v-if="Number(channel.fee_percent_bps || 0) && Number(channel.fee_flat_idr || 0)"> + </span><span v-if="Number(channel.fee_flat_idr || 0)">{{ money(channel.fee_flat_idr) }}</span><span v-if="!Number(channel.fee_percent_bps || 0) && !Number(channel.fee_flat_idr || 0)">Rp0</span></template></TableCell>
                                     <TableCell><div class="flex flex-wrap gap-1"><Badge :variant="channel.available_order ? 'secondary' : 'outline'">Pesanan {{ channel.available_order ? 'siap' : 'belum siap' }}</Badge><Badge v-if="channel.supports_wallet_topup" :variant="channel.available_topup ? 'secondary' : 'outline'">Top up {{ channel.available_topup ? 'siap' : 'belum siap' }}</Badge></div></TableCell>
                                     <TableCell><Badge :variant="channel.is_active ? 'secondary' : 'outline'">{{ channel.is_active ? 'Aktif' : 'Nonaktif' }}</Badge></TableCell>
                                     <TableCell class="text-right"><div v-if="isSuperAdmin" class="flex justify-end gap-2"><Button size="sm" variant="outline" @click="openEditChannel(channel)">Edit</Button><Button size="sm" variant="destructive" @click="deleteChannel(channel)">Hapus</Button></div><span v-else class="text-xs text-muted-foreground">Lihat saja</span></TableCell>
@@ -398,15 +414,15 @@ async function copy(value) {
                         </AdminResponsiveTable>
                     </div>
                 </Card>            <Card v-if="channelEditor" class="p-4">
-                <div class="flex flex-wrap items-start justify-between gap-3"><div><h2 class="text-lg font-semibold">{{ channelEditor.id ? 'Edit Metode Pembayaran' : 'Tambah Metode Pembayaran' }}</h2><p class="mt-1 text-sm text-muted-foreground">Biaya di bawah dibebankan ke customer.</p></div><Button size="sm" variant="ghost" @click="closeChannelEditor">Tutup</Button></div>
+                <div class="flex flex-wrap items-start justify-between gap-3"><div><h2 class="text-lg font-semibold">{{ channelEditor.id ? 'Edit Metode Pembayaran' : 'Tambah Metode Pembayaran' }}</h2><p class="mt-1 text-sm text-muted-foreground">Tarif dasar berlaku untuk pesanan dan top up saldo; tarif per gateway dapat diatur terpisah. LFAMILIA Cash dan QRIS tanpa surcharge.</p></div><Button size="sm" variant="ghost" @click="closeChannelEditor">Tutup</Button></div>
                 <div class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                     <label class="space-y-1"><span class="text-sm font-medium">Nama tampilan</span><Input v-model="channelEditor.name" maxlength="100" /></label>
                     <label class="space-y-1"><span class="text-sm font-medium">Kode metode</span><Input v-model="channelEditor.code" maxlength="60" placeholder="contoh: qris" /></label>
                     <label class="space-y-1"><span class="text-sm font-medium">Jenis</span><select v-model="channelEditor.method" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"><option value="QRIS">QRIS</option><option value="VIRTUAL_ACCOUNT">Virtual Account</option><option value="EWALLET">E-Wallet</option><option value="RETAIL">Gerai Retail</option><option value="WALLET">Saldo</option><option value="OTHER">Lainnya</option></select></label>
                     <details class="space-y-1"><summary class="cursor-pointer text-sm font-medium">Urutan teknis (lanjutan)</summary><label class="mt-2 block text-xs">Skor urutan internal<Input v-model.number="channelEditor.sort_order" type="number" min="0" max="9999" /></label><p class="text-xs text-muted-foreground">Metode ditampilkan sebagai Posisi 1, 2, 3. Skor 10, 20, 30 boleh dibiarkan.</p></details>
                     <label class="space-y-1 md:col-span-2"><span class="text-sm font-medium">Deskripsi customer</span><Input v-model="channelEditor.description" maxlength="160" /></label>
-                    <label class="space-y-1"><span class="text-sm font-medium">Biaya persen (%)</span><Input v-model.number="channelEditor.fee_percent" type="number" min="0" max="99.99" step="0.01" /></label>
-                    <label class="space-y-1"><span class="text-sm font-medium">Biaya tetap (Rp)</span><Input v-model.number="channelEditor.fee_flat_idr" type="number" min="0" max="100000000" /></label>
+                    <label class="space-y-1"><span class="text-sm font-medium">Biaya admin (%)</span><Input v-model.number="channelEditor.fee_percent" type="number" min="0" max="99.99" step="0.01" :disabled="freeMethod(channelEditor.method, channelEditor.code)" /></label>
+                    <label class="space-y-1"><span class="text-sm font-medium">Biaya admin (Rp)</span><Input v-model.number="channelEditor.fee_flat_idr" type="number" min="0" max="100000000" :disabled="freeMethod(channelEditor.method, channelEditor.code)" /><small v-if="freeMethod(channelEditor.method, channelEditor.code)" class="text-muted-foreground">Otomatis Rp0 untuk LFAMILIA Cash/QRIS</small></label>
                     <div class="space-y-2 rounded-md border p-3"><span class="text-sm font-medium">Digunakan untuk</span><label class="flex items-center gap-2 text-sm"><AdminSwitch v-model="channelEditor.supports_order" />Pembayaran pesanan</label><label class="flex items-center gap-2 text-sm"><AdminSwitch v-model="channelEditor.supports_wallet_topup" />Top up saldo</label></div>
                     <div class="space-y-2 rounded-md border p-3"><span class="text-sm font-medium">Status</span><label class="flex items-center gap-2 text-sm"><AdminSwitch v-model="channelEditor.is_active" />Metode aktif</label><p class="text-xs text-muted-foreground">Tetap hanya tampil bila routing dan gateway siap.</p></div>
                     <div class="space-y-2 rounded-md border p-3 md:col-span-2"><span class="text-sm font-medium">Logo metode</span><div class="flex items-center gap-3"><div class="grid size-14 place-items-center overflow-hidden rounded-md border bg-muted"><img v-if="channelLogoPreview" :src="channelLogoPreview" alt="" class="size-full object-contain"><span v-else class="text-xs text-muted-foreground">Logo</span></div><input type="file" accept="image/png,image/jpeg,image/webp" class="min-w-0 text-xs" @change="chooseChannelLogo"></div></div>
@@ -434,14 +450,14 @@ async function copy(value) {
                         </div>
                     </Card></template>
         <template v-else-if="tab === 'routing'">            <Card class="p-4">
-                <div class="flex flex-wrap items-start justify-between gap-3"><div><h2 class="text-lg font-semibold">Routing Pembayaran</h2><p class="mt-1 text-sm text-muted-foreground">Customer memilih metode pembayaran. Posisi gateway dihitung mulai 1 untuk setiap metode. Hanya route yang aktif dan layak digunakan.</p></div><Button v-if="isSuperAdmin" size="sm" variant="outline" @click="showAdvancedRouting = !showAdvancedRouting">{{ showAdvancedRouting ? 'Tutup pengaturan' : 'Atur routing' }}</Button></div>
+                <div class="flex flex-wrap items-start justify-between gap-3"><div><h2 class="text-lg font-semibold">Biaya Admin & Routing Gateway</h2><p class="mt-1 text-sm text-muted-foreground">Atur biaya per kombinasi metode dan gateway untuk pembayaran pesanan serta top up saldo. Prioritas gateway kecil didahulukan; perubahan hanya berlaku pada pesanan baru.</p></div><Button v-if="isSuperAdmin" size="sm" variant="outline" @click="showAdvancedRouting = !showAdvancedRouting">{{ showAdvancedRouting ? 'Tutup pengaturan' : 'Atur routing' }}</Button></div>
                 <div class="mt-4 overflow-x-auto">
-                    <AdminResponsiveTable :mobile-columns="[0,1,4,5]"><TableHeader><TableRow><TableHead>Metode</TableHead><TableHead>Gateway</TableHead><TableHead>Pesanan</TableHead><TableHead>Top up</TableHead><TableHead>Posisi untuk metode ini</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
-                    <TableBody><TableRow v-for="row in routes" :key="row.id"><TableCell>{{ row.channel_name }}</TableCell><TableCell>{{ row.gateway_name }}</TableCell><TableCell>{{ row.supports_order ? 'Ya' : 'Tidak' }}</TableCell><TableCell>{{ row.supports_wallet_topup ? 'Ya' : 'Tidak' }}</TableCell><TableCell>Posisi {{ routePosition(row) }}</TableCell><TableCell><Badge :variant="row.is_active ? 'secondary' : 'outline'">{{ row.is_active ? 'Aktif' : 'Nonaktif' }}</Badge></TableCell></TableRow><TableRow v-if="!routes.length"><TableCell colspan="6" class="py-8 text-center text-muted-foreground">Belum ada routing pembayaran.</TableCell></TableRow></TableBody></AdminResponsiveTable>
+                    <AdminResponsiveTable :mobile-columns="[0,1,4,6]"><TableHeader><TableRow><TableHead>Metode</TableHead><TableHead>Gateway</TableHead><TableHead>Pesanan</TableHead><TableHead>Top up</TableHead><TableHead>Biaya admin</TableHead><TableHead>Prioritas</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+                    <TableBody><TableRow v-for="row in routes" :key="row.id"><TableCell>{{ row.channel_name }}</TableCell><TableCell>{{ row.gateway_name }}</TableCell><TableCell>{{ row.supports_order ? 'Ya' : 'Tidak' }}</TableCell><TableCell>{{ row.supports_wallet_topup ? 'Ya' : 'Tidak' }}</TableCell><TableCell>{{ routeFeeText(row) }}<p v-if="!row.custom_fee && !routeIsFree(row)" class="text-[11px] text-muted-foreground">Ikuti tarif dasar</p></TableCell><TableCell>Posisi {{ routePosition(row) }}</TableCell><TableCell><Badge :variant="row.is_active ? 'secondary' : 'outline'">{{ row.is_active ? 'Aktif' : 'Nonaktif' }}</Badge></TableCell></TableRow><TableRow v-if="!routes.length"><TableCell colspan="7" class="py-8 text-center text-muted-foreground">Belum ada routing pembayaran.</TableCell></TableRow></TableBody></AdminResponsiveTable>
                 </div>
 
                 <div v-if="showAdvancedRouting && isSuperAdmin" class="mt-4 space-y-4 border-t pt-4">
-                    <p class="rounded-md border p-3 text-sm text-muted-foreground">Endpoint, kode channel provider, signature, dan struktur request/response ditentukan oleh source code. Panel ini hanya mengatur penggunaan routing yang sudah didukung aplikasi.</p>
+                    <p class="rounded-md border p-3 text-sm text-muted-foreground">Tarif gateway kosong berarti mengikuti tarif dasar metode. Isi tarif setelah sesuai perjanjian merchant. Untuk QRIS dan LFAMILIA Cash, biaya customer selalu Rp0. Kode provider dan kredensial tidak dapat diubah dari sini.</p>
                     <div class="space-y-3">
                         <div v-for="row in routes" :key="'edit-' + row.id" class="grid gap-3 rounded-md border p-3 md:grid-cols-2 xl:grid-cols-6">
                             <div class="xl:col-span-2"><p class="text-sm font-medium">{{ row.channel_name }}</p><p class="text-xs text-muted-foreground">{{ row.gateway_name }}</p></div>
@@ -449,6 +465,11 @@ async function copy(value) {
                             <div class="space-y-2 text-sm"><label class="flex items-center gap-2"><AdminSwitch v-model="row.supports_order" />Pesanan</label><label class="flex items-center gap-2"><AdminSwitch v-model="row.supports_wallet_topup" />Top up</label></div>
                             <div class="space-y-2 text-sm"><label class="flex items-center gap-2"><AdminSwitch v-model="row.is_active" />Aktif</label></div>
                             <div class="flex items-end justify-end"><Button size="sm" variant="outline" @click="saveRoute(row)">Simpan</Button></div>
+                            <div class="xl:col-span-6 grid gap-3 border-t pt-3 sm:grid-cols-3">
+                                <label class="flex items-center gap-2 text-sm"><AdminSwitch v-model="row.custom_fee" :disabled="routeIsFree(row)" />Tarif khusus gateway</label>
+                                <label class="space-y-1 text-xs"><span>Biaya tetap (Rp)</span><Input v-model.number="row.fee_flat_idr" type="number" min="0" max="100000000" :disabled="routeIsFree(row) || !row.custom_fee" /></label>
+                                <label class="space-y-1 text-xs"><span>Biaya persen (%)</span><Input :model-value="Number(row.fee_percent_bps || 0) / 100" @update:model-value="value => { row.fee_percent_bps = Math.round(Number(value || 0) * 100) }" type="number" min="0" max="99.99" step="0.01" :disabled="routeIsFree(row) || !row.custom_fee" /></label>
+                            </div>
                         </div>
                         <p v-if="!routes.length" class="rounded-md border p-3 text-sm text-muted-foreground">Belum ada routing yang didukung source code.</p>
                     </div>
