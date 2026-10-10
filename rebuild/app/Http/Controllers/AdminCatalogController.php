@@ -701,6 +701,8 @@ class AdminCatalogController
                 $config['customer_no_template'] = $template;
             }
             $data['fulfillment_config'] = $config ?: null;
+            // An explicit admin edit overrides any earlier sync-generated disable.
+            $data['disabled_by_sync'] = false;
             unset($data['customer_no_template']);
         }
 
