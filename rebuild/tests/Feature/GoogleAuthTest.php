@@ -76,6 +76,7 @@ class GoogleAuthTest extends TestCase
         $this->assertSame('081234567890', $user->fresh()->phone);
         $this->get('/account')->assertOk();
     }
+
     public function test_local_password_customer_still_needs_password_confirmation_to_add_phone(): void
     {
         $user = User::create([
@@ -96,6 +97,7 @@ class GoogleAuthTest extends TestCase
 
         $this->assertSame('081234567890', $user->fresh()->phone);
     }
+
     public function test_existing_password_account_can_finish_phone_after_fresh_google_login(): void
     {
         $user = User::create([
