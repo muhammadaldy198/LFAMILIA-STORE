@@ -25,7 +25,7 @@ class DigiflazzAutoSources
 
     public function catalog(): Collection
     {
-        return DB::table('digiflazz_catalog_items')->get()->groupBy(fn (object $item): string => $this->key($item));
+        return DB::table('digiflazz_catalog_items')->where('is_present', true)->get()->groupBy(fn (object $item): string => $this->key($item));
     }
 
     public function importGroup(Product $product, Collection $items, ?string $template, bool $publish, string $margin, bool $automatic, Request $request): ProductPackage
@@ -45,11 +45,16 @@ class DigiflazzAutoSources
         $first = $items->sortBy('price_idr')->first();
         $nominal = app(CatalogNominalOrder::class)->value($first->product_name, $first->brand);
         if (! $package) {
+            // Default imports inherit the current product margin. A different margin
+            // explicitly entered during import remains a per-nominal override.
+            $inheritsProductMargin = number_format((float) $margin, 4, '.', '')
+                === number_format((float) $product->margin_percent, 4, '.', '');
             $package = $product->packages()->create([
                 'code' => 'DF_'.substr(hash('sha256', $first->buyer_sku_code), 0, 20),
                 'name' => $first->product_name, 'group_name' => $first->type ?: null,
                 'nominal_value' => $nominal, 'sort_order' => 0, 'is_active' => $publish,
-                'pricing_mode' => 'PERCENT', 'margin_percent' => $margin,
+                'pricing_mode' => $inheritsProductMargin ? 'PRODUCT_MARGIN' : 'PERCENT',
+                'margin_percent' => $inheritsProductMargin ? null : $margin,
             ]);
             app(AdminAuditService::class)->record($request, 'catalog.package.imported', 'product_package', $package->id, null, $package->toArray());
         } else {

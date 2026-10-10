@@ -319,7 +319,11 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertSame(11220, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
         $this->fakeCatalog([$this->row(['buyer_sku_code' => 'sync-A']), $this->row(['buyer_sku_code' => 'sync-C', 'price' => 10200])]);
         app(DigiflazzCatalogService::class)->sync();
-        $this->assertDatabaseHas('provider_mappings', ['external_sku' => 'sync-A', 'is_active' => false]);
+        // This source was disabled by the missing-SKU sync, not by the owner.
+        // Only such mappings may recover automatically when their SKU returns.
+        $this->assertDatabaseHas('provider_mappings', [
+            'external_sku' => 'sync-A', 'is_active' => true, 'disabled_by_sync' => false,
+        ]);
         $this->assertSame(3, $package->mappings()->count());
     }
 
@@ -503,6 +507,42 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertSame('7.0000', (string) $package->fresh()->margin_percent);
         $this->assertSame(15.0, (float) json_decode(DB::table('system_settings')->where('key', 'catalog.default_margin_percent')->value('value'), true));
         $this->assertDatabaseHas('audit_logs', ['action' => 'catalog.margin.global_updated']);
+    }
+
+    public function test_global_margin_explicitly_converts_legacy_digiflazz_imported_percent_only(): void
+    {
+        $this->login();
+        $product = $this->product();
+        $provider = Provider::where('code', 'DIGIFLAZZ')->firstOrFail();
+        $legacy = ProductPackage::create([
+            'product_id' => $product->id, 'code' => 'DF_legacy_import', 'name' => '5 Diamond',
+            'pricing_mode' => 'PERCENT', 'margin_percent' => 10,
+        ]);
+        ProviderMapping::create([
+            'provider_id' => $provider->id, 'product_package_id' => $legacy->id,
+            'external_sku' => 'df-legacy-'.bin2hex(random_bytes(4)), 'priority' => 0,
+            'cost_idr' => 1500, 'max_price_idr' => 1500, 'is_active' => false,
+        ]);
+        $override = ProductPackage::create([
+            'product_id' => $product->id, 'code' => 'CUSTOM_OVERRIDE', 'name' => 'Custom',
+            'pricing_mode' => 'PERCENT', 'margin_percent' => 7,
+        ]);
+        $fixed = ProductPackage::create([
+            'product_id' => $product->id, 'code' => 'FIXED_PRICE', 'name' => 'Fixed',
+            'pricing_mode' => 'SELL_PRICE', 'sell_price_idr' => 2000,
+        ]);
+
+        $this->put('/admin/catalog/margin', ['margin_percent' => 9])->assertSessionHasNoErrors();
+        $this->assertSame('PERCENT', $legacy->fresh()->pricing_mode);
+        $this->put('/admin/catalog/margin', [
+            'margin_percent' => 9, 'include_imported_percent' => true,
+        ])->assertSessionHasNoErrors();
+        $this->assertSame('9.0000', (string) $product->fresh()->margin_percent);
+        $this->assertSame('PRODUCT_MARGIN', $legacy->fresh()->pricing_mode);
+        $this->assertNull($legacy->fresh()->margin_percent);
+        $this->assertSame('PERCENT', $override->fresh()->pricing_mode);
+        $this->assertSame('7.0000', (string) $override->fresh()->margin_percent);
+        $this->assertSame('SELL_PRICE', $fixed->fresh()->pricing_mode);
     }
 
     public function test_catalog_slugs_are_editable_and_handling_mode_changes_only_while_product_is_empty(): void

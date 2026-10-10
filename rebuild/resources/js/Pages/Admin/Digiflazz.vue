@@ -181,8 +181,8 @@ onUnmounted(() => {
         <Card class="p-4">
             <div class="mb-3 space-y-1 text-xs text-muted-foreground">
                 <p>Sinkron daftar harga lengkap: {{ date(catalogSync?.at || lastSyncedAt) }} · Sinkron otomatis {{ autoSync ? 'setiap ' + monitorSettings.sync_interval_minutes + ' menit' : 'nonaktif' }}.</p>
-                <p>Daftar di layar dimuat ulang setiap 30 detik. SKU yang sudah tidak ada dihapus setelah sinkron lengkap berhasil.</p>
-                <p v-if="catalogSync?.removed">Sinkron terakhir menghapus {{ catalogSync.removed }} SKU lama.</p>
+                <p>Daftar di layar dimuat ulang setiap 30 detik. SKU yang hilang saat sinkron ditandai tidak tersedia, tanpa menghapus data lama.</p>
+                <p v-if="catalogSync?.missing">Sinkron terakhir menandai {{ catalogSync.missing }} SKU hilang sebagai tidak tersedia, tanpa menghapus datanya.</p>
             </div>
             <details><summary class="cursor-pointer font-semibold">Pengaturan monitor & sinkron otomatis</summary>
             <form class="grid gap-4 md:grid-cols-2 xl:grid-cols-4" @submit.prevent="autoSyncForm.put('/admin/digiflazz/settings', { preserveScroll: true })">

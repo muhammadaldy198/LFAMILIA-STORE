@@ -84,7 +84,7 @@ class AdminDigiflazzController
 
         $monitorSettings = $monitor->settings();
         $summaryRows = (clone $base)->get([
-            'items.buyer_active', 'items.seller_active', 'items.unlimited_stock', 'items.stock',
+            'items.is_present', 'items.buyer_active', 'items.seller_active', 'items.unlimited_stock', 'items.stock',
             'items.start_cut_off', 'items.end_cut_off', 'items.price_idr', 'items.baseline_price_idr',
         ]);
         $summary = $monitor->summary($summaryRows, $monitorSettings);
@@ -158,7 +158,7 @@ class AdminDigiflazzController
         }
 
         $critical = function ($nested): void {
-            $nested->where('items.buyer_active', false)
+            $nested->where('items.is_present', false)->orWhere('items.buyer_active', false)
                 ->orWhere('items.seller_active', false)
                 ->orWhere(function ($stock): void {
                     $stock->where('items.unlimited_stock', false)->where('items.stock', '<=', 0);
@@ -268,8 +268,8 @@ class AdminDigiflazzController
         $audit->record($request, 'digiflazz.catalog.synced', 'provider', 'DIGIFLAZZ', null, ['count' => $count, 'sku' => $sku]);
 
         return back()->with('status', $sku !== null && $count === 0
-            ? 'SKU sudah tidak ada di Digiflazz dan telah dihapus dari katalog.'
-            : $count.' SKU berhasil disinkronkan. SKU yang sudah tidak ada dihapus dari katalog.');
+            ? 'SKU tidak dikembalikan oleh Digiflazz; data katalog disimpan sebagai tidak tersedia.'
+            : $count.' SKU berhasil disinkronkan. SKU hilang ditandai tidak tersedia tanpa menghapus data.');
     }
 
     public function syncMapping(Request $request, ProviderMapping $mapping, DigiflazzCatalogService $service, AdminAuditService $audit): RedirectResponse
@@ -280,7 +280,7 @@ class AdminDigiflazzController
         $audit->record($request, 'digiflazz.mapping.synced', 'provider_mapping', $mapping->id, $before, $mapping->fresh()->toArray());
 
         return back()->with('status', $count === 0
-            ? 'SKU sudah tidak ada di Digiflazz. Katalog dihapus dan mapping dinonaktifkan.'
+            ? 'SKU tidak dikembalikan Digiflazz. Data katalog disimpan dan mapping dinonaktifkan.'
             : 'Harga nominal berhasil disinkronkan.');
     }
 
