@@ -17,6 +17,7 @@ use Illuminate\Http\Client\Factory;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
@@ -323,6 +324,34 @@ class AdminDigiflazzRestorationTest extends TestCase
         }
     }
 
+    public function test_invalid_catalog_row_logs_safe_reason_without_changing_previous_prices(): void
+    {
+        $this->login();
+        $this->mappedItem('preserved');
+        $this->fakeCatalog([$this->row(['buyer_sku_code' => 'bad-sku', 'price' => 0])]);
+        Log::spy();
+
+        try {
+            app(DigiflazzCatalogService::class)->sync();
+            $this->fail('Invalid supplier price must be rejected.');
+        } catch (ValidationException $error) {
+            $this->assertSame(
+                ['Format daftar harga tidak valid. Tidak ada perubahan disimpan.'],
+                $error->errors()['sync']
+            );
+        }
+
+        Log::shouldHaveReceived('warning')->withArgs(
+            fn (string $message, array $context): bool => $message === 'Digiflazz catalog sync rejected.'
+                && ($context['reason'] ?? null) === 'invalid_price'
+                && ($context['row_index'] ?? null) === 0
+                && ! array_key_exists('api_key', $context)
+                && ! array_key_exists('response_body', $context)
+        )->once();
+        $this->assertDatabaseHas('digiflazz_catalog_items', ['buyer_sku_code' => 'preserved', 'price_idr' => 10000]);
+        $this->assertDatabaseHas('provider_mappings', ['external_sku' => 'preserved', 'is_active' => true]);
+    }
+
     public function test_monitor_thresholds_and_auto_sync_interval_are_editable(): void
     {
         $this->login();
@@ -370,6 +399,33 @@ class AdminDigiflazzRestorationTest extends TestCase
         ]);
         $this->artisan('lfamilia:sync-digiflazz-catalog')->assertExitCode(0);
         Http::assertSent(fn ($request): bool => $request->url() === 'https://digiflazz-monitor.test/v1/price-list');
+    }
+
+    public function test_failed_auto_sync_throttles_retries_without_marking_a_success(): void
+    {
+        $this->login();
+        $this->fakeCatalog([]);
+        DB::table('system_settings')->whereIn('key', ['digiflazz.last_auto_sync', 'digiflazz.last_auto_sync_attempt'])->delete();
+        DB::table('system_settings')->updateOrInsert(
+            ['key' => 'digiflazz.auto_sync_interval_minutes'],
+            ['value' => json_encode(30), 'created_at' => now(), 'updated_at' => now()]
+        );
+
+        $this->artisan('lfamilia:sync-digiflazz-catalog')->assertExitCode(1);
+        Http::assertSentCount(1);
+        $this->assertDatabaseHas('system_settings', ['key' => 'digiflazz.last_auto_sync_attempt']);
+        $this->assertDatabaseMissing('system_settings', ['key' => 'digiflazz.last_auto_sync']);
+
+        $this->artisan('lfamilia:sync-digiflazz-catalog')->assertExitCode(0);
+        Http::assertSentCount(1);
+
+        DB::table('system_settings')->where('key', 'digiflazz.last_auto_sync_attempt')->update([
+            'value' => json_encode(['at' => now()->subMinutes(31)->toIso8601String()]),
+            'updated_at' => now(),
+        ]);
+        $this->artisan('lfamilia:sync-digiflazz-catalog')->assertExitCode(1);
+        Http::assertSentCount(2);
+        $this->assertDatabaseMissing('system_settings', ['key' => 'digiflazz.last_auto_sync']);
     }
 
     public function test_seller_change_resets_baseline_and_multi_flag_is_synced(): void
