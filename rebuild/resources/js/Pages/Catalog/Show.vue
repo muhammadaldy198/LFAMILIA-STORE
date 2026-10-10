@@ -2,7 +2,7 @@
 import { useCustomerPresentation } from '../../Composables/customerPresentation';
 const { customerText } = useCustomerPresentation();
 
-import { Head, Link, router, usePage } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import CustomerShell from '../../Components/CustomerShell.vue';
 
@@ -553,7 +553,12 @@ async function loadQuote() {
     try {
         const result = await requestJson('/checkout/quote', {
             method: 'POST',
-            body: JSON.stringify(basePayload()),
+            body: JSON.stringify({
+                ...basePayload(),
+                // The fee-inclusive quote is available before buyer details are entered.
+                // Only send identity once complete, so typing a partial address cannot invalidate the quote.
+                ...(!props.customer && !guestContactComplete.value ? { guest_email: null, guest_phone: null } : {}),
+            }),
         });
 
         if (requestId !== quoteRequest || signature !== currentQuoteSignature()) return null;
