@@ -19,6 +19,21 @@
         $seoDescription = mb_substr(trim(strip_tags((string) $seoDescription)), 0, 160);
         $seoCanonical = request()->routeIs('catalog.index') ? route('catalog.index') : url()->current();
         $seoImage = $seoProduct['image_url'] ?? $seoArticle['cover_url'] ?? null;
+        $seoStructuredData = [
+            '@context' => 'https://schema.org',
+            '@type' => 'WebSite',
+            'name' => 'LFAMILIA STORE',
+            'url' => route('catalog.index'),
+            'inLanguage' => 'id-ID',
+            'potentialAction' => [
+                '@type' => 'SearchAction',
+                'target' => [
+                    '@type' => 'EntryPoint',
+                    'urlTemplate' => route('catalog.index').'?q={search_term_string}',
+                ],
+                'query-input' => 'required name=search_term_string',
+            ],
+        ];
     @endphp
     @if ($seoIndexable)
         <meta name="robots" content="index,follow">
@@ -37,18 +52,7 @@
         <meta name="twitter:title" content="{{ $seoName }}">
         <meta name="twitter:description" content="{{ $seoDescription }}">
         @if (request()->routeIs('catalog.index'))
-            <script type="application/ld+json">@json([
-                '@context' => 'https://schema.org',
-                '@type' => 'WebSite',
-                'name' => 'LFAMILIA STORE',
-                'url' => route('catalog.index'),
-                'inLanguage' => 'id-ID',
-                'potentialAction' => [
-                    '@type' => 'SearchAction',
-                    'target' => ['@type' => 'EntryPoint', 'urlTemplate' => route('catalog.index').'?q={search_term_string}'],
-                    'query-input' => 'required name=search_term_string',
-                ],
-            ])</script>
+            <script type="application/ld+json">@json($seoStructuredData)</script>
         @endif
     @else
         <meta name="robots" content="noindex,nofollow">
