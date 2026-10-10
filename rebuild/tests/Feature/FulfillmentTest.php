@@ -8,6 +8,7 @@ use App\Jobs\StartFulfillmentJob;
 use App\Models\Category;
 use App\Models\IntegrationCredential;
 use App\Models\Product;
+use App\Services\CheckoutPricing;
 use App\Services\FulfillmentService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
@@ -345,7 +346,7 @@ class FulfillmentTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        $checkout = app(\\App\\Services\\CheckoutPricing::class)->forPackage($catalog['package_id']);
+        $checkout = app(CheckoutPricing::class)->forPackage($catalog['package_id']);
         $this->assertSame(13130, $checkout['max_price_idr']);
         $this->assertSame(11000, $checkout['subtotal_idr']);
 
