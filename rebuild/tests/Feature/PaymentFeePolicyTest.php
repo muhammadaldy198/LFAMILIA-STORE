@@ -56,8 +56,10 @@ class PaymentFeePolicyTest extends TestCase
         $primary = $routing->resolve('virtual_account', false, 'order');
         $this->assertSame('MIDTRANS', $primary['gateway_code']);
         $this->assertSame(4400, $routing->fee(20000, $primary));
-        $this->assertSame(4400, collect($routing->publicOrderChannels(null))
-            ->firstWhere('code', 'virtual_account')['fee_flat_idr']);
+        $this->assertArrayNotHasKey('fee_flat_idr', collect($routing->publicOrderChannels(null))
+            ->firstWhere('code', 'virtual_account'));
+        $this->assertArrayNotHasKey('fee_percent_bps', collect($routing->publicOrderChannels(null))
+            ->firstWhere('code', 'virtual_account'));
 
         DB::table('payment_gateways')->where('code', 'MIDTRANS')
             ->update(['is_maintenance' => true]);
@@ -65,15 +67,15 @@ class PaymentFeePolicyTest extends TestCase
         $fallback = $routing->resolve('virtual_account', false, 'order');
         $this->assertSame('DOKU', $fallback['gateway_code']);
         $this->assertSame(3500, $routing->fee(20000, $fallback));
-        $this->assertSame(3500, collect($routing->publicOrderChannels(null))
-            ->firstWhere('code', 'virtual_account')['fee_flat_idr']);
+        $this->assertArrayNotHasKey('fee_flat_idr', collect($routing->publicOrderChannels(null))
+            ->firstWhere('code', 'virtual_account'));
 
         $quote = app(WalletTopupService::class)->quote(20000, 'virtual_account');
         $this->assertSame(20000, $quote['amount_idr']);
         $this->assertSame(3500, $quote['fee_idr']);
         $this->assertSame(23500, $quote['total_idr']);
-        $this->assertSame(3500, collect($routing->publicTopupChannels())
-            ->firstWhere('code', 'virtual_account')['fee_flat_idr']);
+        $this->assertArrayNotHasKey('fee_flat_idr', collect($routing->publicTopupChannels())
+            ->firstWhere('code', 'virtual_account'));
     }
 
     public function test_wallet_is_free_but_automatic_midtrans_qris_uses_configured_fee(): void
@@ -101,16 +103,16 @@ class PaymentFeePolicyTest extends TestCase
         $wallet = $routing->resolve('saldo');
         $this->assertSame(0, $routing->fee(20000, $wallet));
         $walletVisible = collect($routing->publicOrderChannels(null))->firstWhere('code', 'saldo');
-        $this->assertSame(0, $walletVisible['fee_flat_idr']);
-        $this->assertSame(0, $walletVisible['fee_percent_bps']);
+        $this->assertArrayNotHasKey('fee_flat_idr', $walletVisible);
+        $this->assertArrayNotHasKey('fee_percent_bps', $walletVisible);
 
         $qris = $routing->resolve('qris');
         $this->assertSame('MIDTRANS', $qris['gateway_code']);
         // Explicit override above: Rp1,000 + 1% gross-up on Rp20,000.
         $this->assertSame(1213, $routing->fee(20000, $qris));
         $qrisVisible = collect($routing->publicOrderChannels(null))->firstWhere('code', 'qris');
-        $this->assertSame(1000, $qrisVisible['fee_flat_idr']);
-        $this->assertSame(100, $qrisVisible['fee_percent_bps']);
+        $this->assertArrayNotHasKey('fee_flat_idr', $qrisVisible);
+        $this->assertArrayNotHasKey('fee_percent_bps', $qrisVisible);
 
         $quote = app(WalletTopupService::class)->quote(20000, 'qris');
         $this->assertSame(1213, $quote['fee_idr']);

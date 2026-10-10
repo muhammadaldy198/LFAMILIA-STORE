@@ -135,6 +135,23 @@ class CheckoutFlowRegressionTest extends TestCase
             ->assertJsonPath('total_idr', 11078)
             ->assertJsonPath('payment_channel_code', 'qris');
 
+        // Customers can see the full, gateway-inclusive total before typing contact details.
+        $earlyQuote = $this->postJson('/checkout/quote', [
+            'package_id' => $package->id,
+            'payment_channel_code' => 'qris',
+        ])->assertOk()
+            ->assertJsonPath('subtotal_idr', 11000)
+            ->assertJsonPath('total_idr', 11078);
+        $this->assertSame($quote->json('total_idr'), $earlyQuote->json('total_idr'));
+
+        // A real order still requires verified buyer contact information.
+        $this->postJson('/checkout/orders', [
+            'package_id' => $package->id,
+            'payment_channel_code' => 'qris',
+            'customer_input' => ['user_id' => '123456'],
+            'idempotency_key' => 'stage-78-missing-contact',
+        ])->assertUnprocessable()->assertJsonValidationErrors(['guest_email', 'guest_phone']);
+
         $order = $this->postJson('/checkout/orders', [
             ...$quotePayload,
             'customer_input' => ['user_id' => '123456', 'zone_id' => '9876'],

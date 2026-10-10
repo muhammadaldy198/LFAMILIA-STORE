@@ -40,9 +40,9 @@ class CheckoutController
             'package_id' => ['required', 'integer'],
             'payment_channel_code' => ['required', 'string', 'max:60'],
             'voucher_code' => ['nullable', 'string', 'max:100'],
-            'guest_email' => $guest ? ['required', 'email:rfc', 'max:255'] : ['prohibited'],
+            'guest_email' => $guest ? ['nullable', 'email:rfc', 'max:255'] : ['prohibited'],
             'guest_phone' => $guest
-                ? ['required', 'string', 'max:32', 'regex:/^[0-9+().\-\s]{6,32}$/']
+                ? ['nullable', 'string', 'max:32', 'regex:/^[0-9+().\-\s]{6,32}$/']
                 : ['prohibited'],
             'total_idr' => ['prohibited'],
             'cost_idr' => ['prohibited'],

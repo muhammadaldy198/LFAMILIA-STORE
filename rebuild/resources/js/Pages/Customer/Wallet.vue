@@ -95,7 +95,7 @@ async function createTopup() {
         <section v-if="topupEnabled" class="space-y-4 rounded-xl border border-slate-800 bg-slate-900 p-5">
             <div>
                 <h2 class="text-xl font-semibold">{{ customerText("pages.customer.wallet.1b8225c4", "Top up saldo") }}</h2>
-                <p class="text-sm text-slate-400">Minimum {{ rupiah(minimumTopupIdr) }}. Biaya metode pembayaran dihitung server.</p>
+                <p class="text-sm text-slate-400">Minimum {{ rupiah(minimumTopupIdr) }}. Total pembayaran ditampilkan sebelum top up.</p>
             </div>
             <label class="block text-sm">{{ customerText("pages.customer.wallet.a2defbe3", "Nominal") }}
                 <input v-model.number="amountIdr" type="number" step="1" :min="minimumTopupIdr" :disabled="Boolean(busy) || attemptLocked" class="mt-1 block w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2">
@@ -123,7 +123,6 @@ async function createTopup() {
             <p v-if="attemptLocked && !result" role="status" class="text-sm text-amber-200">{{ customerText("pages.customer.wallet.2d62f6cc", "Jika status belum pasti, coba cek percobaan yang sama. Jangan membuat top up baru.") }}</p>
             <div v-if="quoteMatches" class="rounded-lg bg-slate-950 p-3 text-sm">
                 <div class="flex justify-between"><span>{{ customerText("pages.customer.wallet.dbcf71f5", "Saldo masuk") }}</span><span>{{ rupiah(quote.amount_idr) }}</span></div>
-                <div class="flex justify-between"><span>{{ customerText("pages.customer.wallet.b6984ce9", "Biaya") }}</span><span>{{ rupiah(quote.fee_idr) }}</span></div>
                 <div class="mt-2 flex justify-between border-t border-slate-800 pt-2 font-semibold"><span>{{ customerText("pages.customer.wallet.4cb761ce", "Total bayar") }}</span><span>{{ rupiah(quote.total_idr) }}</span></div>
             </div>
             <div v-if="result?.payment" class="space-y-2 rounded-lg border border-cyan-500/30 bg-cyan-500/10 p-3 text-sm">

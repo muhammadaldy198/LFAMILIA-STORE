@@ -53,12 +53,6 @@ class HandleInertiaRequests extends Middleware
                 } elseif ($path === 'forgot-password') {
                     $required = true;
                     $action = 'forgot_password';
-                } elseif ($path === 'orders/check') {
-                    $required = true;
-                    $action = 'order_lookup';
-                } elseif (str_starts_with($path, 'catalog/') && ! $request->user()) {
-                    $required = true;
-                    $action = 'guest_checkout';
                 } elseif ($path === 'login') {
                     $required = true;
                     $action = 'customer_login';

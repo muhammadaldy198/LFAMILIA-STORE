@@ -67,6 +67,24 @@ class SecurityM10Test extends TestCase
         $this->assertSame('lax', config('session.same_site'));
     }
 
+    public function test_public_checkout_and_order_lookup_do_not_require_turnstile_but_login_does(): void
+    {
+        $this->enableTurnstile();
+
+        $this->postJson('/checkout/orders', [])->assertUnprocessable()
+            ->assertJsonValidationErrors('package_id')
+            ->assertJsonMissingValidationErrors('turnstile_token');
+
+        $this->postJson('/orders/check', [])->assertUnprocessable()
+            ->assertJsonValidationErrors(['order_number', 'access_code'])
+            ->assertJsonMissingValidationErrors('turnstile_token');
+
+        $this->post('/login', [])->assertSessionHasErrors('turnstile_token');
+
+        $this->get('/')->assertOk()->assertSee('name="robots" content="index,follow"', false);
+        $this->get('/login')->assertOk()->assertSee('name="robots" content="noindex,nofollow"', false);
+    }
+
     public function test_turnstile_secret_is_encrypted_and_never_shared_to_register_page(): void
     {
         $this->enableTurnstile(['allowed_hostnames' => ['localhost']]);

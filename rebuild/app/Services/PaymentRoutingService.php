@@ -36,8 +36,6 @@ class PaymentRoutingService
                     'group' => $this->publicGroup((string) $channel->method),
                     'description' => $channel->description ?: $this->defaultDescription((string) $channel->method),
                     'logo_url' => $channel->getFirstMediaUrl('logo') ?: null,
-                    'fee_flat_idr' => $this->customerFeeIsForbidden($route) ? 0 : (int) $route['fee_flat_idr'],
-                    'fee_percent_bps' => $this->customerFeeIsForbidden($route) ? 0 : (int) $route['fee_percent_bps'],
                     'available' => $route['gateway_code'] !== 'WALLET' || $user !== null,
                 ];
             })->filter()->values()->all();
@@ -70,8 +68,6 @@ class PaymentRoutingService
                     'name' => (string) $channel->name,
                     'description' => $channel->description ?: $this->defaultDescription((string) $channel->method),
                     'logo_url' => $channel->getFirstMediaUrl('logo') ?: null,
-                    'fee_flat_idr' => $this->customerFeeIsForbidden($route) ? 0 : (int) $route['fee_flat_idr'],
-                    'fee_percent_bps' => $this->customerFeeIsForbidden($route) ? 0 : (int) $route['fee_percent_bps'],
                 ];
             })->filter()->values()->all();
     }

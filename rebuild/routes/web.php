@@ -42,6 +42,7 @@ use App\Http\Controllers\ProductReviewController;
 use App\Http\Controllers\PublicContentController;
 use App\Http\Controllers\PublicOrderTrackingController;
 use App\Http\Controllers\SavedGameAccountController;
+use App\Http\Controllers\SeoController;
 use App\Http\Controllers\SupportTicketController;
 use App\Http\Controllers\WalletTopupController;
 use App\Http\Middleware\RequirePasswordWhenSet;
@@ -51,6 +52,8 @@ use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [CatalogController::class, 'index'])->name('catalog.index');
+Route::get('/robots.txt', [SeoController::class, 'robots'])->name('seo.robots');
+Route::get('/sitemap.xml', [SeoController::class, 'sitemap'])->name('seo.sitemap');
 Route::get('/catalog', [LegacyFrontendController::class, 'catalog'])->name('legacy.catalog');
 Route::get('/checkout', [LegacyFrontendController::class, 'checkout'])->name('legacy.checkout');
 Route::get('/track', [LegacyFrontendController::class, 'track'])->name('legacy.track');

@@ -259,7 +259,6 @@ onBeforeUnmount(() => {
                 <div class="flex items-start justify-between gap-4"><dt class="text-white/35">{{ customerText("pages.payment.show.9eb68c25", "Metode") }}</dt><dd class="max-w-[65%] text-right font-bold">{{paymentLabel}}</dd></div>
                 <div class="h-px bg-white/[0.08]"></div>
                 <div class="flex items-start justify-between gap-4"><dt class="text-white/35">{{ customerText("pages.payment.show.8269538b", "Harga setelah promo") }}</dt><dd class="font-bold">{{formatIdr(order.product_total_idr)}}</dd></div>
-                <div class="flex items-start justify-between gap-4"><dt class="text-white/35">{{ customerText("pages.payment.show.c217fcd5", "Biaya pembayaran") }}</dt><dd class="font-bold">{{formatIdr(order.fee_idr)}}</dd></div>
                 <div class="flex items-start justify-between gap-4"><dt class="text-white/35">{{ customerText("pages.payment.show.87378529", "Total pembayaran") }}</dt><dd class="text-lg font-black text-[#b9ff35]">{{formatIdr(order.total_idr)}}</dd></div>
             </dl>
 

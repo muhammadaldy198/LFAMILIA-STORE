@@ -2,9 +2,8 @@
 import { useCustomerPresentation } from '../../Composables/customerPresentation';
 const { customerText } = useCustomerPresentation();
 
-import { Head, Link, router, usePage } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
-import TurnstileWidget from '../../Components/TurnstileWidget.vue';
 import CustomerShell from '../../Components/CustomerShell.vue';
 
 const props = defineProps({
@@ -22,8 +21,6 @@ const props = defineProps({
     initialPackageId: { type: String, default: '' },
 });
 
-const page = usePage();
-const security = computed(() => page.props.security || {});
 
 const selectedPackageId = ref(props.initialPackageId || '');
 const savedAccountItems = ref([...(props.savedAccounts || [])]);
@@ -57,8 +54,6 @@ const noticeOpen = ref(false);
 const noticeIndex = ref(0);
 const hideNotice = ref(false);
 const selectedSavedId = ref('');
-const turnstile = ref(null);
-const turnstileToken = ref('');
 const reviewRating = ref(5);
 const reviewTitle = ref('');
 const reviewBody = ref('');
@@ -78,10 +73,9 @@ const guestContactComplete = computed(() => props.customer || (
 const selectedPaymentChannel = computed(() => (props.paymentChannels || []).find((channel) =>
     channel.available !== false && channel.code === paymentChannelCode.value
 ));
-const canQuote = computed(() => Boolean(selectedPackage.value && selectedPaymentChannel.value && guestContactComplete.value));
+const canQuote = computed(() => Boolean(selectedPackage.value && selectedPaymentChannel.value && (props.customer || !voucherCode.value.trim() || guestContactComplete.value)));
 const summarySubtotal = computed(() => quote.value?.subtotal_idr ?? selectedPackage.value?.price_idr ?? 0);
-const summaryFee = computed(() => quote.value ? Number(quote.value.fee_idr || 0) : null);
-const displayTotal = computed(() => quote.value?.total_idr ?? summarySubtotal.value);
+const displayTotal = computed(() => quote.value?.total_idr ?? null);
 const isVoucherProduct = computed(() => String(props.product?.category_slug || '').toLowerCase() === 'voucher');
 const hasAccountStep = computed(() => !isVoucherProduct.value && (props.fields || []).length > 0);
 const hasExternalPaymentOption = computed(() => paymentGroups.value.some((group) =>
@@ -532,6 +526,7 @@ function choosePackage(item) {
     if (!item.is_available) return;
     selectedPackageId.value = String(item.id);
     invalidateQuote();
+    if (canQuote.value) void loadQuote();
 }
 
 async function choosePayment(code) {
@@ -558,7 +553,12 @@ async function loadQuote() {
     try {
         const result = await requestJson('/checkout/quote', {
             method: 'POST',
-            body: JSON.stringify(basePayload()),
+            body: JSON.stringify({
+                ...basePayload(),
+                // The fee-inclusive quote is available before buyer details are entered.
+                // Only send identity once complete, so typing a partial address cannot invalidate the quote.
+                ...(!props.customer && !guestContactComplete.value ? { guest_email: null, guest_phone: null } : {}),
+            }),
         });
 
         if (requestId !== quoteRequest || signature !== currentQuoteSignature()) return null;
@@ -683,12 +683,10 @@ async function createOrder() {
                 ...basePayload(),
                 customer_input: { ...customerInput },
                 idempotency_key: confirmationSnapshot.value.idempotency_key,
-                turnstile_token: turnstileToken.value || null,
             }),
         });
     } catch (error) {
         errors.value = error.validation || { checkout: [error.message || 'Pesanan gagal dibuat.'] };
-        turnstile.value?.reset();
         busy.value = '';
         return;
     }
@@ -707,7 +705,6 @@ async function createOrder() {
     };
     clearCheckoutAttempt();
     closeConfirmation();
-    turnstile.value?.reset();
 
     busy.value = 'payment';
     try {
@@ -744,6 +741,8 @@ onMounted(() => {
         }
     }
 
+    if (canQuote.value) void loadQuote();
+
     if ((props.notices || []).length) {
         noticeIndex.value = 0;
         hideNotice.value = false;
@@ -754,12 +753,16 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+    if (contactQuoteTimer) window.clearTimeout(contactQuoteTimer);
     window.removeEventListener('scroll', updateCheckoutBarVisibility);
     window.removeEventListener('resize', updateCheckoutBarVisibility);
 });
 
+let contactQuoteTimer;
 watch([guestEmail, guestPhone], () => {
     invalidateQuote();
+    if (contactQuoteTimer) window.clearTimeout(contactQuoteTimer);
+    if (canQuote.value) contactQuoteTimer = window.setTimeout(() => { void loadQuote(); }, 350);
 });
 
 let nicknameAutoTimer;
@@ -953,9 +956,6 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                                 >
                                     <span class="lf-payment-channel-copy">
                                         <strong>{{channel.name}}</strong>
-                                        <small v-if="Number(channel.fee_percent_bps || 0) > 0 || Number(channel.fee_flat_idr || 0) > 0">
-                                            {{ customerText("pages.catalog.show.228d43a3", "Fee") }} <template v-if="Number(channel.fee_percent_bps || 0) > 0">{{(Number(channel.fee_percent_bps || 0) / 100).toLocaleString('id-ID', {maximumFractionDigits:2})}}%</template><template v-if="Number(channel.fee_percent_bps || 0) > 0 && Number(channel.fee_flat_idr || 0) > 0"> + </template><template v-if="Number(channel.fee_flat_idr || 0) > 0">{{formatIdr(channel.fee_flat_idr)}}</template>
-                                        </small>
                                     </span>
                                 </button>
                             </div>
@@ -991,15 +991,6 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                     </div>
                 </section>
 
-                <TurnstileWidget
-                    v-if="security.turnstile_required"
-                    ref="turnstile"
-                    :site-key="security.turnstile_site_key"
-                    :action="security.turnstile_action"
-                    appearance="interaction-only"
-                    @token="turnstileToken=$event"
-                />
-
                 <div v-if="Object.keys(errors).length" class="lf-checkout-errors lf-checkout-error-legacy">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
                     <span><strong>{{ customerText("pages.catalog.show.e37b9457", "Periksa kembali checkout") }}</strong><small>{{firstCheckoutError}}</small></span>
@@ -1018,10 +1009,9 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                     <div><dt>{{ customerText("pages.catalog.show.724d11bc", "Harga") }}</dt><dd>{{formatIdr(summarySubtotal)}}</dd></div>
                     <div v-if="quote?.member_discount_idr"><dt>Diskon {{quote.member_tier_code || 'Member'}}</dt><dd class="lf-discount">-{{formatIdr(quote.member_discount_idr)}}</dd></div>
                     <div v-if="quote?.voucher_discount_idr"><dt>{{ customerText("pages.catalog.show.6af5335f", "Diskon Voucher") }}</dt><dd class="lf-discount">-{{formatIdr(quote.voucher_discount_idr)}}</dd></div>
-                    <div><dt>{{ customerText("pages.catalog.show.c217fcd5", "Biaya pembayaran") }}</dt><dd>{{summaryFee===null ? '—' : formatIdr(summaryFee)}}</dd></div>
-                    <div class="total"><dt>{{ customerText("pages.catalog.show.ad066d9d", "Total") }}</dt><dd>{{formatIdr(displayTotal)}}</dd></div>
+                    <div class="total"><dt>{{ customerText("pages.catalog.show.ad066d9d", "Total") }}</dt><dd>{{displayTotal===null ? 'Menghitung…' : formatIdr(displayTotal)}}</dd></div>
                 </dl>
-                <button type="button" class="lf-order-button" :disabled="busy==='order'||!selectedPackage||!paymentChannelCode" @click="prepareOrder">{{busy==='order'?'Memproses...':'Pesan Sekarang'}}</button>
+                <button type="button" class="lf-order-button" :disabled="busy==='order'||!selectedPackage||!paymentChannelCode||displayTotal===null" @click="prepareOrder">{{busy==='order'?'Memproses...':'Pesan Sekarang'}}</button>
                 <p class="lf-summary-security">{{ customerText("pages.catalog.show.22bd992a", "🔒 Harga dihitung server-side dan dikunci saat pesanan dibuat.") }}</p>
             </aside>
         </div>
@@ -1126,7 +1116,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                         <strong>{{ customerText("pages.catalog.show.eb589e83", "Ringkasan pesanan") }}</strong>
                         <small>{{product.name}} · {{selectedPackage ? nominalLabel(selectedPackage.name, product.name) : 'Pilih nominal'}}</small>
                     </span>
-                    <strong class="lf-mobile-summary-price">{{formatIdr(displayTotal)}}</strong>
+                    <strong class="lf-mobile-summary-price">{{displayTotal===null ? 'Menghitung…' : formatIdr(displayTotal)}}</strong>
                     <span class="lf-mobile-summary-chevron">⌄</span>
                 </button>
                 <dl class="lf-mobile-summary-lines">
@@ -1134,15 +1124,14 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                     <div><dt>{{ customerText("pages.catalog.show.d361488d", "Subtotal") }}</dt><dd>{{formatIdr(summarySubtotal)}}</dd></div>
                     <div v-if="quote?.member_discount_idr"><dt>Diskon {{quote.member_tier_code || 'Member'}}</dt><dd>-{{formatIdr(quote.member_discount_idr)}}</dd></div>
                     <div v-if="quote?.voucher_discount_idr"><dt>{{ customerText("pages.catalog.show.6af5335f", "Diskon Voucher") }}</dt><dd>-{{formatIdr(quote.voucher_discount_idr)}}</dd></div>
-                    <div><dt>{{ customerText("pages.catalog.show.2688b9b5", "Biaya Pembayaran") }}</dt><dd>{{summaryFee===null ? '—' : formatIdr(summaryFee)}}</dd></div>
-                    <div class="total"><dt>{{ customerText("pages.catalog.show.18fcae49", "Total Pembayaran") }}</dt><dd>{{formatIdr(displayTotal)}}</dd></div>
+                    <div class="total"><dt>{{ customerText("pages.catalog.show.18fcae49", "Total Pembayaran") }}</dt><dd>{{displayTotal===null ? 'Menghitung…' : formatIdr(displayTotal)}}</dd></div>
                 </dl>
             </div>
             <button v-else type="button" class="lf-mobile-summary-toggle" aria-expanded="false" @click="summaryOpen=true">
                 <span><strong>{{ customerText("pages.catalog.show.eb589e83", "Ringkasan pesanan") }}</strong><small>{{ customerText("pages.catalog.show.50fa1f6", "Ketuk untuk melihat rincian") }}</small></span>
-                <span><strong>{{formatIdr(displayTotal)}}</strong><b>⌃</b></span>
+                <span><strong>{{displayTotal===null ? 'Menghitung…' : formatIdr(displayTotal)}}</strong><b>⌃</b></span>
             </button>
-            <button type="button" class="lf-mobile-order-button" :disabled="busy==='order'||!selectedPackage||!paymentChannelCode" @click="prepareOrder">
+            <button type="button" class="lf-mobile-order-button" :disabled="busy==='order'||!selectedPackage||!paymentChannelCode||displayTotal===null" @click="prepareOrder">
                 <template v-if="busy==='order'">{{ customerText("pages.catalog.show.aadacc10", "Memproses...") }}</template>
                 <template v-else>
                     <svg class="lf-mobile-order-lock" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
@@ -1224,7 +1213,6 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                 <div><dt>{{ customerText("pages.catalog.show.d361488d", "Subtotal") }}</dt><dd>{{formatIdr(confirmationSnapshot.quote.subtotal_idr)}}</dd></div>
                 <div v-if="confirmationSnapshot.quote.member_discount_idr"><dt>Diskon {{confirmationSnapshot.quote.member_tier_code || 'Member'}}</dt><dd>-{{formatIdr(confirmationSnapshot.quote.member_discount_idr)}}</dd></div>
                 <div v-if="confirmationSnapshot.quote.voucher_discount_idr"><dt>{{ customerText("pages.catalog.show.6af5335f", "Diskon Voucher") }}</dt><dd>-{{formatIdr(confirmationSnapshot.quote.voucher_discount_idr)}}</dd></div>
-                <div><dt>{{ customerText("pages.catalog.show.2688b9b5", "Biaya Pembayaran") }}</dt><dd>{{formatIdr(confirmationSnapshot.quote.fee_idr)}}</dd></div>
                 <div class="total"><dt>{{ customerText("pages.catalog.show.212c4d6e", "Total Bayar") }}</dt><dd>{{formatIdr(confirmationSnapshot.quote.total_idr)}}</dd></div>
             </dl>
             <div v-if="errors.checkout?.length" class="lf-error">{{errors.checkout[0]}}</div>
