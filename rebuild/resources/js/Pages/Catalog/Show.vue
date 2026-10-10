@@ -924,7 +924,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                                 @click="choosePayment(group.items.find(x=>x.code===paymentChannelCode)?.code || group.items.find(x=>x.available!==false)?.code)"
                             >
                                 <span v-if="group.key==='wallet'" class="lf-payment-wallet-art">
-                                    <img :src="'/payment/lfamilia-cash.webp'" :alt="customerText('pages.catalog.show.attribute.alt.d8a0146d', 'LFAMILIA Cash')">
+                                    <img :src="'/assets/payment/lfamilia-cash.webp'" :alt="customerText('pages.catalog.show.attribute.alt.d8a0146d', 'LFAMILIA Cash')">
                                 </span>
                                 <span class="lf-payment-group-copy">
                                     <strong>{{group.title}}</strong>
