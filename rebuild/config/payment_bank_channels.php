@@ -11,5 +11,5 @@ return [
     ['code' => 'va_mandiri', 'name' => 'Mandiri Virtual Account', 'sort_order' => 44, 'midtrans' => 'echannel', 'doku' => 'VIRTUAL_ACCOUNT_BANK_MANDIRI'],
     ['code' => 'va_permata', 'name' => 'Permata Virtual Account', 'sort_order' => 45, 'midtrans' => 'permata_va', 'doku' => 'VIRTUAL_ACCOUNT_BANK_PERMATA'],
     ['code' => 'va_cimb', 'name' => 'CIMB Niaga Virtual Account', 'sort_order' => 46, 'midtrans' => 'cimb_va', 'doku' => 'VIRTUAL_ACCOUNT_BANK_CIMB'],
-    ['code' => 'va_bsi', 'name' => 'BSI Virtual Account', 'sort_order' => 47, 'midtrans' => 'bsi_va', 'doku' => null],
+    ['code' => 'va_bsi', 'name' => 'BSI Virtual Account', 'sort_order' => 47, 'midtrans' => 'bsi_va', 'doku' => null, 'initially_active' => false],
 ];
