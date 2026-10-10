@@ -14,6 +14,14 @@ Candidate berikutnya diurutkan:
 
 Customer tetap membeli satu nominal. Provider mapping dan SKU internal tidak menjadi pilihan customer.
 
+## Digiflazz max_price snapshot
+
+Saat checkout, `provider.max_price_idr` untuk Digiflazz dihitung dari **harga modal tertinggi SKU Digiflazz aktif dan tersedia dalam nominal yang sama, ditambah 1% (dibulatkan ke atas)**. Ini mencakup SKU cadangan termahal. Jika hanya ada satu SKU yang layak, gunakan harga SKU itu +1%. SKU nonaktif/tidak tersedia tidak memperbesar batas.
+
+Batas ini disimpan sebagai snapshot order dan dikirim sebagai `max_price` pada setiap attempt Digiflazz serta reconciliation. Harga jual tetap dihitung dari SKU utama dan tidak dinaikkan otomatis bila failover memakai seller lebih mahal; rugi karena diskon/promo adalah keputusan bisnis yang diterima. SKU dengan modal melebihi batas snapshot tetap tidak boleh dipilih, misalnya setelah kenaikan harga lebih dari toleransi.
+
+Jangan membingungkan `provider_mappings.max_price_idr` (batas administratif per sumber saat sinkron) dengan `order.snapshot.provider.max_price_idr` (batas transaksi Digiflazz hasil perhitungan seluruh kandidat saat checkout).
+
 ## Unsent mapping skip
 
 Sebelum provider request, mapping dapat dinyatakan unusable bila misalnya:
