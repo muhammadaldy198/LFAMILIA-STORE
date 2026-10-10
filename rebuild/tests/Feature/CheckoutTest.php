@@ -119,6 +119,91 @@ class CheckoutTest extends TestCase
             ->where('event_type', 'ORDER_CREATED')->count());
     }
 
+    public function test_single_digiflazz_sku_uses_its_cost_plus_one_percent_as_max_price(): void
+    {
+        $catalog = $this->catalog();
+        $key = 'checkout-single-digiflazz-maxprice';
+
+        $this->postJson('/checkout/orders', $this->guestPayload($catalog['package_id'], $key))
+            ->assertCreated();
+
+        $order = DB::table('orders')->where('idempotency_key', $key)->firstOrFail();
+        $snapshot = json_decode($order->snapshot, true, 512, JSON_THROW_ON_ERROR);
+
+        // The mapping's legacy max_price_idr is 12,000. The Digiflazz API
+        // transaction ceiling instead uses the only current seller cost +1%.
+        $this->assertSame(10100, $snapshot['provider']['max_price_idr']);
+        $this->assertSame(10000, (int) $order->cost_idr);
+        $this->assertSame(11000, (int) $order->total_idr);
+    }
+
+    public function test_digiflazz_max_price_uses_highest_active_backup_plus_one_percent_even_above_sell_price(): void
+    {
+        $catalog = $this->catalog();
+        $providerId = DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
+        $now = now();
+
+        DB::table('provider_mappings')->insert([
+            [
+                'product_package_id' => $catalog['package_id'],
+                'provider_id' => $providerId,
+                'external_sku' => 'BACKUP-LOW-'.bin2hex(random_bytes(4)),
+                'cost_idr' => 10501,
+                'max_price_idr' => 10501,
+                'priority' => 2,
+                'is_active' => true,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ],
+            [
+                'product_package_id' => $catalog['package_id'],
+                'provider_id' => $providerId,
+                'external_sku' => 'BACKUP-HIGH-'.bin2hex(random_bytes(4)),
+                'cost_idr' => 12001,
+                'max_price_idr' => 12001,
+                'priority' => 3,
+                'is_active' => true,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ],
+            [
+                'product_package_id' => $catalog['package_id'],
+                'provider_id' => $providerId,
+                'external_sku' => 'BACKUP-DISABLED-'.bin2hex(random_bytes(4)),
+                'cost_idr' => 99999,
+                'max_price_idr' => 99999,
+                'priority' => 4,
+                'is_active' => false,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ],
+        ]);
+
+        $key = 'checkout-multiple-digiflazz-maxprice';
+        $this->postJson('/checkout/orders', $this->guestPayload($catalog['package_id'], $key))
+            ->assertCreated();
+
+        $order = DB::table('orders')->where('idempotency_key', $key)->firstOrFail();
+        $snapshot = json_decode($order->snapshot, true, 512, JSON_THROW_ON_ERROR);
+
+        // ceil(12,001 * 1.01) = 12,122, excluding the disabled 99,999 SKU.
+        // The order still uses the main SKU for its price. Loss on an eventual
+        // fallback is an explicit merchant policy, not a checkout rejection.
+        $this->assertSame(12122, $snapshot['provider']['max_price_idr']);
+        $this->assertSame($catalog['mapping_id'], $snapshot['provider']['mapping_id']);
+        $this->assertSame(10000, (int) $order->cost_idr);
+        $this->assertSame(11000, (int) $order->total_idr);
+
+        // Existing orders keep their immutable ceiling across later syncs.
+        DB::table('provider_mappings')->where('product_package_id', $catalog['package_id'])
+            ->where('priority', 3)->update(['cost_idr' => 14000, 'max_price_idr' => 14000]);
+        $snapshotAfterSync = json_decode(
+            DB::table('orders')->where('id', $order->id)->value('snapshot'),
+            true, 512, JSON_THROW_ON_ERROR
+        );
+        $this->assertSame(12122, $snapshotAfterSync['provider']['max_price_idr']);
+    }
+
     public function test_client_price_provider_and_sku_are_rejected(): void
     {
         $catalog = $this->catalog();
