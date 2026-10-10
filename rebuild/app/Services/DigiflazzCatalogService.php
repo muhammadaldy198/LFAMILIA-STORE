@@ -79,8 +79,19 @@ class DigiflazzCatalogService
                     'start_cut_off' => preg_match('/^([01][0-9]|2[0-3]):[0-5][0-9]$/', (string) ($row['start_cut_off'] ?? '')) ? $row['start_cut_off'] : '00:00',
                     'end_cut_off' => preg_match('/^([01][0-9]|2[0-3]):[0-5][0-9]$/', (string) ($row['end_cut_off'] ?? '')) ? $row['end_cut_off'] : '00:00',
                     'description' => mb_substr((string) ($row['desc'] ?? ''), 0, 5000),
-                    'synced_at' => now(), 'updated_at' => now(),
+                    'is_present' => true, 'synced_at' => now(), 'updated_at' => now(),
                 ];
+            }
+
+            // Reject suspiciously short "full" lists before marking many live SKUs absent.
+            // Small test catalogs are allowed, but a real catalog collapsing by >50% is not.
+            if ($sku === null) {
+                $previousCount = DB::table('digiflazz_catalog_items')->where('is_present', true)->count();
+                if ($previousCount >= 100 && count($clean) * 2 < $previousCount) {
+                    throw ValidationException::withMessages([
+                        'sync' => 'Jumlah SKU Digiflazz turun drastis. Data lama tidak diubah; ulangi sinkronisasi setelah memeriksa penyedia.',
+                    ]);
+                }
             }
 
             return DB::transaction(function () use ($clean, $sku): int {
@@ -96,13 +107,23 @@ class DigiflazzCatalogService
                     } else {
                         DB::table('digiflazz_catalog_items')->insert([...$row, 'baseline_price_idr' => $row['price_idr'], 'created_at' => now()]);
                     }
-                    DB::table('provider_mappings')->where('provider_id', $providerId)->where('external_sku', $row['buyer_sku_code'])
-                        ->update(['cost_idr' => $row['price_idr'], 'max_price_idr' => $row['price_idr'], 'updated_at' => now()]);
+                    $mappingQuery = DB::table('provider_mappings')->where('provider_id', $providerId)
+                        ->where('external_sku', $row['buyer_sku_code']);
+                    (clone $mappingQuery)->update([
+                        'cost_idr' => $row['price_idr'], 'max_price_idr' => $row['price_idr'], 'updated_at' => now(),
+                    ]);
+                    // Only restore sources disabled *by a past catalog sync*.
+                    // Admin-disabled mappings remain off; a returned SKU must be sellable.
+                    if ($row['buyer_active'] && $row['seller_active']
+                        && ($row['unlimited_stock'] || $row['stock'] > 0)) {
+                        (clone $mappingQuery)->where('disabled_by_sync', true)->where('is_active', false)
+                            ->update(['is_active' => true, 'disabled_by_sync' => false, 'updated_at' => now()]);
+                    }
                 }
                 if ($sku === null || $clean === []) {
                     $missingMappings = DB::table('provider_mappings')->where('provider_id', $providerId)
                         ->whereNotNull('external_sku');
-                    $missingItems = DB::table('digiflazz_catalog_items');
+                    $missingItems = DB::table('digiflazz_catalog_items')->where('is_present', true);
                     if ($sku === null) {
                         $codes = array_column($clean, 'buyer_sku_code');
                         $missingMappings->whereNotIn('external_sku', $codes);
@@ -111,15 +132,15 @@ class DigiflazzCatalogService
                         $missingMappings->where('external_sku', $sku);
                         $missingItems->where('buyer_sku_code', $sku);
                     }
-                    // Keep order/source history, but prevent deleted SKUs from being sold.
+                    // Keep the source catalog and history. Missing SKUs cannot be sold.
                     $disabled = $missingMappings->where('is_active', true)
-                        ->update(['is_active' => false, 'updated_at' => now()]);
-                    $removed = $missingItems->delete();
+                        ->update(['is_active' => false, 'disabled_by_sync' => true, 'updated_at' => now()]);
+                    $missing = $missingItems->update(['is_present' => false, 'updated_at' => now()]);
                     if ($sku === null) {
                         DB::table('system_settings')->updateOrInsert(['key' => 'digiflazz.last_catalog_sync'], [
                             'value' => json_encode([
                                 'at' => now()->toIso8601String(), 'count' => count($clean),
-                                'removed' => $removed, 'disabled_mappings' => $disabled,
+                                'missing' => $missing, 'disabled_mappings' => $disabled,
                             ], JSON_THROW_ON_ERROR),
                             'created_at' => now(), 'updated_at' => now(),
                         ]);
@@ -168,7 +189,8 @@ class DigiflazzCatalogService
 
     public function available(object $item): bool
     {
-        if (! $item->buyer_active || ! $item->seller_active || (! $item->unlimited_stock && $item->stock <= 0)) {
+        if ((isset($item->is_present) && ! (bool) $item->is_present)
+            || ! $item->buyer_active || ! $item->seller_active || (! $item->unlimited_stock && $item->stock <= 0)) {
             return false;
         }
         $start = $item->start_cut_off;
