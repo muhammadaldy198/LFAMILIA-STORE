@@ -303,6 +303,65 @@ class AdminDigiflazzRestorationTest extends TestCase
         $this->assertDatabaseHas('digiflazz_catalog_items', ['buyer_sku_code' => 'other-sku', 'buyer_active' => true]);
     }
 
+    public function test_manual_disable_after_missing_sync_prevents_automatic_reactivation(): void
+    {
+        $this->login();
+        $this->mappedItem('user-disabled-after-sync');
+        $this->mappedItem('still-live');
+        $this->fakeCatalog([$this->row(['buyer_sku_code' => 'still-live'])]);
+        app(DigiflazzCatalogService::class)->sync();
+
+        $mapping = ProviderMapping::where('external_sku', 'user-disabled-after-sync')->firstOrFail();
+        $this->assertTrue((bool) $mapping->fresh()->disabled_by_sync);
+        $this->put('/admin/catalog/mappings/'.$mapping->id, [
+            'priority' => 0, 'is_active' => false, 'customer_no_template' => '',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertFalse((bool) $mapping->fresh()->disabled_by_sync);
+
+        $this->fakeCatalog([
+            $this->row(['buyer_sku_code' => 'still-live']),
+            $this->row(['buyer_sku_code' => 'user-disabled-after-sync']),
+        ]);
+        app(DigiflazzCatalogService::class)->sync();
+        $this->assertDatabaseHas('digiflazz_catalog_items', [
+            'buyer_sku_code' => 'user-disabled-after-sync', 'is_present' => true,
+        ]);
+        $this->assertDatabaseHas('provider_mappings', [
+            'external_sku' => 'user-disabled-after-sync',
+            'is_active' => false, 'disabled_by_sync' => false,
+        ]);
+    }
+
+    public function test_large_unexpected_catalog_drop_is_rejected_without_changes(): void
+    {
+        $this->login();
+        $this->mappedItem('remain');
+        $now = now();
+        $rows = [];
+        for ($n = 0; $n < 100; $n++) {
+            $rows[] = [
+                'buyer_sku_code' => 'synthetic-'.str_pad((string) $n, 3, '0', STR_PAD_LEFT),
+                'product_name' => 'Synthetic '.$n, 'category' => 'Games', 'brand' => 'Synthetic',
+                'type' => 'Umum', 'seller_name' => 'Fake', 'price_idr' => 10000,
+                'baseline_price_idr' => 10000, 'buyer_active' => true, 'seller_active' => true,
+                'unlimited_stock' => true, 'stock' => 0, 'multi' => false,
+                'start_cut_off' => '00:00', 'end_cut_off' => '00:00',
+                'synced_at' => $now, 'created_at' => $now, 'updated_at' => $now,
+            ];
+        }
+        DB::table('digiflazz_catalog_items')->insert($rows);
+        $this->fakeCatalog([$this->row(['buyer_sku_code' => 'remain'])]);
+
+        try {
+            app(DigiflazzCatalogService::class)->sync();
+            $this->fail('Unexpected large catalog drop must be rejected.');
+        } catch (ValidationException $error) {
+            $this->assertArrayHasKey('sync', $error->errors());
+        }
+        $this->assertDatabaseHas('provider_mappings', ['external_sku' => 'remain', 'is_active' => true]);
+        $this->assertSame(101, DB::table('digiflazz_catalog_items')->where('is_present', true)->count());
+    }
+
     public function test_failed_empty_and_malformed_full_syncs_preserve_catalog_and_mappings(): void
     {
         $this->login();
