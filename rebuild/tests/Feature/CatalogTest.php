@@ -42,6 +42,31 @@ class CatalogTest extends TestCase
         $this->assertFalse(Category::where('slug', 'e-wallet')->exists());
     }
 
+    public function test_home_category_filter_supports_partial_inertia_updates_without_reloading_home_sections(): void
+    {
+        $this->get('/?category=game')->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Catalog/Index')
+                ->where('filters.category', 'game')
+                ->has('categories')
+                ->has('products.data')
+                ->etc());
+
+        // The homepage tabs ask Inertia for only the filtered product list and filters.
+        // Banners, navigation categories and news should remain mounted in the browser.
+        $this->withHeaders([
+            'X-Inertia' => 'true',
+            'X-Inertia-Partial-Component' => 'Catalog/Index',
+            'X-Inertia-Partial-Data' => 'products,filters',
+        ])->get('/?category=game')->assertOk()
+            ->assertJsonPath('component', 'Catalog/Index')
+            ->assertJsonPath('props.filters.category', 'game')
+            ->assertJsonStructure(['props' => ['products' => ['data']]])
+            ->assertJsonMissingPath('props.categories')
+            ->assertJsonMissingPath('props.banners')
+            ->assertJsonMissingPath('props.news');
+    }
+
     public function test_only_super_admin_can_manage_a_manual_product_and_customer_sees_no_provider_data(): void
     {
         $category = Category::where('slug', 'game')->firstOrFail();
