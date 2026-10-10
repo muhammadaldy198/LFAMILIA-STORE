@@ -123,7 +123,8 @@ Route::middleware('auth:web')->group(function (): void {
 
     Route::get('/account/phone', [CustomerPhoneController::class, 'edit'])->name('account.phone.edit');
     Route::put('/account/phone', [CustomerPhoneController::class, 'update'])
-        ->middleware('password.confirm')->name('account.phone.update');
+        ->middleware(\App\Http\Middleware\RequirePasswordWhenSet::class)
+        ->name('account.phone.update');
 
     Route::middleware(['phone.required', 'customer.activity'])->group(function (): void {
         Route::get('/account', [CustomerAccountController::class, 'dashboard'])->name('account');
