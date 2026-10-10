@@ -738,14 +738,34 @@ class AdminCatalogController
 
     public function globalMargin(Request $request, AdminAuditService $audit): RedirectResponse
     {
-        $data = $request->validate(['margin_percent' => ['required', 'numeric', 'min:0', 'max:1000']]);
+        $data = $request->validate([
+            'margin_percent' => ['required', 'numeric', 'min:0', 'max:1000'],
+            'include_imported_percent' => ['sometimes', 'boolean'],
+        ]);
         DB::transaction(function () use ($request, $data, $audit): void {
             $before = Product::where('fulfillment_mode', 'AUTO_PROVIDER')->pluck('margin_percent', 'id')->all();
             Product::where('fulfillment_mode', 'AUTO_PROVIDER')->update(['margin_percent' => $data['margin_percent']]);
+
+            // One-time, explicitly opted-in bulk migration for legacy Digiflazz imports.
+            // Keep non-imported nominal overrides, fixed amounts and fixed prices intact.
+            $converted = 0;
+            if ($data['include_imported_percent'] ?? false) {
+                $digiflazzId = Provider::where('code', 'DIGIFLAZZ')->value('id');
+                if ($digiflazzId) {
+                    $converted = ProductPackage::query()
+                        ->where('pricing_mode', 'PERCENT')
+                        ->where('code', 'like', 'DF_%')
+                        ->whereHas('product', fn ($query) => $query->where('fulfillment_mode', 'AUTO_PROVIDER'))
+                        ->whereHas('mappings', fn ($query) => $query->where('provider_id', $digiflazzId))
+                        ->update(['pricing_mode' => 'PRODUCT_MARGIN', 'margin_percent' => null]);
+                }
+            }
             DB::table('system_settings')->updateOrInsert(['key' => 'catalog.default_margin_percent'], [
                 'value' => json_encode($data['margin_percent']), 'updated_at' => now(), 'created_at' => now(),
             ]);
-            $audit->record($request, 'catalog.margin.global_updated', 'product', 'all', $before, $data);
+            $audit->record($request, 'catalog.margin.global_updated', 'product', 'all', $before, [
+                ...$data, 'converted_imported_nominals' => $converted,
+            ]);
         });
 
         return back();
