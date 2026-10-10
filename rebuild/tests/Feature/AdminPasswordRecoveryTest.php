@@ -72,6 +72,7 @@ class AdminPasswordRecoveryTest extends TestCase
 
     public function test_customer_token_does_not_reset_admin_password_and_unknown_email_is_not_disclosed(): void
     {
+        $this->withServerVariables(['REMOTE_ADDR' => '198.51.100.41']);
         $admin = $this->createAdmin([
             'name' => 'Admin',
             'email' => 'isolation@example.test',
@@ -104,6 +105,7 @@ class AdminPasswordRecoveryTest extends TestCase
 
     public function test_admin_login_and_recovery_require_server_verified_turnstile_from_first_attempt(): void
     {
+        $this->withServerVariables(['REMOTE_ADDR' => '198.51.100.42']);
         IntegrationCredential::updateOrCreate(['code' => 'turnstile'], [
             'config_ciphertext' => [
                 'site_key' => 'test-site-key',
