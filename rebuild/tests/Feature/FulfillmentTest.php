@@ -326,6 +326,64 @@ class FulfillmentTest extends TestCase
         $this->assertSame(2, DB::table('fulfillment_attempts')->where('order_id', $orderId)->count());
     }
 
+    public function test_confirmed_failure_can_send_more_expensive_backup_with_checkout_max_price_snapshot(): void
+    {
+        Queue::fake();
+        $this->credentials();
+        $catalog = $this->automaticCatalog();
+        $providerId = DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
+        $backupId = DB::table('provider_mappings')->insertGetId([
+            'product_package_id' => $catalog['package_id'],
+            'provider_id' => $providerId,
+            'external_sku' => 'DF-EXPENSIVE-BACKUP',
+            'cost_idr' => 13000,
+            'max_price_idr' => 13000,
+            'fulfillment_config' => json_encode(['customer_no_template' => '{{user_id}}{{zone_id}}'], JSON_THROW_ON_ERROR),
+            'priority' => 2,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $checkout = app(\\App\\Services\\CheckoutPricing::class)->forPackage($catalog['package_id']);
+        $this->assertSame(13130, $checkout['max_price_idr']);
+        $this->assertSame(11000, $checkout['subtotal_idr']);
+
+        $orderId = $this->paidOrder($catalog, $checkout['max_price_idr']);
+        Http::fake(function ($request) {
+            $payload = $request->data();
+            $success = $payload['buyer_sku_code'] === 'DF-EXPENSIVE-BACKUP';
+
+            return Http::response(['data' => [
+                'ref_id' => $payload['ref_id'],
+                'customer_no' => $payload['customer_no'],
+                'buyer_sku_code' => $payload['buyer_sku_code'],
+                'status' => $success ? 'Sukses' : 'Gagal',
+                'message' => $success ? 'Sukses' : 'Gagal definitif',
+                'rc' => $success ? '00' : '44',
+                'sn' => $success ? 'BACKUP-SN' : '',
+                'price' => $success ? 13000 : 10000,
+            ]]);
+        });
+
+        $service = app(FulfillmentService::class);
+        $service->startOrder($orderId);
+        $first = DB::table('fulfillment_attempts')->where('order_id', $orderId)->firstOrFail();
+        $service->sendAttempt((int) $first->id);
+
+        $backup = DB::table('fulfillment_attempts')->where('order_id', $orderId)
+            ->where('provider_mapping_id', $backupId)->first();
+        $this->assertNotNull($backup);
+        $service->sendAttempt((int) $backup->id);
+
+        $this->assertSame('SUCCESS', DB::table('orders')->where('id', $orderId)->value('status'));
+        $this->assertSame(2, DB::table('fulfillment_attempts')->where('order_id', $orderId)->count());
+        $this->assertSame(2, count(Http::recorded()));
+        foreach (Http::recorded() as [$request]) {
+            $this->assertSame(13130, $request->data()['max_price']);
+        }
+    }
+
     public function test_confirmed_failure_skips_unavailable_backup_before_queuing_next_safe_source(): void
     {
         Queue::fake();
