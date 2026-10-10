@@ -74,7 +74,7 @@ class CheckoutPricing
             $mappingQuery->lockForUpdate();
         }
 
-        $mapping = $mappingQuery->get()->first(function (object $candidate): bool {
+        $eligibleMappings = $mappingQuery->get()->filter(function (object $candidate): bool {
             if ($candidate->provider_code === 'VOUCHER_STOCK') {
                 $config = is_string($candidate->fulfillment_config)
                     ? (json_decode($candidate->fulfillment_config, true) ?: [])
@@ -89,7 +89,8 @@ class CheckoutPricing
             $item = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', $candidate->external_sku)->first();
 
             return $item === null || app(DigiflazzCatalogService::class)->available($item);
-        });
+        })->values();
+        $mapping = $eligibleMappings->first();
         if (! $mapping) {
             throw ValidationException::withMessages([
                 'package_id' => 'Nominal sedang tidak tersedia untuk checkout.',
@@ -122,11 +123,27 @@ class CheckoutPricing
             'provider_mapping_id' => (int) $mapping->mapping_id,
             'provider_code' => $mapping->provider_code,
             'provider_sku' => $mapping->external_sku,
-            'max_price_idr' => $mapping->max_price_idr !== null ? (int) $mapping->max_price_idr : null,
+            // Snapshot a common Digiflazz max_price for this nominal at checkout:
+            // highest eligible backup cost (+1%) or the only SKU (+1%).
+            // Fulfillment must reuse this limit across all attempts and reconciliation.
+            'max_price_idr' => $mapping->provider_code === 'DIGIFLAZZ'
+                ? $this->digiflazzMaxPrice((int) $eligibleMappings
+                    ->where('provider_code', 'DIGIFLAZZ')->max('cost_idr'))
+                : ($mapping->max_price_idr !== null ? (int) $mapping->max_price_idr : null),
             'cost_idr' => $cost,
             'margin_idr' => $margin,
             'subtotal_idr' => $cost + $margin,
         ];
+    }
+
+    private function digiflazzMaxPrice(int $highestEligibleCost): int
+    {
+        // Integer ceil(cost * 1.01): avoid floating-point rounding and overflow.
+        if ($highestEligibleCost <= 0 || $highestEligibleCost > intdiv(PHP_INT_MAX - 99, 101)) {
+            throw ValidationException::withMessages(['package_id' => 'Batas harga Digiflazz tidak valid.']);
+        }
+
+        return intdiv(($highestEligibleCost * 101) + 99, 100);
     }
 
     private function margin(int $cost, string $percent): int
