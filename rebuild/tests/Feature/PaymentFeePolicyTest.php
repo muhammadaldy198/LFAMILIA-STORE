@@ -134,6 +134,9 @@ class PaymentFeePolicyTest extends TestCase
         DB::table('payment_channels')->where('id', $channelId)->update([
             'is_active' => true, 'supports_order' => true, 'supports_wallet_topup' => true,
         ]);
+        DB::table('payment_routes')->where('id', $route->id)->update([
+            'is_active' => true, 'supports_order' => true, 'supports_wallet_topup' => true,
+        ]);
         $resolved = app(PaymentRoutingService::class)->resolve('qris');
         // ceil(10,000 / 0.993) = 10,071; fee Rp71.
         $this->assertSame(71, app(PaymentRoutingService::class)->fee(10000, $resolved));
