@@ -37,10 +37,6 @@ class PublicAbuseProtection
             $this->limit($request, 'admin-reset-password', 5, 600);
         } elseif ($path === 'reset-password') {
             $this->limit($request, 'reset-password', 5, 600);
-        } elseif ($path === 'orders/check') {
-            $this->turnstile->verify($request, 'order_lookup');
-        } elseif ($path === 'checkout/orders' && ! $request->user()) {
-            $this->turnstile->verify($request, 'guest_checkout');
         } elseif ($path === 'login') {
             $this->turnstile->verify($request, 'customer_login');
         } elseif ($path === 'admin/login') {
