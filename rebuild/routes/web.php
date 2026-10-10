@@ -17,6 +17,7 @@ use App\Http\Controllers\AdminNotificationController;
 use App\Http\Controllers\AdminOrderDetailController;
 use App\Http\Controllers\AdminOrdersController;
 use App\Http\Controllers\AdminPasswordConfirmController;
+use App\Http\Controllers\AdminPasswordResetController;
 use App\Http\Controllers\AdminPaymentController;
 use App\Http\Controllers\AdminPresentationController;
 use App\Http\Controllers\AdminPromotionController;
@@ -174,6 +175,15 @@ Route::middleware('guest:admin')->group(function (): void {
     Route::get('/admin/login', [AdminAuthController::class, 'show'])->name('admin.login');
     Route::post('/admin/login', [AdminAuthController::class, 'login'])
         ->middleware('throttle:admin-login')->name('admin.login.store');
+
+    Route::get('/admin/forgot-password', [AdminPasswordResetController::class, 'showRequest'])
+        ->name('admin.password.request');
+    Route::post('/admin/forgot-password', [AdminPasswordResetController::class, 'requestLink'])
+        ->middleware('throttle:3,1')->name('admin.password.email');
+    Route::get('/admin/reset-password/{token}', [AdminPasswordResetController::class, 'showReset'])
+        ->name('admin.password.reset');
+    Route::post('/admin/reset-password', [AdminPasswordResetController::class, 'reset'])
+        ->middleware('throttle:5,1')->name('admin.password.update');
 });
 
 Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {

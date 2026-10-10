@@ -151,10 +151,25 @@ class SecurityM10Test extends TestCase
             'membership_tier_code' => 'BASIC',
         ]);
 
+        // Configured Turnstile is verified on the very first login attempt.
+        $this->post('/login', [
+            'email' => 'login-risk@example.test',
+            'password' => 'WrongPassword123!',
+        ])->assertSessionHasErrors('turnstile_token');
+
+        Http::fake([
+            'https://challenges.cloudflare.com/turnstile/v0/siteverify' => Http::response([
+                'success' => true,
+                'action' => 'customer_login',
+                'hostname' => 'localhost',
+            ]),
+        ]);
+
         for ($attempt = 0; $attempt < 3; $attempt++) {
             $this->post('/login', [
                 'email' => 'login-risk@example.test',
                 'password' => 'WrongPassword123!',
+                'turnstile_token' => 'valid-challenge-token',
             ])->assertSessionHasErrors('email');
         }
 
