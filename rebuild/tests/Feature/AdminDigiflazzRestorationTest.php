@@ -352,6 +352,36 @@ class AdminDigiflazzRestorationTest extends TestCase
         $this->assertDatabaseHas('provider_mappings', ['external_sku' => 'preserved', 'is_active' => true]);
     }
 
+    public function test_supplier_error_code_is_logged_without_supplier_message_or_credentials(): void
+    {
+        $this->login();
+        $this->mappedItem('preserved');
+        $this->fakeCatalog([]);
+        Http::swap(new Factory);
+        Http::fake([
+            'https://digiflazz-monitor.test/v1/price-list' => Http::response([
+                'data' => ['rc' => '41', 'message' => 'Sensitive supplier detail'],
+            ]),
+        ]);
+        Log::spy();
+
+        try {
+            app(DigiflazzCatalogService::class)->sync();
+            $this->fail('Supplier error response must be rejected.');
+        } catch (ValidationException $error) {
+            $this->assertSame(['Daftar harga Digiflazz kosong atau tidak valid.'], $error->errors()['sync']);
+        }
+
+        Log::shouldHaveReceived('warning')->withArgs(
+            fn (string $message, array $context): bool => $message === 'Digiflazz catalog sync rejected.'
+                && ($context['reason'] ?? null) === 'invalid_data_shape'
+                && ($context['provider_rc'] ?? null) === '41'
+                && ! array_key_exists('message', $context)
+                && ! array_key_exists('api_key', $context)
+        )->once();
+        $this->assertDatabaseHas('digiflazz_catalog_items', ['buyer_sku_code' => 'preserved', 'price_idr' => 10000]);
+    }
+
     public function test_monitor_thresholds_and_auto_sync_interval_are_editable(): void
     {
         $this->login();
