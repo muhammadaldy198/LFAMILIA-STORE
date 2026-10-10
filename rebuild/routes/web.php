@@ -43,6 +43,7 @@ use App\Http\Controllers\PublicOrderTrackingController;
 use App\Http\Controllers\SavedGameAccountController;
 use App\Http\Controllers\SupportTicketController;
 use App\Http\Controllers\WalletTopupController;
+use App\Http\Middleware\RequirePasswordWhenSet;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
@@ -123,7 +124,8 @@ Route::middleware('auth:web')->group(function (): void {
 
     Route::get('/account/phone', [CustomerPhoneController::class, 'edit'])->name('account.phone.edit');
     Route::put('/account/phone', [CustomerPhoneController::class, 'update'])
-        ->middleware('password.confirm')->name('account.phone.update');
+        ->middleware(RequirePasswordWhenSet::class)
+        ->name('account.phone.update');
 
     Route::middleware(['phone.required', 'customer.activity'])->group(function (): void {
         Route::get('/account', [CustomerAccountController::class, 'dashboard'])->name('account');
