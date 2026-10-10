@@ -49,7 +49,7 @@ class DigiflazzAutoSources
                 'code' => 'DF_'.substr(hash('sha256', $first->buyer_sku_code), 0, 20),
                 'name' => $first->product_name, 'group_name' => $first->type ?: null,
                 'nominal_value' => $nominal, 'sort_order' => 0, 'is_active' => $publish,
-                'pricing_mode' => 'PERCENT', 'margin_percent' => $margin,
+                'pricing_mode' => 'PRODUCT_MARGIN', 'margin_percent' => null,
             ]);
             app(AdminAuditService::class)->record($request, 'catalog.package.imported', 'product_package', $package->id, null, $package->toArray());
         } else {
