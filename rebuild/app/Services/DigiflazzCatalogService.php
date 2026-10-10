@@ -5,6 +5,7 @@ namespace App\Services;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class DigiflazzCatalogService
@@ -31,19 +32,32 @@ class DigiflazzCatalogService
                     ...($sku !== null ? ['code' => $sku] : []),
                 ]);
                 $rows = $response->json('data');
-            } catch (\Throwable) {
+            } catch (\Throwable $error) {
+                Log::warning('Digiflazz catalog sync rejected.', [
+                    'reason' => 'request_exception',
+                    'exception_class' => $error::class,
+                ]);
                 throw ValidationException::withMessages(['sync' => 'Digiflazz tidak merespons. Data sebelumnya tetap tersimpan.']);
             }
             if (! $response->successful() || ! is_array($rows) || ! array_is_list($rows) || ($sku === null && count($rows) === 0)) {
+                Log::warning('Digiflazz catalog sync rejected.', [
+                    'reason' => ! $response->successful() ? 'http_error'
+                        : (! is_array($rows) || ! array_is_list($rows) ? 'invalid_data_shape' : 'empty_full_catalog'),
+                    'http_status' => $response->status(),
+                    'data_type' => get_debug_type($rows),
+                    'row_count' => is_array($rows) && array_is_list($rows) ? count($rows) : null,
+                ]);
                 throw ValidationException::withMessages(['sync' => 'Daftar harga Digiflazz kosong atau tidak valid.']);
             }
             $clean = [];
-            foreach ($rows as $row) {
-                if (! is_array($row) || ! preg_match('/^[A-Za-z0-9._-]{1,120}$/', (string) ($row['buyer_sku_code'] ?? ''))
-                    || ! isset($row['price']) || ! is_numeric($row['price']) || (int) $row['price'] <= 0
-                    || ! isset($row['buyer_product_status'], $row['seller_product_status'], $row['unlimited_stock'])
-                    || ! is_bool($row['buyer_product_status']) || ! is_bool($row['seller_product_status']) || ! is_bool($row['unlimited_stock'])
-                    || ($sku !== null && $row['buyer_sku_code'] !== $sku)) {
+            foreach ($rows as $index => $row) {
+                $invalidReason = $this->invalidRowReason($row, $sku);
+                if ($invalidReason !== null) {
+                    Log::warning('Digiflazz catalog sync rejected.', [
+                        'reason' => $invalidReason,
+                        'row_index' => $index,
+                        'http_status' => $response->status(),
+                    ]);
                     throw ValidationException::withMessages(['sync' => 'Format daftar harga tidak valid. Tidak ada perubahan disimpan.']);
                 }
                 $clean[] = [
@@ -118,6 +132,35 @@ class DigiflazzCatalogService
         } finally {
             $lock->release();
         }
+    }
+
+    /**
+     * Keep provider payload values out of diagnostic logs.
+     */
+    private function invalidRowReason(mixed $row, ?string $sku): ?string
+    {
+        if (! is_array($row)) {
+            return 'row_not_object';
+        }
+        if (! preg_match('/^[A-Za-z0-9._-]{1,120}$/', (string) ($row['buyer_sku_code'] ?? ''))) {
+            return 'invalid_sku';
+        }
+        if (! isset($row['price']) || ! is_numeric($row['price']) || (int) $row['price'] <= 0) {
+            return 'invalid_price';
+        }
+        foreach (['buyer_product_status', 'seller_product_status', 'unlimited_stock'] as $field) {
+            if (! isset($row[$field])) {
+                return 'missing_'.$field;
+            }
+            if (! is_bool($row[$field])) {
+                return 'invalid_type_'.$field;
+            }
+        }
+        if ($sku !== null && $row['buyer_sku_code'] !== $sku) {
+            return 'sku_mismatch';
+        }
+
+        return null;
     }
 
     public function available(object $item): bool
