@@ -349,7 +349,9 @@ class AdminDigiflazzRestorationTest extends TestCase
                 'synced_at' => $now, 'created_at' => $now, 'updated_at' => $now,
             ];
         }
-        DB::table('digiflazz_catalog_items')->insert($rows);
+        foreach (array_chunk($rows, 25) as $chunk) {
+            DB::table('digiflazz_catalog_items')->insert($chunk);
+        }
         $this->fakeCatalog([$this->row(['buyer_sku_code' => 'remain'])]);
 
         try {
