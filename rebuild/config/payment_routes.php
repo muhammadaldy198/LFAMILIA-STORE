@@ -17,7 +17,7 @@ $routes = [
         'gateway' => 'MIDTRANS',
         'provider_channel' => null,
         'configuration' => [
-            'enabled_payments' => ['bank_transfer'],
+            'enabled_payments' => ['bni_va', 'bri_va', 'echannel', 'cimb_va', 'permata_va', 'bsi_va'],
         ],
         'priority' => 10,
         'supports_order' => true,
@@ -28,7 +28,7 @@ $routes = [
         'gateway' => 'MIDTRANS',
         'provider_channel' => null,
         'configuration' => [
-            'enabled_payments' => ['gopay', 'shopeepay', 'ovo', 'dana'],
+            'enabled_payments' => ['gopay'],
         ],
         'priority' => 10,
         'supports_order' => true,
@@ -62,6 +62,9 @@ foreach (require __DIR__.'/payment_bank_channels.php' as $bank) {
         'supports_order' => true,
         'supports_wallet_topup' => true,
     ];
+    if (empty($bank['doku'])) {
+        continue; // BSI is currently enabled on Midtrans only; do not invent a DOKU protocol.
+    }
     $routes[] = [
         'channel' => $bank['code'],
         'gateway' => 'DOKU',

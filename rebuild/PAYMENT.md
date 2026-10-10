@@ -19,6 +19,31 @@ Candidate diurutkan dengan `payment_routes.priority` kecil lebih dahulu, lalu ID
 
 **Route selection sebelum external request bukan failover sesudah request.** Jika request eksternal sudah diklaim/dikirim dan hasilnya tidak pasti, transaksi dapat masuk `UNKNOWN`. Jangan membuat payment kedua sebagai recovery otomatis.
 
+## Midtrans-only merchant configuration (October 2026)
+
+Merchant dashboard evidence confirms Midtrans GoPay Dynamic QRIS, GoPay, BNI, BRI,
+Mandiri, CIMB Niaga, Permata, and BSI. It does not confirm BCA, OVO, DANA, or
+ShopeePay. Keep unsupported channels disabled in **Admin > Pembayaran > Metode &
+Urutan** and disable the **DOKU** gateway in **Admin > Pembayaran > Gateway**.
+Disabling a gateway retains its credentials, routes and order records.
+
+Server-owned Snap `enabled_payments` restrictions:
+- QRIS: `other_qris` (GoPay QRIS acquirer required).
+- E-wallet: `gopay` only.
+- Generic bank transfer: `bni_va`, `bri_va`, `echannel` (Mandiri),
+  `cimb_va`, `permata_va`, `bsi_va` only.
+- Explicit bank routes exist for individual supported banks. BSI is Midtrans-only
+  and created disabled until the merchant checks the production flow. BCA is
+  retained for possible future use, but must remain disabled until the account
+  actually enables BCA.
+
+Before taking live orders, validate Midtrans production credentials and its
+HTTP notification URL shown under the Gateway tab; check the actual eligible
+methods using a non-charging sandbox session, and confirm a controlled live
+payment only with owner approval. Do not assume a healthy integration means
+production-activated payment methods. Store wallet payments stay free; wallet
+topups using external methods use the same configured payment fees as orders.
+
 ## Admin fees for orders and LFAMILIA Cash topups
 
 - Public methods have merchant-editable base fee (`payment_channels.fee_flat_idr` and `fee_percent_bps`).
