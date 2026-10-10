@@ -18,10 +18,10 @@ class BankVirtualAccountProvisioningTest extends TestCase
 {
     use DatabaseTransactions;
 
-    public function test_all_six_bank_routes_are_explicitly_limited_to_the_selected_bank(): void
+    public function test_verified_midtrans_bank_routes_exclude_unsupported_doku_bsi(): void
     {
         $banks = config('payment_bank_channels');
-        $this->assertCount(6, $banks);
+        $this->assertCount(7, $banks);
         $routes = collect(config('payment_routes'));
 
         foreach ($banks as $bank) {
@@ -31,6 +31,11 @@ class BankVirtualAccountProvisioningTest extends TestCase
                 && $route['gateway'] === 'DOKU');
 
             $this->assertSame([$bank['midtrans']], $midtrans['configuration']['enabled_payments']);
+            if ($bank['doku'] === null) {
+                $this->assertNull($doku, 'DOKU BSI route must not be guessed.');
+
+                continue;
+            }
             $this->assertSame([$bank['doku']], $doku['configuration']['payment_method_types']);
             $this->assertSame('/checkout/v1/payment', $doku['configuration']['api_path']);
         }
@@ -52,12 +57,19 @@ class BankVirtualAccountProvisioningTest extends TestCase
         $catalog = app(PaymentRouteCatalogService::class);
         $first = $catalog->sync();
 
-        $this->assertSame(6, $first['created_channels']);
-        $this->assertSame(12, $first['created']);
-        $this->assertSame(6, DB::table('payment_channels')->whereIn('code', $codes)->count());
-        $this->assertSame(12, DB::table('payment_routes')->whereIn(
+        $this->assertSame(7, $first['created_channels']);
+        $this->assertSame(13, $first['created']);
+        $this->assertSame(7, DB::table('payment_channels')->whereIn('code', $codes)->count());
+        $this->assertSame(13, DB::table('payment_routes')->whereIn(
             'payment_channel_id', DB::table('payment_channels')->whereIn('code', $codes)->pluck('id')
         )->count());
+
+        $bsi = DB::table('payment_channels')->where('code', 'va_bsi')->firstOrFail();
+        $this->assertSame(0, (int) $bsi->is_active, 'BSI must be enabled only after live route check.');
+        $this->assertSame(1, DB::table('payment_routes')
+            ->join('payment_gateways', 'payment_gateways.id', '=', 'payment_routes.payment_gateway_id')
+            ->where('payment_routes.payment_channel_id', $bsi->id)
+            ->where('payment_gateways.code', 'MIDTRANS')->count());
 
         $bca = DB::table('payment_channels')->where('code', 'va_bca')->firstOrFail();
         $this->assertSame(2500, (int) $bca->fee_flat_idr);
@@ -85,6 +97,25 @@ class BankVirtualAccountProvisioningTest extends TestCase
         $this->assertSame(0, (int) $route->is_active);
         $this->assertSame(73, (int) $route->priority);
         $this->assertSame(['enabled_payments' => ['bca_va']], json_decode($route->configuration, true));
+    }
+
+    public function test_midtrans_generic_routes_only_expose_merchant_active_methods(): void
+    {
+        $routes = collect(config('payment_routes'));
+        $qris = $routes->first(fn (array $route): bool => $route['channel'] === 'qris'
+            && $route['gateway'] === 'MIDTRANS');
+        $gopay = $routes->first(fn (array $route): bool => $route['channel'] === 'ewallet'
+            && $route['gateway'] === 'MIDTRANS');
+        $va = $routes->first(fn (array $route): bool => $route['channel'] === 'virtual_account'
+            && $route['gateway'] === 'MIDTRANS');
+
+        $this->assertSame(['other_qris'], $qris['configuration']['enabled_payments']);
+        $this->assertSame(['gopay'], $gopay['configuration']['enabled_payments']);
+        $this->assertSame(
+            ['bni_va', 'bri_va', 'echannel', 'cimb_va', 'permata_va', 'bsi_va'],
+            $va['configuration']['enabled_payments']
+        );
+        $this->assertNotContains('bca_va', $va['configuration']['enabled_payments']);
     }
 
     public function test_midtrans_snap_receives_only_selected_bank(): void
