@@ -40,6 +40,41 @@ try {
         await send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:width<640});
         for(const path of publicPages)await inspect(path,width);
     }
+    // Regression: customer homepage category switching must not remount or scroll to the top.
+    for (const width of [390, 1440]) {
+        await send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:width<640});
+        await navigate('/');
+        const before = await evaluate(`(()=>{
+            document.querySelector('.lf-home-popup-close')?.click();
+            const tab=[...document.querySelectorAll('#produk .lf-filters a')]
+                .find(link=>new URL(link.href).searchParams.get('category')==='game');
+            const section=document.querySelector('#produk');
+            if(!tab||!section)return null;
+            window.__lfCategoryNavigationMarker='kept-alive';
+            window.scrollTo(0,section.getBoundingClientRect().top+window.scrollY-80);
+            const scroll=window.scrollY;
+            tab.click();
+            return {scroll};
+        })()`);
+        if(!before)throw Error('Game category tab or homepage product section missing');
+        let state;
+        for(let attempt=0;attempt<100;attempt++){
+            await pause(100);
+            state=await evaluate(`({
+                marker:window.__lfCategoryNavigationMarker,
+                url:location.search,
+                scroll:window.scrollY,
+                active:!![...document.querySelectorAll('#produk .lf-filters a')]
+                    .find(link=>new URL(link.href).searchParams.get('category')==='game' && link.classList.contains('active')),
+                hasProduct:!!document.querySelector('a.lf-product[href="/catalog/browser-checkout-game"]')
+            })`);
+            if(state.url.includes('category=game')&&state.active)break;
+        }
+        if(!state?.active||state.marker!=='kept-alive'||Math.abs(state.scroll-before.scroll)>6||!state.hasProduct){
+            throw Error('Homepage category switching caused reload, scroll jump, or wrong products: '+JSON.stringify({width,before,state}));
+        }
+        console.log('PASS homepage category SPA '+width);
+    }
     await navigate('/login');
     const login=await evaluate(`(async()=>{const token=document.querySelector('meta[name="csrf-token"]').content;const response=await fetch('/login',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':token},body:JSON.stringify({email:'browser-account@example.test',password:'Browser-test-password-123'})});return response.status;})()`);
     if(login!==200&&login!==204)throw Error('Fixture login failed: '+login);
