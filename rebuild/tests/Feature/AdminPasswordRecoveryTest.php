@@ -25,15 +25,10 @@ class AdminPasswordRecoveryTest extends TestCase
 
     public function test_admin_recovery_routes_are_separate_from_customer_recovery(): void
     {
-        $this->get('/admin/login')->assertOk()->assertInertia(fn (Assert $page) => $page
-            ->component('Admin/Login'));
-        $this->get('/admin/forgot-password')->assertOk()->assertInertia(fn (Assert $page) => $page
-            ->component('Admin/ForgotPassword'));
-        $this->get('/admin/reset-password/example-token?email=admin%40example.test')
-            ->assertOk()->assertInertia(fn (Assert $page) => $page
-                ->component('Admin/ResetPassword')
-                ->where('email', 'admin@example.test')
-                ->where('token', 'example-token'));
+        $this->get('/admin/login')->assertOk()->assertInertia(fn (Assert $page) => $page->component('Admin/Login'));
+        $this->get('/admin/forgot-password')->assertOk()->assertInertia(fn (Assert $page) => $page->component('Admin/ForgotPassword'));
+        $this->get('/admin/reset-password/example-token?email=admin%40example.test')->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->component('Admin/ResetPassword')->where('email', 'admin@example.test')->where('token', 'example-token'));
 
         $this->assertSame(
             'admin_password_reset_tokens',
@@ -58,9 +53,7 @@ class AdminPasswordRecoveryTest extends TestCase
             'password' => Hash::make('old-customer-password-123'),
         ]);
 
-        $this->post('/admin/forgot-password', ['email' => $admin->email])
-            ->assertRedirect()
-            ->assertSessionHas('status');
+        $this->post('/admin/forgot-password', ['email' => $admin->email])->assertRedirect()->assertSessionHas('status');
         $this->assertDatabaseHas('admin_password_reset_tokens', ['email' => $admin->email]);
         $this->assertDatabaseMissing('password_reset_tokens', ['email' => $admin->email]);
 
@@ -104,10 +97,8 @@ class AdminPasswordRecoveryTest extends TestCase
 
         $this->assertTrue(Hash::check('old-admin-password-123', $admin->fresh()->password));
 
-        $unknown = $this->post('/admin/forgot-password', ['email' => 'unknown@example.test'])
-            ->assertRedirect();
-        $known = $this->post('/admin/forgot-password', ['email' => $admin->email])
-            ->assertRedirect();
+        $unknown = $this->post('/admin/forgot-password', ['email' => 'unknown@example.test'])->assertRedirect();
+        $known = $this->post('/admin/forgot-password', ['email' => $admin->email])->assertRedirect();
         $this->assertSame($unknown->headers->get('Location'), $known->headers->get('Location'));
         $this->assertDatabaseMissing('admin_password_reset_tokens', ['email' => 'unknown@example.test']);
     }
@@ -123,18 +114,9 @@ class AdminPasswordRecoveryTest extends TestCase
             'is_active' => true,
         ]);
 
-        $this->get('/admin/login')->assertOk()->assertInertia(fn (Assert $page) => $page
-            ->component('Admin/Login')
-            ->where('security.turnstile_required', true)
-            ->where('security.turnstile_action', 'admin_login'));
-        $this->get('/login')->assertOk()->assertInertia(fn (Assert $page) => $page
-            ->component('Auth/Login')
-            ->where('security.turnstile_required', true)
-            ->where('security.turnstile_action', 'customer_login'));
-        $this->get('/admin/forgot-password')->assertOk()->assertInertia(fn (Assert $page) => $page
-            ->component('Admin/ForgotPassword')
-            ->where('security.turnstile_required', true)
-            ->where('security.turnstile_action', 'admin_forgot_password'));
+        $this->get('/admin/login')->assertOk()->assertInertia(fn (Assert $page) => $page->component('Admin/Login')->where('security.turnstile_required', true)->where('security.turnstile_action', 'admin_login'));
+        $this->get('/login')->assertOk()->assertInertia(fn (Assert $page) => $page->component('Auth/Login')->where('security.turnstile_required', true)->where('security.turnstile_action', 'customer_login'));
+        $this->get('/admin/forgot-password')->assertOk()->assertInertia(fn (Assert $page) => $page->component('Admin/ForgotPassword')->where('security.turnstile_required', true)->where('security.turnstile_action', 'admin_forgot_password'));
 
         $this->post('/admin/login', [
             'email' => 'test@example.test',
