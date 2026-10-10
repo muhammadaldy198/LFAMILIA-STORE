@@ -26,6 +26,11 @@ class CustomerPhoneController
             'phone_normalized' => $digits,
         ])->save();
 
+        $request->session()->forget([
+            'auth.google_phone_onboarding_at',
+            'auth.google_phone_onboarding_user_id',
+        ]);
+
         return redirect()->route('account');
     }
 }
