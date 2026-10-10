@@ -31,6 +31,14 @@ Urutan operasional yang aman:
 **Sinkronisasi script systemd root-owned:** `deploy.sh` juga **tidak otomatis** memperbarui `/usr/local/lib/lfamilia/backup.sh` atau `restore-verify.sh`. Kedua copy tersebut dipasang oleh `install-systemd.sh`. `preflight.sh` sekarang memberi **WARNING** apabila salah satu script terpasang hilang atau berbeda dari source repository, tanpa mengubah file server. Setelah review, operator harus menyinkronkan script terkait secara terpisah dengan prosedur perubahan production dan kemudian menjalankan verifikasi. Jangan abaikan warning drift ketika mengaudit backup, dan jangan menganggap CI hijau berarti copy script privileged di VPS sudah terbaru.
 
 
+### Penting: worker antrean fulfillment dan notifikasi
+
+Job pembelian supplier memakai antrean `fulfillment`; email transaksional (termasuk reset password admin) dan notifikasi admin memakai antrean `notifications`. Service `lfamilia-queue.service` **harus** memproses antrean `fulfillment,notifications,default` sesuai `deploy/systemd/lfamilia-queue.service.in`.
+
+**Deploy kode saja tidak memperbarui unit systemd yang sudah terpasang.** Setelah deployment, operator VPS harus membandingkan `systemctl cat lfamilia-queue.service` dengan template (khususnya `ExecStart`). Jika unit aktual belum memproses ketiga antrean, buat salinan aman unit saat ini, render/perbarui **hanya** unit queue memakai prosedur systemd yang disetujui, verifikasi dengan `systemd-analyze verify`, jalankan `systemctl daemon-reload`, lalu `systemctl restart lfamilia-queue.service` dan cek status. Hindari menjalankan ulang seluruh installer root tanpa meninjau semua perubahan unit/service lain terlebih dahulu.
+
+`systemctl is-active` hanya membuktikan worker hidup, **bukan** bahwa worker memproses antrean yang benar. Periksa antrean dan pengiriman email uji yang diizinkan, serta jangan mengklaim pemulihan email/pesanan sebelum terbukti.
+
 ## Apa yang dilakukan deploy.sh
 
 Script:

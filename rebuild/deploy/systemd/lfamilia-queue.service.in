@@ -8,7 +8,8 @@ Type=simple
 User=@@APP_USER@@
 Group=@@APP_GROUP@@
 WorkingDirectory=@@APP_DIR@@
-ExecStart=@@PHP_BIN@@ artisan queue:work redis --sleep=1 --tries=3 --timeout=120 --max-time=3600
+# Prioritize paid-order fulfillment, then transactional email/admin alerts, then default jobs.
+ExecStart=@@PHP_BIN@@ artisan queue:work redis --queue=fulfillment,notifications,default --sleep=1 --tries=3 --timeout=120 --max-time=3600
 ExecReload=@@PHP_BIN@@ artisan queue:restart
 Restart=always
 RestartSec=5
