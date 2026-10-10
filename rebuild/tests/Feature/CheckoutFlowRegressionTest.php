@@ -91,6 +91,8 @@ class CheckoutFlowRegressionTest extends TestCase
                 'provider_channel' => 'qris',
                 'configuration' => null,
                 'priority' => 0,
+                'fee_flat_idr' => 0,
+                'fee_percent_bps' => 70,
                 'is_active' => true,
                 'created_at' => now(),
                 'updated_at' => now(),
@@ -129,8 +131,8 @@ class CheckoutFlowRegressionTest extends TestCase
         $quote = $this->postJson('/checkout/quote', $quotePayload)
             ->assertOk()
             ->assertJsonPath('subtotal_idr', 11000)
-            ->assertJsonPath('fee_idr', 0)
-            ->assertJsonPath('total_idr', 11000)
+            ->assertJsonPath('fee_idr', 78)
+            ->assertJsonPath('total_idr', 11078)
             ->assertJsonPath('payment_channel_code', 'qris');
 
         $order = $this->postJson('/checkout/orders', [
@@ -139,8 +141,8 @@ class CheckoutFlowRegressionTest extends TestCase
             'idempotency_key' => 'stage-78-order-0001',
         ])->assertCreated()
             ->assertJsonPath('subtotal_idr', 11000)
-            ->assertJsonPath('fee_idr', 0)
-            ->assertJsonPath('total_idr', 11000)
+            ->assertJsonPath('fee_idr', 78)
+            ->assertJsonPath('total_idr', 11078)
             ->assertJsonPath('payment_channel_code', 'qris');
 
         foreach (['subtotal_idr', 'fee_idr', 'total_idr', 'payment_channel_code'] as $field) {
@@ -153,7 +155,7 @@ class CheckoutFlowRegressionTest extends TestCase
         ])->assertOk()
             ->assertJsonPath('status', 'PENDING')
             ->assertJsonPath('channel_code', 'qris')
-            ->assertJsonPath('amount_idr', 11000)
+            ->assertJsonPath('amount_idr', 11078)
             ->assertJsonPath('instructions.token', 'stage-78-snap-token');
 
         $this->get('/payment?invoice='.$order->json('order_number'))
