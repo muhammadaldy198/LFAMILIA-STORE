@@ -75,8 +75,9 @@ class SecurityM10Test extends TestCase
             ->assertJsonValidationErrors('package_id')
             ->assertJsonMissingValidationErrors('turnstile_token');
 
-        $this->post('/orders/check', [])->assertSessionHasErrors()
-            ->assertSessionHasNoErrors('turnstile_token');
+        $this->postJson('/orders/check', [])->assertUnprocessable()
+            ->assertJsonValidationErrors(['order_number', 'access_code'])
+            ->assertJsonMissingValidationErrors('turnstile_token');
 
         $this->post('/login', [])->assertSessionHasErrors('turnstile_token');
 
