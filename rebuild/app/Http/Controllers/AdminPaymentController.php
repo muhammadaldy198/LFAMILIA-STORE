@@ -657,9 +657,10 @@ class AdminPaymentController
             'is_active' => ['required', 'boolean'],
         ]);
 
-        // Wallet and QRIS can never add a payment-method surcharge.
-        if (in_array($data['method'], ['WALLET', 'QRIS'], true)
-            || in_array($data['code'], ['saldo', 'qris', 'manual_qris'], true)) {
+        // Internal wallet and manual QRIS are fee-free; automatic QRIS is
+        // configurable like other externally processed payment methods.
+        if ($data['method'] === 'WALLET'
+            || in_array($data['code'], ['saldo', 'manual_qris'], true)) {
             $data['fee_flat_idr'] = 0;
             $data['fee_percent_bps'] = 0;
         }
@@ -680,7 +681,8 @@ class AdminPaymentController
         $data['payment_channel_id'] = $channelId;
 
         $channel = DB::table('payment_channels')->where('id', $channelId)->first();
-        if ($channel && in_array($channel->method, ['WALLET', 'QRIS'], true)) {
+        if ($channel && ($channel->method === 'WALLET'
+            || in_array($channel->code, ['saldo', 'manual_qris'], true))) {
             if (array_key_exists('fee_flat_idr', $data)) {
                 $data['fee_flat_idr'] = 0;
             }

@@ -112,6 +112,8 @@ class PaymentTest extends TestCase
             [
                 'provider_channel' => $providerChannel,
                 'configuration' => $configuration === null ? null : json_encode($configuration, JSON_THROW_ON_ERROR),
+                'fee_flat_idr' => $flat,
+                'fee_percent_bps' => $bps,
                 'priority' => 0,
                 'is_active' => true,
                 'created_at' => now(),
@@ -245,7 +247,7 @@ class PaymentTest extends TestCase
                     'transaction_status' => 'settlement',
                     'status_code' => '200',
                     'order_id' => rawurldecode($matches[1]),
-                    'gross_amount' => '11000.00',
+                    'gross_amount' => '11078.00',
                     'fraud_status' => 'accept',
                     'settlement_time' => now()->format('Y-m-d H:i:s'),
                 ]);
@@ -259,7 +261,7 @@ class PaymentTest extends TestCase
             'qris',
             'm7-midtrans-order-0001'
         ))->assertCreated();
-        $this->assertSame(11000, $checkout->json('total_idr'));
+        $this->assertSame(11078, $checkout->json('total_idr'));
 
         $payment = $this->postJson('/payments/orders/'.$checkout->json('order_number'), [
             'idempotency_key' => 'm7-midtrans-payment-0001',
@@ -276,7 +278,7 @@ class PaymentTest extends TestCase
             'transaction_status' => 'settlement',
             'status_code' => '200',
             'order_id' => $row->merchant_reference,
-            'gross_amount' => '11000.00',
+            'gross_amount' => '11078.00',
             'fraud_status' => 'accept',
             'settlement_time' => '2026-09-30 10:00:00',
         ];
@@ -342,7 +344,7 @@ class PaymentTest extends TestCase
                     'transaction_status' => 'settlement',
                     'status_code' => '200',
                     'order_id' => rawurldecode($matches[1]),
-                    'gross_amount' => '11000.00',
+                    'gross_amount' => '11078.00',
                     'fraud_status' => 'accept',
                 ]);
             }
@@ -377,7 +379,7 @@ class PaymentTest extends TestCase
             'qris',
             'e2e-simulated-order-0001'
         ))->assertCreated();
-        $this->assertSame(11000, $checkout->json('total_idr'));
+        $this->assertSame(11078, $checkout->json('total_idr'));
 
         $this->postJson('/payments/orders/'.$checkout->json('order_number'), [
             'idempotency_key' => 'e2e-simulated-payment-0001',
@@ -392,7 +394,7 @@ class PaymentTest extends TestCase
             'transaction_status' => 'settlement',
             'status_code' => '200',
             'order_id' => $payment->merchant_reference,
-            'gross_amount' => '11000.00',
+            'gross_amount' => '11078.00',
             'fraud_status' => 'accept',
         ];
         $notification['signature_key'] = hash(
@@ -448,7 +450,7 @@ class PaymentTest extends TestCase
                     'transaction_status' => 'cancel',
                     'status_code' => '202',
                     'order_id' => rawurldecode($matches[1]),
-                    'gross_amount' => '11000.00',
+                    'gross_amount' => '11078.00',
                     'fraud_status' => 'accept',
                 ]);
             }
@@ -474,7 +476,7 @@ class PaymentTest extends TestCase
             'transaction_status' => 'cancel',
             'status_code' => '202',
             'order_id' => $payment->merchant_reference,
-            'gross_amount' => '11000.00',
+            'gross_amount' => '11078.00',
             'fraud_status' => 'accept',
         ];
         $notification['signature_key'] = hash('sha512',
@@ -518,7 +520,7 @@ class PaymentTest extends TestCase
                     'transaction_status' => 'pending',
                     'status_code' => '201',
                     'order_id' => rawurldecode($matches[1]),
-                    'gross_amount' => '11000.00',
+                    'gross_amount' => '11078.00',
                     'fraud_status' => 'accept',
                 ]);
             }
@@ -544,7 +546,7 @@ class PaymentTest extends TestCase
             'transaction_status' => 'settlement',
             'status_code' => '200',
             'order_id' => $payment->merchant_reference,
-            'gross_amount' => '11000.00',
+            'gross_amount' => '11078.00',
             'fraud_status' => 'accept',
             'settlement_time' => now()->format('Y-m-d H:i:s'),
         ];

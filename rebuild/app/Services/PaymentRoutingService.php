@@ -227,8 +227,8 @@ class PaymentRoutingService
             throw ValidationException::withMessages(['payment_channel_code' => 'Nilai transaksi tidak valid.']);
         }
 
-        // Paying with LFAMILIA Cash is always free. QRIS MDR cannot be
-        // passed to consumers via a method-specific surcharge.
+        // LFAMILIA Cash and offline/manual QRIS have no gateway fee.
+        // Automatic QRIS follows the configured Midtrans route fee.
         if ($this->customerFeeIsForbidden($route)) {
             return 0;
         }
@@ -257,8 +257,8 @@ class PaymentRoutingService
 
     private function customerFeeIsForbidden(array $route): bool
     {
-        return in_array(strtoupper((string) ($route['channel_method'] ?? '')), ['WALLET', 'QRIS'], true)
-            || in_array(strtolower((string) ($route['channel_code'] ?? '')), ['saldo', 'qris', 'manual_qris'], true)
+        return strtoupper((string) ($route['channel_method'] ?? '')) === 'WALLET'
+            || in_array(strtolower((string) ($route['channel_code'] ?? '')), ['saldo', 'manual_qris'], true)
             || in_array(strtoupper((string) ($route['gateway_code'] ?? '')), ['WALLET', 'MANUAL_QRIS'], true);
     }
 

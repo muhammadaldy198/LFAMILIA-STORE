@@ -76,7 +76,7 @@ class PaymentFeePolicyTest extends TestCase
             ->firstWhere('code', 'virtual_account')['fee_flat_idr']);
     }
 
-    public function test_wallet_and_qris_are_zero_fee_even_if_legacy_records_still_have_surcharge(): void
+    public function test_wallet_is_free_but_automatic_midtrans_qris_uses_configured_fee(): void
     {
         $this->enableGateway('MIDTRANS', 'midtrans', ['server_key' => 'sandbox-key', 'is_production' => false]);
         DB::table('payment_gateways')->where('code', 'WALLET')->update(['is_active' => true]);
@@ -98,17 +98,51 @@ class PaymentFeePolicyTest extends TestCase
         }
 
         $routing = app(PaymentRoutingService::class);
-        foreach (['saldo', 'qris'] as $code) {
-            $route = $routing->resolve($code);
-            $this->assertSame(0, $routing->fee(20000, $route));
-            $visible = collect($routing->publicOrderChannels(null))->firstWhere('code', $code);
-            $this->assertSame(0, $visible['fee_flat_idr']);
-            $this->assertSame(0, $visible['fee_percent_bps']);
-        }
+        $wallet = $routing->resolve('saldo');
+        $this->assertSame(0, $routing->fee(20000, $wallet));
+        $walletVisible = collect($routing->publicOrderChannels(null))->firstWhere('code', 'saldo');
+        $this->assertSame(0, $walletVisible['fee_flat_idr']);
+        $this->assertSame(0, $walletVisible['fee_percent_bps']);
+
+        $qris = $routing->resolve('qris');
+        $this->assertSame('MIDTRANS', $qris['gateway_code']);
+        // Explicit override above: Rp1,000 + 1% gross-up on Rp20,000.
+        $this->assertSame(1213, $routing->fee(20000, $qris));
+        $qrisVisible = collect($routing->publicOrderChannels(null))->firstWhere('code', 'qris');
+        $this->assertSame(1000, $qrisVisible['fee_flat_idr']);
+        $this->assertSame(100, $qrisVisible['fee_percent_bps']);
 
         $quote = app(WalletTopupService::class)->quote(20000, 'qris');
-        $this->assertSame(0, $quote['fee_idr']);
-        $this->assertSame(20000, $quote['total_idr']);
+        $this->assertSame(1213, $quote['fee_idr']);
+        $this->assertSame(21213, $quote['total_idr']);
+    }
+
+    public function test_default_midtrans_qris_route_is_seventy_basis_points(): void
+    {
+        $channelId = DB::table('payment_channels')->where('code', 'qris')->value('id');
+        $gatewayId = DB::table('payment_gateways')->where('code', 'MIDTRANS')->value('id');
+        $route = DB::table('payment_routes')
+            ->where('payment_channel_id', $channelId)
+            ->where('payment_gateway_id', $gatewayId)
+            ->firstOrFail();
+
+        // Migration sets only automatic Midtrans QRIS, not the manual route.
+        $this->assertSame(0, (int) $route->fee_flat_idr);
+        $this->assertSame(70, (int) $route->fee_percent_bps);
+
+        $this->enableGateway('MIDTRANS', 'midtrans', ['server_key' => 'sandbox-key', 'is_production' => false]);
+        DB::table('payment_channels')->where('id', $channelId)->update([
+            'is_active' => true, 'supports_order' => true, 'supports_wallet_topup' => true,
+        ]);
+        DB::table('payment_routes')->where('id', $route->id)->update([
+            'is_active' => true, 'supports_order' => true, 'supports_wallet_topup' => true,
+        ]);
+        $resolved = app(PaymentRoutingService::class)->resolve('qris');
+        // ceil(10,000 / 0.993) = 10,071; fee Rp71.
+        $this->assertSame(71, app(PaymentRoutingService::class)->fee(10000, $resolved));
+        $quote = app(WalletTopupService::class)->quote(10000, 'qris');
+        $this->assertSame(10071, $quote['total_idr']);
+        $this->assertSame(71, $quote['fee_idr']);
     }
 
     public function test_percentage_gateway_fee_is_grossed_up_for_customer_orders_and_wallet_topups(): void
