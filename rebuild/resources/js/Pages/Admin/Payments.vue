@@ -106,8 +106,10 @@ const freeMethod = (method, code) => ['WALLET', 'QRIS'].includes(method) || ['sa
 const routeIsFree = (row) => freeMethod(row.channel_method, row.channel_code);
 const routeFeeText = (row) => {
     if (routeIsFree(row)) return 'Gratis';
-    const flat = row.custom_fee ? Number(row.fee_flat_idr || 0) : Number(row.channel_fee_flat_idr || 0);
-    const pct = row.custom_fee ? Number(row.fee_percent_bps || 0) : Number(row.channel_fee_percent_bps || 0);
+    const flat = row.custom_fee && row.fee_flat_idr !== null
+        ? Number(row.fee_flat_idr) : Number(row.channel_fee_flat_idr || 0);
+    const pct = row.custom_fee && row.fee_percent_bps !== null
+        ? Number(row.fee_percent_bps) : Number(row.channel_fee_percent_bps || 0);
     const parts = [];
     if (pct) parts.push((pct / 100).toLocaleString('id-ID', { maximumFractionDigits: 2 }) + '%');
     if (flat) parts.push(money(flat));
