@@ -158,8 +158,8 @@ class AdminPaymentRestorationTest extends TestCase
             'code' => 'qris',
             'name' => 'QRIS Utama',
             'description' => 'Scan QR dari aplikasi pembayaran.',
-            'fee_flat_idr' => 500,
-            'fee_percent_bps' => 70,
+            'fee_flat_idr' => 0,
+            'fee_percent_bps' => 0,
             'supports_order' => true,
             'supports_wallet_topup' => true,
             'sort_order' => 7,
@@ -175,6 +175,37 @@ class AdminPaymentRestorationTest extends TestCase
 
         $this->assertNotNull($audit);
         $this->assertStringNotContainsString('must-not-enter-audit', (string) $audit->after);
+    }
+
+    public function test_super_admin_can_configure_route_specific_fees_without_exposing_gateway_secrets(): void
+    {
+        $this->login('SUPER_ADMIN');
+        $channel = DB::table('payment_channels')->where('code', 'virtual_account')->firstOrFail();
+        DB::table('payment_channels')->where('id', $channel->id)
+            ->update(['supports_wallet_topup' => true, 'supports_order' => true]);
+        $route = DB::table('payment_routes')
+            ->where('payment_channel_id', $channel->id)->firstOrFail();
+
+        $this->put('/admin/payments/routes/'.$route->id, [
+            'priority' => 10,
+            'fee_flat_idr' => 4440,
+            'fee_percent_bps' => 25,
+            'supports_order' => true,
+            'supports_wallet_topup' => true,
+            'is_active' => true,
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('payment_routes', [
+            'id' => $route->id, 'fee_flat_idr' => 4440, 'fee_percent_bps' => 25,
+        ]);
+        $this->get('/admin/payments')->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Admin/Payments')
+                ->where('routes', fn ($routes): bool => collect($routes)
+                    ->contains(fn ($row): bool => (int) $row['id'] === (int) $route->id
+                        && $row['fee_flat_idr'] === 4440
+                        && $row['fee_percent_bps'] === 25
+                        && ! array_key_exists('configuration', $row))));
     }
 
     public function test_order_and_wallet_topup_can_route_same_method_to_different_gateways(): void

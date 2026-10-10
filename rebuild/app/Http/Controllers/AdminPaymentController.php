@@ -50,6 +50,8 @@ class AdminPaymentController
                 'routes.payment_gateway_id',
                 'routes.provider_channel',
                 'routes.priority',
+                'routes.fee_flat_idr',
+                'routes.fee_percent_bps',
                 'routes.supports_order',
                 'routes.supports_wallet_topup',
                 'routes.is_active',
@@ -122,16 +124,25 @@ class AdminPaymentController
                 'routes.payment_channel_id',
                 'routes.payment_gateway_id',
                 'routes.priority',
+                'routes.fee_flat_idr',
+                'routes.fee_percent_bps',
                 'routes.supports_order',
                 'routes.supports_wallet_topup',
                 'routes.is_active',
                 'channels.code as channel_code',
                 'channels.name as channel_name',
+                'channels.method as channel_method',
+                'channels.fee_flat_idr as channel_fee_flat_idr',
+                'channels.fee_percent_bps as channel_fee_percent_bps',
                 'gateways.code as gateway_code',
                 'gateways.internal_name as gateway_name',
             ])->get()->map(fn (object $route): array => [
                 ...((array) $route),
                 'priority' => (int) $route->priority,
+                'fee_flat_idr' => $route->fee_flat_idr !== null ? (int) $route->fee_flat_idr : null,
+                'fee_percent_bps' => $route->fee_percent_bps !== null ? (int) $route->fee_percent_bps : null,
+                'channel_fee_flat_idr' => (int) $route->channel_fee_flat_idr,
+                'channel_fee_percent_bps' => (int) $route->channel_fee_percent_bps,
                 'supports_order' => (bool) $route->supports_order,
                 'supports_wallet_topup' => (bool) $route->supports_wallet_topup,
                 'is_active' => (bool) $route->is_active,
@@ -414,6 +425,12 @@ class AdminPaymentController
             'is_active' => $data['is_active'],
             'updated_at' => now(),
         ];
+        if (array_key_exists('fee_flat_idr', $data)) {
+            $after['fee_flat_idr'] = $data['fee_flat_idr'];
+        }
+        if (array_key_exists('fee_percent_bps', $data)) {
+            $after['fee_percent_bps'] = $data['fee_percent_bps'];
+        }
         DB::table('payment_routes')->where('id', $id)->update($after);
         $this->audit($request, 'payment.route.updated', 'payment_route', $id, (array) $before, $after);
 
@@ -624,7 +641,7 @@ class AdminPaymentController
 
     private function channelData(Request $request, ?int $ignoreId = null): array
     {
-        return $request->validate([
+        $data = $request->validate([
             'code' => [
                 'required', 'string', 'min:2', 'max:60', 'regex:/^[a-z0-9_]+$/',
                 Rule::unique('payment_channels', 'code')->ignore($ignoreId),
@@ -639,17 +656,38 @@ class AdminPaymentController
             'sort_order' => ['required', 'integer', 'min:0', 'max:9999'],
             'is_active' => ['required', 'boolean'],
         ]);
+
+        // Wallet and QRIS can never add a payment-method surcharge.
+        if (in_array($data['method'], ['WALLET', 'QRIS'], true)
+            || in_array($data['code'], ['saldo', 'qris', 'manual_qris'], true)) {
+            $data['fee_flat_idr'] = 0;
+            $data['fee_percent_bps'] = 0;
+        }
+
+        return $data;
     }
 
     private function routeData(Request $request, int $channelId): array
     {
         $data = $request->validate([
             'priority' => ['required', 'integer', 'min:0', 'max:9999'],
+            'fee_flat_idr' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:100000000'],
+            'fee_percent_bps' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:9999'],
             'supports_order' => ['required', 'boolean'],
             'supports_wallet_topup' => ['required', 'boolean'],
             'is_active' => ['required', 'boolean'],
         ]);
         $data['payment_channel_id'] = $channelId;
+
+        $channel = DB::table('payment_channels')->where('id', $channelId)->first();
+        if ($channel && in_array($channel->method, ['WALLET', 'QRIS'], true)) {
+            if (array_key_exists('fee_flat_idr', $data)) {
+                $data['fee_flat_idr'] = 0;
+            }
+            if (array_key_exists('fee_percent_bps', $data)) {
+                $data['fee_percent_bps'] = 0;
+            }
+        }
 
         return $data;
     }

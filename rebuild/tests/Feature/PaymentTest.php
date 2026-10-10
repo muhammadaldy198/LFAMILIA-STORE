@@ -141,7 +141,7 @@ class PaymentTest extends TestCase
         ];
     }
 
-    public function test_payment_channel_fee_is_server_side_and_gateway_is_not_exposed(): void
+    public function test_manual_qris_never_adds_customer_fee_and_gateway_is_not_exposed(): void
     {
         $catalog = $this->catalog();
         $this->route('manual_qris', 'MANUAL_QRIS', 500);
@@ -154,14 +154,14 @@ class PaymentTest extends TestCase
 
         $response->assertJsonPath('subtotal_idr', 11000)
             ->assertJsonPath('discount_idr', 0)
-            ->assertJsonPath('fee_idr', 500)
-            ->assertJsonPath('total_idr', 11500)
+            ->assertJsonPath('fee_idr', 0)
+            ->assertJsonPath('total_idr', 11000)
             ->assertJsonMissing(['gateway_code' => 'MANUAL_QRIS']);
 
         $order = DB::table('orders')->where('order_number', $response->json('order_number'))->firstOrFail();
         $snapshot = json_decode($order->snapshot, true, 512, JSON_THROW_ON_ERROR);
-        $this->assertSame(500, (int) $order->fee_idr);
-        $this->assertSame(11500, (int) $order->total_idr);
+        $this->assertSame(0, (int) $order->fee_idr);
+        $this->assertSame(11000, (int) $order->total_idr);
         $this->assertSame('manual_qris', $snapshot['payment']['channel_code']);
         $this->assertSame('MANUAL_QRIS', $snapshot['payment']['gateway_code']);
     }
@@ -245,7 +245,7 @@ class PaymentTest extends TestCase
                     'transaction_status' => 'settlement',
                     'status_code' => '200',
                     'order_id' => rawurldecode($matches[1]),
-                    'gross_amount' => '11077.00',
+                    'gross_amount' => '11000.00',
                     'fraud_status' => 'accept',
                     'settlement_time' => now()->format('Y-m-d H:i:s'),
                 ]);
@@ -259,7 +259,7 @@ class PaymentTest extends TestCase
             'qris',
             'm7-midtrans-order-0001'
         ))->assertCreated();
-        $this->assertSame(11077, $checkout->json('total_idr'));
+        $this->assertSame(11000, $checkout->json('total_idr'));
 
         $payment = $this->postJson('/payments/orders/'.$checkout->json('order_number'), [
             'idempotency_key' => 'm7-midtrans-payment-0001',
@@ -276,7 +276,7 @@ class PaymentTest extends TestCase
             'transaction_status' => 'settlement',
             'status_code' => '200',
             'order_id' => $row->merchant_reference,
-            'gross_amount' => '11077.00',
+            'gross_amount' => '11000.00',
             'fraud_status' => 'accept',
             'settlement_time' => '2026-09-30 10:00:00',
         ];
@@ -342,7 +342,7 @@ class PaymentTest extends TestCase
                     'transaction_status' => 'settlement',
                     'status_code' => '200',
                     'order_id' => rawurldecode($matches[1]),
-                    'gross_amount' => '11077.00',
+                    'gross_amount' => '11000.00',
                     'fraud_status' => 'accept',
                 ]);
             }
@@ -377,7 +377,7 @@ class PaymentTest extends TestCase
             'qris',
             'e2e-simulated-order-0001'
         ))->assertCreated();
-        $this->assertSame(11077, $checkout->json('total_idr'));
+        $this->assertSame(11000, $checkout->json('total_idr'));
 
         $this->postJson('/payments/orders/'.$checkout->json('order_number'), [
             'idempotency_key' => 'e2e-simulated-payment-0001',
@@ -392,7 +392,7 @@ class PaymentTest extends TestCase
             'transaction_status' => 'settlement',
             'status_code' => '200',
             'order_id' => $payment->merchant_reference,
-            'gross_amount' => '11077.00',
+            'gross_amount' => '11000.00',
             'fraud_status' => 'accept',
         ];
         $notification['signature_key'] = hash(
@@ -448,7 +448,7 @@ class PaymentTest extends TestCase
                     'transaction_status' => 'cancel',
                     'status_code' => '202',
                     'order_id' => rawurldecode($matches[1]),
-                    'gross_amount' => '11077.00',
+                    'gross_amount' => '11000.00',
                     'fraud_status' => 'accept',
                 ]);
             }
@@ -474,7 +474,7 @@ class PaymentTest extends TestCase
             'transaction_status' => 'cancel',
             'status_code' => '202',
             'order_id' => $payment->merchant_reference,
-            'gross_amount' => '11077.00',
+            'gross_amount' => '11000.00',
             'fraud_status' => 'accept',
         ];
         $notification['signature_key'] = hash('sha512',
@@ -518,7 +518,7 @@ class PaymentTest extends TestCase
                     'transaction_status' => 'pending',
                     'status_code' => '201',
                     'order_id' => rawurldecode($matches[1]),
-                    'gross_amount' => '11077.00',
+                    'gross_amount' => '11000.00',
                     'fraud_status' => 'accept',
                 ]);
             }
@@ -544,7 +544,7 @@ class PaymentTest extends TestCase
             'transaction_status' => 'settlement',
             'status_code' => '200',
             'order_id' => $payment->merchant_reference,
-            'gross_amount' => '11077.00',
+            'gross_amount' => '11000.00',
             'fraud_status' => 'accept',
             'settlement_time' => now()->format('Y-m-d H:i:s'),
         ];
@@ -1260,8 +1260,8 @@ class PaymentTest extends TestCase
             ->assertJsonPath('member_discount_idr', 0)
             ->assertJsonPath('voucher_discount_idr', 1000)
             ->assertJsonPath('discount_idr', 1000)
-            ->assertJsonPath('fee_idr', 500)
-            ->assertJsonPath('total_idr', 10500);
+            ->assertJsonPath('fee_idr', 0)
+            ->assertJsonPath('total_idr', 10000);
 
         $payload = $this->guestCheckout(
             $catalog['package_id'],
@@ -1277,8 +1277,8 @@ class PaymentTest extends TestCase
             ->assertJsonPath('member_discount_idr', 0)
             ->assertJsonPath('voucher_discount_idr', 1000)
             ->assertJsonPath('discount_idr', 1000)
-            ->assertJsonPath('fee_idr', 500)
-            ->assertJsonPath('total_idr', 10500)
+            ->assertJsonPath('fee_idr', 0)
+            ->assertJsonPath('total_idr', 10000)
             ->assertJsonPath('voucher_code', 'SUMMARY1000')
             ->assertJsonPath('payment_channel_code', 'manual_qris')
             ->assertJsonMissingPath('cost_idr')
@@ -1301,8 +1301,8 @@ class PaymentTest extends TestCase
 
         $persisted = DB::table('orders')->where('order_number', $order->json('order_number'))->firstOrFail();
         $this->assertSame(1000, (int) $persisted->discount_idr);
-        $this->assertSame(500, (int) $persisted->fee_idr);
-        $this->assertSame(10500, (int) $persisted->total_idr);
+        $this->assertSame(0, (int) $persisted->fee_idr);
+        $this->assertSame(10000, (int) $persisted->total_idr);
     }
 
     public function test_external_create_claim_prevents_duplicate_gateway_request_from_stale_payment_object(): void

@@ -19,6 +19,15 @@ Candidate diurutkan dengan `payment_routes.priority` kecil lebih dahulu, lalu ID
 
 **Route selection sebelum external request bukan failover sesudah request.** Jika request eksternal sudah diklaim/dikirim dan hasilnya tidak pasti, transaksi dapat masuk `UNKNOWN`. Jangan membuat payment kedua sebagai recovery otomatis.
 
+## Admin fees for orders and LFAMILIA Cash topups
+
+- Public methods have merchant-editable base fee (`payment_channels.fee_flat_idr` and `fee_percent_bps`).
+- Each payment route (channel + Midtrans/DOKU gateway) may override one or both values. `NULL` means inherit the channel base fee. An explicit `0` means no fee for that component. Select the gateway **before** quoting and persist the chosen route/amount when creating an order or topup.
+- The same calculation is used for checkout orders and topup of LFAMILIA Cash: amount after permitted discounts plus the configured fee. Wallet topup credits only the requested topup amount, not its payment fee. Changes to future pricing must not change existing pending or paid invoices.
+- **LFAMILIA Cash payments have exactly zero customer admin fee**, even if a legacy database record contains nonzero values. QRIS and manual QRIS also have zero method-specific customer surcharge, including transactions above the MDR 0% threshold; the merchant bears the MDR as applicable under Bank Indonesia rules.
+- Only pass through VA/e-wallet fees when allowed by the relevant merchant agreement. Midtrans and DOKU contractual fees and taxes vary by merchant; no unverified amounts are automatically seeded. A fee absent from admin settings stays zero, not an estimated fee.
+- The admin workspace groups settings into understandable tabs and exposes per-route fees without exposing gateway secrets. Existing merchant-edited names, sort scores, and route activation states are preserved during migration and catalog re-sync.
+
 ## Payment creation idempotency
 
 Order dan wallet top-up memakai payment idempotency key + request fingerprint. Key untuk request yang berbeda ditolak. Untuk satu order/top-up, service juga mencari existing non-rejected payment agar double-create tidak terjadi.

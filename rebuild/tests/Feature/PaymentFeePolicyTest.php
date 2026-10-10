@@ -1,0 +1,133 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\IntegrationCredential;
+use App\Services\PaymentRoutingService;
+use App\Services\WalletTopupService;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\DB;
+use Tests\TestCase;
+
+class PaymentFeePolicyTest extends TestCase
+{
+    use DatabaseTransactions;
+
+    private function enableGateway(string $gateway, string $credential, array $config): void
+    {
+        IntegrationCredential::updateOrCreate(['code' => $credential], [
+            'config_ciphertext' => $config,
+            'is_active' => true,
+        ]);
+        DB::table('payment_gateways')->where('code', $gateway)->update([
+            'is_active' => true, 'is_maintenance' => false,
+        ]);
+    }
+
+    public function test_per_gateway_fees_apply_to_orders_and_lfamilia_cash_topups(): void
+    {
+        $this->enableGateway('MIDTRANS', 'midtrans', ['server_key' => 'sandbox-key', 'is_production' => false]);
+        $this->enableGateway('DOKU', 'doku', [
+            'client_id' => 'sandbox-client', 'secret_key' => 'sandbox-secret',
+            'base_url' => 'https://api-sandbox.doku.com',
+        ]);
+
+        $channel = DB::table('payment_channels')->where('code', 'virtual_account')->firstOrFail();
+        DB::table('payment_channels')->where('id', $channel->id)->update([
+            'is_active' => true,
+            'supports_order' => true,
+            'supports_wallet_topup' => true,
+            'fee_flat_idr' => 1000,
+            'fee_percent_bps' => 0,
+        ]);
+        foreach ([['MIDTRANS', 10, 4400], ['DOKU', 20, 3500]] as [$code, $priority, $fee]) {
+            $gateway = DB::table('payment_gateways')->where('code', $code)->firstOrFail();
+            DB::table('payment_routes')->updateOrInsert(
+                ['payment_channel_id' => $channel->id, 'payment_gateway_id' => $gateway->id],
+                [
+                    'priority' => $priority, 'fee_flat_idr' => $fee, 'fee_percent_bps' => 0,
+                    'supports_order' => true, 'supports_wallet_topup' => true,
+                    'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+                ]
+            );
+        }
+
+        $routing = app(PaymentRoutingService::class);
+        $primary = $routing->resolve('virtual_account', false, 'order');
+        $this->assertSame('MIDTRANS', $primary['gateway_code']);
+        $this->assertSame(4400, $routing->fee(20000, $primary));
+        $this->assertSame(4400, collect($routing->publicOrderChannels(null))
+            ->firstWhere('code', 'virtual_account')['fee_flat_idr']);
+
+        DB::table('payment_gateways')->where('code', 'MIDTRANS')
+            ->update(['is_maintenance' => true]);
+
+        $fallback = $routing->resolve('virtual_account', false, 'order');
+        $this->assertSame('DOKU', $fallback['gateway_code']);
+        $this->assertSame(3500, $routing->fee(20000, $fallback));
+        $this->assertSame(3500, collect($routing->publicOrderChannels(null))
+            ->firstWhere('code', 'virtual_account')['fee_flat_idr']);
+
+        $quote = app(WalletTopupService::class)->quote(20000, 'virtual_account');
+        $this->assertSame(20000, $quote['amount_idr']);
+        $this->assertSame(3500, $quote['fee_idr']);
+        $this->assertSame(23500, $quote['total_idr']);
+        $this->assertSame(3500, collect($routing->publicTopupChannels())
+            ->firstWhere('code', 'virtual_account')['fee_flat_idr']);
+    }
+
+    public function test_wallet_and_qris_are_zero_fee_even_if_legacy_records_still_have_surcharge(): void
+    {
+        $this->enableGateway('MIDTRANS', 'midtrans', ['server_key' => 'sandbox-key', 'is_production' => false]);
+        DB::table('payment_gateways')->where('code', 'WALLET')->update(['is_active' => true]);
+        foreach ([['saldo', 'WALLET'], ['qris', 'MIDTRANS']] as [$code, $gateway]) {
+            $channel = DB::table('payment_channels')->where('code', $code)->firstOrFail();
+            DB::table('payment_channels')->where('id', $channel->id)->update([
+                'is_active' => true, 'fee_flat_idr' => 500, 'fee_percent_bps' => 70,
+                'supports_wallet_topup' => $code === 'qris',
+            ]);
+            $gatewayId = DB::table('payment_gateways')->where('code', $gateway)->value('id');
+            DB::table('payment_routes')->updateOrInsert(
+                ['payment_channel_id' => $channel->id, 'payment_gateway_id' => $gatewayId],
+                [
+                    'priority' => 10, 'fee_flat_idr' => 1000, 'fee_percent_bps' => 100,
+                    'supports_order' => true, 'supports_wallet_topup' => $code === 'qris',
+                    'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+                ]
+            );
+        }
+
+        $routing = app(PaymentRoutingService::class);
+        foreach (['saldo', 'qris'] as $code) {
+            $route = $routing->resolve($code);
+            $this->assertSame(0, $routing->fee(20000, $route));
+            $visible = collect($routing->publicOrderChannels(null))->firstWhere('code', $code);
+            $this->assertSame(0, $visible['fee_flat_idr']);
+            $this->assertSame(0, $visible['fee_percent_bps']);
+        }
+
+        $quote = app(WalletTopupService::class)->quote(20000, 'qris');
+        $this->assertSame(0, $quote['fee_idr']);
+        $this->assertSame(20000, $quote['total_idr']);
+    }
+
+    public function test_empty_route_override_inherits_existing_channel_fee(): void
+    {
+        $this->enableGateway('MIDTRANS', 'midtrans', ['server_key' => 'sandbox-key', 'is_production' => false]);
+        $channel = DB::table('payment_channels')->where('code', 'virtual_account')->firstOrFail();
+        DB::table('payment_channels')->where('id', $channel->id)->update([
+            'is_active' => true, 'fee_flat_idr' => 500, 'fee_percent_bps' => 50,
+        ]);
+        $gatewayId = DB::table('payment_gateways')->where('code', 'MIDTRANS')->value('id');
+        DB::table('payment_routes')->updateOrInsert(
+            ['payment_channel_id' => $channel->id, 'payment_gateway_id' => $gatewayId],
+            [
+                'priority' => 0, 'fee_flat_idr' => null, 'fee_percent_bps' => null,
+                'supports_order' => true, 'is_active' => true,
+                'created_at' => now(), 'updated_at' => now(),
+            ]
+        );
+        $route = app(PaymentRoutingService::class)->resolve('virtual_account');
+        $this->assertSame(600, app(PaymentRoutingService::class)->fee(20000, $route));
+    }
+}
