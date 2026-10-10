@@ -32,7 +32,7 @@ const fallbackNews=[
 ];
 const homeNews=computed(()=>p.news?.length?p.news:fallbackNews);
 const q=(x={})=>{const a={...p.filters,...x};Object.keys(a).forEach(k=>{if(!a[k])delete a[k]});const s=new URLSearchParams(a).toString();return s?'/?'+s:'/'};
-const submit=()=>router.get('/',{...p.filters,q:search.value},{preserveState:true,preserveScroll:true});
+const submit=()=>router.get('/',{...p.filters,q:search.value},{preserveState:true,preserveScroll:true,replace:true,only:['products','filters']});
 const initial=n=>(n||'L').slice(0,1).toUpperCase();
 const label=l=>String(l).includes('Previous')?'‹':String(l).includes('Next')?'›':String(l).replace(/&laquo;|&raquo;/g,'').trim();
 const newsDate=v=>v?new Date(v).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}):'LFAMILIA News';
@@ -137,9 +137,9 @@ onUnmounted(()=>{
                 </div>
 
                 <nav class="lf-filters">
-                    <Link :href="q({category:'',mode:''})" class="lf-chip" :class="{active:!filters.category&&!filters.mode}">{{ customerText("pages.catalog.index.4b93aea2", "Semua") }}</Link>
-                    <Link :href="q({category:'',mode:'manual'})" class="lf-chip" :class="{active:filters.mode==='manual'}">{{ customerText("pages.catalog.index.a182b386", "Produk Manual") }}</Link>
-                    <Link v-for="c in categories" :key="c.slug" :href="q({category:c.slug,mode:''})" class="lf-chip" :class="{active:filters.category===c.slug}">
+                    <Link :href="q({category:'',mode:''})" :only="['products','filters']" preserve-state preserve-scroll replace class="lf-chip" :class="{active:!filters.category&&!filters.mode}">{{ customerText("pages.catalog.index.4b93aea2", "Semua") }}</Link>
+                    <Link :href="q({category:'',mode:'manual'})" :only="['products','filters']" preserve-state preserve-scroll replace class="lf-chip" :class="{active:filters.mode==='manual'}">{{ customerText("pages.catalog.index.a182b386", "Produk Manual") }}</Link>
+                    <Link v-for="c in categories" :key="c.slug" :href="q({category:c.slug,mode:''})" :only="['products','filters']" preserve-state preserve-scroll replace class="lf-chip" :class="{active:filters.category===c.slug}">
                         <img v-if="c.image_url" :src="c.image_url" alt="">
                         <CategoryIcon v-else :name="c.icon" class="h-3.5 w-3.5 shrink-0" />
                         {{c.name}}
@@ -157,7 +157,7 @@ onUnmounted(()=>{
 
                 <nav v-if="products.links?.length>3" class="lf-pages">
                     <template v-for="x in products.links" :key="x.label">
-                        <Link v-if="x.url" :href="x.url" :class="{active:x.active}">{{label(x.label)}}</Link>
+                        <Link v-if="x.url" :href="x.url" :only="['products','filters']" preserve-state preserve-scroll replace :class="{active:x.active}">{{label(x.label)}}</Link>
                         <span v-else>{{label(x.label)}}</span>
                     </template>
                 </nav>
