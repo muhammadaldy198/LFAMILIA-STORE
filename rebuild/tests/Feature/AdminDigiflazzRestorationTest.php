@@ -252,7 +252,7 @@ class AdminDigiflazzRestorationTest extends TestCase
         $this->travelBack();
     }
 
-    public function test_full_sync_deletes_missing_supplier_rows_and_disables_only_missing_mappings(): void
+    public function test_full_sync_keeps_missing_supplier_rows_and_restores_sync_disabled_mappings(): void
     {
         $this->login();
         $gone = $this->mappedItem('removed-mapped');
@@ -262,28 +262,29 @@ class AdminDigiflazzRestorationTest extends TestCase
         $this->fakeCatalog([$this->row(['buyer_sku_code' => 'retained', 'price' => 9500])]);
 
         $this->assertSame(1, app(DigiflazzCatalogService::class)->sync());
-        $this->assertDatabaseMissing('digiflazz_catalog_items', ['buyer_sku_code' => 'removed-mapped']);
-        $this->assertDatabaseMissing('digiflazz_catalog_items', ['buyer_sku_code' => 'removed-unmapped']);
-        $this->assertDatabaseHas('provider_mappings', ['external_sku' => 'removed-mapped', 'is_active' => false, 'cost_idr' => 10000]);
+        $this->assertDatabaseHas('digiflazz_catalog_items', ['buyer_sku_code' => 'removed-mapped', 'is_present' => false]);
+        $this->assertDatabaseHas('digiflazz_catalog_items', ['buyer_sku_code' => 'removed-unmapped', 'is_present' => false]);
+        $this->assertDatabaseHas('provider_mappings', ['external_sku' => 'removed-mapped', 'is_active' => false, 'disabled_by_sync' => true, 'cost_idr' => 10000]);
         $this->assertDatabaseHas('product_packages', ['id' => $gone['package']->id, 'is_active' => true]);
         $this->assertDatabaseHas('provider_mappings', ['external_sku' => 'retained', 'is_active' => true, 'cost_idr' => 9500]);
-        $this->assertSame(1, DB::table('digiflazz_catalog_items')->count());
+        $this->assertSame(3, DB::table('digiflazz_catalog_items')->count());
         $sync = json_decode((string) DB::table('system_settings')->where('key', 'digiflazz.last_catalog_sync')->value('value'), true);
-        $this->assertSame(2, $sync['removed']);
+        $this->assertSame(2, $sync['missing']);
         $this->assertSame(1, $sync['disabled_mappings']);
 
         $response = $this->get('/admin/digiflazz');
         $response->assertOk();
         $response->assertInertia(function (Assert $page): void {
-            $page->where('items.total', 1);
-            $page->where('items.data.0.buyer_sku_code', 'retained');
-            $page->where('catalogSync.removed', 2);
+            $page->where('items.total', 3);
+            $page->where('summary.critical', 2);
+            $page->where('catalogSync.missing', 2);
         });
 
         $this->fakeCatalog([$this->row(['buyer_sku_code' => 'removed-mapped'])]);
         app(DigiflazzCatalogService::class)->sync();
         $this->assertDatabaseHas('digiflazz_catalog_items', ['buyer_sku_code' => 'removed-mapped']);
-        $this->assertDatabaseHas('provider_mappings', ['external_sku' => 'removed-mapped', 'is_active' => false]);
+        $this->assertDatabaseHas('digiflazz_catalog_items', ['buyer_sku_code' => 'removed-mapped', 'is_present' => true]);
+        $this->assertDatabaseHas('provider_mappings', ['external_sku' => 'removed-mapped', 'is_active' => true, 'disabled_by_sync' => false]);
     }
 
     public function test_single_sku_sync_does_not_delete_other_supplier_rows(): void
@@ -297,8 +298,8 @@ class AdminDigiflazzRestorationTest extends TestCase
 
         $this->fakeCatalog([]);
         $this->assertSame(0, app(DigiflazzCatalogService::class)->sync('single-target'));
-        $this->assertDatabaseMissing('digiflazz_catalog_items', ['buyer_sku_code' => 'single-target']);
-        $this->assertDatabaseHas('provider_mappings', ['external_sku' => 'single-target', 'is_active' => false]);
+        $this->assertDatabaseHas('digiflazz_catalog_items', ['buyer_sku_code' => 'single-target', 'is_present' => false]);
+        $this->assertDatabaseHas('provider_mappings', ['external_sku' => 'single-target', 'is_active' => false, 'disabled_by_sync' => true]);
         $this->assertDatabaseHas('digiflazz_catalog_items', ['buyer_sku_code' => 'other-sku', 'buyer_active' => true]);
     }
 
