@@ -40,12 +40,15 @@ class DigiflazzCatalogService
                 throw ValidationException::withMessages(['sync' => 'Digiflazz tidak merespons. Data sebelumnya tetap tersimpan.']);
             }
             if (! $response->successful() || ! is_array($rows) || ! array_is_list($rows) || ($sku === null && count($rows) === 0)) {
+                $providerCode = $response->json('data.rc');
+                $providerCode = is_string($providerCode) || is_int($providerCode) ? (string) $providerCode : '';
                 Log::warning('Digiflazz catalog sync rejected.', [
                     'reason' => ! $response->successful() ? 'http_error'
                         : (! is_array($rows) || ! array_is_list($rows) ? 'invalid_data_shape' : 'empty_full_catalog'),
                     'http_status' => $response->status(),
                     'data_type' => get_debug_type($rows),
                     'row_count' => is_array($rows) && array_is_list($rows) ? count($rows) : null,
+                    'provider_rc' => preg_match('/^[A-Za-z0-9_-]{1,16}$/', $providerCode) ? $providerCode : null,
                 ]);
                 throw ValidationException::withMessages(['sync' => 'Daftar harga Digiflazz kosong atau tidak valid.']);
             }
