@@ -100,6 +100,11 @@ class GoogleAuthController
 
         Auth::guard('web')->login($user);
         request()->session()->regenerate();
+        // Only the phone-completion route accepts this short-lived Google proof.
+        request()->session()->put([
+            'auth.google_phone_onboarding_at' => time(),
+            'auth.google_phone_onboarding_user_id' => (string) $user->getAuthIdentifier(),
+        ]);
 
         return redirect()->route($user->phone ? 'account' : 'account.phone.edit');
     }
