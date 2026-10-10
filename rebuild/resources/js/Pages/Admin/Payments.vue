@@ -48,7 +48,7 @@ watch(() => props.gateways, (items) => {
     gateways.splice(0, gateways.length, ...items.map((item) => ({ ...item })));
 }, { deep: true });
 
-const decorateRoute = (item) => ({ ...item, custom_fee: item.fee_flat_idr !== null || item.fee_percent_bps !== null });
+const decorateRoute = (item) => ({ ...item, custom_fee: item.fee_flat_idr !== null || item.fee_percent_bps !== null, fee_percent: Number(item.fee_percent_bps || 0) / 100 });
 const routes = reactive(props.routes.map(decorateRoute));
 const methodPosition = (row) => displayPosition(props.channels, row, byOrder());
 const gatewayPosition = (row) => displayPosition(gateways, row, byOrder());
@@ -311,7 +311,7 @@ function saveRoute(row) {
         is_active: Boolean(row.is_active),
         fee_flat_idr: routeIsFree(row) ? 0 : (row.custom_fee ? Number(row.fee_flat_idr || 0) : null),
         fee_percent_bps: routeIsFree(row) ? 0 : (row.custom_fee
-            ? Math.round(Number(row.fee_percent_bps || 0) * 1) : null),
+            ? Math.max(0, Math.min(9999, Math.round(Number(row.fee_percent || 0) * 100))) : null),
     }, { preserveScroll: true });
 }
 
@@ -468,7 +468,7 @@ async function copy(value) {
                             <div class="xl:col-span-6 grid gap-3 border-t pt-3 sm:grid-cols-3">
                                 <label class="flex items-center gap-2 text-sm"><AdminSwitch v-model="row.custom_fee" :disabled="routeIsFree(row)" />Tarif khusus gateway</label>
                                 <label class="space-y-1 text-xs"><span>Biaya tetap (Rp)</span><Input v-model.number="row.fee_flat_idr" type="number" min="0" max="100000000" :disabled="routeIsFree(row) || !row.custom_fee" /></label>
-                                <label class="space-y-1 text-xs"><span>Biaya persen (%)</span><Input :model-value="Number(row.fee_percent_bps || 0) / 100" @update:model-value="value => { row.fee_percent_bps = Math.round(Number(value || 0) * 100) }" type="number" min="0" max="99.99" step="0.01" :disabled="routeIsFree(row) || !row.custom_fee" /></label>
+                                <label class="space-y-1 text-xs"><span>Biaya persen (%)</span><Input v-model.number="row.fee_percent" type="number" min="0" max="99.99" step="0.01" :disabled="routeIsFree(row) || !row.custom_fee" /></label>
                             </div>
                         </div>
                         <p v-if="!routes.length" class="rounded-md border p-3 text-sm text-muted-foreground">Belum ada routing yang didukung source code.</p>
