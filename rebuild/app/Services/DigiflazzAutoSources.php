@@ -25,7 +25,7 @@ class DigiflazzAutoSources
 
     public function catalog(): Collection
     {
-        return DB::table('digiflazz_catalog_items')->get()->groupBy(fn (object $item): string => $this->key($item));
+        return DB::table('digiflazz_catalog_items')->where('is_present', true)->get()->groupBy(fn (object $item): string => $this->key($item));
     }
 
     public function importGroup(Product $product, Collection $items, ?string $template, bool $publish, string $margin, bool $automatic, Request $request): ProductPackage
