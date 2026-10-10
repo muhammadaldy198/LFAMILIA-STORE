@@ -7,6 +7,7 @@ use App\Models\IntegrationCredential;
 use App\Models\NicknameGameCode;
 use App\Models\Product;
 use App\Models\User;
+use App\Services\CheckoutService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -124,8 +125,9 @@ class CheckoutTest extends TestCase
         $catalog = $this->catalog();
         $key = 'checkout-single-digiflazz-maxprice';
 
-        $this->postJson('/checkout/orders', $this->guestPayload($catalog['package_id'], $key))
-            ->assertCreated();
+        // Test the real checkout service directly, without consuming the shared
+        // HTTP rate-limit budget used by the existing security regression tests.
+        app(CheckoutService::class)->create($this->guestPayload($catalog['package_id'], $key), null);
 
         $order = DB::table('orders')->where('idempotency_key', $key)->firstOrFail();
         $snapshot = json_decode($order->snapshot, true, 512, JSON_THROW_ON_ERROR);
@@ -180,8 +182,9 @@ class CheckoutTest extends TestCase
         ]);
 
         $key = 'checkout-multiple-digiflazz-maxprice';
-        $this->postJson('/checkout/orders', $this->guestPayload($catalog['package_id'], $key))
-            ->assertCreated();
+        // Test the real checkout service directly, without consuming the shared
+        // HTTP rate-limit budget used by the existing security regression tests.
+        app(CheckoutService::class)->create($this->guestPayload($catalog['package_id'], $key), null);
 
         $order = DB::table('orders')->where('idempotency_key', $key)->firstOrFail();
         $snapshot = json_decode($order->snapshot, true, 512, JSON_THROW_ON_ERROR);
