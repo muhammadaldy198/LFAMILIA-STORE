@@ -111,6 +111,41 @@ class PaymentFeePolicyTest extends TestCase
         $this->assertSame(20000, $quote['total_idr']);
     }
 
+    public function test_percentage_gateway_fee_is_grossed_up_for_customer_orders_and_wallet_topups(): void
+    {
+        $this->enableGateway('MIDTRANS', 'midtrans', ['server_key' => 'sandbox-key', 'is_production' => false]);
+        $channel = DB::table('payment_channels')->where('code', 'virtual_account')->firstOrFail();
+        DB::table('payment_channels')->where('id', $channel->id)->update([
+            'is_active' => true,
+            'supports_order' => true,
+            'supports_wallet_topup' => true,
+            'fee_flat_idr' => 0,
+            'fee_percent_bps' => 0,
+        ]);
+        $gatewayId = DB::table('payment_gateways')->where('code', 'MIDTRANS')->value('id');
+        DB::table('payment_routes')->updateOrInsert(
+            ['payment_channel_id' => $channel->id, 'payment_gateway_id' => $gatewayId],
+            [
+                'priority' => 0, 'fee_flat_idr' => 0, 'fee_percent_bps' => 150,
+                'supports_order' => true, 'supports_wallet_topup' => true,
+                'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+            ]
+        );
+
+        $routing = app(PaymentRoutingService::class);
+        $orderRoute = $routing->resolve('virtual_account', false, 'order');
+        $this->assertSame(153, $routing->fee(10000, $orderRoute));
+
+        $quote = app(WalletTopupService::class)->quote(10000, 'virtual_account');
+        $this->assertSame(10000, $quote['amount_idr']);
+        $this->assertSame(153, $quote['fee_idr']);
+        $this->assertSame(10153, $quote['total_idr']);
+
+        // Rounded-up percentage deducted from gross leaves requested balance.
+        $gatewayDeduction = intdiv(($quote['total_idr'] * 150) + 9999, 10000);
+        $this->assertGreaterThanOrEqual(10000, $quote['total_idr'] - $gatewayDeduction);
+    }
+
     public function test_empty_route_override_inherits_existing_channel_fee(): void
     {
         $this->enableGateway('MIDTRANS', 'midtrans', ['server_key' => 'sandbox-key', 'is_production' => false]);
@@ -128,6 +163,8 @@ class PaymentFeePolicyTest extends TestCase
             ]
         );
         $route = app(PaymentRoutingService::class)->resolve('virtual_account');
-        $this->assertSame(600, app(PaymentRoutingService::class)->fee(20000, $route));
+        // ceil((20,000 + 500) / 0.995) = 20,604.
+        // Percent is calculated on the actual payment amount.
+        $this->assertSame(604, app(PaymentRoutingService::class)->fee(20000, $route));
     }
 }
