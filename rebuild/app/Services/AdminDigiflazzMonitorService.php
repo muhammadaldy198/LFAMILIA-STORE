@@ -95,6 +95,9 @@ class AdminDigiflazzMonitorService
         $critical = [];
         $warning = [];
 
+        if (isset($item->is_present) && ! (bool) $item->is_present) {
+            $critical[] = 'SKU tidak muncul pada sinkronisasi Digiflazz terakhir.';
+        }
         if (! (bool) $item->buyer_active) {
             $critical[] = 'Produk buyer sedang nonaktif.';
         }
