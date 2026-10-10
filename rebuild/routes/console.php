@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 Artisan::command('lfamilia:bootstrap-super-admin', function (): int {
     if (AdminUser::where('role', 'SUPER_ADMIN')->exists()) {
@@ -161,23 +162,27 @@ Artisan::command('lfamilia:sync-digiflazz-catalog', function (DigiflazzCatalogSe
         (string) DB::table('system_settings')->where('key', 'digiflazz.auto_sync_interval_minutes')->value('value'),
         true
     ) ?? 15)));
-    $last = json_decode(
-        (string) DB::table('system_settings')->where('key', 'digiflazz.last_auto_sync')->value('value'),
-        true
-    );
-    if (is_array($last) && ! empty($last['at'])) {
-        try {
-            if (Carbon::parse($last['at'])->gt(now()->subMinutes($interval))) {
-                $this->info('Belum mencapai jadwal sinkron otomatis berikutnya.');
+    // Respect the interval after failures as well as successes, avoiding a retry every five minutes.
+    foreach (['digiflazz.last_auto_sync', 'digiflazz.last_auto_sync_attempt'] as $setting) {
+        $last = json_decode((string) DB::table('system_settings')->where('key', $setting)->value('value'), true);
+        if (is_array($last) && ! empty($last['at'])) {
+            try {
+                if (Carbon::parse($last['at'])->gt(now()->subMinutes($interval))) {
+                    $this->info('Belum mencapai jadwal sinkron otomatis berikutnya.');
 
-                return 0;
+                    return 0;
+                }
+            } catch (Throwable) {
+                // Invalid historical timestamp is ignored so the next sync can repair the state.
             }
-        } catch (Throwable) {
-            // Invalid historical timestamp is ignored so the next sync can repair the state.
         }
     }
 
     try {
+        DB::table('system_settings')->updateOrInsert(['key' => 'digiflazz.last_auto_sync_attempt'], [
+            'value' => json_encode(['at' => now()->toIso8601String()], JSON_THROW_ON_ERROR),
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
         $count = $catalog->sync();
         DB::table('system_settings')->updateOrInsert(['key' => 'digiflazz.last_auto_sync'], [
             'value' => json_encode(['at' => now()->toIso8601String(), 'count' => $count]), 'updated_at' => now(),
@@ -186,7 +191,21 @@ Artisan::command('lfamilia:sync-digiflazz-catalog', function (DigiflazzCatalogSe
 
         return 0;
     } catch (Throwable $error) {
-        Log::warning('Automatic Digiflazz catalog sync failed.', ['exception_class' => $error::class]);
+        $validationErrors = $error instanceof ValidationException ? $error->errors() : [];
+        $syncReason = $validationErrors['sync'][0] ?? null;
+        // Only log messages owned by this service; never log raw supplier responses or credentials.
+        $safeReasons = [
+            'Sinkronisasi masih berjalan.',
+            'Lengkapi dan aktifkan Digiflazz di Integrasi.',
+            'Digiflazz tidak merespons. Data sebelumnya tetap tersimpan.',
+            'Daftar harga Digiflazz kosong atau tidak valid.',
+            'Format daftar harga tidak valid. Tidak ada perubahan disimpan.',
+        ];
+        Log::warning('Automatic Digiflazz catalog sync failed.', [
+            'exception_class' => $error::class,
+            'validation_fields' => array_keys($validationErrors),
+            'sync_reason' => in_array($syncReason, $safeReasons, true) ? $syncReason : null,
+        ]);
         $this->error('Sinkron gagal; harga tersimpan dipertahankan. Periksa Integrasi dan coba sinkron manual.');
 
         return 1;
