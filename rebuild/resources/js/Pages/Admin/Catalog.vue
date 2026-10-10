@@ -96,8 +96,18 @@ const resetCatalogFilters=()=>{catalogSearch.value='';catalogCategory.value='';c
 const categoryIconOptions=[['gamepad','Game'],['ticket','Voucher'],['play','Entertainment'],['smartphone','Pulsa / Data'],['zap','PLN / Listrik'],['grid','Umum']];
 const categoryForm = useForm({ name: '', slug: '', icon: 'grid', sort_order: categories.value.length });
 const productForm = useForm({ category_id: '', name: '', slug: '', publisher: '', description: '', fulfillment_mode: 'AUTO_PROVIDER', manual_instructions: '', manual_open_time: '', manual_close_time: '', manual_timezone: 'Asia/Jakarta', margin_percent: props.defaultMargin||0, sort_order: Math.max(-1, ...products.value.map((item) => Number(item.sort_order ?? 0))) + 1 });
-const globalMarginForm = useForm({margin_percent:props.defaultMargin||0});
-const applyGlobalMargin=()=>{if(confirm('Terapkan margin global ke semua produk otomatis? Produk manual dan margin khusus nominal tidak akan diubah.'))globalMarginForm.put('/admin/catalog/margin',{preserveScroll:true});};
+const globalMarginForm = useForm({margin_percent:props.defaultMargin||0,include_imported_percent:false});
+const legacyDigiflazzPercent = computed(() => products.value
+    .filter(item=>item.fulfillment_mode==='AUTO_PROVIDER')
+    .flatMap(item=>item.packages)
+    .filter(pack=>pack.pricing_mode==='PERCENT' && String(pack.code||'').startsWith('DF_')
+        && pack.mappings.some(mapping=>mapping.provider_code==='DIGIFLAZZ')).length);
+const applyGlobalMargin=()=>{
+    const message=globalMarginForm.include_imported_percent
+        ? 'Terapkan margin global dan alihkan '+legacyDigiflazzPercent.value+' nominal impor Digiflazz lama ke mode mengikuti margin produk? PERHATIAN: margin persen khusus yang pernah disetel pada nominal impor ini juga akan diganti. Harga tetap/rupiah dan produk manual tidak diubah.'
+        : 'Terapkan margin global ke produk otomatis yang sudah mengikuti margin produk? Nominal dengan margin persen khusus tidak berubah.';
+    if(confirm(message)) globalMarginForm.put('/admin/catalog/margin',{preserveScroll:true});
+};
 const autoSourcesForm = useForm({});
 const importForm = useForm({item_ids:[],margin_percent:props.defaultMargin||0,publish:true,auto_sources:true,customer_no_template:''});
 const suggestedTemplate = item => {
@@ -349,7 +359,7 @@ const deleteNotice = (notice) => {
                 </div>
             </section>
 
-            <Card class="p-4"><form class="flex flex-wrap items-end gap-3" @submit.prevent="applyGlobalMargin"><label class="text-sm">Margin global produk otomatis (%)<Input v-model.number="globalMarginForm.margin_percent" type="number" min="0" max="1000" step="0.0001" class="mt-1"/><span v-if="globalMarginForm.errors.margin_percent" role="alert" class="text-sm font-normal text-destructive">{{ globalMarginForm.errors.margin_percent }}</span></label><Button :disabled="globalMarginForm.processing">Terapkan margin otomatis</Button><p class="w-full text-xs text-muted-foreground">Produk manual dan nominal dengan pengaturan harga khusus tidak diubah.</p></form></Card>
+            <Card class="p-4"><form class="flex flex-wrap items-end gap-3" @submit.prevent="applyGlobalMargin"><label class="text-sm">Margin global produk otomatis (%)<Input v-model.number="globalMarginForm.margin_percent" type="number" min="0" max="1000" step="0.0001" class="mt-1"/><span v-if="globalMarginForm.errors.margin_percent" role="alert" class="text-sm font-normal text-destructive">{{ globalMarginForm.errors.margin_percent }}</span></label><Button :disabled="globalMarginForm.processing">Terapkan margin otomatis</Button><label class="flex w-full items-start gap-2 text-xs"><input v-model="globalMarginForm.include_imported_percent" type="checkbox" class="mt-0.5"/><span>Alihkan {{legacyDigiflazzPercent}} nominal impor Digiflazz lama dengan margin % tersendiri agar mengikuti Global Margin. Ini termasuk margin % khusus yang pernah diedit; centang hanya bila ingin menggantinya secara massal.</span></label><p class="w-full text-xs text-muted-foreground">Tanpa opsi migrasi, hanya nominal yang mengikuti margin produk berubah. Produk manual, harga tetap, dan margin rupiah tidak diubah.</p></form></Card>
             <section v-show="catalogTab === 'products'" class="lf-admin-catalog-section space-y-5 rounded-xl border border-slate-800 bg-slate-900 p-5">
                 <div class="flex flex-wrap items-start justify-between gap-3"><div><h2 class="text-xl font-semibold">Produk</h2><p class="mt-1 text-sm text-muted-foreground">Kelola produk otomatis dan manual. Kode SKU penyedia hanya dikelola dari panel admin dan tidak ditampilkan kepada pelanggan.</p></div><div class="flex gap-2"><Button v-for="mode in ['AUTO_PROVIDER', 'MANUAL']" :key="mode" type="button" :variant="tab===mode?'default':'outline'" @click="tab = mode">{{ mode === 'MANUAL' ? 'Produk Manual' : 'Produk Otomatis' }}</Button></div></div>
                 <Card class="p-4">
