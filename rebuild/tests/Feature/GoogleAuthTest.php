@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\IntegrationCredential;
 use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\Hash;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\User as GoogleUser;
 use Mockery;
@@ -65,12 +66,34 @@ class GoogleAuthTest extends TestCase
         $user = User::where('google_sub', 'google-sub-123')->firstOrFail();
         $this->assertNotNull($user->email_verified_at);
         $this->assertNull($user->phone);
+        $this->assertNull($user->password);
         $this->get('/account')->assertRedirect(route('account.phone.edit'));
 
-        $this->withSession(['auth.password_confirmed_at' => time()])->put('/account/phone', ['phone' => 'invalid-phone'])->assertSessionHasErrors('phone');
+        $this->put('/account/phone', ['phone' => 'invalid-phone'])->assertSessionHasErrors('phone');
         $this->get('/account')->assertRedirect(route('account.phone.edit'));
 
-        $this->withSession(['auth.password_confirmed_at' => time()])->put('/account/phone', ['phone' => '081234567890'])->assertRedirect(route('account'));
+        $this->put('/account/phone', ['phone' => '081234567890'])->assertRedirect(route('account'));
+        $this->assertSame('081234567890', $user->fresh()->phone);
         $this->get('/account')->assertOk();
+    }
+    public function test_local_password_customer_still_needs_password_confirmation_to_add_phone(): void
+    {
+        $user = User::create([
+            'name' => 'Password Customer',
+            'email' => 'local-password@example.test',
+            'password' => Hash::make('local-password-123'),
+        ]);
+
+        $this->actingAs($user, 'web')
+            ->put('/account/phone', ['phone' => '081234567890'])
+            ->assertRedirect(route('password.confirm'));
+
+        $this->assertNull($user->fresh()->phone);
+
+        $this->withSession(['auth.password_confirmed_at' => time()])
+            ->put('/account/phone', ['phone' => '081234567890'])
+            ->assertRedirect(route('account'));
+
+        $this->assertSame('081234567890', $user->fresh()->phone);
     }
 }
