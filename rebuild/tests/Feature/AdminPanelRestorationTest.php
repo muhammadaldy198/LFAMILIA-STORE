@@ -319,7 +319,11 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertSame(11220, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
         $this->fakeCatalog([$this->row(['buyer_sku_code' => 'sync-A']), $this->row(['buyer_sku_code' => 'sync-C', 'price' => 10200])]);
         app(DigiflazzCatalogService::class)->sync();
-        $this->assertDatabaseHas('provider_mappings', ['external_sku' => 'sync-A', 'is_active' => false]);
+        // This source was disabled by the missing-SKU sync, not by the owner.
+        // Only such mappings may recover automatically when their SKU returns.
+        $this->assertDatabaseHas('provider_mappings', [
+            'external_sku' => 'sync-A', 'is_active' => true, 'disabled_by_sync' => false,
+        ]);
         $this->assertSame(3, $package->mappings()->count());
     }
 
