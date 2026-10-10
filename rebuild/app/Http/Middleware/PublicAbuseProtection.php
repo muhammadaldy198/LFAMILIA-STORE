@@ -2,7 +2,6 @@
 
 namespace App\Http\Middleware;
 
-use App\Services\LoginRiskService;
 use App\Services\TurnstileService;
 use Closure;
 use Illuminate\Cache\RateLimiter;
@@ -15,7 +14,6 @@ class PublicAbuseProtection
     public function __construct(
         private readonly RateLimiter $limiter,
         private readonly TurnstileService $turnstile,
-        private readonly LoginRiskService $loginRisk,
     ) {}
 
     public function handle(Request $request, Closure $next): Response
@@ -32,23 +30,20 @@ class PublicAbuseProtection
         } elseif ($path === 'forgot-password') {
             $this->limit($request, 'forgot-password', 5, 600);
             $this->turnstile->verify($request, 'forgot_password');
+        } elseif ($path === 'admin/forgot-password') {
+            $this->limit($request, 'admin-forgot-password', 3, 600);
+            $this->turnstile->verify($request, 'admin_forgot_password');
+        } elseif ($path === 'admin/reset-password') {
+            $this->limit($request, 'admin-reset-password', 5, 600);
         } elseif ($path === 'reset-password') {
             $this->limit($request, 'reset-password', 5, 600);
         } elseif ($path === 'orders/check') {
             $this->turnstile->verify($request, 'order_lookup');
         } elseif ($path === 'checkout/orders' && ! $request->user()) {
             $this->turnstile->verify($request, 'guest_checkout');
-        } elseif ($path === 'login' && $this->loginRisk->requiresChallenge(
-            'customer',
-            $request->ip(),
-            (string) $request->input('email')
-        )) {
+        } elseif ($path === 'login') {
             $this->turnstile->verify($request, 'customer_login');
-        } elseif ($path === 'admin/login' && $this->loginRisk->requiresChallenge(
-            'admin',
-            $request->ip(),
-            (string) $request->input('email')
-        )) {
+        } elseif ($path === 'admin/login') {
             $this->turnstile->verify($request, 'admin_login');
         }
 
