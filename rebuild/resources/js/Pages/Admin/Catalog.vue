@@ -26,7 +26,10 @@ const props = defineProps({
 const cloneProducts = (items) => items.map((item) => ({
     ...item,
     packages: item.packages.map((pack) => {
-        const mappings = pack.mappings.map((mapping) => ({ ...mapping }));
+        const mappings = pack.mappings.map((mapping) => ({
+            ...mapping,
+            manual_price_idr: mapping.is_manual_price ? mapping.max_price_idr : mapping.cost_idr,
+        }));
         const stock = mappings.find((mapping) => mapping.provider_code === 'VOUCHER_STOCK');
         return {
             ...pack,
@@ -289,7 +292,11 @@ const savePackage = (pack) => router.put('/admin/catalog/packages/' + pack.id, {
 const saveMapping = (mapping) => router.put('/admin/catalog/mappings/' + mapping.id, {
     priority: mapping.priority, is_active: mapping.is_active,
     ...(mapping.provider_code === 'MANUAL' ? { cost_idr: mapping.cost_idr } : {}),
-    ...(mapping.provider_code === 'DIGIFLAZZ' ? { customer_no_template: mapping.customer_no_template || null } : {}),
+    ...(mapping.provider_code === 'DIGIFLAZZ' ? {
+        customer_no_template: mapping.customer_no_template || null,
+        is_manual_price: Boolean(mapping.is_manual_price),
+        ...(mapping.is_manual_price ? { manual_price_idr: Number(mapping.manual_price_idr) } : {}),
+    } : {}),
 });
 const providerLabel = (mapping) => mapping.provider_name || mapping.provider_code || 'Provider';
 const fulfillmentRole = (pack, mapping) => {
@@ -591,9 +598,14 @@ const deleteNotice = (notice) => {
                             <div class="space-y-2 rounded-md border border-slate-800 p-3">
                                 <div><h4 class="text-sm font-semibold">Sumber Top Up: Utama dan Cadangan</h4><p class="mt-1 text-[11px] text-slate-500">Posisi dimulai dari 1. Sumber utama digunakan pertama, cadangan hanya untuk kegagalan definitif. Pending, proses, timeout, atau status tidak pasti wajib direkonsiliasi, bukan langsung dikirim ulang.</p></div>
                                 <div v-for="mapping in [...pack.mappings.filter((entry) => entry.provider_code !== 'VOUCHER_STOCK')].sort(bySourcePriority)" :key="mapping.id" class="flex flex-wrap items-end gap-2 rounded border border-slate-800 p-2 text-xs text-slate-300">
-                                    <span class="min-w-40"><strong>{{ fulfillmentRole(pack, mapping) }}<template v-if="mapping.is_active"> · Posisi {{ sourcePosition(pack,mapping) }}</template></strong><br>{{ providerLabel(mapping) }}<span v-if="mapping.external_sku"> · {{ mapping.external_sku }}</span><br><span class="text-slate-500">Modal Rp{{Number(mapping.cost_idr||0).toLocaleString('id-ID')}}</span></span>
+                                    <span class="min-w-40"><strong>{{ fulfillmentRole(pack, mapping) }}<template v-if="mapping.is_active"> · Posisi {{ sourcePosition(pack,mapping) }}</template></strong><br>{{ providerLabel(mapping) }}<span v-if="mapping.external_sku"> · {{ mapping.external_sku }}</span><br><span class="text-slate-500">Modal Rp{{Number(mapping.cost_idr||0).toLocaleString('id-ID')}}<template v-if="mapping.is_manual_price"> · Terkunci</template></span></span>
                                     <Button v-if="mapping.provider_code==='DIGIFLAZZ'" type="button" variant="outline" @click="router.post('/admin/catalog/mappings/'+mapping.id+'/sync',{}, {preserveScroll:true})">Sinkron harga</Button>
                                     <label v-if="mapping.provider_code === 'MANUAL'">Modal Rp<Input v-model.number="mapping.cost_idr" type="number" min="0" class="mt-1 block w-28 rounded bg-slate-800 p-2" /></label>
+                                    <div v-if="mapping.provider_code === 'DIGIFLAZZ'" class="space-y-1">
+                                        <label class="flex items-center gap-2"><AdminSwitch v-model="mapping.is_manual_price" /> Kunci modal & batas harga manual</label>
+                                        <label v-if="mapping.is_manual_price" class="block">Harga modal / batas manual (Rp)<Input v-model.number="mapping.manual_price_idr" type="number" min="1" max="1000000000" required class="mt-1 block w-36 rounded bg-slate-800 p-2" /></label>
+                                        <p class="max-w-64 text-[11px] text-slate-500">Harga supplier tetap dipantau untuk cutoff. Matikan kunci lalu sinkronkan agar modal kembali mengikuti supplier.</p>
+                                    </div>
                                     <label v-if="mapping.provider_code === 'DIGIFLAZZ'" class="min-w-72">Format ID tujuan<Input v-model="mapping.customer_no_template" placeholder="{{user_id}}{{zone_id}}" class="mt-1 block w-full rounded bg-slate-800 p-2" /><span class="mt-1 block text-[11px] text-slate-500">Gunakan kode kolom di dalam {{ }}.</span></label>
                                     <details class="text-xs"><summary class="cursor-pointer">Prioritas teknis (lanjutan)</summary><label class="mt-2 block">Skor internal<Input v-model.number="mapping.priority" type="number" min="0" max="1000" class="mt-1 block w-20 rounded bg-slate-800 p-2" /></label><p>Angka kecil dipilih lebih dulu. Pada sumber otomatis, skor dapat disusun ulang saat sinkronisasi.</p></details>
                                     <label class="flex gap-2"><AdminSwitch v-model="mapping.is_active" />Aktif</label>

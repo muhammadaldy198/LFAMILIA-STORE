@@ -109,7 +109,9 @@ class DigiflazzCatalogService
                     }
                     $mappingQuery = DB::table('provider_mappings')->where('provider_id', $providerId)
                         ->where('external_sku', $row['buyer_sku_code']);
-                    (clone $mappingQuery)->update([
+                    // Preserve both manually locked amounts, while keeping the supplier
+                    // catalog price, availability, stock and cut-off data current.
+                    (clone $mappingQuery)->where('is_manual_price', false)->update([
                         'cost_idr' => $row['price_idr'], 'max_price_idr' => $row['price_idr'], 'updated_at' => now(),
                     ]);
                     // Only restore sources disabled *by a past catalog sync*.

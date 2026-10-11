@@ -67,6 +67,7 @@ class CheckoutPricing
                 'mappings.external_sku',
                 'mappings.cost_idr',
                 'mappings.max_price_idr',
+                'mappings.is_manual_price',
                 'mappings.fulfillment_config',
                 'providers.code as provider_code'
             );
@@ -88,6 +89,11 @@ class CheckoutPricing
                 return true;
             }
             $item = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', $candidate->external_sku)->first();
+            if ($candidate->is_manual_price) {
+                // A locked accounting cost must not conceal a supplier price spike.
+                // A missing catalog price is unsafe for manually locked SKUs.
+                $candidate->live_cost_idr = $item?->price_idr;
+            }
 
             return $item === null || app(DigiflazzCatalogService::class)->available($item);
         })->values();
@@ -161,6 +167,7 @@ class CheckoutPricing
                 'mappings.external_sku',
                 'mappings.cost_idr',
                 'mappings.max_price_idr',
+                'mappings.is_manual_price',
                 'mappings.fulfillment_config',
                 'providers.code as provider_code'
             );
@@ -185,6 +192,9 @@ class CheckoutPricing
                     return true;
                 }
                 $item = $items->get($candidate->external_sku);
+                if ($candidate->is_manual_price) {
+                    $candidate->live_cost_idr = $item?->price_idr;
+                }
 
                 return $item === null || app(DigiflazzCatalogService::class)->available($item);
             })->values();
@@ -205,12 +215,25 @@ class CheckoutPricing
      */
     private function quoteForContext(object $context, Collection $eligibleMappings): array
     {
+        // Reject an expensive/missing live supplier SKU even if the admin
+        // deliberately keeps its accounting cost and per-source cap fixed.
+        $eligibleMappings = $eligibleMappings->filter(function (object $candidate): bool {
+            if ($candidate->provider_code !== 'DIGIFLAZZ' || ! $candidate->is_manual_price) {
+                return true;
+            }
+
+            return $candidate->live_cost_idr !== null
+                && (int) $candidate->live_cost_idr > 0
+                && (int) $candidate->live_cost_idr <= (int) $candidate->max_price_idr;
+        })->values();
+
         // Even if ALL sellers spike, fixed-price Digiflazz must never be
         // fulfilled below the 8% gross-margin cutoff.
         if ($context->pricing_mode === 'SELL_PRICE') {
             $cap = app(DigiflazzFixedPricePolicy::class)->maximumCost((int) $context->sell_price_idr);
             $eligibleMappings = $eligibleMappings->filter(function (object $candidate) use ($cap): bool {
-                return $candidate->provider_code !== 'DIGIFLAZZ' || (int) $candidate->cost_idr <= $cap;
+                return $candidate->provider_code !== 'DIGIFLAZZ'
+                    || (int) ($candidate->is_manual_price ? $candidate->live_cost_idr : $candidate->cost_idr) <= $cap;
             })->values();
         }
         $mapping = $eligibleMappings->first();

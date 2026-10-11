@@ -81,10 +81,11 @@ class DigiflazzFixedPricePolicy
                 continue;
             }
 
-            $cost = (int) $row->cost_idr;
+            $cost = (int) ($row->is_manual_price ? $row->live_price_idr : $row->cost_idr);
             $alerts[$id]['lowest_cost_idr'] = $alerts[$id]['lowest_cost_idr'] === null
                 ? $cost : min($cost, $alerts[$id]['lowest_cost_idr']);
-            if ($catalog->sellable($row) && $cost <= $cap) {
+            if ($catalog->sellable($row) && $cost <= $cap
+                && (! $row->is_manual_price || $cost <= (int) $row->max_price_idr)) {
                 $alerts[$id]['has_eligible_source'] = true;
             }
         }
@@ -116,6 +117,9 @@ class DigiflazzFixedPricePolicy
                 'products.name as product_name',
                 'mappings.external_sku',
                 'mappings.cost_idr',
+                'mappings.max_price_idr',
+                'mappings.is_manual_price',
+                'items.price_idr as live_price_idr',
                 'items.is_present',
                 'items.buyer_active',
                 'items.seller_active',
