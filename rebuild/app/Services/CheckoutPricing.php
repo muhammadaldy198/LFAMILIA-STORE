@@ -91,6 +91,7 @@ class CheckoutPricing
 
             return $item === null || app(DigiflazzCatalogService::class)->available($item);
         })->values();
+
         return $this->quoteForContext($context, $eligibleMappings);
     }
 
