@@ -254,29 +254,22 @@ class FulfillmentService
                 } catch (ValidationException $exception) {
                     $this->markBlocked($attemptId, $exception->getMessage());
                 }
-    
                 return;
             }
-    
             $request = $this->json($attempt->request_payload);
             if ($request === []) {
                 $this->markUnknown($attemptId, 'Payload reconciliation tidak tersedia.');
-    
                 return;
             }
-    
             try {
                 $response = $this->digiflazz->transact($request);
             } catch (ValidationException $exception) {
                 $this->recordReconciliationError($attemptId, 'Integrasi provider belum siap untuk reconciliation.');
-    
                 return;
             } catch (RuntimeException $exception) {
                 $this->markUnknown($attemptId, 'Reconciliation provider belum dapat dipastikan.');
-    
                 return;
             }
-    
             DB::table('fulfillment_attempts')->where('id', $attemptId)->update([
                 'reconciled_at' => now(),
                 'last_checked_at' => now(),

@@ -52,6 +52,41 @@ class AdminOrdersRestorationTest extends TestCase
         return app(AdminManualOrderService::class)->create($data ?? $this->data(), (int) $admin->id);
     }
 
+    public function test_superadmin_cancellation_requires_confirmed_failure_and_does_not_refund(): void
+    {
+        $admin = $this->login();
+        Queue::fake();
+        $orderId = $this->order($admin);
+
+        $this->withSession(['admin.password_confirmed_at' => time()])
+            ->post('/admin/orders/'.$orderId.'/cancel', [
+                'reason' => 'Tidak boleh saat pengiriman berlangsung', 'confirmed' => true,
+            ])->assertSessionHasErrors('order');
+
+        DB::table('fulfillment_attempts')->where('order_id', $orderId)->update([
+            'status' => 'MANUAL_FAILED', 'updated_at' => now(),
+        ]);
+        DB::table('orders')->where('id', $orderId)->update(['status' => 'FAILED']);
+        $walletLedgerBefore = DB::table('wallet_ledger')->count();
+
+        $this->withSession(['admin.password_confirmed_at' => time()])
+            ->post('/admin/orders/'.$orderId.'/cancel', [
+                'reason' => 'Gagal dikonfirmasi dan akan dibicarakan dengan pelanggan',
+                'confirmed' => true,
+            ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertSame('CANCELLED', DB::table('orders')->where('id', $orderId)->value('status'));
+        $this->assertSame($walletLedgerBefore, DB::table('wallet_ledger')->count());
+        $this->assertSame(1, DB::table('order_events')
+            ->where('order_id', $orderId)->where('event_type', 'ADMIN_ORDER_CANCELLED')->count());
+        $this->assertSame(1, DB::table('audit_logs')
+            ->where('action', 'order.cancelled')->where('target_id', (string) $orderId)->count());
+        $this->withSession(['admin.password_confirmed_at' => time()])
+            ->post('/admin/orders/'.$orderId.'/cancel', [
+                'reason' => 'Permintaan kedua tidak boleh diterima', 'confirmed' => true,
+            ])->assertSessionHasErrors('order');
+    }
+
     public function test_manual_order_is_paid_queued_once_and_never_sent_to_an_external_provider(): void
     {
         $admin = $this->login();
