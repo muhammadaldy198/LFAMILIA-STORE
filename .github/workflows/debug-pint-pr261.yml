@@ -19,7 +19,7 @@ jobs:
           coverage: none
           extensions: mbstring, pdo_mysql
       - name: Install Pint
-        run: composer install --no-interaction --prefer-dist
+        run: composer install --no-interaction --prefer-dist --no-scripts
       - name: Output formatting patch
         run: |
           vendor/bin/pint app/Http/Controllers/AdminCatalogController.php
