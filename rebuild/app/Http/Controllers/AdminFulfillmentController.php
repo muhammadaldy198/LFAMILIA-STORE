@@ -131,7 +131,7 @@ class AdminFulfillmentController
                 'DIGIFLAZZ' => 'Digiflazz',
                 default => $attempt->provider_code ?: 'Belum ditentukan',
             };
-            $terminal = in_array($attempt->order_status, ['SUCCESS', 'REFUND'], true);
+            $terminal = ! in_array($attempt->order_status, ['PAID', 'PROCESSING'], true);
 
             return [
                 'id' => (int) $attempt->id,
@@ -227,7 +227,7 @@ class AdminFulfillmentController
     public function reconcile(Request $request, int $attemptId): RedirectResponse
     {
         $attempt = $this->latestAttempt($attemptId, ['SENDING', 'PENDING', 'UNKNOWN']);
-        ReconcileFulfillmentJob::dispatch($attemptId);
+        ReconcileFulfillmentJob::dispatch($attemptId, true);
         $this->audit($request, 'fulfillment.reconcile.requested', $attemptId, (array) $attempt);
 
         return back()->with('status', 'Pemeriksaan status dimasukkan ke antrean.');
@@ -261,7 +261,7 @@ class AdminFulfillmentController
         }
 
         $orderStatus = DB::table('orders')->where('id', $attempt->order_id)->value('status');
-        if (in_array($orderStatus, ['SUCCESS', 'REFUND'], true)) {
+        if (! in_array($orderStatus, ['PAID', 'PROCESSING'], true)) {
             throw ValidationException::withMessages([
                 'fulfillment' => 'Pesanan ini sudah selesai dan tidak dapat diproses ulang.',
             ]);

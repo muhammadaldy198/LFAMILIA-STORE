@@ -15,7 +15,7 @@ class ReconcileFulfillmentJob implements ShouldBeUnique, ShouldQueue
 
     public int $uniqueFor = 300;
 
-    public function __construct(public readonly int $attemptId)
+    public function __construct(public readonly int $attemptId, public readonly bool $manual = false)
     {
         $this->onQueue('fulfillment');
     }
@@ -27,7 +27,7 @@ class ReconcileFulfillmentJob implements ShouldBeUnique, ShouldQueue
 
     public function handle(FulfillmentService $fulfillment): void
     {
-        $fulfillment->reconcileAttempt($this->attemptId);
+        $fulfillment->reconcileAttempt($this->attemptId, $this->manual);
     }
 
     public function backoff(): array

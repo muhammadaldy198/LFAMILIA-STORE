@@ -19,6 +19,13 @@ DEPLOY_DIR="${APP_DIR}/deploy"
 
 bash "${DEPLOY_DIR}/preflight.sh"
 
+# Fail closed before migrations if the operator has not produced a fresh database backup.
+if [[ "${DEPLOY_REQUIRE_RECENT_BACKUP:-true}" == "true" ]]; then
+  : "${BACKUP_DIR:?BACKUP_DIR is required for safe deployment}"
+  recent_backup="$(find "${BACKUP_DIR}" -maxdepth 1 -type f -name 'lfamilia-*.tar.gz.enc' -mmin -60 -print -quit)"
+  [[ -n "${recent_backup}" ]] || { echo "No encrypted production backup from the last 60 minutes. Abort before migrations." >&2; exit 1; }
+fi
+
 cd "${REPO_DIR}"
 git_repo() {
   git -c "safe.directory=${REPO_DIR}" "$@"

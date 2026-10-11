@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
@@ -86,6 +87,14 @@ class ExternalNotificationService
     }
 
     private function attempt(int $id, string $channel, string $destination, callable $callback): bool
+    {
+        // Serialize external sends across queued workers. The HTTP timeouts are 8 seconds,
+        // so the 30-second lease outlives each network operation.
+        return Cache::lock('lfamilia:notify:'.$id.':'.$channel, 30)
+            ->block(10, fn (): bool => $this->attemptLocked($id, $channel, $destination, $callback));
+    }
+
+    private function attemptLocked(int $id, string $channel, string $destination, callable $callback): bool
     {
         if (DB::table('notification_deliveries')
             ->where('admin_notification_id', $id)

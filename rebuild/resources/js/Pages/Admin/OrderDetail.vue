@@ -7,7 +7,7 @@ import { Button } from '../../Components/ui/button';
 import { Badge } from '../../Components/ui/badge';
 import { Textarea } from '../../Components/ui/textarea';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../../Components/ui/sheet';
-const props = defineProps({ order: Object, events: Array, payments: Array, attempts: Array, canViewCustomer: Boolean, canCheckFulfillment: Boolean, canResendDelivery: Boolean });
+const props = defineProps({ order: Object, events: Array, payments: Array, attempts: Array, canViewCustomer: Boolean, canCheckFulfillment: Boolean, canResendDelivery: Boolean, canCancel: Boolean });
 const notice = ref('');
 const busy = ref(false);
 const action = ref(null);
@@ -18,6 +18,7 @@ const date = value => value ? new Intl.DateTimeFormat('id-ID', { dateStyle:'medi
 const actions = {
     complete:{ title:'Selesaikan pesanan manual', description:'Pastikan produk atau layanan sudah diterima pelanggan. Kode dan catatan pengiriman akan disimpan pada pesanan.', suffix:'complete' },
     fail:{ title:'Nyatakan pesanan manual gagal', description:'Jelaskan alasan kegagalan. Tindakan ini tidak mengembalikan dana secara otomatis.', suffix:'fail' },
+    cancel:{ title:'Batalkan pesanan (superadmin)', description:'Hanya untuk pesanan yang tidak sedang dikirim. Saldo tidak dikembalikan otomatis; selesaikan dana manual bersama customer.', suffix:null },
     retry:{ title:'Lanjutkan pengiriman', description:'Hanya pengiriman yang tertahan sebelum dikirim atau telah dikonfirmasi gagal yang dapat dilanjutkan. Pesanan yang belum pasti hasilnya harus diperiksa terlebih dahulu.', suffix:'retry' },
     payment:{ title:'Konfirmasi pembayaran QRIS manual', description:'Periksa mutasi rekening dan cocokkan nominal serta nomor pesanan sebelum melanjutkan.', suffix:'confirm' },
     resend:{ title:'Kirim ulang hasil pesanan', description:'Kode atau hasil pengiriman yang sudah tersimpan akan dikirim lagi ke email pelanggan. Tindakan ini tidak memproses ulang pesanan ke penyedia.', suffix:null },
@@ -33,7 +34,7 @@ const whatsappUrl = computed(() => {
 function open(type,id) { form.reset(); form.clearErrors(); action.value={type,id}; actionOpen.value=true; }
 function submit() {
     if (!form.confirmed || !action.value) return;
-    const url = action.value.type==='payment' ? '/admin/payments/manual/'+action.value.id+'/confirm' : action.value.type==='resend' ? '/admin/orders/'+props.order.id+'/resend-delivery' : '/admin/fulfillment/'+action.value.id+'/'+heading.value.suffix;
+    const url = action.value.type==='cancel' ? '/admin/orders/'+props.order.id+'/cancel' : action.value.type==='payment' ? '/admin/payments/manual/'+action.value.id+'/confirm' : action.value.type==='resend' ? '/admin/orders/'+props.order.id+'/resend-delivery' : '/admin/fulfillment/'+action.value.id+'/'+heading.value.suffix;
     form.post(url, { preserveScroll:true, onSuccess:()=>{ actionOpen.value=false; notice.value='Tindakan berhasil disimpan.'; } });
 }
 function check(kind) {
@@ -56,7 +57,7 @@ async function copy(value) {
 <Head :title="'Pesanan '+order.order_number" />
 <AdminShell>
     <div class="flex flex-wrap items-start justify-between gap-3"><div class="min-w-0"><h1 class="break-all text-xl font-semibold sm:text-2xl">{{ order.order_number }}</h1><p class="mt-1 text-sm text-muted-foreground">Detail pesanan dan riwayat penanganan.</p></div><Button variant="outline" as-child><Link href="/admin/orders">Daftar pesanan</Link></Button></div>
-    <div class="my-4 flex flex-wrap gap-2"><Button variant="outline" size="sm" @click="copy(order.order_number)">Salin nomor pesanan</Button><Button v-if="whatsappUrl" variant="outline" size="sm" as-child><a :href="whatsappUrl" target="_blank" rel="noopener noreferrer">Hubungi WhatsApp</a></Button><Button variant="outline" size="sm" @click="refresh" :disabled="busy">{{ busy?'Memuat…':'Muat ulang detail' }}</Button><Button v-if="canCheckFulfillment" size="sm" @click="check('process')" :disabled="busy">Periksa proses pesanan</Button></div>
+    <div class="my-4 flex flex-wrap gap-2"><Button variant="outline" size="sm" @click="copy(order.order_number)">Salin nomor pesanan</Button><Button v-if="whatsappUrl" variant="outline" size="sm" as-child><a :href="whatsappUrl" target="_blank" rel="noopener noreferrer">Hubungi WhatsApp</a></Button><Button variant="outline" size="sm" @click="refresh" :disabled="busy">{{ busy?'Memuat…':'Muat ulang detail' }}</Button><Button v-if="canCheckFulfillment" size="sm" @click="check('process')" :disabled="busy">Periksa proses pesanan</Button><Button v-if="canCancel" variant="destructive" size="sm" @click="open('cancel',order.id)">Batalkan pesanan</Button></div>
     <p v-if="notice" role="status" class="mb-4 text-sm">{{ notice }}</p>
     <p v-for="(error,key) in $page.props.errors" :key="key" role="alert" class="mb-3 text-sm text-destructive">{{ error }}</p>
     <div class="grid items-start gap-4 lg:grid-cols-2">
@@ -73,8 +74,8 @@ async function copy(value) {
     <Card class="mt-4 p-4 sm:p-5"><h2 class="font-semibold">Riwayat pesanan</h2><p v-if="!events.length" class="mt-3 text-sm text-muted-foreground">Belum ada perubahan status.</p><ol class="mt-3 divide-y"><li v-for="event in events" :key="event.id" class="py-3"><p class="text-sm font-medium">{{ event.label }}</p><p class="mt-1 text-sm text-muted-foreground">{{ event.from }} → {{ event.to }}</p><p class="mt-1 text-xs text-muted-foreground">{{ date(event.created_at) }}</p></li></ol></Card>
     <Sheet v-model:open="actionOpen"><SheetContent class="w-full overflow-y-auto sm:max-w-lg"><SheetHeader><SheetTitle>{{ heading?.title }}</SheetTitle><SheetDescription>{{ heading?.description }}</SheetDescription></SheetHeader><form @submit.prevent="submit" class="mt-6 space-y-4">
         <template v-if="action?.type==='complete'"><label class="block space-y-1"><span class="text-sm font-medium">Kode / bukti pengiriman (jika ada)</span><Textarea v-model="form.delivery_code" maxlength="2000" :disabled="form.processing" /></label><label class="block space-y-1"><span class="text-sm font-medium">Catatan untuk pelanggan (opsional)</span><Textarea v-model="form.note" maxlength="4000" :disabled="form.processing" /></label></template>
-        <label v-if="action?.type==='fail'" class="block space-y-1"><span class="text-sm font-medium">Alasan kegagalan</span><Textarea v-model="form.reason" required maxlength="4000" :disabled="form.processing" /></label>
-        <p v-if="action?.type==='payment'" class="font-semibold">Total pesanan: {{ money(order.total_idr) }}</p><p v-if="action?.type==='resend'" class="text-sm">Email tujuan: <strong class="break-all">{{ order.buyer_email }}</strong></p>
+        <label v-if="action?.type==='fail' || action?.type==='cancel'" class="block space-y-1"><span class="text-sm font-medium">Alasan kegagalan</span><Textarea v-model="form.reason" required maxlength="4000" :disabled="form.processing" /></label>
+        <p v-if="action?.type==='cancel'" class="text-sm font-medium">Tidak ada refund otomatis. Pengembalian dana jika disetujui dilakukan oleh admin secara terpisah.</p><p v-if="action?.type==='payment'" class="font-semibold">Total pesanan: {{ money(order.total_idr) }}</p><p v-if="action?.type==='resend'" class="text-sm">Email tujuan: <strong class="break-all">{{ order.buyer_email }}</strong></p>
         <label class="flex items-start gap-2 text-sm"><input v-model="form.confirmed" type="checkbox" required class="mt-1 size-4 shrink-0" :disabled="form.processing" /><span>Saya sudah memeriksa pesanan dan memastikan tindakan ini benar.</span></label>
         <p v-for="(error,key) in form.errors" :key="key" role="alert" class="text-sm text-destructive">{{ error }}</p>
         <div class="flex gap-2"><Button type="submit" :disabled="form.processing || !form.confirmed">{{ form.processing?'Menyimpan…':'Konfirmasi tindakan' }}</Button><Button type="button" variant="outline" :disabled="form.processing" @click="actionOpen=false">Batal</Button></div>

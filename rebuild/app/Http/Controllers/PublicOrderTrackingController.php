@@ -156,7 +156,7 @@ class PublicOrderTrackingController
         return DB::table('orders')
             ->join('products', 'products.id', '=', 'orders.product_id')
             ->join('product_packages', 'product_packages.id', '=', 'orders.product_package_id')
-            ->whereIn('orders.status', ['PENDING_PAYMENT', 'PAID', 'PROCESSING', 'SUCCESS', 'FAILED', 'EXPIRED', 'CANCELLED', 'REFUND', 'REFUNDED'])
+            ->whereIn('orders.status', ['PENDING_PAYMENT', 'PAID', 'PROCESSING', 'SUCCESS', 'FAILED', 'BLOCKED', 'EXPIRED', 'CANCELLED', 'REFUND', 'REFUNDED'])
             ->orderByDesc('orders.id')->limit(20)
             ->get([
                 'orders.order_number', 'orders.status', 'orders.total_idr', 'orders.created_at',

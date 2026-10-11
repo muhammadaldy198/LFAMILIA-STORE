@@ -227,6 +227,96 @@ class FulfillmentTest extends TestCase
         $this->assertSame($firstRequest['ref_id'], $recorded[1][0]->data()['ref_id']);
     }
 
+    public function test_two_confirmed_failed_skus_block_without_sending_third_mapping(): void
+    {
+        Queue::fake();
+        $this->credentials();
+        $catalog = $this->automaticCatalog();
+        $providerId = DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
+        foreach (['DF-BACKUP', 'DF-THIRD'] as $index => $sku) {
+            DB::table('provider_mappings')->insert([
+                'product_package_id' => $catalog['package_id'],
+                'provider_id' => $providerId,
+                'external_sku' => $sku,
+                'cost_idr' => 10000,
+                'max_price_idr' => 12000,
+                'fulfillment_config' => json_encode(['customer_no_template' => '{{user_id}}{{zone_id}}']),
+                'priority' => $index + 2,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+        $orderId = $this->paidOrder($catalog);
+        Http::fake(function ($request) {
+            $payload = $request->data();
+
+            return Http::response(['data' => [
+                'ref_id' => $payload['ref_id'],
+                'customer_no' => $payload['customer_no'],
+                'buyer_sku_code' => $payload['buyer_sku_code'],
+                'status' => 'Gagal',
+                'rc' => '44',
+                'sn' => '',
+                'message' => 'Gagal definitif',
+                'price' => 10000,
+            ]]);
+        });
+
+        $service = app(FulfillmentService::class);
+        $service->startOrder($orderId);
+        $first = DB::table('fulfillment_attempts')->where('order_id', $orderId)->firstOrFail();
+        $service->sendAttempt((int) $first->id);
+        $backup = DB::table('fulfillment_attempts')->where('order_id', $orderId)
+            ->where('attempt_no', 2)->firstOrFail();
+        $this->assertSame('DF-BACKUP', DB::table('provider_mappings')
+            ->where('id', $backup->provider_mapping_id)->value('external_sku'));
+        $service->sendAttempt((int) $backup->id);
+
+        $this->assertSame('BLOCKED', DB::table('orders')->where('id', $orderId)->value('status'));
+        $this->assertSame('BLOCKED', DB::table('fulfillment_attempts')->where('id', $backup->id)->value('status'));
+        $this->assertSame(2, DB::table('fulfillment_attempts')->where('order_id', $orderId)->count());
+        Http::assertSentCount(2);
+        $service->startOrder($orderId);
+        $service->reconcileAttempt((int) $backup->id);
+        Http::assertSentCount(2);
+    }
+
+    public function test_uncertain_sku_uses_three_automatic_status_checks_without_failover(): void
+    {
+        Queue::fake();
+        $this->credentials();
+        $catalog = $this->automaticCatalog();
+        $orderId = $this->paidOrder($catalog);
+        Http::fake(function ($request) {
+            $payload = $request->data();
+
+            return Http::response(['data' => [
+                'ref_id' => $payload['ref_id'],
+                'customer_no' => $payload['customer_no'],
+                'buyer_sku_code' => $payload['buyer_sku_code'],
+                'status' => 'Pending',
+                'rc' => '03',
+                'sn' => '',
+                'message' => 'Pending',
+                'price' => 10000,
+            ]]);
+        });
+        $service = app(FulfillmentService::class);
+        $service->startOrder($orderId);
+        $attempt = DB::table('fulfillment_attempts')->where('order_id', $orderId)->firstOrFail();
+        $service->sendAttempt((int) $attempt->id);
+        for ($i = 0; $i < 5; $i++) {
+            $service->reconcileAttempt((int) $attempt->id);
+        }
+        $this->assertSame('PENDING', DB::table('fulfillment_attempts')
+            ->where('id', $attempt->id)->value('status'));
+        $this->assertSame(3, (int) DB::table('fulfillment_attempts')
+            ->where('id', $attempt->id)->value('reconcile_checks'));
+        $this->assertSame(1, DB::table('fulfillment_attempts')->where('order_id', $orderId)->count());
+        Http::assertSentCount(4);
+    }
+
     public function test_pending_never_failovers_before_confirmed_failure(): void
     {
         Queue::fake();

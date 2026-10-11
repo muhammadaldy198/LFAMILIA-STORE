@@ -60,7 +60,7 @@ class PublicContentController
         return Inertia::render('Content/Tools');
     }
 
-    public function legal(string $key): Response
+    private function legal(string $key): Response
     {
         abort_unless(in_array($key, ['terms', 'refund', 'privacy'], true), 404);
         $page = DB::table('content_pages')->where('key', $key)->where('is_active', true)->first();

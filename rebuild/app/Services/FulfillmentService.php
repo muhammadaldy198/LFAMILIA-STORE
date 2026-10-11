@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Jobs\SendFulfillmentJob;
 use App\Services\Fulfillment\DigiflazzClient;
 use App\Services\Fulfillment\FulfillmentTargetBuilder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -208,60 +209,95 @@ class FulfillmentService
         }
     }
 
-    public function reconcileAttempt(int $attemptId): void
+    public function reconcileAttempt(int $attemptId, bool $manual = false): void
     {
-        $attempt = DB::table('fulfillment_attempts')->where('id', $attemptId)->first();
-        if (! $attempt || ! in_array($attempt->status, ['PENDING', 'UNKNOWN', 'SENDING'], true)) {
-            return;
-        }
-        if (DB::table('fulfillment_attempts')
-            ->where('order_id', $attempt->order_id)
-            ->where('id', '>', $attempt->id)
-            ->exists()) {
-            return;
-        }
-
-        $mapping = $this->mapping((int) $attempt->provider_mapping_id);
-        if ($mapping?->provider_code === 'VOUCHER_STOCK') {
-            $config = $this->json($mapping->fulfillment_config);
-            $stockKey = trim((string) data_get($config, 'stock_key', ''));
-            try {
-                $this->fulfillVoucherStock($attemptId, $stockKey);
-            } catch (ValidationException $exception) {
-                $this->markBlocked($attemptId, $exception->getMessage());
+        // Atomic claim prevents the scheduler and manual checks from calling Digiflazz concurrently.
+        $attempt = DB::transaction(function () use ($attemptId, $manual): ?object {
+            $attempt = DB::table('fulfillment_attempts')->where('id', $attemptId)->lockForUpdate()->first();
+            if (! $attempt || ! in_array($attempt->status, ['PENDING', 'UNKNOWN', 'SENDING'], true)) {
+                return null;
+            }
+            $order = DB::table('orders')->where('id', $attempt->order_id)->lockForUpdate()->first();
+            if (! $order || ! in_array($order->status, ['PAID', 'PROCESSING'], true)) {
+                return null;
+            }
+            $newerAttemptExists = DB::table('fulfillment_attempts')
+                ->where('order_id', $attempt->order_id)
+                ->where('id', '>', $attempt->id)->exists();
+            if ($newerAttemptExists) {
+                return null;
+            }
+            if ($attempt->reconcile_claimed_at !== null) {
+                $leaseIsActive = Carbon::parse($attempt->reconcile_claimed_at)->gt(now()->subMinutes(5));
+                if ($leaseIsActive) {
+                    return null;
+                }
             }
 
-            return;
-        }
+            if ($manual === false && (int) $attempt->reconcile_checks >= 3) {
+                return null;
+            }
 
-        $request = $this->json($attempt->request_payload);
-        if ($request === []) {
-            $this->markUnknown($attemptId, 'Payload reconciliation tidak tersedia.');
+            DB::table('fulfillment_attempts')->where('id', $attemptId)->update([
+                'reconcile_checks' => DB::raw('reconcile_checks + 1'),
+                'reconcile_claimed_at' => now(),
+                'updated_at' => now(),
+            ]);
 
+            return $attempt;
+        }, 3);
+
+        if (! $attempt) {
             return;
         }
 
         try {
-            $response = $this->digiflazz->transact($request);
-        } catch (ValidationException $exception) {
-            $this->recordReconciliationError($attemptId, 'Integrasi provider belum siap untuk reconciliation.');
+            $mapping = $this->mapping((int) $attempt->provider_mapping_id);
+            if ($mapping?->provider_code === 'VOUCHER_STOCK') {
+                $config = $this->json($mapping->fulfillment_config);
+                $stockKey = trim((string) data_get($config, 'stock_key', ''));
+                try {
+                    $this->fulfillVoucherStock($attemptId, $stockKey);
+                } catch (ValidationException $exception) {
+                    $this->markBlocked($attemptId, $exception->getMessage());
+                }
 
-            return;
-        } catch (RuntimeException $exception) {
-            $this->markUnknown($attemptId, 'Reconciliation provider belum dapat dipastikan.');
+                return;
+            }
 
-            return;
-        }
+            $request = $this->json($attempt->request_payload);
+            if ($request === []) {
+                $this->markUnknown($attemptId, 'Payload reconciliation tidak tersedia.');
 
-        DB::table('fulfillment_attempts')->where('id', $attemptId)->update([
-            'reconciled_at' => now(),
-            'last_checked_at' => now(),
-            'updated_at' => now(),
-        ]);
-        try {
-            $this->applyProviderResult($attemptId, $response, 'reconciliation');
-        } catch (ValidationException $exception) {
-            $this->markUnknown($attemptId, 'Hasil reconciliation tidak dapat diverifikasi.');
+                return;
+            }
+
+            try {
+                $response = $this->digiflazz->transact($request);
+            } catch (ValidationException $exception) {
+                $this->recordReconciliationError($attemptId, 'Integrasi provider belum siap untuk reconciliation.');
+
+                return;
+            } catch (RuntimeException $exception) {
+                $this->markUnknown($attemptId, 'Reconciliation provider belum dapat dipastikan.');
+
+                return;
+            }
+            DB::table('fulfillment_attempts')->where('id', $attemptId)->update([
+                'reconciled_at' => now(),
+                'last_checked_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            try {
+                $this->applyProviderResult($attemptId, $response, 'reconciliation');
+            } catch (ValidationException $exception) {
+                $this->markUnknown($attemptId, 'Hasil reconciliation tidak dapat diverifikasi.');
+            }
+        } finally {
+            DB::table('fulfillment_attempts')->where('id', $attemptId)->update([
+                'reconcile_claimed_at' => null,
+            ]);
         }
     }
 
@@ -356,9 +392,20 @@ class FulfillmentService
                 );
 
                 if ($price !== null && $price > (int) ($request['max_price'] ?? PHP_INT_MAX)) {
+                    // Successful delivery cannot be reversed; raise an urgent accounting alert.
                     $this->event((int) $order->id, 'FULFILLMENT_PRICE_GUARD_BREACH', 'SUCCESS', 'SUCCESS', [
                         'attempt_id' => $attempt->id,
+                        'provider_price_idr' => $price,
+                        'max_price_idr' => (int) $request['max_price'],
                     ]);
+                    $this->notifications->record(
+                        'fulfillment.price_guard_breach',
+                        'URGENT: harga penyedia melebihi batas',
+                        'Order '.$order->order_number.' sudah terkirim tetapi harga penyedia melebihi batas harga. Tinjau selisih biaya.',
+                        'ERROR',
+                        'order',
+                        $order->id
+                    );
                 }
 
                 return false;
@@ -439,14 +486,14 @@ class FulfillmentService
             if ($attempt->status === 'FAILED_CONFIRMED' && $attempt->safe_to_failover) {
                 return null;
             }
-            if ($attempt->status !== 'BLOCKED') {
+            if ($attempt->status !== 'BLOCKED' || $attempt->last_error === 'Semua SKU yang diizinkan telah gagal. Hubungi superadmin.') {
                 throw ValidationException::withMessages([
                     'fulfillment' => 'Hanya proses tertahan yang belum terkirim yang dapat dicoba ulang.',
                 ]);
             }
 
             $order = DB::table('orders')->where('id', $attempt->order_id)->lockForUpdate()->first();
-            if (! $order || in_array($order->status, ['SUCCESS', 'REFUND'], true)) {
+            if (! $order || ! in_array($order->status, ['PAID', 'PROCESSING'], true)) {
                 return null;
             }
 
@@ -662,7 +709,7 @@ class FulfillmentService
             }
 
             $order = DB::table('orders')->where('id', $failed->order_id)->lockForUpdate()->first();
-            if (! $order || in_array($order->status, ['SUCCESS', 'REFUND'], true)) {
+            if (! $order || ! in_array($order->status, ['PAID', 'PROCESSING'], true)) {
                 return null;
             }
 
@@ -675,25 +722,44 @@ class FulfillmentService
             }
 
             $snapshot = $this->json($order->snapshot);
-            $maxPrice = $this->maxPrice($snapshot);
             $attemptedMappings = DB::table('fulfillment_attempts')
-                ->where('order_id', $order->id)->pluck('provider_mapping_id');
-
-            $mapping = $this->nextSafeDigiflazzMapping(
-                (int) $order->product_package_id,
-                $attemptedMappings->map(fn ($id): int => (int) $id)->all(),
-                $snapshot,
-                $maxPrice,
-            );
-
+                ->where('order_id', $order->id)->pluck('provider_mapping_id')
+                ->map(fn ($id): int => (int) $id)->unique()->values()->all();
+            $sentMappings = DB::table('fulfillment_attempts')
+                ->where('order_id', $order->id)->whereNotNull('request_payload')
+                ->distinct()->pluck('provider_mapping_id');
+            // A: one confirmed failed send -> B: one confirmed failed send -> BLOCKED.
+            // A provider timeout/PENDING/UNKNOWN does not authorize failover.
+            $mapping = count($sentMappings) < 2
+                ? $this->nextSafeDigiflazzMapping(
+                    (int) $order->product_package_id,
+                    $attemptedMappings,
+                    $snapshot,
+                    $this->maxPrice($snapshot)
+                ) : null;
             if (! $mapping) {
-                DB::table('orders')->where('id', $order->id)->update([
-                    'status' => 'FAILED',
+                DB::table('fulfillment_attempts')->where('id', $failed->id)->update([
+                    'status' => 'BLOCKED',
+                    'safe_to_failover' => false,
+                    'last_error' => 'Semua SKU yang diizinkan telah gagal. Hubungi superadmin.',
                     'updated_at' => now(),
                 ]);
-                $this->event((int) $order->id, 'FULFILLMENT_EXHAUSTED', $order->status, 'FAILED', [
-                    'attempt_id' => $failed->id,
+                DB::table('orders')->where('id', $order->id)->update([
+                    'status' => 'BLOCKED',
+                    'updated_at' => now(),
                 ]);
+                $this->event((int) $order->id, 'FULFILLMENT_EXHAUSTED', $order->status, 'BLOCKED', [
+                    'attempt_id' => $failed->id,
+                    'automatic_retries_stopped' => true,
+                ]);
+                $this->notifications->record(
+                    'fulfillment.exhausted',
+                    'Pengiriman tertahan - perlu penanganan manual',
+                    'Order '.$order->order_number.' gagal pada semua SKU. Hubungi pelanggan; refund tidak otomatis.',
+                    'ERROR',
+                    'order',
+                    $order->id
+                );
 
                 return null;
             }

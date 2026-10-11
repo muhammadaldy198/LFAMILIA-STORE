@@ -16,7 +16,7 @@ class AdminOrderPresentation
         'CREATING' => 'Menyiapkan pembayaran', 'PENDING' => 'Menunggu kepastian',
         'REFUNDED' => 'Dana dikembalikan', 'CREATED' => 'Menunggu pengiriman',
         'SENDING' => 'Sedang dikirim', 'UNKNOWN' => 'Perlu pemeriksaan',
-        'FAILED_CONFIRMED' => 'Gagal dikonfirmasi penyedia', 'BLOCKED' => 'Pengiriman tertahan',
+        'FAILED_CONFIRMED' => 'Gagal dikonfirmasi penyedia', 'BLOCKED' => 'Perlu tindakan superadmin',
         'MANUAL_PENDING' => 'Menunggu penanganan manual', 'MANUAL_FAILED' => 'Penanganan manual gagal',
     ];
 
@@ -36,7 +36,9 @@ class AdminOrderPresentation
         'FULFILLMENT_BLOCKED' => 'Pengiriman tertahan',
         'FULFILLMENT_RETRY_QUEUED' => 'Pengiriman ulang masuk antrean',
         'FULFILLMENT_FAILOVER_QUEUED' => 'Dialihkan ke penyedia berikutnya',
-        'FULFILLMENT_EXHAUSTED' => 'Tidak ada penyedia lain yang tersedia',
+        'FULFILLMENT_EXHAUSTED' => 'Kedua SKU gagal; menunggu superadmin',
+        'ADMIN_ORDER_CANCELLED' => 'Dibatalkan superadmin; penyelesaian dana manual',
+        'PAYMENT_REFUND_REVIEW' => 'Laporan refund gateway perlu ditinjau',
         'FULFILLMENT_CONFLICT_IGNORED' => 'Hasil berbeda diterima; status akhir dipertahankan',
         'FULFILLMENT_PRICE_GUARD_BREACH' => 'Harga penyedia melebihi batas',
         'ADMIN_MANUAL_ORDER_CREATED' => 'Pesanan manual dicatat oleh admin',

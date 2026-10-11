@@ -16,7 +16,8 @@ class MidtransStatusVerification
             'capture' => in_array($fraud, ['', 'accept'], true) ? 'PAID' : 'PENDING',
             'expire' => 'EXPIRED', 'cancel' => 'CANCELLED',
             'deny', 'failure' => 'FAILED',
-            'refund', 'partial_refund' => 'REFUNDED',
+            'refund' => 'REFUNDED',
+            'partial_refund' => 'PARTIAL_REFUND_REVIEW',
             default => 'PENDING',
         };
     }

@@ -22,13 +22,13 @@ const reviewDone=ref(Boolean(props.review));
 const reviewMessage=ref('');
 let timer=null;
 
-const terminal=computed(()=>['SUCCESS','FAILED','CANCELLED','EXPIRED','REFUND','REFUNDED'].includes(orderState.value.status));
+const terminal=computed(()=>['SUCCESS','FAILED','BLOCKED','CANCELLED','EXPIRED','REFUND','REFUNDED'].includes(orderState.value.status));
 const manualQris=computed(()=>paymentState.value?.instructions?.kind==='manual_qris'
     || String(paymentState.value?.channel_code||'').toLowerCase().includes('manual'));
 const paymentUncertain=computed(()=>['UNKNOWN','CREATING'].includes(paymentState.value?.status));
 const statusLabel=s=>({
     PENDING_PAYMENT:'Menunggu Pembayaran',PENDING:'Menunggu Pembayaran',CREATING:'Menyiapkan Pembayaran',
-    PAID:'Pembayaran Diterima',PROCESSING:'Sedang Diproses',SUCCESS:'Berhasil',FAILED:'Gagal',
+    PAID:'Pembayaran Diterima',PROCESSING:'Sedang Diproses',SUCCESS:'Berhasil',FAILED:'Gagal',BLOCKED:'Menunggu Penanganan Admin',
     CANCELLED:'Dibatalkan',EXPIRED:'Kedaluwarsa',REFUNDED:'Refund',REFUND:'Refund',
     REJECTED:'Ditolak',UNKNOWN:'Status Belum Pasti',
 }[String(s||'').toUpperCase()]||String(s||'-').replaceAll('_',' '));
