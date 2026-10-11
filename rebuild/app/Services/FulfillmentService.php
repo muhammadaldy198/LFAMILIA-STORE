@@ -221,17 +221,23 @@ class FulfillmentService
             if (! $order || ! in_array($order->status, ['PAID', 'PROCESSING'], true)) {
                 return null;
             }
-            if (DB::table('fulfillment_attempts')->where('order_id', $attempt->order_id)
-                ->where('id', '>', $attempt->id)->exists()) {
+            $newerAttemptExists = DB::table('fulfillment_attempts')
+                ->where('order_id', $attempt->order_id)
+                ->where('id', '>', $attempt->id)->exists();
+            if ($newerAttemptExists) {
                 return null;
             }
-            if ($attempt->reconcile_claimed_at
-                && Carbon::parse($attempt->reconcile_claimed_at)->gt(now()->subMinutes(5))) {
+            if ($attempt->reconcile_claimed_at !== null) {
+                $leaseIsActive = Carbon::parse($attempt->reconcile_claimed_at)->gt(now()->subMinutes(5));
+                if ($leaseIsActive) {
+                    return null;
+                }
+            }
+
+            if ($manual === false && (int) $attempt->reconcile_checks >= 3) {
                 return null;
             }
-            if (! $manual && (int) $attempt->reconcile_checks >= 3) {
-                return null;
-            }
+
             DB::table('fulfillment_attempts')->where('id', $attemptId)->update([
                 'reconcile_checks' => DB::raw('reconcile_checks + 1'),
                 'reconcile_claimed_at' => now(),
@@ -255,20 +261,26 @@ class FulfillmentService
                 } catch (ValidationException $exception) {
                     $this->markBlocked($attemptId, $exception->getMessage());
                 }
+
                 return;
             }
+
             $request = $this->json($attempt->request_payload);
             if ($request === []) {
                 $this->markUnknown($attemptId, 'Payload reconciliation tidak tersedia.');
+
                 return;
             }
+
             try {
                 $response = $this->digiflazz->transact($request);
             } catch (ValidationException $exception) {
                 $this->recordReconciliationError($attemptId, 'Integrasi provider belum siap untuk reconciliation.');
+
                 return;
             } catch (RuntimeException $exception) {
                 $this->markUnknown($attemptId, 'Reconciliation provider belum dapat dipastikan.');
+
                 return;
             }
             DB::table('fulfillment_attempts')->where('id', $attemptId)->update([
@@ -276,6 +288,7 @@ class FulfillmentService
                 'last_checked_at' => now(),
                 'updated_at' => now(),
             ]);
+
             try {
                 $this->applyProviderResult($attemptId, $response, 'reconciliation');
             } catch (ValidationException $exception) {
