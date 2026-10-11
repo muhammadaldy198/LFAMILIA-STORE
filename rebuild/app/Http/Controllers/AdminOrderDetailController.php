@@ -34,7 +34,7 @@ class AdminOrderDetailController
                 'reference' => $attempt->external_reference, 'result_code' => $attempt->provider_rc,
                 'created_at' => $presentation->date($attempt->created_at), 'checked_at' => $presentation->date($attempt->last_checked_at),
                 'can_manual' => $canFulfill && $attempt->status === 'MANUAL_PENDING' && in_array($row->status, ['PAID', 'PROCESSING'], true),
-                'can_retry' => $canFulfill && ! in_array($row->status, ['SUCCESS', 'REFUND'], true)
+                'can_retry' => $canFulfill && in_array($row->status, ['PAID', 'PROCESSING'], true)
                     && ($attempt->status === 'BLOCKED' || ($attempt->status === 'FAILED_CONFIRMED' && $attempt->safe_to_failover)),
             ]);
         // Only the newest attempt can be acted upon.
