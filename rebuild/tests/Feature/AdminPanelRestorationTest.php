@@ -913,11 +913,11 @@ class AdminPanelRestorationTest extends TestCase
             'package_ids' => [$package->id],
         ])->assertSessionHasNoErrors();
         $this->assertSame('SELL_PRICE', $package->fresh()->pricing_mode);
-        $this->assertSame(11000, (int) $package->fresh()->sell_price_idr);
+        $this->assertSame(13500, (int) $package->fresh()->sell_price_idr);
         $this->post('/admin/catalog/digiflazz/lock-prices', [
             'package_ids' => [$package->id],
         ])->assertSessionHasErrors('package_ids');
-        $this->assertSame(11000, (int) $package->fresh()->sell_price_idr);
+        $this->assertSame(13500, (int) $package->fresh()->sell_price_idr);
     }
 
     public function test_fixed_sell_price_below_cost_is_rejected(): void
