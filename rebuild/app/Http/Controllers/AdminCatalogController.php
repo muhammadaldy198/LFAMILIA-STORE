@@ -746,8 +746,11 @@ class AdminCatalogController
      * Existing fixed/manual prices are never overwritten.
      */
     public function lockDigiflazzPrices(
-        Request $request, DigiflazzFixedPricePolicy $policy, AdminAuditService $audit
-    ): RedirectResponse {
+        Request $request,
+        DigiflazzFixedPricePolicy $policy,
+        AdminAuditService $audit
+    ): RedirectResponse
+    {
         $data = $request->validate([
             'package_ids' => ['required', 'array', 'min:1', 'max:2000'],
             'package_ids.*' => ['required', 'integer', 'distinct', 'exists:product_packages,id'],
@@ -771,10 +774,17 @@ class AdminCatalogController
                 $package->update([
                     'pricing_mode' => 'SELL_PRICE',
                     'sell_price_idr' => $proposals->get($id)['sell_price_idr'],
-                    'margin_percent' => null, 'margin_fixed_idr' => null,
+                    'margin_percent' => null,
+                    'margin_fixed_idr' => null,
                 ]);
-                $audit->record($request, 'catalog.digiflazz.fixed_price_locked',
-                    'product_package', $id, $before, $package->toArray());
+                $audit->record(
+                    $request,
+                    'catalog.digiflazz.fixed_price_locked',
+                    'product_package',
+                    $id,
+                    $before,
+                    $package->toArray()
+                );
             }
         }, 3);
 

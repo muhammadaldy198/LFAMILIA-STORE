@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -9,6 +10,7 @@ class DigiflazzFixedPricePolicy
 {
     // Target minimum gross margin: (sell - cost) / sell = 8%.
     public const GROSS_MARGIN_PERCENT = 8;
+
     private const COST_PERCENT = 92;
 
     public function fixedPriceFromCost(int $cost): int
@@ -16,6 +18,7 @@ class DigiflazzFixedPricePolicy
         if ($cost <= 0 || $cost > intdiv(PHP_INT_MAX - 200, 100)) {
             throw new InvalidArgumentException('Modal Digiflazz tidak valid.');
         }
+
         $minimum = intdiv($cost * 100 + self::COST_PERCENT - 1, self::COST_PERCENT);
 
         return intdiv($minimum + 99, 100) * 100;
@@ -39,13 +42,16 @@ class DigiflazzFixedPricePolicy
             if (! $catalog->sellable($row)) {
                 continue;
             }
+
             $id = (int) $row->package_id;
             $cost = (int) $row->cost_idr;
             if (! isset($suggestions[$id]) || $cost < $suggestions[$id]['cost_idr']) {
                 $suggestions[$id] = [
-                    'package_id' => $id, 'product_name' => (string) $row->product_name,
+                    'package_id' => $id,
+                    'product_name' => (string) $row->product_name,
                     'package_name' => (string) $row->package_name,
-                    'cost_idr' => $cost, 'sell_price_idr' => $this->fixedPriceFromCost($cost),
+                    'cost_idr' => $cost,
+                    'sell_price_idr' => $this->fixedPriceFromCost($cost),
                     'seller_sku' => (string) $row->external_sku,
                 ];
             }
@@ -63,15 +69,18 @@ class DigiflazzFixedPricePolicy
             $id = (int) $row->package_id;
             $cap = $this->maximumCost((int) $row->sell_price_idr);
             $alerts[$id] ??= [
-                'package_id' => $id, 'product_name' => (string) $row->product_name,
+                'package_id' => $id,
+                'product_name' => (string) $row->product_name,
                 'package_name' => (string) $row->package_name,
                 'sell_price_idr' => (int) $row->sell_price_idr,
-                'maximum_cost_idr' => $cap, 'lowest_cost_idr' => null,
+                'maximum_cost_idr' => $cap,
+                'lowest_cost_idr' => null,
                 'has_eligible_source' => false,
             ];
             if (! $catalog->available($row)) {
                 continue;
             }
+
             $cost = (int) $row->cost_idr;
             $alerts[$id]['lowest_cost_idr'] = $alerts[$id]['lowest_cost_idr'] === null
                 ? $cost : min($cost, $alerts[$id]['lowest_cost_idr']);
@@ -83,7 +92,7 @@ class DigiflazzFixedPricePolicy
         return array_values(array_filter($alerts, fn (array $row): bool => ! $row['has_eligible_source']));
     }
 
-    private function mappingRows(bool $fixed): \Illuminate\Support\Collection
+    private function mappingRows(bool $fixed): Collection
     {
         return DB::table('product_packages as packages')
             ->join('products', 'products.id', '=', 'packages.product_id')
@@ -100,12 +109,22 @@ class DigiflazzFixedPricePolicy
                     ->orWhereColumn('mappings.cost_idr', '<=', 'mappings.max_price_idr');
             })
             ->where('packages.pricing_mode', $fixed ? '=' : '!=', 'SELL_PRICE')
-            ->select('packages.id as package_id', 'packages.name as package_name',
-                'packages.sell_price_idr', 'products.name as product_name',
-                'mappings.external_sku', 'mappings.cost_idr',
-                'items.is_present', 'items.buyer_active', 'items.seller_active',
-                'items.stock', 'items.unlimited_stock', 'items.start_cut_off',
-                'items.end_cut_off', 'items.synced_at')
+            ->select(
+                'packages.id as package_id',
+                'packages.name as package_name',
+                'packages.sell_price_idr',
+                'products.name as product_name',
+                'mappings.external_sku',
+                'mappings.cost_idr',
+                'items.is_present',
+                'items.buyer_active',
+                'items.seller_active',
+                'items.stock',
+                'items.unlimited_stock',
+                'items.start_cut_off',
+                'items.end_cut_off',
+                'items.synced_at'
+            )
             ->orderBy('packages.id')->orderBy('mappings.cost_idr')->get();
     }
 }

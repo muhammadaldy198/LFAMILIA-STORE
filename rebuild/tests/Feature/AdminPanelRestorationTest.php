@@ -11,6 +11,7 @@ use App\Models\ProviderMapping;
 use App\Models\User;
 use App\Services\CatalogNominalOrder;
 use App\Services\CheckoutPricing;
+use App\Services\DigiflazzFixedPricePolicy;
 use App\Services\CustomerCleanupService;
 use App\Services\DigiflazzCatalogService;
 use App\Services\FulfillmentService;
@@ -210,7 +211,7 @@ class AdminPanelRestorationTest extends TestCase
             $this->assertSame(2, $package->mappings()->count());
             $this->assertSame(2, $package->mappings()->where('is_active', true)->count());
             $this->assertSame([0, 1], $package->mappings()->orderBy('priority')->pluck('priority')->map(fn ($value): int => (int) $value)->all());
-            $this->assertSame(app(\App\Services\DigiflazzFixedPricePolicy::class)
+            $this->assertSame(app(DigiflazzFixedPricePolicy::class)
                 ->fixedPriceFromCost((int) $package->nominal_value * 1000),
                 app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
         }
@@ -889,7 +890,7 @@ class AdminPanelRestorationTest extends TestCase
         app(DigiflazzCatalogService::class)->sync();
         $this->assertArrayNotHasKey($package->id, app(CheckoutPricing::class)->forPackages([$package->id]));
         $this->assertSame(10900, (int) $package->fresh()->sell_price_idr);
-        $this->assertNotEmpty(app(\App\Services\DigiflazzFixedPricePolicy::class)->alerts());
+        $this->assertNotEmpty(app(DigiflazzFixedPricePolicy::class)->alerts());
     }
 
     public function test_admin_can_lock_legacy_prices_without_replacing_existing_fixed_prices(): void
