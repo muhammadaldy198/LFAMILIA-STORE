@@ -1,0 +1,24 @@
+name: Temporary Pint formatting diagnostic
+on:
+  push:
+    branches:
+      - fix/audit-cleanup-performance-20261011
+permissions:
+  contents: read
+jobs:
+  pint-diff:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rebuild
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          tools: composer:v2
+      - run: composer install --no-interaction --prefer-dist --no-progress
+      - name: Show exact Pint formatting diff
+        run: |
+          vendor/bin/pint app/Services/CheckoutPricing.php
+          git diff -- app/Services/CheckoutPricing.php
