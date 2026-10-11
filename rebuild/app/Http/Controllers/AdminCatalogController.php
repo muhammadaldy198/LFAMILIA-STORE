@@ -761,8 +761,10 @@ class AdminCatalogController
             $packages = ProductPackage::whereIn('id', $ids)->orderBy('id')->lockForUpdate()->get()->keyBy('id');
             $proposals = collect($policy->proposals())->keyBy('package_id');
             foreach ($ids as $id) {
-                if (! $packages->has($id) || ! $proposals->has($id)
-                    || $packages->get($id)->pricing_mode === 'SELL_PRICE') {
+                $missingPackage = $packages->has($id) === false;
+                $missingProposal = $proposals->has($id) === false;
+                $alreadyFixed = ! $missingPackage && $packages->get($id)->pricing_mode === 'SELL_PRICE';
+                if ($missingPackage || $missingProposal || $alreadyFixed) {
                     throw ValidationException::withMessages([
                         'package_ids' => 'SKU/harga berubah. Muat ulang pratinjau sebelum menerapkan harga tetap.',
                     ]);
