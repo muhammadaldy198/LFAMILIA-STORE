@@ -227,6 +227,15 @@ class CheckoutPricing
                 && (int) $candidate->live_cost_idr <= (int) $candidate->max_price_idr;
         })->values();
 
+        // The existing SELL_PRICE rule does not allow a negative margin.
+        // Skip an unaffordable source so an eligible backup can still be used.
+        // There is no fixed minimum-margin percentage.
+        if ($context->pricing_mode === 'SELL_PRICE') {
+            $eligibleMappings = $eligibleMappings->filter(
+                fn (object $candidate): bool => (int) $candidate->cost_idr <= (int) $context->sell_price_idr
+            )->values();
+        }
+
         $mapping = $eligibleMappings->first();
         if ($mapping === null) {
             throw ValidationException::withMessages([
