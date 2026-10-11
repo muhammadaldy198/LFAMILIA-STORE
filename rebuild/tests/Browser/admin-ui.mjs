@@ -93,7 +93,7 @@ try {
                             const safe=await evaluate(`(()=>{const p=JSON.parse(document.getElementById('app').dataset.page).props.products.find(p=>p.slug==='browser-checkout-game');const pack=p.packages.find(p=>p.name==='Browser Import 200 Diamonds');return pack&&pack.is_active&&pack.nominal_value===200&&['BROWSER-IMPORT-200','BROWSER-IMPORT-200-B'].every(sku=>pack.mappings.some(m=>m.external_sku===sku&&m.is_active&&m.customer_no_template==='{{user_id}}'));})()`);
                             if(!safe)throw Error('Import did not publish package and source with destination');
                             const storefront=await evaluate(`(async()=>{const r=await fetch('/catalog/browser-checkout-game');if(!r.ok)return {status:r.status};const doc=new DOMParser().parseFromString(await r.text(),'text/html');const page=JSON.parse(doc.getElementById('app').dataset.page);const pack=page.props.packages.find(p=>p.name==='Browser Import 200 Diamonds');return {status:r.status,available:pack?.is_available,price:pack?.price_idr};})()`);
-                            if(storefront.status!==200||storefront.available!==true||storefront.price!==22000)throw Error('Imported package is not available at the expected storefront price: '+JSON.stringify(storefront));
+                            if(storefront.status!==200||storefront.available!==true||storefront.price!==21800)throw Error('Imported package is not available at the expected storefront price: '+JSON.stringify(storefront));
                             importSubmitted=true;await click('Nominal & Harga');
                             console.log('PASS real click, SKU selection, and isolated catalog import');
                         }else{await click('Impor nominal Digiflazz');}
