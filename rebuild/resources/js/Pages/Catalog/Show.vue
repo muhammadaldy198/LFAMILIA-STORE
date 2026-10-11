@@ -886,10 +886,10 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                         <section v-for="group in visiblePackageGroups" :key="group.name || 'all'">
                             <div v-if="group.name" class="lf-package-group-head"><h3>{{group.name}}</h3><span></span></div>
                             <div class="lf-nominal-grid">
-                                <button v-for="item in group.items" :key="item.id" type="button" :disabled="!item.is_available" :class="{selected:selectedPackage && String(selectedPackage.id)===String(item.id)}" @click="choosePackage(item)">
+                                <button v-for="item in group.items" :key="item.id" type="button" :title="nominalLabel(item.name, product.name)" :disabled="!item.is_available" :class="{selected:selectedPackage && String(selectedPackage.id)===String(item.id)}" @click="choosePackage(item)">
                                     <span class="lf-nominal-top">
                                         <span class="lf-nominal-copy"><strong>{{nominalLabel(item.name, product.name)}}</strong><small v-if="item.note" class="lf-nominal-note">{{item.note}}</small></span>
-                                        <img v-if="item.image_url" :src="item.image_url" :alt="nominalLabel(item.name, product.name)">
+                                        <img v-if="item.image_url" :src="item.image_url" :alt="nominalLabel(item.name, product.name)" loading="lazy" decoding="async">
                                     </span>
                                     <b>{{item.is_available?formatIdr(item.price_idr):'Tidak tersedia'}}</b>
                                 </button>

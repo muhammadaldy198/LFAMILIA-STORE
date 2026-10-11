@@ -6142,3 +6142,69 @@
     padding:0 52px;
   }
 }
+
+/* Product nominal cards: uniform rows regardless of label length or package artwork. */
+.lf-customer .lf-nominal-grid{
+  grid-auto-rows:128px!important;
+  align-items:stretch!important;
+}
+.lf-customer .lf-nominal-grid>button{
+  box-sizing:border-box!important;
+  width:100%!important;
+  min-width:0!important;
+  height:128px!important;
+  min-height:128px!important;
+  max-height:128px!important;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:stretch!important;
+  justify-content:space-between!important;
+  overflow:hidden!important;
+  padding:10px!important;
+}
+.lf-customer .lf-nominal-grid .lf-nominal-top{
+  display:flex!important;
+  width:100%!important;
+  flex:1 1 auto!important;
+  min-height:0!important;
+  align-items:flex-start!important;
+  gap:8px!important;
+}
+.lf-customer .lf-nominal-grid .lf-nominal-copy{
+  flex:1 1 auto!important;
+  min-width:0!important;
+  padding-right:0!important;
+}
+.lf-customer .lf-nominal-grid .lf-nominal-copy strong{
+  display:-webkit-box!important;
+  -webkit-box-orient:vertical;
+  -webkit-line-clamp:4;
+  line-clamp:4;
+  max-height:calc(4 * 1.35em);
+  overflow:hidden!important;
+  overflow-wrap:anywhere!important;
+  text-overflow:clip!important;
+  white-space:normal!important;
+}
+.lf-customer .lf-nominal-grid .lf-nominal-top img{
+  position:static!important;
+  display:block!important;
+  flex:0 0 38px!important;
+  width:38px!important;
+  height:38px!important;
+  max-width:38px!important;
+  max-height:38px!important;
+  border-radius:8px!important;
+  object-fit:contain!important;
+  object-position:center;
+}
+.lf-customer .lf-nominal-grid>button>b{
+  position:static!important;
+  display:block!important;
+  flex:0 0 auto!important;
+  align-self:flex-start!important;
+  margin-top:8px!important;
+  line-height:1.25!important;
+  max-width:100%;
+  white-space:nowrap;
+}
