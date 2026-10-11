@@ -182,6 +182,43 @@ class AdminDigiflazzRestorationTest extends TestCase
         ]);
     }
 
+    public function test_admin_can_sell_at_six_percent_margin_without_hidden_eight_percent_cutoff(): void
+    {
+        $this->login();
+        $catalog = $this->mappedItem('manual-six-percent-sku');
+        $catalog['product']->category->update(['is_active' => true]);
+        $catalog['package']->update([
+            'pricing_mode' => 'SELL_PRICE',
+            'sell_price_idr' => 10600,
+        ]);
+        $mapping = ProviderMapping::where('external_sku', 'manual-six-percent-sku')->firstOrFail();
+
+        $this->put('/admin/catalog/mappings/'.$mapping->id, [
+            'priority' => 0,
+            'is_active' => true,
+            'customer_no_template' => '',
+            'is_manual_price' => true,
+            'manual_price_idr' => 10000,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('provider_mappings', [
+            'id' => $mapping->id,
+            'is_manual_price' => true,
+            'cost_idr' => 10000,
+            'max_price_idr' => 10000,
+        ]);
+
+        $quote = app(CheckoutPricing::class)->forPackage($catalog['package']->id);
+        $this->assertSame(10000, $quote['cost_idr']);
+        $this->assertSame(10000, $quote['max_price_idr']);
+        $this->assertSame(600, $quote['margin_idr']);
+        $this->assertSame(10600, $quote['subtotal_idr']);
+
+        $previews = app(CheckoutPricing::class)->forPackages([$catalog['package']->id]);
+        $this->assertSame(10600, $previews[$catalog['package']->id]['subtotal_idr']);
+        $this->assertSame(10000, $previews[$catalog['package']->id]['max_price_idr']);
+    }
+
     public function test_locked_cost_cannot_hide_supplier_spike_above_manual_maximum(): void
     {
         $this->login();
