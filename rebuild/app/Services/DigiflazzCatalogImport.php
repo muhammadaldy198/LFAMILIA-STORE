@@ -43,8 +43,12 @@ class DigiflazzCatalogImport
             }
 
             $before = $mapping->exists ? $mapping->toArray() : null;
-            $mapping->cost_idr = $costIdr;
-            $mapping->max_price_idr = $maxPriceIdr;
+            // Auto-source imports may re-visit existing SKUs. Never reset a
+            // manual price lock from another synchronization path.
+            if (! $mapping->is_manual_price) {
+                $mapping->cost_idr = $costIdr;
+                $mapping->max_price_idr = $maxPriceIdr;
+            }
             $mapping->save();
             DB::table('audit_logs')->insert([
                 'actor_type' => 'system',

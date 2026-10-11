@@ -264,6 +264,7 @@ function saveProvider(row) {
                             <TableHead>SKU</TableHead>
                             <TableHead class="text-right">Harga modal</TableHead>
                             <TableHead class="text-right">Batas harga</TableHead>
+                            <TableHead>Status harga</TableHead>
                             <TableHead class="text-right">Posisi sumber</TableHead>
                             <TableHead>Status</TableHead>
                         </TableRow>
@@ -285,6 +286,7 @@ function saveProvider(row) {
                             <TableCell class="font-mono text-xs">{{ row.external_sku || '—' }}</TableCell>
                             <TableCell class="text-right">{{ money(row.cost_idr) }}</TableCell>
                             <TableCell class="text-right">{{ money(row.max_price_idr) }}</TableCell>
+                            <TableCell>{{ row.provider_code === 'DIGIFLAZZ' && row.is_manual_price ? 'Manual terkunci' : 'Ikuti sinkronisasi' }}</TableCell>
                             <TableCell class="text-right">{{ row.source_position ? 'Posisi ' + row.source_position : 'Nonaktif' }}</TableCell>
                             <TableCell>
                                 <Badge :variant="row.is_active && row.product_active && row.package_active && row.provider_active ? 'secondary' : 'outline'">
@@ -293,7 +295,7 @@ function saveProvider(row) {
                             </TableCell>
                         </TableRow>
                         <TableRow v-if="!mappings.data?.length">
-                            <TableCell colspan="8" class="py-10 text-center text-muted-foreground">Belum ada mapping yang sesuai filter.</TableCell>
+                            <TableCell colspan="9" class="py-10 text-center text-muted-foreground">Belum ada mapping yang sesuai filter.</TableCell>
                         </TableRow>
                     </TableBody>
                 </AdminResponsiveTable>

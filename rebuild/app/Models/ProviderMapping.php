@@ -8,11 +8,12 @@ class ProviderMapping extends Model
 {
     protected $fillable = [
         'product_package_id', 'provider_id', 'external_sku', 'cost_idr',
-        'max_price_idr', 'fulfillment_config', 'priority', 'is_active', 'disabled_by_sync',
+        'max_price_idr', 'is_manual_price', 'fulfillment_config', 'priority', 'is_active', 'disabled_by_sync',
     ];
 
     protected function casts(): array
     {
-        return ['fulfillment_config' => 'array', 'is_active' => 'boolean', 'disabled_by_sync' => 'boolean'];
+        return ['fulfillment_config' => 'array', 'is_active' => 'boolean', 'disabled_by_sync' => 'boolean',
+            'is_manual_price' => 'boolean'];
     }
 }

@@ -668,6 +668,8 @@ class AdminCatalogController
             'priority' => ['required', 'integer', 'min:0', 'max:1000'],
             'is_active' => ['required', 'boolean'],
             'cost_idr' => [$provider->code === 'MANUAL' ? 'required' : 'prohibited', 'integer', 'min:0'],
+            'is_manual_price' => [$provider->code === 'DIGIFLAZZ' ? 'sometimes' : 'prohibited', 'boolean'],
+            'manual_price_idr' => [$provider->code === 'DIGIFLAZZ' ? 'sometimes' : 'prohibited', 'integer', 'min:1', 'max:1000000000'],
             'customer_no_template' => [$provider->code === 'DIGIFLAZZ' ? 'nullable' : 'prohibited', 'string', 'max:500'],
         ]);
         if ($provider->code !== 'MANUAL') {
@@ -675,6 +677,25 @@ class AdminCatalogController
         }
 
         if ($provider->code === 'DIGIFLAZZ') {
+            $locking = (bool) ($data['is_manual_price'] ?? $mapping->is_manual_price);
+            if ($locking && ! $mapping->is_manual_price && ! isset($data['manual_price_idr'])) {
+                throw ValidationException::withMessages([
+                    'manual_price_idr' => 'Isi harga manual saat mengaktifkan kunci harga.',
+                ]);
+            }
+            if (isset($data['manual_price_idr']) && ! $locking) {
+                throw ValidationException::withMessages([
+                    'manual_price_idr' => 'Aktifkan kunci harga sebelum menentukan harga manual.',
+                ]);
+            }
+            if ($locking && isset($data['manual_price_idr'])) {
+                // One admin-supplied amount is both the fixed accounting cost
+                // and per-source maximum. Never use an incoming seller price.
+                $data['cost_idr'] = $data['manual_price_idr'];
+                $data['max_price_idr'] = $data['manual_price_idr'];
+            }
+            unset($data['manual_price_idr']);
+
             $template = trim((string) ($data['customer_no_template'] ?? ''));
             $productId = DB::table('product_packages')->where('id', $mapping->product_package_id)
                 ->value('product_id');
