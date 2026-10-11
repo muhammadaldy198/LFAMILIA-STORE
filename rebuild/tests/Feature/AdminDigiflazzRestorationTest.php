@@ -12,6 +12,8 @@ use App\Models\ProviderMapping;
 use App\Services\AdminDigiflazzMonitorService;
 use App\Services\AdminPermissionService;
 use App\Services\DigiflazzCatalogService;
+use App\Services\DigiflazzCatalogImport;
+use App\Services\CheckoutPricing;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\Client\Factory;
 use Illuminate\Support\Facades\Cache;
@@ -132,6 +134,85 @@ class AdminDigiflazzRestorationTest extends TestCase
             'desc' => 'Monitor description',
         ], $overrides);
     }
+
+
+    public function test_admin_manual_price_lock_survives_sync_and_source_import_until_unlocked(): void
+    {
+        $this->login();
+        $catalog = $this->mappedItem('manual-lock-sku');
+        $mapping = ProviderMapping::where('external_sku', 'manual-lock-sku')->firstOrFail();
+
+        $this->put('/admin/catalog/mappings/'.$mapping->id, [
+            'priority' => 0, 'is_active' => true, 'customer_no_template' => '',
+            'is_manual_price' => true,
+        ])->assertSessionHasErrors('manual_price_idr');
+
+        $this->put('/admin/catalog/mappings/'.$mapping->id, [
+            'priority' => 0, 'is_active' => true, 'customer_no_template' => '',
+            'is_manual_price' => true, 'manual_price_idr' => 11000,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('provider_mappings', [
+            'id' => $mapping->id, 'is_manual_price' => true, 'cost_idr' => 11000, 'max_price_idr' => 11000,
+        ]);
+
+        $this->fakeCatalog([$this->row([
+            'buyer_sku_code' => 'manual-lock-sku', 'price' => 10500,
+            'unlimited_stock' => false, 'stock' => 13,
+        ])]);
+        app(DigiflazzCatalogService::class)->sync();
+        $this->assertDatabaseHas('digiflazz_catalog_items', [
+            'buyer_sku_code' => 'manual-lock-sku', 'price_idr' => 10500, 'stock' => 13,
+        ]);
+        $this->assertDatabaseHas('provider_mappings', [
+            'id' => $mapping->id, 'cost_idr' => 11000, 'max_price_idr' => 11000,
+        ]);
+
+        app(DigiflazzCatalogImport::class)->upsert($catalog['package'], 'manual-lock-sku', 10800, 10800);
+        $this->assertDatabaseHas('provider_mappings', [
+            'id' => $mapping->id, 'cost_idr' => 11000, 'max_price_idr' => 11000,
+        ]);
+
+        $this->put('/admin/catalog/mappings/'.$mapping->id, [
+            'priority' => 0, 'is_active' => true, 'customer_no_template' => '',
+            'is_manual_price' => false,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        app(DigiflazzCatalogService::class)->sync('manual-lock-sku');
+        $this->assertDatabaseHas('provider_mappings', [
+            'id' => $mapping->id, 'is_manual_price' => false,
+            'cost_idr' => 10500, 'max_price_idr' => 10500,
+        ]);
+    }
+
+    public function test_locked_cost_cannot_hide_supplier_spike_above_manual_maximum(): void
+    {
+        $this->login();
+        $catalog = $this->mappedItem('manual-cutoff-sku');
+        $catalog['product']->category->update(['is_active' => true]);
+        $catalog['package']->update(['pricing_mode' => 'SELL_PRICE', 'sell_price_idr' => 13000]);
+        $mapping = ProviderMapping::where('external_sku', 'manual-cutoff-sku')->firstOrFail();
+        $mapping->update(['is_manual_price' => true, 'cost_idr' => 11000, 'max_price_idr' => 11000]);
+
+        $this->assertSame(13000, app(CheckoutPricing::class)->forPackage($catalog['package']->id)['subtotal_idr']);
+
+        $this->fakeCatalog([$this->row(['buyer_sku_code' => 'manual-cutoff-sku', 'price' => 11500])]);
+        app(DigiflazzCatalogService::class)->sync('manual-cutoff-sku');
+        $this->assertDatabaseHas('provider_mappings', [
+            'id' => $mapping->id, 'is_manual_price' => true,
+            'cost_idr' => 11000, 'max_price_idr' => 11000,
+        ]);
+
+        try {
+            app(CheckoutPricing::class)->forPackage($catalog['package']->id);
+            $this->fail('The live supplier price must trigger the locked per-source cutoff.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('package_id', $exception->errors());
+        }
+        $this->assertArrayNotHasKey(
+            $catalog['package']->id,
+            app(CheckoutPricing::class)->forPackages([$catalog['package']->id])
+        );
+    }
+
 
     public function test_admin_can_attach_alternate_digiflazz_source_to_existing_nominal(): void
     {

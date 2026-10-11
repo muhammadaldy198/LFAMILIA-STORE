@@ -148,6 +148,11 @@ class FulfillmentService
                 $customerInput = $this->json($order->customer_input);
                 $customerNo = $this->targetBuilder->customerNo($customerInput, $config);
                 $maxPrice = $this->maxPrice($snapshot);
+                if ($mapping->is_manual_price) {
+                    // Provider-side last line of defense: never authorize a
+                    // supplier charge above the admin's locked per-SKU cap.
+                    $maxPrice = min($maxPrice, (int) $mapping->max_price_idr);
+                }
 
                 $request = [
                     'buyer_sku_code' => (string) $mapping->external_sku,
@@ -982,6 +987,15 @@ class FulfillmentService
                 ->first();
             if ($item && ! $this->digiflazzCatalog->available($item)) {
                 return 'SKU Digiflazz sedang nonaktif, stok habis, atau cut-off.';
+            }
+            if ($mapping->is_manual_price) {
+                if (! $item || (int) $item->price_idr <= 0) {
+                    return 'Harga supplier Digiflazz belum tersedia untuk sumber terkunci.';
+                }
+                if ((int) $item->price_idr > (int) $mapping->max_price_idr
+                    || (int) $item->price_idr > $this->maxPrice($snapshot)) {
+                    return 'Harga supplier Digiflazz melewati batas harga aman.';
+                }
             }
         }
         if ($mapping->provider_code === 'VOUCHER_STOCK') {
