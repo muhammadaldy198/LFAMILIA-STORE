@@ -120,16 +120,12 @@ class CatalogController
             ->where('is_active', true)
             ->orderByRaw('nominal_value IS NULL')
             ->orderBy('sort_order')->orderBy('nominal_value')->orderBy('id')->get();
+        $previewPrices = $pricing->forPackages($packageRows->pluck('id')->all());
         $packages = app(CatalogNominalOrder::class)->sort($packageRows)
-            ->map(function (ProductPackage $package) use ($pricing): array {
-                try {
-                    $quote = $pricing->forPackage($package->id);
-                    $available = true;
-                    $price = $quote['subtotal_idr'];
-                } catch (ValidationException) {
-                    $available = false;
-                    $price = null;
-                }
+            ->map(function (ProductPackage $package) use ($previewPrices): array {
+                $quote = $previewPrices[$package->id] ?? null;
+                $available = $quote !== null;
+                $price = $quote['subtotal_idr'] ?? null;
 
                 return [
                     ...$package->only('id', 'name', 'note', 'group_name', 'nominal_value'),
