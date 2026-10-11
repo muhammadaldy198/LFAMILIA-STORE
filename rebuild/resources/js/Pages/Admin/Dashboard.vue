@@ -11,10 +11,15 @@ import { TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../Co
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem } from '../../Components/ui/dropdown-menu';
 
 const props = defineProps({
-    metrics:Object, notifications:Array, recentOrders:Array, range:String, generatedAt:String,
-    chart:Array, activities:Array, topProducts:Array, integrations:Array, lastSyncedAt:String,webhookReady:Boolean,
+    metrics:{type:Object,default:()=>({})}, notifications:{type:Array,default:()=>[]}, recentOrders:{type:Array,default:()=>[]}, range:String, generatedAt:String,
+    chart:{type:Array,default:()=>[]}, activities:{type:Array,default:()=>[]}, topProducts:{type:Array,default:()=>[]}, integrations:{type:Array,default:()=>[]}, lastSyncedAt:String,webhookReady:Boolean,
     canViewFinance:Boolean, canOrders:Boolean, canCatalog:Boolean, canNotifications:Boolean, digiflazzBalance:Object,
 });
+const chart=computed(()=>Array.isArray(props.chart)?props.chart:[]);
+const notifications=computed(()=>Array.isArray(props.notifications)?props.notifications:[]);
+const recentOrders=computed(()=>Array.isArray(props.recentOrders)?props.recentOrders:[]);
+const topProducts=computed(()=>Array.isArray(props.topProducts)?props.topProducts:[]);
+const integrations=computed(()=>Array.isArray(props.integrations)?props.integrations:[]);
 const page=usePage();
 const owner=computed(()=>page.props.adminPanel?.admin?.role==='SUPER_ADMIN');
 const title=computed(()=>owner.value?'Panel Super Admin LFAMILIA STORE':'Panel Admin LFAMILIA STORE');
@@ -36,7 +41,7 @@ const definitions={
  open_tickets:['Tiket Terbuka','support',false,'OPEN dan IN_PROGRESS'],
  pending_fulfillment:['Pending Fulfillment','fulfillment',false,'Termasuk manual dan perlu diperiksa'],
 };
-const metricCards=computed(()=>Object.entries(definitions).filter(([key])=>Object.hasOwn(props.metrics,key)).map(([key,d])=>({key,label:d[0],icon:d[1],finance:d[2],note:d[3],value:props.metrics[key]})));
+const metricCards=computed(()=>Object.entries(definitions).filter(([key])=>Object.hasOwn(props.metrics||{},key)).map(([key,d])=>({key,label:d[0],icon:d[1],finance:d[2],note:d[3],value:props.metrics?.[key]})));
 const money=value=>value==null?'—':'Rp'+Number(value).toLocaleString('id-ID');
 const date=value=>value?new Intl.DateTimeFormat('id-ID',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Jakarta'}).format(new Date(value))+' WIB':'Belum pernah';
 const shortDay=value=>new Intl.DateTimeFormat('id-ID',{day:'2-digit',month:'short',timeZone:'Asia/Jakarta'}).format(new Date(value+'T00:00:00+07:00'));
@@ -46,11 +51,11 @@ onMounted(()=>{clockTimer=setInterval(()=>clock.value=new Date(),60000);});
 onUnmounted(()=>clearInterval(clockTimer));
 const clockDate=computed(()=>new Intl.DateTimeFormat('id-ID',{weekday:'long',day:'2-digit',month:'short',year:'numeric',timeZone:'Asia/Jakarta'}).format(clock.value));
 const clockTime=computed(()=>new Intl.DateTimeFormat('id-ID',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'Asia/Jakarta'}).format(clock.value)+' WIB');
-const maxRevenue=computed(()=>Math.max(1,...(props.chart||[]).map(p=>p.revenue_idr)));
-const maxOrders=computed(()=>Math.max(1,...(props.chart||[]).map(p=>p.orders)));
+const maxRevenue=computed(()=>Math.max(1,...chart.value.map(p=>p.revenue_idr)));
+const maxOrders=computed(()=>Math.max(1,...chart.value.map(p=>p.orders)));
 const statusLabel=status=>({SUCCESS:'Berhasil',PENDING_PAYMENT:'Pending',PAID:'Dibayar',PROCESSING:'Diproses',FAILED:'Gagal',EXPIRED:'Kedaluwarsa',CANCELLED:'Dibatalkan',HEALTHY:'Tes terakhir berhasil',CONFIGURED:'Tersimpan — tes otomatis tidak tersedia',DOWN:'Bermasalah',DEGRADED:'Perlu diperiksa',NOT_CONFIGURED:'Belum dikonfigurasi',UNTESTED:'Belum dites',STALE:'Perlu tes ulang'}[status]||status);
-const integrationSummary=computed(()=>{const active=(props.integrations||[]).filter(i=>i.active);if(!active.length)return 'Belum ada integrasi aktif';if(active.some(i=>!['HEALTHY','CONFIGURED'].includes(i.status)))return 'Ada yang perlu diperiksa';return active.some(i=>i.status==='CONFIGURED')?'Sebagian belum terverifikasi':'Tes terakhir berhasil';});
-const visibleActivities=computed(()=>props.activities?.length?props.activities:(props.recentOrders||[]).slice(0,5).map(o=>({id:o.id,action:'Pesanan '+statusLabel(o.status),target:o.order_number,created_at:o.created_at,href:'/admin/orders/'+o.id})));
+const integrationSummary=computed(()=>{const active=integrations.value.filter(i=>i.active);if(!active.length)return 'Belum ada integrasi aktif';if(active.some(i=>!['HEALTHY','CONFIGURED'].includes(i.status)))return 'Ada yang perlu diperiksa';return active.some(i=>i.status==='CONFIGURED')?'Sebagian belum terverifikasi':'Tes terakhir berhasil';});
+const visibleActivities=computed(()=>props.activities?.length?props.activities:recentOrders.value.slice(0,5).map(o=>({id:o.id,action:'Pesanan '+statusLabel(o.status),target:o.order_number,created_at:o.created_at,href:'/admin/orders/'+o.id})));
 const markRead=n=>router.post('/admin/notifications/'+n.id+'/read',{}, {preserveScroll:true});
 </script>
 <template>

@@ -2,9 +2,23 @@
 import { Button } from '../../Components/ui/button';
 
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
+import { computed } from 'vue';
 import AdminShell from '../../Components/AdminShell.vue';
 
-defineProps({ notifications: Object });
+const props = defineProps({ notifications: { type: Object, default: () => ({ data: [], links: [] }) } });
+const notifications = computed(() => ({
+    ...(props.notifications || {}),
+    data: Array.isArray(props.notifications?.data) ? props.notifications.data : [],
+    links: Array.isArray(props.notifications?.links) ? props.notifications.links : [],
+}));
+const date = (value) => {
+    if (!value) return 'Waktu tidak tersedia';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return 'Waktu tidak tersedia';
+    return new Intl.DateTimeFormat('id-ID', {
+        dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Jakarta',
+    }).format(parsed) + ' WIB';
+};
 const page = usePage();
 const base = page.props.adminPanel?.base_path || '/admin';
 </script>
@@ -19,7 +33,7 @@ const base = page.props.adminPanel?.base_path || '/admin';
             </div>
 
             <div class="rounded-lg border bg-white px-4"><article v-for="item in notifications.data" :key="item.id" class="lf-admin-record" :class="!item.read_at ? 'border-l-2 border-l-primary pl-3' : ''">
-                <div class="flex flex-wrap justify-between gap-2"><strong>{{ item.title }}</strong><span class="text-xs text-slate-500">{{ item.severity }} · {{ item.created_at }}</span></div>
+                <div class="flex flex-wrap justify-between gap-2"><strong>{{ item.title }}</strong><span class="text-xs text-slate-500">{{ item.severity }} · {{ date(item.created_at) }}</span></div>
                 <p class="mt-2 break-words text-sm text-muted-foreground">{{ item.message }}</p>
                 <Button v-if="!item.read_at" variant="outline" size="sm" class="mt-3" @click="router.post(base + '/notifications/' + item.id + '/read')">Tandai dibaca</Button>
             </article><p v-if="!notifications.data.length" class="lf-admin-empty">Belum ada notifikasi operasional.</p></div>

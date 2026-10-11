@@ -1,7 +1,7 @@
 <script setup>
 import AdminSwitch from '../../Components/AdminSwitch.vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
-import { onMounted, onUnmounted, reactive } from 'vue';
+import { computed, onMounted, onUnmounted, reactive } from 'vue';
 import AdminShell from '../../Components/AdminShell.vue';
 import { Button } from '../../Components/ui/button';
 import { Input } from '../../Components/ui/input';
@@ -10,7 +10,7 @@ import { Badge } from '../../Components/ui/badge';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../Components/ui/table';
 
 const props = defineProps({
-    items: Object,
+    items: { type: Object, default: () => ({ data: [] }) },
     filters: Object,
     categories: Array,
     brands: Array,
@@ -23,10 +23,18 @@ const props = defineProps({
     providerActive: Boolean,
     autoSync: Boolean,
     monitorSettings: Object,
-    recentTransactions: Array,
+    recentTransactions: { type: Array, default: () => [] },
     canSeeBalance: Boolean,
 });
 
+const items = computed(() => ({
+    ...(props.items || {}),
+    data: Array.isArray(props.items?.data) ? props.items.data : [],
+    total: props.items?.total ?? 0,
+    current_page: props.items?.current_page ?? 1,
+    last_page: props.items?.last_page ?? 1,
+}));
+const recentTransactions = computed(() => Array.isArray(props.recentTransactions) ? props.recentTransactions : []);
 const filters = reactive({
     q: props.filters?.q || '',
     category: props.filters?.category || '',

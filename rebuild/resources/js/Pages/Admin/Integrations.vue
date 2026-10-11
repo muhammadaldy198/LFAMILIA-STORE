@@ -335,7 +335,9 @@ async function sendResendTestEmail() {
                 </div>
             </details></Card>
 
-            <nav class="lf-admin-tabs" aria-label="Daftar integrasi">
+            <p v-if="!items.length" role="status" class="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">Belum ada integrasi yang tersedia. Periksa konfigurasi integrasi toko.</p>
+
+            <nav v-if="items.length" class="lf-admin-tabs" aria-label="Daftar integrasi">
                 <Button
                     v-for="item in items"
                     :key="item.code"

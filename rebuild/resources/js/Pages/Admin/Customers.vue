@@ -9,6 +9,7 @@ import { Button } from '../../Components/ui/button';
 import { Card } from '../../Components/ui/card';
 import { Input } from '../../Components/ui/input';
 import { TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../Components/ui/table';
+import { walletAdjustmentError } from '../../lib/adminWalletAdjustment';
 
 const props = defineProps({
     isSuperAdmin: Boolean,
@@ -36,6 +37,7 @@ const cleanup = reactive({
 
 const editor = ref(null);
 const saving = ref('');
+const adjustError = ref('');
 
 const money = (value) => 'Rp' + Number(value || 0).toLocaleString('id-ID');
 const date = (value) => value ? new Intl.DateTimeFormat('id-ID', {
@@ -70,6 +72,7 @@ function reset() {
 }
 
 function openEditor(row) {
+    adjustError.value = '';
     nextTick(()=>document.getElementById('customer-editor')?.scrollIntoView({block:'start'}));
     editor.value = {
         ...row,
@@ -81,6 +84,7 @@ function openEditor(row) {
 
 function closeEditor() {
     editor.value = null;
+    adjustError.value = '';
 }
 
 function saveMembership() {
@@ -99,7 +103,8 @@ function adjustWallet() {
     if (!editor.value || saving.value) return;
     const amount = Number(editor.value.adjust_amount || 0);
     const reason = String(editor.value.adjust_reason || '').trim();
-    if (!amount || reason.length < 3) return;
+    adjustError.value = walletAdjustmentError(editor.value.adjust_amount, reason);
+    if (adjustError.value) return;
 
     saving.value = 'wallet';
     router.post('/admin/customers/' + editor.value.id + '/wallet', {
@@ -110,6 +115,7 @@ function adjustWallet() {
     }, {
         preserveScroll: true,
         onSuccess: closeEditor,
+        onError: (errors) => { adjustError.value = Object.values(errors || {})[0] || 'Penyesuaian saldo gagal. Periksa input kembali.'; },
         onFinish: () => { saving.value = ''; },
     });
 }
@@ -312,6 +318,7 @@ function runCleanup() {
                         <label class="space-y-1"><span class="text-xs font-medium">Nominal (+/-)</span><Input v-model.number="editor.adjust_amount" type="number" /></label>
                         <label class="space-y-1"><span class="text-xs font-medium">Alasan</span><Input v-model="editor.adjust_reason" maxlength="500" placeholder="Alasan penyesuaian saldo" /></label>
                     </div>
+                    <p v-if="adjustError" role="alert" class="mt-2 text-sm text-destructive">{{ adjustError }}</p>
                     <Button class="mt-3" size="sm" :disabled="Boolean(saving)" @click="adjustWallet">{{ saving === 'wallet' ? 'Memproses…' : 'Terapkan penyesuaian' }}</Button>
                 </div>
             </div>

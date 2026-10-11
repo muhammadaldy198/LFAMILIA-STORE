@@ -8,11 +8,12 @@ import { Button } from '../../Components/ui/button';
 import { Card } from '../../Components/ui/card';
 import { Input } from '../../Components/ui/input';
 import { TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../Components/ui/table';
+import { walletAdjustmentError } from '../../lib/adminWalletAdjustment';
 
 const props = defineProps({
     isSuperAdmin: Boolean,
     customer: Object,
-    membershipProfile: Object,
+    membershipProfile: { type: Object, default: null },
     membershipTiers: { type: Array, default: () => [] },
     balanceIdr: Number,
     orders: { type: Object, default: () => ({ data: [], links: [] }) },
@@ -28,6 +29,7 @@ const tab = ref('overview');
 const membership = ref(props.customer?.membership_assignment || 'AUTO');
 const wallet = reactive({ amount_idr: '', reason: '' });
 const saving = ref('');
+const adjustError = ref('');
 
 const money = (value) => 'Rp' + Number(value || 0).toLocaleString('id-ID');
 const date = (value) => value ? new Intl.DateTimeFormat('id-ID', {
@@ -65,7 +67,8 @@ function adjustWallet() {
     if (saving.value) return;
     const amount = Number(wallet.amount_idr || 0);
     const reason = String(wallet.reason || '').trim();
-    if (!amount || reason.length < 3) return;
+    adjustError.value = walletAdjustmentError(wallet.amount_idr, reason);
+    if (adjustError.value) return;
 
     saving.value = 'wallet';
     router.post('/admin/customers/' + props.customer.id + '/wallet', {
@@ -78,7 +81,9 @@ function adjustWallet() {
         onSuccess: () => {
             wallet.amount_idr = '';
             wallet.reason = '';
+            adjustError.value = '';
         },
+        onError: (errors) => { adjustError.value = Object.values(errors || {})[0] || 'Penyesuaian saldo gagal. Periksa input kembali.'; },
         onFinish: () => { saving.value = ''; },
     });
 }
@@ -142,7 +147,7 @@ function deleteEmpty() {
                 <p class="mt-1 text-sm text-muted-foreground">Akun tidak memiliki saldo, ledger, pesanan, top up, atau tiket yang harus dipertahankan.</p>
                 <Button class="mt-3" size="sm" variant="destructive" @click="deleteEmpty">Hapus akun kosong</Button>
             </Card></template>
-        <template v-else-if="tab === 'tier'"><Card class="p-4">
+        <template v-else-if="tab === 'tier'"><Card v-if="membershipProfile" class="p-4">
                     <h2 class="text-lg font-semibold">Progress Membership</h2>
                     <div class="mt-4 grid gap-3 sm:grid-cols-2">
                         <div class="rounded-md border p-3"><p class="text-xs text-muted-foreground">Tier aktif</p><p class="mt-1 text-xl font-semibold">{{ membershipProfile.code }}</p></div>
@@ -152,7 +157,7 @@ function deleteEmpty() {
                     </div>
                     <p v-if="membershipProfile.next_code" class="mt-3 text-sm text-muted-foreground">Menuju {{ membershipProfile.next_code }}: kurang {{ money(membershipProfile.remaining_to_next_idr) }}.</p>
                     <p v-else class="mt-3 text-sm text-muted-foreground">Tidak ada tier aktif berikutnya.</p>
-                </Card><Card v-if="isSuperAdmin" class="p-4">
+                </Card><Card v-else class="p-4"><p class="text-sm text-muted-foreground">Data membership belum tersedia.</p></Card><Card v-if="isSuperAdmin" class="p-4">
                     <h2 class="font-semibold">Atur Membership</h2>
                     <p class="mt-1 text-xs text-muted-foreground">Mode otomatis mengikuti transaksi pelanggan. Pilih tier untuk menetapkannya secara manual.</p>
                     <select v-model="membership" class="mt-3 h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
@@ -192,6 +197,7 @@ function deleteEmpty() {
                         <label class="space-y-1"><span class="text-xs font-medium">Nominal (+/-)</span><Input v-model.number="wallet.amount_idr" type="number" /></label>
                         <label class="space-y-1"><span class="text-xs font-medium">Alasan</span><Input v-model="wallet.reason" maxlength="500" placeholder="Alasan penyesuaian" /></label>
                     </div>
+                    <p v-if="adjustError" role="alert" class="mt-2 text-sm text-destructive">{{ adjustError }}</p>
                     <Button class="mt-3" size="sm" :disabled="Boolean(saving)" @click="adjustWallet">{{ saving === 'wallet' ? 'Memproses…' : 'Terapkan' }}</Button>
                 </Card>
             <div class="lf-admin-summary ">
