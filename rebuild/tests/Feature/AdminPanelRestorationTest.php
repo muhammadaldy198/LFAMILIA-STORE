@@ -13,6 +13,7 @@ use App\Services\CatalogNominalOrder;
 use App\Services\CheckoutPricing;
 use App\Services\CustomerCleanupService;
 use App\Services\DigiflazzCatalogService;
+use App\Services\DigiflazzFixedPricePolicy;
 use App\Services\FulfillmentService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\Client\Factory;
@@ -108,12 +109,12 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertTrue($package->is_active);
         $this->assertTrue($mapping->is_active);
         $this->assertSame('{{user_id}}{{zone_id}}', data_get($mapping->fulfillment_config, 'customer_no_template'));
-        $this->assertSame(11200, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
+        $this->assertSame(10900, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
         $response = $this->get('/catalog/'.$product->slug);
         $response->assertOk();
         $response->assertInertia(function (AssertableInertia $page): void {
             $page->where('packages.0.is_available', true);
-            $page->where('packages.0.price_idr', 11200);
+            $page->where('packages.0.price_idr', 10900);
         });
         $this->assertDatabaseHas('audit_logs', ['action' => 'catalog.mapping.updated', 'target_id' => (string) $mapping->id]);
         Http::assertSentCount(1);
@@ -134,7 +135,7 @@ class AdminPanelRestorationTest extends TestCase
         ])->assertRedirect()->assertSessionHasNoErrors();
         $package = $product->packages()->firstOrFail();
         $this->assertSame('{{destination}}', data_get($package->mappings()->firstOrFail()->fulfillment_config, 'customer_no_template'));
-        $this->assertSame(10500, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
+        $this->assertSame(10900, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
     }
 
     public function test_publish_import_rejects_invalid_destination_formats_without_partial_activation(): void
@@ -210,7 +211,9 @@ class AdminPanelRestorationTest extends TestCase
             $this->assertSame(2, $package->mappings()->count());
             $this->assertSame(2, $package->mappings()->where('is_active', true)->count());
             $this->assertSame([0, 1], $package->mappings()->orderBy('priority')->pluck('priority')->map(fn ($value): int => (int) $value)->all());
-            $this->assertSame((int) $package->nominal_value * 1100, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
+            $this->assertSame(app(DigiflazzFixedPricePolicy::class)
+                ->fixedPriceFromCost((int) $package->nominal_value * 1000),
+                app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
         }
         $response = $this->get('/catalog/'.$product->slug);
         $response->assertOk();
@@ -265,7 +268,7 @@ class AdminPanelRestorationTest extends TestCase
             'product_package_id' => $package->id, 'external_sku' => 'rank-cheap',
             'is_active' => false, 'priority' => 2,
         ]);
-        $this->assertSame(11220, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
+        $this->assertArrayNotHasKey($package->id, app(CheckoutPricing::class)->forPackages([$package->id]));
     }
 
     public function test_automatic_sources_do_not_merge_regions_variants_or_other_product_ownership(): void
@@ -316,7 +319,7 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertDatabaseHas('provider_mappings', ['external_sku' => 'sync-B', 'is_active' => false]);
         $this->assertDatabaseMissing('provider_mappings', ['external_sku' => 'wrong-region']);
         $this->assertDatabaseHas('audit_logs', ['action' => 'catalog.fulfillment_source.auto_attached']);
-        $this->assertSame(11220, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
+        $this->assertArrayNotHasKey($package->id, app(CheckoutPricing::class)->forPackages([$package->id]));
         $this->fakeCatalog([$this->row(['buyer_sku_code' => 'sync-A']), $this->row(['buyer_sku_code' => 'sync-C', 'price' => 10200])]);
         app(DigiflazzCatalogService::class)->sync();
         // This source was disabled by the missing-SKU sync, not by the owner.
@@ -846,6 +849,75 @@ class AdminPanelRestorationTest extends TestCase
             'status' => 'DELIVERED',
         ]);
         Http::assertNothingSent();
+    }
+
+    public function test_fixed_price_import_cutoff_when_both_sellers_spike(): void
+    {
+        $this->login();
+        $this->fakeCatalog([
+            $this->row(['buyer_sku_code' => 'fixed-price-A', 'price' => 10000]),
+            $this->row(['buyer_sku_code' => 'fixed-price-B', 'price' => 10010]),
+        ]);
+        app(DigiflazzCatalogService::class)->sync();
+        Provider::where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
+        $product = $this->product();
+        $product->category->update(['is_active' => true]);
+        $product->fields()->create([
+            'field_key' => 'destination', 'label' => 'ID', 'type' => 'text',
+            'is_required' => true, 'sort_order' => 0,
+        ]);
+        $itemId = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'fixed-price-A')->value('id');
+        $this->post('/admin/catalog/products/'.$product->id.'/import', [
+            'item_ids' => [$itemId], 'publish' => true,
+        ])->assertSessionHasNoErrors();
+
+        $package = $product->packages()->firstOrFail();
+        $this->assertSame('SELL_PRICE', $package->pricing_mode);
+        $this->assertSame(10900, (int) $package->sell_price_idr);
+        $this->assertSame(10028, app(CheckoutPricing::class)->forPackage($package->id)['max_price_idr']);
+
+        $this->fakeCatalog([
+            $this->row(['buyer_sku_code' => 'fixed-price-A', 'price' => 12500]),
+            $this->row(['buyer_sku_code' => 'fixed-price-B', 'price' => 10010]),
+        ]);
+        app(DigiflazzCatalogService::class)->sync();
+        $this->assertSame('fixed-price-B', app(CheckoutPricing::class)->forPackage($package->id)['provider_sku']);
+
+        $this->fakeCatalog([
+            $this->row(['buyer_sku_code' => 'fixed-price-A', 'price' => 12500]),
+            $this->row(['buyer_sku_code' => 'fixed-price-B', 'price' => 11800]),
+        ]);
+        app(DigiflazzCatalogService::class)->sync();
+        $this->assertArrayNotHasKey($package->id, app(CheckoutPricing::class)->forPackages([$package->id]));
+        $this->assertSame(10900, (int) $package->fresh()->sell_price_idr);
+        $this->assertNotEmpty(app(DigiflazzFixedPricePolicy::class)->alerts());
+    }
+
+    public function test_admin_can_lock_legacy_prices_without_replacing_existing_fixed_prices(): void
+    {
+        $this->login();
+        $this->fakeCatalog([$this->row(['buyer_sku_code' => 'lock-legacy-sku'])]);
+        app(DigiflazzCatalogService::class)->sync();
+        Provider::where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
+        $product = $this->product();
+        $package = $product->packages()->create([
+            'code' => 'DF_lock_legacy', 'name' => '10 Diamond', 'pricing_mode' => 'PERCENT',
+            'margin_percent' => 35, 'is_active' => true,
+        ]);
+        $package->mappings()->create([
+            'provider_id' => Provider::where('code', 'DIGIFLAZZ')->value('id'),
+            'external_sku' => 'lock-legacy-sku', 'cost_idr' => 10000,
+            'max_price_idr' => 10000, 'is_active' => true, 'priority' => 0,
+        ]);
+        $this->post('/admin/catalog/digiflazz/lock-prices', [
+            'package_ids' => [$package->id],
+        ])->assertSessionHasNoErrors();
+        $this->assertSame('SELL_PRICE', $package->fresh()->pricing_mode);
+        $this->assertSame(10900, (int) $package->fresh()->sell_price_idr);
+        $this->post('/admin/catalog/digiflazz/lock-prices', [
+            'package_ids' => [$package->id],
+        ])->assertSessionHasErrors('package_ids');
+        $this->assertSame(10900, (int) $package->fresh()->sell_price_idr);
     }
 
     public function test_fixed_sell_price_below_cost_is_rejected(): void

@@ -20,6 +20,8 @@ const props = defineProps({
     digiflazzItems: { type: Array, default: () => [] },
     nicknameGameCodes: { type: Array, default: () => [] },
     defaultMargin: Number,
+    fixedPriceProposals: { type: Array, default: () => [] },
+    fixedPriceAlerts: { type: Array, default: () => [] },
 });
 const cloneProducts = (items) => items.map((item) => ({
     ...item,
@@ -107,6 +109,12 @@ const applyGlobalMargin=()=>{
         ? 'Terapkan margin global dan alihkan '+legacyDigiflazzPercent.value+' nominal impor Digiflazz lama ke mode mengikuti margin produk? PERHATIAN: margin persen khusus yang pernah disetel pada nominal impor ini juga akan diganti. Harga tetap/rupiah dan produk manual tidak diubah.'
         : 'Terapkan margin global ke produk otomatis yang sudah mengikuti margin produk? Nominal dengan margin persen khusus tidak berubah.';
     if(confirm(message)) globalMarginForm.put('/admin/catalog/margin',{preserveScroll:true});
+};
+const applyFixedDigiflazzPrices = () => {
+    const rows = props.fixedPriceProposals;
+    if (!rows.length) return;
+    if (!confirm('Kunci harga jual ' + rows.length + ' nominal Digiflazz pada margin kotor 8%? Periksa pratinjau sebelum menyetujui. Harga tetap manual tidak ditimpa.')) return;
+    router.post('/admin/catalog/digiflazz/lock-prices', { package_ids: rows.map(row => row.package_id) }, { preserveScroll: true });
 };
 const autoSourcesForm = useForm({});
 const importForm = useForm({item_ids:[],margin_percent:props.defaultMargin||0,publish:true,auto_sources:true,customer_no_template:''});
@@ -359,6 +367,22 @@ const deleteNotice = (notice) => {
                 </div>
             </section>
 
+            <Card class="space-y-3 p-4" data-testid="digiflazz-fixed-price-policy">
+                <h2 class="font-semibold">Harga tetap Digiflazz · margin kotor 8%</h2>
+                <p class="text-sm text-muted-foreground">Supplier tetap sinkron otomatis, harga jual tidak ikut berubah. Cutoff harga: modal maksimum 92% dari harga jual. Jika SKU utama dan semua cadangan terlalu mahal, nominal otomatis tidak tersedia.</p>
+                <p class="text-sm">Harga dinamis siap dikunci: <b>{{fixedPriceProposals.length}}</b> · Nominal terkena cutoff/tidak tersedia: <b>{{fixedPriceAlerts.length}}</b></p>
+                <div v-if="fixedPriceProposals.length" class="max-h-56 overflow-auto rounded border p-2 text-xs">
+                    <div v-for="row in fixedPriceProposals" :key="row.package_id" class="flex flex-wrap justify-between gap-2 border-b py-1">
+                        <span>{{row.product_name}} / {{row.package_name}} · modal Rp{{Number(row.cost_idr).toLocaleString('id-ID')}} · SKU {{row.seller_sku}}</span>
+                        <b>Jual Rp{{Number(row.sell_price_idr).toLocaleString('id-ID')}}</b>
+                    </div>
+                </div>
+                <Button type="button" :disabled="!fixedPriceProposals.length||fixedPriceProposals.length>2000" @click="applyFixedDigiflazzPrices">Setujui & kunci {{fixedPriceProposals.length}} harga jual</Button>
+                <div v-if="fixedPriceAlerts.length" class="max-h-48 overflow-auto rounded border border-amber-600 p-2 text-xs">
+                    <strong>Peringatan: produk terkunci sementara karena harga supplier / stok / cutoff jam</strong>
+                    <div v-for="row in fixedPriceAlerts" :key="row.package_id" class="border-b py-1">{{row.product_name}} / {{row.package_name}} · jual Rp{{Number(row.sell_price_idr).toLocaleString('id-ID')}} · batas modal Rp{{Number(row.maximum_cost_idr).toLocaleString('id-ID')}} · modal tersedia {{row.lowest_cost_idr===null?'tidak ada':'Rp'+Number(row.lowest_cost_idr).toLocaleString('id-ID')}}</div>
+                </div>
+            </Card>
             <Card class="p-4"><form class="flex flex-wrap items-end gap-3" @submit.prevent="applyGlobalMargin"><label class="text-sm">Margin global produk otomatis (%)<Input v-model.number="globalMarginForm.margin_percent" type="number" min="0" max="1000" step="0.0001" class="mt-1"/><span v-if="globalMarginForm.errors.margin_percent" role="alert" class="text-sm font-normal text-destructive">{{ globalMarginForm.errors.margin_percent }}</span></label><Button :disabled="globalMarginForm.processing">Terapkan margin otomatis</Button><label class="flex w-full items-start gap-2 text-xs"><input v-model="globalMarginForm.include_imported_percent" type="checkbox" class="mt-0.5"/><span>Alihkan {{legacyDigiflazzPercent}} nominal impor Digiflazz lama dengan margin % tersendiri agar mengikuti Global Margin. Ini termasuk margin % khusus yang pernah diedit; centang hanya bila ingin menggantinya secara massal.</span></label><p class="w-full text-xs text-muted-foreground">Tanpa opsi migrasi, hanya nominal yang mengikuti margin produk berubah. Produk manual, harga tetap, dan margin rupiah tidak diubah.</p></form></Card>
             <section v-show="catalogTab === 'products'" class="lf-admin-catalog-section space-y-5 rounded-xl border border-slate-800 bg-slate-900 p-5">
                 <div class="flex flex-wrap items-start justify-between gap-3"><div><h2 class="text-xl font-semibold">Produk</h2><p class="mt-1 text-sm text-muted-foreground">Kelola produk otomatis dan manual. Kode SKU penyedia hanya dikelola dari panel admin dan tidak ditampilkan kepada pelanggan.</p></div><div class="flex gap-2"><Button v-for="mode in ['AUTO_PROVIDER', 'MANUAL']" :key="mode" type="button" :variant="tab===mode?'default':'outline'" @click="tab = mode">{{ mode === 'MANUAL' ? 'Produk Manual' : 'Produk Otomatis' }}</Button></div></div>
@@ -514,15 +538,15 @@ const deleteNotice = (notice) => {
                         <p v-if="Object.keys(autoSourcesForm.errors).length" role="alert" class="text-sm text-destructive">{{ Object.values(autoSourcesForm.errors).join(' · ') }}</p>
                         <Card v-if="showImport && item.fulfillment_mode==='AUTO_PROVIDER'" class="space-y-3 p-4" data-testid="digiflazz-import">
                             <h4 class="font-semibold">Pilih SKU untuk {{item.name}}</h4>
-                            <div class="grid gap-3 md:grid-cols-3"><label class="text-sm">Cari SKU<Input v-model="importSearch" class="mt-1"/></label><label class="text-sm">Merek<select v-model="importBrand" class="mt-1 block w-full rounded border p-2"><option value="">Semua brand</option><option v-for="brand in importBrands" :key="brand">{{brand}}</option></select></label><label class="text-sm">Margin nominal (%)<Input v-model.number="importForm.margin_percent" type="number" min="0" max="1000" step="0.0001" class="mt-1"/></label></div>
-                            <p class="text-xs text-slate-500">Pilih SKU tersedia yang belum dipakai, tentukan margin, lalu impor untuk menjual.</p>
+                            <div class="grid gap-3 md:grid-cols-3"><label class="text-sm">Cari SKU<Input v-model="importSearch" class="mt-1"/></label><label class="text-sm">Merek<select v-model="importBrand" class="mt-1 block w-full rounded border p-2"><option value="">Semua brand</option><option v-for="brand in importBrands" :key="brand">{{brand}}</option></select></label><p class="self-end text-sm font-semibold text-emerald-700">Harga jual tetap · margin kotor 8%</p></div>
+                            <p class="text-xs text-slate-500">Pilih SKU yang tersedia, lalu impor. Harga jual baru dikunci satu kali pada margin kotor 8%; cadangan sesuai varian ikut terpasang.</p>
                             <label class="flex items-center gap-2 text-sm"><AdminSwitch v-model="importForm.auto_sources" /> Cadangan otomatis untuk nominal yang sama</label>
                             <p class="text-sm text-muted-foreground">SKU dengan nama, merek, jenis, dan kategori yang sama menjadi satu nominal. Sumber termurah yang tersedia dipilih lebih dahulu; cadangan baru ditambahkan saat sinkron.</p>
                             <div class="flex flex-wrap gap-2"><Button type="button" variant="outline" @click="importForm.item_ids=importMatches.map(sku=>sku.id)">Pilih semua hasil filter ({{ importMatches.length }})</Button><Button type="button" variant="outline" @click="importForm.item_ids=[]">Hapus pilihan</Button></div>
                             <label class="flex items-center gap-2 text-sm"><AdminSwitch v-model="importForm.publish" /> Langsung jual setelah impor</label>
                             <label class="block text-sm">Format ID tujuan<Input v-model="importForm.customer_no_template" data-testid="import-customer-template" class="mt-1" placeholder="Pilih kolom pelanggan di bawah" /></label>
                             <div class="flex flex-wrap gap-2"><Button v-for="field in item.fields" :key="field.field_key" type="button" size="sm" variant="outline" @click="importForm.customer_no_template += '{{' + field.field_key + '}}'">{{ field.label }}</Button></div>
-                            <p class="text-sm text-muted-foreground">{{ importForm.publish ? 'Produk, nominal, dan sumber Digiflazz diaktifkan bersama. Harga mengikuti margin di atas.' : 'Nominal disimpan sebagai draf dan belum dijual.' }}</p>
+                            <p class="text-sm text-muted-foreground">{{ importForm.publish ? 'Produk, nominal dan cadangan Digiflazz diaktifkan bersama. Harga jual tetap; jika modal supplier melewati batas, nominal otomatis ditahan.' : 'Nominal disimpan sebagai draf dan belum dijual.' }}</p>
                             <label v-for="sku in importItems" :key="sku.id" :data-sku="sku.buyer_sku_code" class="flex items-start gap-3 rounded border p-2 text-sm"><input v-model="importForm.item_ids" type="checkbox" :value="sku.id"><span>{{sku.product_name}}<small class="block">{{sku.buyer_sku_code}} · Rp{{Number(sku.price_idr).toLocaleString('id-ID')}}<span v-if="importForm.auto_sources"> · {{sku.source_count}} sumber otomatis</span></small></span></label>
                             <p v-if="!importMatches.length" class="text-sm">Tidak ada SKU tersedia yang sesuai dengan filter dan belum diimpor. Hapus filter atau sinkronkan daftar harga di menu Digiflazz.</p>
                             <div class="flex flex-wrap items-center gap-2"><Button type="button" variant="outline" :disabled="importPage===1" @click="importPage--">Sebelumnya</Button><span class="text-sm">Halaman {{importPage}} / {{Math.max(1,Math.ceil(importMatches.length/25))}}</span><Button type="button" variant="outline" :disabled="importPage*25>=importMatches.length" @click="importPage++">Berikutnya</Button></div>
