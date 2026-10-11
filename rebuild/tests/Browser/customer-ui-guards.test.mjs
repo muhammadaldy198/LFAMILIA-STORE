@@ -57,3 +57,23 @@ test('unreferenced page favicon props and paymentResult are removed without chan
     assert.match(product, /await requestJson\('\/payments\/orders\//);
     assert.match(product, /window\.location\.assign\('\/payment\?invoice='/);
 });
+
+test('nominal cards keep equal row height with long names and optional artwork', () => {
+    const product = read('Pages/Catalog/Show.vue');
+    const css = readFileSync(new URL('../../resources/css/app.css', import.meta.url), 'utf8');
+    const section = css.split('/* Product nominal cards: uniform rows regardless of label length or package artwork. */')[1];
+
+    assert.ok(section, 'uniform card layout rules must exist');
+    assert.match(product, /class="lf-nominal-grid"/);
+    assert.match(product, /class="lf-nominal-top"/);
+    assert.match(product, /loading="lazy" decoding="async"/);
+    assert.match(section, /grid-auto-rows:128px!important/);
+    assert.match(section, /height:128px!important/);
+    assert.match(section, /display:flex!important/);
+    assert.match(section, /flex-direction:column!important/);
+    assert.match(section, /justify-content:space-between!important/);
+    assert.match(section, /-webkit-line-clamp:4/);
+    assert.match(section, /width:38px!important/);
+    assert.match(section, /height:38px!important/);
+    assert.match(section, /object-fit:contain!important/);
+});
