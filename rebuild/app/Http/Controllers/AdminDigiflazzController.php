@@ -372,7 +372,8 @@ class AdminDigiflazzController
         $data = $request->validate([
             'item_ids' => ['required', 'array', 'min:1', 'max:2000'],
             'item_ids.*' => ['required', 'integer', 'distinct', 'exists:digiflazz_catalog_items,id'],
-            'margin_percent' => ['required', 'numeric', 'min:0', 'max:1000'],
+            // Kept for old admin forms, but fixed Digiflazz import no longer needs this field.
+            'margin_percent' => ['sometimes', 'numeric', 'min:0', 'max:1000'],
             'publish' => ['sometimes', 'boolean'],
             'auto_sources' => ['sometimes', 'boolean'],
             'customer_no_template' => ['nullable', 'string', 'max:500'],
@@ -400,7 +401,7 @@ class AdminDigiflazzController
                 : $selected->groupBy('buyer_sku_code');
             $catalog = $automatic ? $sources->catalog() : collect();
             foreach ($groups as $key => $items) {
-                $sources->importGroup($product, $automatic ? $catalog->get($key) : $items, $template, $publish, (string) $data['margin_percent'], $automatic, $request);
+                $sources->importGroup($product, $automatic ? $catalog->get($key) : $items, $template, $publish, (string) ($data['margin_percent'] ?? $product->margin_percent), $automatic, $request);
             }
             $sources->orderProduct($product);
             if ($publish && ! $product->is_active) {

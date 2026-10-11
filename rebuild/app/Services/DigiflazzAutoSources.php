@@ -43,7 +43,9 @@ class DigiflazzAutoSources
             throw ValidationException::withMessages(['item_ids' => 'SKU sudah dipakai produk lain. Tidak ada sumber yang dipindahkan.']);
         }
         $sellable = $items->filter(fn (object $item): bool => app(DigiflazzCatalogService::class)->sellable($item));
-        $first = $sellable->sortBy('price_idr')->first();
+        // Historical one-time imports may carry a temporarily cut-off/stale source.
+        // Preserve its identity and price; runtime checkout still checks availability.
+        $first = $sellable->sortBy('price_idr')->first() ?? $items->sortBy('price_idr')->first();
         if (! $first) {
             throw ValidationException::withMessages(['item_ids' => 'Tidak ada SKU Digiflazz yang aktif dan tersedia.']);
         }
