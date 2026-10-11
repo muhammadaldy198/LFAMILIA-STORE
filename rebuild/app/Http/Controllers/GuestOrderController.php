@@ -13,11 +13,6 @@ use Inertia\Response;
 
 class GuestOrderController
 {
-    public function lookup(): Response
-    {
-        return Inertia::render('Guest/Lookup');
-    }
-
     public function verify(Request $request, GuestOrderAccess $access): RedirectResponse
     {
         $data = $request->validate([

@@ -57,6 +57,16 @@ class CustomerAreaTest extends TestCase
         ]);
     }
 
+    public function test_customer_password_confirmation_flow_returns_to_existing_account_route(): void
+    {
+        $user = $this->customer('confirm-password@example.test');
+        $this->actingAs($user, 'web')->get('/user/confirm-password')->assertOk();
+        $this->post('/user/confirm-password', ['password' => 'invalid'])->assertSessionHasErrors('password');
+        $this->post('/user/confirm-password', ['password' => 'old-password-123'])
+            ->assertRedirect(route('account'));
+        $this->get('/user/confirm-password')->assertRedirect(route('account'));
+    }
+
     public function test_member_delivery_is_hidden_until_success_and_closed_tickets_reject_replies(): void
     {
         $user = $this->customer('delivery-owner@example.test');

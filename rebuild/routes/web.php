@@ -128,7 +128,7 @@ Route::middleware('auth:web')->group(function (): void {
 
     Route::get('/account/phone', [CustomerPhoneController::class, 'edit'])->name('account.phone.edit');
     Route::put('/account/phone', [CustomerPhoneController::class, 'update'])
-        ->middleware(RequirePasswordWhenSet::class)
+        ->middleware([RequirePasswordWhenSet::class, 'throttle:account-sensitive'])
         ->name('account.phone.update');
 
     Route::middleware(['phone.required', 'customer.activity'])->group(function (): void {
@@ -279,13 +279,13 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
 
     Route::middleware('admin.permission:catalog.manage')->prefix('admin/catalog')
         ->name('admin.catalog.')->group(function (): void {
-            Route::put('/margin', [AdminCatalogController::class, 'globalMargin']);
-            Route::put('/products/{product}/packages/reorder', [AdminCatalogController::class, 'reorderPackages']);
-            Route::post('/products/{product}/sync', [AdminDigiflazzController::class, 'syncProduct'])->middleware('throttle:admin-sensitive');
-            Route::post('/products/{product}/import', [AdminDigiflazzController::class, 'import']);
-            Route::post('/products/{product}/auto-sources', [AdminDigiflazzController::class, 'autoSources'])->middleware('throttle:admin-sensitive');
-            Route::post('/packages/{package}/sources/digiflazz', [AdminDigiflazzController::class, 'attachSource'])->middleware('throttle:admin-sensitive');
-            Route::post('/mappings/{mapping}/sync', [AdminDigiflazzController::class, 'syncMapping'])->middleware('throttle:admin-sensitive');
+            Route::put('/margin', [AdminCatalogController::class, 'globalMargin'])->name('margin.update');
+            Route::put('/products/{product}/packages/reorder', [AdminCatalogController::class, 'reorderPackages'])->name('packages.reorder');
+            Route::post('/products/{product}/sync', [AdminDigiflazzController::class, 'syncProduct'])->middleware('throttle:admin-sensitive')->name('products.sync');
+            Route::post('/products/{product}/import', [AdminDigiflazzController::class, 'import'])->name('products.import');
+            Route::post('/products/{product}/auto-sources', [AdminDigiflazzController::class, 'autoSources'])->middleware('throttle:admin-sensitive')->name('products.auto-sources');
+            Route::post('/packages/{package}/sources/digiflazz', [AdminDigiflazzController::class, 'attachSource'])->middleware('throttle:admin-sensitive')->name('packages.sources.attach');
+            Route::post('/mappings/{mapping}/sync', [AdminDigiflazzController::class, 'syncMapping'])->middleware('throttle:admin-sensitive')->name('mappings.sync');
             Route::post('/categories', [AdminCatalogController::class, 'category'])->name('categories.store');
             Route::put('/categories/{category}', [AdminCatalogController::class, 'updateCategory'])->name('categories.update');
             Route::delete('/categories/{category}', [AdminCatalogController::class, 'destroyCategory'])->name('categories.destroy');
@@ -333,7 +333,7 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
 
     Route::middleware('admin.permission:providers.manage')->group(function (): void {
         Route::get('/admin/digiflazz', [AdminDigiflazzController::class, 'index'])->name('admin.digiflazz');
-        Route::put('/admin/digiflazz/settings', [AdminDigiflazzController::class, 'settings']);
+        Route::put('/admin/digiflazz/settings', [AdminDigiflazzController::class, 'settings'])->name('admin.digiflazz.settings.update');
         Route::post('/admin/digiflazz/sync', [AdminDigiflazzController::class, 'sync'])->middleware('throttle:admin-sensitive');
         Route::put('/admin/digiflazz/baseline/{id}', [AdminDigiflazzController::class, 'baseline'])
             ->middleware('throttle:admin-sensitive');

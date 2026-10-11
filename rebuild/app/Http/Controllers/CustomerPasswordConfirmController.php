@@ -14,7 +14,7 @@ class CustomerPasswordConfirmController
     public function show(Request $request): Response|RedirectResponse
     {
         if ($this->confirmed($request)) {
-            return redirect()->intended(route('home'));
+            return redirect()->intended(route('account'));
         }
 
         return Inertia::render('Auth/ConfirmPassword');
@@ -36,7 +36,7 @@ class CustomerPasswordConfirmController
 
         $request->session()->put('auth.password_confirmed_at', time());
 
-        return redirect()->intended(route('home'));
+        return redirect()->intended(route('account'));
     }
 
     private function confirmed(Request $request): bool

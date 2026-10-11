@@ -30,8 +30,25 @@ class PaymentStateService
             }
 
             $incomingStatus = strtoupper($incomingStatus);
-            if (! in_array($incomingStatus, ['PENDING', 'PAID', 'FAILED', 'CANCELLED', 'EXPIRED', 'REFUNDED'], true)) {
+            if (! in_array($incomingStatus, ['PENDING', 'PAID', 'FAILED', 'CANCELLED', 'EXPIRED', 'REFUNDED', 'PARTIAL_REFUND_REVIEW'], true)) {
                 throw ValidationException::withMessages(['payment' => 'Status pembayaran tidak valid.']);
+            }
+
+            // A partial refund is NOT proof that the entire order or top-up was refunded.
+            // Keep money/order state unchanged until an operator verifies the amount.
+            if ($incomingStatus === 'PARTIAL_REFUND_REVIEW') {
+                $targetId = $payment->order_id ?: $payment->wallet_topup_id;
+                $targetType = $payment->order_id ? 'order' : 'wallet_topup';
+                $this->notifications->record(
+                    'payment.partial_refund_review',
+                    'Refund sebagian memerlukan pemeriksaan',
+                    'Midtrans melaporkan partial refund untuk pembayaran #'.$payment->id.'. Verifikasi nominal secara manual; tidak ada saldo atau status pesanan yang diubah.',
+                    'WARNING',
+                    $targetType,
+                    $targetId
+                );
+
+                return ['result' => 'PARTIAL_REFUND_REVIEW', 'status' => $payment->status];
             }
 
             if ($payment->status === 'REFUNDED') {

@@ -100,8 +100,9 @@ class ProductReviewController
             'rating' => (int) $data['rating'],
             'title' => filled($data['title'] ?? null) ? trim((string) $data['title']) : null,
             'body' => trim($data['body']),
-            'is_active' => true,
-            'published_at' => now(),
+            // Moderation is required before a customer review becomes public.
+            'is_active' => false,
+            'published_at' => null,
         ]);
 
         return response()->json([
