@@ -51,9 +51,11 @@ class DigiflazzAutoSources
         }
         $nominal = app(CatalogNominalOrder::class)->value($first->product_name, $first->brand);
         if (! $package) {
-            // Lock each new Digiflazz nominal once at a safe 8% gross margin.
-            // Later supplier sync updates costs, NOT the customer-facing price.
-            $fixedPrice = app(DigiflazzFixedPricePolicy::class)->fixedPriceFromCost((int) $first->price_idr);
+            // The initial fixed selling price uses the margin configured by
+            // the admin. Supplier sync must not rewrite this selling price.
+            $fixedPrice = app(DigiflazzFixedPricePolicy::class)->fixedPriceFromCost(
+                (int) $first->price_idr, $margin
+            );
             $package = $product->packages()->create([
                 'code' => 'DF_'.substr(hash('sha256', $first->buyer_sku_code), 0, 20),
                 'name' => $first->product_name, 'group_name' => $first->type ?: null,

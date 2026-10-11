@@ -8,29 +8,27 @@ use InvalidArgumentException;
 
 class DigiflazzFixedPricePolicy
 {
-    // Target minimum gross margin: (sell - cost) / sell = 8%.
-    public const GROSS_MARGIN_PERCENT = 8;
-
-    private const COST_PERCENT = 92;
-
-    public function fixedPriceFromCost(int $cost): int
+    // A price proposal follows the administrator's configured margin.
+    // There is no minimum margin percentage imposed by the supplier policy.
+    public function fixedPriceFromCost(int $cost, string $percent): int
     {
-        if ($cost <= 0 || $cost > intdiv(PHP_INT_MAX - 200, 100)) {
-            throw new InvalidArgumentException('Modal Digiflazz tidak valid.');
+        if ($cost <= 0 || ! preg_match('/^(\d+)(?:\.(\d{1,4}))?$/', $percent, $matches)) {
+            throw new InvalidArgumentException('Modal atau margin Digiflazz tidak valid.');
         }
 
-        $minimum = intdiv($cost * 100 + self::COST_PERCENT - 1, self::COST_PERCENT);
-
-        return intdiv($minimum + 99, 100) * 100;
-    }
-
-    public function maximumCost(int $sellPrice): int
-    {
-        if ($sellPrice <= 0 || $sellPrice > intdiv(PHP_INT_MAX, self::COST_PERCENT)) {
-            return 0;
+        $units = ((int) $matches[1] * 10000)
+            + (int) str_pad($matches[2] ?? '', 4, '0');
+        $denominator = 1000000;
+        if ($units > 0 && $cost > intdiv(PHP_INT_MAX - ($denominator - 1), $units)) {
+            throw new InvalidArgumentException('Harga Digiflazz di luar batas aman.');
         }
 
-        return intdiv($sellPrice * self::COST_PERCENT, 100);
+        $margin = $units === 0 ? 0 : intdiv(($cost * $units) + ($denominator - 1), $denominator);
+        if ($margin > PHP_INT_MAX - $cost) {
+            throw new InvalidArgumentException('Harga Digiflazz di luar batas aman.');
+        }
+
+        return $cost + $margin;
     }
 
     /** Suggested fixed prices for legacy imported packages; no database writes. */
@@ -51,7 +49,12 @@ class DigiflazzFixedPricePolicy
                     'product_name' => (string) $row->product_name,
                     'package_name' => (string) $row->package_name,
                     'cost_idr' => $cost,
-                    'sell_price_idr' => $this->fixedPriceFromCost($cost),
+                    'sell_price_idr' => $row->pricing_mode === 'FIXED'
+                        ? $cost + (int) $row->margin_fixed_idr
+                        : $this->fixedPriceFromCost(
+                            $cost,
+                            (string) ($row->pricing_mode === 'PERCENT' ? $row->package_margin_percent : $row->product_margin_percent)
+                        ),
                     'seller_sku' => (string) $row->external_sku,
                 ];
             }
@@ -67,16 +70,21 @@ class DigiflazzFixedPricePolicy
         $catalog = app(DigiflazzCatalogService::class);
         foreach ($this->mappingRows(true) as $row) {
             $id = (int) $row->package_id;
-            $cap = $this->maximumCost((int) $row->sell_price_idr);
             $alerts[$id] ??= [
                 'package_id' => $id,
                 'product_name' => (string) $row->product_name,
                 'package_name' => (string) $row->package_name,
                 'sell_price_idr' => (int) $row->sell_price_idr,
-                'maximum_cost_idr' => $cap,
+                'maximum_cost_idr' => null,
                 'lowest_cost_idr' => null,
                 'has_eligible_source' => false,
             ];
+            if ($row->is_manual_price) {
+                $alerts[$id]['maximum_cost_idr'] = max(
+                    (int) ($alerts[$id]['maximum_cost_idr'] ?? 0),
+                    (int) $row->max_price_idr
+                );
+            }
             if (! $catalog->available($row)) {
                 continue;
             }
@@ -84,7 +92,9 @@ class DigiflazzFixedPricePolicy
             $cost = (int) ($row->is_manual_price ? $row->live_price_idr : $row->cost_idr);
             $alerts[$id]['lowest_cost_idr'] = $alerts[$id]['lowest_cost_idr'] === null
                 ? $cost : min($cost, $alerts[$id]['lowest_cost_idr']);
-            if ($catalog->sellable($row) && $cost <= $cap
+            if ($catalog->sellable($row)
+                && $cost > 0
+                && $cost <= (int) $row->sell_price_idr
                 && (! $row->is_manual_price || $cost <= (int) $row->max_price_idr)) {
                 $alerts[$id]['has_eligible_source'] = true;
             }
@@ -114,6 +124,10 @@ class DigiflazzFixedPricePolicy
                 'packages.id as package_id',
                 'packages.name as package_name',
                 'packages.sell_price_idr',
+                'packages.pricing_mode',
+                'packages.margin_percent as package_margin_percent',
+                'packages.margin_fixed_idr',
+                'products.margin_percent as product_margin_percent',
                 'products.name as product_name',
                 'mappings.external_sku',
                 'mappings.cost_idr',
