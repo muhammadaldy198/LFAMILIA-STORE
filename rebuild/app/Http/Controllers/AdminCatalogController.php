@@ -749,8 +749,7 @@ class AdminCatalogController
         Request $request,
         DigiflazzFixedPricePolicy $policy,
         AdminAuditService $audit
-    ): RedirectResponse
-    {
+    ): RedirectResponse {
         $data = $request->validate([
             'package_ids' => ['required', 'array', 'min:1', 'max:2000'],
             'package_ids.*' => ['required', 'integer', 'distinct', 'exists:product_packages,id'],
@@ -763,7 +762,7 @@ class AdminCatalogController
             foreach ($ids as $id) {
                 $missingPackage = $packages->has($id) === false;
                 $missingProposal = $proposals->has($id) === false;
-                $alreadyFixed = ! $missingPackage && $packages->get($id)->pricing_mode === 'SELL_PRICE';
+                $alreadyFixed = $missingPackage === false && $packages->get($id)->pricing_mode === 'SELL_PRICE';
                 if ($missingPackage || $missingProposal || $alreadyFixed) {
                     throw ValidationException::withMessages([
                         'package_ids' => 'SKU/harga berubah. Muat ulang pratinjau sebelum menerapkan harga tetap.',
