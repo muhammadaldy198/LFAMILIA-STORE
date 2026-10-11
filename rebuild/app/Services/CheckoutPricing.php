@@ -205,7 +205,7 @@ class CheckoutPricing
     private function quoteForContext(object $context, Collection $eligibleMappings): array
     {
         $mapping = $eligibleMappings->first();
-        if (! $mapping) {
+        if ($mapping === null) {
             throw ValidationException::withMessages([
                 'package_id' => 'Nominal sedang tidak tersedia untuk checkout.',
             ]);
