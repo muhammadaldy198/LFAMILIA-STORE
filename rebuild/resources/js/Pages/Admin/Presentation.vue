@@ -8,20 +8,30 @@ import { computed, ref } from 'vue';
 import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
 import AdminShell from '../../Components/AdminShell.vue';
 const props = defineProps({ registry: Object, fields: Object, sections: Object, presentation: Object });
+const registry = computed(() => props.registry || {});
+const fields = computed(() => props.fields || {});
+const sections = computed(() => props.sections || {});
 const base = usePage().props.adminPanel?.base_path || '/admin';
 const tab = ref('text'), query = ref(''), group = ref('');
-const groups = computed(() => [...new Set(Object.values(props.registry).map(x => x.group))]);
-const entries = computed(() => Object.entries(props.registry).filter(([, item]) =>
+const groups = computed(() => [...new Set(Object.values(registry.value).map(x => x.group))]);
+const entries = computed(() => Object.entries(registry.value).filter(([, item]) =>
     (!group.value || item.group === group.value) && (!query.value || (item.label + ' ' + item.group).toLowerCase().includes(query.value.toLowerCase()))));
+const sourceTypography = props.presentation?.typography || {};
+const initialTypography = Object.fromEntries(['mobile', 'desktop'].map(viewport => [
+    viewport,
+    Object.fromEntries(Object.entries(fields.value).map(([key, definition]) => [
+        key, sourceTypography?.[viewport]?.[key] ?? definition?.[viewport] ?? 0,
+    ])),
+]));
 const form = useForm({
-    text: { ...props.presentation.text },
-    typography: JSON.parse(JSON.stringify(props.presentation.typography)),
-    sections: { ...props.presentation.sections },
+    text: { ...(props.presentation?.text || {}) },
+    typography: initialTypography,
+    sections: { ...(props.presentation?.sections || {}) },
 });
 const save = () => { if (!form.processing) form.put(base + '/content/presentation', { preserveScroll: true }); };
 const defaultText = key => { delete form.text[key]; };
 const restoreTypography = () => {
-    for (const viewport of ['mobile', 'desktop']) for (const [field, definition] of Object.entries(props.fields)) form.typography[viewport][field] = definition[viewport];
+    for (const viewport of ['mobile', 'desktop']) for (const [field, definition] of Object.entries(fields.value)) form.typography[viewport][field] = definition[viewport];
 };
 </script>
 <template>

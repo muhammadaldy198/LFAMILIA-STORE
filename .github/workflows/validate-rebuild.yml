@@ -222,8 +222,8 @@ jobs:
           HUSKY: 0
         run: npm ci
 
-      - name: Test admin ordering and customer UI regressions
-        run: node --test tests/Browser/ordering.test.mjs tests/Browser/customer-ui-guards.test.mjs
+      - name: Test ordering and customer/admin UI regressions
+        run: node --test tests/Browser/ordering.test.mjs tests/Browser/customer-ui-guards.test.mjs tests/Browser/admin-ui-guards.test.mjs
 
       - name: Lint Vue and JavaScript
         run: npm run lint
