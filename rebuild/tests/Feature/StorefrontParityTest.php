@@ -7,6 +7,7 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductReview;
 use App\Models\User;
+use App\Services\CheckoutPricing;
 use App\Services\PaymentRoutingService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Crypt;
@@ -163,7 +164,7 @@ class StorefrontParityTest extends TestCase
             ]);
         }
 
-        $pricing = app(\App\Services\CheckoutPricing::class);
+        $pricing = app(CheckoutPricing::class);
         $queries = [];
         DB::listen(function ($query) use (&$queries): void {
             $sql = strtolower($query->sql);
@@ -180,10 +181,13 @@ class StorefrontParityTest extends TestCase
             $this->assertSame($pricing->forPackage($id), $quotes[$id]);
         }
 
-        $this->get('/catalog/'.$product->slug)->assertOk()->assertInertia(
-            fn (Assert $page) => $page->component('Catalog/Show')
-                ->has('packages', 5)->where('packages.0.is_available', true)->etc()
-        );
+        $this->get('/catalog/'.$product->slug)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Catalog/Show')
+                ->has('packages', 5)
+                ->where('packages.0.is_available', true)
+                ->etc());
     }
 
     public function test_footer_assets_and_customer_product_parity_are_available_without_internal_data(): void

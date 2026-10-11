@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -101,7 +102,10 @@ class CheckoutPricing
      */
     public function forPackages(array $packageIds): array
     {
-        $packageIds = array_values(array_unique(array_filter(array_map('intval', $packageIds), fn (int $id): bool => $id > 0)));
+        $packageIds = array_values(array_unique(array_filter(
+            array_map('intval', $packageIds),
+            fn (int $id): bool => $id > 0
+        )));
         if ($packageIds === []) {
             return [];
         }
@@ -195,10 +199,10 @@ class CheckoutPricing
     }
 
     /**
-     * @param  \Illuminate\Support\Collection<int, object>  $eligibleMappings
+     * @param  Collection<int, object>  $eligibleMappings
      * @return array<string, mixed>
      */
-    private function quoteForContext(object $context, \Illuminate\Support\Collection $eligibleMappings): array
+    private function quoteForContext(object $context, Collection $eligibleMappings): array
     {
         $mapping = $eligibleMappings->first();
         if (! $mapping) {

@@ -104,15 +104,16 @@ class AdminCustomerRestorationTest extends TestCase
         $recorded = [];
         DB::listen(function ($query) use (&$recorded): void {
             $sql = strtolower($query->sql);
-            if (str_contains($sql, 'from ' . chr(96).'users'.chr(96))
-                || str_contains($sql, 'from ' . chr(96).'orders'.chr(96))
-                || str_contains($sql, 'from ' . chr(96).'support_tickets'.chr(96))) {
+            if (str_contains($sql, 'from '.chr(96).'users'.chr(96))
+                || str_contains($sql, 'from '.chr(96).'orders'.chr(96))
+                || str_contains($sql, 'from '.chr(96).'support_tickets'.chr(96))) {
                 $recorded[] = $sql;
             }
         });
 
         $this->get('/admin/customers?q=Batch%20Stats%20Customer')
-            ->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
                 ->component('Admin/Customers')
                 ->has('customers.data', 1)
                 ->where('customers.data.0.id', $customer->id)
