@@ -42,19 +42,22 @@ class DigiflazzAutoSources
         if ($package && (int) $package->product_id !== (int) $product->id) {
             throw ValidationException::withMessages(['item_ids' => 'SKU sudah dipakai produk lain. Tidak ada sumber yang dipindahkan.']);
         }
-        $first = $items->sortBy('price_idr')->first();
+        $sellable = $items->filter(fn (object $item): bool => app(DigiflazzCatalogService::class)->sellable($item));
+        $first = $sellable->sortBy('price_idr')->first();
+        if (! $first) {
+            throw ValidationException::withMessages(['item_ids' => 'Tidak ada SKU Digiflazz yang aktif dan tersedia.']);
+        }
         $nominal = app(CatalogNominalOrder::class)->value($first->product_name, $first->brand);
         if (! $package) {
-            // Default imports inherit the current product margin. A different margin
-            // explicitly entered during import remains a per-nominal override.
-            $inheritsProductMargin = number_format((float) $margin, 4, '.', '')
-                === number_format((float) $product->margin_percent, 4, '.', '');
+            // Lock each new Digiflazz nominal once at a safe 8% gross margin.
+            // Later supplier sync updates costs, NOT the customer-facing price.
+            $fixedPrice = app(DigiflazzFixedPricePolicy::class)->fixedPriceFromCost((int) $first->price_idr);
             $package = $product->packages()->create([
                 'code' => 'DF_'.substr(hash('sha256', $first->buyer_sku_code), 0, 20),
                 'name' => $first->product_name, 'group_name' => $first->type ?: null,
                 'nominal_value' => $nominal, 'sort_order' => 0, 'is_active' => $publish,
-                'pricing_mode' => $inheritsProductMargin ? 'PRODUCT_MARGIN' : 'PERCENT',
-                'margin_percent' => $inheritsProductMargin ? null : $margin,
+                'pricing_mode' => 'SELL_PRICE', 'sell_price_idr' => $fixedPrice,
+                'margin_percent' => null,
             ]);
             app(AdminAuditService::class)->record($request, 'catalog.package.imported', 'product_package', $package->id, null, $package->toArray());
         } else {

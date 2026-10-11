@@ -205,6 +205,14 @@ class CheckoutPricing
      */
     private function quoteForContext(object $context, Collection $eligibleMappings): array
     {
+        // Even if ALL sellers spike, fixed-price Digiflazz must never be
+        // fulfilled below the 8% gross-margin cutoff.
+        if ($context->pricing_mode === 'SELL_PRICE') {
+            $cap = app(DigiflazzFixedPricePolicy::class)->maximumCost((int) $context->sell_price_idr);
+            $eligibleMappings = $eligibleMappings->filter(fn (object $candidate): bool =>
+                $candidate->provider_code !== 'DIGIFLAZZ' || (int) $candidate->cost_idr <= $cap
+            )->values();
+        }
         $mapping = $eligibleMappings->first();
         if ($mapping === null) {
             throw ValidationException::withMessages([
@@ -242,8 +250,12 @@ class CheckoutPricing
             // highest eligible backup cost (+1%) or the only SKU (+1%).
             // Fulfillment must reuse this limit across all attempts and reconciliation.
             'max_price_idr' => $mapping->provider_code === 'DIGIFLAZZ'
-                ? $this->digiflazzMaxPrice((int) $eligibleMappings
-                    ->where('provider_code', 'DIGIFLAZZ')->max('cost_idr'))
+                ? ($context->pricing_mode === 'SELL_PRICE'
+                    ? min(
+                        $this->digiflazzMaxPrice((int) $eligibleMappings->where('provider_code', 'DIGIFLAZZ')->max('cost_idr')),
+                        app(DigiflazzFixedPricePolicy::class)->maximumCost((int) $context->sell_price_idr)
+                    )
+                    : $this->digiflazzMaxPrice((int) $eligibleMappings->where('provider_code', 'DIGIFLAZZ')->max('cost_idr')))
                 : ($mapping->max_price_idr !== null ? (int) $mapping->max_price_idr : null),
             'cost_idr' => $cost,
             'margin_idr' => $margin,

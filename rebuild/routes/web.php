@@ -281,6 +281,8 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
     Route::middleware('admin.permission:catalog.manage')->prefix('admin/catalog')
         ->name('admin.catalog.')->group(function (): void {
             Route::put('/margin', [AdminCatalogController::class, 'globalMargin'])->name('margin.update');
+            Route::post('/digiflazz/lock-prices', [AdminCatalogController::class, 'lockDigiflazzPrices'])
+                ->middleware('throttle:admin-sensitive')->name('digiflazz.lock-prices');
             Route::put('/products/{product}/packages/reorder', [AdminCatalogController::class, 'reorderPackages'])->name('packages.reorder');
             Route::post('/products/{product}/sync', [AdminDigiflazzController::class, 'syncProduct'])->middleware('throttle:admin-sensitive')->name('products.sync');
             Route::post('/products/{product}/import', [AdminDigiflazzController::class, 'import'])->name('products.import');

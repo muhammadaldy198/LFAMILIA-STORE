@@ -15,6 +15,7 @@ use App\Services\AdminAuditService;
 use App\Services\CatalogAudit;
 use App\Services\CatalogNominalOrder;
 use App\Services\DigiflazzAutoSources;
+use App\Services\DigiflazzFixedPricePolicy;
 use App\Services\DigiflazzCatalogService;
 use App\Services\VoucherStockService;
 use Illuminate\Http\RedirectResponse;
@@ -77,6 +78,8 @@ class AdminCatalogController
                     ])->all(),
                 ]),
             'defaultMargin' => json_decode((string) DB::table('system_settings')->where('key', 'catalog.default_margin_percent')->value('value'), true) ?? 0,
+            'fixedPriceProposals' => app(DigiflazzFixedPricePolicy::class)->proposals(),
+            'fixedPriceAlerts' => app(DigiflazzFixedPricePolicy::class)->alerts(),
             'digiflazzItems' => (function () {
                 // N+1 fix: preload mapped SKUs sekali, bukan per item
                 $digiflazzIds = Provider::where('code', 'DIGIFLAZZ')->pluck('id');
@@ -736,6 +739,46 @@ class AdminCatalogController
         });
 
         return back();
+    }
+
+    /**
+     * One-time, audited conversion of legacy dynamic Digiflazz prices.
+     * Existing fixed/manual prices are never overwritten.
+     */
+    public function lockDigiflazzPrices(
+        Request $request, DigiflazzFixedPricePolicy $policy, AdminAuditService $audit
+    ): RedirectResponse {
+        $data = $request->validate([
+            'package_ids' => ['required', 'array', 'min:1', 'max:2000'],
+            'package_ids.*' => ['required', 'integer', 'distinct', 'exists:product_packages,id'],
+        ]);
+        $ids = array_map('intval', $data['package_ids']);
+
+        DB::transaction(function () use ($policy, $audit, $request, $ids): void {
+            $packages = ProductPackage::whereIn('id', $ids)->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+            $proposals = collect($policy->proposals())->keyBy('package_id');
+            foreach ($ids as $id) {
+                if (! $packages->has($id) || ! $proposals->has($id)
+                    || $packages->get($id)->pricing_mode === 'SELL_PRICE') {
+                    throw ValidationException::withMessages([
+                        'package_ids' => 'SKU/harga berubah. Muat ulang pratinjau sebelum menerapkan harga tetap.',
+                    ]);
+                }
+            }
+            foreach ($ids as $id) {
+                $package = $packages->get($id);
+                $before = $package->toArray();
+                $package->update([
+                    'pricing_mode' => 'SELL_PRICE',
+                    'sell_price_idr' => $proposals->get($id)['sell_price_idr'],
+                    'margin_percent' => null, 'margin_fixed_idr' => null,
+                ]);
+                $audit->record($request, 'catalog.digiflazz.fixed_price_locked',
+                    'product_package', $id, $before, $package->toArray());
+            }
+        }, 3);
+
+        return back()->with('status', count($ids).' harga nominal Digiflazz dikunci pada margin kotor 8%.');
     }
 
     public function globalMargin(Request $request, AdminAuditService $audit): RedirectResponse
