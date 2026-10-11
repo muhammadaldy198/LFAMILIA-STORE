@@ -3,14 +3,19 @@ import { useCustomerPresentation } from '../../Composables/customerPresentation'
 const { customerText } = useCustomerPresentation();
 
 import { Head, Link } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import AccountShell from '../../Components/AccountShell.vue';
 import { rupiah } from '../../lib/money';
 
 const props = defineProps({ order: Object, payment: Object, review: Object });
 
 const paymentState = ref(props.payment);
-const errors = ref({});
+const paymentIssue = computed(() => {
+    const status = String(paymentState.value?.status || '').toUpperCase();
+    if (['REJECTED', 'FAILED', 'DENIED', 'DENY'].includes(status)) return 'rejected';
+    if (['EXPIRED', 'EXPIRE', 'CANCELLED', 'CANCEL'].includes(status)) return 'closed';
+    return '';
+});
 const busy = ref(false);
 
 const reviewRating = ref(Number(props.review?.rating || 5));
@@ -60,7 +65,9 @@ async function submitReview() {
             <p v-if="paymentState?.status === 'PENDING' && paymentState?.instructions?.payment_code" class="text-sm">{{ customerText("pages.customer.orderdetail.6af68bec", "Kode pembayaran:") }} <strong>{{ paymentState.instructions.payment_code }}</strong></p>
             <p v-if="paymentState?.status === 'UNKNOWN'" class="text-sm text-amber-200">{{ customerText("pages.customer.orderdetail.2107d542", "Status pembayaran belum dapat dipastikan. Sistem tidak akan membuat pembayaran kedua otomatis.") }}</p>
             <Link :href="'/payment?invoice=' + encodeURIComponent(order.order_number)" class="lf-primary">{{ customerText("pages.customer.orderdetail.a548f73b", "Lihat pembayaran") }}</Link>
-            <p v-if="errors.payment" class="text-sm text-red-300">{{ errors.payment[0] }}</p>
+            <p v-if="paymentIssue" role="alert" class="text-sm text-red-300">{{ paymentIssue === 'closed'
+                ? customerText('pages.customer.orderdetail.payment_closed', 'Percobaan pembayaran telah berakhir. Periksa status invoice untuk langkah berikutnya.')
+                : customerText('pages.customer.orderdetail.payment_rejected', 'Percobaan pembayaran gagal atau ditolak. Periksa status invoice sebelum mencoba lagi.') }}</p>
         </section>
 
         <section v-if="order.status === 'SUCCESS' && order.delivery" class="space-y-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-5">

@@ -3038,5 +3038,20 @@
     "group": "Components/Support",
     "label": "Lainnya",
     "default": "Lainnya"
+  },
+  "pages.guest.support.ticket_for": {
+    "group": "Pages/Guest/Support",
+    "label": "Tiket untuk",
+    "default": "Tiket untuk"
+  },
+  "pages.customer.orderdetail.payment_closed": {
+    "group": "Pages/Customer/OrderDetail",
+    "label": "Percobaan pembayaran telah berakhir. Periksa status invoice untuk langkah berikutnya.",
+    "default": "Percobaan pembayaran telah berakhir. Periksa status invoice untuk langkah berikutnya."
+  },
+  "pages.customer.orderdetail.payment_rejected": {
+    "group": "Pages/Customer/OrderDetail",
+    "label": "Percobaan pembayaran gagal atau ditolak. Periksa status invoice sebelum mencoba lagi.",
+    "default": "Percobaan pembayaran gagal atau ditolak. Periksa status invoice sebelum mencoba lagi."
   }
 }

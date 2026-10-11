@@ -52,16 +52,16 @@ async function refreshStatus(){
         const response=await fetch('/orders/guest/'+encodeURIComponent(orderState.value.order_number)+'/events',{
             headers:{Accept:'application/json'},cache:'no-store',
         });
-        if(!response.ok)return;
+        if(!response.ok)throw new Error('Gagal memperbarui status pesanan.');
         const data=await response.json();
-        errors.value={};
         if(disposed)return;
+        errors.value={};
         orderState.value={...orderState.value,...(data.order||{})};
         paymentState.value=data.payment||paymentState.value;
         timeline.value=data.events||timeline.value;
         if(terminal.value&&timer){clearInterval(timer);timer=null;}
     }catch{
-        errors.value={status:['Status belum dapat diperbarui. Coba cek lagi.']};
+        if(!disposed)errors.value={status:['Status belum dapat diperbarui. Coba cek lagi.']};
     }finally{refreshing.value=false;}
 }
 

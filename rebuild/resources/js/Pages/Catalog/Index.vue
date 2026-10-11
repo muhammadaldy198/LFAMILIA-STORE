@@ -8,7 +8,7 @@ import CustomerShell from '../../Components/CustomerShell.vue';
 import CategoryIcon from '../../Components/CategoryIcon.vue';
 
 const p=defineProps({
-    categories:Array,products:Object,popularProducts:Array,filters:Object,logoUrl:String,faviconUrl:String,
+    categories:Array,products:Object,popularProducts:Array,filters:Object,logoUrl:String,
     banners:Array,popups:Array,news:Array,reviews:Array,
 });
 const page=usePage();
@@ -25,12 +25,6 @@ const visibleBanners=computed(()=>(p.banners||[]).filter((item)=>mobile.value ? 
 const activeBanner=computed(()=>visibleBanners.value[Math.min(bannerIndex.value,Math.max(visibleBanners.value.length-1,0))]||null);
 const activePopup=computed(()=>popupItem.value);
 const popular=computed(()=>p.popularProducts??[]);
-const fallbackNews=[
-    {id:'preview-game',title:'Info gaming terbaru',summary:'Update game dan informasi produk terbaru akan tampil di sini.',source_label:'Contoh Berita',is_preview:true},
-    {id:'preview-promo',title:'Promo & produk LFAMILIA',summary:'Promo dan informasi produk terbaru akan tampil setelah diterbitkan.',source_label:'Contoh Berita',is_preview:true},
-    {id:'preview-service',title:'Pengumuman layanan',summary:'Informasi layanan dan pembaruan toko akan tampil di sini.',source_label:'Contoh Berita',is_preview:true},
-];
-const homeNews=computed(()=>p.news?.length?p.news:fallbackNews);
 const q=(x={})=>{const a={...p.filters,...x};Object.keys(a).forEach(k=>{if(!a[k])delete a[k]});const s=new URLSearchParams(a).toString();return s?'/?'+s:'/'};
 // Request only the listing props; keep the banner, popup and the rest of the homepage mounted.
 const listingProps=['products','filters'];
@@ -179,24 +173,14 @@ onUnmounted(()=>{
                 </div>
             </section>
 
-            <section v-if="sectionEnabled('news')" class="lf-news-home">
+            <section v-if="sectionEnabled('news') && p.news?.length" class="lf-news-home">
                 <div class="lf-container lf-section">
                     <p class="lf-eyebrow">{{ customerText("pages.catalog.index.8422e105", "LFAMILIA NEWS") }}</p>
                     <h2 class="lf-title">{{storefront.homeNewsTitle||'LFAMILIA NEWS: INFO GAMING & UPDATE TERBARU'}}</h2>
                     <p class="lf-copy">{{storefront.homeNewsIntro||'Info gaming, promo, produk, dan pengumuman layanan.'}}</p>
                     <div class="lf-news-grid mt-5">
-                        <template v-for="a in homeNews" :key="a.id">
-                            <article v-if="a.is_preview" class="lf-news-card">
-                                <div class="lf-news-placeholder">{{ customerText("pages.catalog.index.6ae24f17", "LF") }}</div>
-                                <div class="lf-news-overlay"></div>
-                                <div class="lf-news-body">
-                                    <small>{{ customerText("pages.catalog.index.9c238977", "PREVIEW") }}</small>
-                                    <h3>{{a.title}}</h3>
-                                    <p>{{a.summary}}</p>
-                                    <strong>{{a.source_label}}</strong>
-                                </div>
-                            </article>
-                            <Link v-else :href="'/news/'+a.slug" class="lf-news-card">
+                        <template v-for="a in p.news" :key="a.id">
+                            <Link :href="'/news/'+a.slug" class="lf-news-card">
                                 <img v-if="a.cover_url" :src="a.cover_url" alt="">
                                 <div v-else class="lf-news-placeholder">{{ customerText("pages.catalog.index.6ae24f17", "LF") }}</div>
                                 <div class="lf-news-overlay"></div>

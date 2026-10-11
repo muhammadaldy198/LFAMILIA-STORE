@@ -5,6 +5,7 @@ const { customerText } = useCustomerPresentation();
 import SupportMessageActions from '../../Components/SupportMessageActions.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import AccountShell from '../../Components/AccountShell.vue';
+import CustomerPagination from '../../Components/CustomerPagination.vue';
 
 const props = defineProps({ tickets: Object, orders: Array });
 const form = useForm({ subject: '', message: '', order_id: '' });
@@ -41,6 +42,6 @@ const submit = () => { if (!form.processing) form.post('/account/tickets', { onS
             <Link :href="'/account/tickets/' + ticket.id" class="font-semibold text-cyan-300 hover:underline">#{{ ticket.id }} · {{ ticket.subject }}</Link>
             <p class="mt-1 text-sm text-slate-400">{{ ticket.status }} · {{ ticket.created_at }}</p>
         </div>
-        <nav :aria-label="customerText('pages.customer.tickets.attribute.aria-label.a837ddc2', 'Halaman tiket')" class="flex flex-wrap gap-2"><Link v-for="link in tickets.links" :key="link.label" :href="link.url || '#'" class="rounded-md px-3 py-2 text-sm" :class="link.active ? 'bg-cyan-400 text-slate-950' : 'bg-slate-800 text-slate-200'" :aria-disabled="!link.url" v-html="link.label" /></nav>
+        <CustomerPagination :links="tickets.links || []" :label="customerText('pages.customer.tickets.attribute.aria-label.a837ddc2', 'Halaman tiket')" />
     </AccountShell>
 </template>
