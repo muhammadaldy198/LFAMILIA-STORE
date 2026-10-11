@@ -227,15 +227,6 @@ class CheckoutPricing
                 && (int) $candidate->live_cost_idr <= (int) $candidate->max_price_idr;
         })->values();
 
-        // Even if ALL sellers spike, fixed-price Digiflazz must never be
-        // fulfilled below the 8% gross-margin cutoff.
-        if ($context->pricing_mode === 'SELL_PRICE') {
-            $cap = app(DigiflazzFixedPricePolicy::class)->maximumCost((int) $context->sell_price_idr);
-            $eligibleMappings = $eligibleMappings->filter(function (object $candidate) use ($cap): bool {
-                return $candidate->provider_code !== 'DIGIFLAZZ'
-                    || (int) ($candidate->is_manual_price ? $candidate->live_cost_idr : $candidate->cost_idr) <= $cap;
-            })->values();
-        }
         $mapping = $eligibleMappings->first();
         if ($mapping === null) {
             throw ValidationException::withMessages([
@@ -256,15 +247,13 @@ class CheckoutPricing
 
         $maxPrice = $mapping->max_price_idr !== null ? (int) $mapping->max_price_idr : null;
         if ($mapping->provider_code === 'DIGIFLAZZ') {
-            $maxPrice = $this->digiflazzMaxPrice(
-                (int) $eligibleMappings->where('provider_code', 'DIGIFLAZZ')->max('cost_idr')
-            );
-            if ($context->pricing_mode === 'SELL_PRICE') {
-                $maxPrice = min(
-                    $maxPrice,
-                    app(DigiflazzFixedPricePolicy::class)->maximumCost((int) $context->sell_price_idr)
+            // The admin's locked cost is the exact max_price sent to Digiflazz.
+            // Other sources keep their existing provider-price tolerance.
+            $maxPrice = $mapping->is_manual_price
+                ? (int) $mapping->max_price_idr
+                : $this->digiflazzMaxPrice(
+                    (int) $eligibleMappings->where('provider_code', 'DIGIFLAZZ')->max('cost_idr')
                 );
-            }
         }
 
         return [
@@ -282,9 +271,8 @@ class CheckoutPricing
             'provider_mapping_id' => (int) $mapping->mapping_id,
             'provider_code' => $mapping->provider_code,
             'provider_sku' => $mapping->external_sku,
-            // Snapshot a common Digiflazz max_price for this nominal at checkout:
-            // highest eligible backup cost (+1%) or the only SKU (+1%).
-            // Fulfillment must reuse this limit across all attempts and reconciliation.
+            // Snapshot the admin's exact manual cap, or the existing
+            // automatic-source cap, for fulfillment and reconciliation.
             'max_price_idr' => $maxPrice,
             'cost_idr' => $cost,
             'margin_idr' => $margin,
