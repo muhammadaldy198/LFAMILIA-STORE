@@ -52,6 +52,11 @@ class AdminOrderDetailController
             'order' => $order, 'attempts' => $attempts,
             'canViewCustomer' => $permissions->allows($request->user('admin'), 'customers.view'),
             'canResendDelivery' => $canResendDelivery,
+            'canCancel' => strtoupper((string) $request->user('admin')?->role) === 'SUPER_ADMIN'
+                && in_array($row->status, ['PAID', 'FAILED', 'BLOCKED'], true)
+                && $attempts->every(fn (array $a): bool => in_array(
+                    $a['status'], ['FAILED_CONFIRMED', 'MANUAL_FAILED', 'BLOCKED'], true
+                )),
             'canCheckFulfillment' => $canFulfill && in_array($row->status, ['PAID', 'PROCESSING'], true)
                 && in_array($attempts->first()['status'] ?? '', ['PENDING', 'UNKNOWN', 'SENDING'], true),
             'payments' => DB::table('payment_transactions')->where('order_id', $id)->orderByDesc('id')

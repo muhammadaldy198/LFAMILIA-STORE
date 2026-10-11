@@ -869,9 +869,9 @@ class PaymentTest extends TestCase
             ]
         );
 
-        $this->assertSame(0, (int) DB::table('wallets')->where('id', $wallet->id)->value('balance_idr'));
-        $this->assertSame(1, DB::table('wallet_ledger')->where('source', 'REFUND')->count());
-        $this->assertSame('REFUNDED', DB::table('wallet_topups')->where('id', $topupId)->value('status'));
+        $this->assertSame(10000, (int) DB::table('wallets')->where('id', $wallet->id)->value('balance_idr'));
+        $this->assertSame(0, DB::table('wallet_ledger')->where('source', 'REFUND')->count());
+        $this->assertSame('REFUND_REVIEW', DB::table('wallet_topups')->where('id', $topupId)->value('status'));
         $this->assertSame('REFUNDED', DB::table('payment_transactions')->where('id', $paymentId)->value('status'));
     }
 

@@ -15,6 +15,7 @@ use App\Http\Controllers\AdminIntegrationController;
 use App\Http\Controllers\AdminNicknameController;
 use App\Http\Controllers\AdminNotificationController;
 use App\Http\Controllers\AdminOrderDetailController;
+use App\Http\Controllers\AdminOrderCancellationController;
 use App\Http\Controllers\AdminOrdersController;
 use App\Http\Controllers\AdminPasswordConfirmController;
 use App\Http\Controllers\AdminPasswordResetController;
@@ -352,6 +353,9 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
         ->middleware(['admin.permission:orders.view', 'admin.permission:fulfillment.manage', 'throttle:10,1'])->name('admin.orders.check-process');
     Route::post('/admin/orders/{id}/resend-delivery', [AdminOrdersController::class, 'resendDelivery'])
         ->middleware(['admin.permission:orders.view', 'admin.permission:fulfillment.manage', 'throttle:10,1'])->name('admin.orders.resend-delivery');
+    Route::post('/admin/orders/{id}/cancel', AdminOrderCancellationController::class)
+        ->middleware(['admin.permission:orders.view', 'admin.super', 'admin.password.confirm', 'throttle:admin-sensitive'])
+        ->name('admin.orders.cancel');
     Route::get('/admin/orders/{id}', AdminOrderDetailController::class)->middleware('admin.permission:orders.view')->name('admin.orders.show');
     Route::get('/admin/orders', [AdminOrdersController::class, 'index'])
         ->middleware('admin.permission:orders.view')->name('admin.orders');
