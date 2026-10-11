@@ -78,19 +78,44 @@ class AdminCustomerController
                 'users.last_active_at',
                 'users.created_at',
                 'wallets.balance_idr',
-                DB::raw('(SELECT COUNT(*) FROM orders o WHERE o.user_id = users.id) as order_count'),
-                DB::raw("(SELECT COUNT(*) FROM orders o WHERE o.user_id = users.id AND o.status = 'SUCCESS') as successful_order_count"),
-                DB::raw("(SELECT COALESCE(SUM(o.total_idr),0) FROM orders o WHERE o.user_id=users.id AND o.status IN ('PAID','PROCESSING','SUCCESS')) as lifetime_spend_idr"),
-                DB::raw("(SELECT COUNT(*) FROM support_tickets st WHERE st.user_id = users.id AND st.status IN ('OPEN','IN_PROGRESS')) as open_ticket_count"),
-                DB::raw('(SELECT COUNT(*) FROM support_tickets st WHERE st.user_id = users.id) as ticket_count'),
-                DB::raw('(SELECT COUNT(*) FROM wallet_topups wt WHERE wt.user_id = users.id) as topup_count'),
-                DB::raw('(SELECT COUNT(*) FROM wallet_ledger wl WHERE wl.wallet_id = wallets.id) as ledger_count'),
-                DB::raw('(SELECT COUNT(*) FROM saved_game_accounts sga WHERE sga.user_id = users.id) as saved_account_count'),
+                'wallets.id as wallet_id',
             ]);
 
-        $customers = $query->paginate($filters['per_page'])
-            ->withQueryString()
-            ->through(fn (object $row): array => [
+        $customers = $query->paginate($filters['per_page'])->withQueryString();
+        $rows = $customers->getCollection();
+        $userIds = $rows->pluck('id')->all();
+        $walletIds = $rows->pluck('wallet_id')->filter()->all();
+
+        // Batch per page: five grouped queries replace eight correlated aggregates per row.
+        $orderMetrics = DB::table('orders')->whereIn('user_id', $userIds)
+            ->select('user_id')
+            ->selectRaw("COUNT(*) as order_count, SUM(CASE WHEN status = 'SUCCESS' THEN 1 ELSE 0 END) as successful_order_count")
+            ->selectRaw("COALESCE(SUM(CASE WHEN status IN ('PAID','PROCESSING','SUCCESS') THEN total_idr ELSE 0 END), 0) as lifetime_spend_idr")
+            ->groupBy('user_id')->get()->keyBy('user_id');
+        $ticketMetrics = DB::table('support_tickets')->whereIn('user_id', $userIds)
+            ->select('user_id')
+            ->selectRaw("COUNT(*) as ticket_count, SUM(CASE WHEN status IN ('OPEN','IN_PROGRESS') THEN 1 ELSE 0 END) as open_ticket_count")
+            ->groupBy('user_id')->get()->keyBy('user_id');
+        $topupMetrics = DB::table('wallet_topups')->whereIn('user_id', $userIds)
+            ->select('user_id')->selectRaw('COUNT(*) as topup_count')
+            ->groupBy('user_id')->get()->keyBy('user_id');
+        $ledgerMetrics = DB::table('wallet_ledger')->whereIn('wallet_id', $walletIds)
+            ->select('wallet_id')->selectRaw('COUNT(*) as ledger_count')
+            ->groupBy('wallet_id')->get()->keyBy('wallet_id');
+        $savedMetrics = DB::table('saved_game_accounts')->whereIn('user_id', $userIds)
+            ->select('user_id')->selectRaw('COUNT(*) as saved_account_count')
+            ->groupBy('user_id')->get()->keyBy('user_id');
+
+        $customers->through(function (object $row) use (
+            $orderMetrics, $ticketMetrics, $topupMetrics, $ledgerMetrics, $savedMetrics
+        ): array {
+            $orders = $orderMetrics->get($row->id);
+            $tickets = $ticketMetrics->get($row->id);
+            $topups = $topupMetrics->get($row->id);
+            $ledger = $ledgerMetrics->get($row->wallet_id);
+            $saved = $savedMetrics->get($row->id);
+
+            return [
                 'id' => (int) $row->id,
                 'name' => (string) $row->name,
                 'email' => $row->email,
@@ -105,19 +130,20 @@ class AdminCustomerController
                 'membership_progress_bonus_idr' => (int) $row->membership_progress_bonus_idr,
                 'leaderboard_opt_in' => (bool) $row->leaderboard_opt_in,
                 'balance_idr' => (int) ($row->balance_idr ?? 0),
-                'order_count' => (int) $row->order_count,
-                'successful_order_count' => (int) $row->successful_order_count,
-                'lifetime_spend_idr' => (int) $row->lifetime_spend_idr,
-                'open_ticket_count' => (int) $row->open_ticket_count,
-                'saved_account_count' => (int) $row->saved_account_count,
+                'order_count' => (int) ($orders?->order_count ?? 0),
+                'successful_order_count' => (int) ($orders?->successful_order_count ?? 0),
+                'lifetime_spend_idr' => (int) ($orders?->lifetime_spend_idr ?? 0),
+                'open_ticket_count' => (int) ($tickets?->open_ticket_count ?? 0),
+                'saved_account_count' => (int) ($saved?->saved_account_count ?? 0),
                 'deletable' => (int) ($row->balance_idr ?? 0) === 0
-                    && (int) $row->order_count === 0
-                    && (int) $row->ticket_count === 0
-                    && (int) $row->topup_count === 0
-                    && (int) $row->ledger_count === 0,
+                    && (int) ($orders?->order_count ?? 0) === 0
+                    && (int) ($tickets?->ticket_count ?? 0) === 0
+                    && (int) ($topups?->topup_count ?? 0) === 0
+                    && (int) ($ledger?->ledger_count ?? 0) === 0,
                 'last_active_at' => $row->last_active_at,
                 'created_at' => $row->created_at,
-            ]);
+            ];
+        });
 
         $activeUsers = DB::table('users')->whereNull('deleted_at');
 

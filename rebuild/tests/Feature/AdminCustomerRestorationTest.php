@@ -97,6 +97,37 @@ class AdminCustomerRestorationTest extends TestCase
                 ->has('membershipTiers'));
     }
 
+    public function test_customer_summary_uses_page_scoped_aggregates_without_correlated_queries(): void
+    {
+        $this->login();
+        $customer = $this->customer(['name' => 'Batch Stats Customer']);
+        $recorded = [];
+        DB::listen(function ($query) use (&$recorded): void {
+            $sql = strtolower($query->sql);
+            if (str_contains($sql, 'from ' . chr(96).'users'.chr(96))
+                || str_contains($sql, 'from ' . chr(96).'orders'.chr(96))
+                || str_contains($sql, 'from ' . chr(96).'support_tickets'.chr(96))) {
+                $recorded[] = $sql;
+            }
+        });
+
+        $this->get('/admin/customers?q=Batch%20Stats%20Customer')
+            ->assertOk()->assertInertia(fn (Assert $page) => $page
+                ->component('Admin/Customers')
+                ->has('customers.data', 1)
+                ->where('customers.data.0.id', $customer->id)
+                ->where('customers.data.0.order_count', 0)
+                ->where('customers.data.0.successful_order_count', 0)
+                ->where('customers.data.0.open_ticket_count', 0)
+                ->where('customers.data.0.deletable', true)
+                ->etc());
+
+        $this->assertFalse(collect($recorded)->contains(
+            fn (string $sql): bool => str_contains($sql, '(select count(*) from orders')
+                || str_contains($sql, '(select count(*) from support_tickets')
+        ));
+    }
+
     public function test_customer_detail_combines_operational_history_without_exposing_saved_account_input(): void
     {
         $this->login();
