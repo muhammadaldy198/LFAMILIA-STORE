@@ -129,21 +129,6 @@ class IntegrationRuntimeConfig
         return $profiles;
     }
 
-    /**
-     * @param  array<string,mixed>  $config
-     */
-    public function credentialsComplete(string $code, array $config): bool
-    {
-        foreach ($this->registry->requiredFields($code) as $field) {
-            $value = $config[$field] ?? null;
-            if ($value === null || $value === '' || $value === []) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
     public function telegramBotBase(string $environment, string $token): string
     {
         $base = 'https://api.telegram.org/bot'.rawurlencode($token);

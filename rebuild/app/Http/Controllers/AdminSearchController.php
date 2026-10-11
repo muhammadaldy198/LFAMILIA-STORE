@@ -13,6 +13,7 @@ class AdminSearchController
     {
         $data = $request->validate(['q' => ['required', 'string', 'min:2', 'max:100']]);
         $q = trim($data['q']);
+        $pattern = '%'.addcslashes($q, '%_\\').'%';
         $admin = $request->user('admin');
         $results = [];
         foreach ($permissions->menu($admin) as $item) {
@@ -21,20 +22,20 @@ class AdminSearchController
             }
         }
         if ($permissions->allows($admin, 'orders.view')) {
-            foreach (DB::table('orders')->where('order_number', 'like', '%'.$q.'%')->orderByDesc('id')->limit(5)->get(['order_number']) as $order) {
+            foreach (DB::table('orders')->where('order_number', 'like', $pattern)->orderByDesc('id')->limit(5)->get(['order_number']) as $order) {
                 $results[] = ['title' => $order->order_number, 'detail' => 'Pesanan',
                     'href' => '/admin/orders?q='.rawurlencode($order->order_number)];
             }
         }
         if ($permissions->allows($admin, 'catalog.manage')) {
-            foreach (DB::table('products')->where(fn ($query) => $query->where('name', 'like', '%'.$q.'%')->orWhere('slug', 'like', '%'.$q.'%'))
+            foreach (DB::table('products')->where(fn ($query) => $query->where('name', 'like', $pattern)->orWhere('slug', 'like', $pattern))
                 ->orderBy('name')->limit(5)->get(['name', 'slug']) as $product) {
                 $results[] = ['title' => $product->name, 'detail' => 'Produk',
                     'href' => '/admin/catalog?q='.rawurlencode($product->name)];
             }
         }
         if ($permissions->allows($admin, 'customers.view')) {
-            foreach (DB::table('users')->whereNull('deleted_at')->where(fn ($query) => $query->where('name', 'like', '%'.$q.'%')->orWhere('email', 'like', '%'.$q.'%'))
+            foreach (DB::table('users')->whereNull('deleted_at')->where(fn ($query) => $query->where('name', 'like', $pattern)->orWhere('email', 'like', $pattern))
                 ->orderBy('name')->limit(5)->get(['name', 'email']) as $customer) {
                 $results[] = ['title' => $customer->name, 'detail' => 'Pelanggan',
                     'href' => '/admin/customers?q='.rawurlencode($customer->email ?: $customer->name)];

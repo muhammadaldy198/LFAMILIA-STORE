@@ -82,8 +82,6 @@ class AppServiceProvider extends ServiceProvider
             ->by('api-account:'.($request->user()?->id ?? $request->ip())));
         RateLimiter::for('admin-sensitive', fn (Request $request) => Limit::perMinute(20)
             ->by('admin-sensitive:'.($request->user('admin')?->id ?? $request->ip())));
-        RateLimiter::for('secret-reveal', fn (Request $request) => Limit::perMinute(5)
-            ->by('secret-reveal:'.($request->user('admin')?->id ?? $request->ip())));
         RateLimiter::for('account-sensitive', fn (Request $request) => Limit::perMinute(10)
             ->by('account-sensitive:'.($request->user()?->id ?? $request->ip())));
     }

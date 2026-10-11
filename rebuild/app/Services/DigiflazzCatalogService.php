@@ -187,6 +187,11 @@ class DigiflazzCatalogService
         return null;
     }
 
+    public function sellable(object $item): bool
+    {
+        return $this->available($item) && now()->diffInHours($item->synced_at, true) <= 24;
+    }
+
     public function available(object $item): bool
     {
         if ((isset($item->is_present) && ! (bool) $item->is_present)

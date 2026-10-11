@@ -195,7 +195,7 @@ class AdminSettingsController
         $requirements = $before['requirements'];
         $benefits = $before['benefits'];
 
-        if ($request->exists('requirements')) {
+        if ($request->filled('requirements')) {
             $requirements = $this->jsonPayload($data['requirements'] ?? null, 'requirements');
         } elseif ($request->exists('minimum_spend_idr')) {
             $requirements['minimum_spend_idr'] = (int) ($data['minimum_spend_idr'] ?? 0);
@@ -205,7 +205,7 @@ class AdminSettingsController
             ]);
         }
 
-        if ($request->exists('benefits')) {
+        if ($request->filled('benefits')) {
             $benefits = $this->jsonPayload($data['benefits'] ?? null, 'benefits');
         } elseif ($request->exists('discount_percent') || $request->exists('benefit_notes')) {
             $benefits['discount_bps'] = (int) round(((float) ($data['discount_percent'] ?? 0)) * 100);
