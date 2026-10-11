@@ -135,7 +135,6 @@ class AdminDigiflazzRestorationTest extends TestCase
         ], $overrides);
     }
 
-
     public function test_admin_manual_price_lock_survives_sync_and_source_import_until_unlocked(): void
     {
         $this->login();
@@ -212,7 +211,6 @@ class AdminDigiflazzRestorationTest extends TestCase
             app(CheckoutPricing::class)->forPackages([$catalog['package']->id])
         );
     }
-
 
     public function test_admin_can_attach_alternate_digiflazz_source_to_existing_nominal(): void
     {
