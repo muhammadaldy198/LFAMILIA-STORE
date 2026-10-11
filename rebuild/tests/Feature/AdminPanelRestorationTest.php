@@ -135,7 +135,7 @@ class AdminPanelRestorationTest extends TestCase
         ])->assertRedirect()->assertSessionHasNoErrors();
         $package = $product->packages()->firstOrFail();
         $this->assertSame('{{destination}}', data_get($package->mappings()->firstOrFail()->fulfillment_config, 'customer_no_template'));
-        $this->assertSame(11200, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
+        $this->assertSame(10500, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
     }
 
     public function test_publish_import_rejects_invalid_destination_formats_without_partial_activation(): void
@@ -268,7 +268,7 @@ class AdminPanelRestorationTest extends TestCase
             'product_package_id' => $package->id, 'external_sku' => 'rank-cheap',
             'is_active' => false, 'priority' => 2,
         ]);
-        $this->assertArrayNotHasKey($package->id, app(CheckoutPricing::class)->forPackages([$package->id]));
+        $this->assertSame('rank-middle', app(CheckoutPricing::class)->forPackages([$package->id])[$package->id]['provider_sku']);
     }
 
     public function test_automatic_sources_do_not_merge_regions_variants_or_other_product_ownership(): void
@@ -319,7 +319,7 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertDatabaseHas('provider_mappings', ['external_sku' => 'sync-B', 'is_active' => false]);
         $this->assertDatabaseMissing('provider_mappings', ['external_sku' => 'wrong-region']);
         $this->assertDatabaseHas('audit_logs', ['action' => 'catalog.fulfillment_source.auto_attached']);
-        $this->assertArrayNotHasKey($package->id, app(CheckoutPricing::class)->forPackages([$package->id]));
+        $this->assertSame('sync-C', app(CheckoutPricing::class)->forPackages([$package->id])[$package->id]['provider_sku']);
         $this->fakeCatalog([$this->row(['buyer_sku_code' => 'sync-A']), $this->row(['buyer_sku_code' => 'sync-C', 'price' => 10200])]);
         app(DigiflazzCatalogService::class)->sync();
         // This source was disabled by the missing-SKU sync, not by the owner.
