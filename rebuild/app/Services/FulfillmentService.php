@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Jobs\SendFulfillmentJob;
 use App\Services\Fulfillment\DigiflazzClient;
 use App\Services\Fulfillment\FulfillmentTargetBuilder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -225,7 +226,7 @@ class FulfillmentService
                 return null;
             }
             if ($attempt->reconcile_claimed_at
-                && \Illuminate\Support\Carbon::parse($attempt->reconcile_claimed_at)->gt(now()->subMinutes(5))) {
+                && Carbon::parse($attempt->reconcile_claimed_at)->gt(now()->subMinutes(5))) {
                 return null;
             }
             if (! $manual && (int) $attempt->reconcile_checks >= 3) {
