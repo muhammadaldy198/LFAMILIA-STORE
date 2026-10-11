@@ -109,12 +109,12 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertTrue($package->is_active);
         $this->assertTrue($mapping->is_active);
         $this->assertSame('{{user_id}}{{zone_id}}', data_get($mapping->fulfillment_config, 'customer_no_template'));
-        $this->assertSame(10900, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
+        $this->assertSame(11200, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
         $response = $this->get('/catalog/'.$product->slug);
         $response->assertOk();
         $response->assertInertia(function (AssertableInertia $page): void {
             $page->where('packages.0.is_available', true);
-            $page->where('packages.0.price_idr', 10900);
+            $page->where('packages.0.price_idr', 11200);
         });
         $this->assertDatabaseHas('audit_logs', ['action' => 'catalog.mapping.updated', 'target_id' => (string) $mapping->id]);
         Http::assertSentCount(1);
@@ -135,7 +135,7 @@ class AdminPanelRestorationTest extends TestCase
         ])->assertRedirect()->assertSessionHasNoErrors();
         $package = $product->packages()->firstOrFail();
         $this->assertSame('{{destination}}', data_get($package->mappings()->firstOrFail()->fulfillment_config, 'customer_no_template'));
-        $this->assertSame(10900, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
+        $this->assertSame(11200, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
     }
 
     public function test_publish_import_rejects_invalid_destination_formats_without_partial_activation(): void
@@ -212,7 +212,7 @@ class AdminPanelRestorationTest extends TestCase
             $this->assertSame(2, $package->mappings()->where('is_active', true)->count());
             $this->assertSame([0, 1], $package->mappings()->orderBy('priority')->pluck('priority')->map(fn ($value): int => (int) $value)->all());
             $this->assertSame(app(DigiflazzFixedPricePolicy::class)
-                ->fixedPriceFromCost((int) $package->nominal_value * 1000),
+                ->fixedPriceFromCost((int) $package->nominal_value * 1000, '10'),
                 app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
         }
         $response = $this->get('/catalog/'.$product->slug);
@@ -873,8 +873,8 @@ class AdminPanelRestorationTest extends TestCase
 
         $package = $product->packages()->firstOrFail();
         $this->assertSame('SELL_PRICE', $package->pricing_mode);
-        $this->assertSame(10900, (int) $package->sell_price_idr);
-        $this->assertSame(10028, app(CheckoutPricing::class)->forPackage($package->id)['max_price_idr']);
+        $this->assertSame(11000, (int) $package->sell_price_idr);
+        $this->assertSame(10111, app(CheckoutPricing::class)->forPackage($package->id)['max_price_idr']);
 
         $this->fakeCatalog([
             $this->row(['buyer_sku_code' => 'fixed-price-A', 'price' => 12500]),
@@ -889,7 +889,7 @@ class AdminPanelRestorationTest extends TestCase
         ]);
         app(DigiflazzCatalogService::class)->sync();
         $this->assertArrayNotHasKey($package->id, app(CheckoutPricing::class)->forPackages([$package->id]));
-        $this->assertSame(10900, (int) $package->fresh()->sell_price_idr);
+        $this->assertSame(11000, (int) $package->fresh()->sell_price_idr);
         $this->assertNotEmpty(app(DigiflazzFixedPricePolicy::class)->alerts());
     }
 
@@ -913,11 +913,11 @@ class AdminPanelRestorationTest extends TestCase
             'package_ids' => [$package->id],
         ])->assertSessionHasNoErrors();
         $this->assertSame('SELL_PRICE', $package->fresh()->pricing_mode);
-        $this->assertSame(10900, (int) $package->fresh()->sell_price_idr);
+        $this->assertSame(11000, (int) $package->fresh()->sell_price_idr);
         $this->post('/admin/catalog/digiflazz/lock-prices', [
             'package_ids' => [$package->id],
         ])->assertSessionHasErrors('package_ids');
-        $this->assertSame(10900, (int) $package->fresh()->sell_price_idr);
+        $this->assertSame(11000, (int) $package->fresh()->sell_price_idr);
     }
 
     public function test_fixed_sell_price_below_cost_is_rejected(): void
