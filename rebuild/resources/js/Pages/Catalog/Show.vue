@@ -17,7 +17,6 @@ const props = defineProps({
     reviews: Array,
     reviewStats: Object,
     faqs: Array,
-    faviconUrl: String,
     initialPackageId: { type: String, default: '' },
 });
 
@@ -35,7 +34,6 @@ const accountValidationSignature = ref('');
 let accountValidationRequest = 0;
 let quoteRequest = 0;
 const checkoutResult = ref(null);
-const paymentResult = ref(null);
 const errors = ref({});
 const busy = ref('');
 const activeTab = ref('transaction');
@@ -708,7 +706,7 @@ async function createOrder() {
 
     busy.value = 'payment';
     try {
-        paymentResult.value = await requestJson('/payments/orders/' + encodeURIComponent(checkoutResult.value.order_number), {
+        await requestJson('/payments/orders/' + encodeURIComponent(checkoutResult.value.order_number), {
             method: 'POST',
             body: JSON.stringify({
                 idempotency_key: paymentIdempotencyKey.value,

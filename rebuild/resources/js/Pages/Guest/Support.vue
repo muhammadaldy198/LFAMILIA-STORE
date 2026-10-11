@@ -32,7 +32,7 @@ const reply = id => { const f = replyForm(id); if (!f.processing) f.post('/suppo
   <SupportMessageActions :fields="{ invoice: form.order_number, subject: form.subject, message: form.message }" />
  </form>
  <section v-if="order" class="lf-guest-support-history">
-  <h2>Tiket untuk {{ order.order_number }}</h2>
+  <h2>{{ customerText('pages.guest.support.ticket_for', 'Tiket untuk') }} {{ order.order_number }}</h2>
   <p v-if="!tickets.length">{{ customerText("pages.guest.support.e066336", "Belum ada tiket untuk pesanan ini.") }}</p>
   <article v-for="ticket in tickets" :key="ticket.id" class="lf-guest-support-form">
    <h3>#{{ ticket.id }} · {{ ticket.subject }}</h3><p>Status: {{ ticket.status }}</p>

@@ -4,6 +4,7 @@ const { customerText } = useCustomerPresentation();
 
 import { Head, Link } from '@inertiajs/vue3';
 import AccountShell from '../../Components/AccountShell.vue';
+import CustomerPagination from '../../Components/CustomerPagination.vue';
 import { rupiah } from '../../lib/money';
 
 defineProps({ orders: Object });
@@ -19,6 +20,6 @@ defineProps({ orders: Object });
             <p class="mt-1">{{ order.product_name }} · {{ rupiah(order.total_idr) }}</p>
             <p class="mt-1 text-sm text-slate-400">{{ order.status }} · {{ order.created_at }}</p>
         </div>
-        <nav :aria-label="customerText('pages.customer.orders.attribute.aria-label.5819e517', 'Halaman pesanan')" class="flex flex-wrap gap-2"><Link v-for="link in orders.links" :key="link.label" :href="link.url || '#'" class="rounded-md px-3 py-2 text-sm" :class="link.active ? 'bg-cyan-400 text-slate-950' : 'bg-slate-800 text-slate-200'" :aria-disabled="!link.url" v-html="link.label" /></nav>
+        <CustomerPagination :links="orders.links || []" :label="customerText('pages.customer.orders.attribute.aria-label.5819e517', 'Halaman pesanan')" />
     </AccountShell>
 </template>
