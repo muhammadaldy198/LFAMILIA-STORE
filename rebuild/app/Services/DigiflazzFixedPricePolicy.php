@@ -12,7 +12,7 @@ class DigiflazzFixedPricePolicy
     // There is no minimum margin percentage imposed by the supplier policy.
     public function fixedPriceFromCost(int $cost, string $percent): int
     {
-        if ($cost <= 0 || ! preg_match('/^(\\d+)(?:\\.(\\d{1,4}))?$/', $percent, $matches)) {
+        if ($cost <= 0 || ! preg_match('/^(\d+)(?:\.(\d{1,4}))?$/', $percent, $matches)) {
             throw new InvalidArgumentException('Modal atau margin Digiflazz tidak valid.');
         }
 
