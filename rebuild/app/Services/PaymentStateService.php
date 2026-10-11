@@ -284,41 +284,18 @@ class PaymentStateService
                 'last_callback_at' => now(),
                 'updated_at' => now(),
             ]);
+            // This is only a gateway status report, not authorization to refund locally.
+            $this->orderEvent((int) $order->id, 'PAYMENT_REFUND_REVIEW', $order->status, $order->status, $metadata);
+            $this->notifications->record(
+                'payment.refund_review',
+                'Midtrans melaporkan refund - pemeriksaan manual',
+                'Pembayaran order '.$order->order_number.' direfund oleh gateway. Hubungi customer dan periksa manual; tidak ada perubahan saldo otomatis.',
+                'WARNING',
+                'order',
+                $order->id
+            );
 
-            if (in_array($order->status, ['PENDING_PAYMENT', 'PAID', 'PROCESSING', 'SUCCESS'], true)) {
-                $before = $order->status;
-                DB::table('orders')->where('id', $order->id)->update([
-                    'status' => 'REFUND',
-                    'updated_at' => now(),
-                ]);
-                if ($order->user_id !== null) {
-                    $user = User::find((int) $order->user_id);
-                    if ($user) {
-                        $this->membership->sync($user);
-                    }
-                }
-                if ($before === 'PENDING_PAYMENT') {
-                    $this->releaseVoucher((int) $order->id);
-                }
-                $this->orderEvent($order->id, 'PAYMENT_REFUNDED', $before, 'REFUND', $metadata);
-                $this->notifications->record(
-                    'payment.refunded',
-                    'Order refund',
-                    'Order '.$order->order_number.' berubah menjadi REFUND.',
-                    'WARNING',
-                    'order',
-                    $order->id
-                );
-                $this->emails->queueForOrder(
-                    (int) $order->id,
-                    'Refund LFAMILIA STORE',
-                    'Order '.$order->order_number.' telah masuk proses/status refund.'
-                );
-
-                return ['result' => 'REFUNDED', 'status' => 'REFUND'];
-            }
-
-            return ['result' => 'REFUNDED', 'status' => $order->status];
+            return ['result' => 'REFUND_REVIEW', 'status' => $order->status];
         }
 
         DB::table('payment_transactions')->where('id', $payment->id)->update([
@@ -414,69 +391,25 @@ class PaymentStateService
                 'last_callback_at' => now(),
                 'updated_at' => now(),
             ]);
-
-            if ($topup->status !== 'PAID') {
-                DB::table('wallet_topups')->where('id', $topup->id)->update([
-                    'status' => 'REFUNDED',
-                    'updated_at' => now(),
-                ]);
-
-                return ['result' => 'REFUNDED', 'status' => 'REFUNDED'];
-            }
-
-            $wallet = DB::table('wallets')->where('id', $topup->wallet_id)->lockForUpdate()->first();
-            if (! $wallet) {
-                throw ValidationException::withMessages(['payment' => 'Wallet tidak ditemukan.']);
-            }
-
-            $refundKey = 'wallet-topup-refund:'.$payment->id;
-            if (DB::table('wallet_ledger')->where('idempotency_key', $refundKey)->exists()) {
-                return ['result' => 'REFUNDED', 'status' => 'REFUNDED'];
-            }
-
-            if ((int) $wallet->balance_idr < (int) $topup->amount_idr) {
-                DB::table('wallet_topups')->where('id', $topup->id)->update([
-                    'status' => 'REFUND_REVIEW',
-                    'updated_at' => now(),
-                ]);
+            // No automatic reversal of a customer's existing wallet balance.
+            $review = $topup->status === 'PAID';
+            DB::table('wallet_topups')->where('id', $topup->id)->update([
+                'status' => $review ? 'REFUND_REVIEW' : 'REFUNDED',
+                'updated_at' => now(),
+            ]);
+            if ($review) {
                 $this->notifications->record(
                     'wallet.topup_refund_review',
-                    'Refund top up perlu ditinjau',
-                    'Top up #'.$topup->id.' sudah direfund gateway, tetapi saldo pelanggan tidak cukup untuk pembalikan internal.',
+                    'Refund top up memerlukan tindakan admin',
+                    'Gateway melaporkan refund top up #'.$topup->id.'. Saldo tidak diubah otomatis; periksa dan selesaikan melalui panel admin.',
                     'WARNING',
                     'wallet_topup',
                     $topup->id
                 );
-
-                return ['result' => 'REFUND_REVIEW', 'status' => 'REFUND_REVIEW'];
             }
 
-            $before = (int) $wallet->balance_idr;
-            $after = $before - (int) $topup->amount_idr;
-            DB::table('wallets')->where('id', $wallet->id)->update([
-                'balance_idr' => $after,
-                'version' => DB::raw('version + 1'),
-                'updated_at' => now(),
-            ]);
-            DB::table('wallet_ledger')->insert([
-                'wallet_id' => $wallet->id,
-                'amount_idr' => -(int) $topup->amount_idr,
-                'balance_before_idr' => $before,
-                'balance_after_idr' => $after,
-                'source' => 'REFUND',
-                'reference_type' => 'WALLET_TOPUP',
-                'reference_id' => (string) $topup->id,
-                'actor_type' => 'payment_gateway',
-                'actor_id' => null,
-                'idempotency_key' => $refundKey,
-                'created_at' => now(),
-            ]);
-            DB::table('wallet_topups')->where('id', $topup->id)->update([
-                'status' => 'REFUNDED',
-                'updated_at' => now(),
-            ]);
-
-            return ['result' => 'REFUNDED', 'status' => 'REFUNDED'];
+            return ['result' => $review ? 'REFUND_REVIEW' : 'REFUNDED',
+                'status' => $review ? 'REFUND_REVIEW' : 'REFUNDED'];
         }
 
         if (in_array($incomingStatus, ['FAILED', 'CANCELLED', 'EXPIRED'], true)) {

@@ -11,7 +11,7 @@ class AdminOrderPresentation
 
     public const STATUSES = [
         'PENDING_PAYMENT' => 'Menunggu pembayaran', 'PAID' => 'Pembayaran diterima',
-        'PROCESSING' => 'Sedang diproses', 'SUCCESS' => 'Berhasil', 'FAILED' => 'Gagal',
+        'PROCESSING' => 'Sedang diproses', 'SUCCESS' => 'Berhasil', 'FAILED' => 'Gagal', 'BLOCKED' => 'Perlu tindakan superadmin',
         'EXPIRED' => 'Kedaluwarsa', 'CANCELLED' => 'Dibatalkan', 'REFUND' => 'Dana dikembalikan',
         'CREATING' => 'Menyiapkan pembayaran', 'PENDING' => 'Menunggu kepastian',
         'REFUNDED' => 'Dana dikembalikan', 'CREATED' => 'Menunggu pengiriman',

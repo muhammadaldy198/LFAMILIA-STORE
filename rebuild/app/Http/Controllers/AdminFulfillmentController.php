@@ -227,7 +227,7 @@ class AdminFulfillmentController
     public function reconcile(Request $request, int $attemptId): RedirectResponse
     {
         $attempt = $this->latestAttempt($attemptId, ['SENDING', 'PENDING', 'UNKNOWN']);
-        ReconcileFulfillmentJob::dispatch($attemptId);
+        ReconcileFulfillmentJob::dispatch($attemptId, true);
         $this->audit($request, 'fulfillment.reconcile.requested', $attemptId, (array) $attempt);
 
         return back()->with('status', 'Pemeriksaan status dimasukkan ke antrean.');

@@ -94,6 +94,7 @@ Artisan::command('lfamilia:recover-fulfillment', function (): void {
 
     DB::table('fulfillment_attempts')
         ->whereIn('status', ['PENDING', 'UNKNOWN', 'SENDING'])
+        ->where('reconcile_checks', '<', 3)
         ->where('updated_at', '<=', now()->subMinutes(2))
         ->orderBy('id')
         ->chunkById(100, function ($attempts) use (&$queued): void {
