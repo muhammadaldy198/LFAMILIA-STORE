@@ -7,6 +7,7 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductReview;
 use App\Models\User;
+use App\Services\CheckoutPricing;
 use App\Services\PaymentRoutingService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Crypt;
@@ -139,6 +140,54 @@ class StorefrontParityTest extends TestCase
             ->assertOk()->assertJsonPath('order.delivery.code', 'PRIVATE-DELIVERY-CODE');
         $this->withSession(['guest_order_id' => $orderId + 1])
             ->get('/orders/guest/LF261001-DELIVERY')->assertNotFound();
+    }
+
+    public function test_catalog_batch_quotes_match_authoritative_single_package_quotes(): void
+    {
+        $catalog = $this->catalog();
+        $product = $catalog['product'];
+        $providerId = DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
+        $ids = [$catalog['package_id']];
+        foreach ([200, 500, 1000, 2000] as $nominal) {
+            $package = $product->packages()->create([
+                'code' => 'BATCH'.$nominal.bin2hex(random_bytes(2)),
+                'name' => $nominal.' Diamonds', 'nominal_value' => $nominal,
+                'sort_order' => $nominal, 'is_active' => true,
+            ]);
+            $ids[] = $package->id;
+            DB::table('provider_mappings')->insert([
+                'product_package_id' => $package->id, 'provider_id' => $providerId,
+                'external_sku' => 'BATCH-'.$nominal.'-'.bin2hex(random_bytes(3)),
+                'cost_idr' => $nominal * 100, 'max_price_idr' => $nominal * 120,
+                'priority' => 0, 'is_active' => true,
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+        }
+
+        $pricing = app(CheckoutPricing::class);
+        $queries = [];
+        DB::listen(function ($query) use (&$queries): void {
+            $sql = strtolower($query->sql);
+            if (str_contains($sql, 'provider_mappings') || str_contains($sql, 'product_packages')
+                || str_contains($sql, 'digiflazz_catalog_items')) {
+                $queries[] = $sql;
+            }
+        });
+
+        $quotes = $pricing->forPackages($ids);
+        $this->assertCount(5, $quotes);
+        $this->assertLessThanOrEqual(4, count($queries));
+        foreach ($ids as $id) {
+            $this->assertSame($pricing->forPackage($id), $quotes[$id]);
+        }
+
+        $this->get('/catalog/'.$product->slug)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Catalog/Show')
+                ->has('packages', 5)
+                ->where('packages.0.is_available', true)
+                ->etc());
     }
 
     public function test_footer_assets_and_customer_product_parity_are_available_without_internal_data(): void

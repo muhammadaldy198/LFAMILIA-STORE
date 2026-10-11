@@ -234,7 +234,7 @@ class AdminSupportController
                 ->where('tickets.id', $id)
                 ->value(DB::raw('COALESCE(users.email, orders.guest_email)'));
 
-            if (is_string($email) && $email !== '') {
+            if (is_string($email) && filter_var($email, FILTER_VALIDATE_EMAIL)) {
                 $emails->queue(
                     $email,
                     'Balasan tiket LFAMILIA #'.$id,

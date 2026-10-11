@@ -306,7 +306,7 @@ class AdminDigiflazzController
 
         DB::transaction(function () use ($request, $package, $service, $importer, $audit, $data): void {
             $item = DB::table('digiflazz_catalog_items')->where('id', $data['item_id'])->lockForUpdate()->firstOrFail();
-            if (! $service->available($item) || now()->diffInHours($item->synced_at, true) > 24) {
+            if (! $service->sellable($item)) {
                 throw ValidationException::withMessages([
                     'item_id' => 'SKU tidak tersedia atau data lebih dari 24 jam. Sinkronkan Digiflazz dahulu.',
                 ]);
@@ -387,7 +387,7 @@ class AdminDigiflazzController
             $automatic = (bool) ($data['auto_sources'] ?? true);
             $selected = DB::table('digiflazz_catalog_items')->whereIn('id', $data['item_ids'])->lockForUpdate()->get();
             foreach ($selected as $item) {
-                if (! $service->available($item) || now()->diffInHours($item->synced_at, true) > 24) {
+                if (! $service->sellable($item)) {
                     throw ValidationException::withMessages(['item_ids' => 'SKU tidak tersedia atau data lebih dari 24 jam. Sinkronkan dahulu.']);
                 }
                 if ($product->package_tabs_enabled && ! in_array(trim((string) $item->type), $product->package_tabs ?? [], true)) {

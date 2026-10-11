@@ -63,7 +63,7 @@ class DigiflazzAutoSources
             app(AdminAuditService::class)->record($request, 'catalog.package.updated', 'product_package', $package->id, $before, $package->fresh()->toArray());
         }
         foreach ($items as $item) {
-            if (! app(DigiflazzCatalogService::class)->available($item) || now()->diffInHours($item->synced_at, true) > 24) {
+            if (! app(DigiflazzCatalogService::class)->sellable($item)) {
                 continue;
             }
             $mapping = app(DigiflazzCatalogImport::class)->upsert($package, $item->buyer_sku_code, (int) $item->price_idr, (int) $item->price_idr);
@@ -189,7 +189,7 @@ class DigiflazzAutoSources
                 }
             }
             foreach ($items as $item) {
-                if (! app(DigiflazzCatalogService::class)->available($item) || now()->diffInHours($item->synced_at, true) > 24
+                if (! app(DigiflazzCatalogService::class)->sellable($item)
                     || ProviderMapping::where('provider_id', $provider->id)->where('external_sku', $item->buyer_sku_code)->exists()) {
                     continue;
                 }

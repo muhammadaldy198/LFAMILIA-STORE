@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -90,8 +91,122 @@ class CheckoutPricing
 
             return $item === null || app(DigiflazzCatalogService::class)->available($item);
         })->values();
+
+        return $this->quoteForContext($context, $eligibleMappings);
+    }
+
+    /**
+     * Batch preview quotes; checkout continues to use forPackage() with locking.
+     *
+     * @param  array<int, int>  $packageIds
+     * @return array<int, array<string, mixed>>
+     */
+    public function forPackages(array $packageIds): array
+    {
+        $packageIds = array_values(array_unique(array_filter(
+            array_map('intval', $packageIds),
+            fn (int $id): bool => $id > 0
+        )));
+        if ($packageIds === []) {
+            return [];
+        }
+
+        $contextsQuery = DB::table('product_packages as packages')
+            ->join('products', 'products.id', '=', 'packages.product_id')
+            ->join('categories', 'categories.id', '=', 'products.category_id')
+            ->whereIn('packages.id', $packageIds)
+            ->where('packages.is_active', true)
+            ->where('products.is_active', true)
+            ->where('categories.is_active', true)
+            ->select(
+                'packages.id as package_id',
+                'packages.code as package_code',
+                'packages.name as package_name',
+                'packages.nominal_value',
+                'packages.pricing_mode', 'packages.margin_percent as package_margin_percent',
+                'packages.margin_fixed_idr', 'packages.sell_price_idr',
+                'products.id as product_id',
+                'products.name as product_name',
+                'products.slug as product_slug',
+                'products.category_id',
+                'products.margin_percent',
+                'products.fulfillment_mode',
+                'categories.name as category_name'
+            );
+        $contexts = $contextsQuery->get()->keyBy('package_id');
+        if ($contexts->isEmpty()) {
+            return [];
+        }
+
+        $mappingQuery = DB::table('provider_mappings as mappings')
+            ->join('providers', 'providers.id', '=', 'mappings.provider_id')
+            ->join('product_packages as packages', 'packages.id', '=', 'mappings.product_package_id')
+            ->join('products', 'products.id', '=', 'packages.product_id')
+            ->whereIn('mappings.product_package_id', $contexts->keys()->all())
+            ->where('mappings.is_active', true)
+            ->where('providers.is_active', true)
+            ->whereColumn('providers.fulfillment_mode', 'products.fulfillment_mode')
+            ->whereNotNull('mappings.cost_idr')
+            ->where('mappings.cost_idr', '>', 0)
+            ->where(function ($query): void {
+                $query->whereNull('mappings.max_price_idr')
+                    ->orWhereColumn('mappings.cost_idr', '<=', 'mappings.max_price_idr');
+            })
+            ->orderBy('mappings.priority')
+            ->orderBy('mappings.cost_idr')
+            ->orderBy('mappings.id')
+            ->select(
+                'mappings.product_package_id as package_id',
+                'mappings.id as mapping_id',
+                'mappings.external_sku',
+                'mappings.cost_idr',
+                'mappings.max_price_idr',
+                'mappings.fulfillment_config',
+                'providers.code as provider_code'
+            );
+        $mappings = $mappingQuery->get()->groupBy('package_id');
+        $skus = $mappings->flatten(1)->where('provider_code', 'DIGIFLAZZ')
+            ->pluck('external_sku')->unique()->values()->all();
+        $items = $skus === [] ? collect() : DB::table('digiflazz_catalog_items')
+            ->whereIn('buyer_sku_code', $skus)->get()->keyBy('buyer_sku_code');
+        $quotes = [];
+
+        foreach ($contexts as $id => $context) {
+            $eligible = $mappings->get($id, collect())->filter(function (object $candidate) use ($items): bool {
+                if ($candidate->provider_code === 'VOUCHER_STOCK') {
+                    $config = is_string($candidate->fulfillment_config)
+                        ? (json_decode($candidate->fulfillment_config, true) ?: [])
+                        : (is_array($candidate->fulfillment_config) ? $candidate->fulfillment_config : []);
+                    $stockKey = trim((string) ($config['stock_key'] ?? ''));
+
+                    return $stockKey !== '' && app(VoucherStockService::class)->available($stockKey);
+                }
+                if ($candidate->provider_code !== 'DIGIFLAZZ') {
+                    return true;
+                }
+                $item = $items->get($candidate->external_sku);
+
+                return $item === null || app(DigiflazzCatalogService::class)->available($item);
+            })->values();
+
+            try {
+                $quotes[(int) $id] = $this->quoteForContext($context, $eligible);
+            } catch (ValidationException) {
+                // One unavailable nominal must not hide other packages.
+            }
+        }
+
+        return $quotes;
+    }
+
+    /**
+     * @param  Collection<int, object>  $eligibleMappings
+     * @return array<string, mixed>
+     */
+    private function quoteForContext(object $context, Collection $eligibleMappings): array
+    {
         $mapping = $eligibleMappings->first();
-        if (! $mapping) {
+        if ($mapping === null) {
             throw ValidationException::withMessages([
                 'package_id' => 'Nominal sedang tidak tersedia untuk checkout.',
             ]);
