@@ -671,7 +671,6 @@ async function createOrder() {
     }
 
     checkoutResult.value = null;
-    paymentResult.value = null;
     busy.value = 'order';
 
     try {
