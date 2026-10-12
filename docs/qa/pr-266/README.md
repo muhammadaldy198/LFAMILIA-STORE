@@ -9,8 +9,8 @@ These are **original Chromium screenshots from Codex Cloud**, using synthetic lo
 | Section | Result | Browser assertions |
 |---|---|---|
 | Top banner | PASS | Full viewport width; height >=224px; centered crop; contain at >=1024px; gradient begins at 70% |
-| Product icon 3D | PASS | CSS 128/240px square; 64/112px overlap at 768px breakpoint; DOMMatrix equals rotateY(20deg) rotateX(-4deg); origin 0px 64/120px |
-| Numbered section headers | PASS | 40x40px tiles and 40px overall headers with zero outer padding; title 14px/24px; section body padding 16px |
+| Product icon 3D | PASS | CSS 128/240px square; 64/112px overlap at 768px breakpoint; DOMMatrix equals rotateY(20deg) rotateX(-4deg); origin 0px 64/120px; z-index 20 and margins -56/-80px |
+| Numbered section headers | PASS | 40x40px tiles and 40px overall headers with zero outer padding; title 14px/24px with semibold weight 600; section body padding 16px |
 | Package cards | PASS | 2/3/2/3 columns at 640/768/1024; gap/padding 16px; radius 12px; height >=85px; long label unclipped; info control does not cover label |
 | Payment methods | PASS | Radius 8px; padding 10px; logo max-height 48px; QRIS/E-Wallet/VA interaction |
 | Mobile sticky checkout | PASS | Fixed bottom/full width below 1024px, z-index 40; padding 16px; dashed info 4em; full-width 52px CTA and bounded 20px bag SVG; disabled before selection, enabled after valid server quote |
@@ -62,6 +62,8 @@ Each viewport uses an independent synthetic client IP behind an explicitly trust
 
 9. Screenshot review found an oversized default SVG at tablet width, even though the bar rectangle passed. Define the bag icon as 20×20px through the entire mobile/tablet range and assert its bounds.
 10. High-specificity desktop header padding and admin control sizing still yielded a 72px header and 40px tablet CTA. Fix specificity and explicitly assert a 40px full header, zero header padding, and 52px CTA.
+
+11. Exact V3 style review also found weight 700 and icon z-index 2 instead of semibold 600 and z-index 20. Align the label/tile weights, icon layer and -56/-80px image margins; add computed-style assertions and regenerate the evidence.
 
 ## Local automated validation
 

@@ -7233,7 +7233,7 @@
 }
 .lf-customer .lf-checkout-page .lf-product-cover-3d{
   position:absolute!important;
-  z-index:2;
+  z-index:20;
   top:-64px!important;
   left:14px!important;
   width:128px!important;
@@ -7249,7 +7249,8 @@
 }
 .lf-customer .lf-checkout-page .lf-product-cover-3d img{
   position:relative;
-  z-index:2;
+  z-index:20;
+  margin-bottom:-56px!important;
   display:block!important;
   width:100%!important;
   height:100%!important;
@@ -7295,6 +7296,7 @@
     top:-112px!important;
     left:20px!important;
   }
+  .lf-customer .lf-checkout-page .lf-product-cover-3d img{margin-bottom:-80px!important}
   .lf-customer .lf-checkout-page .lf-product-title{padding:18px 0 0!important}
   .lf-customer .lf-checkout-page .lf-product-perks{
     grid-column:2!important;
@@ -7339,7 +7341,7 @@
   background:var(--lf-lime)!important;
   color:#101a08!important;
   font-size:14px!important;
-  font-weight:700!important;
+  font-weight:600!important;
 }
 .lf-customer .lf-checkout-page .lf-checkout-panel>header>div{
   padding:8px 16px!important;
@@ -7349,7 +7351,7 @@
 .lf-customer.lf-customer .lf-checkout-page .lf-checkout-panel>header h2{
   font-size:14px!important;
   line-height:24px!important;
-  font-weight:700!important;
+  font-weight:600!important;
   margin:0!important;
 }
 .lf-customer.lf-customer .lf-checkout-page .lf-checkout-panel>header p{
