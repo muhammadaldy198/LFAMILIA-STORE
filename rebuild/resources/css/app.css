@@ -7183,3 +7183,359 @@
   letter-spacing:-1px;
   line-height:1;
 }
+
+
+/* PR #266 / SPEC FINAL V3: Ourastore-measured checkout geometry; LFAMILIA palette.
+   Header/banner artwork stays LFAMILIA-owned; footer/banner-footer intentionally untouched.
+   Keep all pricing, SKU, merchant, quote, and payment logic as-is. */
+
+/* 1. Product hero: full-width minimum 224px, center crop and lower fade. */
+.lf-customer .lf-checkout-page .lf-product-hero{
+  position:relative!important;
+  width:100%!important;
+  min-height:224px!important;
+  height:clamp(224px,23vw,360px)!important;
+  margin:0!important;
+  overflow:hidden!important;
+  background:#0b111c!important;
+}
+.lf-customer .lf-checkout-page .lf-product-hero>img{
+  display:block!important;
+  width:100%!important;
+  height:100%!important;
+  min-height:224px!important;
+  object-fit:cover!important;
+  object-position:center center!important;
+}
+.lf-customer .lf-checkout-page .lf-product-hero::after{
+  content:"";
+  position:absolute;
+  inset:70% 0 0;
+  pointer-events:none;
+  background:linear-gradient(to bottom,transparent,#0b111c);
+  z-index:1;
+}
+@media(min-width:1024px){
+  .lf-customer .lf-checkout-page .lf-product-hero>img{object-fit:contain!important}
+}
+
+/* 2. Product thumbnail: 128px mobile / 240px desktop, measured 3D transform on IMG. */
+.lf-customer .lf-checkout-page .lf-product-identity{position:relative;overflow:visible}
+.lf-customer .lf-checkout-page .lf-product-identity-inner{
+  position:relative;
+  display:grid!important;
+  grid-template-columns:145px minmax(0,1fr)!important;
+  grid-template-rows:minmax(80px,auto) auto!important;
+  min-height:168px!important;
+  column-gap:8px!important;
+  padding:10px 14px 16px!important;
+  align-items:start;
+}
+.lf-customer .lf-checkout-page .lf-product-cover-3d{
+  position:absolute!important;
+  z-index:2;
+  top:-64px!important;
+  left:14px!important;
+  width:128px!important;
+  height:128px!important;
+  aspect-ratio:1!important;
+  margin:0!important;
+  border:0!important;
+  border-radius:16px!important;
+  overflow:visible!important;
+  transform:none!important;
+  box-shadow:none!important;
+  background:transparent!important;
+}
+.lf-customer .lf-checkout-page .lf-product-cover-3d img{
+  position:relative;
+  z-index:2;
+  display:block!important;
+  width:100%!important;
+  height:100%!important;
+  aspect-ratio:1!important;
+  border-radius:16px!important;
+  object-fit:cover!important;
+  box-shadow:0 15px 30px rgba(0,0,0,.55)!important;
+  transform:rotateY(20deg) rotateX(-4deg)!important;
+  transform-origin:left center!important;
+}
+.lf-customer .lf-checkout-page .lf-product-cover-3d>span{
+  width:100%;
+  height:100%;
+  border-radius:16px;
+  background:#172234;
+  box-shadow:0 15px 30px rgba(0,0,0,.55);
+}
+.lf-customer .lf-checkout-page .lf-product-title{
+  grid-column:2!important;
+  grid-row:1!important;
+  min-width:0;
+  padding:12px 0 0!important;
+  align-self:start!important;
+}
+.lf-customer .lf-checkout-page .lf-product-perks{
+  position:static!important;
+  grid-column:1 / -1!important;
+  grid-row:2!important;
+  align-self:end!important;
+  margin-top:12px!important;
+  min-width:0;
+}
+@media(min-width:768px){
+  .lf-customer .lf-checkout-page .lf-product-identity-inner{
+    grid-template-columns:260px minmax(0,1fr)!important;
+    min-height:194px!important;
+    padding:12px 20px 16px!important;
+    column-gap:18px!important;
+  }
+  .lf-customer .lf-checkout-page .lf-product-cover-3d{
+    width:240px!important;
+    height:240px!important;
+    top:-112px!important;
+    left:20px!important;
+  }
+  .lf-customer .lf-checkout-page .lf-product-title{padding:18px 0 0!important}
+  .lf-customer .lf-checkout-page .lf-product-perks{
+    grid-column:2!important;
+    margin-top:12px!important;
+  }
+}
+@media(max-width:359px){
+  .lf-customer .lf-checkout-page .lf-product-identity-inner{grid-template-columns:137px minmax(0,1fr)!important;column-gap:4px!important}
+  .lf-customer .lf-checkout-page .lf-product-title h1{font-size:15px!important}
+}
+
+/* 3. Numbered section header: 40px square tile, 14/24px label, 16px body. */
+.lf-customer .lf-checkout-page .lf-checkout-panel{
+  padding:0!important;
+  overflow:hidden!important;
+  border-radius:12px!important;
+  border:1px solid rgba(255,255,255,.10)!important;
+  background:rgba(17,24,36,.65)!important;
+  box-shadow:0 12px 30px rgba(0,0,0,.24)!important;
+  scroll-margin-top:80px;
+}
+.lf-customer .lf-checkout-page .lf-checkout-panel>header{
+  min-height:40px!important;
+  gap:0!important;
+  padding:0!important;
+  display:flex!important;
+  align-items:center!important;
+  background:#172131!important;
+  border-bottom:0!important;
+  border-radius:12px 12px 0 0!important;
+}
+.lf-customer .lf-checkout-page .lf-checkout-panel>header>.lf-step-number{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  flex:0 0 40px!important;
+  width:40px!important;
+  min-width:40px!important;
+  height:40px!important;
+  border:0!important;
+  border-radius:0!important;
+  background:var(--lf-lime)!important;
+  color:#101a08!important;
+  font-size:14px!important;
+  font-weight:700!important;
+}
+.lf-customer .lf-checkout-page .lf-checkout-panel>header>div{
+  padding:8px 16px!important;
+  min-width:0!important;
+}
+.lf-customer .lf-checkout-page .lf-checkout-panel>header h2{
+  font-size:14px!important;
+  line-height:24px!important;
+  font-weight:700!important;
+  margin:0!important;
+}
+.lf-customer .lf-checkout-page .lf-checkout-panel .lf-panel-body{
+  padding:16px!important;
+}
+.lf-customer .lf-checkout-page .lf-checkout-panels{gap:24px!important}
+
+/* 4. Data-driven product cards: 2/3/2/3 columns, 16px gap, minimum 85px.
+   Flexible row heights keep long product names and optional promo/points readable. */
+.lf-customer .lf-checkout-page .lf-nominal-grid{
+  display:grid!important;
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  gap:16px!important;
+  grid-auto-rows:minmax(85px,auto)!important;
+  align-items:stretch!important;
+}
+.lf-customer .lf-checkout-page .lf-nominal-option{
+  position:relative!important;
+  min-width:0!important;
+  min-height:85px!important;
+  height:auto!important;
+  display:flex!important;
+}
+.lf-customer .lf-checkout-page .lf-nominal-grid .lf-nominal-option>.lf-nominal-select{
+  position:relative!important;
+  display:flex!important;
+  flex-direction:column!important;
+  justify-content:space-between!important;
+  gap:16px!important;
+  width:100%!important;
+  min-height:85px!important;
+  height:100%!important;
+  max-height:none!important;
+  padding:16px!important;
+  border-radius:12px!important;
+  border:1px solid transparent!important;
+  box-shadow:0 2px 6px rgba(0,0,0,.2)!important;
+  overflow:hidden!important;
+}
+.lf-customer .lf-checkout-page .lf-nominal-grid .lf-nominal-option>.lf-nominal-select.selected{
+  border-color:rgba(178,222,98,.85)!important;
+  box-shadow:0 0 0 1px rgba(178,222,98,.25)!important;
+}
+.lf-customer .lf-checkout-page .lf-nominal-option:has(.lf-nominal-promo)>.lf-nominal-select{padding-top:30px!important}
+.lf-customer .lf-checkout-page .lf-nominal-option:has(.lf-nominal-info-button)>.lf-nominal-select{padding-right:30px!important}
+.lf-customer .lf-checkout-page .lf-nominal-grid .lf-nominal-top{
+  flex:0 0 auto!important;
+  gap:8px!important;
+}
+.lf-customer .lf-checkout-page .lf-nominal-footer{
+  flex:0 0 auto!important;
+  min-width:0!important;
+}
+@media(min-width:640px){
+  .lf-customer .lf-checkout-page .lf-nominal-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+}
+@media(min-width:768px){
+  .lf-customer .lf-checkout-page .lf-nominal-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+}
+@media(min-width:1024px){
+  .lf-customer .lf-checkout-page .lf-nominal-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+}
+
+/* 5. Payment cards: rounded 8px, 10px padding, uncropped logos up to 48px high. */
+.lf-customer .lf-checkout-page .lf-payment-groups{gap:12px!important}
+.lf-customer .lf-checkout-page .lf-payment-group-card{
+  border-radius:8px!important;
+  border:1px solid transparent!important;
+  box-shadow:0 2px 6px rgba(0,0,0,.2)!important;
+  overflow:visible!important;
+  background:#101823!important;
+}
+.lf-customer .lf-checkout-page .lf-payment-group-card.selected{
+  border-color:rgba(100,167,240,.65)!important;
+}
+.lf-customer .lf-checkout-page .lf-payment-group-main{
+  width:100%!important;
+  min-height:0!important;
+  height:auto!important;
+  display:flex!important;
+  align-items:center!important;
+  padding:10px!important;
+  border-radius:8px!important;
+  gap:12px!important;
+}
+.lf-customer .lf-checkout-page .lf-payment-brand-strip{
+  padding:0 10px 10px!important;
+  gap:8px!important;
+}
+.lf-customer .lf-checkout-page .lf-payment-brand-item img{
+  width:auto!important;
+  height:auto!important;
+  max-width:100%!important;
+  max-height:48px!important;
+  object-fit:contain!important;
+}
+.lf-customer .lf-checkout-page .lf-payment-channel-grid{padding:10px!important}
+.lf-customer .lf-checkout-page .lf-payment-channel-grid>button{
+  min-width:0!important;
+  min-height:0!important;
+  padding:10px!important;
+  border-radius:8px!important;
+}
+.lf-customer .lf-checkout-page .lf-payment-channel-logo{
+  flex:0 0 52px!important;
+  width:52px!important;
+  height:48px!important;
+  padding:4px!important;
+}
+.lf-customer .lf-checkout-page .lf-payment-channel-logo img{
+  max-width:100%!important;
+  max-height:48px!important;
+  object-fit:contain!important;
+}
+.lf-customer .lf-checkout-page .lf-payment-channel-copy strong{
+  white-space:normal!important;
+  overflow:visible!important;
+  text-overflow:clip!important;
+  overflow-wrap:anywhere!important;
+}
+
+/* 6. Mobile checkout fixed bar applies until lg (1024px); desktop keeps V2 bar. */
+@media(max-width:1023px){
+  .lf-customer .lf-desktop-checkout-bar{display:none!important}
+  .lf-customer .lf-checkout-page{padding-bottom:160px!important}
+  .lf-customer .lf-checkout-page .lf-checkout-grid{padding-bottom:170px!important}
+  .lf-customer .lf-mobile-checkout-bar{
+    position:fixed!important;
+    inset:auto 0 0!important;
+    z-index:40!important;
+    display:block!important;
+    width:100%!important;
+    padding:16px 16px calc(16px + env(safe-area-inset-bottom))!important;
+    border-radius:6px 6px 0 0!important;
+    background:#101722!important;
+    border-top:1px solid rgba(255,255,255,.12)!important;
+    box-shadow:0 -10px 32px rgba(0,0,0,.4)!important;
+  }
+  .lf-customer .lf-mobile-checkout-inner{
+    display:flex!important;
+    width:100%!important;
+    max-width:720px!important;
+    margin:auto!important;
+    flex-direction:column!important;
+    gap:16px!important;
+  }
+  .lf-customer .lf-mobile-summary-toggle{
+    display:flex!important;
+    height:4em!important;
+    min-height:4em!important;
+    max-height:4em!important;
+    width:100%!important;
+    min-width:0!important;
+    margin:0!important;
+    padding:8px 12px!important;
+    align-items:center!important;
+    justify-content:center!important;
+    border:1px dashed rgba(255,255,255,.35)!important;
+    border-radius:8px!important;
+    background:#0a111b!important;
+    color:#f5f7fc!important;
+    text-align:center!important;
+  }
+  .lf-customer .lf-mobile-summary-selection{
+    justify-content:center!important;
+    min-width:0!important;
+  }
+  .lf-customer .lf-mobile-summary-selection-copy{
+    min-width:0!important;
+    text-align:center!important;
+  }
+  .lf-customer .lf-mobile-order-button{
+    display:flex!important;
+    width:100%!important;
+    min-height:52px!important;
+    height:52px!important;
+    margin:0!important;
+    align-items:center!important;
+    justify-content:center!important;
+    gap:10px!important;
+    border-radius:8px!important;
+  }
+  .lf-customer:has(.lf-mobile-checkout-bar:not(.is-hidden)) .lf-live-support{
+    bottom:195px!important;
+  }
+}
+@media(min-width:1024px){
+  .lf-customer .lf-mobile-checkout-bar{display:none!important}
+  .lf-customer .lf-desktop-checkout-bar{display:block!important}
+}
