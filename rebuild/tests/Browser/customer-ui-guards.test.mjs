@@ -77,3 +77,14 @@ test('nominal cards keep equal row height with long names and optional artwork',
     assert.match(section, /height:38px!important/);
     assert.match(section, /object-fit:contain!important/);
 });
+
+test('V2 checkout quote remains server-authoritative and payment section scrolls smoothly', () => {
+    const source = read('Pages/Catalog/Show.vue');
+    assert.match(source, /const canQuote = computed\(\(\) => Boolean\(selectedPackage\.value && selectedPaymentChannel\.value\)\)/);
+    assert.match(source, /await requestJson\('\/checkout\/quote'/);
+    assert.match(source, /quoteStatusText = computed/);
+    assert.match(source, /quoteError\.value = error\.message/);
+    assert.match(source, /scrollIntoView\(\{/);
+    assert.match(source, /behavior: 'smooth'/);
+    assert.match(source, /displayTotal = computed\(\(\) => quote\.value\?\.total_idr \?\? null\)/);
+});

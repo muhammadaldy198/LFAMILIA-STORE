@@ -3,7 +3,7 @@ import { useCustomerPresentation } from '../../Composables/customerPresentation'
 const { customerText } = useCustomerPresentation();
 
 import { Head, Link, router } from '@inertiajs/vue3';
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import CustomerShell from '../../Components/CustomerShell.vue';
 
 const props = defineProps({
@@ -42,6 +42,7 @@ const voucherCode = ref('');
 const paymentChannelCode = ref('');
 const expandedPaymentGroup = ref('');
 const quote = ref(null);
+const quoteError = ref('');
 const nicknameResult = ref(null);
 const accountValidationSignature = ref('');
 let accountValidationRequest = 0;
@@ -85,9 +86,18 @@ const guestContactComplete = computed(() => props.customer || (
 const selectedPaymentChannel = computed(() => (props.paymentChannels || []).find((channel) =>
     channel.available !== false && channel.code === paymentChannelCode.value
 ));
-const canQuote = computed(() => Boolean(selectedPackage.value && selectedPaymentChannel.value && (props.customer || !voucherCode.value.trim() || guestContactComplete.value)));
+// A server-side quote may be requested with guest contact unset; order creation still validates contact.
+const canQuote = computed(() => Boolean(selectedPackage.value && selectedPaymentChannel.value));
 const summarySubtotal = computed(() => quote.value?.subtotal_idr ?? selectedPackage.value?.price_idr ?? 0);
 const displayTotal = computed(() => quote.value?.total_idr ?? null);
+const quoteStatusText = computed(() => {
+    if (!selectedPackage.value) return 'Belum ada item produk yang dipilih.';
+    if (!selectedPaymentChannel.value) return 'Pilih metode pembayaran';
+    if (busy.value === 'quote') return 'Menghitung total…';
+    if (quoteError.value) return quoteError.value;
+    if (voucherCode.value.trim() && !quote.value) return 'Tekan Gunakan untuk menghitung promo';
+    return 'Total belum tersedia';
+});
 const isVoucherProduct = computed(() => String(props.product?.category_slug || '').toLowerCase() === 'voucher');
 const hasAccountStep = computed(() => !isVoucherProduct.value && (props.fields || []).length > 0);
 const hasExternalPaymentOption = computed(() => paymentGroups.value.some((group) =>
@@ -350,6 +360,7 @@ function invalidateConfirmation() {
 function invalidateQuote() {
     quoteRequest += 1;
     quote.value = null;
+    quoteError.value = '';
     invalidateConfirmation();
     if (busy.value === 'quote') busy.value = '';
 }
@@ -554,6 +565,13 @@ function choosePackage(item) {
     selectedPackageId.value = String(item.id);
     invalidateQuote();
     if (canQuote.value) void loadQuote();
+    // Wait for the selected card to update, then move the customer to payment options.
+    void nextTick(() => {
+        document.querySelector('.lf-checkout-payment-panel')?.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start',
+        });
+    });
 }
 
 function selectPaymentGroup(group) {
@@ -584,6 +602,7 @@ async function loadQuote() {
     const signature = currentQuoteSignature();
     const requestId = ++quoteRequest;
     quote.value = null;
+    quoteError.value = '';
     errors.value = {};
     busy.value = 'quote';
 
@@ -601,11 +620,13 @@ async function loadQuote() {
         if (requestId !== quoteRequest || signature !== currentQuoteSignature()) return null;
 
         quote.value = result;
+        quoteError.value = '';
         return result;
     } catch (error) {
         if (requestId !== quoteRequest || signature !== currentQuoteSignature()) return null;
 
-        errors.value = error.validation || {};
+        errors.value = error.validation || { checkout: [error.message || 'Total tidak dapat dihitung.'] };
+        quoteError.value = error.message || 'Total tidak dapat dihitung. Silakan pilih metode pembayaran ulang.';
         return null;
     } finally {
         if (requestId === quoteRequest && busy.value === 'quote') busy.value = '';
@@ -1147,7 +1168,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                 <template v-if="selectedPackage">
                     <span class="lf-desktop-checkout-product">{{ product.name }} · {{ nominalLabel(selectedPackage.name, product.name) }}</span>
                     <span class="lf-desktop-checkout-price-label">Total Pembayaran</span>
-                    <strong class="lf-desktop-checkout-price">{{ displayTotal === null ? (paymentChannelCode ? 'Menunggu perhitungan total' : 'Pilih metode pembayaran') : formatIdr(displayTotal) }}</strong>
+                    <strong class="lf-desktop-checkout-price">{{ displayTotal === null ? quoteStatusText : formatIdr(displayTotal) }}</strong>
                 </template>
                 <span v-else class="lf-desktop-checkout-empty">Belum ada item produk yang dipilih.</span>
             </div>
@@ -1172,15 +1193,15 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                         <strong>{{ customerText("pages.catalog.show.eb589e83", "Ringkasan pesanan") }}</strong>
                         <small>{{product.name}} · {{selectedPackage ? nominalLabel(selectedPackage.name, product.name) : 'Pilih nominal'}}</small>
                     </span>
-                    <strong class="lf-mobile-summary-price">{{displayTotal===null ? 'Menghitung…' : formatIdr(displayTotal)}}</strong>
-                    <span class="lf-mobile-summary-chevron">⌄</span>
+                    <strong class="lf-mobile-summary-price">{{displayTotal===null ? quoteStatusText : formatIdr(displayTotal)}}</strong>
+                    <span class="lf-mobile-summary-chevron"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 15 6-6 6 6"/></svg></span>
                 </button>
                 <dl class="lf-mobile-summary-lines">
                     <div><dt>{{ customerText("pages.catalog.show.f95874", "Harga Satuan") }}</dt><dd>{{formatIdr(summarySubtotal)}}</dd></div>
                     <div><dt>{{ customerText("pages.catalog.show.d361488d", "Subtotal") }}</dt><dd>{{formatIdr(summarySubtotal)}}</dd></div>
                     <div v-if="quote?.member_discount_idr"><dt>Diskon {{quote.member_tier_code || 'Member'}}</dt><dd>-{{formatIdr(quote.member_discount_idr)}}</dd></div>
                     <div v-if="quote?.voucher_discount_idr"><dt>{{ customerText("pages.catalog.show.6af5335f", "Diskon Voucher") }}</dt><dd>-{{formatIdr(quote.voucher_discount_idr)}}</dd></div>
-                    <div class="total"><dt>{{ customerText("pages.catalog.show.18fcae49", "Total Pembayaran") }}</dt><dd>{{displayTotal===null ? 'Menghitung…' : formatIdr(displayTotal)}}</dd></div>
+                    <div class="total"><dt>{{ customerText("pages.catalog.show.18fcae49", "Total Pembayaran") }}</dt><dd>{{displayTotal===null ? quoteStatusText : formatIdr(displayTotal)}}</dd></div>
                 </dl>
             </div>
             <button v-else type="button" class="lf-mobile-summary-toggle" aria-expanded="false" :disabled="!selectedPackage" @click="summaryOpen=true">
@@ -1191,7 +1212,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                     </span>
                     <span class="lf-mobile-summary-selection-copy">
                         <strong>{{ selectedPackage ? product.name + ' · ' + nominalLabel(selectedPackage.name, product.name) : 'Belum ada item produk yang dipilih.' }}</strong>
-                        <small v-if="selectedPackage">{{ displayTotal !== null ? 'Total ' + formatIdr(displayTotal) : (paymentChannelCode ? 'Menunggu perhitungan total' : 'Pilih metode pembayaran') }}</small>
+                        <small v-if="selectedPackage">{{ displayTotal !== null ? 'Total ' + formatIdr(displayTotal) : quoteStatusText }}</small>
                     </span>
                 </span>
                 <span v-if="selectedPackage" class="lf-mobile-summary-selection-chevron" aria-hidden="true">
