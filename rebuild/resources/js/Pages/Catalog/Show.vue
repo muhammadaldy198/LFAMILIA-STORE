@@ -28,6 +28,7 @@ const guestEmail = ref(props.customer?.email || '');
 const guestPhone = ref(props.customer?.phone || '');
 const voucherCode = ref('');
 const paymentChannelCode = ref('');
+const expandedPaymentGroup = ref('');
 const quote = ref(null);
 const nicknameResult = ref(null);
 const accountValidationSignature = ref('');
@@ -124,7 +125,7 @@ const visiblePackageGroups = computed(() => packageTabs.value.length
 
 const paymentGroups = computed(() => {
     const labels = {
-        wallet: ['LFAMILIA Cash', 'Bayar memakai saldo LFAMILIA Cash'],
+        wallet: ['LFAMILIA Coins', 'Bayar memakai saldo LFAMILIA Coins'],
         qris: ['QRIS', 'Scan dari semua aplikasi yang mendukung QRIS'],
         ewallet: ['E-Wallet', 'Bayar melalui aplikasi e-wallet yang tersedia'],
         va: ['Virtual Account', 'Transfer bank dengan nomor VA unik'],
@@ -523,6 +524,16 @@ function choosePackage(item) {
     selectedPackageId.value = String(item.id);
     invalidateQuote();
     if (canQuote.value) void loadQuote();
+}
+
+function selectPaymentGroup(group) {
+    const first = group.items.find((channel) => channel.available !== false);
+    if (!first) return;
+    if (group.key === 'wallet' || group.key === 'qris') {
+        void choosePayment(first.code);
+        return;
+    }
+    expandedPaymentGroup.value = expandedPaymentGroup.value === group.key ? '' : group.key;
 }
 
 async function choosePayment(code) {
@@ -926,7 +937,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                                 type="button"
                                 class="lf-payment-group-main"
                                 :disabled="group.items.every(x=>x.available===false)"
-                                @click="choosePayment(group.items.find(x=>x.code===paymentChannelCode)?.code || group.items.find(x=>x.available!==false)?.code)"
+                                @click="selectPaymentGroup(group)"
                             >
                                 <span v-if="group.key==='wallet'" class="lf-payment-wallet-art">
                                     <img :src="'/assets/payment/lfamilia-cash.webp'" :alt="customerText('pages.catalog.show.attribute.alt.d8a0146d', 'LFAMILIA Cash')">
@@ -938,17 +949,18 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                                     <small v-else>{{group.description}}</small>
                                 </span>
                                 <span v-if="group.items.some(x=>x.code===paymentChannelCode)" class="lf-payment-check"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m8 12 2.5 2.5L16 9"/></svg></span>
+                                <svg v-if="!['wallet','qris'].includes(group.key)" class="lf-payment-chevron" :class="{expanded:expandedPaymentGroup===group.key}" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
                             </button>
 
-                            <div v-if="group.key!=='wallet'" class="lf-payment-brand-strip">
-                                <span v-if="group.key==='qris'">{{ customerText("pages.catalog.show.c64a26ec", "QRIS • DANA • ShopeePay") }}</span>
-                                <template v-else>
-                                    <span v-for="channel in group.items.slice(0,7)" :key="channel.code">{{channel.name}}</span>
-                                </template>
+                            <div v-if="group.key==='qris'" class="lf-payment-brand-strip">
+                                <span v-for="channel in group.items" :key="channel.code" class="lf-payment-brand-item">
+                                    <img v-if="channel.logo_url" :src="channel.logo_url" :alt="channel.name" loading="lazy">
+                                    <span v-else>{{channel.name}}</span>
+                                </span>
                             </div>
 
                             <div
-                                v-if="group.key!=='wallet' && group.key!=='qris' && group.items.some(x=>x.code===paymentChannelCode)"
+                                v-if="group.key!=='wallet' && group.key!=='qris' && expandedPaymentGroup===group.key"
                                 class="lf-payment-channel-grid"
                             >
                                 <button
@@ -959,6 +971,10 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                                     :class="{selected:paymentChannelCode===channel.code}"
                                     @click="choosePayment(channel.code)"
                                 >
+                                    <span v-if="channel.logo_url" class="lf-payment-channel-logo">
+                                        <img :src="channel.logo_url" :alt="channel.name" loading="lazy">
+                                    </span>
+                                    <span v-else class="lf-payment-channel-fallback" aria-hidden="true">{{channel.name.slice(0,2).toUpperCase()}}</span>
                                     <span class="lf-payment-channel-copy">
                                         <strong>{{channel.name}}</strong>
                                     </span>
