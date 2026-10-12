@@ -1,0 +1,3969 @@
+{
+  "viewports": [
+    {
+      "overlaps": [],
+      "width": 360,
+      "height": 800,
+      "scrollWidth": 360,
+      "fade": {
+        "top": "156.797px",
+        "background": "linear-gradient(rgba(0, 0, 0, 0), rgb(11, 17, 28))"
+      },
+      "clipped": [],
+      "broken": [],
+      "elements": [
+        {
+          "selector": ".lf-product-hero",
+          "rect": {
+            "x": 0,
+            "y": 69,
+            "width": 360,
+            "height": 224,
+            "right": 360,
+            "bottom": 293
+          },
+          "style": {
+            "width": "360px",
+            "height": "224px",
+            "top": "0px",
+            "position": "relative",
+            "display": "block",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "normal",
+            "borderRadius": "0px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "180px 112px",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "hidden",
+            "minHeight": "224px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-product-hero>img",
+          "rect": {
+            "x": 0,
+            "y": 69,
+            "width": 360,
+            "height": 224,
+            "right": 360,
+            "bottom": 293
+          },
+          "style": {
+            "width": "360px",
+            "height": "224px",
+            "top": "0px",
+            "position": "absolute",
+            "display": "block",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "normal",
+            "borderRadius": "0px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "cover",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "180px 112px",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "clip",
+            "minHeight": "224px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-product-identity-inner",
+          "rect": {
+            "x": 0,
+            "y": 294,
+            "width": 360,
+            "height": 168,
+            "right": 360,
+            "bottom": 462
+          },
+          "style": {
+            "width": "360px",
+            "height": "168px",
+            "top": "0px",
+            "position": "relative",
+            "display": "grid",
+            "paddingTop": "10px",
+            "paddingRight": "14px",
+            "paddingBottom": "16px",
+            "paddingLeft": "14px",
+            "gap": "normal 8px",
+            "borderRadius": "0px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "180px 84px",
+            "gridTemplateColumns": "145px 179px",
+            "zIndex": "auto",
+            "overflow": "visible",
+            "minHeight": "168px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-product-cover-3d",
+          "rect": {
+            "x": 14,
+            "y": 230,
+            "width": 128,
+            "height": 128,
+            "right": 142,
+            "bottom": 358
+          },
+          "style": {
+            "width": "128px",
+            "height": "128px",
+            "top": "-64px",
+            "position": "absolute",
+            "display": "block",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "normal",
+            "borderRadius": "16px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "64px 64px",
+            "gridTemplateColumns": "none",
+            "zIndex": "2",
+            "overflow": "visible",
+            "minHeight": "0px",
+            "borderStyle": "none",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-product-cover-3d img",
+          "rect": {
+            "x": 12.4730806350708,
+            "y": 230.15589904785156,
+            "width": 123.33448791503906,
+            "height": 127.68821716308594,
+            "right": 135.80756855010986,
+            "bottom": 357.8441162109375
+          },
+          "style": {
+            "width": "128px",
+            "height": "128px",
+            "top": "0px",
+            "position": "relative",
+            "display": "block",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "normal",
+            "borderRadius": "16px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "cover",
+            "objectPosition": "50% 50%",
+            "transform": "matrix3d(0.939693, 0, -0.34202, 0, -0.0238581, 0.997564, -0.0655496, 0, 0.341187, 0.0697565, 0.937404, 0, 0, 0, 0, 1)",
+            "transformOrigin": "0px 64px",
+            "gridTemplateColumns": "none",
+            "zIndex": "2",
+            "overflow": "clip",
+            "minHeight": "0px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-step-number",
+          "rect": {
+            "x": 17,
+            "y": 522.78125,
+            "width": 40,
+            "height": 40,
+            "right": 57,
+            "bottom": 562.78125
+          },
+          "style": {
+            "width": "40px",
+            "height": "40px",
+            "top": "auto",
+            "position": "static",
+            "display": "flex",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "normal",
+            "borderRadius": "0px",
+            "fontSize": "14px",
+            "lineHeight": "14px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "20px 20px",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "visible",
+            "minHeight": "auto",
+            "borderStyle": "none",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-checkout-panel>header h2",
+          "rect": {
+            "x": 73,
+            "y": 530.78125,
+            "width": 254,
+            "height": 24,
+            "right": 327,
+            "bottom": 554.78125
+          },
+          "style": {
+            "width": "254px",
+            "height": "24px",
+            "top": "auto",
+            "position": "static",
+            "display": "block",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "normal",
+            "borderRadius": "0px",
+            "fontSize": "14px",
+            "lineHeight": "24px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "127px 12px",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "visible",
+            "minHeight": "0px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-panel-body",
+          "rect": {
+            "x": 17,
+            "y": 562.78125,
+            "width": 326,
+            "height": 151.578125,
+            "right": 343,
+            "bottom": 714.359375
+          },
+          "style": {
+            "width": "326px",
+            "height": "151.578px",
+            "top": "auto",
+            "position": "static",
+            "display": "block",
+            "paddingTop": "16px",
+            "paddingRight": "16px",
+            "paddingBottom": "16px",
+            "paddingLeft": "16px",
+            "gap": "normal",
+            "borderRadius": "8px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "163px 75.7891px",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "visible",
+            "minHeight": "0px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-nominal-grid",
+          "rect": {
+            "x": 33,
+            "y": 907.65625,
+            "width": 294,
+            "height": 641.65625,
+            "right": 327,
+            "bottom": 1549.3125
+          },
+          "style": {
+            "width": "294px",
+            "height": "641.656px",
+            "top": "auto",
+            "position": "static",
+            "display": "grid",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "16px",
+            "borderRadius": "0px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "147px 320.828px",
+            "gridTemplateColumns": "139px 139px",
+            "zIndex": "auto",
+            "overflow": "visible",
+            "minHeight": "0px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-nominal-select",
+          "rect": {
+            "x": 33,
+            "y": 907.65625,
+            "width": 139,
+            "height": 165.21875,
+            "right": 172,
+            "bottom": 1072.875
+          },
+          "style": {
+            "width": "139px",
+            "height": "165.219px",
+            "top": "0px",
+            "position": "relative",
+            "display": "flex",
+            "paddingTop": "16px",
+            "paddingRight": "16px",
+            "paddingBottom": "16px",
+            "paddingLeft": "16px",
+            "gap": "16px",
+            "borderRadius": "12px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "69.5px 82.6094px",
+            "gridTemplateColumns": "34px 1fr",
+            "zIndex": "auto",
+            "overflow": "hidden",
+            "minHeight": "85px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-payment-group-main",
+          "rect": {
+            "x": 34,
+            "y": 1648.3125,
+            "width": 292,
+            "height": 74.59375,
+            "right": 326,
+            "bottom": 1722.90625
+          },
+          "style": {
+            "width": "292px",
+            "height": "74.5938px",
+            "top": "auto",
+            "position": "static",
+            "display": "flex",
+            "paddingTop": "10px",
+            "paddingRight": "10px",
+            "paddingBottom": "10px",
+            "paddingLeft": "10px",
+            "gap": "12px",
+            "borderRadius": "8px",
+            "fontSize": "12px",
+            "lineHeight": "18px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "146px 37.2969px",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "visible",
+            "minHeight": "0px",
+            "borderStyle": "none",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-payment-group-card",
+          "rect": {
+            "x": 33,
+            "y": 1647.3125,
+            "width": 294,
+            "height": 147.59375,
+            "right": 327,
+            "bottom": 1794.90625
+          },
+          "style": {
+            "width": "294px",
+            "height": "147.594px",
+            "top": "auto",
+            "position": "static",
+            "display": "block",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "normal",
+            "borderRadius": "8px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "147px 73.7969px",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "visible",
+            "minHeight": "auto",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-payment-brand-item img",
+          "rect": {
+            "x": 172.296875,
+            "y": 1729.90625,
+            "width": 120,
+            "height": 48,
+            "right": 292.296875,
+            "bottom": 1777.90625
+          },
+          "style": {
+            "width": "120px",
+            "height": "48px",
+            "top": "auto",
+            "position": "static",
+            "display": "block",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "normal",
+            "borderRadius": "0px",
+            "fontSize": "8px",
+            "lineHeight": "12px",
+            "objectFit": "contain",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "60px 24px",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "clip",
+            "minHeight": "auto",
+            "borderStyle": "solid",
+            "maxHeight": "48px"
+          }
+        },
+        {
+          "selector": ".lf-mobile-checkout-bar",
+          "rect": {
+            "x": 0,
+            "y": 651,
+            "width": 360,
+            "height": 149,
+            "right": 360,
+            "bottom": 800
+          },
+          "style": {
+            "width": "360px",
+            "height": "149px",
+            "top": "651px",
+            "position": "fixed",
+            "display": "block",
+            "paddingTop": "16px",
+            "paddingRight": "16px",
+            "paddingBottom": "16px",
+            "paddingLeft": "16px",
+            "gap": "10px",
+            "borderRadius": "6px 6px 0px 0px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "180px 74.5px",
+            "gridTemplateColumns": "minmax(0px, 1fr) auto",
+            "zIndex": "40",
+            "overflow": "visible",
+            "minHeight": "0px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-mobile-summary-toggle",
+          "rect": {
+            "x": 16,
+            "y": 668,
+            "width": 328,
+            "height": 48,
+            "right": 344,
+            "bottom": 716
+          },
+          "style": {
+            "width": "328px",
+            "height": "48px",
+            "top": "auto",
+            "position": "static",
+            "display": "flex",
+            "paddingTop": "8px",
+            "paddingRight": "12px",
+            "paddingBottom": "8px",
+            "paddingLeft": "12px",
+            "gap": "10px",
+            "borderRadius": "8px",
+            "fontSize": "12px",
+            "lineHeight": "18px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "164px 24px",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "visible",
+            "minHeight": "48px",
+            "borderStyle": "dashed",
+            "maxHeight": "48px"
+          }
+        },
+        {
+          "selector": ".lf-mobile-order-button",
+          "rect": {
+            "x": 16,
+            "y": 732,
+            "width": 328,
+            "height": 52,
+            "right": 344,
+            "bottom": 784
+          },
+          "style": {
+            "width": "328px",
+            "height": "52px",
+            "top": "auto",
+            "position": "static",
+            "display": "flex",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "10px",
+            "borderRadius": "10px",
+            "fontSize": "12px",
+            "lineHeight": "14.4px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "164px 26px",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "visible",
+            "minHeight": "52px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        }
+      ],
+      "cards": [
+        {
+          "padding": "16px",
+          "height": 165.21875
+        },
+        {
+          "padding": "16px",
+          "height": 165.21875
+        },
+        {
+          "padding": "16px",
+          "height": 112.03125
+        },
+        {
+          "padding": "16px",
+          "height": 112.03125
+        },
+        {
+          "padding": "16px",
+          "height": 112.03125
+        },
+        {
+          "padding": "16px",
+          "height": 112.03125
+        },
+        {
+          "padding": "16px",
+          "height": 204.375
+        }
+      ],
+      "headers": [
+        {
+          "width": 40,
+          "height": 40
+        },
+        {
+          "width": 40,
+          "height": 40
+        },
+        {
+          "width": 40,
+          "height": 40
+        },
+        {
+          "width": 40,
+          "height": 40
+        },
+        {
+          "width": 40,
+          "height": 40
+        }
+      ],
+      "logos": [
+        {
+          "height": 48,
+          "maxHeight": "48px"
+        }
+      ],
+      "pass": true
+    },
+    {
+      "overlaps": [],
+      "width": 390,
+      "height": 844,
+      "scrollWidth": 390,
+      "fade": {
+        "top": "156.797px",
+        "background": "linear-gradient(rgba(0, 0, 0, 0), rgb(11, 17, 28))"
+      },
+      "clipped": [],
+      "broken": [],
+      "elements": [
+        {
+          "selector": ".lf-product-hero",
+          "rect": {
+            "x": 0,
+            "y": 69,
+            "width": 390,
+            "height": 224,
+            "right": 390,
+            "bottom": 293
+          },
+          "style": {
+            "width": "390px",
+            "height": "224px",
+            "top": "0px",
+            "position": "relative",
+            "display": "block",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "normal",
+            "borderRadius": "0px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "195px 112px",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "hidden",
+            "minHeight": "224px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-product-hero>img",
+          "rect": {
+            "x": 0,
+            "y": 69,
+            "width": 390,
+            "height": 224,
+            "right": 390,
+            "bottom": 293
+          },
+          "style": {
+            "width": "390px",
+            "height": "224px",
+            "top": "0px",
+            "position": "absolute",
+            "display": "block",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "normal",
+            "borderRadius": "0px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "cover",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "195px 112px",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "clip",
+            "minHeight": "224px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-product-identity-inner",
+          "rect": {
+            "x": 0,
+            "y": 294,
+            "width": 390,
+            "height": 168,
+            "right": 390,
+            "bottom": 462
+          },
+          "style": {
+            "width": "390px",
+            "height": "168px",
+            "top": "0px",
+            "position": "relative",
+            "display": "grid",
+            "paddingTop": "10px",
+            "paddingRight": "14px",
+            "paddingBottom": "16px",
+            "paddingLeft": "14px",
+            "gap": "normal 8px",
+            "borderRadius": "0px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "195px 84px",
+            "gridTemplateColumns": "145px 209px",
+            "zIndex": "auto",
+            "overflow": "visible",
+            "minHeight": "168px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-product-cover-3d",
+          "rect": {
+            "x": 14,
+            "y": 230,
+            "width": 128,
+            "height": 128,
+            "right": 142,
+            "bottom": 358
+          },
+          "style": {
+            "width": "128px",
+            "height": "128px",
+            "top": "-64px",
+            "position": "absolute",
+            "display": "block",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "normal",
+            "borderRadius": "16px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "64px 64px",
+            "gridTemplateColumns": "none",
+            "zIndex": "2",
+            "overflow": "visible",
+            "minHeight": "0px",
+            "borderStyle": "none",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-product-cover-3d img",
+          "rect": {
+            "x": 12.4730806350708,
+            "y": 230.15589904785156,
+            "width": 123.33448791503906,
+            "height": 127.68821716308594,
+            "right": 135.80756855010986,
+            "bottom": 357.8441162109375
+          },
+          "style": {
+            "width": "128px",
+            "height": "128px",
+            "top": "0px",
+            "position": "relative",
+            "display": "block",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "normal",
+            "borderRadius": "16px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "cover",
+            "objectPosition": "50% 50%",
+            "transform": "matrix3d(0.939693, 0, -0.34202, 0, -0.0238581, 0.997564, -0.0655496, 0, 0.341187, 0.0697565, 0.937404, 0, 0, 0, 0, 1)",
+            "transformOrigin": "0px 64px",
+            "gridTemplateColumns": "none",
+            "zIndex": "2",
+            "overflow": "clip",
+            "minHeight": "0px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-step-number",
+          "rect": {
+            "x": 17,
+            "y": 522.78125,
+            "width": 40,
+            "height": 40,
+            "right": 57,
+            "bottom": 562.78125
+          },
+          "style": {
+            "width": "40px",
+            "height": "40px",
+            "top": "auto",
+            "position": "static",
+            "display": "flex",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "normal",
+            "borderRadius": "0px",
+            "fontSize": "14px",
+            "lineHeight": "14px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "20px 20px",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "visible",
+            "minHeight": "auto",
+            "borderStyle": "none",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-checkout-panel>header h2",
+          "rect": {
+            "x": 73,
+            "y": 530.78125,
+            "width": 284,
+            "height": 24,
+            "right": 357,
+            "bottom": 554.78125
+          },
+          "style": {
+            "width": "284px",
+            "height": "24px",
+            "top": "auto",
+            "position": "static",
+            "display": "block",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "normal",
+            "borderRadius": "0px",
+            "fontSize": "14px",
+            "lineHeight": "24px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "142px 12px",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "visible",
+            "minHeight": "0px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-panel-body",
+          "rect": {
+            "x": 17,
+            "y": 562.78125,
+            "width": 356,
+            "height": 151.578125,
+            "right": 373,
+            "bottom": 714.359375
+          },
+          "style": {
+            "width": "356px",
+            "height": "151.578px",
+            "top": "auto",
+            "position": "static",
+            "display": "block",
+            "paddingTop": "16px",
+            "paddingRight": "16px",
+            "paddingBottom": "16px",
+            "paddingLeft": "16px",
+            "gap": "normal",
+            "borderRadius": "8px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "178px 75.7891px",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "visible",
+            "minHeight": "0px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-nominal-grid",
+          "rect": {
+            "x": 33,
+            "y": 907.65625,
+            "width": 324,
+            "height": 564.703125,
+            "right": 357,
+            "bottom": 1472.359375
+          },
+          "style": {
+            "width": "324px",
+            "height": "564.703px",
+            "top": "auto",
+            "position": "static",
+            "display": "grid",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "16px",
+            "borderRadius": "0px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "162px 282.352px",
+            "gridTemplateColumns": "154px 154px",
+            "zIndex": "auto",
+            "overflow": "visible",
+            "minHeight": "0px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-nominal-select",
+          "rect": {
+            "x": 33,
+            "y": 907.65625,
+            "width": 154,
+            "height": 149.828125,
+            "right": 187,
+            "bottom": 1057.484375
+          },
+          "style": {
+            "width": "154px",
+            "height": "149.828px",
+            "top": "0px",
+            "position": "relative",
+            "display": "flex",
+            "paddingTop": "16px",
+            "paddingRight": "16px",
+            "paddingBottom": "16px",
+            "paddingLeft": "16px",
+            "gap": "16px",
+            "borderRadius": "12px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "77px 74.9141px",
+            "gridTemplateColumns": "34px 1fr",
+            "zIndex": "auto",
+            "overflow": "hidden",
+            "minHeight": "85px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-payment-group-main",
+          "rect": {
+            "x": 34,
+            "y": 1571.359375,
+            "width": 322,
+            "height": 58.09375,
+            "right": 356,
+            "bottom": 1629.453125
+          },
+          "style": {
+            "width": "322px",
+            "height": "58.0938px",
+            "top": "auto",
+            "position": "static",
+            "display": "flex",
+            "paddingTop": "10px",
+            "paddingRight": "10px",
+            "paddingBottom": "10px",
+            "paddingLeft": "10px",
+            "gap": "12px",
+            "borderRadius": "8px",
+            "fontSize": "12px",
+            "lineHeight": "18px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "161px 29.0469px",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "visible",
+            "minHeight": "0px",
+            "borderStyle": "none",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-payment-group-card",
+          "rect": {
+            "x": 33,
+            "y": 1570.359375,
+            "width": 324,
+            "height": 131.09375,
+            "right": 357,
+            "bottom": 1701.453125
+          },
+          "style": {
+            "width": "324px",
+            "height": "131.094px",
+            "top": "auto",
+            "position": "static",
+            "display": "block",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "normal",
+            "borderRadius": "8px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "162px 65.5469px",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "visible",
+            "minHeight": "auto",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-payment-brand-item img",
+          "rect": {
+            "x": 172.296875,
+            "y": 1636.453125,
+            "width": 120,
+            "height": 48,
+            "right": 292.296875,
+            "bottom": 1684.453125
+          },
+          "style": {
+            "width": "120px",
+            "height": "48px",
+            "top": "auto",
+            "position": "static",
+            "display": "block",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "normal",
+            "borderRadius": "0px",
+            "fontSize": "8px",
+            "lineHeight": "12px",
+            "objectFit": "contain",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "60px 24px",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "clip",
+            "minHeight": "auto",
+            "borderStyle": "solid",
+            "maxHeight": "48px"
+          }
+        },
+        {
+          "selector": ".lf-mobile-checkout-bar",
+          "rect": {
+            "x": 0,
+            "y": 695,
+            "width": 390,
+            "height": 149,
+            "right": 390,
+            "bottom": 844
+          },
+          "style": {
+            "width": "390px",
+            "height": "149px",
+            "top": "695px",
+            "position": "fixed",
+            "display": "block",
+            "paddingTop": "16px",
+            "paddingRight": "16px",
+            "paddingBottom": "16px",
+            "paddingLeft": "16px",
+            "gap": "10px",
+            "borderRadius": "6px 6px 0px 0px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "195px 74.5px",
+            "gridTemplateColumns": "minmax(0px, 1fr) auto",
+            "zIndex": "40",
+            "overflow": "visible",
+            "minHeight": "0px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-mobile-summary-toggle",
+          "rect": {
+            "x": 16,
+            "y": 712,
+            "width": 358,
+            "height": 48,
+            "right": 374,
+            "bottom": 760
+          },
+          "style": {
+            "width": "358px",
+            "height": "48px",
+            "top": "auto",
+            "position": "static",
+            "display": "flex",
+            "paddingTop": "8px",
+            "paddingRight": "12px",
+            "paddingBottom": "8px",
+            "paddingLeft": "12px",
+            "gap": "10px",
+            "borderRadius": "8px",
+            "fontSize": "12px",
+            "lineHeight": "18px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "179px 24px",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "visible",
+            "minHeight": "48px",
+            "borderStyle": "dashed",
+            "maxHeight": "48px"
+          }
+        },
+        {
+          "selector": ".lf-mobile-order-button",
+          "rect": {
+            "x": 16,
+            "y": 776,
+            "width": 358,
+            "height": 52,
+            "right": 374,
+            "bottom": 828
+          },
+          "style": {
+            "width": "358px",
+            "height": "52px",
+            "top": "auto",
+            "position": "static",
+            "display": "flex",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "10px",
+            "borderRadius": "10px",
+            "fontSize": "12px",
+            "lineHeight": "14.4px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "179px 26px",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "visible",
+            "minHeight": "52px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        }
+      ],
+      "cards": [
+        {
+          "padding": "16px",
+          "height": 149.828125
+        },
+        {
+          "padding": "16px",
+          "height": 149.828125
+        },
+        {
+          "padding": "16px",
+          "height": 96.640625
+        },
+        {
+          "padding": "16px",
+          "height": 96.640625
+        },
+        {
+          "padding": "16px",
+          "height": 96.640625
+        },
+        {
+          "padding": "16px",
+          "height": 96.640625
+        },
+        {
+          "padding": "16px",
+          "height": 173.59375
+        }
+      ],
+      "headers": [
+        {
+          "width": 40,
+          "height": 40
+        },
+        {
+          "width": 40,
+          "height": 40
+        },
+        {
+          "width": 40,
+          "height": 40
+        },
+        {
+          "width": 40,
+          "height": 40
+        },
+        {
+          "width": 40,
+          "height": 40
+        }
+      ],
+      "logos": [
+        {
+          "height": 48,
+          "maxHeight": "48px"
+        }
+      ],
+      "pass": true
+    },
+    {
+      "overlaps": [],
+      "width": 768,
+      "height": 1024,
+      "scrollWidth": 768,
+      "fade": {
+        "top": "156.797px",
+        "background": "linear-gradient(rgba(0, 0, 0, 0), rgb(11, 17, 28))"
+      },
+      "clipped": [],
+      "broken": [],
+      "elements": [
+        {
+          "selector": ".lf-product-hero",
+          "rect": {
+            "x": 0,
+            "y": 67,
+            "width": 768,
+            "height": 224,
+            "right": 768,
+            "bottom": 291
+          },
+          "style": {
+            "width": "768px",
+            "height": "224px",
+            "top": "0px",
+            "position": "relative",
+            "display": "block",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "normal",
+            "borderRadius": "0px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "384px 112px",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "hidden",
+            "minHeight": "224px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-product-hero>img",
+          "rect": {
+            "x": 0,
+            "y": 67,
+            "width": 768,
+            "height": 224,
+            "right": 768,
+            "bottom": 291
+          },
+          "style": {
+            "width": "768px",
+            "height": "224px",
+            "top": "auto",
+            "position": "static",
+            "display": "block",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "normal",
+            "borderRadius": "0px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "cover",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "384px 112px",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "clip",
+            "minHeight": "224px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-product-identity-inner",
+          "rect": {
+            "x": 16,
+            "y": 292,
+            "width": 736,
+            "height": 194,
+            "right": 752,
+            "bottom": 486
+          },
+          "style": {
+            "width": "736px",
+            "height": "194px",
+            "top": "0px",
+            "position": "relative",
+            "display": "grid",
+            "paddingTop": "12px",
+            "paddingRight": "20px",
+            "paddingBottom": "16px",
+            "paddingLeft": "20px",
+            "gap": "normal 18px",
+            "borderRadius": "0px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "368px 97px",
+            "gridTemplateColumns": "260px 418px",
+            "zIndex": "auto",
+            "overflow": "visible",
+            "minHeight": "194px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-product-cover-3d",
+          "rect": {
+            "x": 36,
+            "y": 180,
+            "width": 240,
+            "height": 240,
+            "right": 276,
+            "bottom": 420
+          },
+          "style": {
+            "width": "240px",
+            "height": "240px",
+            "top": "-112px",
+            "position": "absolute",
+            "display": "block",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "normal",
+            "borderRadius": "16px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "120px 120px",
+            "gridTemplateColumns": "none",
+            "zIndex": "2",
+            "overflow": "visible",
+            "minHeight": "0px",
+            "borderStyle": "none",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-product-cover-3d img",
+          "rect": {
+            "x": 33.13702392578125,
+            "y": 180.2923126220703,
+            "width": 231.252197265625,
+            "height": 239.41539001464844,
+            "right": 264.38922119140625,
+            "bottom": 419.70770263671875
+          },
+          "style": {
+            "width": "240px",
+            "height": "240px",
+            "top": "0px",
+            "position": "relative",
+            "display": "block",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "normal",
+            "borderRadius": "16px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "cover",
+            "objectPosition": "50% 50%",
+            "transform": "matrix3d(0.939693, 0, -0.34202, 0, -0.0238581, 0.997564, -0.0655496, 0, 0.341187, 0.0697565, 0.937404, 0, 0, 0, 0, 1)",
+            "transformOrigin": "0px 120px",
+            "gridTemplateColumns": "none",
+            "zIndex": "2",
+            "overflow": "clip",
+            "minHeight": "0px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-step-number",
+          "rect": {
+            "x": 41,
+            "y": 585,
+            "width": 40,
+            "height": 40,
+            "right": 81,
+            "bottom": 625
+          },
+          "style": {
+            "width": "40px",
+            "height": "40px",
+            "top": "auto",
+            "position": "static",
+            "display": "flex",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "normal",
+            "borderRadius": "0px",
+            "fontSize": "14px",
+            "lineHeight": "21px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "20px 20px",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "visible",
+            "minHeight": "auto",
+            "borderStyle": "none",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-checkout-panel>header h2",
+          "rect": {
+            "x": 97,
+            "y": 593,
+            "width": 614,
+            "height": 24,
+            "right": 711,
+            "bottom": 617
+          },
+          "style": {
+            "width": "614px",
+            "height": "24px",
+            "top": "auto",
+            "position": "static",
+            "display": "block",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "normal",
+            "borderRadius": "0px",
+            "fontSize": "14px",
+            "lineHeight": "24px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "307px 12px",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "visible",
+            "minHeight": "0px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-panel-body",
+          "rect": {
+            "x": 25,
+            "y": 641,
+            "width": 718,
+            "height": 145.6875,
+            "right": 743,
+            "bottom": 786.6875
+          },
+          "style": {
+            "width": "718px",
+            "height": "145.688px",
+            "top": "auto",
+            "position": "static",
+            "display": "block",
+            "paddingTop": "16px",
+            "paddingRight": "16px",
+            "paddingBottom": "16px",
+            "paddingLeft": "16px",
+            "gap": "normal",
+            "borderRadius": "8px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "359px 72.8438px",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "visible",
+            "minHeight": "0px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-nominal-grid",
+          "rect": {
+            "x": 41,
+            "y": 1020.4375,
+            "width": 686,
+            "height": 510.171875,
+            "right": 727,
+            "bottom": 1530.609375
+          },
+          "style": {
+            "width": "686px",
+            "height": "510.172px",
+            "top": "auto",
+            "position": "static",
+            "display": "grid",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "16px",
+            "borderRadius": "0px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "343px 255.086px",
+            "gridTemplateColumns": "335px 335px",
+            "zIndex": "auto",
+            "overflow": "visible",
+            "minHeight": "0px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-nominal-select",
+          "rect": {
+            "x": 41,
+            "y": 1020.4375,
+            "width": 335,
+            "height": 151.234375,
+            "right": 376,
+            "bottom": 1171.671875
+          },
+          "style": {
+            "width": "335px",
+            "height": "151.234px",
+            "top": "0px",
+            "position": "relative",
+            "display": "flex",
+            "paddingTop": "16px",
+            "paddingRight": "16px",
+            "paddingBottom": "16px",
+            "paddingLeft": "16px",
+            "gap": "16px",
+            "borderRadius": "12px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "167.5px 75.6172px",
+            "gridTemplateColumns": "38px minmax(0px, 1fr)",
+            "zIndex": "auto",
+            "overflow": "hidden",
+            "minHeight": "85px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-payment-group-main",
+          "rect": {
+            "x": 42,
+            "y": 1661.609375,
+            "width": 684,
+            "height": 59.09375,
+            "right": 726,
+            "bottom": 1720.703125
+          },
+          "style": {
+            "width": "684px",
+            "height": "59.0938px",
+            "top": "auto",
+            "position": "static",
+            "display": "flex",
+            "paddingTop": "10px",
+            "paddingRight": "10px",
+            "paddingBottom": "10px",
+            "paddingLeft": "10px",
+            "gap": "12px",
+            "borderRadius": "8px",
+            "fontSize": "13px",
+            "lineHeight": "19.5px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "342px 29.5469px",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "visible",
+            "minHeight": "0px",
+            "borderStyle": "none",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-payment-group-card",
+          "rect": {
+            "x": 41,
+            "y": 1660.609375,
+            "width": 686,
+            "height": 132.09375,
+            "right": 727,
+            "bottom": 1792.703125
+          },
+          "style": {
+            "width": "686px",
+            "height": "132.094px",
+            "top": "auto",
+            "position": "static",
+            "display": "block",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "normal",
+            "borderRadius": "8px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "343px 66.0469px",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "visible",
+            "minHeight": "auto",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-payment-brand-item img",
+          "rect": {
+            "x": 180.296875,
+            "y": 1727.703125,
+            "width": 120,
+            "height": 48,
+            "right": 300.296875,
+            "bottom": 1775.703125
+          },
+          "style": {
+            "width": "120px",
+            "height": "48px",
+            "top": "auto",
+            "position": "static",
+            "display": "block",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "normal",
+            "borderRadius": "0px",
+            "fontSize": "8px",
+            "lineHeight": "12px",
+            "objectFit": "contain",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "60px 24px",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "clip",
+            "minHeight": "auto",
+            "borderStyle": "solid",
+            "maxHeight": "48px"
+          }
+        },
+        {
+          "selector": ".lf-mobile-checkout-bar",
+          "rect": {
+            "x": 0,
+            "y": 883,
+            "width": 768,
+            "height": 141,
+            "right": 768,
+            "bottom": 1024
+          },
+          "style": {
+            "width": "768px",
+            "height": "141px",
+            "top": "883px",
+            "position": "fixed",
+            "display": "block",
+            "paddingTop": "16px",
+            "paddingRight": "16px",
+            "paddingBottom": "16px",
+            "paddingLeft": "16px",
+            "gap": "normal",
+            "borderRadius": "6px 6px 0px 0px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "384px 70.5px",
+            "gridTemplateColumns": "none",
+            "zIndex": "40",
+            "overflow": "visible",
+            "minHeight": "0px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-mobile-summary-toggle",
+          "rect": {
+            "x": 16,
+            "y": 900,
+            "width": 736,
+            "height": 52,
+            "right": 752,
+            "bottom": 952
+          },
+          "style": {
+            "width": "736px",
+            "height": "52px",
+            "top": "auto",
+            "position": "static",
+            "display": "flex",
+            "paddingTop": "8px",
+            "paddingRight": "12px",
+            "paddingBottom": "8px",
+            "paddingLeft": "12px",
+            "gap": "normal",
+            "borderRadius": "8px",
+            "fontSize": "13px",
+            "lineHeight": "19.5px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "368px 26px",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "visible",
+            "minHeight": "52px",
+            "borderStyle": "dashed",
+            "maxHeight": "52px"
+          }
+        },
+        {
+          "selector": ".lf-mobile-order-button",
+          "rect": {
+            "x": 16,
+            "y": 968,
+            "width": 736,
+            "height": 40,
+            "right": 752,
+            "bottom": 1008
+          },
+          "style": {
+            "width": "736px",
+            "height": "40px",
+            "top": "auto",
+            "position": "static",
+            "display": "flex",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "10px",
+            "borderRadius": "8px",
+            "fontSize": "13px",
+            "lineHeight": "15.6px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "368px 20px",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "visible",
+            "minHeight": "40px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        }
+      ],
+      "cards": [
+        {
+          "padding": "16px",
+          "height": 151.234375
+        },
+        {
+          "padding": "16px",
+          "height": 151.234375
+        },
+        {
+          "padding": "16px",
+          "height": 98.046875
+        },
+        {
+          "padding": "16px",
+          "height": 98.046875
+        },
+        {
+          "padding": "16px",
+          "height": 98.046875
+        },
+        {
+          "padding": "16px",
+          "height": 98.046875
+        },
+        {
+          "padding": "16px",
+          "height": 114.84375
+        }
+      ],
+      "headers": [
+        {
+          "width": 40,
+          "height": 40
+        },
+        {
+          "width": 40,
+          "height": 40
+        },
+        {
+          "width": 40,
+          "height": 40
+        },
+        {
+          "width": 40,
+          "height": 40
+        },
+        {
+          "width": 40,
+          "height": 40
+        }
+      ],
+      "logos": [
+        {
+          "height": 48,
+          "maxHeight": "48px"
+        }
+      ],
+      "pass": true
+    },
+    {
+      "overlaps": [],
+      "width": 1280,
+      "height": 800,
+      "scrollWidth": 1280,
+      "fade": {
+        "top": "206.062px",
+        "background": "linear-gradient(rgba(0, 0, 0, 0), rgb(11, 17, 28))"
+      },
+      "clipped": [],
+      "broken": [],
+      "elements": [
+        {
+          "selector": ".lf-product-hero",
+          "rect": {
+            "x": 0,
+            "y": 67,
+            "width": 1280,
+            "height": 294.390625,
+            "right": 1280,
+            "bottom": 361.390625
+          },
+          "style": {
+            "width": "1280px",
+            "height": "294.391px",
+            "top": "0px",
+            "position": "relative",
+            "display": "block",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "normal",
+            "borderRadius": "0px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "640px 147.195px",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "hidden",
+            "minHeight": "224px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-product-hero>img",
+          "rect": {
+            "x": 0,
+            "y": 67,
+            "width": 1280,
+            "height": 294.390625,
+            "right": 1280,
+            "bottom": 361.390625
+          },
+          "style": {
+            "width": "1280px",
+            "height": "294.391px",
+            "top": "auto",
+            "position": "static",
+            "display": "block",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "normal",
+            "borderRadius": "0px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "contain",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "640px 147.195px",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "clip",
+            "minHeight": "224px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-product-identity-inner",
+          "rect": {
+            "x": 16,
+            "y": 362.390625,
+            "width": 1248,
+            "height": 194,
+            "right": 1264,
+            "bottom": 556.390625
+          },
+          "style": {
+            "width": "1248px",
+            "height": "194px",
+            "top": "0px",
+            "position": "relative",
+            "display": "grid",
+            "paddingTop": "12px",
+            "paddingRight": "20px",
+            "paddingBottom": "16px",
+            "paddingLeft": "20px",
+            "gap": "normal 18px",
+            "borderRadius": "0px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "624px 97px",
+            "gridTemplateColumns": "260px 930px",
+            "zIndex": "auto",
+            "overflow": "visible",
+            "minHeight": "194px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-product-cover-3d",
+          "rect": {
+            "x": 36,
+            "y": 250.390625,
+            "width": 240,
+            "height": 240,
+            "right": 276,
+            "bottom": 490.390625
+          },
+          "style": {
+            "width": "240px",
+            "height": "240px",
+            "top": "-112px",
+            "position": "absolute",
+            "display": "block",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "normal",
+            "borderRadius": "16px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "120px 120px",
+            "gridTemplateColumns": "none",
+            "zIndex": "2",
+            "overflow": "visible",
+            "minHeight": "0px",
+            "borderStyle": "none",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-product-cover-3d img",
+          "rect": {
+            "x": 33.13702392578125,
+            "y": 250.6829376220703,
+            "width": 231.252197265625,
+            "height": 239.41539001464844,
+            "right": 264.38922119140625,
+            "bottom": 490.09832763671875
+          },
+          "style": {
+            "width": "240px",
+            "height": "240px",
+            "top": "0px",
+            "position": "relative",
+            "display": "block",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "normal",
+            "borderRadius": "16px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "cover",
+            "objectPosition": "50% 50%",
+            "transform": "matrix3d(0.939693, 0, -0.34202, 0, -0.0238581, 0.997564, -0.0655496, 0, 0.341187, 0.0697565, 0.937404, 0, 0, 0, 0, 1)",
+            "transformOrigin": "0px 120px",
+            "gridTemplateColumns": "none",
+            "zIndex": "2",
+            "overflow": "clip",
+            "minHeight": "0px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-step-number",
+          "rect": {
+            "x": 297,
+            "y": 655.390625,
+            "width": 40,
+            "height": 40,
+            "right": 337,
+            "bottom": 695.390625
+          },
+          "style": {
+            "width": "40px",
+            "height": "40px",
+            "top": "auto",
+            "position": "static",
+            "display": "flex",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "normal",
+            "borderRadius": "0px",
+            "fontSize": "14px",
+            "lineHeight": "21px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "20px 20px",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "visible",
+            "minHeight": "auto",
+            "borderStyle": "none",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-checkout-panel>header h2",
+          "rect": {
+            "x": 353,
+            "y": 663.390625,
+            "width": 614,
+            "height": 24,
+            "right": 967,
+            "bottom": 687.390625
+          },
+          "style": {
+            "width": "614px",
+            "height": "24px",
+            "top": "auto",
+            "position": "static",
+            "display": "block",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "normal",
+            "borderRadius": "0px",
+            "fontSize": "14px",
+            "lineHeight": "24px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "307px 12px",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "visible",
+            "minHeight": "0px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-panel-body",
+          "rect": {
+            "x": 281,
+            "y": 711.390625,
+            "width": 718,
+            "height": 145.6875,
+            "right": 999,
+            "bottom": 857.078125
+          },
+          "style": {
+            "width": "718px",
+            "height": "145.688px",
+            "top": "auto",
+            "position": "static",
+            "display": "block",
+            "paddingTop": "16px",
+            "paddingRight": "16px",
+            "paddingBottom": "16px",
+            "paddingLeft": "16px",
+            "gap": "normal",
+            "borderRadius": "8px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "359px 72.8438px",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "visible",
+            "minHeight": "0px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-nominal-grid",
+          "rect": {
+            "x": 297,
+            "y": 1090.828125,
+            "width": 686,
+            "height": 429.71875,
+            "right": 983,
+            "bottom": 1520.546875
+          },
+          "style": {
+            "width": "686px",
+            "height": "429.719px",
+            "top": "auto",
+            "position": "static",
+            "display": "grid",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "16px",
+            "borderRadius": "0px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "343px 214.859px",
+            "gridTemplateColumns": "218px 218px 218px",
+            "zIndex": "auto",
+            "overflow": "visible",
+            "minHeight": "0px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-nominal-select",
+          "rect": {
+            "x": 297,
+            "y": 1090.828125,
+            "width": 218,
+            "height": 151.234375,
+            "right": 515,
+            "bottom": 1242.0625
+          },
+          "style": {
+            "width": "218px",
+            "height": "151.234px",
+            "top": "0px",
+            "position": "relative",
+            "display": "flex",
+            "paddingTop": "16px",
+            "paddingRight": "16px",
+            "paddingBottom": "16px",
+            "paddingLeft": "16px",
+            "gap": "16px",
+            "borderRadius": "12px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "109px 75.6172px",
+            "gridTemplateColumns": "38px minmax(0px, 1fr)",
+            "zIndex": "auto",
+            "overflow": "hidden",
+            "minHeight": "85px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-payment-group-main",
+          "rect": {
+            "x": 298,
+            "y": 1651.546875,
+            "width": 684,
+            "height": 59.09375,
+            "right": 982,
+            "bottom": 1710.640625
+          },
+          "style": {
+            "width": "684px",
+            "height": "59.0938px",
+            "top": "auto",
+            "position": "static",
+            "display": "flex",
+            "paddingTop": "10px",
+            "paddingRight": "10px",
+            "paddingBottom": "10px",
+            "paddingLeft": "10px",
+            "gap": "12px",
+            "borderRadius": "8px",
+            "fontSize": "13px",
+            "lineHeight": "19.5px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "342px 29.5469px",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "visible",
+            "minHeight": "0px",
+            "borderStyle": "none",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-payment-group-card",
+          "rect": {
+            "x": 297,
+            "y": 1650.546875,
+            "width": 686,
+            "height": 132.09375,
+            "right": 983,
+            "bottom": 1782.640625
+          },
+          "style": {
+            "width": "686px",
+            "height": "132.094px",
+            "top": "auto",
+            "position": "static",
+            "display": "block",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "normal",
+            "borderRadius": "8px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "343px 66.0469px",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "visible",
+            "minHeight": "auto",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-payment-brand-item img",
+          "rect": {
+            "x": 436.296875,
+            "y": 1717.640625,
+            "width": 120,
+            "height": 48,
+            "right": 556.296875,
+            "bottom": 1765.640625
+          },
+          "style": {
+            "width": "120px",
+            "height": "48px",
+            "top": "auto",
+            "position": "static",
+            "display": "block",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "normal",
+            "borderRadius": "0px",
+            "fontSize": "8px",
+            "lineHeight": "12px",
+            "objectFit": "contain",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "60px 24px",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "clip",
+            "minHeight": "auto",
+            "borderStyle": "solid",
+            "maxHeight": "48px"
+          }
+        },
+        {
+          "selector": ".lf-mobile-checkout-bar",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "style": {
+            "width": "auto",
+            "height": "auto",
+            "top": "auto",
+            "position": "static",
+            "display": "none",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "normal",
+            "borderRadius": "0px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "50% 50%",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "visible",
+            "minHeight": "0px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-mobile-summary-toggle",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "style": {
+            "width": "auto",
+            "height": "auto",
+            "top": "auto",
+            "position": "static",
+            "display": "inline-block",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "normal",
+            "borderRadius": "0px",
+            "fontSize": "13px",
+            "lineHeight": "19.5px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "50% 50%",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "visible",
+            "minHeight": "36px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-mobile-order-button",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "style": {
+            "width": "auto",
+            "height": "40px",
+            "top": "auto",
+            "position": "static",
+            "display": "inline-flex",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "normal",
+            "borderRadius": "0px",
+            "fontSize": "13px",
+            "lineHeight": "15.6px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "50% 50%",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "visible",
+            "minHeight": "40px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        }
+      ],
+      "cards": [
+        {
+          "padding": "16px",
+          "height": 151.234375
+        },
+        {
+          "padding": "16px",
+          "height": 151.234375
+        },
+        {
+          "padding": "16px",
+          "height": 151.234375
+        },
+        {
+          "padding": "16px",
+          "height": 98.046875
+        },
+        {
+          "padding": "16px",
+          "height": 98.046875
+        },
+        {
+          "padding": "16px",
+          "height": 98.046875
+        },
+        {
+          "padding": "16px",
+          "height": 148.4375
+        }
+      ],
+      "headers": [
+        {
+          "width": 40,
+          "height": 40
+        },
+        {
+          "width": 40,
+          "height": 40
+        },
+        {
+          "width": 40,
+          "height": 40
+        },
+        {
+          "width": 40,
+          "height": 40
+        },
+        {
+          "width": 40,
+          "height": 40
+        }
+      ],
+      "logos": [
+        {
+          "height": 48,
+          "maxHeight": "48px"
+        }
+      ],
+      "pass": true
+    },
+    {
+      "overlaps": [],
+      "width": 1440,
+      "height": 900,
+      "scrollWidth": 1440,
+      "fade": {
+        "top": "231.828px",
+        "background": "linear-gradient(rgba(0, 0, 0, 0), rgb(11, 17, 28))"
+      },
+      "clipped": [],
+      "broken": [],
+      "elements": [
+        {
+          "selector": ".lf-product-hero",
+          "rect": {
+            "x": 0,
+            "y": 67,
+            "width": 1440,
+            "height": 331.1875,
+            "right": 1440,
+            "bottom": 398.1875
+          },
+          "style": {
+            "width": "1440px",
+            "height": "331.188px",
+            "top": "0px",
+            "position": "relative",
+            "display": "block",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "normal",
+            "borderRadius": "0px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "720px 165.594px",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "hidden",
+            "minHeight": "224px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-product-hero>img",
+          "rect": {
+            "x": 0,
+            "y": 67,
+            "width": 1440,
+            "height": 331.1875,
+            "right": 1440,
+            "bottom": 398.1875
+          },
+          "style": {
+            "width": "1440px",
+            "height": "331.188px",
+            "top": "auto",
+            "position": "static",
+            "display": "block",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "normal",
+            "borderRadius": "0px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "contain",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "720px 165.594px",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "clip",
+            "minHeight": "224px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-product-identity-inner",
+          "rect": {
+            "x": 80,
+            "y": 399.1875,
+            "width": 1280,
+            "height": 194,
+            "right": 1360,
+            "bottom": 593.1875
+          },
+          "style": {
+            "width": "1280px",
+            "height": "194px",
+            "top": "0px",
+            "position": "relative",
+            "display": "grid",
+            "paddingTop": "12px",
+            "paddingRight": "20px",
+            "paddingBottom": "16px",
+            "paddingLeft": "20px",
+            "gap": "normal 18px",
+            "borderRadius": "0px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "640px 97px",
+            "gridTemplateColumns": "260px 962px",
+            "zIndex": "auto",
+            "overflow": "visible",
+            "minHeight": "194px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-product-cover-3d",
+          "rect": {
+            "x": 100,
+            "y": 287.1875,
+            "width": 240,
+            "height": 240,
+            "right": 340,
+            "bottom": 527.1875
+          },
+          "style": {
+            "width": "240px",
+            "height": "240px",
+            "top": "-112px",
+            "position": "absolute",
+            "display": "block",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "normal",
+            "borderRadius": "16px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "120px 120px",
+            "gridTemplateColumns": "none",
+            "zIndex": "2",
+            "overflow": "visible",
+            "minHeight": "0px",
+            "borderStyle": "none",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-product-cover-3d img",
+          "rect": {
+            "x": 97.13702392578125,
+            "y": 287.4798278808594,
+            "width": 231.252197265625,
+            "height": 239.41537475585938,
+            "right": 328.38922119140625,
+            "bottom": 526.8952026367188
+          },
+          "style": {
+            "width": "240px",
+            "height": "240px",
+            "top": "0px",
+            "position": "relative",
+            "display": "block",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "normal",
+            "borderRadius": "16px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "cover",
+            "objectPosition": "50% 50%",
+            "transform": "matrix3d(0.939693, 0, -0.34202, 0, -0.0238581, 0.997564, -0.0655496, 0, 0.341187, 0.0697565, 0.937404, 0, 0, 0, 0, 1)",
+            "transformOrigin": "0px 120px",
+            "gridTemplateColumns": "none",
+            "zIndex": "2",
+            "overflow": "clip",
+            "minHeight": "0px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-step-number",
+          "rect": {
+            "x": 377,
+            "y": 692.1875,
+            "width": 40,
+            "height": 40,
+            "right": 417,
+            "bottom": 732.1875
+          },
+          "style": {
+            "width": "40px",
+            "height": "40px",
+            "top": "auto",
+            "position": "static",
+            "display": "flex",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "normal",
+            "borderRadius": "0px",
+            "fontSize": "14px",
+            "lineHeight": "21px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "20px 20px",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "visible",
+            "minHeight": "auto",
+            "borderStyle": "none",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-checkout-panel>header h2",
+          "rect": {
+            "x": 433,
+            "y": 700.1875,
+            "width": 614,
+            "height": 24,
+            "right": 1047,
+            "bottom": 724.1875
+          },
+          "style": {
+            "width": "614px",
+            "height": "24px",
+            "top": "auto",
+            "position": "static",
+            "display": "block",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "normal",
+            "borderRadius": "0px",
+            "fontSize": "14px",
+            "lineHeight": "24px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "307px 12px",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "visible",
+            "minHeight": "0px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-panel-body",
+          "rect": {
+            "x": 361,
+            "y": 748.1875,
+            "width": 718,
+            "height": 145.6875,
+            "right": 1079,
+            "bottom": 893.875
+          },
+          "style": {
+            "width": "718px",
+            "height": "145.688px",
+            "top": "auto",
+            "position": "static",
+            "display": "block",
+            "paddingTop": "16px",
+            "paddingRight": "16px",
+            "paddingBottom": "16px",
+            "paddingLeft": "16px",
+            "gap": "normal",
+            "borderRadius": "8px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "359px 72.8438px",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "visible",
+            "minHeight": "0px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-nominal-grid",
+          "rect": {
+            "x": 377,
+            "y": 1127.625,
+            "width": 686,
+            "height": 429.71875,
+            "right": 1063,
+            "bottom": 1557.34375
+          },
+          "style": {
+            "width": "686px",
+            "height": "429.719px",
+            "top": "auto",
+            "position": "static",
+            "display": "grid",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "16px",
+            "borderRadius": "0px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "343px 214.859px",
+            "gridTemplateColumns": "218px 218px 218px",
+            "zIndex": "auto",
+            "overflow": "visible",
+            "minHeight": "0px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-nominal-select",
+          "rect": {
+            "x": 377,
+            "y": 1127.625,
+            "width": 218,
+            "height": 151.234375,
+            "right": 595,
+            "bottom": 1278.859375
+          },
+          "style": {
+            "width": "218px",
+            "height": "151.234px",
+            "top": "0px",
+            "position": "relative",
+            "display": "flex",
+            "paddingTop": "16px",
+            "paddingRight": "16px",
+            "paddingBottom": "16px",
+            "paddingLeft": "16px",
+            "gap": "16px",
+            "borderRadius": "12px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "109px 75.6172px",
+            "gridTemplateColumns": "38px minmax(0px, 1fr)",
+            "zIndex": "auto",
+            "overflow": "hidden",
+            "minHeight": "85px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-payment-group-main",
+          "rect": {
+            "x": 378,
+            "y": 1688.34375,
+            "width": 684,
+            "height": 59.09375,
+            "right": 1062,
+            "bottom": 1747.4375
+          },
+          "style": {
+            "width": "684px",
+            "height": "59.0938px",
+            "top": "auto",
+            "position": "static",
+            "display": "flex",
+            "paddingTop": "10px",
+            "paddingRight": "10px",
+            "paddingBottom": "10px",
+            "paddingLeft": "10px",
+            "gap": "12px",
+            "borderRadius": "8px",
+            "fontSize": "13px",
+            "lineHeight": "19.5px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "342px 29.5469px",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "visible",
+            "minHeight": "0px",
+            "borderStyle": "none",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-payment-group-card",
+          "rect": {
+            "x": 377,
+            "y": 1687.34375,
+            "width": 686,
+            "height": 132.09375,
+            "right": 1063,
+            "bottom": 1819.4375
+          },
+          "style": {
+            "width": "686px",
+            "height": "132.094px",
+            "top": "auto",
+            "position": "static",
+            "display": "block",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "normal",
+            "borderRadius": "8px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "343px 66.0469px",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "visible",
+            "minHeight": "auto",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-payment-brand-item img",
+          "rect": {
+            "x": 516.296875,
+            "y": 1754.4375,
+            "width": 120,
+            "height": 48,
+            "right": 636.296875,
+            "bottom": 1802.4375
+          },
+          "style": {
+            "width": "120px",
+            "height": "48px",
+            "top": "auto",
+            "position": "static",
+            "display": "block",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "normal",
+            "borderRadius": "0px",
+            "fontSize": "8px",
+            "lineHeight": "12px",
+            "objectFit": "contain",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "60px 24px",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "clip",
+            "minHeight": "auto",
+            "borderStyle": "solid",
+            "maxHeight": "48px"
+          }
+        },
+        {
+          "selector": ".lf-mobile-checkout-bar",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "style": {
+            "width": "auto",
+            "height": "auto",
+            "top": "auto",
+            "position": "static",
+            "display": "none",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "normal",
+            "borderRadius": "0px",
+            "fontSize": "16px",
+            "lineHeight": "24px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "50% 50%",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "visible",
+            "minHeight": "0px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-mobile-summary-toggle",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "style": {
+            "width": "auto",
+            "height": "auto",
+            "top": "auto",
+            "position": "static",
+            "display": "inline-block",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "normal",
+            "borderRadius": "0px",
+            "fontSize": "13px",
+            "lineHeight": "19.5px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "50% 50%",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "visible",
+            "minHeight": "36px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        },
+        {
+          "selector": ".lf-mobile-order-button",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 0,
+            "height": 0,
+            "right": 0,
+            "bottom": 0
+          },
+          "style": {
+            "width": "auto",
+            "height": "40px",
+            "top": "auto",
+            "position": "static",
+            "display": "inline-flex",
+            "paddingTop": "0px",
+            "paddingRight": "0px",
+            "paddingBottom": "0px",
+            "paddingLeft": "0px",
+            "gap": "normal",
+            "borderRadius": "0px",
+            "fontSize": "13px",
+            "lineHeight": "15.6px",
+            "objectFit": "fill",
+            "objectPosition": "50% 50%",
+            "transform": "none",
+            "transformOrigin": "50% 50%",
+            "gridTemplateColumns": "none",
+            "zIndex": "auto",
+            "overflow": "visible",
+            "minHeight": "40px",
+            "borderStyle": "solid",
+            "maxHeight": "none"
+          }
+        }
+      ],
+      "cards": [
+        {
+          "padding": "16px",
+          "height": 151.234375
+        },
+        {
+          "padding": "16px",
+          "height": 151.234375
+        },
+        {
+          "padding": "16px",
+          "height": 151.234375
+        },
+        {
+          "padding": "16px",
+          "height": 98.046875
+        },
+        {
+          "padding": "16px",
+          "height": 98.046875
+        },
+        {
+          "padding": "16px",
+          "height": 98.046875
+        },
+        {
+          "padding": "16px",
+          "height": 148.4375
+        }
+      ],
+      "headers": [
+        {
+          "width": 40,
+          "height": 40
+        },
+        {
+          "width": 40,
+          "height": 40
+        },
+        {
+          "width": 40,
+          "height": 40
+        },
+        {
+          "width": 40,
+          "height": 40
+        },
+        {
+          "width": 40,
+          "height": 40
+        }
+      ],
+      "logos": [
+        {
+          "height": 48,
+          "maxHeight": "48px"
+        }
+      ],
+      "pass": true
+    }
+  ],
+  "breakpoints": [
+    {
+      "width": 639,
+      "columns": 2
+    },
+    {
+      "width": 640,
+      "columns": 3
+    },
+    {
+      "width": 767,
+      "columns": 3
+    },
+    {
+      "width": 768,
+      "columns": 2
+    },
+    {
+      "width": 1023,
+      "columns": 2
+    },
+    {
+      "width": 1024,
+      "columns": 3
+    }
+  ],
+  "functional": [
+    {
+      "width": 360,
+      "scroll": [
+        {
+          "className": "lf-checkout-panel lf-checkout-compact-panel lf-checkout-payment-panel",
+          "options": {
+            "behavior": "smooth",
+            "block": "start"
+          }
+        }
+      ],
+      "quotes": [
+        {
+          "status": 200,
+          "body": {
+            "subtotal_idr": 20000,
+            "member_discount_idr": 0,
+            "voucher_discount_idr": 0,
+            "discount_idr": 0,
+            "member_tier_code": null,
+            "member_discount_bps": 0,
+            "fee_idr": 141,
+            "total_idr": 20141,
+            "voucher_code": null,
+            "payment_channel_code": "qris"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "subtotal_idr": 20000,
+            "member_discount_idr": 0,
+            "voucher_discount_idr": 0,
+            "discount_idr": 0,
+            "member_tier_code": null,
+            "member_discount_bps": 0,
+            "fee_idr": 0,
+            "total_idr": 20000,
+            "voucher_code": null,
+            "payment_channel_code": "va_bni"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "subtotal_idr": 20000,
+            "member_discount_idr": 0,
+            "voucher_discount_idr": 0,
+            "discount_idr": 0,
+            "member_tier_code": null,
+            "member_discount_bps": 0,
+            "fee_idr": 0,
+            "total_idr": 20000,
+            "voucher_code": null,
+            "payment_channel_code": "ewallet"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "subtotal_idr": 20000,
+            "member_discount_idr": 0,
+            "voucher_discount_idr": 0,
+            "discount_idr": 0,
+            "member_tier_code": null,
+            "member_discount_bps": 0,
+            "fee_idr": 141,
+            "total_idr": 20141,
+            "voucher_code": null,
+            "payment_channel_code": "qris"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "subtotal_idr": 20000,
+            "member_discount_idr": 0,
+            "voucher_discount_idr": 0,
+            "discount_idr": 0,
+            "member_tier_code": null,
+            "member_discount_bps": 0,
+            "fee_idr": 141,
+            "total_idr": 20141,
+            "voucher_code": null,
+            "payment_channel_code": "qris"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "subtotal_idr": 20000,
+            "member_discount_idr": 0,
+            "voucher_discount_idr": 1000,
+            "discount_idr": 1000,
+            "member_tier_code": null,
+            "member_discount_bps": 0,
+            "fee_idr": 134,
+            "total_idr": 19134,
+            "voucher_code": "CLOUDQA1000",
+            "payment_channel_code": "qris"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "subtotal_idr": 20000,
+            "member_discount_idr": 0,
+            "voucher_discount_idr": 1000,
+            "discount_idr": 1000,
+            "member_tier_code": null,
+            "member_discount_bps": 0,
+            "fee_idr": 134,
+            "total_idr": 19134,
+            "voucher_code": "CLOUDQA1000",
+            "payment_channel_code": "qris"
+          }
+        }
+      ],
+      "dialog": {
+        "width": 328,
+        "height": 213.59375
+      },
+      "validation": "missing contact rejected",
+      "confirmation": {
+        "subtotal_idr": 20000,
+        "member_discount_idr": 0,
+        "voucher_discount_idr": 1000,
+        "discount_idr": 1000,
+        "member_tier_code": null,
+        "member_discount_bps": 0,
+        "fee_idr": 134,
+        "total_idr": 19134,
+        "voucher_code": "CLOUDQA1000",
+        "payment_channel_code": "qris"
+      },
+      "transactions": 0,
+      "externalRequests": 0
+    },
+    {
+      "width": 390,
+      "scroll": [
+        {
+          "className": "lf-checkout-panel lf-checkout-compact-panel lf-checkout-payment-panel",
+          "options": {
+            "behavior": "smooth",
+            "block": "start"
+          }
+        }
+      ],
+      "quotes": [
+        {
+          "status": 200,
+          "body": {
+            "subtotal_idr": 20000,
+            "member_discount_idr": 0,
+            "voucher_discount_idr": 0,
+            "discount_idr": 0,
+            "member_tier_code": null,
+            "member_discount_bps": 0,
+            "fee_idr": 141,
+            "total_idr": 20141,
+            "voucher_code": null,
+            "payment_channel_code": "qris"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "subtotal_idr": 20000,
+            "member_discount_idr": 0,
+            "voucher_discount_idr": 0,
+            "discount_idr": 0,
+            "member_tier_code": null,
+            "member_discount_bps": 0,
+            "fee_idr": 0,
+            "total_idr": 20000,
+            "voucher_code": null,
+            "payment_channel_code": "va_bni"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "subtotal_idr": 20000,
+            "member_discount_idr": 0,
+            "voucher_discount_idr": 0,
+            "discount_idr": 0,
+            "member_tier_code": null,
+            "member_discount_bps": 0,
+            "fee_idr": 0,
+            "total_idr": 20000,
+            "voucher_code": null,
+            "payment_channel_code": "ewallet"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "subtotal_idr": 20000,
+            "member_discount_idr": 0,
+            "voucher_discount_idr": 0,
+            "discount_idr": 0,
+            "member_tier_code": null,
+            "member_discount_bps": 0,
+            "fee_idr": 141,
+            "total_idr": 20141,
+            "voucher_code": null,
+            "payment_channel_code": "qris"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "subtotal_idr": 20000,
+            "member_discount_idr": 0,
+            "voucher_discount_idr": 0,
+            "discount_idr": 0,
+            "member_tier_code": null,
+            "member_discount_bps": 0,
+            "fee_idr": 141,
+            "total_idr": 20141,
+            "voucher_code": null,
+            "payment_channel_code": "qris"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "subtotal_idr": 20000,
+            "member_discount_idr": 0,
+            "voucher_discount_idr": 1000,
+            "discount_idr": 1000,
+            "member_tier_code": null,
+            "member_discount_bps": 0,
+            "fee_idr": 134,
+            "total_idr": 19134,
+            "voucher_code": "CLOUDQA1000",
+            "payment_channel_code": "qris"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "subtotal_idr": 20000,
+            "member_discount_idr": 0,
+            "voucher_discount_idr": 1000,
+            "discount_idr": 1000,
+            "member_tier_code": null,
+            "member_discount_bps": 0,
+            "fee_idr": 134,
+            "total_idr": 19134,
+            "voucher_code": "CLOUDQA1000",
+            "payment_channel_code": "qris"
+          }
+        }
+      ],
+      "dialog": {
+        "width": 358,
+        "height": 213.59375
+      },
+      "validation": "missing contact rejected",
+      "confirmation": {
+        "subtotal_idr": 20000,
+        "member_discount_idr": 0,
+        "voucher_discount_idr": 1000,
+        "discount_idr": 1000,
+        "member_tier_code": null,
+        "member_discount_bps": 0,
+        "fee_idr": 134,
+        "total_idr": 19134,
+        "voucher_code": "CLOUDQA1000",
+        "payment_channel_code": "qris"
+      },
+      "transactions": 0,
+      "externalRequests": 0
+    },
+    {
+      "width": 768,
+      "scroll": [
+        {
+          "className": "lf-checkout-panel lf-checkout-compact-panel lf-checkout-payment-panel",
+          "options": {
+            "behavior": "smooth",
+            "block": "start"
+          }
+        }
+      ],
+      "quotes": [
+        {
+          "status": 200,
+          "body": {
+            "subtotal_idr": 20000,
+            "member_discount_idr": 0,
+            "voucher_discount_idr": 0,
+            "discount_idr": 0,
+            "member_tier_code": null,
+            "member_discount_bps": 0,
+            "fee_idr": 141,
+            "total_idr": 20141,
+            "voucher_code": null,
+            "payment_channel_code": "qris"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "subtotal_idr": 20000,
+            "member_discount_idr": 0,
+            "voucher_discount_idr": 0,
+            "discount_idr": 0,
+            "member_tier_code": null,
+            "member_discount_bps": 0,
+            "fee_idr": 0,
+            "total_idr": 20000,
+            "voucher_code": null,
+            "payment_channel_code": "va_bni"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "subtotal_idr": 20000,
+            "member_discount_idr": 0,
+            "voucher_discount_idr": 0,
+            "discount_idr": 0,
+            "member_tier_code": null,
+            "member_discount_bps": 0,
+            "fee_idr": 0,
+            "total_idr": 20000,
+            "voucher_code": null,
+            "payment_channel_code": "ewallet"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "subtotal_idr": 20000,
+            "member_discount_idr": 0,
+            "voucher_discount_idr": 0,
+            "discount_idr": 0,
+            "member_tier_code": null,
+            "member_discount_bps": 0,
+            "fee_idr": 141,
+            "total_idr": 20141,
+            "voucher_code": null,
+            "payment_channel_code": "qris"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "subtotal_idr": 20000,
+            "member_discount_idr": 0,
+            "voucher_discount_idr": 0,
+            "discount_idr": 0,
+            "member_tier_code": null,
+            "member_discount_bps": 0,
+            "fee_idr": 141,
+            "total_idr": 20141,
+            "voucher_code": null,
+            "payment_channel_code": "qris"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "subtotal_idr": 20000,
+            "member_discount_idr": 0,
+            "voucher_discount_idr": 1000,
+            "discount_idr": 1000,
+            "member_tier_code": null,
+            "member_discount_bps": 0,
+            "fee_idr": 134,
+            "total_idr": 19134,
+            "voucher_code": "CLOUDQA1000",
+            "payment_channel_code": "qris"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "subtotal_idr": 20000,
+            "member_discount_idr": 0,
+            "voucher_discount_idr": 1000,
+            "discount_idr": 1000,
+            "member_tier_code": null,
+            "member_discount_bps": 0,
+            "fee_idr": 134,
+            "total_idr": 19134,
+            "voucher_code": "CLOUDQA1000",
+            "payment_channel_code": "qris"
+          }
+        }
+      ],
+      "dialog": {
+        "width": 520,
+        "height": 202.390625
+      },
+      "validation": "missing contact rejected",
+      "confirmation": {
+        "subtotal_idr": 20000,
+        "member_discount_idr": 0,
+        "voucher_discount_idr": 1000,
+        "discount_idr": 1000,
+        "member_tier_code": null,
+        "member_discount_bps": 0,
+        "fee_idr": 134,
+        "total_idr": 19134,
+        "voucher_code": "CLOUDQA1000",
+        "payment_channel_code": "qris"
+      },
+      "transactions": 0,
+      "externalRequests": 0
+    },
+    {
+      "width": 1280,
+      "scroll": [
+        {
+          "className": "lf-checkout-panel lf-checkout-compact-panel lf-checkout-payment-panel",
+          "options": {
+            "behavior": "smooth",
+            "block": "start"
+          }
+        }
+      ],
+      "quotes": [
+        {
+          "status": 200,
+          "body": {
+            "subtotal_idr": 20000,
+            "member_discount_idr": 0,
+            "voucher_discount_idr": 0,
+            "discount_idr": 0,
+            "member_tier_code": null,
+            "member_discount_bps": 0,
+            "fee_idr": 141,
+            "total_idr": 20141,
+            "voucher_code": null,
+            "payment_channel_code": "qris"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "subtotal_idr": 20000,
+            "member_discount_idr": 0,
+            "voucher_discount_idr": 0,
+            "discount_idr": 0,
+            "member_tier_code": null,
+            "member_discount_bps": 0,
+            "fee_idr": 0,
+            "total_idr": 20000,
+            "voucher_code": null,
+            "payment_channel_code": "va_bni"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "subtotal_idr": 20000,
+            "member_discount_idr": 0,
+            "voucher_discount_idr": 0,
+            "discount_idr": 0,
+            "member_tier_code": null,
+            "member_discount_bps": 0,
+            "fee_idr": 0,
+            "total_idr": 20000,
+            "voucher_code": null,
+            "payment_channel_code": "ewallet"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "subtotal_idr": 20000,
+            "member_discount_idr": 0,
+            "voucher_discount_idr": 0,
+            "discount_idr": 0,
+            "member_tier_code": null,
+            "member_discount_bps": 0,
+            "fee_idr": 141,
+            "total_idr": 20141,
+            "voucher_code": null,
+            "payment_channel_code": "qris"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "subtotal_idr": 20000,
+            "member_discount_idr": 0,
+            "voucher_discount_idr": 0,
+            "discount_idr": 0,
+            "member_tier_code": null,
+            "member_discount_bps": 0,
+            "fee_idr": 141,
+            "total_idr": 20141,
+            "voucher_code": null,
+            "payment_channel_code": "qris"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "subtotal_idr": 20000,
+            "member_discount_idr": 0,
+            "voucher_discount_idr": 1000,
+            "discount_idr": 1000,
+            "member_tier_code": null,
+            "member_discount_bps": 0,
+            "fee_idr": 134,
+            "total_idr": 19134,
+            "voucher_code": "CLOUDQA1000",
+            "payment_channel_code": "qris"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "subtotal_idr": 20000,
+            "member_discount_idr": 0,
+            "voucher_discount_idr": 1000,
+            "discount_idr": 1000,
+            "member_tier_code": null,
+            "member_discount_bps": 0,
+            "fee_idr": 134,
+            "total_idr": 19134,
+            "voucher_code": "CLOUDQA1000",
+            "payment_channel_code": "qris"
+          }
+        }
+      ],
+      "dialog": {
+        "width": 520,
+        "height": 202.390625
+      },
+      "validation": "missing contact rejected",
+      "confirmation": {
+        "subtotal_idr": 20000,
+        "member_discount_idr": 0,
+        "voucher_discount_idr": 1000,
+        "discount_idr": 1000,
+        "member_tier_code": null,
+        "member_discount_bps": 0,
+        "fee_idr": 134,
+        "total_idr": 19134,
+        "voucher_code": "CLOUDQA1000",
+        "payment_channel_code": "qris"
+      },
+      "transactions": 0,
+      "externalRequests": 0
+    },
+    {
+      "width": 1440,
+      "scroll": [
+        {
+          "className": "lf-checkout-panel lf-checkout-compact-panel lf-checkout-payment-panel",
+          "options": {
+            "behavior": "smooth",
+            "block": "start"
+          }
+        }
+      ],
+      "quotes": [
+        {
+          "status": 200,
+          "body": {
+            "subtotal_idr": 20000,
+            "member_discount_idr": 0,
+            "voucher_discount_idr": 0,
+            "discount_idr": 0,
+            "member_tier_code": null,
+            "member_discount_bps": 0,
+            "fee_idr": 141,
+            "total_idr": 20141,
+            "voucher_code": null,
+            "payment_channel_code": "qris"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "subtotal_idr": 20000,
+            "member_discount_idr": 0,
+            "voucher_discount_idr": 0,
+            "discount_idr": 0,
+            "member_tier_code": null,
+            "member_discount_bps": 0,
+            "fee_idr": 0,
+            "total_idr": 20000,
+            "voucher_code": null,
+            "payment_channel_code": "va_bni"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "subtotal_idr": 20000,
+            "member_discount_idr": 0,
+            "voucher_discount_idr": 0,
+            "discount_idr": 0,
+            "member_tier_code": null,
+            "member_discount_bps": 0,
+            "fee_idr": 0,
+            "total_idr": 20000,
+            "voucher_code": null,
+            "payment_channel_code": "ewallet"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "subtotal_idr": 20000,
+            "member_discount_idr": 0,
+            "voucher_discount_idr": 0,
+            "discount_idr": 0,
+            "member_tier_code": null,
+            "member_discount_bps": 0,
+            "fee_idr": 141,
+            "total_idr": 20141,
+            "voucher_code": null,
+            "payment_channel_code": "qris"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "subtotal_idr": 20000,
+            "member_discount_idr": 0,
+            "voucher_discount_idr": 0,
+            "discount_idr": 0,
+            "member_tier_code": null,
+            "member_discount_bps": 0,
+            "fee_idr": 141,
+            "total_idr": 20141,
+            "voucher_code": null,
+            "payment_channel_code": "qris"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "subtotal_idr": 20000,
+            "member_discount_idr": 0,
+            "voucher_discount_idr": 1000,
+            "discount_idr": 1000,
+            "member_tier_code": null,
+            "member_discount_bps": 0,
+            "fee_idr": 134,
+            "total_idr": 19134,
+            "voucher_code": "CLOUDQA1000",
+            "payment_channel_code": "qris"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "subtotal_idr": 20000,
+            "member_discount_idr": 0,
+            "voucher_discount_idr": 1000,
+            "discount_idr": 1000,
+            "member_tier_code": null,
+            "member_discount_bps": 0,
+            "fee_idr": 134,
+            "total_idr": 19134,
+            "voucher_code": "CLOUDQA1000",
+            "payment_channel_code": "qris"
+          }
+        }
+      ],
+      "dialog": {
+        "width": 520,
+        "height": 202.390625
+      },
+      "validation": "missing contact rejected",
+      "confirmation": {
+        "subtotal_idr": 20000,
+        "member_discount_idr": 0,
+        "voucher_discount_idr": 1000,
+        "discount_idr": 1000,
+        "member_tier_code": null,
+        "member_discount_bps": 0,
+        "fee_idr": 134,
+        "total_idr": 19134,
+        "voucher_code": "CLOUDQA1000",
+        "payment_channel_code": "qris"
+      },
+      "transactions": 0,
+      "externalRequests": 0
+    }
+  ],
+  "errors": [],
+  "blockedRequests": []
+}

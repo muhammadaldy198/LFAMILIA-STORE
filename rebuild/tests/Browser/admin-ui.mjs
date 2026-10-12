@@ -164,7 +164,7 @@ try {
             if(path==='/admin/content'&&width===390){
                 await click('Logo & Gambar');
                 const previousIcon=await evaluate(`document.querySelector('link[rel=icon]')?.getAttribute('href')`);
-                const file=join(profile,'browser-favicon.png');await writeFile(file,Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAAY0lEQVR4nO3PQQ3AIADAQMAKwhCNoYngcVnSU9DOfe74s6UDXjWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgfYaaAdUdZaagAAAAAElFTkSuQmCC','base64'));
+                const file=join(profile,'browser-favicon.png');await writeFile(file,Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAAY0lEQVRoge3PQQ3AIADAQEAI2hGGmIngcVnSU9DOc/f4s6UDXjWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgfYlFAhpkoryPAAAAAElFTkSuQmCC','base64'));
                 const input=await send('Runtime.evaluate',{expression:`[...document.querySelectorAll('article')].find(a=>a.textContent.includes('Favicon')).querySelector('input[type=file]')`});
                 await send('DOM.setFileInputFiles',{objectId:input.result.objectId,files:[file]});await pause(100);
                 await evaluate(`[...document.querySelectorAll('article')].find(a=>a.textContent.includes('Favicon')).querySelector('form').requestSubmit()`);

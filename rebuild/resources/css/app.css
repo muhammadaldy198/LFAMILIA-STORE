@@ -5594,7 +5594,7 @@
 
 /* Global customer control geometry: 36px at every viewport. */
 .lf-customer{--lf-ui-control-height:36px;--lf-ui-button-sm-height:36px}
-.lf-customer button:not(.lf-menu):not(.lf-support-trigger):not(.lf-account-menu-toggle):not(.lf-account-menu-close):not(.lf-drawer-close):not(:has(img)):not(:has(.lf-nominal-copy)):not(:has(.lf-voucher-copy)):not(:has(.lf-mobile-summary-copy)),
+.lf-customer button:not(.lf-menu):not(.lf-support-trigger):not(.lf-account-menu-toggle):not(.lf-account-menu-close):not(.lf-drawer-close):not(:has(img)):not(:has(.lf-nominal-copy)):not(:has(.lf-voucher-copy)):not(:has(.lf-mobile-summary-copy)):not(.lf-payment-group-main):not(.lf-mobile-summary-toggle):not(.lf-mobile-order-button),
 .lf-customer .lf-primary,.lf-customer .lf-secondary,
 .lf-customer .lf-review-submit,.lf-customer .lf-order-button,
 .lf-customer .lf-mobile-order-button,.lf-customer .lf-support-cta-button,
@@ -5666,7 +5666,7 @@
  .lf-customer{--lf-ui-control-height:40px;--lf-ui-button-sm-height:40px}
  .lf-customer input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
  .lf-customer select,
- .lf-customer button:not(.lf-menu):not(.lf-support-trigger):not(.lf-account-menu-toggle):not(.lf-account-menu-close):not(.lf-drawer-close):not(:has(img)):not(:has(.lf-nominal-copy)):not(:has(.lf-voucher-copy)):not(:has(.lf-mobile-summary-copy)),
+ .lf-customer button:not(.lf-menu):not(.lf-support-trigger):not(.lf-account-menu-toggle):not(.lf-account-menu-close):not(.lf-drawer-close):not(:has(img)):not(:has(.lf-nominal-copy)):not(:has(.lf-voucher-copy)):not(:has(.lf-mobile-summary-copy)):not(.lf-payment-group-main):not(.lf-mobile-summary-toggle):not(.lf-mobile-order-button),
  .lf-customer .lf-primary,.lf-customer .lf-secondary,
  .lf-customer .lf-review-submit,.lf-customer .lf-order-button,
  .lf-customer .lf-account-nav a,.lf-customer .lf-chip,
@@ -7355,7 +7355,7 @@
 .lf-customer.lf-customer .lf-checkout-page .lf-checkout-panel>header p{
   display:none!important;
 }
-.lf-customer .lf-checkout-page .lf-checkout-panel .lf-panel-body{
+.lf-customer.lf-customer .lf-checkout-page .lf-checkout-panel .lf-panel-body{
   padding:16px!important;
 }
 .lf-customer .lf-checkout-page .lf-checkout-panels{gap:24px!important}
@@ -7396,8 +7396,22 @@
   border-color:rgba(178,222,98,.85)!important;
   box-shadow:0 0 0 1px rgba(178,222,98,.25)!important;
 }
-.lf-customer .lf-checkout-page .lf-nominal-option:has(.lf-nominal-promo)>.lf-nominal-select{padding-top:30px!important}
-.lf-customer .lf-checkout-page .lf-nominal-option:has(.lf-nominal-info-button)>.lf-nominal-select{padding-right:30px!important}
+/* Keep card padding at 16px; reserve room inside the content for the info control. */
+.lf-customer .lf-checkout-page .lf-nominal-promo{
+  position:static!important;
+  align-self:flex-start;
+  border-radius:4px;
+}
+.lf-customer .lf-checkout-page .lf-nominal-option:has(.lf-nominal-info-button) .lf-nominal-top{padding-right:28px}
+.lf-customer .lf-checkout-page .lf-nominal-option>.lf-nominal-info-button{top:16px!important;right:16px!important}
+.lf-customer.lf-customer .lf-checkout-page .lf-nominal-copy strong{
+  display:block!important;
+  -webkit-line-clamp:unset!important;
+  line-clamp:unset!important;
+  max-height:none!important;
+  overflow:visible!important;
+  overflow-wrap:anywhere;
+}
 .lf-customer .lf-checkout-page .lf-nominal-grid .lf-nominal-top{
   flex:0 0 auto!important;
   gap:8px!important;
@@ -7494,7 +7508,7 @@
   .lf-customer .lf-mobile-checkout-inner{
     display:flex!important;
     width:100%!important;
-    max-width:720px!important;
+    max-width:none!important;
     margin:auto!important;
     flex-direction:column!important;
     gap:16px!important;

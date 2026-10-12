@@ -195,6 +195,23 @@ jobs:
       - name: Run rebuild tests
         run: vendor/bin/phpunit
 
+      - name: Checkout SPEC FINAL V3 Playwright QA
+        env:
+          PLAYWRIGHT_HOME: /tmp/lfamilia-playwright
+          CHECKOUT_QA_OUTPUT: /tmp/lfamilia-checkout-v3
+        run: |
+          mysql -h 127.0.0.1 -uroot -p"${DB_PASSWORD}" -e 'CREATE DATABASE IF NOT EXISTS lfamilia_checkout_preview_v3'
+          npm install --prefix "$PLAYWRIGHT_HOME" --ignore-scripts --no-package-lock playwright@1.64.0
+          bash tests/Browser/checkout-v3.sh
+
+      - name: Upload checkout browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: checkout-spec-v3
+          path: /tmp/lfamilia-checkout-v3
+          if-no-files-found: ignore
+
       - name: Run M11 browser smoke
         run: bash tests/Browser/smoke.sh
 

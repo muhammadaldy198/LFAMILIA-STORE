@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_URL="http://127.0.0.1:8000"
+export APP_URL="http://127.0.0.1:8000"
 LOG_FILE="/tmp/lfamilia-browser-smoke.log"
 SERVER_PID=""
 
