@@ -7345,11 +7345,15 @@
   padding:8px 16px!important;
   min-width:0!important;
 }
-.lf-customer .lf-checkout-page .lf-checkout-panel>header h2{
+/* Match the V2 high-specificity selectors so the measured header size wins. */
+.lf-customer.lf-customer .lf-checkout-page .lf-checkout-panel>header h2{
   font-size:14px!important;
   line-height:24px!important;
   font-weight:700!important;
   margin:0!important;
+}
+.lf-customer.lf-customer .lf-checkout-page .lf-checkout-panel>header p{
+  display:none!important;
 }
 .lf-customer .lf-checkout-page .lf-checkout-panel .lf-panel-body{
   padding:16px!important;
