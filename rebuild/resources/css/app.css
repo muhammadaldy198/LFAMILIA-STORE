@@ -7034,3 +7034,94 @@
   .lf-customer.lf-customer .lf-checkout-page .lf-package-sections h3{font-size:14px!important}
   .lf-customer.lf-customer .lf-checkout-page .lf-nominal-copy strong{font-size:11px!important}
 }
+
+/* PR #266 / Final V2, step 10: one color = one checkout role.
+   Lime reserved for order CTAs and selected transaction tab/active section navigation. */
+.lf-customer .lf-checkout-page{
+  background:#050911!important;
+  color:#f4f7fc;
+}
+.lf-customer .lf-checkout-tabs button.active{
+  background:var(--lf-lime)!important;
+  color:#0a1104!important;
+}
+.lf-customer .lf-checkout-page .lf-nominal-grid .lf-nominal-option>.lf-nominal-select.selected{
+  border-color:#779ddf!important;
+  background:linear-gradient(135deg,#18273a,#101a28)!important;
+  box-shadow:inset 0 0 0 1px #779ddf!important;
+}
+.lf-customer .lf-checkout-page .lf-nominal-grid .lf-nominal-footer>b,
+.lf-customer .lf-checkout-page .lf-nominal-points,
+.lf-customer .lf-checkout-page .lf-nominal-old-price,
+.lf-customer .lf-checkout-page .lf-mobile-summary-selection-copy small{
+  text-shadow:none!important;
+}
+.lf-customer .lf-checkout-page .lf-nominal-footer>b,
+.lf-customer .lf-mobile-summary-selection-copy small,
+.lf-customer .lf-mobile-summary-price,
+.lf-customer .lf-mobile-summary-lines .total dd{
+  color:#ffd46c!important;
+}
+.lf-customer .lf-checkout-page .lf-nominal-promo{
+  background:#d94634!important;
+  color:#fff!important;
+}
+.lf-customer .lf-checkout-page .lf-nominal-points{color:#f8c957!important}
+.lf-customer .lf-checkout-page .lf-nominal-old-price{color:#f48f91!important}
+.lf-customer .lf-checkout-page .lf-payment-group-card.selected,
+.lf-customer .lf-checkout-page .lf-payment-channel-grid>button.selected{
+  border-color:#729ce0!important;
+  background:#16283c!important;
+  color:#f5f8ff!important;
+}
+.lf-customer .lf-checkout-page .lf-payment-check{
+  background:#6f9ee3!important;
+  color:#06101d!important;
+}
+.lf-customer .lf-checkout-page .lf-account-avatar,
+.lf-customer .lf-checkout-page .lf-checkout-info-note svg,
+.lf-customer .lf-checkout-page .lf-payment-login-hint a,
+.lf-customer .lf-checkout-page .lf-customer-checkout-note a{
+  color:#89b8ff!important;
+}
+.lf-customer .lf-checkout-page .lf-account-avatar{
+  background:#14283d!important;
+}
+.lf-customer .lf-checkout-page .lf-checkout-panel>header>.lf-step-number{
+  border-color:#7b9de0!important;
+  background:#263c5e!important;
+  color:#eef4ff!important;
+}
+.lf-customer .lf-checkout-page .lf-available-promo,
+.lf-customer .lf-checkout-page .lf-promo-input button{
+  background:#344155!important;
+  border-color:#657185!important;
+  color:#fff!important;
+}
+.lf-customer .lf-checkout-page .lf-available-promo:hover,
+.lf-customer .lf-checkout-page .lf-promo-input button:not(:disabled):hover{
+  background:#46566d!important;
+  border-color:#8a9ebd!important;
+}
+.lf-customer .lf-checkout-page .lf-payment-group-copy small,
+.lf-customer .lf-checkout-page .lf-account-fields input::placeholder,
+.lf-customer .lf-checkout-page .lf-promo-input input::placeholder,
+.lf-customer .lf-checkout-page .lf-contact-privacy{
+  color:#9ca7b6!important;
+}
+.lf-customer .lf-desktop-checkout-action,
+.lf-customer .lf-mobile-order-button:not(:disabled){
+  background:var(--lf-lime)!important;
+  color:#0b1205!important;
+  border-color:var(--lf-lime)!important;
+}
+.lf-customer .lf-desktop-checkout-action:disabled,
+.lf-customer .lf-mobile-order-button:disabled{
+  background:#394335!important;
+  color:#c0cbb8!important;
+  border-color:#394335!important;
+}
+.lf-customer .lf-package-info-confirm{
+  background:#344155!important;
+  color:#fff!important;
+}
