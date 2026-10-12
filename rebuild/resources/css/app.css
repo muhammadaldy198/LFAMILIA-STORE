@@ -6208,3 +6208,95 @@
   max-width:100%;
   white-space:nowrap;
 }
+
+/* PR #266 / Final V2, step 1: centered 720px desktop checkout and fixed action bar.
+   Keep the existing mobile layout intact until step 2. */
+.lf-desktop-checkout-bar{display:none}
+@media (min-width:640px){
+  .lf-customer .lf-checkout-page{padding-bottom:140px}
+  .lf-customer .lf-checkout-page>.lf-container{
+    width:min(720px,calc(100% - 32px))!important;
+    max-width:720px!important;
+    margin-inline:auto!important;
+  }
+  .lf-customer .lf-checkout-tabs{width:100%;max-width:none}
+  .lf-customer .lf-checkout-grid{
+    display:block!important;
+    grid-template-columns:none!important;
+    width:100%;
+    margin-top:16px;
+  }
+  .lf-customer .lf-checkout-panels{
+    width:100%;
+    min-width:0;
+  }
+  .lf-customer .lf-desktop-checkout-bar{
+    display:block;
+    position:fixed;
+    inset: auto 0 0;
+    z-index:70;
+    padding:14px max(16px,env(safe-area-inset-right)) calc(14px + env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));
+    border-top:1px solid rgba(255,255,255,.15);
+    background:rgba(9,13,20,.97);
+    box-shadow:0 -14px 42px rgba(0,0,0,.42);
+    backdrop-filter:blur(12px);
+  }
+  .lf-customer .lf-desktop-checkout-inner{
+    width:100%;
+    max-width:720px;
+    margin-inline:auto;
+    display:flex;
+    align-items:center;
+    gap:20px;
+  }
+  .lf-customer .lf-desktop-checkout-details{
+    display:flex;
+    flex:1 1 auto;
+    min-width:0;
+    flex-direction:column;
+    gap:3px;
+  }
+  .lf-customer .lf-desktop-checkout-product{
+    color:#f0f3f9;
+    font-size:13px;
+    line-height:1.35;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .lf-customer .lf-desktop-checkout-empty{
+    color:#b9c1cc;
+    font-size:14px;
+    line-height:1.5;
+  }
+  .lf-customer .lf-desktop-checkout-price-label{
+    color:#a8b1c1;
+    font-size:11px;
+  }
+  .lf-customer .lf-desktop-checkout-price{
+    color:#ffd46c;
+    font-size:19px;
+    line-height:1.3;
+    font-weight:750;
+  }
+  .lf-customer .lf-desktop-checkout-action{
+    flex:0 0 auto;
+    min-width:174px;
+    min-height:46px!important;
+    height:46px!important;
+    padding:0 22px;
+    border:0;
+    border-radius:10px;
+    background:var(--lf-lime);
+    color:#0b1004;
+    font-size:14px;
+    font-weight:800;
+    cursor:pointer;
+  }
+  .lf-customer .lf-desktop-checkout-action:disabled{
+    cursor:not-allowed;
+    background:#44513b;
+    color:#c3ccbd;
+  }
+  .lf-customer .lf-desktop-checkout-action:not(:disabled):hover{filter:brightness(1.08)}
+}

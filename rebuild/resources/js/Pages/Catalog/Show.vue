@@ -995,22 +995,6 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
 
             </div>
 
-            <aside class="lf-order-summary">
-                <h2>{{ customerText("pages.catalog.show.e728eee3", "Ringkasan Pesanan") }}</h2>
-                <div class="lf-summary-product">
-                    <img v-if="selectedPackage?.image_url || product.image_url" :src="selectedPackage?.image_url || product.image_url" :alt="product.name">
-                    <span v-else class="lf-mobile-package-fallback">{{ customerText("pages.catalog.show.6ae24f17", "LF") }}</span>
-                    <div><strong>{{product.name}}</strong><small>{{selectedPackage ? nominalLabel(selectedPackage.name, product.name) : 'Pilih nominal'}}</small></div>
-                </div>
-                <dl>
-                    <div><dt>{{ customerText("pages.catalog.show.724d11bc", "Harga") }}</dt><dd>{{formatIdr(summarySubtotal)}}</dd></div>
-                    <div v-if="quote?.member_discount_idr"><dt>Diskon {{quote.member_tier_code || 'Member'}}</dt><dd class="lf-discount">-{{formatIdr(quote.member_discount_idr)}}</dd></div>
-                    <div v-if="quote?.voucher_discount_idr"><dt>{{ customerText("pages.catalog.show.6af5335f", "Diskon Voucher") }}</dt><dd class="lf-discount">-{{formatIdr(quote.voucher_discount_idr)}}</dd></div>
-                    <div class="total"><dt>{{ customerText("pages.catalog.show.ad066d9d", "Total") }}</dt><dd>{{displayTotal===null ? 'Menghitung…' : formatIdr(displayTotal)}}</dd></div>
-                </dl>
-                <button type="button" class="lf-order-button" :disabled="busy==='order'||!selectedPackage||!paymentChannelCode||displayTotal===null" @click="prepareOrder">{{busy==='order'?'Memproses...':'Pesan Sekarang'}}</button>
-                <p class="lf-summary-security">{{ customerText("pages.catalog.show.22bd992a", "🔒 Harga dihitung server-side dan dikunci saat pesanan dibuat.") }}</p>
-            </aside>
         </div>
 
         <section v-else class="lf-product-details">
@@ -1099,6 +1083,26 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                 </div>
             </article>
         </section>
+    </div>
+
+    <!-- Checkout action on desktop remains visible during scrolling; prices always come from server quotes. -->
+    <div v-if="activeTab==='transaction'" class="lf-desktop-checkout-bar">
+        <div class="lf-desktop-checkout-inner">
+            <div class="lf-desktop-checkout-details" aria-live="polite">
+                <template v-if="selectedPackage">
+                    <span class="lf-desktop-checkout-product">{{ product.name }} · {{ nominalLabel(selectedPackage.name, product.name) }}</span>
+                    <span class="lf-desktop-checkout-price-label">Total Pembayaran</span>
+                    <strong class="lf-desktop-checkout-price">{{ displayTotal === null ? (paymentChannelCode ? 'Menunggu perhitungan total' : 'Pilih metode pembayaran') : formatIdr(displayTotal) }}</strong>
+                </template>
+                <span v-else class="lf-desktop-checkout-empty">Belum ada item produk yang dipilih.</span>
+            </div>
+            <button
+                type="button"
+                class="lf-desktop-checkout-action"
+                :disabled="busy==='order'||!selectedPackage||!paymentChannelCode||displayTotal===null"
+                @click="prepareOrder"
+            >{{ busy==='order' ? 'Memproses...' : 'Pesan Sekarang' }}</button>
+        </div>
     </div>
 
     <div v-if="activeTab==='transaction'" class="lf-mobile-checkout-bar" :class="{'is-hidden': !checkoutBarVisible}">
