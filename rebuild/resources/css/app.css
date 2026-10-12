@@ -6300,3 +6300,104 @@
   }
   .lf-customer .lf-desktop-checkout-action:not(:disabled):hover{filter:brightness(1.08)}
 }
+
+/* PR #266 / Final V2, step 2: mobile sticky checkout status and bag CTA. */
+@media (max-width:639px){
+  .lf-customer .lf-mobile-checkout-bar{
+    z-index:80!important;
+    padding:10px 12px calc(10px + env(safe-area-inset-bottom))!important;
+    background:rgba(8,12,19,.98)!important;
+  }
+  .lf-customer .lf-mobile-summary-toggle{
+    display:flex!important;
+    width:100%!important;
+    min-height:62px!important;
+    height:auto!important;
+    align-items:center!important;
+    justify-content:space-between!important;
+    gap:10px!important;
+    padding:10px 12px!important;
+    margin-bottom:10px!important;
+    border:1px dashed rgba(255,255,255,.2)!important;
+    border-radius:10px!important;
+    background:#121720!important;
+    text-align:left!important;
+  }
+  .lf-customer .lf-mobile-summary-toggle:disabled{
+    opacity:1!important;
+    cursor:default;
+  }
+  .lf-customer .lf-mobile-summary-selection{
+    display:flex!important;
+    min-width:0;
+    flex:1 1 auto;
+    align-items:center;
+    gap:10px;
+  }
+  .lf-customer .lf-mobile-summary-selection .lf-mobile-summary-art{
+    width:38px!important;
+    height:38px!important;
+    flex:0 0 38px!important;
+  }
+  .lf-customer .lf-mobile-summary-selection-copy{
+    display:flex;
+    flex:1 1 auto;
+    min-width:0;
+    flex-direction:column;
+    gap:3px;
+  }
+  .lf-customer .lf-mobile-summary-selection-copy strong{
+    display:block;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    color:#f8fafc!important;
+    font-size:12px!important;
+    line-height:1.4!important;
+    font-weight:700!important;
+  }
+  .lf-customer .lf-mobile-summary-selection-copy small{
+    margin:0!important;
+    color:#ffd46c!important;
+    font-size:12px!important;
+    line-height:1.4!important;
+    font-weight:750!important;
+  }
+  .lf-customer .lf-mobile-summary-selection-chevron{
+    display:flex;
+    flex:0 0 20px;
+    align-items:center;
+    justify-content:center;
+    color:#c3cbd8;
+  }
+  .lf-customer .lf-mobile-summary-selection-chevron svg{
+    width:19px;
+    height:19px;
+    fill:none;
+    stroke:currentColor;
+    stroke-width:2;
+    stroke-linecap:round;
+    stroke-linejoin:round;
+  }
+  .lf-customer.lf-customer.lf-customer.lf-customer .lf-mobile-order-button{
+    min-height:52px!important;
+    height:52px!important;
+    border-radius:10px!important;
+    font-size:15px!important;
+    box-shadow:0 4px 15px rgba(158,229,45,.12);
+  }
+  .lf-customer .lf-mobile-order-bag{
+    width:20px;
+    height:20px;
+    flex:0 0 20px;
+    fill:none;
+    stroke:currentColor;
+    stroke-width:2;
+    stroke-linecap:round;
+    stroke-linejoin:round;
+  }
+  .lf-customer .lf-checkout-grid{padding-bottom:176px!important}
+  .lf-customer:has(.lf-mobile-checkout-bar:not(.is-hidden)) .lf-live-support{
+    bottom:160px!important;
+  }
+}

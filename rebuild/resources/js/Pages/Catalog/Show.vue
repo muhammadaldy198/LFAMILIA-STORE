@@ -180,20 +180,8 @@ function closeNotice() {
 }
 
 function updateCheckoutBarVisibility() {
-    if (window.innerWidth >= 640) {
-        checkoutBarVisible.value = true;
-        return;
-    }
-
-    const main = document.querySelector('.lf-checkout-page');
-    const accountPanel = document.querySelector('.lf-checkout-account-panel');
-    if (!main) return;
-
-    const mainStillActive = main.getBoundingClientRect().bottom > window.innerHeight + 8;
-    const accountCleared = !accountPanel
-        || accountPanel.getBoundingClientRect().bottom <= window.innerHeight - 128;
-
-    checkoutBarVisible.value = mainStillActive && accountCleared;
+    // Keep the mobile checkout action visible from the first checkout step.
+    checkoutBarVisible.value = true;
 }
 
 function newIdempotencyKey() {
@@ -1128,15 +1116,26 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                     <div class="total"><dt>{{ customerText("pages.catalog.show.18fcae49", "Total Pembayaran") }}</dt><dd>{{displayTotal===null ? 'Menghitung…' : formatIdr(displayTotal)}}</dd></div>
                 </dl>
             </div>
-            <button v-else type="button" class="lf-mobile-summary-toggle" aria-expanded="false" @click="summaryOpen=true">
-                <span><strong>{{ customerText("pages.catalog.show.eb589e83", "Ringkasan pesanan") }}</strong><small>{{ customerText("pages.catalog.show.50fa1f6", "Ketuk untuk melihat rincian") }}</small></span>
-                <span><strong>{{displayTotal===null ? 'Menghitung…' : formatIdr(displayTotal)}}</strong><b>⌃</b></span>
+            <button v-else type="button" class="lf-mobile-summary-toggle" aria-expanded="false" :disabled="!selectedPackage" @click="summaryOpen=true">
+                <span class="lf-mobile-summary-selection">
+                    <span v-if="selectedPackage" class="lf-mobile-summary-art">
+                        <img v-if="selectedPackage.image_url || product.image_url" :src="selectedPackage.image_url || product.image_url" alt="">
+                        <span v-else class="lf-mobile-package-fallback">LF</span>
+                    </span>
+                    <span class="lf-mobile-summary-selection-copy">
+                        <strong>{{ selectedPackage ? product.name + ' · ' + nominalLabel(selectedPackage.name, product.name) : 'Belum ada item produk yang dipilih.' }}</strong>
+                        <small v-if="selectedPackage">{{ displayTotal !== null ? 'Total ' + formatIdr(displayTotal) : (paymentChannelCode ? 'Menunggu perhitungan total' : 'Pilih metode pembayaran') }}</small>
+                    </span>
+                </span>
+                <span v-if="selectedPackage" class="lf-mobile-summary-selection-chevron" aria-hidden="true">
+                    <svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+                </span>
             </button>
             <button type="button" class="lf-mobile-order-button" :disabled="busy==='order'||!selectedPackage||!paymentChannelCode||displayTotal===null" @click="prepareOrder">
                 <template v-if="busy==='order'">{{ customerText("pages.catalog.show.aadacc10", "Memproses...") }}</template>
                 <template v-else>
-                    <svg class="lf-mobile-order-lock" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
-                    <span>{{ customerText("pages.catalog.show.ca26b75a", "Pesan Sekarang") }}</span>
+                    <svg class="lf-mobile-order-bag" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h16l-1.2 12H5.2L4 8Z"/><path d="M9 9V6a3 3 0 0 1 6 0v3"/></svg>
+                    <span>Pesan Sekarang!</span>
                 </template>
             </button>
         </div>
