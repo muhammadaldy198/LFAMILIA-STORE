@@ -7316,7 +7316,7 @@
   box-shadow:0 12px 30px rgba(0,0,0,.24)!important;
   scroll-margin-top:80px;
 }
-.lf-customer .lf-checkout-page .lf-checkout-panel>header{
+.lf-customer.lf-customer .lf-checkout-page .lf-checkout-panel>header{
   min-height:40px!important;
   gap:0!important;
   padding:0!important;
@@ -7538,7 +7538,8 @@
     min-width:0!important;
     text-align:center!important;
   }
-  .lf-customer .lf-mobile-order-button{
+  /* Beat admin-configurable generic control sizing at tablet widths. */
+  .lf-customer.lf-customer.lf-customer.lf-customer .lf-mobile-order-button{
     display:flex!important;
     width:100%!important;
     min-height:52px!important;
@@ -7548,6 +7549,16 @@
     justify-content:center!important;
     gap:10px!important;
     border-radius:8px!important;
+  }
+  .lf-customer .lf-mobile-order-button .lf-mobile-order-bag{
+    width:20px!important;
+    height:20px!important;
+    flex:0 0 20px!important;
+    fill:none;
+    stroke:currentColor;
+    stroke-width:1.8;
+    stroke-linecap:round;
+    stroke-linejoin:round;
   }
   .lf-customer:has(.lf-mobile-checkout-bar:not(.is-hidden)) .lf-live-support{
     bottom:195px!important;

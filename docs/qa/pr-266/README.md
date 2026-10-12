@@ -10,10 +10,10 @@ These are **original Chromium screenshots from Codex Cloud**, using synthetic lo
 |---|---|---|
 | Top banner | PASS | Full viewport width; height >=224px; centered crop; contain at >=1024px; gradient begins at 70% |
 | Product icon 3D | PASS | CSS 128/240px square; 64/112px overlap at 768px breakpoint; DOMMatrix equals rotateY(20deg) rotateX(-4deg); origin 0px 64/120px |
-| Numbered section headers | PASS | 40x40px tiles; title 14px/24px; section body padding 16px |
+| Numbered section headers | PASS | 40x40px tiles and 40px overall headers with zero outer padding; title 14px/24px; section body padding 16px |
 | Package cards | PASS | 2/3/2/3 columns at 640/768/1024; gap/padding 16px; radius 12px; height >=85px; long label unclipped; info control does not cover label |
 | Payment methods | PASS | Radius 8px; padding 10px; logo max-height 48px; QRIS/E-Wallet/VA interaction |
-| Mobile sticky checkout | PASS | Fixed bottom/full width below 1024px, z-index 40; padding 16px; dashed info 4em; full-width bag CTA; disabled before selection, enabled after valid server quote |
+| Mobile sticky checkout | PASS | Fixed bottom/full width below 1024px, z-index 40; padding 16px; dashed info 4em; full-width 52px CTA and bounded 20px bag SVG; disabled before selection, enabled after valid server quote |
 
 ## Measured geometry
 
@@ -59,6 +59,18 @@ Each viewport uses an independent synthetic client IP behind an explicitly trust
 6. Two admin order tests ran email jobs synchronously without fixtures. Fake the queue before completing their dummy order, preserving existing queue assertions.
 7. Browser favicon fixture had a PNG IDAT CRC error. Replace it with a valid synthetic PNG.
 8. Browser smoke assigned APP_URL without exporting it; local localhost media was cross-origin against 127.0.0.1 and CSP blocked it. Export the local test URL without weakening CSP.
+
+9. Screenshot review found an oversized default SVG at tablet width, even though the bar rectangle passed. Define the bag icon as 20×20px through the entire mobile/tablet range and assert its bounds.
+10. High-specificity desktop header padding and admin control sizing still yielded a 72px header and 40px tablet CTA. Fix specificity and explicitly assert a 40px full header, zero header padding, and 52px CTA.
+
+## Local automated validation
+
+- PHPUnit: 371 tests / 4,178 assertions PASS.
+- Pint: 265 files PASS.
+- ESLint, Vue SFC check, production build: PASS.
+- Frontend regression: 18 tests PASS.
+- Full M11 responsive/admin smoke: exit 0; 816 PASS messages. The final checkout-only CSS follow-up is additionally covered by the five-viewport Playwright run and a repeated responsive smoke; final CI executes the complete smoke at the pushed SHA.
+- Playwright: all five visual/functional viewports and six breakpoint boundaries PASS; no page errors or forbidden requests; orders/payment_transactions both zero.
 
 ## Reproduce
 
