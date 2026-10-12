@@ -6974,3 +6974,63 @@
     width:32px!important;height:32px!important;min-width:32px!important;flex-basis:32px!important
   }
 }
+/* PR #266 / Final V2, step 9: section > subgroup > fields > secondary hierarchy. */
+.lf-customer.lf-customer .lf-checkout-page .lf-checkout-panel>header h2{
+  font-size:18px!important;
+  line-height:1.4!important;
+  font-weight:750!important;
+  color:#f4f7fc!important;
+  letter-spacing:normal!important;
+}
+.lf-customer.lf-customer .lf-checkout-page .lf-checkout-panel>header p{
+  margin-top:4px!important;
+  font-size:12px!important;
+  line-height:1.5!important;
+  font-weight:400!important;
+  color:#a5afbf!important;
+}
+.lf-customer.lf-customer .lf-checkout-page .lf-package-sections h3{
+  font-size:15px!important;
+  line-height:1.45!important;
+  font-weight:700!important;
+  color:#eff3fa!important;
+}
+.lf-customer.lf-customer .lf-checkout-page .lf-account-fields label>span,
+.lf-customer.lf-customer .lf-checkout-page .lf-saved-account-select>span{
+  color:#d2dce8!important;
+  font-size:13px!important;
+  line-height:1.4!important;
+  font-weight:650!important;
+}
+.lf-customer.lf-customer .lf-checkout-page .lf-account-fields input,
+.lf-customer.lf-customer .lf-checkout-page .lf-account-fields select,
+.lf-customer.lf-customer .lf-checkout-page .lf-promo-input input{
+  font-size:14px!important;
+  font-weight:450!important;
+}
+.lf-customer.lf-customer .lf-checkout-page .lf-account-fields input::placeholder,
+.lf-customer.lf-customer .lf-checkout-page .lf-promo-input input::placeholder{
+  font-size:12px!important;
+  font-weight:400!important;
+  color:#a4afbd!important;
+}
+.lf-customer.lf-customer .lf-checkout-page .lf-nominal-copy strong{
+  font-size:12px!important;
+  line-height:1.4!important;
+  font-weight:700!important;
+  color:#f6f8fb!important;
+}
+.lf-customer.lf-customer .lf-checkout-page .lf-nominal-copy small,
+.lf-customer.lf-customer .lf-checkout-page .lf-payment-group-copy small,
+.lf-customer.lf-customer .lf-checkout-page .lf-checkout-info-note,
+.lf-customer.lf-customer .lf-checkout-page .lf-contact-privacy{
+  font-size:11px!important;
+  line-height:1.5!important;
+  font-weight:400!important;
+  color:#a0abbb!important;
+}
+@media(max-width:639px){
+  .lf-customer.lf-customer .lf-checkout-page .lf-checkout-panel>header h2{font-size:16px!important}
+  .lf-customer.lf-customer .lf-checkout-page .lf-package-sections h3{font-size:14px!important}
+  .lf-customer.lf-customer .lf-checkout-page .lf-nominal-copy strong{font-size:11px!important}
+}
