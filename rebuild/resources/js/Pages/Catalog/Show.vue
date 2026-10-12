@@ -864,7 +864,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
         <div v-if="activeTab==='transaction'" class="lf-checkout-grid">
             <div class="lf-checkout-panels">
                 <section v-if="hasAccountStep" class="lf-checkout-panel lf-checkout-account-panel">
-                    <header><div><h2>{{ customerText("pages.catalog.show.ec1c9711", "Masukkan Data Akun") }}</h2></div></header>
+                    <header><span class="lf-step-number">1</span><div><h2>{{ customerText("pages.catalog.show.ec1c9711", "Masukkan Data Akun") }}</h2></div></header>
                     <div class="lf-panel-body">
 
                         <label v-if="savedAccountItems.length" class="lf-saved-account-select">
@@ -908,7 +908,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                 </section>
 
                 <section class="lf-checkout-panel lf-checkout-compact-panel lf-checkout-nominal-panel">
-                    <header><div><h2>{{ customerText("pages.catalog.show.75d5eb47", "Pilih Nominal") }}</h2><p>{{product.checkout_nominal_description || 'Pesanan diproses otomatis setelah pembayaran.'}}</p></div></header>
+                    <header><span class="lf-step-number">{{hasAccountStep?2:1}}</span><div><h2>{{ customerText("pages.catalog.show.75d5eb47", "Pilih Nominal") }}</h2><p>{{product.checkout_nominal_description || 'Pesanan diproses otomatis setelah pembayaran.'}}</p></div></header>
                     <div class="lf-panel-body lf-package-sections">
                         <nav v-if="packageTabs.length" class="lf-filters mb-3">
                             <button v-for="tabName in packageTabs" :key="tabName" type="button" class="lf-chip" :class="{active:activePackageTab===tabName}" @click="activePackageTab=tabName">{{tabName}}</button>
@@ -939,7 +939,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                 </section>
 
                 <section class="lf-checkout-panel lf-checkout-compact-panel lf-checkout-payment-panel">
-                    <header><div><h2>{{ customerText("pages.catalog.show.c08763ef", "Pilih Pembayaran") }}</h2><p>{{ customerText("pages.catalog.show.e7920111", "Pilih metode pembayaran yang ingin digunakan.") }}</p></div></header>
+                    <header><span class="lf-step-number">{{hasAccountStep?3:2}}</span><div><h2>{{ customerText("pages.catalog.show.c08763ef", "Pilih Pembayaran") }}</h2><p>{{ customerText("pages.catalog.show.e7920111", "Pilih metode pembayaran yang ingin digunakan.") }}</p></div></header>
                     <div class="lf-panel-body lf-payment-groups">
                         <div v-if="!paymentChannels?.length" class="lf-payment-unavailable">
                             {{ customerText("pages.catalog.show.51de2747", "Belum ada metode pembayaran aktif.") }}
@@ -1007,7 +1007,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                 </section>
 
                 <section class="lf-checkout-panel lf-checkout-compact-panel lf-checkout-contact-panel">
-                    <header><div><h2>{{ customerText("pages.catalog.show.19af3a35", "Data Pembeli") }}</h2><p>{{ customerText("pages.catalog.show.1e6ddd4f", "Email dan WhatsApp digunakan untuk invoice serta status transaksi.") }}</p></div></header>
+                    <header><span class="lf-step-number">{{hasAccountStep?4:3}}</span><div><h2>{{ customerText("pages.catalog.show.19af3a35", "Data Pembeli") }}</h2><p>{{ customerText("pages.catalog.show.1e6ddd4f", "Email dan WhatsApp digunakan untuk invoice serta status transaksi.") }}</p></div></header>
                     <div class="lf-panel-body">
                         <div v-if="!customer" class="lf-account-fields">
                             <label><span>{{ customerText("pages.catalog.show.43352167", "Email") }}</span><input v-model="guestEmail" type="email" maxlength="255" :placeholder="customerText('pages.catalog.show.attribute.placeholder.f333f780', 'Contoh: nama@email.com')"></label>
@@ -1032,7 +1032,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                 </section>
 
                 <section class="lf-checkout-panel lf-checkout-compact-panel lf-checkout-promo-panel">
-                    <header><div><h2>{{ customerText("pages.catalog.show.a2cdbf5b", "Kode Promo") }}</h2><p>{{ customerText("pages.catalog.show.98e0f6bb", "Masukkan kode promo atau voucher diskon yang tersedia.") }}</p></div></header>
+                    <header><span class="lf-step-number">{{hasAccountStep?5:4}}</span><div><h2>{{ customerText("pages.catalog.show.a2cdbf5b", "Kode Promo") }}</h2><p>{{ customerText("pages.catalog.show.98e0f6bb", "Masukkan kode promo atau voucher diskon yang tersedia.") }}</p></div></header>
                     <div class="lf-panel-body">
                         <div class="lf-promo-input">
                             <input :value="voucherCode" maxlength="100" :placeholder="customerText('pages.catalog.show.attribute.placeholder.1d49aca8', 'Masukkan kode promo')" @input="updateVoucherInput($event.target.value)">
