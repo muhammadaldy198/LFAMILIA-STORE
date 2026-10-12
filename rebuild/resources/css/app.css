@@ -6847,3 +6847,90 @@
   .lf-customer .lf-whatsapp-phone-row select{flex-basis:96px;width:96px!important;min-width:96px!important}
   .lf-customer .lf-checkout-contact-panel .lf-account-fields{grid-template-columns:1fr!important;gap:14px!important}
 }
+/* PR #266 / Final V2, step 7: original banner, responsive crop; real 3D product tilt. */
+.lf-customer .lf-product-hero{
+  position:relative!important;
+  overflow:hidden!important;
+  background:#101821!important;
+}
+.lf-customer .lf-product-hero>img{
+  display:block!important;
+  width:100%!important;
+  height:100%!important;
+  object-fit:cover!important;
+  object-position:center center!important;
+}
+.lf-customer .lf-product-cover-3d{
+  border:1px solid rgba(229,237,251,.55)!important;
+  border-radius:12px!important;
+  overflow:hidden!important;
+  background:#0a111b!important;
+  box-shadow:10px 14px 24px -12px rgba(0,0,0,.78)!important;
+  transform:perspective(600px) rotateY(-12deg)!important;
+  transform-origin:center center!important;
+  backface-visibility:hidden;
+}
+.lf-customer .lf-product-cover-3d img{
+  display:block!important;
+  width:100%!important;
+  height:100%!important;
+  object-fit:cover!important;
+  object-position:center!important;
+}
+.lf-customer .lf-product-cover-3d::after{display:none!important}
+.lf-customer .lf-product-perks>div:nth-child(1) span,
+.lf-customer .lf-product-perks>div:nth-child(1) svg{color:#f5c550!important}
+.lf-customer .lf-product-perks>div:nth-child(2) span,
+.lf-customer .lf-product-perks>div:nth-child(2) svg{color:#66a9fa!important}
+.lf-customer .lf-product-perks>div:nth-child(3) span,
+.lf-customer .lf-product-perks>div:nth-child(3) svg{color:#5bdf9e!important}
+@media (min-width:640px){
+  .lf-customer .lf-product-hero{
+    height:clamp(190px,22vw,350px)!important;
+    aspect-ratio:auto!important;
+  }
+  .lf-customer .lf-product-hero>img{object-position:50% 48%!important}
+  .lf-customer .lf-product-identity-inner{
+    grid-template-columns:170px minmax(0,1fr)!important;
+    column-gap:18px!important;
+  }
+  .lf-customer .lf-product-cover-3d{
+    top:-65px!important;
+    left:12px!important;
+    width:146px!important;
+    height:160px!important;
+    border-radius:12px!important;
+  }
+}
+@media (max-width:639px){
+  .lf-customer .lf-product-hero{
+    width:100vw!important;
+    height:auto!important;
+    aspect-ratio:2/1!important;
+    margin:8px calc(50% - 50vw) 0!important;
+  }
+  .lf-customer .lf-product-hero>img{object-position:center!important}
+  .lf-customer .lf-product-identity-inner{
+    min-height:132px!important;
+    padding:9px 14px 16px!important;
+  }
+  .lf-customer .lf-product-cover-3d{
+    top:-56px!important;
+    left:16px!important;
+    width:104px!important;
+    height:116px!important;
+    border-radius:12px!important;
+  }
+  .lf-customer .lf-product-title{
+    padding:13px 0 0 133px!important;
+    min-height:76px!important;
+  }
+  .lf-customer .lf-product-title h1{overflow-wrap:anywhere!important;white-space:normal!important;font-size:17px!important}
+  .lf-customer .lf-product-perks{left:10px!important;right:10px!important;bottom:12px!important}
+  .lf-customer .lf-product-perks>div{gap:5px!important;font-size:10px!important}
+}
+@media (max-width:360px){
+  .lf-customer .lf-product-cover-3d{width:91px!important;height:103px!important;top:-50px!important}
+  .lf-customer .lf-product-title{padding-left:115px!important}
+  .lf-customer .lf-product-perks>div{font-size:9px!important}
+}
