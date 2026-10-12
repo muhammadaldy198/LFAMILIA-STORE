@@ -6771,3 +6771,79 @@
   .lf-customer .lf-promo-input button{min-width:82px!important;padding-inline:9px!important}
   .lf-customer .lf-available-promo{width:100%;justify-content:center}
 }
+
+/* PR #266 / Final V2, step 6: uncluttered game ID/Server, WhatsApp country prefix. */
+.lf-customer .lf-checkout-account-panel .lf-account-fields{
+  display:grid!important;
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  gap:14px!important;
+}
+.lf-customer .lf-checkout-account-panel .lf-account-fields label,
+.lf-customer .lf-checkout-contact-panel .lf-account-fields label{
+  min-width:0!important;
+}
+.lf-customer .lf-checkout-account-panel .lf-account-fields input{
+  width:100%;
+  min-width:0;
+  box-sizing:border-box;
+  padding:0 11px!important;
+  font-size:13px!important;
+  text-overflow:ellipsis;
+}
+.lf-customer .lf-checkout-account-panel .lf-account-fields input::placeholder{
+  font-size:12px!important;
+  color:#aab4c0!important;
+  opacity:1;
+}
+.lf-customer .lf-account-field-label{display:inline-flex!important;align-items:center;gap:5px}
+.lf-customer .lf-account-field-help{
+  color:#d9e1ee;
+  font-size:13px;
+  font-weight:600;
+  cursor:help;
+}
+.lf-customer .lf-whatsapp-phone-row{
+  display:flex;
+  align-items:stretch;
+  width:100%;
+  gap:0;
+  overflow:hidden;
+  margin-top:6px;
+  border:1px solid #374256;
+  border-radius:10px;
+  background:#0b111b;
+}
+.lf-customer .lf-whatsapp-phone-row select{
+  width:110px!important;
+  min-width:94px!important;
+  flex:0 0 110px;
+  padding:0 8px;
+  border:0!important;
+  border-right:1px solid #374256!important;
+  border-radius:0!important;
+  background:#1a2635!important;
+  color:#fff!important;
+  font-size:12px!important;
+}
+.lf-customer .lf-whatsapp-phone-row input{
+  display:block;
+  width:100%!important;
+  min-width:0!important;
+  height:42px!important;
+  min-height:42px!important;
+  flex:1;
+  margin:0!important;
+  padding:0 12px!important;
+  border:0!important;
+  border-radius:0!important;
+  background:transparent!important;
+  color:#fff!important;
+  font-size:13px!important;
+}
+.lf-customer .lf-whatsapp-phone-row input::placeholder{font-size:12px!important;color:#aeb8c6!important}
+@media(max-width:639px){
+  .lf-customer .lf-checkout-account-panel .lf-account-fields{gap:8px!important}
+  .lf-customer .lf-checkout-account-panel .lf-account-fields input{padding-inline:8px!important}
+  .lf-customer .lf-whatsapp-phone-row select{flex-basis:96px;width:96px!important;min-width:96px!important}
+  .lf-customer .lf-checkout-contact-panel .lf-account-fields{grid-template-columns:1fr!important;gap:14px!important}
+}

@@ -26,6 +26,18 @@ const savedAccountItems = ref([...(props.savedAccounts || [])]);
 const customerInput = reactive(Object.fromEntries((props.fields || []).map((field) => [field.field_key, ''])));
 const guestEmail = ref(props.customer?.email || '');
 const guestPhone = ref(props.customer?.phone || '');
+const guestPhoneCountry = ref('62');
+const guestPhoneLocal = computed({
+    get() {
+        const digits = String(guestPhone.value || '').replace(/\D/g, '');
+        const local = digits.startsWith(guestPhoneCountry.value) ? digits.slice(guestPhoneCountry.value.length) : digits;
+        return local.replace(/^0+/, '');
+    },
+    set(value) {
+        const local = String(value || '').replace(/\D/g, '').replace(/^0+/, '').slice(0, 14);
+        guestPhone.value = local ? '+' + guestPhoneCountry.value + local : '';
+    },
+});
 const voucherCode = ref('');
 const paymentChannelCode = ref('');
 const expandedPaymentGroup = ref('');
@@ -242,6 +254,24 @@ function normalizeWhatsapp(value) {
     const hasPlus = text.trim().startsWith('+');
     const digits = text.replace(/\D/g, '').slice(0, 16);
     return (hasPlus ? '+' : '') + digits;
+}
+
+function changeGuestPhoneCountry(country) {
+    const local = guestPhoneLocal.value;
+    guestPhoneCountry.value = country;
+    guestPhoneLocal.value = local;
+}
+
+function isIdInputField(field) {
+    const name = String(field?.field_key || '') + ' ' + String(field?.label || '');
+    return /\b(user[ _-]?id|player[ _-]?id|id)\b/i.test(name);
+}
+
+function checkoutFieldPlaceholder(field) {
+    const name = String(field?.field_key || '') + ' ' + String(field?.label || '');
+    if (/server|zone[ _-]?id/i.test(name)) return 'Masukkan Server';
+    if (isIdInputField(field)) return 'Masukkan ID';
+    return field.placeholder || 'Masukkan ' + field.label;
 }
 
 function normalizePromo(value) {
@@ -834,18 +864,9 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
         <div v-if="activeTab==='transaction'" class="lf-checkout-grid">
             <div class="lf-checkout-panels">
                 <section v-if="hasAccountStep" class="lf-checkout-panel lf-checkout-account-panel">
-                    <header><div><h2>{{ customerText("pages.catalog.show.ec1c9711", "Masukkan Data Akun") }}</h2><p>{{ customerText("pages.catalog.show.b691e78b", "Isi ID tujuan dengan benar. Nickname diperiksa otomatis jika didukung.") }}</p></div></header>
+                    <header><div><h2>{{ customerText("pages.catalog.show.ec1c9711", "Masukkan Data Akun") }}</h2></div></header>
                     <div class="lf-panel-body">
-                        <div class="lf-account-product-mobile">
-                            <span class="lf-account-product-art">
-                                <img v-if="product.image_url" :src="product.image_url" :alt="product.name">
-                                <span v-else>{{product.name.slice(0,1)}}</span>
-                            </span>
-                            <div class="lf-account-product-copy">
-                                <strong>{{product.name}}</strong>
-                                <Link href="/#produk">{{ customerText("pages.catalog.show.f100ee83", "Ganti produk") }}</Link>
-                            </div>
-                        </div>
+
                         <label v-if="savedAccountItems.length" class="lf-saved-account-select">
                             <span>{{ customerText("pages.catalog.show.85989a9d", "Akun game tersimpan") }}</span>
                             <select v-model="selectedSavedId" @change="chooseSavedAccount(selectedSavedId)">
@@ -856,8 +877,8 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
 
                         <div class="lf-account-fields">
                             <label v-for="field in fields" :key="field.field_key">
-                                <span>{{field.label}}{{field.is_required ? '' : ' (opsional)'}}</span>
-                                <input v-model="customerInput[field.field_key]" :type="field.type==='email'?'email':field.type==='tel'?'tel':'text'" :required="field.is_required" maxlength="255" :placeholder="field.placeholder || ('Masukkan '+field.label)">
+                                <span class="lf-account-field-label">{{field.label}}{{field.is_required ? '' : ' (opsional)'}} <span v-if="isIdInputField(field)" class="lf-account-field-help" title="Masukkan ID akun sesuai permainan" aria-label="Masukkan ID akun sesuai permainan">ⓘ</span></span>
+                                <input v-model="customerInput[field.field_key]" :type="field.type==='email'?'email':field.type==='tel'?'tel':'text'" :required="field.is_required" maxlength="255" :placeholder="checkoutFieldPlaceholder(field)">
                                 <small v-if="fieldError(field.field_key)" class="lf-field-error">{{fieldError(field.field_key)}}</small>
                             </label>
                         </div>
@@ -990,7 +1011,17 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                     <div class="lf-panel-body">
                         <div v-if="!customer" class="lf-account-fields">
                             <label><span>{{ customerText("pages.catalog.show.43352167", "Email") }}</span><input v-model="guestEmail" type="email" maxlength="255" :placeholder="customerText('pages.catalog.show.attribute.placeholder.f333f780', 'Contoh: nama@email.com')"></label>
-                            <label><span>{{ customerText("pages.catalog.show.8aa48a22", "Nomor WhatsApp") }}</span><input :value="guestPhone" type="tel" inputmode="tel" autocomplete="tel" maxlength="17" pattern="\\+?[0-9]{8,16}" :placeholder="customerText('pages.catalog.show.attribute.placeholder.a02514d1', 'Contoh: 081234567890')" @input="guestPhone=normalizeWhatsapp($event.target.value)"></label>
+                            <label><span>{{ customerText("pages.catalog.show.8aa48a22", "Nomor WhatsApp") }}</span>
+                                <span class="lf-whatsapp-phone-row">
+                                    <select :value="guestPhoneCountry" aria-label="Kode negara WhatsApp" @change="changeGuestPhoneCountry($event.target.value)">
+                                        <option value="62">🇮🇩 +62</option>
+                                        <option value="60">🇲🇾 +60</option>
+                                        <option value="65">🇸🇬 +65</option>
+                                        <option value="1">🇺🇸 +1</option>
+                                    </select>
+                                    <input v-model="guestPhoneLocal" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="14" pattern="[0-9]{7,14}" placeholder="Nomor WhatsApp">
+                                </span>
+                            </label>
                         </div>
                         <div v-else class="lf-customer-checkout-note">
                             <span class="lf-account-avatar">{{customer.name?.slice(0,1)?.toUpperCase()}}</span>
