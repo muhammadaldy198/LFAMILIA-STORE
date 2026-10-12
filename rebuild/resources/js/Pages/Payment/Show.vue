@@ -67,7 +67,7 @@ const paymentLabel = computed(() => {
     const name = String(props.payment?.channel_name || props.payment?.channel_code || '').trim();
     const value = (code + ' ' + name).toLowerCase();
     if (value.includes('qris') || value.includes('qr')) return 'QRIS';
-    if (value.includes('wallet') || value.includes('saldo') || value.includes('cash')) return 'LFAMILIA Cash';
+    if (value.includes('wallet') || value.includes('saldo') || value.includes('cash')) return 'LFAMILIA Coins';
     if (value.includes('va') || value.includes('virtual') || value.includes('bank')) return name ? 'Virtual Account • ' + name : 'Virtual Account';
     if (value.includes('dana') || value.includes('ovo') || value.includes('gopay') || value.includes('shopee')) return name ? 'E-Wallet • ' + name : 'E-Wallet';
     return name || '-';

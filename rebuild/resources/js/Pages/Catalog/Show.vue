@@ -17,6 +17,7 @@ const props = defineProps({
     reviews: Array,
     reviewStats: Object,
     faqs: Array,
+    faviconUrl: String,
     initialPackageId: { type: String, default: '' },
 });
 
@@ -34,6 +35,7 @@ const accountValidationSignature = ref('');
 let accountValidationRequest = 0;
 let quoteRequest = 0;
 const checkoutResult = ref(null);
+const paymentResult = ref(null);
 const errors = ref({});
 const busy = ref('');
 const activeTab = ref('transaction');
@@ -50,6 +52,8 @@ const summaryOpen = ref(false);
 const checkoutBarVisible = ref(true);
 const noticeOpen = ref(false);
 const noticeIndex = ref(0);
+const packageDetailOpen = ref(false);
+const packageDetailItem = ref(null);
 const hideNotice = ref(false);
 const selectedSavedId = ref('');
 const reviewRating = ref(5);
@@ -123,7 +127,7 @@ const visiblePackageGroups = computed(() => packageTabs.value.length
 
 const paymentGroups = computed(() => {
     const labels = {
-        wallet: ['LFAMILIA Cash', 'Bayar memakai saldo LFAMILIA Cash'],
+        wallet: ['LFAMILIA Coins', 'Bayar memakai saldo LFAMILIA Coins'],
         qris: ['QRIS', 'Scan dari semua aplikasi yang mendukung QRIS'],
         ewallet: ['E-Wallet', 'Bayar melalui aplikasi e-wallet yang tersedia'],
         va: ['Virtual Account', 'Transfer bank dengan nomor VA unik'],
@@ -177,6 +181,16 @@ function closeNotice() {
         );
     }
     noticeOpen.value = false;
+}
+
+function openPackageDetail(item) {
+    packageDetailItem.value = item;
+    packageDetailOpen.value = true;
+}
+
+function closePackageDetail() {
+    packageDetailOpen.value = false;
+    packageDetailItem.value = null;
 }
 
 function updateCheckoutBarVisibility() {
@@ -671,6 +685,7 @@ async function createOrder() {
     }
 
     checkoutResult.value = null;
+    paymentResult.value = null;
     busy.value = 'order';
 
     try {
@@ -705,7 +720,7 @@ async function createOrder() {
 
     busy.value = 'payment';
     try {
-        await requestJson('/payments/orders/' + encodeURIComponent(checkoutResult.value.order_number), {
+        paymentResult.value = await requestJson('/payments/orders/' + encodeURIComponent(checkoutResult.value.order_number), {
             method: 'POST',
             body: JSON.stringify({
                 idempotency_key: paymentIdempotencyKey.value,
@@ -886,12 +901,16 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                         <section v-for="group in visiblePackageGroups" :key="group.name || 'all'">
                             <div v-if="group.name" class="lf-package-group-head"><h3>{{group.name}}</h3><span></span></div>
                             <div class="lf-nominal-grid">
-                                <button v-for="item in group.items" :key="item.id" type="button" :title="nominalLabel(item.name, product.name)" :disabled="!item.is_available" :class="{selected:selectedPackage && String(selectedPackage.id)===String(item.id)}" @click="choosePackage(item)">
+                                <button v-for="item in group.items" :key="item.id" type="button" :disabled="!item.is_available" :class="{selected:selectedPackage && String(selectedPackage.id)===String(item.id)}" @click="choosePackage(item)">
+                                    <span v-if="item.is_promo" class="lf-promo-badge">PROMO</span>
                                     <span class="lf-nominal-top">
                                         <span class="lf-nominal-copy"><strong>{{nominalLabel(item.name, product.name)}}</strong><small v-if="item.note" class="lf-nominal-note">{{item.note}}</small></span>
-                                        <img v-if="item.image_url" :src="item.image_url" :alt="nominalLabel(item.name, product.name)" loading="lazy" decoding="async">
+                                        <img v-if="item.image_url" :src="item.image_url" :alt="nominalLabel(item.name, product.name)">
                                     </span>
                                     <b>{{item.is_available?formatIdr(item.price_idr):'Tidak tersedia'}}</b>
+                                    <span v-if="item.original_price_idr && item.original_price_idr > item.price_idr" class="lf-price-strike">{{formatIdr(item.original_price_idr)}}</span>
+                                    <span v-if="item.points_earned" class="lf-points-badge">+{{item.points_earned}} Points</span>
+                                    <span v-if="item.has_detail" class="lf-nominal-info" @click.stop="openPackageDetail(item)" title="Info produk">ⓘ</span>
                                 </button>
                             </div>
                         </section>
@@ -905,7 +924,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                             {{ customerText("pages.catalog.show.51de2747", "Belum ada metode pembayaran aktif.") }}
                         </div>
                         <div v-else-if="!hasExternalPaymentOption" class="lf-payment-unavailable">
-                            <template v-if="customer && hasAvailableWalletPaymentOption">{{ customerText("pages.catalog.show.4bfa0eb", "Pembayaran otomatis belum tersedia. Kamu masih bisa memakai LFAMILIA Cash bila saldo mencukupi.") }}</template>
+                            <template v-if="customer && hasAvailableWalletPaymentOption">{{ customerText("pages.catalog.show.4bfa0eb", "Pembayaran otomatis belum tersedia. Kamu masih bisa memakai LFAMILIA Coins bila saldo mencukupi.") }}</template>
                             <template v-else>{{ customerText("pages.catalog.show.f4a728b6", "Belum ada metode pembayaran yang dapat digunakan saat ini.") }}</template>
                         </div>
                         <div
@@ -921,7 +940,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                                 @click="choosePayment(group.items.find(x=>x.code===paymentChannelCode)?.code || group.items.find(x=>x.available!==false)?.code)"
                             >
                                 <span v-if="group.key==='wallet'" class="lf-payment-wallet-art">
-                                    <img :src="'/assets/payment/lfamilia-cash.webp'" :alt="customerText('pages.catalog.show.attribute.alt.d8a0146d', 'LFAMILIA Cash')">
+                                    <img :src="'/assets/payment/lfamilia-coins.webp'" :alt="customerText('pages.catalog.show.attribute.alt.d8a0146d', 'LFAMILIA Coins')">
                                 </span>
                                 <span class="lf-payment-group-copy">
                                     <strong>{{group.title}}</strong>
@@ -1156,6 +1175,25 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                 <input v-model="hideNotice" type="checkbox">
                 {{ customerText("pages.catalog.show.d643d9c2", "Jangan tampilkan lagi dalam 7 hari") }}
             </label>
+        </div>
+    </div>
+
+    <div v-if="packageDetailOpen && packageDetailItem" class="lf-modal-backdrop" @click.self="closePackageDetail">
+        <div class="lf-product-notice-modal">
+            <header>
+                <span>Info Produk</span>
+                <button type="button" aria-label="Tutup informasi" @click="closePackageDetail">×</button>
+            </header>
+            <div class="lf-product-notice-body">
+                <h2>{{nominalLabel(packageDetailItem.name, product.name)}}</h2>
+                <img v-if="packageDetailItem.image_url" :src="packageDetailItem.image_url" :alt="packageDetailItem.name" style="max-width:120px;border-radius:12px;margin:12px auto;display:block">
+                <p v-if="packageDetailItem.detail_text" style="white-space:pre-line">{{packageDetailItem.detail_text}}</p>
+                <p v-else-if="packageDetailItem.note">{{packageDetailItem.note}}</p>
+                <p v-else>Belum ada informasi detail untuk produk ini.</p>
+                <div class="lf-product-notice-actions">
+                    <button type="button" class="lf-primary" @click="closePackageDetail">OK, Saya Mengerti</button>
+                </div>
+            </div>
         </div>
     </div>
 

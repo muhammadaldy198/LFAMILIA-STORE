@@ -223,7 +223,7 @@ class PaymentRoutingService
             throw ValidationException::withMessages(['payment_channel_code' => 'Nilai transaksi tidak valid.']);
         }
 
-        // LFAMILIA Cash and offline/manual QRIS have no gateway fee.
+        // LFAMILIA Coins and offline/manual QRIS have no gateway fee.
         // Automatic QRIS follows the configured Midtrans route fee.
         if ($this->customerFeeIsForbidden($route)) {
             return 0;

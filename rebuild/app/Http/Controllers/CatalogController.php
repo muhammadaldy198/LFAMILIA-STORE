@@ -14,6 +14,7 @@ use App\Services\CheckoutPricing;
 use App\Services\PaymentRoutingService;
 use App\Services\StorefrontContentService;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -119,18 +120,23 @@ class CatalogController
             ->where('is_active', true)
             ->orderByRaw('nominal_value IS NULL')
             ->orderBy('sort_order')->orderBy('nominal_value')->orderBy('id')->get();
-        $previewPrices = $pricing->forPackages($packageRows->pluck('id')->all());
         $packages = app(CatalogNominalOrder::class)->sort($packageRows)
-            ->map(function (ProductPackage $package) use ($previewPrices): array {
-                $quote = $previewPrices[$package->id] ?? null;
-                $available = $quote !== null;
-                $price = $quote['subtotal_idr'] ?? null;
+            ->map(function (ProductPackage $package) use ($pricing): array {
+                try {
+                    $quote = $pricing->forPackage($package->id);
+                    $available = true;
+                    $price = $quote['subtotal_idr'];
+                } catch (ValidationException) {
+                    $available = false;
+                    $price = null;
+                }
 
                 return [
-                    ...$package->only('id', 'name', 'note', 'group_name', 'nominal_value'),
+                    ...$package->only('id', 'name', 'note', 'detail_text', 'group_name', 'nominal_value', 'is_promo', 'original_price_idr', 'points_earned'),
                     'image_url' => $package->getFirstMediaUrl('image'),
                     'is_available' => $available,
                     'price_idr' => $price,
+                    'has_detail' => ! empty($package->detail_text) || ! empty($package->note),
                 ];
             });
 
