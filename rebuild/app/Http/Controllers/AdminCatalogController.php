@@ -60,7 +60,7 @@ class AdminCatalogController
                     'packages' => $product->packages->sortBy([
                         ['sort_order', 'asc'], ['nominal_value', 'asc'],
                     ])->values()->map(fn (ProductPackage $package): array => [
-                        ...$package->only('id', 'code', 'name', 'note', 'group_name', 'nominal_value', 'sort_order', 'is_active', 'pricing_mode', 'margin_percent', 'margin_fixed_idr', 'sell_price_idr'),
+                        ...$package->only('id', 'code', 'name', 'note', 'group_name', 'nominal_value', 'sort_order', 'is_active', 'pricing_mode', 'margin_percent', 'margin_fixed_idr', 'sell_price_idr', 'is_promo', 'original_price', 'points', 'detail_text'),
                         'image_url' => $package->getFirstMediaUrl('image'),
                         'mappings' => $package->mappings->map(fn (ProviderMapping $mapping): array => [
                             ...$mapping->only('id', 'provider_id', 'external_sku', 'cost_idr',
@@ -438,6 +438,10 @@ class AdminCatalogController
             'group_name' => ['nullable', 'string', 'max:120'],
             'nominal_value' => ['nullable', 'integer', 'min:0'],
             'sort_order' => ['required', 'integer', 'min:0'],
+            'is_promo' => ['sometimes', 'boolean'],
+            'original_price' => ['nullable', 'integer', 'min:0', 'max:1000000000'],
+            'points' => ['nullable', 'integer', 'min:0', 'max:1000000000'],
+            'detail_text' => ['nullable', 'string', 'max:20000'],
             'cost_idr' => [$product->fulfillment_mode === 'MANUAL' ? 'required' : 'nullable',
                 'integer', 'min:0'],
         ]);
@@ -461,6 +465,10 @@ class AdminCatalogController
                 'nominal_value' => $data['nominal_value'] ?? null,
                 'sort_order' => $data['sort_order'],
                 'is_active' => false,
+                'is_promo' => (bool) ($data['is_promo'] ?? false),
+                'original_price' => $data['original_price'] ?? null,
+                'points' => $data['points'] ?? null,
+                'detail_text' => $data['detail_text'] ?? null,
             ]);
             if ($product->fulfillment_mode === 'MANUAL') {
                 $provider = Provider::where('code', 'MANUAL')->firstOrFail();
@@ -493,6 +501,10 @@ class AdminCatalogController
             'nominal_value' => ['nullable', 'integer', 'min:0'],
             'sort_order' => ['required', 'integer', 'min:0'],
             'is_active' => ['required', 'boolean'],
+            'is_promo' => ['sometimes', 'boolean'],
+            'original_price' => ['nullable', 'integer', 'min:0', 'max:1000000000'],
+            'points' => ['nullable', 'integer', 'min:0', 'max:1000000000'],
+            'detail_text' => ['nullable', 'string', 'max:20000'],
             'pricing_mode' => ['sometimes', Rule::in(['PRODUCT_MARGIN', 'PERCENT', 'FIXED', 'SELL_PRICE'])],
             'margin_percent' => ['nullable', 'numeric', 'min:0', 'max:1000', 'required_if:pricing_mode,PERCENT'],
             'margin_fixed_idr' => ['nullable', 'integer', 'min:0', 'max:1000000000', 'required_if:pricing_mode,FIXED'],

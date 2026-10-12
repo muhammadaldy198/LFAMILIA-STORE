@@ -219,7 +219,7 @@ const previewPrice=(pack,item)=>{
  return 'Rp'+price.toLocaleString('id-ID')+(price<cost?' · di bawah modal':'');
 };
 watch(()=>props.defaultMargin,value=>{if(!productForm.isDirty)productForm.margin_percent=value;if(!globalMarginForm.isDirty)globalMarginForm.margin_percent=value;if(!importForm.isDirty)importForm.margin_percent=value;});
-const packageForm = useForm({ product_id: '', code: '', name: '', note: '', group_name: '', nominal_value: '', sort_order: 0, cost_idr: '' });
+const packageForm = useForm({ product_id: '', code: '', name: '', note: '', group_name: '', nominal_value: '', sort_order: 0, cost_idr: '', is_promo: false, original_price: '', points: '', detail_text: '' });
 const noticeDrafts = reactive({});
 const fieldsProductId = ref('');
 const fieldRows = ref([]);
@@ -287,6 +287,8 @@ const saveProduct = (item) => router.put('/admin/catalog/products/' + item.id, {
 const savePackage = (pack) => router.put('/admin/catalog/packages/' + pack.id, {
     code: pack.code, name: pack.name, note: pack.note || null, group_name: pack.group_name || null, nominal_value: pack.nominal_value,
     sort_order: pack.sort_order, is_active: pack.is_active,
+    is_promo: Boolean(pack.is_promo), original_price: pack.original_price ?? null,
+    points: pack.points ?? null, detail_text: pack.detail_text || null,
     pricing_mode:pack.pricing_mode||'PRODUCT_MARGIN',margin_percent:pack.margin_percent??null,margin_fixed_idr:pack.margin_fixed_idr??null,sell_price_idr:pack.sell_price_idr??null,
 });
 const saveMapping = (mapping) => router.put('/admin/catalog/mappings/' + mapping.id, {
@@ -585,6 +587,12 @@ const deleteNotice = (notice) => {
                                 <label class="flex gap-2 text-xs"><AdminSwitch v-model="pack.is_active" />Aktif</label>
                                 <Button type="button" class="rounded bg-slate-700 px-3 py-2 text-xs" @click="savePackage(pack)">Simpan</Button>
                             </div>
+                            <div class="grid gap-3 rounded-lg border border-slate-700 bg-slate-900/60 p-3 md:grid-cols-2">
+                                <label class="flex items-center gap-2 text-xs"><AdminSwitch v-model="pack.is_promo" />Tampilkan badge PROMO</label>
+                                <label class="text-xs">Harga lama dicoret (tampilan saja; bukan harga jual)<Input v-model.number="pack.original_price" type="number" min="0" placeholder="Opsional" class="mt-1 block w-full rounded bg-slate-800 p-2" /></label>
+                                <label class="text-xs">Points reward (tampilan saja)<Input v-model.number="pack.points" type="number" min="0" placeholder="Opsional" class="mt-1 block w-full rounded bg-slate-800 p-2" /></label>
+                                <label class="text-xs md:col-span-2">Syarat / detail khusus untuk tombol info<Textarea v-model="pack.detail_text" rows="3" maxlength="20000" placeholder="Kosongkan jika produk tidak memerlukan tombol informasi" class="mt-1 block w-full rounded bg-slate-800 p-2" /></label>
+                            </div>
                             <div class="grid gap-3 md:grid-cols-3">
                                 <label class="text-xs">Mode harga<select v-model="pack.pricing_mode" class="mt-1 block w-full rounded border p-2"><option value="PRODUCT_MARGIN">Ikuti margin produk</option><option value="PERCENT">Margin persen nominal</option><option value="FIXED">Margin rupiah nominal</option><option value="SELL_PRICE">Harga jual tetap</option></select></label>
                                 <label v-if="pack.pricing_mode==='PERCENT'" class="text-xs">Margin %<Input v-model.number="pack.margin_percent" type="number" min="0" max="1000" step="0.0001" class="mt-1"/></label>
@@ -653,6 +661,11 @@ const deleteNotice = (notice) => {
                             <label class="text-xs">Nilai nominal<Input v-model.number="packageForm.nominal_value" type="number" min="0" class="mt-1 block w-28 rounded bg-slate-800 p-2" /></label>
                             <details class="text-xs"><summary class="cursor-pointer">Urutan nominal (lanjutan)</summary><label class="mt-2 block">Skor teknis<Input v-model.number="packageForm.sort_order" type="number" min="0" required class="mt-1 block w-20 rounded bg-slate-800 p-2" /></label></details>
                             <label v-if="item.fulfillment_mode === 'MANUAL'" class="text-xs">Modal Rp<Input v-model.number="packageForm.cost_idr" type="number" min="0" required class="mt-1 block w-28 rounded bg-slate-800 p-2" /></label>
+                            <label class="flex items-center gap-2 text-xs"><AdminSwitch v-model="packageForm.is_promo" />Promo</label>
+                            <label class="text-xs">Harga lama (tampilan saja)<Input v-model.number="packageForm.original_price" type="number" min="0" placeholder="Opsional" class="mt-1 block w-36 rounded bg-slate-800 p-2" /></label>
+                            <label class="text-xs">Points tampilan<Input v-model.number="packageForm.points" type="number" min="0" placeholder="Opsional" class="mt-1 block w-32 rounded bg-slate-800 p-2" /></label>
+                            <label class="block w-full text-xs">Detail/syarat untuk tombol info<Textarea v-model="packageForm.detail_text" rows="3" maxlength="20000" placeholder="Opsional" class="mt-1 block w-full rounded bg-slate-800 p-2" /></label>
+
                             <Button :disabled="packageForm.processing" class="rounded bg-cyan-400 px-3 py-2 text-xs font-semibold text-slate-950">Tambah nominal</Button>
                             <span v-if="Object.keys(packageForm.errors).length" class="text-xs text-red-300">{{ Object.values(packageForm.errors).join(' · ') }}</span>
                         </form>
