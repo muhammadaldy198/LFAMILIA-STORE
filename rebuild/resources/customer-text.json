@@ -116,8 +116,8 @@
   },
   "pages.catalog.show.4bfa0eb": {
     "group": "Pages/Catalog/Show",
-    "label": "Pembayaran otomatis belum tersedia. Kamu masih bisa memakai LFAMILIA Cash bila saldo mencukupi.",
-    "default": "Pembayaran otomatis belum tersedia. Kamu masih bisa memakai LFAMILIA Cash bila saldo mencukupi."
+    "label": "Pembayaran otomatis belum tersedia. Kamu masih bisa memakai LFAMILIA Coins bila saldo mencukupi.",
+    "default": "Pembayaran otomatis belum tersedia. Kamu masih bisa memakai LFAMILIA Coins bila saldo mencukupi."
   },
   "pages.catalog.show.f4a728b6": {
     "group": "Pages/Catalog/Show",
@@ -2486,8 +2486,8 @@
   },
   "pages.catalog.show.attribute.alt.d8a0146d": {
     "group": "Pages/Catalog/Show",
-    "label": "Deskripsi gambar: LFAMILIA Cash",
-    "default": "LFAMILIA Cash"
+    "label": "Deskripsi gambar: LFAMILIA Coins",
+    "default": "LFAMILIA Coins"
   },
   "pages.catalog.show.attribute.placeholder.f333f780": {
     "group": "Pages/Catalog/Show",

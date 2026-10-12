@@ -171,6 +171,11 @@ const paymentGroups = computed(() => {
         .sort((left, right) => order.indexOf(left.key) - order.indexOf(right.key));
 });
 
+function checkoutCoinsText(key, fallback) {
+    // Admin-configured legacy presentation text must not reintroduce the retired Cash label.
+    return customerText(key, fallback).replace(/LFAMILIA Cash/gi, 'LFAMILIA Coins');
+}
+
 function formatNotice(value) {
     const zone = props.product?.manual_timezone === 'Asia/Makassar'
         ? 'WITA'
@@ -966,7 +971,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                             {{ customerText("pages.catalog.show.51de2747", "Belum ada metode pembayaran aktif.") }}
                         </div>
                         <div v-else-if="!hasExternalPaymentOption" class="lf-payment-unavailable">
-                            <template v-if="customer && hasAvailableWalletPaymentOption">{{ customerText("pages.catalog.show.4bfa0eb", "Pembayaran otomatis belum tersedia. Kamu masih bisa memakai LFAMILIA Cash bila saldo mencukupi.") }}</template>
+                            <template v-if="customer && hasAvailableWalletPaymentOption">{{ checkoutCoinsText("pages.catalog.show.4bfa0eb", "Pembayaran otomatis belum tersedia. Kamu masih bisa memakai LFAMILIA Coins bila saldo mencukupi.") }}</template>
                             <template v-else>{{ customerText("pages.catalog.show.f4a728b6", "Belum ada metode pembayaran yang dapat digunakan saat ini.") }}</template>
                         </div>
                         <div
@@ -981,8 +986,8 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                                 :disabled="group.items.every(x=>x.available===false)"
                                 @click="selectPaymentGroup(group)"
                             >
-                                <span v-if="group.key==='wallet'" class="lf-payment-wallet-art">
-                                    <img :src="'/assets/payment/lfamilia-cash.webp'" :alt="customerText('pages.catalog.show.attribute.alt.d8a0146d', 'LFAMILIA Cash')">
+                                <span v-if="group.key==='wallet'" class="lf-payment-wallet-art" role="img" aria-label="LFAMILIA Coins">
+                                    <span class="lf-payment-coins-mark" aria-hidden="true">LF</span>
                                 </span>
                                 <span class="lf-payment-group-copy">
                                     <strong>{{group.title}}</strong>
