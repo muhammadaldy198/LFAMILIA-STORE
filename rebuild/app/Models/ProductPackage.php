@@ -12,11 +12,11 @@ class ProductPackage extends Model implements HasMedia
 {
     use InteractsWithMedia;
 
-    protected $fillable = ['product_id', 'code', 'name', 'note', 'group_name', 'nominal_value', 'sort_order', 'is_active', 'pricing_mode', 'margin_percent', 'margin_fixed_idr', 'sell_price_idr'];
+    protected $fillable = ['product_id', 'code', 'name', 'note', 'group_name', 'nominal_value', 'sort_order', 'is_active', 'pricing_mode', 'margin_percent', 'margin_fixed_idr', 'sell_price_idr', 'is_promo', 'original_price', 'points', 'detail_text'];
 
     protected function casts(): array
     {
-        return ['is_active' => 'boolean'];
+        return ['is_active' => 'boolean', 'is_promo' => 'boolean', 'original_price' => 'integer', 'points' => 'integer'];
     }
 
     public function product(): BelongsTo

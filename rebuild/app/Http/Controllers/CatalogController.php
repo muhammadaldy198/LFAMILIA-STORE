@@ -127,7 +127,7 @@ class CatalogController
                 $price = $quote['subtotal_idr'] ?? null;
 
                 return [
-                    ...$package->only('id', 'name', 'note', 'group_name', 'nominal_value'),
+                    ...$package->only('id', 'name', 'note', 'group_name', 'nominal_value', 'is_promo', 'original_price', 'points', 'detail_text'),
                     'image_url' => $package->getFirstMediaUrl('image'),
                     'is_available' => $available,
                     'price_idr' => $price,

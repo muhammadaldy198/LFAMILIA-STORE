@@ -6401,3 +6401,158 @@
     bottom:160px!important;
   }
 }
+
+/* PR #266 / Final V2, step 3: data-driven promo, points, and product info. */
+.lf-customer .lf-nominal-grid{
+  grid-auto-rows:140px!important;
+}
+.lf-customer .lf-nominal-option{
+  position:relative;
+  min-width:0;
+  height:140px;
+}
+.lf-customer .lf-nominal-grid .lf-nominal-option > .lf-nominal-select{
+  position:relative;
+  display:flex!important;
+  flex-direction:column!important;
+  justify-content:space-between!important;
+  align-items:stretch!important;
+  width:100%!important;
+  height:140px!important;
+  min-height:140px!important;
+  max-height:140px!important;
+  overflow:hidden!important;
+  padding:30px 10px 10px!important;
+  box-sizing:border-box;
+  text-align:left;
+  border-radius:10px;
+}
+.lf-customer .lf-nominal-grid .lf-nominal-option > .lf-nominal-select:not(.selected){border-color:rgba(255,255,255,.13)}
+.lf-customer .lf-nominal-grid .lf-nominal-top{flex:0 1 auto!important}
+.lf-customer .lf-nominal-grid .lf-nominal-copy strong{-webkit-line-clamp:2;line-clamp:2;max-height:2.8em}
+.lf-customer .lf-nominal-promo{
+  position:absolute;
+  inset:0 auto auto 0;
+  z-index:1;
+  padding:4px 9px;
+  border-radius:9px 0 9px 0;
+  background:#e34f38;
+  color:#fff;
+  font-size:10px;
+  line-height:1.3;
+  font-weight:800;
+}
+.lf-customer .lf-nominal-footer{
+  display:flex;
+  flex:0 0 auto;
+  align-self:stretch;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:3px;
+  min-width:0;
+}
+.lf-customer .lf-nominal-old-price{
+  color:#ef8287;
+  font-size:11px;
+  line-height:1.2;
+  text-decoration:line-through;
+}
+.lf-customer .lf-nominal-grid .lf-nominal-footer>b{
+  color:#ffd46c!important;
+  font-size:13px!important;
+  line-height:1.25;
+}
+.lf-customer .lf-nominal-points{
+  color:#f5c75c;
+  font-size:10px;
+  font-weight:800;
+  line-height:1.2;
+}
+.lf-customer .lf-nominal-grid .lf-nominal-option>.lf-nominal-info-button{
+  position:absolute!important;
+  top:5px!important;
+  right:5px!important;
+  display:grid!important;
+  place-items:center!important;
+  min-width:0!important;
+  width:26px!important;
+  min-height:26px!important;
+  height:26px!important;
+  padding:3px!important;
+  border:1px solid rgba(255,255,255,.35)!important;
+  border-radius:50%!important;
+  background:rgba(8,13,20,.95)!important;
+  color:#e7edf7!important;
+  box-shadow:none!important;
+  cursor:pointer;
+  z-index:2;
+}
+.lf-customer .lf-nominal-info-button svg{
+  width:17px;
+  height:17px;
+  stroke:currentColor;
+  stroke-width:2;
+  fill:none;
+}
+.lf-customer .lf-package-info-modal{
+  width:min(520px,100%);
+  max-height:85dvh;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  border:1px solid rgba(255,255,255,.15);
+  border-radius:14px;
+  background:#141a22;
+  color:#fff;
+  box-shadow:0 24px 80px rgba(0,0,0,.55);
+}
+.lf-customer .lf-package-info-modal header,
+.lf-customer .lf-package-info-modal footer{
+  padding:14px 18px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+.lf-customer .lf-package-info-modal header{border-bottom:1px solid rgba(255,255,255,.14)}
+.lf-customer .lf-package-info-modal h2{margin:0;font-size:18px}
+.lf-customer .lf-package-info-modal header button{
+  flex:0 0 32px;
+  width:32px;
+  height:32px;
+  border:1px solid rgba(255,255,255,.2);
+  border-radius:8px;
+  background:transparent;
+  color:#fff;
+  cursor:pointer;
+}
+.lf-customer .lf-package-info-body{
+  overflow:auto;
+  padding:20px 18px;
+}
+.lf-customer .lf-package-info-body p{white-space:pre-wrap;color:#e6e9f0;line-height:1.7;margin:0}
+.lf-customer .lf-package-info-modal footer{
+  justify-content:flex-end;
+  border-top:1px solid rgba(255,255,255,.14);
+}
+.lf-customer .lf-package-info-modal footer button{
+  min-height:40px;
+  padding:8px 14px;
+  border-radius:8px;
+  cursor:pointer;
+  font-weight:700;
+}
+.lf-customer .lf-package-info-confirm{
+  border:0;
+  background:var(--lf-lime);
+  color:#071006;
+}
+.lf-customer .lf-package-info-cancel{
+  border:1px solid rgba(255,255,255,.2);
+  background:transparent;
+  color:#fff;
+}
+@media(max-width:639px){
+  .lf-customer .lf-nominal-grid{grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:140px!important}
+  .lf-customer .lf-nominal-option{height:140px}
+}

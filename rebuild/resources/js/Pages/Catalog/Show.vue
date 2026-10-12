@@ -49,6 +49,7 @@ const confirmationSnapshot = ref(null);
 const summaryOpen = ref(false);
 const checkoutBarVisible = ref(true);
 const noticeOpen = ref(false);
+const packageInfoItem = ref(null);
 const noticeIndex = ref(0);
 const hideNotice = ref(false);
 const selectedSavedId = ref('');
@@ -508,6 +509,15 @@ async function checkNickname() {
     }
 }
 
+function openPackageDetails(item) {
+    if (!String(item.detail_text || '').trim()) return;
+    packageInfoItem.value = item;
+}
+
+function closePackageDetails() {
+    packageInfoItem.value = null;
+}
+
 function choosePackage(item) {
     if (!item.is_available) return;
     selectedPackageId.value = String(item.id);
@@ -874,13 +884,23 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                         <section v-for="group in visiblePackageGroups" :key="group.name || 'all'">
                             <div v-if="group.name" class="lf-package-group-head"><h3>{{group.name}}</h3><span></span></div>
                             <div class="lf-nominal-grid">
-                                <button v-for="item in group.items" :key="item.id" type="button" :title="nominalLabel(item.name, product.name)" :disabled="!item.is_available" :class="{selected:selectedPackage && String(selectedPackage.id)===String(item.id)}" @click="choosePackage(item)">
-                                    <span class="lf-nominal-top">
-                                        <span class="lf-nominal-copy"><strong>{{nominalLabel(item.name, product.name)}}</strong><small v-if="item.note" class="lf-nominal-note">{{item.note}}</small></span>
-                                        <img v-if="item.image_url" :src="item.image_url" :alt="nominalLabel(item.name, product.name)" loading="lazy" decoding="async">
-                                    </span>
-                                    <b>{{item.is_available?formatIdr(item.price_idr):'Tidak tersedia'}}</b>
-                                </button>
+                                <div v-for="item in group.items" :key="item.id" class="lf-nominal-option">
+                                    <button type="button" class="lf-nominal-select" :title="nominalLabel(item.name, product.name)" :disabled="!item.is_available" :class="{selected:selectedPackage && String(selectedPackage.id)===String(item.id)}" @click="choosePackage(item)">
+                                        <span v-if="item.is_promo" class="lf-nominal-promo">PROMO</span>
+                                        <span class="lf-nominal-top">
+                                            <span class="lf-nominal-copy"><strong>{{nominalLabel(item.name, product.name)}}</strong><small v-if="item.note" class="lf-nominal-note">{{item.note}}</small></span>
+                                            <img v-if="item.image_url" :src="item.image_url" :alt="nominalLabel(item.name, product.name)" loading="lazy" decoding="async">
+                                        </span>
+                                        <span class="lf-nominal-footer">
+                                            <del v-if="item.is_promo && item.original_price !== null && item.original_price !== undefined" class="lf-nominal-old-price">{{formatIdr(item.original_price)}}</del>
+                                            <b>{{item.is_available?formatIdr(item.price_idr):'Tidak tersedia'}}</b>
+                                            <span v-if="item.points !== null && item.points !== undefined && Number(item.points) > 0" class="lf-nominal-points">+{{Number(item.points).toLocaleString('id-ID')}} Points</span>
+                                        </span>
+                                    </button>
+                                    <button v-if="item.detail_text?.trim()" type="button" class="lf-nominal-info-button" :aria-label="'Informasi ' + nominalLabel(item.name, product.name)" @click="openPackageDetails(item)">
+                                        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5h.01"/></svg>
+                                    </button>
+                                </div>
                             </div>
                         </section>
                     </div>
@@ -1138,6 +1158,22 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
                     <span>Pesan Sekarang!</span>
                 </template>
             </button>
+        </div>
+    </div>
+
+    <div v-if="packageInfoItem" class="lf-modal-backdrop lf-package-info-backdrop" @click.self="closePackageDetails" @keydown.esc="closePackageDetails">
+        <div class="lf-package-info-modal" role="dialog" aria-modal="true" aria-labelledby="lf-package-info-title">
+            <header>
+                <h2 id="lf-package-info-title">{{nominalLabel(packageInfoItem.name, product.name)}}</h2>
+                <button type="button" aria-label="Tutup detail produk" @click="closePackageDetails">×</button>
+            </header>
+            <div class="lf-package-info-body">
+                <p>{{packageInfoItem.detail_text}}</p>
+            </div>
+            <footer>
+                <button type="button" class="lf-package-info-confirm" @click="closePackageDetails">OK, Saya Mengerti</button>
+                <button type="button" class="lf-package-info-cancel" @click="closePackageDetails">Batal</button>
+            </footer>
         </div>
     </div>
 
