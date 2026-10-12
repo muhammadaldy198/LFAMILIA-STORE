@@ -30,7 +30,10 @@ class PaymentStaticAssetTest extends TestCase
 
         $catalog = file_get_contents(resource_path('js/Pages/Catalog/Show.vue'));
         $this->assertNotFalse($catalog);
-        $this->assertStringContainsString('/assets/payment/lfamilia-cash.webp', $catalog);
+        // The wallet payment option now uses the CSS-rendered LFAMILIA Coins mark.
+        // Keep guarding against the old physical public/payment route collision.
+        $this->assertStringContainsString('lf-payment-coins-mark', $catalog);
+        $this->assertStringContainsString('LFAMILIA Coins', $catalog);
         $this->assertStringNotContainsString("'/payment/lfamilia-cash.webp'", $catalog);
     }
 }
