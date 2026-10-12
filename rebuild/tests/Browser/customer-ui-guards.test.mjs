@@ -88,3 +88,33 @@ test('V2 checkout quote remains server-authoritative and payment section scrolls
     assert.match(source, /behavior: 'smooth'/);
     assert.match(source, /displayTotal = computed\(\(\) => quote\.value\?\.total_idr \?\? null\)/);
 });
+
+
+test('V3 checkout geometry stays measured and keeps LFAMILIA-only assets', () => {
+    const vue = read('Pages/Catalog/Show.vue');
+    const css = readFileSync(new URL('../../resources/css/app.css', import.meta.url), 'utf8');
+    const v3 = css.split('/* PR #266 / SPEC FINAL V3: Ourastore-measured checkout geometry; LFAMILIA palette.')[1];
+
+    assert.ok(v3, 'V3 layout rules must be present');
+    assert.match(v3, /min-height:224px!important/);
+    assert.match(v3, /object-fit:contain!important/);
+    assert.match(v3, /inset:70% 0 0/);
+    assert.match(v3, /width:128px!important/);
+    assert.match(v3, /width:240px!important/);
+    assert.match(v3, /top:-64px!important/);
+    assert.match(v3, /top:-112px!important/);
+    assert.match(v3, /transform:rotateY\(20deg\) rotateX\(-4deg\)!important/);
+    assert.match(v3, /transform-origin:left center!important/);
+    assert.match(v3, /flex:0 0 40px!important/);
+    assert.match(v3, /grid-template-columns:repeat\(2,minmax\(0,1fr\)\)!important/);
+    assert.match(v3, /grid-template-columns:repeat\(3,minmax\(0,1fr\)\)!important/);
+    assert.match(v3, /grid-auto-rows:minmax\(85px,auto\)!important/);
+    assert.match(v3, /max-height:48px!important/);
+    assert.match(v3, /@media\(max-width:1023px\)/);
+    assert.match(v3, /height:4em!important/);
+    assert.doesNotMatch(v3, /\.lf-footer-banner\s*\{/);
+    assert.doesNotMatch(vue, /Pengiriman INSTAN|ourastore\.(com|id)\/.*(?:png|jpg|webp)/i);
+    assert.match(vue, /v-if="item\.is_promo"/);
+    assert.match(vue, /v-if="item\.detail_text\?\.trim\(\)"/);
+    assert.match(vue, /formatIdr\(displayTotal\)/);
+});
