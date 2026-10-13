@@ -225,3 +225,40 @@ DB::transaction(function (): void {
 });
 
 echo "browser-checkout-game\n";
+
+// Comparable Lab visual data, confined to this local/testing fixture database.
+DB::transaction(function (): void {
+    $product = Product::updateOrCreate(['slug' => 'checkout-lab-reference'], [
+        'category_id' => Category::where('slug', 'game')->value('id'),
+        'name' => 'Mobile Legends', 'publisher' => 'Moonton',
+        'description' => 'Fixture visual Checkout Lab. Tidak ada transaksi nyata.',
+        'margin_percent' => 0, 'fulfillment_mode' => 'AUTO_PROVIDER',
+        'nickname_check_enabled' => false, 'is_active' => true,
+    ]);
+    foreach (['user_id' => 'User ID', 'zone_id' => 'Zone ID'] as $key => $label) {
+        $product->fields()->updateOrCreate(['field_key' => $key], [
+            'label' => $label, 'placeholder' => $key === 'user_id' ? 'Contoh: 12345678' : 'Contoh: 1234',
+            'type' => 'text', 'is_required' => true, 'sort_order' => $key === 'user_id' ? 0 : 1,
+        ]);
+    }
+    $product->addMedia(__DIR__.'/reference/cover.png')->preservingOriginal()->toMediaCollection('image');
+    $product->addMedia(__DIR__.'/reference/hero.png')->preservingOriginal()->toMediaCollection('banner');
+    foreach ([['5 Diamonds', 1500], ['12 Diamonds', 3500], ['28 Diamonds', 7800], ['56 Diamonds', 14800], ['86 Diamonds', 22900], ['172 Diamonds', 44500], ['257 Diamonds', 65300], ['Weekly Diamond Pass', 28300]] as $index => [$name, $price]) {
+        $package = $product->packages()->updateOrCreate(['code' => 'VISUAL-'.($index + 1)], [
+            'name' => $name, 'sort_order' => $index, 'pricing_mode' => 'FIXED',
+            'sell_price_idr' => $price, 'is_active' => true,
+        ]);
+        DB::table('provider_mappings')->updateOrInsert(['product_package_id' => $package->id, 'external_sku' => 'VISUAL-SKU-'.$index], [
+            'provider_id' => DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id'),
+            'cost_idr' => $price, 'max_price_idr' => $price, 'priority' => 1, 'is_active' => true,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('digiflazz_catalog_items')->updateOrInsert(['buyer_sku_code' => 'VISUAL-SKU-'.$index], [
+            'product_name' => $name, 'category' => 'Games', 'brand' => 'Visual Fixture', 'type' => 'Umum',
+            'seller_name' => 'Fixture', 'price_idr' => $price, 'baseline_price_idr' => $price,
+            'buyer_active' => true, 'seller_active' => true, 'unlimited_stock' => true,
+            'stock' => 0, 'multi' => false, 'start_cut_off' => '00:00', 'end_cut_off' => '00:00',
+            'synced_at' => now(), 'created_at' => now(), 'updated_at' => now(),
+        ]);
+    }
+});

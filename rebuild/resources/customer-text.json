@@ -3053,5 +3053,15 @@
     "group": "Pages/Customer/OrderDetail",
     "label": "Percobaan pembayaran gagal atau ditolak. Periksa status invoice sebelum mencoba lagi.",
     "default": "Percobaan pembayaran gagal atau ditolak. Periksa status invoice sebelum mencoba lagi."
+  },
+  "checkout.support_label": {
+    "label": "Bantuan pada header produk",
+    "default": "Bantuan Pelanggan",
+    "group": "Pages/Catalog/Show"
+  },
+  "checkout.account_hint": {
+    "label": "Informasi data akun checkout",
+    "default": "Pastikan ID atau Server sudah sesuai sebelum memesan.",
+    "group": "Pages/Catalog/Show"
   }
 }

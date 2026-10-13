@@ -74,12 +74,14 @@ assert_page "/catalog/browser-checkout-game" "Data Akun" 1440 1000
 assert_page "/catalog/browser-checkout-game" "Pilih Nominal" 1440 1000
 assert_page "/catalog/browser-checkout-game" "Pilih Pembayaran" 1440 1000
 assert_page "/catalog/browser-checkout-game" "100 Diamonds" 1440 1000
-assert_page "/catalog/browser-checkout-game" "Ringkasan pesanan" 390 844
-assert_page "/catalog/browser-checkout-game" "Pakai Voucher" 390 844
+assert_page "/catalog/browser-checkout-game" "Ringkasan Pesanan" 390 844
+assert_page "/catalog/browser-checkout-game" "Lihat voucher" 390 844
 
 echo "Running responsive browser smoke (maximum 5 minutes)"
 timeout --signal=TERM --kill-after=10s 5m node tests/Browser/responsive.mjs "$CHROME_BIN"
 echo "Running admin browser smoke (maximum 9 minutes)"
 timeout --signal=TERM --kill-after=10s 9m node tests/Browser/admin-ui.mjs "$CHROME_BIN"
 
+echo "Running checkout Lab comparison across ten viewports"
+timeout --signal=TERM --kill-after=10s 5m node tests/Browser/checkout-visual.mjs "$CHROME_BIN"
 echo "M11 browser smoke passed."

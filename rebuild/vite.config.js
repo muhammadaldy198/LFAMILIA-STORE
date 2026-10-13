@@ -8,7 +8,7 @@ export default defineConfig({
     resolve: { alias: { '@': fileURLToPath(new URL('./resources/js', import.meta.url)) } },
     plugins: [
         laravel({
-            input: ['resources/css/app.css', 'resources/js/app.js'],
+            input: ['resources/css/app.css', 'resources/css/admin.css', 'resources/js/app.js'],
             refresh: true,
         }),
         vue(),

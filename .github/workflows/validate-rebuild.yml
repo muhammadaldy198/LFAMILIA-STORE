@@ -198,6 +198,14 @@ jobs:
       - name: Run M11 browser smoke
         run: bash tests/Browser/smoke.sh
 
+      - name: Upload checkout visual comparison
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: checkout-lab-comparison
+          path: rebuild/checkout-visual-results
+          if-no-files-found: warn
+
       - name: Check PHP style
         run: vendor/bin/pint --test
 

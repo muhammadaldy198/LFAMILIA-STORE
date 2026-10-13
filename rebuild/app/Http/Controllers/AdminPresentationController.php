@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\AdminAuditService;
 use App\Services\CustomerPresentationService;
+use App\Services\StoreThemeService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -13,9 +14,11 @@ use Inertia\Response;
 
 class AdminPresentationController
 {
-    public function index(CustomerPresentationService $presentation): Response
+    public function index(CustomerPresentationService $presentation, StoreThemeService $theme): Response
     {
         return Inertia::render('Admin/Presentation', [
+            'themeFields' => $theme->fields(),
+            'theme' => $theme->saved(),
             'registry' => $presentation->registry(),
             'fields' => $presentation->fields(),
             'sections' => config('customer_presentation.sections'),
@@ -63,5 +66,39 @@ class AdminPresentationController
         $audit->record($request, 'content.presentation.updated', 'system_setting', 'store.customer_presentation', $before, $after);
 
         return back()->with('status', 'Teks dan tampilan customer berhasil disimpan.');
+    }
+
+    public function theme(Request $request, StoreThemeService $theme, AdminAuditService $audit): RedirectResponse
+    {
+        $keys = array_keys($theme->fields());
+        $rules = ['colors' => ['required', 'array:'.implode(',', $keys)]];
+        foreach ($keys as $key) {
+            $rules['colors.'.$key] = ['required', 'string', 'regex:/^#[0-9A-Fa-f]{6}$/D'];
+        }
+        $data = $request->validate($rules);
+        $after = $theme->sanitize($data['colors']);
+        foreach (['background', 'background-alt', 'surface', 'panel', 'card'] as $surface) {
+            foreach (['text', 'muted'] as $text) {
+                if ($theme->contrast($after[$text], $after[$surface]) < 4.5) {
+                    throw ValidationException::withMessages(['colors.'.$text => 'Kontras teks terlalu rendah. Pilih warna yang lebih mudah dibaca.']);
+                }
+            }
+        }
+        foreach (['primary', 'secondary'] as $action) {
+            if ($theme->contrast($after['background-alt'], $after[$action]) < 4.5) {
+                throw ValidationException::withMessages(['colors.'.$action => 'Kontras tombol terlalu rendah. Pilih aksen yang lebih terang.']);
+            }
+        }
+        DB::transaction(function () use ($request, $theme, $audit, $after): void {
+            $before = $theme->saved();
+            DB::table('system_settings')->updateOrInsert(['key' => 'store.theme'], [
+                'value' => json_encode($after, JSON_THROW_ON_ERROR),
+                'updated_by_admin_id' => $request->user('admin')->id,
+                'updated_at' => now(),
+            ]);
+            $audit->record($request, 'content.theme.updated', 'system_setting', 'store.theme', $before, $after);
+        });
+
+        return back()->with('status', 'Warna website berhasil disimpan.');
     }
 }

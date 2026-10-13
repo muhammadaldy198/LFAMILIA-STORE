@@ -1,0 +1,26 @@
+/* Global branding only. Never define checkout geometry in this file. */
+:root {
+  --lf-color-background: #0C111A;
+  --lf-color-background-alt: #090E19;
+  --lf-color-surface: #111A2A;
+  --lf-color-panel: #161D29;
+  --lf-color-card: #1A2638;
+  --lf-color-border: #34445B;
+  --lf-color-text: #EDF3FF;
+  --lf-color-muted: #9EAEC5;
+  --lf-color-primary: #609CFF;
+  --lf-color-secondary: #B398FF;
+  --lf-color-highlight: #C8F66B;
+  --lf-color-success: #76D6AB;
+  --lf-color-warning: #F5C76A;
+  --lf-color-error: #FF999B;
+  --lf-primary-rgb:96,156,255;
+  --lime:var(--lf-color-primary);--lime2:var(--lf-color-secondary);--blue:var(--lf-color-primary);
+  --lf-gradient-action:linear-gradient(105deg,var(--lf-color-primary),var(--lf-color-secondary));
+}
+.lf-checkout-shell{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
+.lf-checkout-shell .lf-live-support{bottom:calc(110px + env(safe-area-inset-bottom))}
+.lf-customer{color:var(--lf-color-text)}
+.lf-customer :is(.lf-primary,.lf-order-button){background:var(--lf-gradient-action);color:var(--lf-color-background-alt)}
+.lf-header{background:color-mix(in srgb,var(--lf-color-background-alt) 94%,transparent)}
+.lf-footer{background:var(--lf-color-background-alt);color:var(--lf-color-text)}

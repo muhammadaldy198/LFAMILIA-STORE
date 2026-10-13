@@ -58,6 +58,9 @@
         <meta name="robots" content="noindex,nofollow">
     @endif
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @if (request()->is('admin', 'admin/*'))
+        @vite('resources/css/admin.css')
+    @endif
     @inertiaHead
 </head>
 <body>
