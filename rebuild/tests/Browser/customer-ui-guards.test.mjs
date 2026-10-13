@@ -73,3 +73,29 @@ test('checkout uses Lab nominal geometry inside an explicit legacy CSS boundary'
     assert.doesNotMatch(global, /@import ['"]\.\/admin.css/);
     assert.doesNotMatch(product, /lab-pricing|demo-data|mock-api|successModal|lf-order-summary/);
 });
+
+test('customer searches show real product suggestions instead of linking to the homepage section', () => {
+    const header = read('Components/CustomerShell.vue');
+    const home = read('Pages/Catalog/Index.vue');
+    const search = read('Components/ProductSearch.vue');
+    const styles = readFileSync(new URL('../../resources/css/app.css', import.meta.url), 'utf8');
+    assert.match(header, /<ProductSearch class="lf-header-search"/);
+    assert.match(header, /mobileSearchOpen/);
+    assert.match(home, /<ProductSearch class="lf-search"/);
+    assert.match(search, /fetch\('\/catalog\/search\?q='/);
+    assert.match(search, /'\/catalog\/' \+ encodeURIComponent\(product.slug\)/);
+    assert.match(search, /@pointerdown.prevent/);
+    assert.doesNotMatch(header, /<Link href="\/#produk" class="lf-header-search"/);
+    assert.doesNotMatch(header, /<Link href="\/#produk" class="lf-search-mobile"/);
+    assert.match(styles, /padding:0 14px 0 46px!important/);
+});
+
+test('wallet payment status is never a fake perpetual quote and checkout description is not duplicated', () => {
+    const methods = read('Components/Checkout/PaymentMethods.vue');
+    const checkout = read('Pages/Catalog/Show.vue');
+    assert.match(methods, /channel\?\.group === 'wallet' && !props\.customer/);
+    assert.match(methods, /return props\.loadingQuotes \? 'Menghitung…' : 'Pilih metode'/);
+    assert.match(checkout, /:loading-quotes="busy==='quote'"/);
+    assert.doesNotMatch(checkout, /lfx-description-box/);
+    assert.match(checkout, /lf-product-description-legacy/);
+});
