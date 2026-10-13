@@ -105,7 +105,7 @@ onUnmounted(() => { ++serial; cancelPending(); });
 </script>
 
 <template>
-    <div class="lf-product-search" :class="'lf-product-search-' + variant" @focusout="blur" @keydown.esc="focused=false">
+    <div class="lf-product-search" :class="'lf-product-search-' + variant" @focusout="blur" @keydown.esc="input?.blur()">
         <form class="lf-product-search-form" role="search" @submit.prevent="submit">
             <svg class="lf-product-search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 5 5"/></svg>
             <input
@@ -139,6 +139,7 @@ onUnmounted(() => { ++serial; cancelPending(); });
                     :href="'/catalog/' + encodeURIComponent(product.slug)"
                     role="option"
                     :aria-selected="activeIndex===index"
+                    @pointerdown.prevent
                     @click="focused=false"
                 >
                     <img v-if="product.image_url" :src="product.image_url" :alt="product.name">
