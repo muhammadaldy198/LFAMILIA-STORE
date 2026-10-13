@@ -27,7 +27,7 @@ createInertiaApp({
                     for (const stylesheet of styles) stylesheet.disabled = !adminRoute;
                     if (adminRoute && !styles.length) window.location.assign(url);
                 }, {immediate:true});
-                watch(() => page.props.theme, colors => {
+                watch(() => page.props?.theme, colors => {
                     for (const [key, value] of Object.entries(colors || {})) {
                         if (/^[a-z-]+$/.test(key) && /^#[0-9A-Fa-f]{6}$/.test(value)) document.documentElement.style.setProperty('--lf-color-' + key, value);
                     }
