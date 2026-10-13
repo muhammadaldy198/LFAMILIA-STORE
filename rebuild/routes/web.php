@@ -58,6 +58,7 @@ Route::get('/sitemap.xml', [SeoController::class, 'sitemap'])->name('seo.sitemap
 Route::get('/catalog', [LegacyFrontendController::class, 'catalog'])->name('legacy.catalog');
 Route::get('/checkout', [LegacyFrontendController::class, 'checkout'])->name('legacy.checkout');
 Route::get('/track', [LegacyFrontendController::class, 'track'])->name('legacy.track');
+Route::get('/catalog/search', [CatalogController::class, 'search'])->middleware('throttle:60,1')->name('catalog.search');
 Route::get('/catalog/{slug}', [CatalogController::class, 'show'])->name('catalog.show');
 Route::get('/news', [PublicContentController::class, 'news'])->name('content.news');
 Route::get('/news/{slug}', [PublicContentController::class, 'article'])->name('content.article');
