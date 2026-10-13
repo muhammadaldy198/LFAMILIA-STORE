@@ -82,9 +82,11 @@ timeout --signal=TERM --kill-after=10s 5m node tests/Browser/responsive.mjs "$CH
 echo "Running admin browser smoke (maximum 9 minutes)"
 timeout --signal=TERM --kill-after=10s 9m node tests/Browser/admin-ui.mjs "$CHROME_BIN"
 
-# Expose the URL of any failing resource while investigating the 404 regression.
-# This only enriches diagnostics in the CI working copy; all errors still fail.
-sed -i "s/message.type()+': '+message.text());/message.type()+': '+message.text()+' [source='+message.location().url+']');/" tests/Browser/checkout-visual.mjs
+# Browser-fallback icon must exist even when no Admin favicon is configured.
+curl --fail --silent --show-error "$APP_URL/favicon.ico" >/dev/null || {
+  echo "Default favicon is unavailable (GET /favicon.ico)."
+  exit 1
+}
 echo "Running checkout Lab comparison across ten viewports"
 if ! timeout --signal=TERM --kill-after=10s 5m node tests/Browser/checkout-visual.mjs "$CHROME_BIN"; then
   echo "Browser server HTTP errors:"
