@@ -6205,3 +6205,32 @@ body:where(:not(.lfx, .lfx *)){margin:0;font-family:Inter,ui-sans-serif,system-u
   max-width:100%;
   white-space:nowrap;
 }
+
+/* Shared customer catalogue search; keeps icon and input text apart at every breakpoint. */
+.lf-customer .lf-product-search:where(:not(.lfx, .lfx *)){min-width:0;max-width:100%}
+.lf-customer .lf-header-search.lf-product-search:where(:not(.lfx, .lfx *)){padding:0;overflow:visible}
+.lf-customer .lf-product-search-form:where(:not(.lfx, .lfx *)){min-width:0;width:100%}
+.lf-customer.lf-customer.lf-customer.lf-customer .lf-product-search-form input.lf-product-search-input:where(:not(.lfx, .lfx *)){
+  width:100%!important;min-width:0!important;box-sizing:border-box!important;
+  padding:0 14px 0 46px!important;text-overflow:ellipsis;
+}
+.lf-customer .lf-product-search-icon:where(:not(.lfx, .lfx *)){left:14px;flex:none}
+.lf-customer .lf-product-search-results:where(:not(.lfx, .lfx *)){min-width:0;width:100%}
+.lf-search-overlay:where(:not(.lfx, .lfx *)){
+  position:fixed;inset:0;z-index:120;padding:70px 14px 16px;
+  background:rgba(0,0,0,.78);display:flex;justify-content:center;align-items:flex-start;
+}
+.lf-search-dialog:where(:not(.lfx, .lfx *)){
+  position:relative;width:min(520px,100%);padding:46px 13px 13px;
+  border:1px solid var(--lf-color-border);border-radius:14px;background:var(--lf-color-panel);
+  box-shadow:0 22px 55px rgba(0,0,0,.5);
+}
+.lf-search-dialog-close:where(:not(.lfx, .lfx *)){
+  position:absolute;right:12px;top:8px;border:0;background:transparent;color:var(--lf-color-text);
+  font-size:28px;cursor:pointer;line-height:1;
+}
+.lf-search-dialog .lf-product-search-results:where(:not(.lfx, .lfx *)){max-height:min(55vh,400px)}
+@media(max-width:639px){
+  .lf-search-overlay:where(:not(.lfx, .lfx *)){padding-top:66px}
+  .lf-search-dialog:where(:not(.lfx, .lfx *)){width:100%}
+}
