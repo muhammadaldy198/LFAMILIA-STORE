@@ -95,6 +95,9 @@ test('customer searches show real product suggestions instead of linking to the 
     assert.match(search, /function dismissSuggestions\(\)/);
     assert.match(search, /@keydown\.esc="dismissSuggestions"/);
     assert.match(search, /@input="focused=true"/);
+    assert.match(search, /function focusSearch\(\)/);
+    assert.match(search, /@focus="focusSearch"/);
+    assert.match(search, /query\.value\.trim\(\) && !ready\.value && !loading\.value/);
     assert.match(search, /:id="menuId \+ '-option-' \+ index"/);
     assert.doesNotMatch(header, /<Link href="\/#produk" class="lf-header-search"/);
     assert.doesNotMatch(header, /<Link href="\/#produk" class="lf-search-mobile"/);
