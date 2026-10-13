@@ -2,9 +2,10 @@
 import { useCustomerPresentation } from '../../Composables/customerPresentation';
 const { customerText, sectionEnabled } = useCustomerPresentation();
 
-import {Head,Link,router,usePage} from '@inertiajs/vue3';
-import {computed,onMounted,onUnmounted,ref,watch} from 'vue';
+import {Head,Link,usePage} from '@inertiajs/vue3';
+import {computed,onMounted,onUnmounted,ref} from 'vue';
 import CustomerShell from '../../Components/CustomerShell.vue';
+import ProductSearch from '../../Components/ProductSearch.vue';
 import CategoryIcon from '../../Components/CategoryIcon.vue';
 
 const p=defineProps({
@@ -13,7 +14,6 @@ const p=defineProps({
 });
 const page=usePage();
 const storefront=computed(()=>page.props.storefront||{});
-const search=ref(p.filters.q??'');
 const mobile=ref(false);
 const bannerIndex=ref(0);
 const popupOpen=ref(false);
@@ -26,11 +26,8 @@ const activeBanner=computed(()=>visibleBanners.value[Math.min(bannerIndex.value,
 const activePopup=computed(()=>popupItem.value);
 const popular=computed(()=>p.popularProducts??[]);
 const q=(x={})=>{const a={...p.filters,...x};Object.keys(a).forEach(k=>{if(!a[k])delete a[k]});const s=new URLSearchParams(a).toString();return s?'/?'+s:'/'};
-// Request only the listing props; keep the banner, popup and the rest of the homepage mounted.
+// Keep catalogue filter tabs as partial Inertia updates without remounting the homepage.
 const listingProps=['products','filters'];
-const submit=()=>router.get('/',{...p.filters,q:search.value},{only:listingProps,preserveState:true,preserveScroll:true});
-// Keep the input in sync when visitors use browser back/forward to revisit a filter.
-watch(()=>p.filters.q,(value)=>{search.value=value??''});
 const initial=n=>(n||'L').slice(0,1).toUpperCase();
 const label=l=>String(l).includes('Previous')?'‹':String(l).includes('Next')?'›':String(l).replace(/&laquo;|&raquo;/g,'').trim();
 const newsDate=v=>v?new Date(v).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}):'LFAMILIA News';
@@ -128,10 +125,7 @@ onUnmounted(()=>{
                         <h1 class="lf-title">{{ customerText("pages.catalog.index.c79e09c7", "Pilih produk favoritmu") }}</h1>
                         <p class="lf-copy">{{ customerText("pages.catalog.index.37d8d356", "Top up game, voucher, hiburan, pulsa, PLN, dan produk digital langsung dari halaman utama.") }}</p>
                     </div>
-                    <form class="lf-search" @submit.prevent="submit">
-                        <span aria-hidden="true">⌕</span>
-                        <input v-model="search" maxlength="80" :placeholder="customerText('pages.catalog.index.attribute.placeholder.6c55bcac', 'Cari game, voucher, pulsa, atau PLN')">
-                    </form>
+                    <ProductSearch class="lf-search" variant="home" :initial-query="filters.q || ''" :placeholder="customerText('pages.catalog.index.attribute.placeholder.6c55bcac', 'Cari game, voucher, pulsa, atau PLN')" />
                 </div>
 
                 <nav class="lf-filters">
