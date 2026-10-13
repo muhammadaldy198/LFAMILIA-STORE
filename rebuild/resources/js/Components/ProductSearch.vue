@@ -97,6 +97,11 @@ async function submit() {
         router.visit('/catalog/' + encodeURIComponent(product.slug));
     }
 }
+function focusSearch() {
+    focused.value = true;
+    // A bookmarked /?q=... value was populated before the query watcher attached.
+    if (query.value.trim() && !ready.value && !loading.value) void lookup(query.value);
+}
 function dismissSuggestions() {
     // Escape also works when keyboard focus has moved into a suggestion link.
     input.value?.focus();
@@ -131,7 +136,7 @@ onUnmounted(() => { ++serial; cancelPending(); });
                 :aria-expanded="open"
                 :aria-controls="menuId"
                 :aria-activedescendant="open && activeIndex >= 0 ? menuId + '-option-' + activeIndex : undefined"
-                @focus="focused=true"
+                @focus="focusSearch"
                 @input="focused=true"
                 @keydown.down.prevent="move(1)"
                 @keydown.up.prevent="move(-1)"
