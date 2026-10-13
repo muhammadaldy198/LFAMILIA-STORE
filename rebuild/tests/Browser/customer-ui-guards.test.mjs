@@ -68,7 +68,8 @@ test('checkout uses Lab nominal geometry inside an explicit legacy CSS boundary'
     assert.match(css, /justify-content:space-between/);
     assert.match(css, /-webkit-line-clamp:2/);
     assert.match(css, /object-fit:contain/);
-    assert.match(global, /@scope \(:root\) to \(\.lfx\)/);
+    assert.match(global, /:where\(:not\(\.lfx, \.lfx \*\)\)/);
+    assert.doesNotMatch(global, /@scope\s*\(/);
     assert.doesNotMatch(global, /@import ['"]\.\/admin.css/);
     assert.doesNotMatch(product, /lab-pricing|demo-data|mock-api|successModal|lf-order-summary/);
 });

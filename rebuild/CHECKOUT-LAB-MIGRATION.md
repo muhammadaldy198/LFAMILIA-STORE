@@ -15,10 +15,12 @@ LFAMILIA Coin is a display label using the configured channel logo or existing o
 ## CSS boundary
 
 - `tokens.css`: semantic customer colors only, no geometry.
-- `app.css`: legacy rules inside `@scope (:root) to (.lfx)` cannot target checkout, including their `!important` selectors.
+- `app.css`: legacy selectors use the zero-specificity `:where(:not(.lfx, .lfx *))` boundary, including their `!important` rules. It works in browsers without CSS `@scope`.
 - `checkout.css`: approved Lab geometry in the `.lfx` namespace; measured baseline sizes belong to checkout, independent of admin typography settings.
 - Payment/voucher components: local scoped styles.
 - `admin.css`: original white admin rules in an independent Vite entry, loaded only on admin requests. Customer color settings do not change admin tokens.
+
+The checkout action gradient derives from the saved primary palette while retaining the exact approved default stops.
 
 Sticky controls share one height variable: 54 px below 768, 62 px at 768–1023, 70 px from 1024. Artwork is square before perspective. Desktop/tablet banners contain the full image; phones crop horizontally only. Missing banners show the background. Content padding/support drag bounds reserve the action bar on every device.
 

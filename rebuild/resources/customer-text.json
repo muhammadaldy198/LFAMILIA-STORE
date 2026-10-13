@@ -3063,5 +3063,30 @@
     "label": "Informasi data akun checkout",
     "default": "Pastikan ID atau Server sudah sesuai sebelum memesan.",
     "group": "Pages/Catalog/Show"
+  },
+  "checkout.account_title": {
+    "label": "Checkout: Data Akun",
+    "default": "Data Akun",
+    "group": "Pages/Catalog/Show"
+  },
+  "checkout.nominal_title": {
+    "label": "Checkout: Pilih Nominal",
+    "default": "Pilih Nominal",
+    "group": "Pages/Catalog/Show"
+  },
+  "checkout.payment_title": {
+    "label": "Checkout: Pilih Pembayaran",
+    "default": "Pilih Pembayaran",
+    "group": "Pages/Catalog/Show"
+  },
+  "checkout.voucher_title": {
+    "label": "Checkout: Voucher Diskon",
+    "default": "Voucher Diskon",
+    "group": "Pages/Catalog/Show"
+  },
+  "checkout.contact_title": {
+    "label": "Checkout: Detail Kontak",
+    "default": "Detail Kontak",
+    "group": "Pages/Catalog/Show"
   }
 }

@@ -41,7 +41,7 @@ class HandleInertiaRequests extends Middleware
                     ],
                 ];
             },
-            'theme' => fn () => app(StoreThemeService::class)->saved(),
+            'theme' => fn () => app(StoreThemeService::class)->tokens(),
             'storefront' => fn () => $storefront->shared(),
             'security' => function () use ($request, $turnstile): array {
                 $config = $turnstile->publicConfig();

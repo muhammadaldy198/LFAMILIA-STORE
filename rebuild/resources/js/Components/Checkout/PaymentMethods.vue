@@ -9,6 +9,7 @@ const props = defineProps({
   quotes: {type:Object, default:()=>({})},
   currentQuote: {type:Object, default:null},
   hasPackage: {type:Boolean, default:false},
+  locked: Boolean,
   customer: { type: Object, default: null },
 });
 const emit = defineEmits(['select']);
@@ -56,9 +57,16 @@ const hasExternalPaymentOption = computed(() => paymentGroups.value.some(group =
 const hasAvailableWalletPaymentOption = computed(() => paymentGroups.value.some(group =>
   group.key === 'wallet' && group.items.some(item => item.available !== false)));
 
+function usable(channel) {
+    if (!channel || channel.available === false) return false;
+    const value = props.currentQuote?.payment_channel_code === channel.code ? props.currentQuote : props.quotes[channel.code];
+    if (value?.error) return false;
+    return channel.group !== 'wallet' || !props.customer || value?.total_idr == null || value.total_idr <= Number(props.customer.balance_idr || 0);
+}
 function choosePayment(code) {
+    if (props.locked) return;
     const channel = (props.paymentChannels || []).find(item => item.code === code && item.available !== false);
-    if (!channel) return;
+    if (!usable(channel)) return;
     emit('select', channel.code);
 }
 </script>
@@ -81,15 +89,15 @@ function choosePayment(code) {
                             <button
                                 type="button"
                                 class="lf-payment-group-main"
-                                :disabled="group.items.every(x=>x.available===false)"
-                                @click="choosePayment(group.items.find(x=>x.code===paymentChannelCode)?.code || group.items.find(x=>x.available!==false)?.code)"
+                                :disabled="locked || group.items.every(x=>!usable(x))"
+                                @click="choosePayment(group.items.find(x=>x.code===paymentChannelCode)?.code || group.items.find(x=>usable(x))?.code)"
                             >
                                 <span v-if="group.key==='wallet'" class="lf-payment-wallet-art">
                                     <img :src="groupChannel(group)?.logo_url || '/assets/payment/lfamilia-cash.webp'" :alt="'LFAMILIA Coin'">
                                 </span>
                                 <span class="lf-payment-group-copy">
                                     <strong>{{group.title}}</strong>
-                                    <small v-if="group.key==='wallet' && customer">Saldo {{formatIdr(customer.balance_idr)}}</small>
+                                    <small v-if="group.key==='wallet' && customer">{{group.items.some(x=>usable(x))?'Saldo '+formatIdr(customer.balance_idr):'Saldo tidak mencukupi'}}</small>
                                     <small v-else-if="group.key==='wallet'">Masuk akun untuk memakai saldo</small>
                                     <small v-else>{{group.description}}</small>
                                 </span>
@@ -114,11 +122,11 @@ function choosePayment(code) {
                                     v-for="channel in group.items"
                                     :key="channel.code"
                                     class="lfx-payment-method-card"
-                                    :class="{ 'is-selected': paymentChannelCode === channel.code, 'is-unavailable': channel.available===false }"
+                                    :class="{ 'is-selected': paymentChannelCode === channel.code, 'is-unavailable': !usable(channel) }"
                                     role="radio"
                                     :aria-checked="paymentChannelCode===channel.code"
-                                    :aria-disabled="channel.available===false"
-                                    :tabindex="channel.available===false?-1:0"
+                                    :aria-disabled="!usable(channel)"
+                                    :tabindex="usable(channel)?0:-1"
                                     @click="choosePayment(channel.code)"
                                     @keydown.enter.prevent="choosePayment(channel.code)"
                                     @keydown.space.prevent="choosePayment(channel.code)"

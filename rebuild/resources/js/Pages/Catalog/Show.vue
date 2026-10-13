@@ -3,7 +3,7 @@ import { useCustomerPresentation } from '../../Composables/customerPresentation'
 const { customerText } = useCustomerPresentation();
 
 import { Head, Link, router } from '@inertiajs/vue3';
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import CustomerShell from '../../Components/CustomerShell.vue';
 import CheckoutPaymentMethods from '../../Components/Checkout/PaymentMethods.vue';
 import CheckoutVoucherModal from '../../Components/Checkout/VoucherModal.vue';
@@ -50,6 +50,32 @@ const confirmOpen = ref(false);
 const agreed = ref(false);
 const confirmationSnapshot = ref(null);
 const summaryOpen = ref(false);
+let dialogReturnFocus;
+let dialogPreviousOverflow = '';
+function onDialogKey(event) {
+    if (event.key === 'Escape') { if (busy.value === 'order' || busy.value === 'payment') return; voucherOpen.value = false; closeReview(); return; }
+    if (event.key !== 'Tab') return;
+    const dialog = document.querySelector('.lfx-offer-modal, .lfx-modal[role="dialog"]');
+    const focusable = [...(dialog?.querySelectorAll('button:not(:disabled), input:not(:disabled), a[href], select:not(:disabled), [tabindex="0"]') || [])];
+    if (!focusable.length) return;
+    const first = focusable[0], last = focusable[focusable.length-1];
+    if (event.shiftKey && (document.activeElement === first || !dialog.contains(document.activeElement))) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && (document.activeElement === last || !dialog.contains(document.activeElement))) { event.preventDefault(); first.focus(); }
+}
+watch(() => summaryOpen.value || confirmOpen.value || voucherOpen.value, async open => {
+    if (open) {
+        dialogReturnFocus = document.activeElement;
+        dialogPreviousOverflow = document.documentElement.style.overflow;
+        document.documentElement.style.overflow = 'hidden';
+        window.addEventListener('keydown', onDialogKey);
+        await nextTick();
+        document.querySelector('.lfx-offer-modal button, .lfx-modal[role="dialog"] button')?.focus();
+    } else {
+        window.removeEventListener('keydown', onDialogKey);
+        document.documentElement.style.overflow = dialogPreviousOverflow;
+        dialogReturnFocus?.focus?.();
+    }
+});
 const noticeOpen = ref(false);
 const noticeIndex = ref(0);
 const hideNotice = ref(false);
@@ -428,6 +454,13 @@ async function requestJson(url, options = {}) {
             ...(options.headers || {}),
         },
         ...options,
+    }).catch(error => {
+        const message = ['TimeoutError', 'AbortError'].includes(error.name)
+            ? 'Koneksi terlalu lama. Periksa jaringan lalu coba lagi.'
+            : 'Tidak dapat terhubung. Periksa jaringan lalu coba lagi.';
+        const failure = new Error(message);
+        failure.validation = { checkout: [message] };
+        throw failure;
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
@@ -517,6 +550,7 @@ async function choosePayment(code) {
 async function loadQuote() {
     if (!canQuote.value) {
         invalidateQuote();
+        if (voucherCode.value && !props.customer && !guestContactComplete.value) errors.value = {voucher_code:['Lengkapi email dan WhatsApp sebelum memakai voucher.']};
         return null;
     }
 
@@ -729,6 +763,8 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+    if (summaryOpen.value || confirmOpen.value || voucherOpen.value) document.documentElement.style.overflow = dialogPreviousOverflow;
+    window.removeEventListener('keydown', onDialogKey);
     if (contactQuoteTimer) window.clearTimeout(contactQuoteTimer);
     if (nicknameAutoTimer) window.clearTimeout(nicknameAutoTimer);
 
@@ -780,9 +816,9 @@ function closeReview() { summaryOpen.value = false; closeConfirmation(); }
       <div class="lfx-layout">
         <div class="lfx-sections">
           <template v-if="activeTab==='transaction'">
-            <section v-if="hasAccountStep" id="lfx-account" class="lfx-panel"><header class="lfx-panel-header"><span class="lfx-number">1</span><div><h2>Data Akun</h2></div></header><div class="lfx-panel-content"><label v-if="savedAccountItems.length" class="lfx-field lfx-saved-account"><span>Akun tersimpan</span><select v-model="selectedSavedId" @change="chooseSavedAccount(selectedSavedId)"><option value="">Isi manual</option><option v-for="saved in savedAccountItems" :key="saved.id" :value="String(saved.id)">{{saved.label}}{{saved.nickname?' · '+saved.nickname:''}}</option></select></label><div class="lfx-field-grid" :class="{single:fields.length===1}"><label v-for="field in fields" :key="field.field_key" class="lfx-field"><span>{{field.label}} <b v-if="field.is_required">*</b><i title="Pastikan data akun benar">ⓘ</i></span><input v-model="customerInput[field.field_key]" :placeholder="field.placeholder||'Masukkan '+field.label" :type="['email','tel'].includes(field.type)?field.type:'text'" :inputmode="field.type==='number'?'numeric':undefined" :required="field.is_required" maxlength="255" autocomplete="off"/></label></div><p v-for="field in fields.filter(x=>fieldError(x.field_key))" :key="field.field_key" class="lfx-error">{{fieldError(field.field_key)}}</p><div v-if="busy==='nickname'" class="lfx-hint">Memeriksa akun…</div><div v-else-if="nicknameResult?.verified" class="lfx-hint">✓ {{nicknameResult.nickname}}</div><div v-else-if="nicknameResult?.warning" class="lfx-hint">{{nicknameResult.warning}}</div><div class="lfx-hint"><span>i</span> {{customerText("checkout.account_hint", "Pastikan ID atau Server sudah sesuai sebelum memesan.")}}</div></div></section>
+            <section v-if="hasAccountStep" id="lfx-account" class="lfx-panel"><header class="lfx-panel-header"><span class="lfx-number">1</span><div><h2>{{customerText("checkout.account_title", "Data Akun")}}</h2></div></header><div class="lfx-panel-content"><label v-if="savedAccountItems.length" class="lfx-field lfx-saved-account"><span>Akun tersimpan</span><select v-model="selectedSavedId" @change="chooseSavedAccount(selectedSavedId)"><option value="">Isi manual</option><option v-for="saved in savedAccountItems" :key="saved.id" :value="String(saved.id)">{{saved.label}}{{saved.nickname?' · '+saved.nickname:''}}</option></select></label><div class="lfx-field-grid" :class="{single:fields.length===1}"><label v-for="field in fields" :key="field.field_key" class="lfx-field"><span>{{field.label}} <b v-if="field.is_required">*</b><i title="Pastikan data akun benar">ⓘ</i></span><input v-model="customerInput[field.field_key]" :placeholder="field.placeholder||'Masukkan '+field.label" :type="['email','tel'].includes(field.type)?field.type:'text'" :inputmode="field.type==='number'?'numeric':undefined" :required="field.is_required" maxlength="255" autocomplete="off"/></label></div><p v-for="field in fields.filter(x=>fieldError(x.field_key))" :key="field.field_key" class="lfx-error">{{fieldError(field.field_key)}}</p><div v-if="busy==='nickname'" class="lfx-hint">Memeriksa akun…</div><div v-else-if="nicknameResult?.verified" class="lfx-hint">✓ {{nicknameResult.nickname}}</div><div v-else-if="nicknameResult?.warning" class="lfx-hint">{{nicknameResult.warning}}</div><div class="lfx-hint"><span>i</span> {{customerText("checkout.account_hint", "Pastikan ID atau Server sudah sesuai sebelum memesan.")}}</div></div></section>
             <section id="lfx-nominal" class="lfx-panel">
-              <header class="lfx-panel-header"><span class="lfx-number">2</span><div><h2>Pilih Nominal</h2></div></header>
+              <header class="lfx-panel-header"><span class="lfx-number">2</span><div><h2>{{customerText("checkout.nominal_title", "Pilih Nominal")}}</h2></div></header>
               <div class="lfx-panel-content">
                 <div v-if="packageTabs.length" class="lfx-category-tabs" role="tablist" aria-label="Kategori dari LFAMILIA"><button v-for="item in packageTabs" :key="item" role="tab" :aria-selected="(activePackageTab||packageTabs[0])===item" :class="{active:(activePackageTab||packageTabs[0])===item}" @click="activePackageTab=item">{{item}}</button></div>
                 <section v-for="itemsGroup in visiblePackageGroups" :key="itemsGroup.name||'default'" class="lfx-nominal-group">
@@ -809,11 +845,11 @@ function closeReview() { summaryOpen.value = false; closeConfirmation(); }
               </div>
             </section>
             <section id="lfx-payment" class="lfx-panel">
-              <header class="lfx-panel-header"><span class="lfx-number">3</span><div><h2>Pilih Pembayaran</h2></div></header>
-              <CheckoutPaymentMethods :payment-channels="paymentChannels" :selected-code="paymentChannelCode" :quotes="channelQuotes" :current-quote="quote" :has-package="Boolean(selectedPackage)" :customer="customer" @select="choosePayment"/>
+              <header class="lfx-panel-header"><span class="lfx-number">3</span><div><h2>{{customerText("checkout.payment_title", "Pilih Pembayaran")}}</h2></div></header>
+              <CheckoutPaymentMethods :payment-channels="paymentChannels" :selected-code="paymentChannelCode" :quotes="channelQuotes" :current-quote="quote" :locked="busy==='order'||busy==='payment'" :has-package="Boolean(selectedPackage)" :customer="customer" @select="choosePayment"/>
             </section>
-            <section class="lfx-panel" id="lfx-voucher"><header class="lfx-panel-header"><span class="lfx-number">4</span><div><h2>Voucher Diskon</h2></div></header><div class="lfx-panel-content"><div class="lfx-voucher-input"><span>⌗</span><input  :value="voucherCode" @input="updateVoucherInput($event.target.value)" maxlength="100" placeholder="Masukkan kode voucher" aria-label="Kode voucher diskon" autocapitalize="characters" @keyup.enter="loadQuote"/><button @click="loadQuote">Gunakan</button></div><p v-if="errors.voucher_code" class="lfx-error">{{errors.voucher_code[0]}}</p><div v-if="quote?.voucher_code" class="lfx-applied"><span>✓</span><div><strong>{{quote.voucher_code}} berhasil dipakai</strong><small>Diskon {{formatIdr(reviewQuote?.voucher_discount_idr || 0)}}</small></div><button @click="updateVoucherInput('');loadQuote()">Hapus</button></div><button class="lfx-voucher-browse" @click="openVoucherPicker"><span>♧</span><strong>Lihat voucher yang tersedia</strong><b>→</b></button></div></section>
-            <section id="lfx-contact" class="lfx-panel"><header class="lfx-panel-header"><span class="lfx-number">5</span><div><h2>Detail Kontak</h2></div></header><div class="lfx-panel-content"><div class="lfx-field-grid"><label class="lfx-field"><span>Nomor WhatsApp <b>*</b></span><input :value="guestPhone" @input="guestPhone=normalizeWhatsapp($event.target.value)" :readonly="Boolean(customer)" type="tel" inputmode="tel" placeholder="081234567890"/></label><label class="lfx-field"><span>Email <b>*</b></span><input v-model="guestEmail" :readonly="Boolean(customer)" type="email" placeholder="nama@email.com"/></label></div><div class="lfx-hint"><span>i</span> {{customerText("pages.catalog.show.efbf2ce0", "Kami hanya memakai kontak untuk invoice dan status transaksi.")}}</div></div></section>
+            <section class="lfx-panel" id="lfx-voucher"><header class="lfx-panel-header"><span class="lfx-number">4</span><div><h2>{{customerText("checkout.voucher_title", "Voucher Diskon")}}</h2></div></header><div class="lfx-panel-content"><div class="lfx-voucher-input"><span>⌗</span><input  :value="voucherCode" @input="updateVoucherInput($event.target.value)" maxlength="100" placeholder="Masukkan kode voucher" aria-label="Kode voucher diskon" autocapitalize="characters" @keyup.enter="loadQuote"/><button @click="loadQuote">Gunakan</button></div><p v-if="errors.voucher_code" class="lfx-error">{{errors.voucher_code[0]}}</p><div v-if="quote?.voucher_code" class="lfx-applied"><span>✓</span><div><strong>{{quote.voucher_code}} berhasil dipakai</strong><small>Diskon {{formatIdr(reviewQuote?.voucher_discount_idr || 0)}}</small></div><button @click="updateVoucherInput('');loadQuote()">Hapus</button></div><button class="lfx-voucher-browse" @click="openVoucherPicker"><span>♧</span><strong>Lihat voucher yang tersedia</strong><b>→</b></button></div></section>
+            <section id="lfx-contact" class="lfx-panel"><header class="lfx-panel-header"><span class="lfx-number">5</span><div><h2>{{customerText("checkout.contact_title", "Detail Kontak")}}</h2></div></header><div class="lfx-panel-content"><div class="lfx-field-grid"><label class="lfx-field"><span>Nomor WhatsApp <b>*</b></span><input :value="guestPhone" @input="guestPhone=normalizeWhatsapp($event.target.value)" :readonly="Boolean(customer)" type="tel" inputmode="tel" placeholder="081234567890"/></label><label class="lfx-field"><span>Email <b>*</b></span><input v-model="guestEmail" :readonly="Boolean(customer)" type="email" placeholder="nama@email.com"/></label></div><div class="lfx-hint"><span>i</span> {{customerText("pages.catalog.show.efbf2ce0", "Kami hanya memakai kontak untuk invoice dan status transaksi.")}}</div></div></section>
           </template>
 <section v-else class="lfx-panel lfx-details lf-product-details">
             <article class="lf-product-description lf-product-description-legacy">

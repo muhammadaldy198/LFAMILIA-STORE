@@ -14,6 +14,8 @@
   --lf-color-success: #76D6AB;
   --lf-color-warning: #F5C76A;
   --lf-color-error: #FF999B;
+  --lf-color-action-start:#91C7FF;--lf-color-action-end:#729FEA;
+  --lf-color-card-start:#253147;--lf-color-card-mid:#1A2436;--lf-color-card-end:#171F30;--lf-color-card-selected-start:#253E59;--lf-color-card-selected-mid:#21334C;--lf-color-card-selected-end:#253645;--lf-color-header-start:#2B3645;--lf-color-header-end:#293443;--lf-color-modal-start:#202D46;--lf-color-modal-end:#101929;--lf-color-modal-rows:#0B1627;--lf-color-border-light:#A8BEDC;
   --lf-primary-rgb:96,156,255;
   --lime:var(--lf-color-primary);--lime2:var(--lf-color-secondary);--blue:var(--lf-color-primary);
   --lf-gradient-action:linear-gradient(105deg,var(--lf-color-primary),var(--lf-color-secondary));

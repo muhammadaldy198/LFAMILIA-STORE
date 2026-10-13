@@ -66,4 +66,14 @@ class StoreThemeTest extends TestCase
         $this->assertSame($service->defaults(), $service->saved());
         $this->assertSame($service->defaults(), $service->sanitize(['primary' => 'red', 'unknown' => '#FFFFFF']));
     }
+
+    public function test_checkout_action_tokens_follow_primary_and_preserve_approved_defaults(): void
+    {
+        $service = app(StoreThemeService::class);
+        $this->assertSame('#91C7FF', $service->tokens()['action-start']);
+        $this->assertSame('#729FEA', $service->tokens()['action-end']);
+        DB::table('system_settings')->updateOrInsert(['key' => 'store.theme'], ['value' => json_encode(['primary' => '#75AAFF'])]);
+        $this->assertSame('#A6D5FF', $service->tokens()['action-start']);
+        $this->assertSame('#87ADEA', $service->tokens()['action-end']);
+    }
 }
