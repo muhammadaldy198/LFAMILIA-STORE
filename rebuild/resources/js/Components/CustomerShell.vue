@@ -5,7 +5,8 @@ const { customerText, sectionEnabled, presentationStyle } = useCustomerPresentat
 import { Head, Link, usePage } from '@inertiajs/vue3';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 
-defineProps({
+const props = defineProps({
+    checkout: {type:Boolean, default:false},
     logoUrl: { type: String, default: '' },
     compactFooter: { type: Boolean, default: false },
 });
@@ -118,7 +119,7 @@ function clampSupportPosition() {
     const width = window.innerWidth <= 640 ? 48 : 54;
     const height = width;
     const x = clamp(supportPosition.value.x, 8, Math.max(8, window.innerWidth - width - 8));
-    const y = clamp(supportPosition.value.y, 68, Math.max(68, window.innerHeight - height - 14));
+    const y = clamp(supportPosition.value.y, 68, Math.max(68, window.innerHeight - height - (props.checkout ? 116 : 14)));
     supportPosition.value = { x, y, ...supportPlacement(x, y, width, height) };
 }
 
@@ -150,7 +151,7 @@ function moveSupportDrag(event) {
     if (Math.hypot(dx, dy) > 5) supportDrag.moved = true;
 
     const x = clamp(supportDrag.originX + dx, 8, window.innerWidth - supportDrag.width - 8);
-    const y = clamp(supportDrag.originY + dy, 68, window.innerHeight - supportDrag.height - 14);
+    const y = clamp(supportDrag.originY + dy, 68, window.innerHeight - supportDrag.height - (props.checkout ? 116 : 14));
     supportPosition.value = {
         x,
         y,
@@ -172,7 +173,7 @@ function endSupportDrag(event) {
 </script>
 
 <template>
-<div class="lf-customer" :style="presentationStyle">
+<div class="lf-customer" :class="{'lf-checkout-shell':checkout}" :style="presentationStyle">
     <Head>
         <link v-if="favicon" rel="icon" :href="favicon">
         <link v-if="favicon" rel="shortcut icon" :href="favicon">

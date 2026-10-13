@@ -6,8 +6,10 @@ use App\Models\Product;
 use App\Services\CheckoutInputValidator;
 use App\Services\CheckoutService;
 use App\Services\NicknameService;
+use App\Services\PaymentRoutingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class CheckoutController
 {
@@ -33,11 +35,12 @@ class CheckoutController
             ->header('Cache-Control', 'no-store, private');
     }
 
-    public function quote(Request $request, CheckoutService $checkout): JsonResponse
+    public function quote(Request $request, CheckoutService $checkout, PaymentRoutingService $routing): JsonResponse
     {
         $guest = ! $request->user();
         $data = $request->validate([
             'package_id' => ['required', 'integer'],
+            'include_channel_totals' => ['sometimes', 'boolean'],
             'payment_channel_code' => ['required', 'string', 'max:60'],
             'voucher_code' => ['nullable', 'string', 'max:100'],
             'guest_email' => $guest ? ['nullable', 'email:rfc', 'max:255'] : ['prohibited'],
@@ -68,14 +71,32 @@ class CheckoutController
             'voucher_redemption_id' => ['prohibited'],
         ]);
 
-        return response()->json($checkout->quote(
+        $quote = $checkout->quote(
             (int) $data['package_id'],
             $data['payment_channel_code'],
             $data['voucher_code'] ?? null,
             $request->user(),
             $data['guest_email'] ?? null,
             $data['guest_phone'] ?? null,
-        ));
+        );
+        if ($data['include_channel_totals'] ?? false) {
+            $quote['channel_quotes'] = [$data['payment_channel_code'] => $quote];
+            foreach ($routing->publicOrderChannels($request->user()) as $channel) {
+                if (! $channel['available'] || $channel['code'] === $data['payment_channel_code']) {
+                    continue;
+                }
+                try {
+                    $quote['channel_quotes'][$channel['code']] = $checkout->quote(
+                        (int) $data['package_id'], $channel['code'], $data['voucher_code'] ?? null,
+                        $request->user(), $data['guest_email'] ?? null, $data['guest_phone'] ?? null,
+                    );
+                } catch (ValidationException) {
+                    $quote['channel_quotes'][$channel['code']] = ['error' => 'Metode tidak tersedia untuk pesanan ini.'];
+                }
+            }
+        }
+
+        return response()->json($quote)->header('Cache-Control', 'no-store, private');
     }
 
     public function vouchers(Request $request, CheckoutService $checkout): JsonResponse

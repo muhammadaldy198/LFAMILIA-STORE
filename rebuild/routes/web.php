@@ -309,6 +309,7 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
 
     Route::middleware('admin.permission:content.manage')->group(function (): void {
         Route::get('/admin/content/presentation', [AdminPresentationController::class, 'index'])->name('admin.content.presentation');
+        Route::put('/admin/content/theme', [AdminPresentationController::class, 'theme'])->name('admin.content.theme.update');
         Route::put('/admin/content/presentation', [AdminPresentationController::class, 'update'])->name('admin.content.presentation.update');
         Route::get('/admin/content', [AdminContentController::class, 'index'])->name('admin.content');
         Route::put('/admin/content/settings', [AdminContentController::class, 'updateSettings'])->name('admin.content.settings');

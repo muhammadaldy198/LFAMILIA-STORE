@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Services\AdminPermissionService;
 use App\Services\StorefrontContentService;
+use App\Services\StoreThemeService;
 use App\Services\TurnstileService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -40,6 +41,7 @@ class HandleInertiaRequests extends Middleware
                     ],
                 ];
             },
+            'theme' => fn () => app(StoreThemeService::class)->tokens(),
             'storefront' => fn () => $storefront->shared(),
             'security' => function () use ($request, $turnstile): array {
                 $config = $turnstile->publicConfig();

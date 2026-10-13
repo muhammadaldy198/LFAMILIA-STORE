@@ -58,22 +58,18 @@ test('unreferenced page favicon props and paymentResult are removed without chan
     assert.match(product, /window\.location\.assign\('\/payment\?invoice='/);
 });
 
-test('nominal cards keep equal row height with long names and optional artwork', () => {
+test('checkout uses Lab nominal geometry inside an explicit legacy CSS boundary', () => {
     const product = read('Pages/Catalog/Show.vue');
-    const css = readFileSync(new URL('../../resources/css/app.css', import.meta.url), 'utf8');
-    const section = css.split('/* Product nominal cards: uniform rows regardless of label length or package artwork. */')[1];
-
-    assert.ok(section, 'uniform card layout rules must exist');
-    assert.match(product, /class="lf-nominal-grid"/);
-    assert.match(product, /class="lf-nominal-top"/);
-    assert.match(product, /loading="lazy" decoding="async"/);
-    assert.match(section, /grid-auto-rows:128px!important/);
-    assert.match(section, /height:128px!important/);
-    assert.match(section, /display:flex!important/);
-    assert.match(section, /flex-direction:column!important/);
-    assert.match(section, /justify-content:space-between!important/);
-    assert.match(section, /-webkit-line-clamp:4/);
-    assert.match(section, /width:38px!important/);
-    assert.match(section, /height:38px!important/);
-    assert.match(section, /object-fit:contain!important/);
+    const css = readFileSync(new URL('../../resources/css/checkout.css', import.meta.url), 'utf8');
+    const global = readFileSync(new URL('../../resources/css/app.css', import.meta.url), 'utf8');
+    assert.match(product, /class="lfx-nominal-grid"/);
+    assert.match(product, /class="lfx-nominal-top"/);
+    assert.match(product, /role="radio"/);
+    assert.match(css, /justify-content:space-between/);
+    assert.match(css, /-webkit-line-clamp:2/);
+    assert.match(css, /object-fit:contain/);
+    assert.match(global, /:where\(:not\(\.lfx, \.lfx \*\)\)/);
+    assert.doesNotMatch(global, /@scope\s*\(/);
+    assert.doesNotMatch(global, /@import ['"]\.\/admin.css/);
+    assert.doesNotMatch(product, /lab-pricing|demo-data|mock-api|successModal|lf-order-summary/);
 });

@@ -28,7 +28,7 @@ class PaymentStaticAssetTest extends TestCase
         $this->assertDirectoryDoesNotExist(public_path('payment'));
         $this->assertFileExists(public_path('assets/payment/lfamilia-cash.webp'));
 
-        $catalog = file_get_contents(resource_path('js/Pages/Catalog/Show.vue'));
+        $catalog = file_get_contents(resource_path('js/Components/Checkout/PaymentMethods.vue'));
         $this->assertNotFalse($catalog);
         $this->assertStringContainsString('/assets/payment/lfamilia-cash.webp', $catalog);
         $this->assertStringNotContainsString("'/payment/lfamilia-cash.webp'", $catalog);

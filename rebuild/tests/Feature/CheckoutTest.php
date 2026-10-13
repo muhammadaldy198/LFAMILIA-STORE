@@ -656,4 +656,17 @@ class CheckoutTest extends TestCase
             ->assertJsonValidationErrors(['payment_channel_code']);
         $this->assertDatabaseMissing('orders', ['idempotency_key' => 'checkout-final-payment-0001']);
     }
+
+    public function test_optional_channel_totals_use_the_same_server_pricing_and_exclude_guest_wallet(): void
+    {
+        $catalog = $this->catalog();
+        $payload = ['package_id' => $catalog['package_id'], 'payment_channel_code' => 'manual_qris'];
+        $quote = $this->postJson('/checkout/quote', $payload)->assertOk()->json();
+        $response = $this->postJson('/checkout/quote', [...$payload, 'include_channel_totals' => true])->assertOk();
+        $this->assertSame($quote['total_idr'], $response->json('channel_quotes.manual_qris.total_idr'));
+        $this->assertSame($quote['fee_idr'], $response->json('channel_quotes.manual_qris.fee_idr'));
+        $this->assertArrayNotHasKey('wallet', $response->json('channel_quotes'));
+        $this->assertArrayNotHasKey('saldo', $response->json('channel_quotes'));
+        $this->postJson('/checkout/quote', [...$payload, 'include_channel_totals' => true, 'total_idr' => 1])->assertUnprocessable();
+    }
 }

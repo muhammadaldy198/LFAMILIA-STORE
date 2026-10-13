@@ -18,7 +18,7 @@ permissions:
 
 jobs:
   foundation:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: rebuild
@@ -62,7 +62,7 @@ jobs:
       QUEUE_CONNECTION: redis
       SESSION_DRIVER: redis
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
 
@@ -87,7 +87,7 @@ jobs:
           extensions: mbstring, pdo_mysql, redis, gd, exif, pcntl
           coverage: none
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '22'
 
@@ -198,20 +198,28 @@ jobs:
       - name: Run M11 browser smoke
         run: bash tests/Browser/smoke.sh
 
+      - name: Upload checkout visual comparison
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: checkout-lab-comparison
+          path: rebuild/checkout-visual-results
+          if-no-files-found: warn
+
       - name: Check PHP style
         run: vendor/bin/pint --test
 
   frontend-static:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: rebuild
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: npm
