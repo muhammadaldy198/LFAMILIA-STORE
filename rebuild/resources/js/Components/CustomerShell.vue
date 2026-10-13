@@ -4,7 +4,7 @@ const { customerText, sectionEnabled, presentationStyle } = useCustomerPresentat
 
 import { Head, Link, usePage } from '@inertiajs/vue3';
 import ProductSearch from './ProductSearch.vue';
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 
 const props = defineProps({
     checkout: {type:Boolean, default:false},
@@ -16,6 +16,8 @@ const page = usePage();
 const open = ref(false);
 const supportOpen = ref(false);
 const mobileSearchOpen = ref(false);
+const mobileSearchTrigger = ref(null);
+const mobileSearchDialog = ref(null);
 const supportPosition = ref(null);
 let supportDrag = null;
 const logged = computed(() => Boolean(page.props.auth?.user));
@@ -77,14 +79,47 @@ const legal = [
     ['Kebijakan Pengembalian Dana', '/refund'],
 ];
 
+function openMobileSearch() {
+    open.value = false;
+    supportOpen.value = false;
+    mobileSearchOpen.value = true;
+}
+function closeMobileSearch() {
+    mobileSearchOpen.value = false;
+    nextTick(() => mobileSearchTrigger.value?.focus());
+}
+function onMobileSearchKeydown(event) {
+    if (event.key === 'Escape') {
+        event.preventDefault();
+        closeMobileSearch();
+        return;
+    }
+    if (event.key !== 'Tab' || !mobileSearchDialog.value) return;
+    const focusable = [...mobileSearchDialog.value.querySelectorAll('button:not([disabled]), a[href], input:not([disabled]), [tabindex]:not([tabindex="-1"])')]
+        .filter(element => element.getClientRects().length > 0);
+    if (!focusable.length) {
+        event.preventDefault();
+        return;
+    }
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && (document.activeElement === first || !mobileSearchDialog.value.contains(document.activeElement))) {
+        event.preventDefault();
+        last.focus();
+    } else if (!event.shiftKey && (document.activeElement === last || !mobileSearchDialog.value.contains(document.activeElement))) {
+        event.preventDefault();
+        first.focus();
+    }
+}
+
 function openDrawer() {
     supportOpen.value = false;
     open.value = true;
 }
 function closeDrawer() { open.value = false; }
 
-watch(open, (value) => {
-    document.documentElement.style.overflow = value ? 'hidden' : '';
+watch([open, mobileSearchOpen], ([drawer, search]) => {
+    document.documentElement.style.overflow = drawer || search ? 'hidden' : '';
 });
 onMounted(() => {
     window.addEventListener('resize', clampSupportPosition);
@@ -204,7 +239,7 @@ function endSupportDrag(event) {
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm7 8a7 7 0 0 0-14 0"/></svg>
                     {{accountLabel}}
                 </Link>
-                <button type="button" class="lf-search-mobile" :aria-label="customerText('components.customershell.attribute.aria-label.4e933d91', 'Cari produk')" @click="mobileSearchOpen=true">
+                <button type="button" ref="mobileSearchTrigger" class="lf-search-mobile" :aria-label="customerText('components.customershell.attribute.aria-label.4e933d91', 'Cari produk')" @click="openMobileSearch">
                     <svg viewBox="0 0 24 24"><path d="m21 21-4.35-4.35m1.35-5.65a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z"/></svg>
                 </button>
                 <button type="button" class="lf-menu" :aria-label="customerText('components.customershell.attribute.aria-label.9fa7b867', 'Buka menu')" :aria-expanded="open" @click="openDrawer">
@@ -214,9 +249,9 @@ function endSupportDrag(event) {
         </div>
     </header>
 
-    <div v-if="mobileSearchOpen" class="lf-search-overlay" @click.self="mobileSearchOpen=false">
-        <div class="lf-search-dialog" role="dialog" aria-modal="true" aria-label="Cari produk">
-            <button type="button" class="lf-search-dialog-close" aria-label="Tutup pencarian" @click="mobileSearchOpen=false">×</button>
+    <div v-if="mobileSearchOpen" class="lf-search-overlay" @click.self="closeMobileSearch">
+        <div ref="mobileSearchDialog" class="lf-search-dialog" role="dialog" aria-modal="true" aria-label="Cari produk" @keydown="onMobileSearchKeydown">
+            <button type="button" class="lf-search-dialog-close" aria-label="Tutup pencarian" @click="closeMobileSearch">×</button>
             <ProductSearch variant="mobile" :autofocus="true" :placeholder="customerText('components.customershell.d0853d5f', 'Cari game atau voucher...')" />
         </div>
     </div>
