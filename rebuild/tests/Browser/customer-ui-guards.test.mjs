@@ -73,3 +73,44 @@ test('checkout uses Lab nominal geometry inside an explicit legacy CSS boundary'
     assert.doesNotMatch(global, /@import ['"]\.\/admin.css/);
     assert.doesNotMatch(product, /lab-pricing|demo-data|mock-api|successModal|lf-order-summary/);
 });
+
+test('customer searches show real product suggestions instead of linking to the homepage section', () => {
+    const header = read('Components/CustomerShell.vue');
+    const home = read('Pages/Catalog/Index.vue');
+    const search = read('Components/ProductSearch.vue');
+    const styles = readFileSync(new URL('../../resources/css/app.css', import.meta.url), 'utf8');
+    assert.match(header, /<ProductSearch class="lf-header-search"/);
+    assert.match(header, /mobileSearchOpen/);
+    assert.match(header, /onMobileSearchKeydown/);
+    assert.match(header, /mobileSearchTrigger\.value\?\.focus\(\)/);
+    assert.match(header, /event\.key === 'Escape'/);
+    assert.match(header, /event\.key !== 'Tab'/);
+    assert.match(home, /<ProductSearch class="lf-search"/);
+    assert.match(search, /fetch\('\/catalog\/search\?q='/);
+    assert.match(search, /'\/catalog\/' \+ encodeURIComponent\(product.slug\)/);
+    assert.match(search, /@pointerdown.prevent/);
+    assert.match(search, /activeIndex\.value < 0/);
+    assert.match(search, /step < 0 \? results\.value\.length - 1 : 0/);
+    assert.match(search, /:aria-activedescendant=/);
+    assert.match(search, /function dismissSuggestions\(\)/);
+    assert.match(search, /@keydown\.esc="dismissSuggestions"/);
+    assert.match(search, /@input="focused=true"/);
+    assert.match(search, /function focusSearch\(\)/);
+    assert.match(search, /@focus="focusSearch"/);
+    assert.match(search, /query\.value\.trim\(\) && !ready\.value && !loading\.value/);
+    assert.match(search, /:id="menuId \+ '-option-' \+ index"/);
+    assert.doesNotMatch(header, /<Link href="\/#produk" class="lf-header-search"/);
+    assert.doesNotMatch(header, /<Link href="\/#produk" class="lf-search-mobile"/);
+    assert.match(styles, /padding:0 14px 0 46px!important/);
+    assert.match(styles, /height:40px;padding:0;overflow:visible;border:0;border-radius:0;background:transparent/);
+});
+
+test('wallet payment status is never a fake perpetual quote and checkout description is not duplicated', () => {
+    const methods = read('Components/Checkout/PaymentMethods.vue');
+    const checkout = read('Pages/Catalog/Show.vue');
+    assert.match(methods, /channel\?\.group === 'wallet' && !props\.customer/);
+    assert.match(methods, /return props\.loadingQuotes \? 'Menghitung…' : 'Pilih metode'/);
+    assert.match(checkout, /:loading-quotes="busy==='quote'"/);
+    assert.doesNotMatch(checkout, /lfx-description-box/);
+    assert.match(checkout, /lf-product-description-legacy/);
+});

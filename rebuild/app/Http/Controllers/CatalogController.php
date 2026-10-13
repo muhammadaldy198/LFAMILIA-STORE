@@ -13,6 +13,7 @@ use App\Services\CatalogNominalOrder;
 use App\Services\CheckoutPricing;
 use App\Services\PaymentRoutingService;
 use App\Services\StorefrontContentService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -101,6 +102,35 @@ class CatalogController
             'news' => $content->news(3),
             'reviews' => $content->reviews(6),
         ]);
+    }
+
+    public function search(Request $request): JsonResponse
+    {
+        $filters = $request->validate(['q' => ['required', 'string', 'max:80']]);
+        $needle = trim($filters['q']);
+
+        if ($needle === '') {
+            return response()->json(['products' => []]);
+        }
+
+        $products = Product::with(['category', 'media'])
+            ->where('is_active', true)
+            ->whereHas('category', fn ($query) => $query->where('is_active', true))
+            ->whereHas('packages', fn ($query) => $query->where('is_active', true))
+            ->where('name', 'like', '%'.$needle.'%')
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->limit(8)
+            ->get()
+            ->map(fn (Product $product): array => [
+                'name' => $product->name,
+                'slug' => $product->slug,
+                'category_name' => $product->category->name,
+                'image_url' => $product->getFirstMediaUrl('image'),
+            ])
+            ->values();
+
+        return response()->json(['products' => $products]);
     }
 
     public function show(

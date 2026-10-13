@@ -846,7 +846,7 @@ function closeReview() { summaryOpen.value = false; closeConfirmation(); }
             </section>
             <section id="lfx-payment" class="lfx-panel">
               <header class="lfx-panel-header"><span class="lfx-number">3</span><div><h2>{{customerText("checkout.payment_title", "Pilih Pembayaran")}}</h2></div></header>
-              <CheckoutPaymentMethods :payment-channels="paymentChannels" :selected-code="paymentChannelCode" :quotes="channelQuotes" :current-quote="quote" :locked="busy==='order'||busy==='payment'" :has-package="Boolean(selectedPackage)" :customer="customer" @select="choosePayment"/>
+              <CheckoutPaymentMethods :payment-channels="paymentChannels" :selected-code="paymentChannelCode" :quotes="channelQuotes" :current-quote="quote" :locked="busy==='order'||busy==='payment'" :has-package="Boolean(selectedPackage)" :loading-quotes="busy==='quote'" :customer="customer" @select="choosePayment"/>
             </section>
             <section class="lfx-panel" id="lfx-voucher"><header class="lfx-panel-header"><span class="lfx-number">4</span><div><h2>{{customerText("checkout.voucher_title", "Voucher Diskon")}}</h2></div></header><div class="lfx-panel-content"><div class="lfx-voucher-input"><span>⌗</span><input  :value="voucherCode" @input="updateVoucherInput($event.target.value)" maxlength="100" placeholder="Masukkan kode voucher" aria-label="Kode voucher diskon" autocapitalize="characters" @keyup.enter="loadQuote"/><button @click="loadQuote">Gunakan</button></div><p v-if="errors.voucher_code" class="lfx-error">{{errors.voucher_code[0]}}</p><div v-if="quote?.voucher_code" class="lfx-applied"><span>✓</span><div><strong>{{quote.voucher_code}} berhasil dipakai</strong><small>Diskon {{formatIdr(reviewQuote?.voucher_discount_idr || 0)}}</small></div><button @click="updateVoucherInput('');loadQuote()">Hapus</button></div><button class="lfx-voucher-browse" @click="openVoucherPicker"><span>♧</span><strong>Lihat voucher yang tersedia</strong><b>→</b></button></div></section>
             <section id="lfx-contact" class="lfx-panel"><header class="lfx-panel-header"><span class="lfx-number">5</span><div><h2>{{customerText("checkout.contact_title", "Detail Kontak")}}</h2></div></header><div class="lfx-panel-content"><div class="lfx-field-grid"><label class="lfx-field"><span>Nomor WhatsApp <b>*</b></span><input :value="guestPhone" @input="guestPhone=normalizeWhatsapp($event.target.value)" :readonly="Boolean(customer)" type="tel" inputmode="tel" placeholder="081234567890"/></label><label class="lfx-field"><span>Email <b>*</b></span><input v-model="guestEmail" :readonly="Boolean(customer)" type="email" placeholder="nama@email.com"/></label></div><div class="lfx-hint"><span>i</span> {{customerText("pages.catalog.show.efbf2ce0", "Kami hanya memakai kontak untuk invoice dan status transaksi.")}}</div></div></section>
@@ -937,7 +937,6 @@ function closeReview() { summaryOpen.value = false; closeConfirmation(); }
                 </div>
             </article>
         </section>
-          <section class="lfx-description-box"><div><span>✧</span><strong>Deskripsi {{product.name}}</strong></div><p>{{product.description}}</p></section>
         </div>
 
 

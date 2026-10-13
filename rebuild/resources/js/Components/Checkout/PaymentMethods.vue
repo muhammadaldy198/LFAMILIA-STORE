@@ -9,6 +9,7 @@ const props = defineProps({
   quotes: {type:Object, default:()=>({})},
   currentQuote: {type:Object, default:null},
   hasPackage: {type:Boolean, default:false},
+  loadingQuotes: {type:Boolean, default:false},
   locked: Boolean,
   customer: { type: Object, default: null },
 });
@@ -19,8 +20,13 @@ const customer = computed(() => props.customer);
 const formatIdr = value => 'Rp '+Number(value || 0).toLocaleString('id-ID');
 const amount = channel => {
   if (!props.hasPackage) return 'Pilih nominal';
-  const value = props.currentQuote?.payment_channel_code === channel?.code ? props.currentQuote : props.quotes[channel?.code];
-  return value?.total_idr != null ? formatIdr(value.total_idr) : value?.error ? 'Tidak tersedia' : 'Menghitung…';
+  // Guests cannot pay with their wallet; do not pretend its quote is loading forever.
+  if (channel?.group === 'wallet' && !props.customer) return 'Masuk akun';
+  if (!channel || channel.available === false) return 'Tidak tersedia';
+  const value = props.currentQuote?.payment_channel_code === channel.code ? props.currentQuote : props.quotes[channel.code];
+  if (value?.total_idr != null) return formatIdr(value.total_idr);
+  if (value?.error) return 'Tidak tersedia';
+  return props.loadingQuotes ? 'Menghitung…' : 'Pilih metode';
 };
 const groupChannel = group => group.items.find(channel => channel.code === paymentChannelCode.value)
   || group.items.find(channel => channel.available !== false) || group.items[0];
