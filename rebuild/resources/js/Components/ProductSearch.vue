@@ -83,7 +83,9 @@ watch(() => props.initialQuery, value => { if (value !== query.value) query.valu
 
 function move(step) {
     if (!results.value.length) return;
-    activeIndex.value = (activeIndex.value + step + results.value.length) % results.value.length;
+    activeIndex.value = activeIndex.value < 0
+        ? (step < 0 ? results.value.length - 1 : 0)
+        : (activeIndex.value + step + results.value.length) % results.value.length;
 }
 async function submit() {
     const text = query.value.trim();
@@ -123,6 +125,7 @@ onUnmounted(() => { ++serial; cancelPending(); });
                 aria-autocomplete="list"
                 :aria-expanded="open"
                 :aria-controls="menuId"
+                :aria-activedescendant="open && activeIndex >= 0 ? menuId + '-option-' + activeIndex : undefined"
                 @focus="focused=true"
                 @keydown.down.prevent="move(1)"
                 @keydown.up.prevent="move(-1)"
@@ -134,6 +137,7 @@ onUnmounted(() => { ++serial; cancelPending(); });
                 <Link
                     v-for="(product, index) in results"
                     :key="product.slug"
+                    :id="menuId + '-option-' + index"
                     class="lf-product-search-result"
                     :class="{ 'is-active': activeIndex === index }"
                     :href="'/catalog/' + encodeURIComponent(product.slug)"
