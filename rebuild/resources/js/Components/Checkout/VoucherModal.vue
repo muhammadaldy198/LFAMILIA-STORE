@@ -19,7 +19,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
 </script>
 
 <template>
-  
+
   <Teleport to="body">
     <div class="lfx-offer-backdrop" @click.self="emit('close')">
       <section class="lfx-offer-modal" role="dialog" aria-modal="true" aria-labelledby="lfx-offer-heading">
