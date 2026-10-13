@@ -89,6 +89,10 @@ test('customer searches show real product suggestions instead of linking to the 
     assert.match(search, /fetch\('\/catalog\/search\?q='/);
     assert.match(search, /'\/catalog\/' \+ encodeURIComponent\(product.slug\)/);
     assert.match(search, /@pointerdown.prevent/);
+    assert.match(search, /activeIndex\.value < 0/);
+    assert.match(search, /step < 0 \? results\.value\.length - 1 : 0/);
+    assert.match(search, /:aria-activedescendant=/);
+    assert.match(search, /:id="menuId \+ '-option-' \+ index"/);
     assert.doesNotMatch(header, /<Link href="\/#produk" class="lf-header-search"/);
     assert.doesNotMatch(header, /<Link href="\/#produk" class="lf-search-mobile"/);
     assert.match(styles, /padding:0 14px 0 46px!important/);
