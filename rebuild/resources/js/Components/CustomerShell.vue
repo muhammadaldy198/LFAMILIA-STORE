@@ -3,6 +3,7 @@ import { useCustomerPresentation } from '../Composables/customerPresentation';
 const { customerText, sectionEnabled, presentationStyle } = useCustomerPresentation();
 
 import { Head, Link, usePage } from '@inertiajs/vue3';
+import ProductSearch from './ProductSearch.vue';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 
 const props = defineProps({
@@ -14,6 +15,7 @@ const props = defineProps({
 const page = usePage();
 const open = ref(false);
 const supportOpen = ref(false);
+const mobileSearchOpen = ref(false);
 const supportPosition = ref(null);
 let supportDrag = null;
 const logged = computed(() => Boolean(page.props.auth?.user));
@@ -191,10 +193,7 @@ function endSupportDrag(event) {
                 </span>
             </Link>
 
-            <Link href="/#produk" class="lf-header-search" :aria-label="customerText('components.customershell.attribute.aria-label.4e933d91', 'Cari produk')">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.35-4.35m1.35-5.65a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z"/></svg>
-                <span>{{ customerText("components.customershell.d0853d5f", "Cari game atau voucher...") }}</span>
-            </Link>
+            <ProductSearch class="lf-header-search" variant="header" :placeholder="customerText('components.customershell.d0853d5f', 'Cari game atau voucher...')" />
 
             <nav class="lf-nav" :aria-label="customerText('components.customershell.attribute.aria-label.70783293', 'Navigasi utama')">
                 <Link v-for="[href,label] in desktopNav" :key="href" :href="href">{{ customerText('navigation.desktopNav.' + href, label) }}</Link>
@@ -205,15 +204,22 @@ function endSupportDrag(event) {
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm7 8a7 7 0 0 0-14 0"/></svg>
                     {{accountLabel}}
                 </Link>
-                <Link href="/#produk" class="lf-search-mobile" :aria-label="customerText('components.customershell.attribute.aria-label.4e933d91', 'Cari produk')">
+                <button type="button" class="lf-search-mobile" :aria-label="customerText('components.customershell.attribute.aria-label.4e933d91', 'Cari produk')" @click="mobileSearchOpen=true">
                     <svg viewBox="0 0 24 24"><path d="m21 21-4.35-4.35m1.35-5.65a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z"/></svg>
-                </Link>
+                </button>
                 <button type="button" class="lf-menu" :aria-label="customerText('components.customershell.attribute.aria-label.9fa7b867', 'Buka menu')" :aria-expanded="open" @click="openDrawer">
                     <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
                 </button>
             </div>
         </div>
     </header>
+
+    <div v-if="mobileSearchOpen" class="lf-search-overlay" @click.self="mobileSearchOpen=false">
+        <div class="lf-search-dialog" role="dialog" aria-modal="true" aria-label="Cari produk">
+            <button type="button" class="lf-search-dialog-close" aria-label="Tutup pencarian" @click="mobileSearchOpen=false">×</button>
+            <ProductSearch variant="mobile" :autofocus="true" :placeholder="customerText('components.customershell.d0853d5f', 'Cari game atau voucher...')" />
+        </div>
+    </div>
 
     <div v-if="open" class="lf-overlay" @click="closeDrawer"></div>
     <aside class="lf-drawer" :class="{open}" :aria-label="customerText('components.customershell.attribute.aria-label.980d1dd6', 'Menu customer')">
