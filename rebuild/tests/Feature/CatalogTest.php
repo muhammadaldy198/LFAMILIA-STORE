@@ -73,6 +73,49 @@ class CatalogTest extends TestCase
             ->assertJsonMissingPath('props.news');
     }
 
+    public function test_instant_search_returns_only_active_orderable_products(): void
+    {
+        $category = Category::where('slug', 'game')->firstOrFail();
+        $active = Product::create([
+            'category_id' => $category->id,
+            'name' => 'LiveSearch Regression Game',
+            'slug' => 'livesearch-regression-game',
+            'margin_percent' => 10,
+            'is_active' => true,
+        ]);
+        $active->packages()->create([
+            'code' => 'SEARCHLIVE1', 'name' => 'Search Package', 'is_active' => true,
+        ]);
+        $hidden = Product::create([
+            'category_id' => $category->id,
+            'name' => 'LiveSearch Hidden Game',
+            'slug' => 'livesearch-hidden-game',
+            'margin_percent' => 10,
+            'is_active' => false,
+        ]);
+        $hidden->packages()->create([
+            'code' => 'SEARCHHIDDEN1', 'name' => 'Hidden Package', 'is_active' => true,
+        ]);
+        Product::create([
+            'category_id' => $category->id,
+            'name' => 'LiveSearch No Package',
+            'slug' => 'livesearch-no-package',
+            'margin_percent' => 10,
+            'is_active' => true,
+        ]);
+
+        $this->getJson('/catalog/search?q=LiveSearch')
+            ->assertOk()
+            ->assertJsonCount(1, 'products')
+            ->assertJsonPath('products.0.slug', $active->slug)
+            ->assertJsonPath('products.0.category_name', $category->name)
+            ->assertJsonMissingPath('products.0.margin_percent');
+
+        $this->getJson('/catalog/search?q='.str_repeat('x', 81))
+            ->assertUnprocessable();
+        $this->getJson('/catalog/search?q=')->assertUnprocessable();
+    }
+
     public function test_only_super_admin_can_manage_a_manual_product_and_customer_sees_no_provider_data(): void
     {
         $category = Category::where('slug', 'game')->firstOrFail();
