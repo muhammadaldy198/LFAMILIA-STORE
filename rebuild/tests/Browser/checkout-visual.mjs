@@ -5,6 +5,11 @@ const browser=await chromium.launch({executablePath:process.argv[2],args:['--no-
 const lab=process.env.CHECKOUT_LAB_URL||'https://lfamilia-checkout-lab.vercel.app/';
 const base=process.env.CHECKOUT_STORE_URL||'http://127.0.0.1:8000';
 const report=[];
+const storeErrors=[];
+browser.on('page',page=>{
+ page.on('pageerror',error=>{if(page.url().startsWith(base))storeErrors.push(error.message);});
+ page.on('console',message=>{if(page.url().startsWith(base)&&['error','warning'].includes(message.type()))storeErrors.push(message.type()+': '+message.text());});
+});
 const sizes=[[360,780],[390,844],[430,932],[640,960],[768,1024],[1024,768],[1366,768],[1440,900],[1920,1080],[2560,1440]];
 async function inspect(page){return page.evaluate(()=>{
  const box=selector=>{const e=document.querySelector(selector);if(!e)return null;const r=e.getBoundingClientRect(),c=getComputedStyle(e);return {x:r.x,y:r.y,width:r.width,height:r.height,font:c.fontSize,line:c.lineHeight,transform:c.transform,origin:c.transformOrigin,fit:c.objectFit};};
@@ -92,5 +97,6 @@ try{
  await admin.waitForFunction(()=>document.documentElement.style.getPropertyValue('--lf-color-primary')==='#609CFF');
  await admin.close();await customer.close();
  await fs.writeFile(output+'/report.json',JSON.stringify({baseline:'a42f97d3a6d5a8a5cb59bd651ce9ffe1a8c928f2',report,quote,adminTheme:{persisted:true,cta:true,paymentCards:true,voucherSurface:true,reset:true,whiteAdmin:true},noFinancialActions:true},null,2));
+ if(storeErrors.length)throw Error('Customer/admin browser console regressions: '+JSON.stringify(storeErrors));
  console.log('PASS admin customer palette persistence, checkout/payment/voucher colors, reset and unchanged white admin');
 }finally{await browser.close();}

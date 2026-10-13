@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Models\SupportTicket;
 use App\Models\User;
 use App\Services\AdminManualOrderService;
+use App\Services\StoreThemeService;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -26,6 +27,11 @@ Queue::fake();
 Http::preventStrayRequests();
 
 DB::transaction(function (): void {
+    DB::table('system_settings')->updateOrInsert(['key' => 'store.theme'], [
+        'value' => json_encode(app(StoreThemeService::class)->defaults()),
+        'updated_at' => now(),
+    ]);
+
     $browserAdmin = AdminUser::updateOrCreate(['email' => 'browser-admin@example.test'], [
         'name' => 'Browser Admin',
         'password' => Hash::make('Browser-admin-test-password-123'),
@@ -229,6 +235,11 @@ echo "browser-checkout-game\n";
 
 // Comparable Lab visual data, confined to this local/testing fixture database.
 DB::transaction(function (): void {
+    DB::table('system_settings')->updateOrInsert(['key' => 'store.theme'], [
+        'value' => json_encode(app(StoreThemeService::class)->defaults()),
+        'updated_at' => now(),
+    ]);
+
     $product = Product::updateOrCreate(['slug' => 'checkout-lab-reference'], [
         'category_id' => Category::where('slug', 'game')->value('id'),
         'name' => 'Mobile Legends', 'publisher' => 'Moonton',
