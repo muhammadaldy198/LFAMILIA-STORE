@@ -97,6 +97,11 @@ async function submit() {
         router.visit('/catalog/' + encodeURIComponent(product.slug));
     }
 }
+function dismissSuggestions() {
+    // Escape also works when keyboard focus has moved into a suggestion link.
+    input.value?.focus();
+    focused.value = false;
+}
 function blur(event) {
     if (!event.currentTarget.contains(event.relatedTarget)) focused.value = false;
 }
@@ -107,7 +112,7 @@ onUnmounted(() => { ++serial; cancelPending(); });
 </script>
 
 <template>
-    <div class="lf-product-search" :class="'lf-product-search-' + variant" @focusout="blur" @keydown.esc="input?.blur()">
+    <div class="lf-product-search" :class="'lf-product-search-' + variant" @focusout="blur" @keydown.esc="dismissSuggestions">
         <form class="lf-product-search-form" role="search" @submit.prevent="submit">
             <svg class="lf-product-search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 5 5"/></svg>
             <input
