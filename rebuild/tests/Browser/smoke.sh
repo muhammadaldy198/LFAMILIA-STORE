@@ -83,5 +83,9 @@ echo "Running admin browser smoke (maximum 9 minutes)"
 timeout --signal=TERM --kill-after=10s 9m node tests/Browser/admin-ui.mjs "$CHROME_BIN"
 
 echo "Running checkout Lab comparison across ten viewports"
-timeout --signal=TERM --kill-after=10s 5m node tests/Browser/checkout-visual.mjs "$CHROME_BIN"
+if ! timeout --signal=TERM --kill-after=10s 5m node tests/Browser/checkout-visual.mjs "$CHROME_BIN"; then
+  echo "Browser server HTTP errors:"
+  grep -n -E '404|Not Found' "$LOG_FILE" || true
+  exit 1
+fi
 echo "M11 browser smoke passed."
