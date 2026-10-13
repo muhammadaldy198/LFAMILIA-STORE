@@ -132,6 +132,7 @@ onUnmounted(() => { ++serial; cancelPending(); });
                 :aria-controls="menuId"
                 :aria-activedescendant="open && activeIndex >= 0 ? menuId + '-option-' + activeIndex : undefined"
                 @focus="focused=true"
+                @input="focused=true"
                 @keydown.down.prevent="move(1)"
                 @keydown.up.prevent="move(-1)"
             >
