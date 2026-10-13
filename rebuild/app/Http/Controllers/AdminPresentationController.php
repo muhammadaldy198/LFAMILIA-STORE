@@ -84,6 +84,11 @@ class AdminPresentationController
                 }
             }
         }
+        // The selected-nominal checkmark uses highlight behind background-alt text.
+        // Reject palettes that make this small selection indicator unreadable.
+        if ($theme->contrast($after['highlight'], $after['background-alt']) < 4.5) {
+            throw ValidationException::withMessages(['colors.highlight' => 'Kontras highlight terlalu rendah terhadap latar tanda pilihan. Pilih warna yang lebih jelas.']);
+        }
         $tokens = $theme->tokens($after);
         foreach (['primary', 'secondary', 'action-start', 'action-end'] as $action) {
             if ($theme->contrast($after['background-alt'], $tokens[$action]) < 4.5) {
