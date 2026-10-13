@@ -6208,7 +6208,7 @@ body:where(:not(.lfx, .lfx *)){margin:0;font-family:Inter,ui-sans-serif,system-u
 
 /* Shared customer catalogue search; keeps icon and input text apart at every breakpoint. */
 .lf-customer .lf-product-search:where(:not(.lfx, .lfx *)){min-width:0;max-width:100%}
-.lf-customer .lf-header-search.lf-product-search:where(:not(.lfx, .lfx *)){padding:0;overflow:visible}
+.lf-customer .lf-header-search.lf-product-search:where(:not(.lfx, .lfx *)){height:40px;padding:0;overflow:visible;border:0;border-radius:0;background:transparent}
 .lf-customer .lf-product-search-form:where(:not(.lfx, .lfx *)){min-width:0;width:100%}
 .lf-customer.lf-customer.lf-customer.lf-customer .lf-product-search-form input.lf-product-search-input:where(:not(.lfx, .lfx *)){
   width:100%!important;min-width:0!important;box-sizing:border-box!important;
