@@ -67,6 +67,21 @@ class StoreThemeTest extends TestCase
         $this->assertSame($service->defaults(), $service->sanitize(['primary' => 'red', 'unknown' => '#FFFFFF']));
     }
 
+    public function test_highlight_must_contrast_with_selection_indicator_text(): void
+    {
+        $this->editor();
+        $service = app(StoreThemeService::class);
+        $colors = $service->defaults();
+        $colors['highlight'] = $colors['background-alt'];
+
+        $this->put('/admin/content/theme', ['colors' => $colors])
+            ->assertSessionHasErrors('colors.highlight');
+        $this->assertSame($service->defaults(), $service->saved());
+
+        $this->put('/admin/content/theme', ['colors' => $service->defaults()])
+            ->assertSessionHasNoErrors();
+    }
+
     public function test_checkout_action_tokens_follow_primary_and_preserve_approved_defaults(): void
     {
         $service = app(StoreThemeService::class);
