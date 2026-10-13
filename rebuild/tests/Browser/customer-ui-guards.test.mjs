@@ -81,6 +81,10 @@ test('customer searches show real product suggestions instead of linking to the 
     const styles = readFileSync(new URL('../../resources/css/app.css', import.meta.url), 'utf8');
     assert.match(header, /<ProductSearch class="lf-header-search"/);
     assert.match(header, /mobileSearchOpen/);
+    assert.match(header, /onMobileSearchKeydown/);
+    assert.match(header, /mobileSearchTrigger\.value\?\.focus\(\)/);
+    assert.match(header, /event\.key === 'Escape'/);
+    assert.match(header, /event\.key !== 'Tab'/);
     assert.match(home, /<ProductSearch class="lf-search"/);
     assert.match(search, /fetch\('\/catalog\/search\?q='/);
     assert.match(search, /'\/catalog\/' \+ encodeURIComponent\(product.slug\)/);
@@ -88,6 +92,7 @@ test('customer searches show real product suggestions instead of linking to the 
     assert.doesNotMatch(header, /<Link href="\/#produk" class="lf-header-search"/);
     assert.doesNotMatch(header, /<Link href="\/#produk" class="lf-search-mobile"/);
     assert.match(styles, /padding:0 14px 0 46px!important/);
+    assert.match(styles, /height:40px;padding:0;overflow:visible;border:0;border-radius:0;background:transparent/);
 });
 
 test('wallet payment status is never a fake perpetual quote and checkout description is not duplicated', () => {
