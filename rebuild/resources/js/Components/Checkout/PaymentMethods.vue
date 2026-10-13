@@ -171,7 +171,7 @@ function choosePayment(code) {
   flex: 0 0 auto;
   display: inline-block;
   margin-left: auto;
-  color: #e2efff;
+  color: var(--lf-color-text);
   font-size: 12px;
   line-height: 1.3;
   font-weight: 850;
@@ -205,15 +205,15 @@ function choosePayment(code) {
   padding: 14px;
   border: 1px solid rgba(166, 190, 226, .28);
   border-radius: 11px;
-  background: linear-gradient(145deg, #303f53, #263448);
-  color: #eff5ff;
+  background: linear-gradient(145deg, var(--lf-color-payment-card-start), var(--lf-color-payment-card-end));
+  color: var(--lf-color-text);
   cursor: pointer;
   text-align: left;
   user-select: none;
 }
 .lfx-payment-method-card.is-selected {
-  border-color: #a6cdfd;
-  background: linear-gradient(145deg, #36547b, #293d5b);
+  border-color: var(--lf-color-payment-selected-border);
+  background: linear-gradient(145deg, var(--lf-color-payment-selected-start), var(--lf-color-payment-selected-end));
   box-shadow: inset 0 0 0 1px rgba(185, 219, 255, .22);
 }
 .lfx-payment-method-card.is-unavailable {
@@ -240,7 +240,7 @@ function choosePayment(code) {
   min-width: 0;
   padding-top: 10px;
   border-top: 1px solid rgba(215, 231, 255, .22);
-  color: #f3f8ff;
+  color: var(--lf-color-text);
   font-size: 13px;
   line-height: 1.25;
   font-weight: 900;

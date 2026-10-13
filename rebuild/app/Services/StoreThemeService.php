@@ -36,9 +36,9 @@ class StoreThemeService
         return $this->sanitize(is_array($value) ? $value : []);
     }
 
-    public function tokens(): array
+    public function tokens(?array $palette = null): array
     {
-        $colors = $this->saved();
+        $colors = $palette === null ? $this->saved() : $this->sanitize($palette);
         // Keep the approved pale-blue checkout gradient at the default palette.
         // A primary edit shifts both stops by the same RGB difference.
         $primary = array_map('hexdec', str_split(substr($colors['primary'], 1), 2));
@@ -54,7 +54,11 @@ class StoreThemeService
             'card-selected-start' => ['card', '#253E59'], 'card-selected-mid' => ['card', '#21334C'], 'card-selected-end' => ['card', '#253645'],
             'header-start' => ['panel', '#2B3645'], 'header-end' => ['panel', '#293443'],
             'modal-start' => ['surface', '#202D46'], 'modal-end' => ['surface', '#101929'],
-            'modal-rows' => ['surface', '#0B1627'], 'border-light' => ['border', '#A8BEDC'],
+            'modal-rows' => ['surface', '#0B1627'],
+            'voucher-modal-start' => ['surface', '#202D47'], 'voucher-modal-end' => ['surface', '#111B2D'],
+            'payment-card-start' => ['card', '#303F53'], 'payment-card-end' => ['card', '#263448'],
+            'payment-selected-start' => ['card', '#36547B'], 'payment-selected-end' => ['card', '#293D5B'],
+            'payment-selected-border' => ['primary', '#A6CDFD'], 'border-light' => ['border', '#A8BEDC'],
         ];
         $defaults = $this->defaults();
         foreach ($variants as $key => [$role, $reference]) {

@@ -2,6 +2,7 @@
 
 use App\Models\AdminUser;
 use App\Models\Category;
+use App\Models\IntegrationCredential;
 use App\Models\Product;
 use App\Models\SupportTicket;
 use App\Models\User;
@@ -262,3 +263,21 @@ DB::transaction(function (): void {
         ]);
     }
 });
+
+// Disposable sandbox readiness for dropdown/quote coverage; browser tests never initiate payments.
+IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
+    'config_ciphertext' => ['server_key' => 'browser-sandbox-fixture-key', 'is_production' => false],
+    'is_active' => true,
+]);
+DB::table('payment_gateways')->whereIn('code', ['MIDTRANS', 'WALLET'])->update(['is_active' => true, 'is_maintenance' => false]);
+DB::table('payment_channels')->whereIn('code', ['saldo', 'ewallet', 'virtual_account'])->update(['is_active' => true, 'supports_order' => true]);
+foreach (['ewallet' => 'gopay', 'virtual_account' => 'bank_transfer'] as $code => $providerChannel) {
+    DB::table('payment_routes')->updateOrInsert([
+        'payment_channel_id' => DB::table('payment_channels')->where('code', $code)->value('id'),
+        'payment_gateway_id' => DB::table('payment_gateways')->where('code', 'MIDTRANS')->value('id'),
+    ], [
+        'provider_channel' => $providerChannel, 'priority' => 0,
+        'supports_order' => true, 'supports_wallet_topup' => true, 'is_active' => true,
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+}

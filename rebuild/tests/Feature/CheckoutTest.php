@@ -666,6 +666,7 @@ class CheckoutTest extends TestCase
         $this->assertSame($quote['total_idr'], $response->json('channel_quotes.manual_qris.total_idr'));
         $this->assertSame($quote['fee_idr'], $response->json('channel_quotes.manual_qris.fee_idr'));
         $this->assertArrayNotHasKey('wallet', $response->json('channel_quotes'));
+        $this->assertArrayNotHasKey('saldo', $response->json('channel_quotes'));
         $this->postJson('/checkout/quote', [...$payload, 'include_channel_totals' => true, 'total_idr' => 1])->assertUnprocessable();
     }
 }

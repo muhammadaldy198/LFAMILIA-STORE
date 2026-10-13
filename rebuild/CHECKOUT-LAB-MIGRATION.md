@@ -18,7 +18,7 @@ LFAMILIA Coin is a display label using the configured channel logo or existing o
 - `app.css`: legacy selectors use the zero-specificity `:where(:not(.lfx, .lfx *))` boundary, including their `!important` rules. It works in browsers without CSS `@scope`.
 - `checkout.css`: approved Lab geometry in the `.lfx` namespace; measured baseline sizes belong to checkout, independent of admin typography settings.
 - Payment/voucher components: local scoped styles.
-- `admin.css`: original white admin rules in an independent Vite entry, loaded only on admin requests. Customer color settings do not change admin tokens.
+- `admin.css`: original white admin rules in an independent Vite entry, loaded only on admin requests. Customer color settings do not change admin tokens. Client navigation disables the admin stylesheet on customer pages and re-enables it on admin routes; entering admin without its entry requests the fully styled document.
 
 The checkout action gradient derives from the saved primary palette while retaining the exact approved default stops.
 

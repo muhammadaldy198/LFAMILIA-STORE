@@ -3056,7 +3056,7 @@
   },
   "checkout.support_label": {
     "label": "Bantuan pada header produk",
-    "default": "Bantuan Pelanggan",
+    "default": "Layanan Chat 24/7",
     "group": "Pages/Catalog/Show"
   },
   "checkout.account_hint": {

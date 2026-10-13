@@ -84,9 +84,10 @@ class AdminPresentationController
                 }
             }
         }
-        foreach (['primary', 'secondary'] as $action) {
-            if ($theme->contrast($after['background-alt'], $after[$action]) < 4.5) {
-                throw ValidationException::withMessages(['colors.'.$action => 'Kontras tombol terlalu rendah. Pilih aksen yang lebih terang.']);
+        $tokens = $theme->tokens($after);
+        foreach (['primary', 'secondary', 'action-start', 'action-end'] as $action) {
+            if ($theme->contrast($after['background-alt'], $tokens[$action]) < 4.5) {
+                throw ValidationException::withMessages(['colors.'.(str_starts_with($action, 'action-') ? 'primary' : $action) => 'Kontras tombol terlalu rendah. Pilih aksen yang lebih terang.']);
             }
         }
         DB::transaction(function () use ($request, $theme, $audit, $after): void {

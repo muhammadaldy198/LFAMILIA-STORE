@@ -808,7 +808,7 @@ function closeReview() { summaryOpen.value = false; closeConfirmation(); }
     <div class="lfx-hero"><img v-if="product.banner_url" :src="product.banner_url" :alt="'Banner '+product.name"/><span class="lfx-hero-overlay"></span></div>
     <section class="lfx-product-header"><div class="lfx-container lfx-product-header-inner">
       <div class="lfx-product-cover"><div class="lfx-cover-frame"><img v-if="product.image_url" :src="product.image_url" :alt="product.name"/><span v-else>LF</span></div></div>
-      <div class="lfx-product-intro"><div class="lfx-breadcrumb"><Link href="/">Beranda</Link><span>›</span><span>{{product.category_name}}</span><span>›</span><strong>{{product.name}}</strong></div><div class="lfx-overline">DIGITAL TOP UP · PREMIUM EXPERIENCE</div><h1>{{product.name}}</h1><p>{{product.publisher||'LFAMILIA STORE'}}</p></div><div class="lfx-trust"><span><b>⚡</b> Proses Cepat</span><span><b>✧</b> {{customerText("checkout.support_label", "Bantuan Pelanggan")}}</span><span><b>◷</b> Pembayaran Aman</span></div>
+      <div class="lfx-product-intro"><div class="lfx-breadcrumb"><Link href="/">Beranda</Link><span>›</span><span>{{product.category_name}}</span><span>›</span><strong>{{product.name}}</strong></div><div class="lfx-overline">DIGITAL TOP UP · PREMIUM EXPERIENCE</div><h1>{{product.name}}</h1><p>{{product.publisher||'LFAMILIA STORE'}}</p></div><div class="lfx-trust"><span><b>⚡</b> Proses Cepat</span><span><b>✧</b> {{customerText("checkout.support_label", "Layanan Chat 24/7")}}</span><span><b>◷</b> Pembayaran Aman</span></div>
 
     </div></section>
     <div class="lfx-container lfx-content"><p v-if="firstCheckoutError" role="alert" class="lfx-error">{{firstCheckoutError}}</p>

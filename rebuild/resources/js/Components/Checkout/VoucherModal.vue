@@ -59,7 +59,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
   padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
   background: rgba(3, 7, 18, .82);
   backdrop-filter: blur(8px);
-  color: #f1f5ff;
+  color: var(--lf-color-text);
   font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
 }
 .lfx-offer-modal {
@@ -69,7 +69,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
   border: 1px solid rgba(139, 169, 221, .34);
   border-radius: 18px;
   padding: 22px;
-  background: linear-gradient(155deg, #202d47 0%, #111b2d 100%);
+  background: linear-gradient(155deg, var(--lf-color-voucher-modal-start) 0%, var(--lf-color-voucher-modal-end) 100%);
   box-shadow: 0 20px 60px #000a;
 }
 .lfx-offer-heading {
@@ -81,7 +81,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
 .lfx-offer-heading-copy { min-width: 0; }
 .lfx-offer-heading-copy > span {
   display: block;
-  color: #9dbaff;
+  color: var(--lf-color-muted);
   font-size: 10px;
   font-weight: 900;
   letter-spacing: .15em;
@@ -100,7 +100,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
   height: 36px;
   border-radius: 9px;
   border: 1px solid #ffffff27;
-  color: #dee7fa;
+  color: var(--lf-color-text);
   background: #ffffff0d;
   font-size: 23px;
   cursor: pointer;
@@ -109,7 +109,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
   font-size: 12px;
   line-height: 1.5;
   margin: 16px 0 18px;
-  color: #b6c5dd;
+  color: var(--lf-color-muted);
 }
 .lfx-offer-list {
   display: flex;
@@ -151,20 +151,20 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
 }
 .lfx-offer-copy strong {
   font-size: 13px;
-  color: #f4f7ff;
+  color: var(--lf-color-text);
   font-weight: 850;
   overflow-wrap: anywhere;
 }
 .lfx-offer-copy > span {
   font-size: 11px;
-  color: #b6c6df;
+  color: var(--lf-color-muted);
   overflow-wrap: anywhere;
 }
 .lfx-offer-copy code {
   align-self: flex-start;
   max-width: 100%;
   margin-top: 2px;
-  color: #d6e9ff;
+  color: var(--lf-color-text);
   font: 800 10px/1.3 ui-monospace, monospace;
   overflow-wrap: anywhere;
 }
@@ -189,7 +189,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
 .lfx-offer-apply:hover, .lfx-offer-apply:focus-visible { background: #6489d1; }
 .lfx-offer-disclaimer {
   margin: 17px 0 0;
-  color: #9cabc2;
+  color: var(--lf-color-muted);
   text-align: center;
   font-size: 10px;
   line-height: 1.5;
