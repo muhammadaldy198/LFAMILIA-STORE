@@ -6,10 +6,12 @@ const lab=process.env.CHECKOUT_LAB_URL||'https://lfamilia-checkout-lab.vercel.ap
 const base=process.env.CHECKOUT_STORE_URL||'http://127.0.0.1:8000';
 const report=[];
 const storeErrors=[];
-browser.on('page',page=>{
- page.on('pageerror',error=>{if(page.url().startsWith(base))storeErrors.push(error.message);});
+async function observedPage(options){
+ const page=await browser.newPage(options);
+ page.on('pageerror',error=>{if(page.url().startsWith(base))storeErrors.push('pageerror: '+error.message);});
  page.on('console',message=>{if(page.url().startsWith(base)&&['error','warning'].includes(message.type()))storeErrors.push(message.type()+': '+message.text());});
-});
+ return page;
+}
 const sizes=[[360,780],[390,844],[430,932],[640,960],[768,1024],[1024,768],[1366,768],[1440,900],[1920,1080],[2560,1440]];
 async function inspect(page){return page.evaluate(()=>{
  const box=selector=>{const e=document.querySelector(selector);if(!e)return null;const r=e.getBoundingClientRect(),c=getComputedStyle(e);return {x:r.x,y:r.y,width:r.width,height:r.height,font:c.fontSize,line:c.lineHeight,transform:c.transform,origin:c.transformOrigin,fit:c.objectFit};};
@@ -19,7 +21,7 @@ try{
  for(const [width,height] of sizes){
   const item={width,height,labUrl:lab};
   for(const [name,url] of [['lab',lab],['store',base+'/catalog/checkout-lab-reference']]){
-   const page=await browser.newPage({viewport:{width,height}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
+   const page=await observedPage({viewport:{width,height}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
    await page.goto(url,{waitUntil:'networkidle',timeout:45000});await page.locator('.lfx').waitFor();
    item[name]=await inspect(page);await page.screenshot({path:`${output}/${name}-${width}.png`,fullPage:true});
    await page.locator('.lf-payment-group-main').filter({hasText:'E-Wallet'}).click();
@@ -45,7 +47,7 @@ try{
   }
   report.push(item);console.log('PASS checkout Lab comparison '+width+'x'+height);
  }
- const page=await browser.newPage({viewport:{width:390,height:844}});
+ const page=await observedPage({viewport:{width:390,height:844}});
  await page.goto(base+'/catalog/browser-checkout-game');
  await page.locator('.lfx-nominal').first().click();
  await page.waitForFunction(()=>/Rp/.test(document.querySelector('.lfx-bottom-amount strong')?.textContent||''));
@@ -66,7 +68,7 @@ try{
  await page.screenshot({path:`${output}/voucher-real-backend.png`});
  await fs.writeFile(output+'/report.json',JSON.stringify({baseline:'a42f97d3a6d5a8a5cb59bd651ce9ffe1a8c928f2',report,quote,noFinancialActions:true},null,2));
  await page.close();
- const admin=await browser.newPage({viewport:{width:390,height:844}});
+ const admin=await observedPage({viewport:{width:390,height:844}});
  await admin.goto(base+'/admin/login');
  const login=await admin.evaluate(async()=>{const response=await fetch('/admin/login',{method:'POST',headers:{Accept:'application/json','Content-Type':'application/json','X-CSRF-TOKEN':document.querySelector('meta[name=csrf-token]').content},body:JSON.stringify({email:'browser-admin@example.test',password:'Browser-admin-test-password-123'})});return response.status;});
  if(![200,204].includes(login))throw Error('Admin theme fixture login failed: '+login);
@@ -79,7 +81,7 @@ try{
  await admin.getByRole('button',{name:'Simpan Perubahan',exact:true}).click();
  await admin.getByText('Warna website berhasil disimpan.',{exact:true}).first().waitFor();
  if(await admin.locator('.lf-admin').evaluate(e=>getComputedStyle(e).backgroundColor)!==white)throw Error('Customer palette recolored Admin');
- const customer=await browser.newPage({viewport:{width:390,height:844}});
+ const customer=await observedPage({viewport:{width:390,height:844}});
  await customer.goto(base+'/catalog/browser-checkout-game');
  const gradient=await customer.locator('#lfx-bottom-pay').evaluate(e=>getComputedStyle(e).backgroundImage);
  if(!gradient.includes('166, 213, 255')||!gradient.includes('135, 173, 234'))throw Error('Saved primary did not reach checkout gradient: '+gradient);
