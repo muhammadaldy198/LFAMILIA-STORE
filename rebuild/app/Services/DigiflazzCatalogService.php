@@ -109,17 +109,35 @@ class DigiflazzCatalogService
                     }
                     $mappingQuery = DB::table('provider_mappings')->where('provider_id', $providerId)
                         ->where('external_sku', $row['buyer_sku_code']);
-                    // Preserve both manually locked amounts, while keeping the supplier
-                    // catalog price, availability, stock and cut-off data current.
-                    (clone $mappingQuery)->where('is_manual_price', false)->update([
-                        'cost_idr' => $row['price_idr'], 'max_price_idr' => $row['price_idr'], 'updated_at' => now(),
-                    ]);
-                    // Only restore sources disabled *by a past catalog sync*.
-                    // Admin-disabled mappings remain off; a returned SKU must be sellable.
-                    if ($row['buyer_active'] && $row['seller_active']
-                        && ($row['unlimited_stock'] || $row['stock'] > 0)) {
-                        (clone $mappingQuery)->where('disabled_by_sync', true)->where('is_active', false)
-                            ->update(['is_active' => true, 'disabled_by_sync' => false, 'updated_at' => now()]);
+                    // Never overwrite the price of a mapping whose pinned supplier
+                    // identity disagrees with this SKU, even when its price is not
+                    // manually locked. Such mappings stay active but ineligible for
+                    // checkout and fulfillment until an admin examines them.
+                    $mappings = (clone $mappingQuery)->lockForUpdate()
+                        ->get(['id', 'is_manual_price', 'fulfillment_config']);
+                    $matching = $mappings->filter(
+                        fn (object $mapping): bool => $this->verifiedIdentityMatches((object) $row, $mapping->fulfillment_config)
+                    );
+                    if ($matching->count() !== $mappings->count()) {
+                        Log::warning('Digiflazz SKU identity changed; locked mapping values preserved.', [
+                            'buyer_sku_code' => $row['buyer_sku_code'],
+                            'affected_mappings' => $mappings->count() - $matching->count(),
+                        ]);
+                    }
+                    $matchingIds = $matching->pluck('id')->all();
+                    if ($matchingIds !== []) {
+                        (clone $mappingQuery)->whereIn('id', $matchingIds)
+                            ->where('is_manual_price', false)->update([
+                                'cost_idr' => $row['price_idr'], 'max_price_idr' => $row['price_idr'], 'updated_at' => now(),
+                            ]);
+                        // Restore only mappings previously disabled *by sync*, and
+                        // only if their verified supplier identity still matches.
+                        if ($row['buyer_active'] && $row['seller_active']
+                            && ($row['unlimited_stock'] || $row['stock'] > 0)) {
+                            (clone $mappingQuery)->whereIn('id', $matchingIds)
+                                ->where('disabled_by_sync', true)->where('is_active', false)
+                                ->update(['is_active' => true, 'disabled_by_sync' => false, 'updated_at' => now()]);
+                        }
                     }
                 }
                 if ($sku === null || $clean === []) {
