@@ -18,6 +18,7 @@ use App\Services\PaymentStateService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Routing\Middleware\ThrottleRequests;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
@@ -1491,8 +1492,8 @@ class PaymentTest extends TestCase
         DB::table('orders')->where('id', $order->id)
             ->update(['expires_at' => now()->subMinute()]);
 
-        \Illuminate\Support\Facades\Artisan::call('lfamilia:expire-unpaid-orders');
-        \Illuminate\Support\Facades\Artisan::call('lfamilia:expire-unpaid-orders');
+        Artisan::call('lfamilia:expire-unpaid-orders');
+        Artisan::call('lfamilia:expire-unpaid-orders');
 
         $this->assertSame('EXPIRED', DB::table('orders')->where('id', $order->id)->value('status'));
         $this->assertSame('RELEASED', DB::table('voucher_redemptions')
