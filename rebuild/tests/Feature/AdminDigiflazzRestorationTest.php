@@ -255,9 +255,18 @@ class AdminDigiflazzRestorationTest extends TestCase
         $this->login();
         $catalog = $this->mappedItem('primary-sku');
         $primary = ProviderMapping::where('product_package_id', $catalog['package']->id)->firstOrFail();
+        $catalog['product']->fields()->create([
+            'field_key' => 'user_id', 'label' => 'User ID', 'type' => 'text',
+            'is_required' => true, 'sort_order' => 0,
+        ]);
+        $primaryItem = DB::table('digiflazz_catalog_items')
+            ->where('buyer_sku_code', 'primary-sku')->first();
         $primary->update([
             'priority' => 0,
-            'fulfillment_config' => ['customer_no_template' => '{{user_id}}'],
+            'fulfillment_config' => [
+                'customer_no_template' => '{{user_id}}',
+                'auto_source_group' => app(DigiflazzAutoSources::class)->key($primaryItem),
+            ],
         ]);
 
         $itemId = DB::table('digiflazz_catalog_items')->insertGetId([
@@ -290,6 +299,23 @@ class AdminDigiflazzRestorationTest extends TestCase
         $this->assertSame(1, $alternate->priority);
         $this->assertFalse($alternate->is_active);
         $this->assertSame('{{user_id}}', data_get($alternate->fulfillment_config, 'customer_no_template'));
+        $alternateItem = DB::table('digiflazz_catalog_items')
+            ->where('buyer_sku_code', 'alternate-sku')->first();
+        $this->assertSame(
+            app(DigiflazzAutoSources::class)->key($alternateItem),
+            data_get($alternate->fulfillment_config, 'auto_source_group')
+        );
+        $this->assertNotSame(
+            data_get($primary->fresh()->fulfillment_config, 'auto_source_group'),
+            data_get($alternate->fulfillment_config, 'auto_source_group')
+        );
+
+        $primary->update(['is_active' => false]);
+        $alternate->update(['is_active' => true]);
+        $this->assertSame(
+            'alternate-sku',
+            app(CheckoutPricing::class)->forPackage($catalog['package']->id)['provider_sku']
+        );
     }
 
     public function test_digiflazz_has_a_dedicated_menu_and_health_summary_with_filters(): void
