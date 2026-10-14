@@ -165,7 +165,7 @@ class AdminFulfillmentController
                 'can_fail' => ! $terminal && $attempt->status === 'MANUAL_PENDING',
                 'can_reconcile' => ! $terminal && in_array($attempt->status, ['SENDING', 'PENDING', 'UNKNOWN'], true),
                 'can_retry' => ! $terminal && (
-                    $attempt->status === 'BLOCKED'
+                    ($attempt->status === 'BLOCKED' && $attempt->last_error !== 'Semua SKU yang diizinkan telah gagal. Hubungi superadmin.')
                     || ($attempt->status === 'FAILED_CONFIRMED' && (bool) $attempt->safe_to_failover)
                 ),
                 'retry_label' => $attempt->status === 'FAILED_CONFIRMED'
