@@ -97,7 +97,7 @@ class PublicOrderTrackingController
             ->where('orders.order_number', $orderNumber)
             ->select(
                 'orders.id', 'orders.order_number', 'orders.status', 'orders.customer_input',
-                'orders.total_idr', 'orders.created_at', 'orders.updated_at',
+                'orders.total_idr', 'orders.paid_at', 'orders.created_at', 'orders.updated_at',
                 'products.name as product_name', 'product_packages.name as package_name',
                 'payment_channels.name as payment_channel_name'
             )->first();
@@ -112,7 +112,7 @@ class PublicOrderTrackingController
             ->where('orders.id', $orderId)
             ->select(
                 'orders.id', 'orders.order_number', 'orders.status', 'orders.customer_input',
-                'orders.total_idr', 'orders.created_at', 'orders.updated_at',
+                'orders.total_idr', 'orders.paid_at', 'orders.created_at', 'orders.updated_at',
                 'products.name as product_name', 'product_packages.name as package_name',
                 'payment_channels.name as payment_channel_name'
             )->first();
@@ -143,7 +143,7 @@ class PublicOrderTrackingController
             'destination' => $this->maskedDestination($order->customer_input),
             'total' => (int) $order->total_idr,
             'paymentMethod' => $order->payment_channel_name ?: 'Pembayaran',
-            'paymentStatus' => $this->paymentStatus((string) ($payment?->status ?? ''), (string) $order->status),
+            'paymentStatus' => $this->paymentStatus((string) ($payment?->status ?? ''), (string) $order->status, $order->paid_at !== null),
             'fulfillmentStatus' => $this->publicStatus((string) $order->status),
             'events' => $events,
             'createdAt' => $order->created_at,
@@ -156,7 +156,7 @@ class PublicOrderTrackingController
         return DB::table('orders')
             ->join('products', 'products.id', '=', 'orders.product_id')
             ->join('product_packages', 'product_packages.id', '=', 'orders.product_package_id')
-            ->whereIn('orders.status', ['PENDING_PAYMENT', 'PAID', 'PROCESSING', 'SUCCESS', 'FAILED', 'BLOCKED', 'EXPIRED', 'CANCELLED', 'REFUND', 'REFUNDED'])
+            ->whereIn('orders.status', ['PENDING_PAYMENT', 'PAID', 'PROCESSING', 'SUCCESS', 'FAILED', 'BLOCKED', 'EXPIRED', 'CANCELLED'])
             ->orderByDesc('orders.id')->limit(20)
             ->get([
                 'orders.order_number', 'orders.status', 'orders.total_idr', 'orders.created_at',
@@ -276,18 +276,23 @@ class PublicOrderTrackingController
             'SUCCESS' => 'success',
             'EXPIRED' => 'expired',
             'CANCELLED' => 'cancelled',
+            'BLOCKED' => 'blocked',
             'REFUND', 'REFUNDED' => 'refunded',
             default => 'failed',
         };
     }
 
-    private function paymentStatus(string $paymentStatus, string $orderStatus): string
+    private function paymentStatus(string $paymentStatus, string $orderStatus, bool $wasPaid): string
     {
         $payment = strtoupper($paymentStatus);
         if ($payment === 'REFUNDED' || in_array(strtoupper($orderStatus), ['REFUND', 'REFUNDED'], true)) {
             return 'refunded';
         }
         if (in_array($payment, ['SETTLEMENT', 'CAPTURE', 'PAID', 'SUCCESS'], true)) {
+            return 'paid';
+        }
+        // Keep the paid flag when a previously paid fulfillment fails.
+        if ($wasPaid) {
             return 'paid';
         }
         if (in_array($payment, ['EXPIRE', 'EXPIRED'], true) || strtoupper($orderStatus) === 'EXPIRED') {
@@ -333,7 +338,8 @@ class PublicOrderTrackingController
                 'FAILED' => 'Transaksi gagal',
                 'EXPIRED' => 'Pembayaran kedaluwarsa',
                 'CANCELLED' => 'Transaksi dibatalkan',
-                'REFUND', 'REFUNDED' => 'Pengembalian dana',
+                'BLOCKED' => 'Gagal diproses; hubungi admin',
+                'REFUND', 'REFUNDED' => 'Perlu pemeriksaan admin',
                 default => 'Status pesanan diperbarui',
             };
         }
