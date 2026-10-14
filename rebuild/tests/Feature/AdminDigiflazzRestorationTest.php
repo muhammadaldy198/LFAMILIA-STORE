@@ -905,6 +905,17 @@ class AdminDigiflazzRestorationTest extends TestCase
         $this->assertDatabaseHas('provider_mappings', [
             'id' => $mapping->id, 'is_active' => true,
         ]);
+        $this->fakeCatalog([$this->row([
+            'buyer_sku_code' => 'PINNED8.000', 'brand' => 'Wrong Product',
+            'product_name' => 'Wrong 8.000', 'price' => 18000,
+        ])]);
+        app(DigiflazzCatalogService::class)->sync('PINNED8.000');
+        // A reused supplier code may update live catalog information but may
+        // never reprice an active mapping for a different verified product.
+        $this->assertDatabaseHas('provider_mappings', [
+            'id' => $mapping->id, 'cost_idr' => 10000,
+            'max_price_idr' => 10000, 'is_active' => true,
+        ]);
 
         DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'PINNED8.000')
             ->update(['brand' => 'Pinned', 'product_name' => 'Pinned 8.000']);
