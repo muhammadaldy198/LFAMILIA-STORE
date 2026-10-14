@@ -71,7 +71,8 @@ class GuestOrderTest extends TestCase
         $this->post('/orders/track/search', ['query' => 'LFTRACK-BLOCKED-100'])
             ->assertOk()
             ->assertJsonPath('order.fulfillmentStatus', 'blocked')
-            ->assertJsonPath('order.paymentStatus', 'paid');
+            ->assertJsonPath('order.paymentStatus', 'paid')
+            ->assertJsonPath('order.wasPaid', true);
     }
 
     public function test_reissuing_code_invalidates_old_code(): void
