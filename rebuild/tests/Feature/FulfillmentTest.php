@@ -232,6 +232,35 @@ class FulfillmentTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_supplier_retagging_of_verified_sku_blocks_paid_order_before_send(): void
+    {
+        Queue::fake();
+        $this->credentials();
+        $catalog = $this->automaticCatalog();
+        $orderId = $this->paidOrder($catalog);
+
+        $item = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'DF-PRIMARY')->first();
+        $identity = app(\App\Services\DigiflazzAutoSources::class)->key($item);
+        DB::table('provider_mappings')->where('id', $catalog['mapping_id'])->update([
+            'fulfillment_config' => json_encode([
+                'customer_no_template' => '{{user_id}}{{zone_id}}',
+                'auto_source_group' => $identity,
+            ], JSON_THROW_ON_ERROR),
+        ]);
+        DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'DF-PRIMARY')
+            ->update(['brand' => 'Unrelated Supplier Product']);
+
+        Http::fake();
+        app(FulfillmentService::class)->startOrder($orderId);
+        $attempt = DB::table('fulfillment_attempts')->where('order_id', $orderId)->firstOrFail();
+        $this->assertSame('BLOCKED', $attempt->status);
+        $this->assertSame('PAID', DB::table('orders')->where('id', $orderId)->value('status'));
+        $this->assertDatabaseHas('provider_mappings', [
+            'id' => $catalog['mapping_id'], 'is_active' => true,
+        ]);
+        Http::assertNothingSent();
+    }
+
     public function test_timeout_becomes_unknown_and_reconciliation_reuses_same_reference(): void
     {
         Queue::fake();
