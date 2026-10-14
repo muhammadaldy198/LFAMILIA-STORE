@@ -36,7 +36,7 @@ const statusMeta=s=>({
 const sourceLabel=s=>({payment:'Pembayaran',processing:'Proses Pesanan',delivery:'Pengiriman',admin:'Admin',system:'Sistem'}[s]||'Sistem');
 const date=v=>v?new Date(v).toLocaleString('id-ID',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'}):'-';
 const terminal=computed(()=>detail.value&&['success','failed','blocked','cancelled','expired','refunded'].includes(detail.value.fulfillmentStatus));
-const nextAction=computed(()=>detail.value?nextOrderAction(detail.value.fulfillmentStatus,detail.value.paymentStatus):null);
+const nextAction=computed(()=>detail.value?nextOrderAction(detail.value.fulfillmentStatus,detail.value.paymentStatus,detail.value.wasPaid):null);
 
 async function json(url,options={}){
  const token=document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')||'';
