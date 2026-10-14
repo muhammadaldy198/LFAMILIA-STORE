@@ -504,7 +504,13 @@ class AdminPanelRestorationTest extends TestCase
         $manual = $this->product('MANUAL');
         $manual->update(['margin_percent' => 9]);
         $package = ProductPackage::create(['product_id' => $product->id, 'code' => 'OVERRIDE', 'name' => 'Override', 'pricing_mode' => 'PERCENT', 'margin_percent' => 7]);
-        $this->put('/admin/catalog/margin', ['margin_percent' => 15])->assertRedirect()->assertSessionHasNoErrors();
+        $this->put('/admin/catalog/margin', ['margin_percent' => 15])
+            ->assertSessionHasErrors('preview_token');
+        $response = $this->postJson('/admin/catalog/margin/preview', ['margin_percent' => 15])
+            ->assertOk();
+        $this->assertSame('10.0000', (string) $product->fresh()->margin_percent);
+        $this->put('/admin/catalog/margin', ['preview_token' => $response->json('token')])
+            ->assertRedirect()->assertSessionHasNoErrors();
         $this->assertSame('15.0000', (string) $product->fresh()->margin_percent);
         $this->assertSame('9.0000', (string) $manual->fresh()->margin_percent);
         $this->assertSame('7.0000', (string) $package->fresh()->margin_percent);
@@ -535,11 +541,18 @@ class AdminPanelRestorationTest extends TestCase
             'pricing_mode' => 'SELL_PRICE', 'sell_price_idr' => 2000,
         ]);
 
-        $this->put('/admin/catalog/margin', ['margin_percent' => 9])->assertSessionHasNoErrors();
+        $preview = $this->postJson('/admin/catalog/margin/preview', [
+            'margin_percent' => 9,
+        ])->assertOk();
+        $this->put('/admin/catalog/margin', ['preview_token' => $preview->json('token')])
+            ->assertSessionHasNoErrors();
         $this->assertSame('PERCENT', $legacy->fresh()->pricing_mode);
-        $this->put('/admin/catalog/margin', [
+        $converted = $this->postJson('/admin/catalog/margin/preview', [
             'margin_percent' => 9, 'include_imported_percent' => true,
-        ])->assertSessionHasNoErrors();
+        ])->assertOk();
+        $this->assertSame('PERCENT', $legacy->fresh()->pricing_mode);
+        $this->put('/admin/catalog/margin', ['preview_token' => $converted->json('token')])
+            ->assertSessionHasNoErrors();
         $this->assertSame('9.0000', (string) $product->fresh()->margin_percent);
         $this->assertSame('PRODUCT_MARGIN', $legacy->fresh()->pricing_mode);
         $this->assertNull($legacy->fresh()->margin_percent);
