@@ -181,6 +181,7 @@ class FulfillmentTest extends TestCase
         $this->assertSame('SUCCESS', DB::table('fulfillment_attempts')->where('id', $attempt->id)->value('status'));
         $delivery = json_decode(DB::table('orders')->where('id', $orderId)->value('delivery_payload'), true);
         $this->assertSame('SERIAL-123', $delivery['serial_number']);
+        Queue::assertNotPushed(SendTransactionalEmailJob::class, fn (SendTransactionalEmailJob $job): bool => $job->subject === 'Pesanan LFAMILIA gagal diproses');
         Http::assertSentCount(1);
     }
 

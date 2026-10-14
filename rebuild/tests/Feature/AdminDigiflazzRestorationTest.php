@@ -745,6 +745,35 @@ class AdminDigiflazzRestorationTest extends TestCase
             ->update(['seller_active' => true]);
         $this->assertSame(0, app(DigiflazzAutoSources::class)->sync());
         $this->assertDatabaseMissing('provider_mappings', ['external_sku' => 'BLOCK2.000']);
+        $blocked['package']->update(['is_active' => true]);
+        $blocked['product']->update(['is_active' => false]);
+        $this->assertSame(0, app(DigiflazzAutoSources::class)->sync());
+        $this->assertDatabaseMissing('provider_mappings', ['external_sku' => 'BLOCK2.000']);
+    }
+
+    public function test_duplicate_active_mappings_are_reported_but_never_changed_by_auto_sources(): void
+    {
+        $sample = $this->mappedItem('DUPE-A');
+        ProviderMapping::create([
+            'product_package_id' => $sample['package']->id,
+            'provider_id' => $sample['provider']->id,
+            'external_sku' => 'DUPE-B',
+            'cost_idr' => 10000,
+            'max_price_idr' => 10000,
+            'priority' => 2,
+            'is_active' => true,
+        ]);
+        Cache::forget('digiflazz.mapping.duplicates.'.$sample['package']->id);
+        $before = ProviderMapping::where('product_package_id', $sample['package']->id)
+            ->orderBy('id')->get(['id', 'external_sku', 'is_active', 'priority'])->toArray();
+        $this->assertSame(0, app(DigiflazzAutoSources::class)->sync());
+        $after = ProviderMapping::where('product_package_id', $sample['package']->id)
+            ->orderBy('id')->get(['id', 'external_sku', 'is_active', 'priority'])->toArray();
+        $this->assertEquals($before, $after);
+        $this->assertDatabaseHas('admin_notifications', [
+            'event_type' => 'digiflazz.mapping.duplicate_active',
+            'target_id' => (string) $sample['package']->id,
+        ]);
     }
 
     public function test_sync_failure_creates_only_one_admin_alert_per_hour(): void
