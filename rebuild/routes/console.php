@@ -138,7 +138,6 @@ Artisan::command('lfamilia:expire-unpaid-orders', function (PaymentStateService 
 
 Schedule::command('lfamilia:expire-unpaid-orders')->everyMinute()->withoutOverlapping();
 
-
 Schedule::job(new QueueHeartbeatJob)->everyMinute()->name('lfamilia-queue-worker-heartbeat');
 
 Schedule::call(function (): void {
