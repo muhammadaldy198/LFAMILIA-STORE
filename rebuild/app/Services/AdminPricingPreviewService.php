@@ -88,8 +88,20 @@ class AdminPricingPreviewService
         DB::transaction(function () use ($request, $preview, $audit): void {
             $prices = $preview['input']['prices'];
             $providerId = Provider::where('code', 'DIGIFLAZZ')->value('id');
+            $dependencies = DB::table('provider_mappings as mappings')
+                ->join('product_packages as packages', 'packages.id', '=', 'mappings.product_package_id')
+                ->where('mappings.provider_id', $providerId)
+                ->whereIn('mappings.external_sku', array_keys($prices))
+                ->get(['packages.id as package_id', 'packages.product_id']);
+            // Match the global-margin confirmation lock order: product, package,
+            // then mapping. All selling-price dependencies remain stable until commit.
+            Product::whereIn('id', $dependencies->pluck('product_id')->unique()->all())
+                ->orderBy('id')->lockForUpdate()->get(['id']);
+            ProductPackage::whereIn('id', $dependencies->pluck('package_id')->unique()->all())
+                ->orderBy('id')->lockForUpdate()->get(['id']);
             DB::table('provider_mappings')->where('provider_id', $providerId)
-                ->whereIn('external_sku', array_keys($prices))->lockForUpdate()->get(['id']);
+                ->whereIn('external_sku', array_keys($prices))
+                ->orderBy('id')->lockForUpdate()->get(['id']);
             $plan = $this->maxPlan($prices);
             $this->assertUnchanged($preview['fingerprint'], $plan);
             foreach ($plan['mappings'] as $row) {
