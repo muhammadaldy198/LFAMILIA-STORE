@@ -10,6 +10,7 @@ const props = defineProps({
     order: { type: Object, required: true },
     payment: { type: Object, default: null },
     statusUrl: { type: String, required: true },
+    serverNow: { type: String, required: true },
     pageSettings: { type: Object, default: () => ({}) },
 });
 
@@ -36,6 +37,21 @@ const paid = computed(() => !refunded.value && !expired.value && !cancelled.valu
     && (paidStatuses.includes(paymentStatus.value) || ['PAID', 'PROCESSING', 'SUCCESS'].includes(orderStatus.value)));
 const uncertain = computed(() => ['UNKNOWN', 'CREATING'].includes(paymentStatus.value) && !paid.value && !refunded.value);
 const terminal = computed(() => paid.value || expired.value || cancelled.value || failed.value || refunded.value);
+const canOrderAgain = computed(() => !latePaid.value && (expired.value || failed.value || cancelled.value));
+const clockOffset = Date.parse(props.serverNow) - Date.now();
+const clockTick = ref(Date.now());
+const expiryTimestamp = computed(() => Date.parse(props.order.expires_at || props.payment?.expires_at || ''));
+const expirySeconds = computed(() => Number.isFinite(expiryTimestamp.value)
+    ? Math.max(0, Math.ceil((expiryTimestamp.value - clockTick.value - clockOffset) / 1000))
+    : null);
+const expiryCountdown = computed(() => expirySeconds.value === null ? ''
+    : String(Math.floor(expirySeconds.value / 60)).padStart(2, '0') + ':'
+      + String(expirySeconds.value % 60).padStart(2, '0'));
+const expiryWib = computed(() => Number.isFinite(expiryTimestamp.value)
+    ? new Intl.DateTimeFormat('id-ID', {
+        timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', hour12: false,
+    }).format(expiryTimestamp.value)
+    : null);
 const canResume = computed(() => !terminal.value && (!props.payment || retryRejected.value));
 const title = computed(() => {
     if (refunded.value) return 'Pengembalian dana';
@@ -76,9 +92,9 @@ const statusText = computed(() => {
     if (refunded.value) return 'Pesanan masuk proses pengembalian dana. Periksa status invoice atau hubungi bantuan.';
     if (latePaid.value) return 'Pembayaran terverifikasi setelah pesanan ditutup. Admin perlu memeriksa transaksi ini. Jangan membayar lagi.';
     if (paid.value) return settings.value.paidStatusText || 'Pembayaran sudah diterima. Status pesanan akan diperbarui otomatis.';
-    if (expired.value) return settings.value.expiredStatusText || 'Waktu pembayaran sudah berakhir. Invoice ini tetap dapat dipakai untuk mengecek status transaksi.';
-    if (cancelled.value) return settings.value.cancelledStatusText || 'Pembayaran dibatalkan. Invoice tetap tersimpan dan statusnya dapat dicek kapan saja.';
-    if (failed.value) return settings.value.failedStatusText || 'Pembayaran gagal. Jangan membuat pesanan baru sebelum mengecek status invoice ini.';
+    if (expired.value) return 'Pesanan ini sudah berakhir. Cek status invoice jika ragu, lalu buat pesanan baru untuk membayar.';
+    if (cancelled.value) return 'Pesanan dibatalkan. Cek status invoice jika ragu, lalu buat pesanan baru untuk membayar.';
+    if (failed.value) return 'Cek status invoice dulu. Jika pembayaran sudah dipastikan gagal, buat pesanan baru.';
     if (uncertain.value) return 'Status pembayaran sedang dipastikan. Jangan membayar ulang atau membuat pesanan baru. Periksa status invoice ini.';
     if (retryRejected.value) return 'Percobaan sebelumnya ditolak sebelum pembayaran dibuat. Kamu dapat menyiapkan pembayaran lagi untuk invoice yang sama.';
     return settings.value.pendingStatusText || 'Status diperiksa otomatis setiap 3 detik.';
@@ -92,7 +108,7 @@ function formatDateTime(value) {
     if (!value) return '';
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return String(value);
-    return date.toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
+    return date.toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Jakarta' }) + ' WIB';
 }
 
 async function copyValue(value, kind) {
@@ -180,6 +196,7 @@ async function resumePayment() {
 }
 
 let poller;
+let clockInterval;
 function stopPolling() {
     if (poller) window.clearInterval(poller);
     poller = null;
@@ -190,6 +207,7 @@ function restorePage() {
 }
 watch(terminal, value => { if (value) stopPolling(); });
 onMounted(() => {
+    clockInterval = window.setInterval(() => { clockTick.value = Date.now(); }, 1000);
     window.addEventListener('pageshow', restorePage);
     const shouldResume = new URLSearchParams(window.location.search).get('resume') === '1';
     if (shouldResume && canResume.value) void resumePayment();
@@ -202,6 +220,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
     disposed = true;
     stopPolling();
+    if (clockInterval) window.clearInterval(clockInterval);
     window.removeEventListener('pageshow', restorePage);
 });
 </script>
@@ -289,7 +308,11 @@ onBeforeUnmount(() => {
                 </div>
             </div>
 
-            <p v-if="!terminal && payment?.expires_at" class="lf-payment-expiry">Berlaku sampai {{formatDateTime(payment.expires_at)}}</p>
+            <div v-if="!terminal && expiryWib" class="lf-payment-expiry mt-4 rounded-lg border border-amber-300/20 bg-amber-300/[0.05] p-3 text-xs leading-5" role="timer" aria-label="Batas waktu pembayaran">
+                <p class="font-bold">Bayar sebelum {{ expiryWib }} WIB</p>
+                <p>Sisa waktu: <strong>{{ expiryCountdown }}</strong></p>
+                <p class="mt-1 text-white/60">Setelah batas waktu, pesanan berakhir otomatis. Pembayaran terlambat tidak diproses otomatis dan masuk peninjauan admin.</p>
+            </div>
 
             <div v-if="settings.showStatusBox !== false" class="lf-payment-status-box">
                 <svg v-if="paid" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>
@@ -301,6 +324,7 @@ onBeforeUnmount(() => {
             <button v-if="canResume" type="button" :disabled="startingPayment || refreshingStatus" class="lf-payment-primary mt-5 flex h-12 w-full items-center justify-center rounded-xl bg-[#b9ff35] font-black text-[#091006] disabled:opacity-50" @click="resumePayment">{{startingPayment ? 'Menyiapkan…' : 'Siapkan pembayaran'}}</button>
             <button v-if="!terminal && !uncertain && paymentUrl" type="button" :disabled="openingPayment" class="lf-payment-primary mt-5 flex h-12 w-full items-center justify-center rounded-xl bg-[#b9ff35] font-black text-[#091006] disabled:opacity-50" @click="openPayment">{{openingPayment ? 'Memproses…' : (settings.payButtonText || 'Bayar Sekarang')}}</button>
             <Link v-if="paid || latePaid || refunded" :href="statusUrl" class="lf-payment-primary mt-5 flex h-12 w-full items-center justify-center rounded-xl bg-[#b9ff35] font-black text-[#091006]">{{ customerText("pages.payment.show.2fdc5653", "Lihat status pesanan") }}</Link>
+            <Link v-if="canOrderAgain" href="/" class="lf-payment-primary mt-5 flex h-12 w-full items-center justify-center rounded-xl bg-[#b9ff35] font-black text-[#091006]">Buat pesanan baru</Link>
 
             <div class="lf-payment-actions mt-3 grid grid-cols-2 gap-2">
                 <button type="button" class="h-10 rounded-lg border border-white/10 bg-white/[0.03] text-[10px] font-bold text-white" :disabled="refreshingStatus || startingPayment" @click="refreshStatus">{{settings.checkStatusButtonText || 'Cek status'}}</button>
