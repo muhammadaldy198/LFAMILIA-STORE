@@ -841,6 +841,51 @@ class AdminDigiflazzRestorationTest extends TestCase
         ]);
     }
 
+    public function test_auto_bootstrap_pins_identity_and_checkout_rejects_reused_sku(): void
+    {
+        $sample = $this->mappedItem('PINNED8.000', [
+            'brand' => 'Pinned', 'product_name' => 'Pinned 8.000',
+        ]);
+        $sample['product']->update(['name' => 'Pinned']);
+        $sample['product']->fields()->create([
+            'field_key' => 'user_id', 'label' => 'User ID', 'type' => 'text',
+            'is_required' => true, 'sort_order' => 0,
+        ]);
+        $sample['package']->update(['nominal_value' => 8000]);
+        ProviderMapping::where('external_sku', 'PINNED8.000')->delete();
+        $this->assertSame(1, app(DigiflazzAutoSources::class)->sync());
+
+        $mapping = ProviderMapping::where('external_sku', 'PINNED8.000')->firstOrFail();
+        $item = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'PINNED8.000')->first();
+        $this->assertSame(
+            app(DigiflazzAutoSources::class)->key($item),
+            data_get($mapping->fulfillment_config, 'auto_source_group')
+        );
+        $this->assertSame($sample['package']->id,
+            app(CheckoutPricing::class)->forPackage($sample['package']->id)['package_id']
+        );
+
+        // Supplier retags the same SKU code; the mapping must stay active but unsellable.
+        DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'PINNED8.000')
+            ->update(['brand' => 'Wrong Product', 'product_name' => 'Wrong 8.000']);
+        $this->assertSame([], app(CheckoutPricing::class)->forPackages([$sample['package']->id]));
+        try {
+            app(CheckoutPricing::class)->forPackage($sample['package']->id);
+            $this->fail('Retagged SKU must never be eligible for checkout.');
+        } catch (ValidationException) {
+            // Mismatched verified identity is blocked without changing the mapping.
+        }
+        $this->assertDatabaseHas('provider_mappings', [
+            'id' => $mapping->id, 'is_active' => true,
+        ]);
+
+        DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'PINNED8.000')
+            ->update(['brand' => 'Pinned', 'product_name' => 'Pinned 8.000']);
+        $this->assertSame($sample['package']->id,
+            app(CheckoutPricing::class)->forPackage($sample['package']->id)['package_id']
+        );
+    }
+
     public function test_auto_source_never_publishes_mapping_for_unverified_multi_field_destination(): void
     {
         $sample = $this->mappedItem('TWOFIELDS3.000', [
