@@ -144,6 +144,7 @@ class PublicOrderTrackingController
             'total' => (int) $order->total_idr,
             'paymentMethod' => $order->payment_channel_name ?: 'Pembayaran',
             'paymentStatus' => $this->paymentStatus((string) ($payment?->status ?? ''), (string) $order->status, $order->paid_at !== null),
+            'wasPaid' => $order->paid_at !== null,
             'fulfillmentStatus' => $this->publicStatus((string) $order->status),
             'events' => $events,
             'createdAt' => $order->created_at,
@@ -292,7 +293,7 @@ class PublicOrderTrackingController
             return 'paid';
         }
         // Keep the paid flag when a previously paid fulfillment fails.
-        if ($wasPaid) {
+        if ($wasPaid && in_array(strtoupper($orderStatus), ['FAILED', 'BLOCKED'], true)) {
             return 'paid';
         }
         if (in_array($payment, ['EXPIRE', 'EXPIRED'], true) || strtoupper($orderStatus) === 'EXPIRED') {
