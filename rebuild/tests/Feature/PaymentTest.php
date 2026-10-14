@@ -1556,7 +1556,7 @@ class PaymentTest extends TestCase
             ->assertRedirect();
         $this->assertSame($expectedOrderStatus, DB::table('orders')->where('id', $order->id)->value('status'));
         $this->assertSame(1, DB::table('payment_transactions')->where('order_id', $order->id)->count());
-        $this->assertSame(1, DB::table('admin_audit_logs')->where('action', 'order.payment.checked')
+        $this->assertSame(1, DB::table('audit_logs')->where('action', 'order.payment.checked')
             ->where('target_id', (string) $order->id)->count());
     }
 
