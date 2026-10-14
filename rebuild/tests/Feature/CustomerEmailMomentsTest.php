@@ -6,16 +6,18 @@ use App\Jobs\SendTransactionalEmailJob;
 use App\Models\Category;
 use App\Models\IntegrationCredential;
 use App\Models\Product;
+use App\Models\StoreAsset;
 use App\Models\User;
 use App\Services\FulfillmentService;
 use App\Services\PaymentStateService;
 use App\Services\TransactionalEmailService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
-use Illuminate\Http\Client\Response;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 /**
@@ -150,8 +152,22 @@ class CustomerEmailMomentsTest extends TestCase
      * karena link-nya signed URL. Tanpa signature, jalur lama tetap
      * menolak (403) — link tanpa signature bukan jalan pintas.
      */
+    /**
+     * QRIS manual butuh aset StoreAsset manual_qris aktif + gambar QR
+     * (ManualQrisGateway::create menolak tanpa itu). Pola yang sama
+     * dengan test media di CatalogTest.
+     */
+    private function seedManualQrisAsset(): void
+    {
+        Storage::fake('public');
+        $asset = StoreAsset::where('key', 'manual_qris')->firstOrFail();
+        $asset->update(['is_active' => true]);
+        $asset->addMedia(UploadedFile::fake()->image('qris.png'))->toMediaCollection('image', 'public');
+    }
+
     public function test_payment_link_from_email_opens_without_checkout_session(): void
     {
+        $this->seedManualQrisAsset();
         $catalog = $this->catalog();
         $this->seedCheckoutDigiflazzCatalog($catalog['package_id']);
         $this->enableManualQrisRoute();
@@ -183,11 +199,27 @@ class CustomerEmailMomentsTest extends TestCase
         // Tanpa signature tetap ditolak.
         $this->get('/payment?invoice='.$invoice)->assertForbidden();
         // Dengan signature dari email: halaman pembayaran terbuka.
-        $this->get($payUrl)->assertOk();
+        // Respons HTML awal membawa page Inertia di viewData('page')
+        // — baca createPaymentUrl dari sana (tanpa header X-Inertia,
+        // yang butuh X-Inertia-Version agar tidak 409).
+        $page = $this->get($payUrl)->assertOk()->viewData('page');
+        $createUrl = $page['props']['createPaymentUrl'] ?? null;
+
+        // Sesi dibuang lagi SETELAH GET (GET tadi sempat menanam
+        // guest_order_id di sesi) — POST harus lolos berkat signature
+        // di createPaymentUrl, bukan berkat sesi.
+        session()->flush();
+
+        $this->assertIsString($createUrl);
+        $this->assertStringContainsString('signature=', $createUrl);
+        $this->postJson($createUrl, [
+            'idempotency_key' => 'paylink-create-guest-'.bin2hex(random_bytes(6)),
+        ])->assertOk();
     }
 
     public function test_payment_link_from_email_opens_for_logged_out_member(): void
     {
+        $this->seedManualQrisAsset();
         $catalog = $this->catalog();
         $this->seedCheckoutDigiflazzCatalog($catalog['package_id']);
         $this->enableManualQrisRoute();
@@ -223,7 +255,25 @@ class CustomerEmailMomentsTest extends TestCase
         session()->flush();
 
         $this->get('/payment?invoice='.$invoice)->assertForbidden();
-        $this->get($payUrl)->assertOk();
+        // Respons HTML awal membawa page Inertia di viewData('page')
+        // — baca createPaymentUrl dari sana (tanpa header X-Inertia,
+        // yang butuh X-Inertia-Version agar tidak 409).
+        $page = $this->get($payUrl)->assertOk()->viewData('page');
+        $createUrl = $page['props']['createPaymentUrl'] ?? null;
+        $this->assertSame($user->id, (int) DB::table('orders')->where('order_number', $invoice)->value('user_id'));
+
+        // Halaman GET terbuka lewat signature SAJA belum cukup: tombol
+        // "Siapkan pembayaran" POST ke /payments/orders/{invoice}, dan
+        // PaymentController::create sebelumnya mensyaratkan owner yang
+        // login -> 403. Halaman kini meneruskan otorisasi yang sama
+        // sebagai createPaymentUrl (signed POST URL) — POST lewat URL
+        // itu harus berhasil menyiapkan pembayaran, tanpa login.
+
+        $this->assertIsString($createUrl);
+        $this->assertStringContainsString('signature=', $createUrl);
+        $this->postJson($createUrl, [
+            'idempotency_key' => 'paylink-create-'.bin2hex(random_bytes(6)),
+        ])->assertOk();
     }
 
     public function test_payment_confirmed_email_contains_amount_and_details(): void
@@ -324,7 +374,12 @@ class CustomerEmailMomentsTest extends TestCase
             'updated_at' => now(),
         ]);
         $this->seedCheckoutDigiflazzCatalog($catalog['package_id']);
-        Http::fake(fn ($request): Response => Http::response(['data' => [
+        // JANGAN tambah return type `: Response` pada closure ini:
+        // Http::response() mengembalikan FulfilledPromise, bukan
+        // Response — return type itu melempar TypeError di dalam stub,
+        // transact() mengira provider tidak dapat dipastikan
+        // (markUnknown) dan order mentok PROCESSING.
+        Http::fake(fn ($request) => Http::response(['data' => [
             'ref_id' => $request->data()['ref_id'],
             'customer_no' => $request->data()['customer_no'],
             'buyer_sku_code' => $request->data()['buyer_sku_code'],
@@ -504,7 +559,7 @@ class CustomerEmailMomentsTest extends TestCase
             'updated_at' => now(),
         ]);
         $this->seedCheckoutDigiflazzCatalog($catalog['package_id']);
-        Http::fake(fn ($request): Response => Http::response(['data' => [
+        Http::fake(fn ($request) => Http::response(['data' => [
             'ref_id' => $request->data()['ref_id'],
             'customer_no' => $request->data()['customer_no'],
             'buyer_sku_code' => $request->data()['buyer_sku_code'],

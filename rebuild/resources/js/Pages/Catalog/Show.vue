@@ -117,7 +117,10 @@ const requiredFieldsComplete = computed(() => (props.fields || []).filter((field
     .every((field) => String(customerInput[field.field_key] || '').trim() !== ''));
 const guestContactComplete = computed(() => props.customer || (
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail.value.trim())
-    && guestPhone.value.replace(/\D/g, '').length >= 8
+    // D17.1: server menolak HP di bawah 10 digit (422) — threshold
+    // client harus sama, supaya tombol quote/checkout tidak aktif
+    // untuk nomor yang pasti ditolak server.
+    && guestPhone.value.replace(/\D/g, '').length >= 10
 ));
 const selectedPaymentChannel = computed(() => (props.paymentChannels || []).find((channel) =>
     channel.available !== false && channel.code === paymentChannelCode.value

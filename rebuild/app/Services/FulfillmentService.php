@@ -305,7 +305,42 @@ class FulfillmentService
             DB::table('fulfillment_attempts')->where('id', $attemptId)->update([
                 'reconcile_claimed_at' => null,
             ]);
+
+            // Escalation point (D5.3): the scheduler only queues attempts
+            // with reconcile_checks < 3, so the top-of-function branch
+            // (checks >= 3) is never reached from production — the 3rd
+            // check is the last one that runs. If that check completes
+            // without a terminal result, escalate HERE instead of waiting
+            // for a 4th call that never comes. This MUST live in the
+            // finally: every check path ends in an early `return` inside
+            // the try, and a return skips code placed after try/finally.
+            // Manual reconciles never escalate (an admin is already
+            // looking at the attempt).
+            if (! $manual) {
+                $this->escalateIfStalled($attemptId);
+            }
         }
+    }
+
+    /**
+     * Escalate an attempt that exhausted its automatic checks without
+     * a terminal result. Deduped inside escalateStalledReconciliation.
+     */
+    private function escalateIfStalled(int $attemptId): void
+    {
+        $attempt = DB::table('fulfillment_attempts')->where('id', $attemptId)->first();
+        if (! $attempt
+            || ! in_array($attempt->status, ['PENDING', 'UNKNOWN', 'SENDING'], true)
+            || (int) $attempt->reconcile_checks < 3) {
+            return;
+        }
+
+        $order = DB::table('orders')->where('id', $attempt->order_id)->first();
+        if (! $order) {
+            return;
+        }
+
+        $this->escalateStalledReconciliation($attempt, $order);
     }
 
     /**

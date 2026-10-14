@@ -43,23 +43,38 @@ class CatalogController
      * bisa dibeli. Keterbelian diputuskan CheckoutPricing::forPackages —
      * cek yang sama dengan yang dipakai checkout (bukan cuma paket aktif).
      *
+     * Keterbelian per produk TIDAK bergantung filter request (kategori /
+     * pencarian / mode) — filter itu diterapkan terpisah oleh query
+     * pemanggil. Karena itu set global dihitung sekali per request dan
+     * dipakai ulang listing + popular (sebelumnya forPackages
+     * menghargai seluruh katalog 2x per request index). Memo ini hidup
+     * di instance controller (resolved per request), jadi tidak ada
+     * risiko basi antar-request; checkout tetap menghargai ulang
+     * langsung (otoritatif), listing hanya discovery.
+     *
      * @return array<int>
      */
-    private function buyableProductIds(Builder $products): array
+    private ?array $buyableProductIdsMemo = null;
+
+    private function buyableProductIds(): array
     {
-        $packageIds = ProductPackage::whereIn('product_id', (clone $products)->pluck('id'))
-            ->where('is_active', true)
+        if ($this->buyableProductIdsMemo !== null) {
+            return $this->buyableProductIdsMemo;
+        }
+
+        $packageIds = ProductPackage::where('is_active', true)
+            ->whereHas('product', fn ($query) => $query->where('is_active', true))
             ->pluck('id')
             ->all();
         if ($packageIds === []) {
-            return [];
+            return $this->buyableProductIdsMemo = [];
         }
         $quotes = app(CheckoutPricing::class)->forPackages($packageIds);
         if ($quotes === []) {
-            return [];
+            return $this->buyableProductIdsMemo = [];
         }
 
-        return ProductPackage::whereIn('id', array_keys($quotes))
+        return $this->buyableProductIdsMemo = ProductPackage::whereIn('id', array_keys($quotes))
             ->pluck('product_id')
             ->unique()
             ->values()
@@ -90,7 +105,7 @@ class CatalogController
             ->when($search !== '', fn ($query) => $this->searchScope($query, $search));
 
         $products = $baseProducts
-            ->whereIn('id', $this->buyableProductIds($baseProducts))
+            ->whereIn('id', $this->buyableProductIds())
             ->orderBy('sort_order')->orderBy('name')->paginate(24)
             ->withQueryString()
             ->through(fn (Product $product): array => [
@@ -106,7 +121,7 @@ class CatalogController
             ->whereHas('category', fn ($query) => $query->where('is_active', true))
             ->whereHas('packages', fn ($query) => $query->where('is_active', true));
         $popularProducts = $basePopular
-            ->whereIn('id', $this->buyableProductIds($basePopular))
+            ->whereIn('id', $this->buyableProductIds())
             ->orderByDesc('popular')
             ->orderByDesc('active_reviews_count')
             ->orderBy('sort_order')
@@ -170,7 +185,7 @@ class CatalogController
             ->whereHas('packages', fn ($query) => $query->where('is_active', true));
         $this->searchScope($baseProducts, $needle);
         $products = $baseProducts
-            ->whereIn('id', $this->buyableProductIds($baseProducts))
+            ->whereIn('id', $this->buyableProductIds())
             ->orderBy('sort_order')
             ->orderBy('name')
             ->limit(8)

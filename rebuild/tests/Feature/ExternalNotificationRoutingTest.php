@@ -84,7 +84,13 @@ class ExternalNotificationRoutingTest extends TestCase
             'status' => 'SENT',
         ]);
         // Discord: hanya notif ORDER yang dikirim, ke webhook ORDER.
-        Http::assertSentCount(1, fn ($request) => $request->url() === self::ORDER_WEBHOOK);
+        // CATATAN: Http::assertSentCount() hanya menerima $count —
+        // callback filter argumen ke-2 DIABAIKAN diam-diam (PHP tidak
+        // error untuk argumen berlebih), sehingga ia menghitung TOTAL
+        // semua request (2 telegram + 1 discord = 3). Pakai
+        // Http::recorded($filter)->count() agar yang dihitung benar-benar
+        // post ke webhook ini.
+        $this->assertSame(1, Http::recorded(fn ($request) => $request->url() === self::ORDER_WEBHOOK)->count());
         $this->assertDatabaseMissing('notification_deliveries', [
             'admin_notification_id' => $fulfillmentId,
             'channel' => 'discord:fulfillment',
@@ -113,8 +119,8 @@ class ExternalNotificationRoutingTest extends TestCase
         $service->deliver($fulfillmentId);
         $service->deliver($fulfillmentId);
 
-        Http::assertSentCount(1, fn ($request) => $request->url() === self::ORDER_WEBHOOK);
-        Http::assertSentCount(1, fn ($request) => $request->url() === self::FULFILLMENT_WEBHOOK);
+        $this->assertSame(1, Http::recorded(fn ($request) => $request->url() === self::ORDER_WEBHOOK)->count());
+        $this->assertSame(1, Http::recorded(fn ($request) => $request->url() === self::FULFILLMENT_WEBHOOK)->count());
         // Channel kedua TIDAK ke-skip gara-gara channel pertama SENT:
         // tiap channel punya baris dedupe sendiri.
         $this->assertDatabaseHas('notification_deliveries', [
@@ -141,7 +147,8 @@ class ExternalNotificationRoutingTest extends TestCase
         $service->deliver($fulfillmentId);
 
         // Tanpa URL per-channel, semua notif jatuh ke webhook lama.
-        Http::assertSentCount(2, fn ($request) => $request->url() === self::LEGACY_WEBHOOK);
+        // (Alasan tidak pakai Http::assertSentCount: lihat catatan di test pertama.)
+        $this->assertSame(2, Http::recorded(fn ($request) => $request->url() === self::LEGACY_WEBHOOK)->count());
         $this->assertDatabaseHas('notification_deliveries', [
             'admin_notification_id' => $fulfillmentId,
             'channel' => 'discord:fulfillment',

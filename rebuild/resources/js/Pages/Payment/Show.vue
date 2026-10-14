@@ -12,6 +12,12 @@ const props = defineProps({
     statusUrl: { type: String, required: true },
     serverNow: { type: String, required: true },
     pageSettings: { type: Object, default: () => ({}) },
+    // Signed URL untuk POST pembuatan pembayaran — hanya terisi bila
+    // halaman ini dibuka lewat link signed dari email. Tanpa ini,
+    // POST ke /payments/orders ditolak 403 untuk member yang belum
+    // login (PaymentController::create mensyaratkan owner login),
+    // padahal halaman GET-nya sudah terbuka lewat signature.
+    createPaymentUrl: { type: String, default: null },
 });
 
 const page = usePage();
@@ -162,7 +168,14 @@ async function resumePayment() {
 
     try {
         const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-        const response = await fetch('/payments/orders/' + encodeURIComponent(props.order.order_number), {
+        // Pakai signed URL bila halaman dibuka lewat link email —
+        // signature yang sama mengotorisasi POST ini
+        // (PaymentController::create menerima signature valid sebagai
+        // alternatif login owner). Tanpa signature, URL biasa dipakai
+        // dan jalur otorisasi lama (owner login / sesi guest /
+        // access_code) yang berlaku.
+        const createUrl = props.createPaymentUrl || ('/payments/orders/' + encodeURIComponent(props.order.order_number));
+        const response = await fetch(createUrl, {
             method: 'POST',
             cache: 'no-store',
             headers: {

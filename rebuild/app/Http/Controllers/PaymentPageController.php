@@ -7,6 +7,7 @@ use App\Services\PaymentPresentationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\URL;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -77,8 +78,25 @@ class PaymentPageController
             ],
             'payment' => $payments->forOrder((int) $order->id),
             'statusUrl' => $statusUrl,
+            // Bila halaman dibuka lewat link signed, teruskan otorisasi
+            // yang sama ke POST pembuatan pembayaran (lihat
+            // PaymentController::create): tanpa URL signed ini, tombol
+            // "Siapkan pembayaran" mengembalikan 403 untuk member yang
+            // belum login, padahal halaman GET-nya sudah terbuka lewat
+            // signature. Kedaluwarsa mengikuti aturan yang sama dengan
+            // link bayar di email (expires_at order).
+            'createPaymentUrl' => $signed ? $this->createPaymentUrl($order) : null,
             'serverNow' => now()->toIso8601String(),
             'pageSettings' => $settings->read(),
         ]);
+    }
+
+    private function createPaymentUrl(object $order): string
+    {
+        $expires = $order->expires_at !== null ? Carbon::parse($order->expires_at) : null;
+
+        return $expires !== null && $expires->isFuture()
+            ? URL::temporarySignedRoute('payments.orders.create', $expires, ['orderNumber' => $order->order_number])
+            : URL::signedRoute('payments.orders.create', ['orderNumber' => $order->order_number]);
     }
 }

@@ -125,8 +125,12 @@ class FulfillmentAdminNotificationsTest extends TestCase
         ['order_id' => $orderId] = $this->makeOrder('blocked53@example.test');
 
         $service = app(FulfillmentService::class);
-        $attemptId = $service->startOrder($orderId);
-        $this->assertNotNull($attemptId);
+        // startOrder() mengembalikan void — attempt diambil dari DB,
+        // bukan dari return value.
+        $service->startOrder($orderId);
+        $attempt = DB::table('fulfillment_attempts')->where('order_id', $orderId)->first();
+        $this->assertNotNull($attempt);
+        $attemptId = (int) $attempt->id;
         $this->assertSame('PROCESSING', DB::table('orders')->where('id', $orderId)->value('status'));
 
         // Tanpa kredensial Digiflazz, transact melempar ValidationException -> markBlocked.
@@ -183,5 +187,55 @@ class FulfillmentAdminNotificationsTest extends TestCase
             ->count());
         // Order tetap PAID/PROCESSING — eskalasi tidak mengubah status order.
         $this->assertSame('PAID', DB::table('orders')->where('id', $orderId)->value('status'));
+    }
+
+    public function test_reconcile_third_check_without_result_escalates_from_scheduler_path(): void
+    {
+        // Jalur produksi: scheduler hanya mengantre attempt dengan
+        // reconcile_checks < 3, jadi eskalasi HARUS terjadi saat cek
+        // ke-3 selesai tanpa hasil — bukan menunggu panggilan ke-4
+        // yang tidak pernah datang (cabang checks >= 3 di atas).
+        ['order_id' => $orderId, 'mapping_id' => $mappingId] = $this->makeOrder('stall3rd@example.test');
+        $attemptId = DB::table('fulfillment_attempts')->insertGetId([
+            'order_id' => $orderId,
+            'attempt_no' => 1,
+            'provider_mapping_id' => $mappingId,
+            'status' => 'PENDING',
+            'external_reference' => 'D53-'.uniqid(),
+            'correlation_id' => (string) Str::uuid(),
+            'request_payload' => json_encode([
+                'buyer_sku_code' => 'D53-SKU',
+                'customer_no' => '1234569876',
+                'ref_id' => 'D53-REF',
+                'max_price' => 12000,
+            ]),
+            // Cek ke-3: tanpa kredensial Digiflazz, transact melempar
+            // ValidationException -> recordReconciliationError, attempt
+            // tetap PENDING (tanpa hasil).
+            'reconcile_checks' => 2,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $service = app(FulfillmentService::class);
+        $service->reconcileAttempt((int) $attemptId);
+
+        $this->assertSame(1, DB::table('admin_notifications')
+            ->where('event_type', 'fulfillment.reconcile.stalled')
+            ->where('target_type', 'fulfillment_attempt')
+            ->where('target_id', (string) $attemptId)
+            ->count());
+        $this->assertSame(1, DB::table('order_events')
+            ->where('order_id', $orderId)
+            ->where('event_type', 'FULFILLMENT_RECONCILE_STALLED')
+            ->count());
+
+        // Panggilan berikutnya (cabang checks >= 3) tidak menggandakan.
+        $service->reconcileAttempt((int) $attemptId);
+        $this->assertSame(1, DB::table('admin_notifications')
+            ->where('event_type', 'fulfillment.reconcile.stalled')
+            ->where('target_type', 'fulfillment_attempt')
+            ->where('target_id', (string) $attemptId)
+            ->count());
     }
 }
