@@ -5,6 +5,7 @@ const { customerText } = useCustomerPresentation();
 import {Head,Link} from '@inertiajs/vue3';
 import {computed,onMounted,onUnmounted,ref} from 'vue';
 import CustomerShell from '../../Components/CustomerShell.vue';
+import { manualHelpMessage, nextOrderAction } from '../../lib/orderStatus';
 
 const props=defineProps({transactions:Array});
 const query=ref('');
@@ -30,11 +31,12 @@ const statusMeta=s=>({
   blocked:['Gagal Diproses','Pesanan gagal diproses. Silakan hubungi admin LFAMILIA untuk penanganan manual.','red'],
  cancelled:['Dibatalkan','Transaksi dibatalkan dan tidak akan diproses.','red'],
  expired:['Kedaluwarsa','Waktu pembayaran telah berakhir.','gray'],
- refunded:['Refund','Pengembalian dana sedang atau telah diproses.','amber'],
+ refunded:['Perlu Pemeriksaan Admin','Hubungi admin untuk memeriksa status dana dan pesanan.','amber'],
 }[s]||['Diproses','Status sedang diperbarui.','blue']);
 const sourceLabel=s=>({payment:'Pembayaran',processing:'Proses Pesanan',delivery:'Pengiriman',admin:'Admin',system:'Sistem'}[s]||'Sistem');
 const date=v=>v?new Date(v).toLocaleString('id-ID',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'}):'-';
 const terminal=computed(()=>detail.value&&['success','failed','blocked','cancelled','expired','refunded'].includes(detail.value.fulfillmentStatus));
+const nextAction=computed(()=>detail.value?nextOrderAction(detail.value.fulfillmentStatus,detail.value.paymentStatus):null);
 
 async function json(url,options={}){
  const token=document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')||'';
@@ -148,7 +150,12 @@ onUnmounted(()=>{disposed=true;selectionVersion++;stopDetailPolling();if(feedTim
      <div><dt>{{ customerText("pages.guest.track.e378eb96", "Dibuat") }}</dt><dd>{{date(detail.createdAt)}}</dd></div>
      <div><dt>{{ customerText("pages.guest.track.6e230e94", "Update") }}</dt><dd>{{date(detail.updatedAt)}}</dd></div>
     </dl>
-    <div class="lf-track-sensitive">
+    <div v-if="nextAction" class="mb-4 space-y-3 rounded-xl border border-white/10 p-4">
+      <p v-if="nextAction==='support'" class="text-sm">{{manualHelpMessage}}</p>
+      <Link v-if="nextAction==='support'" href="/contact" class="lf-primary">Hubungi admin</Link>
+      <Link v-else href="/" class="lf-primary">Buat pesanan baru</Link>
+     </div>
+     <div class="lf-track-sensitive">
      <strong>{{ customerText("pages.guest.track.ee28e295", "Butuh kode/hasil pesanan?") }}</strong>
      <p>{{ customerText("pages.guest.track.84d645e7", "Data sensitif hanya ditampilkan melalui halaman akses guest yang memakai kode akses, atau dari Riwayat Pesanan jika kamu login.") }}</p>
      <Link href="/login" class="lf-secondary">{{ customerText("pages.guest.track.da4f28f7", "Masuk Akun") }}</Link>
