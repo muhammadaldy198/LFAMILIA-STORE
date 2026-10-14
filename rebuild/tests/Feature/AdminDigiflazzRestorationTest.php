@@ -13,6 +13,7 @@ use App\Services\AdminDigiflazzMonitorService;
 use App\Services\AdminPermissionService;
 use App\Services\CheckoutPricing;
 use App\Services\DigiflazzCatalogImport;
+use App\Services\DigiflazzAutoSources;
 use App\Services\DigiflazzCatalogService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\Client\Factory;
@@ -682,5 +683,118 @@ class AdminDigiflazzRestorationTest extends TestCase
     {
         $this->login('ADMIN', ['dashboard.view']);
         $this->get('/admin/digiflazz')->assertForbidden();
+    }
+
+    public function test_orphan_mapping_and_stale_data_are_rejected_by_checkout(): void
+    {
+        $orphan = $this->mappedItem('orphan-only');
+        DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'orphan-only')->delete();
+        $this->assertSame([], app(CheckoutPricing::class)->forPackages([$orphan['package']->id]));
+        try {
+            app(CheckoutPricing::class)->forPackage($orphan['package']->id);
+            $this->fail('Orphan SKU must be ineligible.');
+        } catch (ValidationException) {
+            // Orphaned mappings must not pass checkout.
+        }
+
+        $stale = $this->mappedItem('stale-only');
+        DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'stale-only')
+            ->update(['synced_at' => now()->subHours(25)]);
+        $this->assertSame([], app(CheckoutPricing::class)->forPackages([$stale['package']->id]));
+        try {
+            app(CheckoutPricing::class)->forPackage($stale['package']->id);
+            $this->fail('Stale supplier data must be ineligible.');
+        } catch (ValidationException) {
+            // Stale catalog must be blocked.
+        }
+
+        DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'stale-only')
+            ->update(['synced_at' => now()]);
+        $this->assertSame($stale['package']->id,
+            app(CheckoutPricing::class)->forPackage($stale['package']->id)['package_id']);
+    }
+
+    public function test_auto_sources_bootstrap_one_mapping_only_for_active_sellable_nominals(): void
+    {
+        $sample = $this->mappedItem('BOOT1.000', [
+            'brand' => 'Bootstrap', 'product_name' => 'Bootstrap 1.000',
+        ]);
+        $sample['product']->update(['name' => 'Bootstrap']);
+        $sample['package']->update(['nominal_value' => 1000]);
+        ProviderMapping::where('external_sku', 'BOOT1.000')->delete();
+
+        $this->assertSame(1, app(DigiflazzAutoSources::class)->sync());
+        $this->assertDatabaseHas('provider_mappings', [
+            'external_sku' => 'BOOT1.000', 'priority' => 0, 'is_active' => true,
+            'is_manual_price' => false, 'cost_idr' => 10000, 'max_price_idr' => 10000,
+        ]);
+        $this->assertSame(0, app(DigiflazzAutoSources::class)->sync());
+        $this->assertSame(1, ProviderMapping::where('product_package_id', $sample['package']->id)->count());
+
+        $blocked = $this->mappedItem('BLOCK2.000', [
+            'brand' => 'BlockedGame', 'product_name' => 'BlockedGame 2.000', 'seller_active' => false,
+        ]);
+        $blocked['product']->update(['name' => 'BlockedGame']);
+        $blocked['package']->update(['nominal_value' => 2000]);
+        ProviderMapping::where('external_sku', 'BLOCK2.000')->delete();
+        $this->assertSame(0, app(DigiflazzAutoSources::class)->sync());
+        $blocked['package']->update(['is_active' => false]);
+        DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'BLOCK2.000')
+            ->update(['seller_active' => true]);
+        $this->assertSame(0, app(DigiflazzAutoSources::class)->sync());
+        $this->assertDatabaseMissing('provider_mappings', ['external_sku' => 'BLOCK2.000']);
+    }
+
+    public function test_sync_failure_creates_only_one_admin_alert_per_hour(): void
+    {
+        $this->fakeCatalog([]);
+        $reason = 'Daftar harga Digiflazz kosong atau tidak valid.';
+        Cache::forget('digiflazz.sync.failed.'.hash('sha256', $reason));
+        $before = DB::table('admin_notifications')->where('event_type', 'digiflazz.sync.failed')->count();
+        foreach ([1, 2] as $attempt) {
+            try {
+                app(DigiflazzCatalogService::class)->sync();
+                $this->fail('Empty full sync cannot succeed.');
+            } catch (ValidationException) {
+                // Fails safely.
+            }
+        }
+        $this->assertSame($before + 1,
+            DB::table('admin_notifications')->where('event_type', 'digiflazz.sync.failed')->count());
+    }
+
+    public function test_admin_buyer_area_max_price_requires_preview_and_only_changes_selected_sku(): void
+    {
+        $this->login();
+        $this->mappedItem('max-price-A');
+        $this->mappedItem('max-price-B');
+        ProviderMapping::where('external_sku', 'max-price-A')->update(['is_manual_price' => true]);
+        $preview = $this->postJson('/admin/digiflazz/max-prices/preview', [
+            'sku_text' => "SKU,Harga Max\nmax-price-A,12.500",
+        ])->assertOk();
+        $this->assertSame(1, $preview->json('summary.skus'));
+        $this->assertDatabaseHas('provider_mappings', ['external_sku' => 'max-price-A', 'cost_idr' => 10000]);
+        $this->post('/admin/digiflazz/max-prices/apply', [])->assertSessionHasErrors('preview_token');
+        $this->post('/admin/digiflazz/max-prices/apply', [
+            'preview_token' => $preview->json('token'),
+        ])->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('provider_mappings', [
+            'external_sku' => 'max-price-A', 'cost_idr' => 12500, 'max_price_idr' => 12500,
+            'is_manual_price' => true,
+        ]);
+        $this->assertDatabaseHas('provider_mappings', [
+            'external_sku' => 'max-price-B', 'cost_idr' => 10000, 'max_price_idr' => 10000,
+        ]);
+        $this->post('/admin/digiflazz/max-prices/apply', [
+            'preview_token' => $preview->json('token'),
+        ])->assertSessionHasErrors('preview_token');
+        $this->fakeCatalog([
+            $this->row(['buyer_sku_code' => 'max-price-A', 'price' => 15000]),
+            $this->row(['buyer_sku_code' => 'max-price-B', 'price' => 10000]),
+        ]);
+        app(DigiflazzCatalogService::class)->sync();
+        $this->assertDatabaseHas('provider_mappings', [
+            'external_sku' => 'max-price-A', 'cost_idr' => 12500, 'max_price_idr' => 12500,
+        ]);
     }
 }
