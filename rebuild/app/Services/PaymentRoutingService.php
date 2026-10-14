@@ -149,6 +149,23 @@ class PaymentRoutingService
     }
 
     /**
+     * Kode gateway mentah untuk sebuah route — tanpa filter
+     * ketersediaan/maintenance seperti byRouteId(). Dipakai untuk
+     * keputusan otorisasi (mis. WALLET wajib owner login), yang harus
+     * didasarkan pada route yang SUDAH dipilih order, bukan pada
+     * apakah gateway itu sedang tersedia.
+     */
+    public function gatewayCodeForRoute(int $routeId): ?string
+    {
+        $code = DB::table('payment_routes as routes')
+            ->join('payment_gateways as gateways', 'gateways.id', '=', 'routes.payment_gateway_id')
+            ->where('routes.id', $routeId)
+            ->value('gateways.code');
+
+        return is_string($code) && $code !== '' ? $code : null;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function byRouteId(int $routeId, string $purpose = 'order', bool $lock = false): array

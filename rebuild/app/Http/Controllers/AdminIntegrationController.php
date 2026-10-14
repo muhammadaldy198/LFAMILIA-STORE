@@ -6,6 +6,7 @@ use App\Jobs\SendTransactionalEmailJob;
 use App\Models\IntegrationCredential;
 use App\Services\AdminAuditService;
 use App\Services\AdminNotificationService;
+use App\Services\DiscordWebhookUrl;
 use App\Services\IntegrationConnectionService;
 use App\Services\IntegrationRegistry;
 use App\Services\IntegrationRuntimeConfig;
@@ -288,6 +289,17 @@ class AdminIntegrationController
         $selectedConfig = $environments !== [] && $registry->credentialsArePerEnvironment($code)
             ? (is_array($config['profiles'][$environment] ?? null) ? $config['profiles'][$environment] : [])
             : $config;
+
+        // Discord: setiap webhook_url_* per-channel harus URL webhook
+        // Discord yang valid — bukan cuma webhook_url default. Tanpa
+        // ini, URL per-channel malformed / bukan-HTTPS / bukan-Discord
+        // tersimpan diam-diam, lalu delivery (webhookUrl) menganggap
+        // nilainya tidak ada dan notif jatuh ke webhook default — alert
+        // mendarat di channel yang salah padahal integrasi tampak
+        // terkonfigurasi benar.
+        if ($code === 'discord') {
+            $this->validateDiscordWebhooks($config);
+        }
 
         if ($data['is_active']) {
             foreach ($registry->requiredFields($code) as $required) {
@@ -750,6 +762,26 @@ class AdminIntegrationController
         }
 
         return $config;
+    }
+
+    /**
+     * @param  array<string,mixed>  $config
+     */
+    private function validateDiscordWebhooks(array $config): void
+    {
+        foreach ($config as $key => $value) {
+            if (! str_starts_with((string) $key, 'webhook_url')) {
+                continue;
+            }
+            $url = trim((string) $value);
+            if ($url === '' || DiscordWebhookUrl::valid($url)) {
+                continue;
+            }
+
+            throw ValidationException::withMessages([
+                'config.'.$key => 'Webhook Discord tidak valid. Gunakan URL webhook Discord (https://discord.com/api/webhooks/...).',
+            ]);
+        }
     }
 
     /**

@@ -233,20 +233,87 @@ class IntegrationConnectionService
 
     /**
      * @param  array<string, mixed>  $config
-     * @return array{status:string,message:string,reason:string,verified:bool}
+     * @return array{status:string,message:string,reason:string,verified:bool,channels?:array<int,array{channel:string,verified:bool,status:string,message:string}>}
      */
     private function discord(array $config): array
     {
-        $url = trim((string) ($config['webhook_url'] ?? ''));
-        if (! DiscordWebhookUrl::valid($url)) {
+        // Probe SETIAP webhook yang dideklarasikan (default + per-channel),
+        // bukan cuma default: URL per-channel yang mati (mis. webhook
+        // dihapus di Discord → 404) lolos validasi format saat save,
+        // dan delivery diam-diam menjatuhkan notif channel itu ke
+        // webhook default. Tes koneksi harus menunjukkannya.
+        // URL yang sama (mis. beberapa channel pakai webhook yang sama)
+        // di-probe sekali saja.
+        $urls = [];
+        $default = trim((string) ($config['webhook_url'] ?? ''));
+        if ($default !== '') {
+            $urls['default'] = $default;
+        }
+        foreach (DiscordNotificationRouting::CHANNELS as $channel) {
+            $url = trim((string) ($config['webhook_url_'.$channel] ?? ''));
+            if ($url !== '') {
+                $urls[$channel] = $url;
+            }
+        }
+        if ($urls === []) {
             return $this->notConfigured('Webhook URL Discord belum valid.');
         }
+        foreach ($urls as $channel => $url) {
+            if (! DiscordWebhookUrl::valid($url)) {
+                return $this->notConfigured("Webhook Discord channel {$channel} belum valid.");
+            }
+        }
 
-        $response = Http::acceptJson()
-            ->withOptions(['allow_redirects' => false])
-            ->connectTimeout(3)
-            ->timeout(8)
-            ->get($url);
+        $probed = [];
+        foreach (array_unique(array_values($urls)) as $url) {
+            $probed[$url] = $this->probeDiscordWebhook($url);
+        }
+
+        $channels = [];
+        $failed = [];
+        foreach ($urls as $channel => $url) {
+            $result = $probed[$url];
+            $channels[] = [
+                'channel' => $channel,
+                'verified' => $result['verified'],
+                'status' => $result['status'],
+                'message' => $result['message'],
+            ];
+            if (! $result['verified']) {
+                $failed[] = $channel;
+            }
+        }
+
+        if ($failed !== []) {
+            return [
+                ...$this->unverified(
+                    'Webhook Discord bermasalah di channel: '.implode(', ', $failed).'. Notif channel tersebut jatuh ke webhook default.'
+                ),
+                'channels' => $channels,
+            ];
+        }
+
+        return [
+            ...$this->verified('Webhook Discord terverifikasi tanpa mengirim notifikasi.'),
+            'channels' => $channels,
+        ];
+    }
+
+    /** @return array{status:string,message:string,reason:string,verified:bool} */
+    private function probeDiscordWebhook(string $url): array
+    {
+        try {
+            $response = Http::acceptJson()
+                ->withOptions(['allow_redirects' => false])
+                ->connectTimeout(3)
+                ->timeout(8)
+                ->get($url);
+        } catch (Throwable) {
+            // Satu channel yang transport-nya gagal tidak boleh
+            // menggugurkan probe channel lain (test() menangkap
+            // Throwable jadi unavailable untuk SEMUA).
+            return $this->unavailable();
+        }
 
         if (in_array($response->status(), [401, 403, 404], true)) {
             return $this->invalidCredential();

@@ -146,7 +146,14 @@ class AdminOrdersController
     {
         $data = $request->validate([
             'customer_name' => ['required', 'string', 'min:2', 'max:120'],
-            'phone' => ['required', 'string', 'regex:/^\+?[0-9]{10,16}$/'],
+            // Samakan aturan HP guest checkout (CheckoutController):
+            // hitung digit (min 10) sambil tetap mengizinkan format
+            // yang biasa di-paste admin: +62, spasi, strip, titik,
+            // kurung. Regex lama /^\+?[0-9]{10,16}$/ menolak nomor
+            // valid berformat seperti '+62 812-3456-7890' padahal
+            // digitnya cukup. Service sudah menyimpan versi
+            // ternormalisasi (guest_phone_normalized = digit saja).
+            'phone' => ['required', 'string', 'max:32', 'regex:/^(?=(?:[^0-9]*[0-9]){10})[0-9+().\-\s]{6,32}$/'],
             'email' => ['nullable', 'email', 'max:255'],
             'product_name' => ['required', 'string', 'min:2', 'max:120'],
             'package_name' => ['required', 'string', 'min:2', 'max:120'],

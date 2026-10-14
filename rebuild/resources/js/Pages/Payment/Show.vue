@@ -190,6 +190,16 @@ async function resumePayment() {
         });
         const data = await response.json().catch(() => ({}));
 
+        // Pembayaran wallet wajib owner login (PaymentController):
+        // arahkan ke login, bukan sekadar tampilkan error. Return
+        // destination sudah disetel halaman ini sebagai intended
+        // (PaymentPageController), jadi setelah login pengguna
+        // kembali ke halaman pembayaran ini.
+        if (response.status === 401 && typeof data.login_url === 'string' && data.login_url !== '') {
+            window.location.href = data.login_url;
+            return;
+        }
+
         if (!response.ok) {
             throw new Error(data.message || Object.values(data.errors || {})?.[0]?.[0] || 'Pembayaran belum dapat disiapkan.');
         }

@@ -135,6 +135,34 @@ class AdminOrdersRestorationTest extends TestCase
         $this->post('/admin/orders/manual', [...$data, 'idempotency_key' => (string) Str::uuid(), 'payment_received' => false])->assertSessionHasErrors('payment_received');
     }
 
+    public function test_manual_order_accepts_formatted_phone_numbers(): void
+    {
+        $admin = $this->login();
+
+        // Nomor valid berformat (paste dari kontak): spasi, strip,
+        // kurung, +62 — digitnya >= 10. Regex lama menolaknya.
+        $formatted = [
+            '+62 812-3456-7890' => '6281234567890',
+            '(021) 1234-5678' => '02112345678',
+            '+62 (812) 3456.7890' => '6281234567890',
+        ];
+        foreach ($formatted as $phone => $digits) {
+            $data = [...$this->data(), 'phone' => $phone, 'idempotency_key' => (string) Str::uuid()];
+            $this->post('/admin/orders/manual', $data)->assertRedirect()->assertSessionHasNoErrors();
+
+            $order = DB::table('orders')->where('guest_email', $data['email'])->orderByDesc('id')->first();
+            $this->assertSame($phone, $order->guest_phone);
+            $this->assertSame($digits, $order->guest_phone_normalized);
+        }
+
+        // Di bawah 10 digit tetap ditolak; karakter selain
+        // digit/+/().-/spasi tetap ditolak.
+        $this->post('/admin/orders/manual', [...$this->data(), 'phone' => '0812-345'])
+            ->assertSessionHasErrors('phone');
+        $this->post('/admin/orders/manual', [...$this->data(), 'phone' => '0812 3456 7890 x123'])
+            ->assertSessionHasErrors('phone');
+    }
+
     public function test_search_snapshot_filters_wib_dates_and_csv_selection_match_the_list(): void
     {
         $admin = $this->login();

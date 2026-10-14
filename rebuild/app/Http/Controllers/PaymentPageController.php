@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Services\PaymentPageSettingsService;
 use App\Services\PaymentPresentationService;
+use App\Services\PaymentRoutingService;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -13,7 +15,7 @@ use Inertia\Response;
 
 class PaymentPageController
 {
-    public function show(Request $request, PaymentPresentationService $payments, PaymentPageSettingsService $settings): Response
+    public function show(Request $request, PaymentPresentationService $payments, PaymentPageSettingsService $settings, PaymentRoutingService $routing): Response|RedirectResponse
     {
         $invoice = strtoupper(trim((string) $request->query('invoice', '')));
         abort_if($invoice === '', 404);
@@ -26,6 +28,7 @@ class PaymentPageController
                 'orders.id',
                 'orders.order_number',
                 'orders.user_id',
+                'orders.payment_route_id',
                 'orders.status',
                 'orders.cost_idr',
                 'orders.margin_idr',
@@ -62,6 +65,20 @@ class PaymentPageController
                 abort_unless($request->user() && (int) $request->user()->id === (int) $order->user_id, 403);
             }
             $statusUrl = route('account.orders.show', $order->id);
+        }
+
+        // Wallet: saldo milik akun owner — signature saja tidak cukup
+        // untuk membayar. Halaman wallet yang dibuka lewat link signed
+        // saat logout / akun lain dialihkan ke login dengan intended =
+        // URL halaman ini (redirect()->guest), jadi setelah login
+        // sebagai owner pengguna kembali ke halaman ini dan tombol
+        // "Siapkan pembayaran" bisa jalan. Tanpa ini tombol itu hanya
+        // menghasilkan 422 sesudah payment dibuat-lalu-ditolak
+        // (lihat PaymentController::create).
+        if ($order->user_id !== null
+            && $routing->gatewayCodeForRoute((int) $order->payment_route_id) === 'WALLET'
+            && (! $request->user() || (int) $request->user()->id !== (int) $order->user_id)) {
+            return redirect()->guest(route('login'));
         }
 
         return Inertia::render('Payment/Show', [

@@ -25,6 +25,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -817,6 +818,97 @@ class PaymentTest extends TestCase
             ->where('order_number', $checkout->json('order_number'))->value('status'));
         $this->assertSame('REJECTED', DB::table('payment_transactions')
             ->where('idempotency_key', 'm11-wallet-low-payment-0001')->value('status'));
+    }
+
+    /**
+     * @return array{user:User, order_number:string}
+     */
+    private function walletOrder(string $email, string $orderKey): array
+    {
+        $catalog = $this->catalog();
+        $this->route('saldo', 'WALLET');
+
+        $user = User::create([
+            'name' => 'Wallet Buyer',
+            'email' => $email,
+            'phone' => '081234567891',
+            'password' => Hash::make('StrongPassword123!'),
+        ]);
+        $user->forceFill(['email_verified_at' => now()])->save();
+        DB::table('wallets')->where('user_id', $user->id)->update(['balance_idr' => 50000]);
+
+        $checkout = $this->actingAs($user)->postJson('/checkout/orders', [
+            'package_id' => $catalog['package_id'],
+            'payment_channel_code' => 'saldo',
+            'customer_input' => ['user_id' => '888888'],
+            'voucher_code' => null,
+            'idempotency_key' => $orderKey,
+        ])->assertCreated();
+
+        return ['user' => $user, 'order_number' => $checkout->json('order_number')];
+    }
+
+    public function test_wallet_payment_via_signed_link_requires_owner_login(): void
+    {
+        $order = $this->walletOrder('wallet-signed@example.test', 'wallet-signed-order-0001');
+
+        // Buka link signed email saat logout: signature lolos cek
+        // otorisasi, TAPI wallet wajib owner login — bukan 422 sesudah
+        // payment dibuat-lalu-ditolak, melainkan 401 + login_url, dan
+        // TIDAK ada payment_transactions yang dibuat.
+        auth()->logout();
+        $signed = URL::signedRoute('payments.orders.create', ['orderNumber' => $order['order_number']]);
+
+        $this->postJson($signed, ['idempotency_key' => 'wallet-signed-payment-0001'])
+            ->assertUnauthorized()
+            ->assertJsonPath('login_url', route('login'))
+            ->assertJsonPath('message', 'Masuk sebagai pemilik pesanan untuk membayar dengan saldo.');
+
+        $this->assertSame(0, DB::table('payment_transactions')
+            ->where('order_id', DB::table('orders')->where('order_number', $order['order_number'])->value('id'))
+            ->count());
+    }
+
+    public function test_wallet_payment_rejects_other_logged_in_account(): void
+    {
+        $order = $this->walletOrder('wallet-other@example.test', 'wallet-other-order-0001');
+
+        $other = User::create([
+            'name' => 'Other Account',
+            'email' => 'wallet-other-account@example.test',
+            'phone' => '081234567899',
+            'password' => Hash::make('StrongPassword123!'),
+        ]);
+        $other->forceFill(['email_verified_at' => now()])->save();
+
+        $signed = URL::signedRoute('payments.orders.create', ['orderNumber' => $order['order_number']]);
+
+        $this->actingAs($other)->postJson($signed, ['idempotency_key' => 'wallet-other-payment-0001'])
+            ->assertUnauthorized()
+            ->assertJsonPath('login_url', route('login'));
+    }
+
+    public function test_wallet_pay_page_via_signed_link_redirects_to_login_with_intended(): void
+    {
+        $order = $this->walletOrder('wallet-page@example.test', 'wallet-page-order-0001');
+        auth()->logout();
+
+        $signedPage = URL::signedRoute('payment.show', ['invoice' => $order['order_number']]);
+
+        $this->get($signedPage)
+            ->assertRedirect(route('login'));
+        $intended = session('url.intended');
+        $this->assertIsString($intended);
+        $this->assertStringContainsString('/payment?invoice='.$order['order_number'], $intended);
+    }
+
+    public function test_wallet_pay_page_opens_for_owner(): void
+    {
+        $order = $this->walletOrder('wallet-page-owner@example.test', 'wallet-page-owner-order-0001');
+
+        $signedPage = URL::signedRoute('payment.show', ['invoice' => $order['order_number']]);
+
+        $this->actingAs($order['user'])->get($signedPage)->assertOk();
     }
 
     public function test_wallet_checkout_is_blocked_while_topup_refund_review_is_open(): void

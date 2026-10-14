@@ -783,4 +783,85 @@ class AdminIntegrationsRestorationTest extends TestCase
                 ->where('summary.awaiting_verification', 0)
         );
     }
+
+    public function test_discord_per_channel_webhook_must_be_valid_discord_url_on_save(): void
+    {
+        $this->loginSuperAdmin();
+        $this->clearIntegrationState();
+
+        IntegrationCredential::create([
+            'code' => 'discord',
+            'is_active' => true,
+            'config_ciphertext' => ['webhook_url' => 'https://discord.com/api/webhooks/111/aaa'],
+        ]);
+
+        // Bukan-HTTPS / bukan-Discord di field per-channel ditolak —
+        // sebelumnya lolos karena applyFields hanya memvalidasi key
+        // persis 'webhook_url', lalu delivery diam-diam fallback ke default.
+        $this->put('/admin/integrations/discord', [
+            'is_active' => true,
+            'config' => [
+                'webhook_url' => 'https://discord.com/api/webhooks/111/aaa',
+                'webhook_url_order' => 'http://not-discord.example/hook',
+            ],
+            'clear_secrets' => [],
+        ])->assertSessionHasErrors('config.webhook_url_order');
+
+        $stored = IntegrationCredential::where('code', 'discord')->firstOrFail()->config_ciphertext;
+        $this->assertArrayNotHasKey('webhook_url_order', $stored);
+
+        $this->put('/admin/integrations/discord', [
+            'is_active' => true,
+            'config' => [
+                'webhook_url' => 'https://discord.com/api/webhooks/111/aaa',
+                'webhook_url_order' => 'https://discord.com/api/webhooks/222/bbb',
+            ],
+            'clear_secrets' => [],
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $stored = IntegrationCredential::where('code', 'discord')->firstOrFail()->config_ciphertext;
+        $this->assertSame('https://discord.com/api/webhooks/222/bbb', $stored['webhook_url_order']);
+    }
+
+    public function test_discord_connection_test_probes_every_declared_channel_webhook(): void
+    {
+        $this->loginSuperAdmin();
+        $this->clearIntegrationState();
+
+        IntegrationCredential::create([
+            'code' => 'discord',
+            'is_active' => true,
+            'config_ciphertext' => [
+                'webhook_url' => 'https://discord.com/api/webhooks/111/aaa',
+                'webhook_url_order' => 'https://discord.com/api/webhooks/222/bbb',
+                'webhook_url_qris' => 'https://discord.com/api/webhooks/111/aaa',
+            ],
+        ]);
+
+        // Default + QRIS (URL sama, di-probe sekali) OK; ORDER 404
+        // (webhook dihapus di Discord) — sebelumnya tes koneksi hanya
+        // mengetes default dan melaporkan HEALTHY.
+        Http::fake([
+            'https://discord.com/api/webhooks/111/aaa' => Http::response(['id' => '111'], 200),
+            'https://discord.com/api/webhooks/222/bbb' => Http::response([], 404),
+        ]);
+
+        $this->postJson('/admin/integrations/discord/test')
+            ->assertOk()
+            ->assertJson([
+                'verified' => false,
+                'status' => 'DEGRADED',
+            ])
+            ->assertJsonPath('channels.0.channel', 'default')
+            ->assertJsonPath('channels.0.verified', true)
+            ->assertJsonPath('channels.1.channel', 'order')
+            ->assertJsonPath('channels.1.verified', false)
+            ->assertJsonPath('channels.2.channel', 'qris')
+            ->assertJsonPath('channels.2.verified', true);
+
+        $saved = json_decode((string) DB::table('system_settings')
+            ->where('key', 'integration.health.discord')->value('value'), true);
+        $this->assertFalse($saved['verified']);
+        $this->assertStringContainsString('order', $saved['message']);
+    }
 }
