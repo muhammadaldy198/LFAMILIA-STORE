@@ -9,6 +9,8 @@ const orderStatuses = {
     EXPIRED: ['Pembayaran kedaluwarsa', 'Waktu pembayaran telah berakhir.'],
     CANCELLED: ['Pesanan dibatalkan', 'Pesanan tidak akan diproses lagi.'],
     BLOCKED: ['Gagal diproses', 'Top up gagal diproses dan perlu penanganan admin.'],
+    REFUND: ['Perlu pemeriksaan admin', 'Hubungi admin untuk memeriksa status pembayaran dan penyelesaian pesanan.'],
+    REFUNDED: ['Perlu pemeriksaan admin', 'Penyedia melaporkan status refund. Hubungi admin untuk memeriksa penyelesaian.'],
 };
 const paymentLabels = {
     PENDING: 'Menunggu pembayaran', PENDING_PAYMENT: 'Menunggu pembayaran',
