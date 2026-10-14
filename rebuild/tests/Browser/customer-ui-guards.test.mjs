@@ -122,6 +122,11 @@ test('all eight order statuses display Indonesian labels and descriptions', () =
         assert.ok(label.label && label.description);
         assert.notEqual(label.label, status);
     }
+    for (const status of ['REFUND', 'REFUNDED']) {
+        const label = orderStatusInfo(status);
+        assert.notEqual(label.label, 'Status sedang diperbarui');
+        assert.match(label.description, /admin/i);
+    }
     const detail = read('Pages/Customer/OrderDetail.vue');
     assert.doesNotMatch(detail, /{{\s*order\.status\s*}}|{{\s*paymentState\.status\s*}}/);
     assert.match(detail, /statusInfo\.label/);
