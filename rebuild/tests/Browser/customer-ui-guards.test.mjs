@@ -138,10 +138,11 @@ test('paid or uncertain failed orders cannot be encouraged to pay again', () => 
     assert.equal(nextOrderAction('FAILED', null, '2026-10-14T01:00:00Z'), 'support');
     assert.equal(nextOrderAction('blocked', 'paid'), 'support');
     assert.equal(nextOrderAction('blocked', 'failed'), 'support');
+    assert.equal(nextOrderAction('cancelled', 'cancelled', true), 'support');
     assert.equal(nextOrderAction('processing', 'paid'), null);
     assert.match(manualHelpMessage, /ID order dan bukti bayar/);
     const tracking = read('Pages/Guest/Track.vue');
-    assert.match(tracking, /nextOrderAction\(detail\.value\.fulfillmentStatus,detail\.value\.paymentStatus\)/);
+    assert.match(tracking, /nextOrderAction\(detail\.value\.fulfillmentStatus,detail\.value\.paymentStatus,detail\.value\.wasPaid\)/);
     assert.match(tracking, /nextAction==='support'/);
     assert.match(tracking, /Buat pesanan baru/);
     assert.match(tracking, /Hubungi admin/);
