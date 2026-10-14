@@ -4,18 +4,22 @@
 
 # LFAMILIA STORE
 ## PRODUCT REQUIREMENTS DOCUMENT (PRD)
-### MASTER v1.0 — Laravel + CloudPanel + VPS
+### MASTER v1.1 — Laravel + CloudPanel + VPS
 
 | Item | Keputusan | Status |
 |---|---|---|
-| Baseline pembangunan / single source of truth | Dokumen ini | ✅ |
+| Baseline pembangunan | PRD ini + catatan keputusan pasca-PRD (§47) | ✅ |
 | Domain utama | lfamiliastore.my.id | — |
 | Bahasa | Bahasa Indonesia | — |
 | Platform awal | Website | — |
 | Platform berikutnya | Aplikasi Android | — |
-| Fase | Pre-production / pembangunan baru | — |
+| Fase | Live | — |
 
 Dokumen ini menjadi acuan utama untuk arsitektur, fitur, keamanan, pengujian, dan deployment LFAMILIA STORE.
+
+### Changelog
+- **v1.1 (2026-10-15):** §44: sumber kebenaran = PRD + log keputusan pasca-PRD; tambah §47 Keputusan Pasca-PRD. §13: "refund" → "penyelesaian pesanan bermasalah (tambah saldo)". §16: hapus status order "Refund", tambah BLOCKED. §5: satu nominal boleh beberapa provider; khusus Digiflazz 1 SKU per nominal. §6: Digiflazz Tools terpisah + auto-switch belum ada (mungkin nanti). §19: DOKU dinonaktifkan sementara untuk pengujian Midtrans dulu. §25: tambah menu Validasi Akun. §41: checkbox diperbarui sesuai kenyataan. Header: Fase Pre-production → Live. §40: M13 sebagian. Tidak diubah di v1.1: §17 (ditunda ke pembahasan produk), §34, §45/§46.
+- **v1.0 (2026-10-04):** Dokumen awal.
 
 ---
 
@@ -62,6 +66,7 @@ E-wallet tidak menjadi kategori katalog produk awal. Arsitektur kategori harus e
 ## 5. Model Katalog & Multi-Provider
 - Struktur utama: **Kategori → Produk → Nominal/Paket → Provider Mapping**.
 - Satu nominal dapat memiliki satu atau beberapa provider.
+- Khusus Digiflazz: 1 SKU per nominal (model `_A`, tanpa SKU cadangan `_B`).
 - Business logic checkout tidak boleh dikunci hanya untuk Digiflazz.
 - Provider awal: **Digiflazz** dan **Manual**.
 - Provider tambahan dapat ditambahkan kemudian melalui abstraction/provider adapter.
@@ -71,7 +76,8 @@ E-wallet tidak menjadi kategori katalog produk awal. Arsitektur kategori harus e
 ## 6. Digiflazz
 - Panel LFAMILIA menyediakan import dan sync produk/SKU Digiflazz.
 - `buyer_sku_code` berasal dari data Digiflazz dan tidak dapat dimanipulasi customer.
-- Seller selection, ranking, toleransi harga, dan auto-switch seller dikelola oleh Digiflazz Tools terpisah.
+- Seller selection, ranking, dan toleransi harga adalah prosedur manual melalui Buyer Area → Produk.
+- Digiflazz Tools terpisah + auto-switch seller BELUM ADA (mungkin ditambahkan nanti, bukan dibatalkan); tidak ada auto-switch seller.
 - LFAMILIA hanya mengonsumsi hasil/mapping yang dibutuhkan untuk fulfillment.
 
 ## 7. Produk Manual
@@ -124,7 +130,7 @@ Akun dapat masuk automatic cleanup bila saldo Rp0, belum pernah bertransaksi, da
 
 ## 13. Wallet / Saldo
 - Wallet wajib untuk registered customer.
-- Sumber saldo: top-up customer, penambahan oleh Super Admin, dan refund.
+- Sumber saldo: top-up customer, penambahan oleh Super Admin, dan penyelesaian pesanan bermasalah (tambah saldo).
 - Minimum top-up default Rp10.000 dan dapat diubah melalui panel.
 - Saldo dapat dipakai untuk seluruh produk yang mendukung pembayaran saldo.
 - Saldo tidak dapat ditarik menjadi uang tunai oleh customer.
@@ -164,7 +170,7 @@ Nominal produk diurutkan berdasarkan nilai nominal produk, bukan berdasarkan har
 | Gagal | Transaksi gagal sesuai state machine |
 | Dibatalkan | Pembayaran/order dibatalkan sebelum fulfillment dimulai |
 | Kedaluwarsa | Batas waktu pembayaran habis |
-| Refund | Dana dikembalikan sesuai flow refund |
+| BLOCKED | Pesanan ke-block karena ada masalah |
 
 ## 17. Pricing & Snapshot
 - Formula: **harga modal + margin produk + biaya payment channel = harga final customer**.
@@ -181,7 +187,7 @@ Nominal produk diurutkan berdasarkan nilai nominal produk, bukan berdasarkan har
 - Redemption harus atomic untuk mencegah double-use akibat concurrent checkout.
 
 ## 19. Payment Architecture
-- Gateway awal: **Midtrans Snap** dan **DOKU Direct API**.
+- Gateway awal: **Midtrans Snap** dan **DOKU Direct API**. DOKU ada di kode tetapi dinonaktifkan sementara untuk pengujian Midtrans dulu.
 - Customer tidak memilih nama gateway; customer hanya memilih channel/metode pembayaran.
 - Super Admin mengatur routing channel → gateway.
 - Panel mendukung enable/disable gateway, enable/disable channel, biaya per channel, dan maintenance mode.
@@ -248,6 +254,7 @@ Staff tidak digunakan pada v1. Membership customer BASIC–MAFIA bukan role admi
 15. Integrasi
 16. System Health
 17. Audit Log
+18. Validasi Akun
 
 ## 26. Audit Log
 - Catat actor, role, action, target, before, after, IP, user agent, timestamp, dan correlation ID.
@@ -354,24 +361,24 @@ Branch `main` harus selalu deployable. Merge ditolak bila build, automated tests
 | M10 Security | Rate limit, Turnstile, secret encryption, hardening, audit |
 | M11 Testing | Functional, API, security, browser, payment, abuse tests |
 | M12 Deployment | CloudPanel/VPS production, Cloudflare, queues, scheduler, SSL, backup |
-| M13 Acceptance | End-to-end customer/admin/integration/recovery validation |
+| M13 Acceptance | End-to-end customer/admin/integration/recovery validation — SEBAGIAN (uji E2E sandbox ditunda ke terakhir) |
 
 ## 41. Definition of Done
-- [ ] Customer desktop selesai dan sesuai target UI.
-- [ ] Customer mobile responsive selesai.
-- [ ] Register/login/Google/forgot password bekerja.
-- [ ] Guest checkout bekerja.
-- [ ] Wallet dan membership bekerja.
-- [ ] Catalog, nickname checker, voucher, pricing, dan order snapshot bekerja.
-- [ ] Midtrans, DOKU, Manual QRIS, Digiflazz, dan manual fulfillment bekerja.
-- [ ] Multi-provider abstraction dan reconciliation bekerja.
-- [ ] Super Admin/Admin permissions bekerja.
-- [ ] Telegram/Discord, email, System Health, dan Audit Log bekerja.
-- [ ] Backup otomatis dan restore test berhasil.
-- [ ] Queue dan scheduler stabil.
-- [ ] Tidak ada critical security issue.
-- [ ] Abuse test dan full checkout smoke test lulus.
-- [ ] Build production dan seluruh test wajib hijau.
+- [x] Customer desktop selesai dan sesuai target UI.
+- [ ] Customer mobile responsive selesai. _(Belum ada uji visual — belum dicentang.)_
+- [x] Register/login/Google/forgot password bekerja.
+- [x] Guest checkout bekerja.
+- [x] Wallet dan membership bekerja.
+- [x] Catalog, nickname checker, voucher, pricing, dan order snapshot bekerja.
+- [ ] Midtrans, DOKU, Manual QRIS, Digiflazz, dan manual fulfillment bekerja. _(DOKU dinonaktifkan sementara; sisanya bekerja — belum dicentang.)_
+- [x] Multi-provider abstraction dan reconciliation bekerja.
+- [x] Super Admin/Admin permissions bekerja.
+- [x] Telegram/Discord, email, System Health, dan Audit Log bekerja.
+- [ ] Backup otomatis dan restore test berhasil. _(Script restore-verify ada; bukti eksekusi berkala belum diverifikasi — belum dicentang.)_
+- [x] Queue dan scheduler stabil.
+- [x] Tidak ada critical security issue.
+- [x] Abuse test dan full checkout smoke test lulus.
+- [x] Build production dan seluruh test wajib hijau.
 
 ## 42. Non-Negotiable Requirements
 1. Jangan mempercayai harga dari frontend.
@@ -401,7 +408,7 @@ Branch `main` harus selalu deployable. Merge ditolak bila build, automated tests
 - Logo, favicon, banner, popup, gambar produk dan nominal.
 
 ## 44. Prinsip Implementasi
-PRD ini adalah single source of truth pembangunan LFAMILIA STORE Laravel v1. Implementasi boleh memperbaiki struktur teknis, performa, keamanan, dan maintainability, tetapi tidak boleh mengubah alur bisnis utama atau scope tanpa keputusan eksplisit. Frontend customer harus mengejar kemiripan tinggi dengan referensi Ourastore.com, sementara backend tetap dirancang mandiri, aman, dan provider-agnostic.
+Sumber kebenaran pembangunan LFAMILIA STORE Laravel v1 adalah PRD ini ditambah log keputusan pasca-PRD (§47). Implementasi boleh memperbaiki struktur teknis, performa, keamanan, dan maintainability, tetapi tidak boleh mengubah alur bisnis utama atau scope tanpa keputusan eksplisit. Frontend customer harus mengejar kemiripan tinggi dengan referensi Ourastore.com, sementara backend tetap dirancang mandiri, aman, dan provider-agnostic.
 
 ## 45. Homepage Support, Footer & Navigasi Customer
 Komponen bagian bawah frontend customer pada referensi LFAMILIA STORE yang sudah ada tidak boleh hilang saat pembangunan ulang. Tampilan boleh dirapikan agar konsisten dengan desain baru yang sangat mirip Ourastore, tetapi seluruh fungsi dan jalur navigasi berikut wajib dipertahankan.
@@ -427,3 +434,20 @@ Komponen bagian bawah frontend customer pada referensi LFAMILIA STORE yang sudah
 - [ ] Tidak ada link footer dummy, placeholder, atau route 404.
 - [ ] Penggantian logo/banner/link dari panel tercermin di frontend tanpa perubahan source code.
 - [ ] Visual footer tetap konsisten dengan tema dark LFAMILIA dan target kemiripan frontend dengan Ourastore.
+
+## 47. Keputusan Pasca-PRD
+
+Keputusan bisnis yang dibuat setelah PRD v1.0 dan menggantikan/menyempurnakan bagian PRD di atas. Sumber kebenaran = PRD ini + daftar di bawah.
+
+| Tanggal | Keputusan | Dampak ke PRD |
+|---|---|---|
+| 2026-10-15 | Sumber kebenaran = PRD + log keputusan pasca-PRD | §44 |
+| 2026-10-14 | Tidak ada refund (no-refund) | §13, §16: refund bukan sumber saldo / bukan status order |
+| 2026-10-12 | Konsep SKU cadangan `_B` dihapus | §5, §6: 1 SKU Digiflazz per nominal (model `_A`) |
+| 2026-10-12 | Harga jual ML = modal × 1,06, tidak dibulatkan | §17: perumusan harga lengkap DITUNDA ke pembahasan produk |
+| 2026-10-15 | Satu nominal boleh punya beberapa provider | §5 |
+| 2026-10-15 | Digiflazz Tools terpisah + auto-switch belum ada (mungkin nanti) | §6 |
+| 2026-10-15 | DOKU dinonaktifkan sementara untuk pengujian Midtrans dulu | §19 |
+| 2026-10-15 | Menu Validasi Akun ditambahkan | §25 |
+| 2026-10-15 | Website Live; M13 sebagian (uji E2E sandbox ditunda ke terakhir) | §1, §40 |
+| 2026-10-15 | Android tetap rencana (fase berikutnya) | §14 |
