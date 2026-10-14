@@ -36,7 +36,6 @@ abstract class TestCase extends BaseTestCase
         }
     }
 
-
     protected function createAdmin(array $attributes): AdminUser
     {
         $trusted = array_intersect_key($attributes, array_flip(['role', 'permissions', 'is_active']));
