@@ -73,7 +73,7 @@ class DigiflazzAutoSources
         }
         foreach ($items as $item) {
             // Automatic grouping may never attach a second active source.
-            if ($automatic && ! $existingBySku->has($item->buyer_sku_code)
+            if ($automatic && $existingBySku->has($item->buyer_sku_code) === false
                 && $package->mappings()->where('provider_id', $provider->id)->where('is_active', true)->exists()) {
                 continue;
             }
@@ -189,7 +189,7 @@ class DigiflazzAutoSources
     public function sync(): int
     {
         $provider = Provider::where('code', 'DIGIFLAZZ')->first();
-        if (! $provider || ! $provider->is_active) {
+        if ($provider === null || $provider->is_active === false) {
             return 0;
         }
 
@@ -221,7 +221,7 @@ class DigiflazzAutoSources
                 $brand = $this->normalizedIdentity((string) $item->brand);
                 $catalogName = $this->normalizedIdentity((string) $item->product_name);
                 // Never attach a same-nominal SKU belonging to a different game/service.
-                if ($brand !== $productName && ! str_starts_with($catalogName, $productName)) {
+                if ($brand !== $productName && str_starts_with($catalogName, $productName) === false) {
                     return false;
                 }
 
@@ -234,13 +234,13 @@ class DigiflazzAutoSources
             })->sort(fn (object $a, object $b): int => (int) $a->price_idr <=> (int) $b->price_idr
                 ?: strcmp((string) $a->buyer_sku_code, (string) $b->buyer_sku_code));
             $item = $candidates->first();
-            if (! $item) {
+            if ($item === null) {
                 continue;
             }
 
             DB::transaction(function () use ($package, $provider, $item, $request, &$added): void {
                 $locked = ProductPackage::whereKey($package->id)->lockForUpdate()->first();
-                if (! $locked || ! $locked->is_active
+                if ($locked === null || $locked->is_active === false)
                     || $locked->product()->where('is_active', true)->doesntExist()
                     || ProviderMapping::where('product_package_id', $package->id)
                         ->where('provider_id', $provider->id)->exists()

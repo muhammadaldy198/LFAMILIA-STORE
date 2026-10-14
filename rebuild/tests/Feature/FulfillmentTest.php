@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Jobs\ReconcileFulfillmentJob;
+use App\Jobs\SendTransactionalEmailJob;
 use App\Jobs\SendFulfillmentJob;
 use App\Jobs\StartFulfillmentJob;
 use App\Models\Category;
@@ -248,6 +249,7 @@ class FulfillmentTest extends TestCase
             ]);
         }
         $orderId = $this->paidOrder($catalog);
+        DB::table('orders')->where('id', $orderId)->update(['guest_email' => 'blocked@example.test']);
         Http::fake(function ($request) {
             $payload = $request->data();
 
@@ -276,6 +278,8 @@ class FulfillmentTest extends TestCase
         $this->assertSame('BLOCKED', DB::table('orders')->where('id', $orderId)->value('status'));
         $this->assertSame('BLOCKED', DB::table('fulfillment_attempts')->where('id', $backup->id)->value('status'));
         $this->assertSame(2, DB::table('fulfillment_attempts')->where('order_id', $orderId)->count());
+        Queue::assertPushed(SendTransactionalEmailJob::class, fn (SendTransactionalEmailJob $job): bool => $job->recipient === 'blocked@example.test'
+            && $job->subject === 'Pesanan LFAMILIA gagal diproses');
         Http::assertSentCount(2);
         $service->startOrder($orderId);
         $service->reconcileAttempt((int) $backup->id);

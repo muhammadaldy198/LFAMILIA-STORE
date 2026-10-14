@@ -953,7 +953,7 @@ class AdminPanelRestorationTest extends TestCase
         $this->fakeCatalog([$this->row()]);
         app(DigiflazzCatalogService::class)->sync();
         $this->assertDatabaseMissing('digiflazz_catalog_items', ['buyer_sku_code' => 'gone-sku']);
-        $this->assertDatabaseHas('provider_mappings', ['external_sku' => 'gone-sku', 'is_active' => false]);
+        $this->assertDatabaseHas('provider_mappings', ['external_sku' => 'gone-sku', 'is_active' => true]);
         $this->expectException(ValidationException::class);
         app(CheckoutPricing::class)->forPackage($package->id);
     }

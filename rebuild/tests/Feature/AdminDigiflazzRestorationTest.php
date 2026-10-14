@@ -710,8 +710,10 @@ class AdminDigiflazzRestorationTest extends TestCase
 
         DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'stale-only')
             ->update(['synced_at' => now()]);
-        $this->assertSame($stale['package']->id,
-            app(CheckoutPricing::class)->forPackage($stale['package']->id)['package_id']);
+        $this->assertSame(
+            $stale['package']->id,
+            app(CheckoutPricing::class)->forPackage($stale['package']->id)['package_id']
+        );
     }
 
     public function test_auto_sources_bootstrap_one_mapping_only_for_active_sellable_nominals(): void
@@ -751,7 +753,7 @@ class AdminDigiflazzRestorationTest extends TestCase
         $reason = 'Daftar harga Digiflazz kosong atau tidak valid.';
         Cache::forget('digiflazz.sync.failed.'.hash('sha256', $reason));
         $before = DB::table('admin_notifications')->where('event_type', 'digiflazz.sync.failed')->count();
-        foreach ([1, 2] as $attempt) {
+        for ($attempt = 0; $attempt < 2; $attempt++) {
             try {
                 app(DigiflazzCatalogService::class)->sync();
                 $this->fail('Empty full sync cannot succeed.');
@@ -759,8 +761,10 @@ class AdminDigiflazzRestorationTest extends TestCase
                 // Fails safely.
             }
         }
-        $this->assertSame($before + 1,
-            DB::table('admin_notifications')->where('event_type', 'digiflazz.sync.failed')->count());
+        $this->assertSame(
+            $before + 1,
+            DB::table('admin_notifications')->where('event_type', 'digiflazz.sync.failed')->count()
+        );
     }
 
     public function test_admin_buyer_area_max_price_requires_preview_and_only_changes_selected_sku(): void
