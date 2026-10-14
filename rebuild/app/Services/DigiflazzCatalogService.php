@@ -123,26 +123,25 @@ class DigiflazzCatalogService
                     }
                 }
                 if ($sku === null || $clean === []) {
-                    $missingMappings = DB::table('provider_mappings')->where('provider_id', $providerId)
-                        ->whereNotNull('external_sku');
-                    $missingItems = DB::table('digiflazz_catalog_items')->where('is_present', true);
+                    $missingItems = DB::table('digiflazz_catalog_items');
                     if ($sku === null) {
                         $codes = array_column($clean, 'buyer_sku_code');
-                        $missingMappings->whereNotIn('external_sku', $codes);
                         $missingItems->whereNotIn('buyer_sku_code', $codes);
                     } else {
-                        $missingMappings->where('external_sku', $sku);
                         $missingItems->where('buyer_sku_code', $sku);
                     }
-                    // Keep the source catalog and history. Missing SKUs cannot be sold.
-                    $disabled = $missingMappings->where('is_active', true)
-                        ->update(['is_active' => false, 'disabled_by_sync' => true, 'updated_at' => now()]);
-                    $missing = $missingItems->update(['is_present' => false, 'updated_at' => now()]);
+                    // Never delete or automatically disable an active mapping.
+                    $missing = $missingItems->delete();
+                    // Delete ONLY inactive Digiflazz mappings whose SKU no longer exists.
+                    $removedMappings = DB::table('provider_mappings')->where('provider_id', $providerId)
+                        ->where('is_active', false)->whereNotNull('external_sku')
+                        ->whereNotIn('external_sku', DB::table('digiflazz_catalog_items')->select('buyer_sku_code'))
+                        ->delete();
                     if ($sku === null) {
                         DB::table('system_settings')->updateOrInsert(['key' => 'digiflazz.last_catalog_sync'], [
                             'value' => json_encode([
                                 'at' => now()->toIso8601String(), 'count' => count($clean),
-                                'missing' => $missing, 'disabled_mappings' => $disabled,
+                                'missing_deleted' => $missing, 'inactive_mappings_deleted' => $removedMappings,
                             ], JSON_THROW_ON_ERROR),
                             'created_at' => now(), 'updated_at' => now(),
                         ]);
@@ -155,6 +154,16 @@ class DigiflazzCatalogService
 
                 return count($clean);
             }, 3);
+        } catch (\Throwable $error) {
+            // Alert only after rollback. An alert failure must not mask the original error.
+            try {
+                app(AdminNotificationService::class)->recordDigiflazzSyncFailure($error);
+            } catch (\Throwable $notificationError) {
+                Log::warning('Digiflazz sync failure alert could not be recorded.', [
+                    'exception_class' => $notificationError::class,
+                ]);
+            }
+            throw $error;
         } finally {
             $lock->release();
         }

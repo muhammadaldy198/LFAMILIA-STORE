@@ -268,8 +268,8 @@ class AdminDigiflazzController
         $audit->record($request, 'digiflazz.catalog.synced', 'provider', 'DIGIFLAZZ', null, ['count' => $count, 'sku' => $sku]);
 
         return back()->with('status', $sku !== null && $count === 0
-            ? 'SKU tidak dikembalikan oleh Digiflazz; data katalog disimpan sebagai tidak tersedia.'
-            : $count.' SKU berhasil disinkronkan. SKU hilang ditandai tidak tersedia tanpa menghapus data.');
+            ? 'SKU tidak dikembalikan Digiflazz. Baris katalog dihapus; mapping aktif tetap dilindungi.'
+            : $count.' SKU berhasil disinkronkan. SKU yang hilang dihapus dari katalog.');
     }
 
     public function syncMapping(Request $request, ProviderMapping $mapping, DigiflazzCatalogService $service, AdminAuditService $audit): RedirectResponse
@@ -280,7 +280,7 @@ class AdminDigiflazzController
         $audit->record($request, 'digiflazz.mapping.synced', 'provider_mapping', $mapping->id, $before, $mapping->fresh()->toArray());
 
         return back()->with('status', $count === 0
-            ? 'SKU tidak dikembalikan Digiflazz. Data katalog disimpan dan mapping dinonaktifkan.'
+            ? 'SKU tidak dikembalikan Digiflazz. Baris katalog dihapus; mapping aktif tetap dilindungi.'
             : 'Harga nominal berhasil disinkronkan.');
     }
 

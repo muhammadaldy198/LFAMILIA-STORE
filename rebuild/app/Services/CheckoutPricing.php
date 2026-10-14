@@ -95,7 +95,7 @@ class CheckoutPricing
                 $candidate->live_cost_idr = $item?->price_idr;
             }
 
-            return $item === null || app(DigiflazzCatalogService::class)->available($item);
+            return $item !== null && app(DigiflazzCatalogService::class)->sellable($item);
         })->values();
 
         return $this->quoteForContext($context, $eligibleMappings);
@@ -196,7 +196,7 @@ class CheckoutPricing
                     $candidate->live_cost_idr = $item?->price_idr;
                 }
 
-                return $item === null || app(DigiflazzCatalogService::class)->available($item);
+                return $item !== null && app(DigiflazzCatalogService::class)->sellable($item);
             })->values();
 
             try {

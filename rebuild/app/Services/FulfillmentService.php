@@ -765,6 +765,12 @@ class FulfillmentService
                     'order',
                     $order->id
                 );
+                $this->emails->queueForOrder(
+                    (int) $order->id,
+                    'Pesanan LFAMILIA gagal diproses',
+                    'Pesanan '.$order->order_number.' gagal diproses karena semua SKU penyedia yang diizinkan gagal. '
+                    .'Silakan hubungi admin LFAMILIA STORE dengan nomor pesanan tersebut agar dapat ditangani secara manual.'
+                );
 
                 return null;
             }
