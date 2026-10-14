@@ -792,6 +792,55 @@ class AdminDigiflazzRestorationTest extends TestCase
         ]);
     }
 
+    public function test_auto_bootstrap_detects_ambiguous_region_already_mapped_elsewhere(): void
+    {
+        $sample = $this->mappedItem('OWNED6.000', [
+            'brand' => 'Owned', 'product_name' => 'Owned 6.000',
+        ]);
+        $sample['product']->update(['name' => 'Owned']);
+        $sample['product']->fields()->create([
+            'field_key' => 'user_id', 'label' => 'User ID', 'type' => 'text',
+            'is_required' => true, 'sort_order' => 0,
+        ]);
+        $sample['package']->update(['nominal_value' => 6000]);
+        ProviderMapping::where('external_sku', 'OWNED6.000')->delete();
+
+        $variant = (array) DB::table('digiflazz_catalog_items')
+            ->where('buyer_sku_code', 'OWNED6.000')->first();
+        unset($variant['id']);
+        $variant['buyer_sku_code'] = 'OWNED6.000B';
+        $variant['product_name'] = 'Owned 6.000 Region B';
+        $variant['type'] = 'Region B';
+        DB::table('digiflazz_catalog_items')->insert($variant);
+
+        $other = $this->mappedItem('OTHER7.000');
+        ProviderMapping::create([
+            'product_package_id' => $other['package']->id,
+            'provider_id' => $sample['provider']->id,
+            'external_sku' => 'OWNED6.000B',
+            'cost_idr' => 10000,
+            'max_price_idr' => 10000,
+            'priority' => 1,
+            'is_active' => true,
+        ]);
+
+        // An already-owned variant still makes the source identity ambiguous.
+        $this->assertSame(0, app(DigiflazzAutoSources::class)->sync());
+        $this->assertDatabaseMissing('provider_mappings', [
+            'product_package_id' => $sample['package']->id,
+            'external_sku' => 'OWNED6.000',
+        ]);
+
+        DB::table('provider_mappings')->where('external_sku', 'OWNED6.000B')->delete();
+        DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'OWNED6.000B')->delete();
+        $this->assertSame(1, app(DigiflazzAutoSources::class)->sync());
+        $this->assertDatabaseHas('provider_mappings', [
+            'product_package_id' => $sample['package']->id,
+            'external_sku' => 'OWNED6.000',
+            'is_active' => true,
+        ]);
+    }
+
     public function test_auto_source_never_publishes_mapping_for_unverified_multi_field_destination(): void
     {
         $sample = $this->mappedItem('TWOFIELDS3.000', [
