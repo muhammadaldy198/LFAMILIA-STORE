@@ -180,6 +180,8 @@ class CheckoutController
         return response()->json([
             'order_id' => $order->id,
             'order_number' => $order->order_number,
+            'expires_at' => $order->expires_at ? \Illuminate\Support\Carbon::parse($order->expires_at)->toIso8601String() : null,
+            'server_now' => now()->toIso8601String(),
             'status' => $order->status,
             'subtotal_idr' => max(0, (int) $order->total_idr + (int) $order->discount_idr - (int) $order->fee_idr),
             'member_discount_idr' => (int) ($pricing['member_discount_idr'] ?? 0),
