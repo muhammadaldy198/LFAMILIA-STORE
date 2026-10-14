@@ -610,11 +610,37 @@ class PaymentTest extends TestCase
         ]);
 
         $dokuSignature = new DokuSignature;
-        Http::fake(function ($request) use ($dokuSignature) {
+        $gatewayStatus = 'PENDING';
+        $gatewayAmountMismatch = false;
+        Http::fake(function ($request) use ($dokuSignature, &$gatewayStatus, &$gatewayAmountMismatch) {
             $requestId = (string) (($request->header('Request-Id')[0] ?? ''));
             $clientId = (string) (($request->header('Client-Id')[0] ?? ''));
             $this->assertSame('MCH-TEST', $clientId);
             $this->assertStringStartsWith('HMACSHA256=', (string) (($request->header('Signature')[0] ?? '')));
+
+            if ($request->method() === 'GET') {
+                $path = (string) parse_url($request->url(), PHP_URL_PATH);
+                $this->assertStringStartsWith('/orders/v1/status/', $path);
+                $this->assertSame(
+                    $dokuSignature->signGet(
+                        $clientId, $requestId,
+                        (string) ($request->header('Request-Timestamp')[0] ?? ''),
+                        $path, 'doku-secret'
+                    ),
+                    (string) ($request->header('Signature')[0] ?? '')
+                );
+                $reference = rawurldecode(substr($path, strlen('/orders/v1/status/')));
+                $local = DB::table('payment_transactions')
+                    ->where('merchant_reference', $reference)->firstOrFail();
+
+                return Http::response([
+                    'order' => [
+                        'invoice_number' => $reference,
+                        'amount' => $gatewayAmountMismatch ? ((int) $local->amount_idr + 1) : (int) $local->amount_idr,
+                    ],
+                    'transaction' => ['status' => $gatewayStatus],
+                ]);
+            }
 
             $body = json_decode($request->body(), true, 512, JSON_THROW_ON_ERROR);
             $responseData = [
@@ -672,6 +698,30 @@ class PaymentTest extends TestCase
             'doku-secret'
         );
 
+        $response = $this->call('POST', '/api/payments/doku/notification', [], [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_ACCEPT' => 'application/json',
+            'HTTP_CLIENT_ID' => 'MCH-TEST',
+            'HTTP_REQUEST_ID' => $requestId,
+            'HTTP_REQUEST_TIMESTAMP' => $timestamp,
+            'HTTP_SIGNATURE' => $signature,
+        ], $raw);
+        $response->assertStatus(503);
+        $this->assertSame('PENDING_PAYMENT', DB::table('orders')->where('id', $payment->order_id)->value('status'));
+
+        $gatewayAmountMismatch = true;
+        $gatewayStatus = 'SUCCESS';
+        $this->call('POST', '/api/payments/doku/notification', [], [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_ACCEPT' => 'application/json',
+            'HTTP_CLIENT_ID' => 'MCH-TEST',
+            'HTTP_REQUEST_ID' => $requestId,
+            'HTTP_REQUEST_TIMESTAMP' => $timestamp,
+            'HTTP_SIGNATURE' => $signature,
+        ], $raw)->assertStatus(422);
+        $this->assertSame('PENDING_PAYMENT', DB::table('orders')->where('id', $payment->order_id)->value('status'));
+
+        $gatewayAmountMismatch = false;
         $response = $this->call('POST', '/api/payments/doku/notification', [], [], [], [
             'CONTENT_TYPE' => 'application/json',
             'HTTP_ACCEPT' => 'application/json',
@@ -1414,6 +1464,153 @@ class PaymentTest extends TestCase
             ->where('idempotency_key', 'audit-fast-callback-payment-0001')
             ->firstOrFail();
         $this->assertSame('PAID', $payment->status);
+    }
+
+    public function test_scheduled_expiry_closes_untouched_order_and_releases_voucher_only_once(): void
+    {
+        Queue::fake();
+        $catalog = $this->catalog();
+        $this->route('qris', 'MIDTRANS', 0, 0, 'qris');
+        $voucherId = DB::table('vouchers')->insertGetId([
+            'code' => 'SWEEPER-TEST-'.bin2hex(random_bytes(4)),
+            'discount_type' => 'FIXED',
+            'discount_value' => 1000,
+            'minimum_total_idr' => 0,
+            'total_quota' => 10,
+            'per_customer_limit' => 1,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $voucherCode = DB::table('vouchers')->where('id', $voucherId)->value('code');
+        $payload = $this->guestCheckout($catalog['package_id'], 'qris', 'sweeper-no-touch-0001');
+        $payload['voucher_code'] = $voucherCode;
+        $checkout = $this->postJson('/checkout/orders', $payload)->assertCreated()
+            ->assertJsonStructure(['expires_at', 'server_now']);
+        $order = DB::table('orders')->where('order_number', $checkout->json('order_number'))->firstOrFail();
+        DB::table('orders')->where('id', $order->id)
+            ->update(['expires_at' => now()->subMinute()]);
+
+        \Illuminate\Support\Facades\Artisan::call('lfamilia:expire-unpaid-orders');
+        \Illuminate\Support\Facades\Artisan::call('lfamilia:expire-unpaid-orders');
+
+        $this->assertSame('EXPIRED', DB::table('orders')->where('id', $order->id)->value('status'));
+        $this->assertSame('RELEASED', DB::table('voucher_redemptions')
+            ->where('order_id', $order->id)->value('status'));
+        $this->assertSame(1, DB::table('order_events')->where('order_id', $order->id)
+            ->where('event_type', 'ORDER_EXPIRED')->count());
+    }
+
+    /**
+     * @dataProvider adminUnknownStatuses
+     */
+    public function test_admin_can_verify_unknown_midtrans_payment_without_creating_another_payment(
+        string $gatewayStatus,
+        string $expectedOrderStatus
+    ): void {
+        Queue::fake();
+        $catalog = $this->catalog();
+        $routeId = $this->route('qris', 'MIDTRANS', 0, 0, 'qris');
+        IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
+            'config_ciphertext' => ['server_key' => 'server-test', 'is_production' => false],
+            'is_active' => true,
+        ]);
+        $checkout = $this->postJson('/checkout/orders', $this->guestCheckout(
+            $catalog['package_id'], 'qris', 'unknown-admin-order-'.strtolower($gatewayStatus)
+        ))->assertCreated();
+        $order = DB::table('orders')->where('order_number', $checkout->json('order_number'))->firstOrFail();
+        $reference = 'PAY-ADMIN-'.strtoupper($gatewayStatus).'-'.bin2hex(random_bytes(3));
+        $paymentId = DB::table('payment_transactions')->insertGetId([
+            'order_id' => $order->id,
+            'wallet_topup_id' => null,
+            'payment_route_id' => $routeId,
+            'gateway_code' => 'MIDTRANS',
+            'channel_code' => 'qris',
+            'merchant_reference' => $reference,
+            'amount_idr' => $order->total_idr,
+            'status' => 'UNKNOWN',
+            'request_fingerprint' => hash('sha256', $reference),
+            'idempotency_key' => 'unknown-admin-payment-'.strtolower($gatewayStatus),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        Http::fake(function ($request) use ($reference, $order, $gatewayStatus) {
+            $this->assertStringContainsString('/v2/'.$reference.'/status', $request->url());
+
+            return Http::response([
+                'order_id' => $reference,
+                'gross_amount' => (string) $order->total_idr,
+                'status_code' => '200',
+                'transaction_status' => $gatewayStatus,
+            ]);
+        });
+        $admin = $this->createAdmin([
+            'name' => 'Payment Checker',
+            'email' => 'payment-check-'.bin2hex(random_bytes(3)).'@example.test',
+            'password' => bcrypt('payment-test-password'),
+            'role' => 'SUPER_ADMIN',
+            'is_active' => true,
+        ]);
+        $this->actingAs($admin, 'admin')
+            ->post('/admin/orders/'.$order->id.'/check-payment')
+            ->assertRedirect();
+        $this->assertSame($expectedOrderStatus, DB::table('orders')->where('id', $order->id)->value('status'));
+        $this->assertSame(1, DB::table('payment_transactions')->where('order_id', $order->id)->count());
+        $this->assertSame(1, DB::table('admin_audit_logs')->where('action', 'order.payment.checked')
+            ->where('target_id', (string) $order->id)->count());
+    }
+
+    public static function adminUnknownStatuses(): array
+    {
+        return [
+            'paid' => ['settlement', 'PAID'],
+            'failed' => ['failure', 'FAILED'],
+            'expired' => ['expire', 'EXPIRED'],
+        ];
+    }
+
+    public function test_admin_unknown_gateway_unreachable_leaves_status_unchanged(): void
+    {
+        Queue::fake();
+        $catalog = $this->catalog();
+        $routeId = $this->route('qris', 'MIDTRANS', 0, 0, 'qris');
+        IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
+            'config_ciphertext' => ['server_key' => 'server-test', 'is_production' => false],
+            'is_active' => true,
+        ]);
+        $checkout = $this->postJson('/checkout/orders', $this->guestCheckout(
+            $catalog['package_id'], 'qris', 'unknown-unreachable-order-0001'
+        ))->assertCreated();
+        $order = DB::table('orders')->where('order_number', $checkout->json('order_number'))->firstOrFail();
+        $reference = 'PAY-ADMIN-UNREACHABLE-'.bin2hex(random_bytes(3));
+        DB::table('payment_transactions')->insert([
+            'order_id' => $order->id,
+            'wallet_topup_id' => null,
+            'payment_route_id' => $routeId,
+            'gateway_code' => 'MIDTRANS',
+            'channel_code' => 'qris',
+            'merchant_reference' => $reference,
+            'amount_idr' => $order->total_idr,
+            'status' => 'UNKNOWN',
+            'request_fingerprint' => hash('sha256', $reference),
+            'idempotency_key' => 'unknown-unreachable-payment-0001',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        Http::fake(['*' => Http::response(['error' => 'gateway unavailable'], 503)]);
+        $admin = $this->createAdmin([
+            'name' => 'Payment Retry Checker',
+            'email' => 'payment-retry-'.bin2hex(random_bytes(3)).'@example.test',
+            'password' => bcrypt('payment-test-password'),
+            'role' => 'SUPER_ADMIN',
+            'is_active' => true,
+        ]);
+        $this->actingAs($admin, 'admin')
+            ->post('/admin/orders/'.$order->id.'/check-payment')
+            ->assertStatus(503);
+        $this->assertSame('UNKNOWN', DB::table('payment_transactions')
+            ->where('order_id', $order->id)->value('status'));
+        $this->assertSame('PENDING_PAYMENT', DB::table('orders')->where('id', $order->id)->value('status'));
     }
 
     public function test_public_channel_is_hidden_when_external_gateway_credentials_are_not_ready(): void
