@@ -183,10 +183,12 @@ class DigiflazzAutoSources
                 continue;
             }
 
-            // A multi-field destination cannot be safely built without a verified
-            // provider-specific customer_no template. Never expose a paid-but-blocked SKU.
-            if ($package->product->fields()->count() > 1) {
-                Log::warning('Digiflazz auto-source skipped: destination template needs admin verification.', [
+            // Without a verified provider template the fulfillment target builder
+            // requires exactly one nonempty destination. An optional, absent, or
+            // multi-field destination must not become purchasable automatically.
+            $fields = $package->product->fields()->get(['field_key', 'is_required']);
+            if ($fields->count() !== 1 || ! (bool) $fields->first()->is_required) {
+                Log::warning('Digiflazz auto-source skipped: destination requires one verified field.', [
                     'product_id' => $package->product_id,
                     'package_id' => $package->id,
                 ]);
@@ -210,10 +212,26 @@ class DigiflazzAutoSources
                     return false;
                 }
 
+                // Regions/service variants must match the package's group when set.
+                $group = $this->normalizedIdentity((string) ($package->group_name ?? ''));
+                if ($group !== '' && $group !== $this->normalizedIdentity((string) $item->type)
+                    && ! str_contains($catalogName, $group)) {
+                    return false;
+                }
+
                 return ProviderMapping::where('provider_id', $provider->id)
                     ->where('external_sku', $item->buyer_sku_code)->doesntExist();
             })->sort(fn (object $a, object $b): int => (int) $a->price_idr <=> (int) $b->price_idr
                 ?: strcmp((string) $a->buyer_sku_code, (string) $b->buyer_sku_code));
+            // Multiple distinct catalog identities (including region or type)
+            // are ambiguous. Never guess which service to fulfill by lowest cost.
+            if ($candidates->groupBy(fn (object $item): string => $this->key($item))->count() > 1) {
+                Log::warning('Digiflazz auto-source skipped: ambiguous supplier identity.', [
+                    'package_id' => $package->id,
+                ]);
+
+                continue;
+            }
             $item = $candidates->first();
             if ($item === null) {
                 continue;
