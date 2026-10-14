@@ -4,11 +4,13 @@ namespace Tests\Feature;
 
 use App\Jobs\ReconcileFulfillmentJob;
 use App\Jobs\SendFulfillmentJob;
+use App\Jobs\SendTransactionalEmailJob;
 use App\Jobs\StartFulfillmentJob;
 use App\Models\Category;
 use App\Models\IntegrationCredential;
 use App\Models\Product;
 use App\Services\CheckoutPricing;
+use App\Services\DigiflazzAutoSources;
 use App\Services\FulfillmentService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
@@ -83,6 +85,26 @@ class FulfillmentTest extends TestCase
     private function paidOrder(array $catalog, ?int $snapshotMaxPrice = null): int
     {
         $mapping = DB::table('provider_mappings')->where('id', $catalog['mapping_id'])->first();
+        // A paid-order fixture must contain the fresh supplier rows that a
+        // real successful checkout had already verified, including backups.
+        $sources = DB::table('provider_mappings')->where('product_package_id', $catalog['package_id'])
+            ->where('provider_id', DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id'))
+            ->whereNotNull('external_sku')->get();
+        foreach ($sources as $source) {
+            if (DB::table('digiflazz_catalog_items')->where('buyer_sku_code', $source->external_sku)->exists()) {
+                continue;
+            }
+            DB::table('digiflazz_catalog_items')->insert([
+                'buyer_sku_code' => $source->external_sku, 'product_name' => 'Fixture '.$source->external_sku,
+                'category' => 'Games', 'brand' => 'Fixture', 'type' => 'Umum',
+                'seller_name' => 'Fixture Seller', 'price_idr' => (int) $source->cost_idr,
+                'baseline_price_idr' => (int) $source->cost_idr,
+                'buyer_active' => true, 'seller_active' => true,
+                'unlimited_stock' => true, 'stock' => 0, 'is_present' => true,
+                'start_cut_off' => '00:00', 'end_cut_off' => '00:00',
+                'synced_at' => now(), 'created_at' => now(), 'updated_at' => now(),
+            ]);
+        }
         $snapshot = [
             'product' => [
                 'id' => $catalog['product']->id,
@@ -180,7 +202,64 @@ class FulfillmentTest extends TestCase
         $this->assertSame('SUCCESS', DB::table('fulfillment_attempts')->where('id', $attempt->id)->value('status'));
         $delivery = json_decode(DB::table('orders')->where('id', $orderId)->value('delivery_payload'), true);
         $this->assertSame('SERIAL-123', $delivery['serial_number']);
+        Queue::assertNotPushed(SendTransactionalEmailJob::class, fn (SendTransactionalEmailJob $job): bool => $job->subject === 'Pesanan LFAMILIA gagal diproses');
         Http::assertSentCount(1);
+    }
+
+    public function test_removed_supplier_sku_blocks_paid_order_and_queued_send(): void
+    {
+        Queue::fake();
+        $this->credentials();
+        $catalog = $this->automaticCatalog();
+        $orderId = $this->paidOrder($catalog);
+        DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'DF-PRIMARY')->delete();
+
+        Http::fake();
+        app(FulfillmentService::class)->startOrder($orderId);
+        $attempt = DB::table('fulfillment_attempts')->where('order_id', $orderId)->firstOrFail();
+        $this->assertSame('BLOCKED', $attempt->status);
+        $this->assertSame('PAID', DB::table('orders')->where('id', $orderId)->value('status'));
+        Http::assertNothingSent();
+
+        $second = $this->automaticCatalog(sku: 'DF-DELETED-AFTER-QUEUE');
+        $secondOrderId = $this->paidOrder($second);
+        $service = app(FulfillmentService::class);
+        $service->startOrder($secondOrderId);
+        $queued = DB::table('fulfillment_attempts')->where('order_id', $secondOrderId)->firstOrFail();
+        $this->assertSame('CREATED', $queued->status);
+        DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'DF-DELETED-AFTER-QUEUE')->delete();
+        $service->sendAttempt((int) $queued->id);
+        $this->assertSame('BLOCKED', DB::table('fulfillment_attempts')->where('id', $queued->id)->value('status'));
+        Http::assertNothingSent();
+    }
+
+    public function test_supplier_retagging_of_verified_sku_blocks_paid_order_before_send(): void
+    {
+        Queue::fake();
+        $this->credentials();
+        $catalog = $this->automaticCatalog();
+        $orderId = $this->paidOrder($catalog);
+
+        $item = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'DF-PRIMARY')->first();
+        $identity = app(DigiflazzAutoSources::class)->key($item);
+        DB::table('provider_mappings')->where('id', $catalog['mapping_id'])->update([
+            'fulfillment_config' => json_encode([
+                'customer_no_template' => '{{user_id}}{{zone_id}}',
+                'auto_source_group' => $identity,
+            ], JSON_THROW_ON_ERROR),
+        ]);
+        DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'DF-PRIMARY')
+            ->update(['brand' => 'Unrelated Supplier Product']);
+
+        Http::fake();
+        app(FulfillmentService::class)->startOrder($orderId);
+        $attempt = DB::table('fulfillment_attempts')->where('order_id', $orderId)->firstOrFail();
+        $this->assertSame('BLOCKED', $attempt->status);
+        $this->assertSame('PAID', DB::table('orders')->where('id', $orderId)->value('status'));
+        $this->assertDatabaseHas('provider_mappings', [
+            'id' => $catalog['mapping_id'], 'is_active' => true,
+        ]);
+        Http::assertNothingSent();
     }
 
     public function test_timeout_becomes_unknown_and_reconciliation_reuses_same_reference(): void
@@ -248,6 +327,7 @@ class FulfillmentTest extends TestCase
             ]);
         }
         $orderId = $this->paidOrder($catalog);
+        DB::table('orders')->where('id', $orderId)->update(['guest_email' => 'blocked@example.test']);
         Http::fake(function ($request) {
             $payload = $request->data();
 
@@ -276,6 +356,8 @@ class FulfillmentTest extends TestCase
         $this->assertSame('BLOCKED', DB::table('orders')->where('id', $orderId)->value('status'));
         $this->assertSame('BLOCKED', DB::table('fulfillment_attempts')->where('id', $backup->id)->value('status'));
         $this->assertSame(2, DB::table('fulfillment_attempts')->where('order_id', $orderId)->count());
+        Queue::assertPushed(SendTransactionalEmailJob::class, fn (SendTransactionalEmailJob $job): bool => $job->recipient === 'blocked@example.test'
+            && $job->subject === 'Pesanan LFAMILIA gagal diproses');
         Http::assertSentCount(2);
         $service->startOrder($orderId);
         $service->reconcileAttempt((int) $backup->id);
@@ -436,6 +518,7 @@ class FulfillmentTest extends TestCase
             'updated_at' => now(),
         ]);
 
+        $this->seedCheckoutDigiflazzCatalog($catalog['package_id']);
         $checkout = app(CheckoutPricing::class)->forPackage($catalog['package_id']);
         $this->assertSame(13130, $checkout['max_price_idr']);
         $this->assertSame(11000, $checkout['subtotal_idr']);

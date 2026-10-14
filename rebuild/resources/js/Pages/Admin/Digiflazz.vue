@@ -1,7 +1,7 @@
 <script setup>
 import AdminSwitch from '../../Components/AdminSwitch.vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
-import { computed, onMounted, onUnmounted, reactive } from 'vue';
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import AdminShell from '../../Components/AdminShell.vue';
 import { Button } from '../../Components/ui/button';
 import { Input } from '../../Components/ui/input';
@@ -51,6 +51,11 @@ const autoSyncForm = useForm({
     price_warning_percent: Number(props.monitorSettings?.price_warning_percent || 3),
 });
 const syncForm = useForm({});
+const maxSkuText = ref('');
+const maxPricePreview = ref(null);
+const maxPriceBusy = ref(false);
+const maxPriceError = ref('');
+watch(maxSkuText, () => { maxPricePreview.value = null; });
 
 const money = value => value == null ? '—' : 'Rp' + Number(value).toLocaleString('id-ID');
 const date = value => value
@@ -109,6 +114,38 @@ function sync(id = null) {
         .post('/admin/digiflazz/sync', { preserveScroll: true });
 }
 
+async function previewMaxPrices() {
+    maxPriceError.value = '';
+    maxPricePreview.value = null;
+    maxPriceBusy.value = true;
+    try {
+        const response = await fetch('/admin/digiflazz/max-prices/preview', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+            },
+            body: JSON.stringify({ sku_text: maxSkuText.value }),
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(Object.values(body.errors || {})?.[0]?.[0] || body.message || 'Preview gagal.');
+        maxPricePreview.value = body;
+    } catch (error) {
+        maxPriceError.value = error.message;
+    } finally {
+        maxPriceBusy.value = false;
+    }
+}
+function applyMaxPrices() {
+    if (!maxPricePreview.value || !confirm('Terapkan Harga Max dan modal sesuai daftar SKU pada preview ini?')) return;
+    router.post('/admin/digiflazz/max-prices/apply', { preview_token: maxPricePreview.value.token }, {
+        preserveScroll: true,
+        onSuccess: () => { maxPricePreview.value = null; },
+        onError: errors => { maxPriceError.value = errors.preview_token || 'Eksekusi ditolak. Buat preview baru.'; },
+    });
+}
 function baseline(id) {
     router.put('/admin/digiflazz/baseline/' + id, {}, { preserveScroll: true });
 }
@@ -155,6 +192,25 @@ onUnmounted(() => {
                 </Button>
             </div>
         </header>
+
+        <Card class="space-y-3 p-4">
+            <h2 class="font-semibold">Samakan Harga Max dari Buyer Area</h2>
+            <p class="text-sm text-muted-foreground">Tempel CSV atau TSV berisi SKU dan Harga Max dari Buyer Area Digiflazz. Data API sinkronisasi tidak menyediakan Harga Max. Hanya SKU yang ditempel yang dapat diubah, setelah preview dan konfirmasi.</p>
+            <textarea v-model="maxSkuText" class="w-full rounded-md border bg-transparent p-3 font-mono text-sm" rows="5" aria-label="Daftar SKU dan Harga Max" placeholder="SKU, Harga Max — satu SKU setiap baris"></textarea>
+            <Button type="button" :disabled="maxPriceBusy || !maxSkuText.trim()" @click="previewMaxPrices">{{maxPriceBusy ? 'Membuat preview…' : 'Pratinjau Harga Max'}}</Button>
+            <p v-if="maxPriceError" role="alert" class="text-sm text-destructive">{{maxPriceError}}</p>
+            <div v-if="maxPricePreview" class="space-y-3 rounded border p-3">
+                <strong>Preview: {{maxPricePreview.summary.skus}} SKU · {{maxPricePreview.summary.affected_mappings}} mapping · Selisih harga jual {{money(maxPricePreview.summary.total_sell_difference_idr)}}</strong>
+                <div class="max-h-72 space-y-2 overflow-auto text-xs">
+                    <div v-for="row in maxPricePreview.mappings" :key="row.mapping_id" class="border-b pb-2">
+                        <b>{{row.sku}} — {{row.product}} / {{row.package}}</b>
+                        <p>Harga Max {{money(row.old_max_price_idr)}} → {{money(row.new_max_price_idr)}} · Modal {{money(row.old_cost_idr)}} → {{money(row.new_cost_idr)}}</p>
+                        <p>Harga jual {{money(row.before_sell_idr)}} → {{money(row.after_sell_idr)}} · Selisih {{money(row.difference_idr)}} · {{row.is_manual_price ? 'Harga manual tetap terkunci' : 'Harga bukan manual: dapat berubah pada sync berikutnya'}}</p>
+                    </div>
+                </div>
+                <Button type="button" variant="outline" @click="applyMaxPrices">Konfirmasi &amp; samakan Harga Max</Button>
+            </div>
+        </Card>
 
         <div class="lf-admin-summary">
             <Card class="p-4">

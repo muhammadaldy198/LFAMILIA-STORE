@@ -765,6 +765,12 @@ class FulfillmentService
                     'order',
                     $order->id
                 );
+                $this->emails->queueForOrder(
+                    (int) $order->id,
+                    'Pesanan LFAMILIA gagal diproses',
+                    'Pesanan '.$order->order_number.' gagal diproses karena semua SKU penyedia yang diizinkan gagal. '
+                    .'Silakan hubungi admin LFAMILIA STORE dengan nomor pesanan tersebut agar dapat ditangani secara manual.'
+                );
 
                 return null;
             }
@@ -985,8 +991,14 @@ class FulfillmentService
             $item = DB::table('digiflazz_catalog_items')
                 ->where('buyer_sku_code', $mapping->external_sku)
                 ->first();
-            if ($item && ! $this->digiflazzCatalog->available($item)) {
+            if (! $item) {
+                return 'SKU Digiflazz tidak lagi ditemukan pada katalog supplier.';
+            }
+            if (! $this->digiflazzCatalog->available($item)) {
                 return 'SKU Digiflazz sedang nonaktif, stok habis, atau cut-off.';
+            }
+            if (! $this->digiflazzCatalog->verifiedIdentityMatches($item, $mapping->fulfillment_config)) {
+                return 'Identitas produk SKU Digiflazz berubah. Periksa ulang mapping di panel admin.';
             }
             if ($mapping->is_manual_price) {
                 if (! $item || (int) $item->price_idr <= 0) {

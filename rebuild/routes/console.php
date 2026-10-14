@@ -231,6 +231,12 @@ Artisan::command('lfamilia:sync-digiflazz-catalog', function (DigiflazzCatalogSe
             'Daftar harga Digiflazz kosong atau tidak valid.',
             'Format daftar harga tidak valid. Tidak ada perubahan disimpan.',
         ];
+        // Same dedupe key as DigiflazzCatalogService; no duplicate channel delivery.
+        try {
+            app(AdminNotificationService::class)->recordDigiflazzSyncFailure($error);
+        } catch (Throwable $notificationError) {
+            Log::warning('Automatic Digiflazz sync notification failed.', ['exception_class' => $notificationError::class]);
+        }
         Log::warning('Automatic Digiflazz catalog sync failed.', [
             'exception_class' => $error::class,
             'validation_fields' => array_keys($validationErrors),

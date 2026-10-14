@@ -8,7 +8,9 @@ use App\Models\Provider;
 use App\Models\ProviderMapping;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class DigiflazzAutoSources
@@ -70,6 +72,11 @@ class DigiflazzAutoSources
             app(AdminAuditService::class)->record($request, 'catalog.package.updated', 'product_package', $package->id, $before, $package->fresh()->toArray());
         }
         foreach ($items as $item) {
+            // Automatic grouping may never attach a second active source.
+            if ($automatic && $existingBySku->has($item->buyer_sku_code) === false
+                && $package->mappings()->where('provider_id', $provider->id)->exists()) {
+                continue;
+            }
             if (! app(DigiflazzCatalogService::class)->sellable($item)) {
                 continue;
             }
@@ -139,82 +146,217 @@ class DigiflazzAutoSources
 
     public function enableProduct(Product $product, Request $request): int
     {
-        return DB::transaction(function () use ($product, $request): int {
-            $product = Product::whereKey($product->id)->lockForUpdate()->firstOrFail();
-            $catalog = $this->catalog();
-            $provider = Provider::where('code', 'DIGIFLAZZ')->firstOrFail();
-            $added = 0;
-            foreach ($product->packages()->with('mappings')->get() as $package) {
-                $mappings = $package->mappings->where('provider_id', $provider->id);
-                $rows = DB::table('digiflazz_catalog_items')->whereIn('buyer_sku_code', $mappings->pluck('external_sku'))->get();
-                $keys = $rows->map(fn (object $item): string => $this->key($item))->unique();
-                if ($keys->count() > 1) {
-                    throw ValidationException::withMessages(['auto_sources' => 'Nominal '.$package->name.' memiliki sumber dari varian berbeda. Tidak ada sumber yang dipindahkan.']);
-                }
-                if ($keys->isEmpty()) {
-                    continue;
-                }
-                $peers = $catalog->get($keys->first(), collect());
-                $template = $mappings->map(fn (ProviderMapping $mapping) => data_get($mapping->fulfillment_config, 'customer_no_template'))
-                    ->filter()->unique();
-                if ($template->count() > 1 || ($product->fields()->count() > 1 && $template->isEmpty())) {
-                    throw ValidationException::withMessages(['auto_sources' => 'Format ID tujuan nominal '.$package->name.' harus seragam sebelum cadangan otomatis diaktifkan.']);
-                }
-                $before = $mappings->count();
-                $this->importGroup($product, $peers, $template->first(), $package->is_active && $mappings->contains('is_active', true), (string) $product->margin_percent, true, $request);
-                $added += $package->mappings()->where('provider_id', $provider->id)->count() - $before;
-            }
-            $this->orderProduct($product);
+        // The admin action uses the same safe one-source bootstrap as full sync.
+        // It may add an initial mapping, but never auto-add a second mapping.
+        // Supplier sync already owns this lock while calling sync().
+        // The standalone admin action must share that exclusion to prevent
+        // new/retagged catalog identities appearing during candidate selection.
+        $lock = Cache::lock('digiflazz.catalog.sync', 60);
+        if (! $lock->get()) {
+            throw ValidationException::withMessages([
+                'auto_sources' => 'Sinkronisasi Digiflazz sedang berlangsung. Coba lagi setelah selesai.',
+            ]);
+        }
 
-            return $added;
-        });
+        try {
+            return $this->sync((int) $product->id);
+        } finally {
+            $lock->release();
+        }
     }
 
-    public function sync(): int
+    /**
+     * Observe existing mappings without changing their state. Bootstrap exactly one
+     * safe, uniquely identified Digiflazz mapping for an active unmapped package.
+     */
+    public function sync(?int $productId = null): int
     {
         $provider = Provider::where('code', 'DIGIFLAZZ')->first();
-        if (! $provider) {
+        if ($provider === null || $provider->is_active === false) {
             return 0;
         }
-        $catalog = $this->catalog();
-        $packages = ProductPackage::whereHas('mappings', fn ($query) => $query->where('provider_id', $provider->id)->whereNotNull('fulfillment_config->auto_source_group'))->with(['mappings', 'product'])->get();
+
         $request = Request::create('/internal/digiflazz-auto-sources', 'POST');
         $request->setUserResolver(fn ($guard = null) => null);
-        $bySku = $catalog->flatten(1)->keyBy('buyer_sku_code');
+        $catalog = $this->catalog()->flatten(1)->filter(
+            fn (object $item): bool => app(DigiflazzCatalogService::class)->sellable($item)
+        );
+        $packages = ProductPackage::with(['mappings', 'product'])
+            ->where('is_active', true)
+            ->whereHas('product', fn ($query) => $query->where('is_active', true)
+                ->where('fulfillment_mode', 'AUTO_PROVIDER'))
+            ->when($productId !== null, fn ($query) => $query->where('product_id', $productId))
+            ->get();
         $added = 0;
+
         foreach ($packages as $package) {
-            $seed = $package->mappings->first(fn (ProviderMapping $mapping): bool => $mapping->provider_id === $provider->id && data_get($mapping->fulfillment_config, 'auto_source_group') !== null);
-            $key = data_get($seed->fulfillment_config, 'auto_source_group');
-            $items = $catalog->get($key, collect());
-            foreach ($package->mappings as $existing) {
-                $current = $bySku->get($existing->external_sku);
-                $expected = data_get($existing->fulfillment_config, 'auto_source_group');
-                if ($expected !== null && $current && $this->key($current) !== $expected) {
-                    $before = $existing->toArray();
-                    $existing->update(['is_active' => false]);
-                    app(AdminAuditService::class)->record($request, 'catalog.fulfillment_source.identity_changed', 'provider_mapping', $existing->id, $before, $existing->fresh()->toArray());
-                }
+            $this->warnDuplicateMappings($package, (int) $provider->id);
+            // Bootstrap ONLY when there are no Digiflazz mappings of any state.
+            if ($package->mappings->contains(fn (ProviderMapping $mapping): bool => (int) $mapping->provider_id === (int) $provider->id)
+                || $package->nominal_value === null || (int) $package->nominal_value <= 0) {
+                continue;
             }
-            foreach ($items as $item) {
-                if (! app(DigiflazzCatalogService::class)->sellable($item)
-                    || ProviderMapping::where('provider_id', $provider->id)->where('external_sku', $item->buyer_sku_code)->exists()) {
-                    continue;
-                }
-                $mapping = app(DigiflazzCatalogImport::class)->upsert($package, $item->buyer_sku_code, (int) $item->price_idr, (int) $item->price_idr);
-                $before = $mapping->toArray();
-                $mapping->update([
-                    'is_active' => $provider->is_active && $package->is_active && $package->product->is_active,
-                    'priority' => 0,
-                    'fulfillment_config' => $seed->fulfillment_config,
+
+            // Without a verified provider template the fulfillment target builder
+            // requires exactly one nonempty destination. An optional, absent, or
+            // multi-field destination must not become purchasable automatically.
+            $fields = $package->product->fields()->get(['field_key', 'is_required']);
+            if ($fields->count() !== 1 || ! (bool) $fields->first()->is_required) {
+                Log::warning('Digiflazz auto-source skipped: destination requires one verified field.', [
+                    'product_id' => $package->product_id,
+                    'package_id' => $package->id,
                 ]);
-                app(AdminAuditService::class)->record($request, 'catalog.fulfillment_source.auto_attached', 'provider_mapping', $mapping->id, $before, $mapping->fresh()->toArray());
+
+                continue;
+            }
+
+            $productName = $this->normalizedIdentity((string) $package->product->name);
+            if ($productName === '') {
+                continue;
+            }
+            // Identity ambiguity is evaluated across ALL matching supplier SKUs,
+            // including those already mapped to another package. Ownership does
+            // not prove which region/service the unmapped package intends.
+            $matching = $catalog->filter(
+                fn (object $item): bool => $this->matchesPackage($package, $package->product, $item)
+            );
+            $candidates = $matching->filter(
+                fn (object $item): bool => ProviderMapping::where('provider_id', $provider->id)
+                    ->where('external_sku', $item->buyer_sku_code)->doesntExist()
+            )->sort(fn (object $a, object $b): int => (int) $a->price_idr <=> (int) $b->price_idr
+                ?: strcmp((string) $a->buyer_sku_code, (string) $b->buyer_sku_code));
+            // Multiple distinct catalog identities (including region or type)
+            // are ambiguous. Never guess which service to fulfill by lowest cost.
+            if ($matching->groupBy(fn (object $item): string => $this->key($item))->count() > 1) {
+                Log::warning('Digiflazz auto-source skipped: ambiguous supplier identity.', [
+                    'package_id' => $package->id,
+                ]);
+
+                continue;
+            }
+            $item = $candidates->first();
+            if ($item === null) {
+                continue;
+            }
+
+            DB::transaction(function () use ($package, $provider, $request, &$added): void {
+                // Lock and recheck the actual inputs, not the optimistic snapshot
+                // selected before this transaction. Match global pricing lock order.
+                $product = Product::whereKey($package->product_id)->lockForUpdate()->first();
+                $locked = ProductPackage::whereKey($package->id)->lockForUpdate()->first();
+                if ($product === null || ! $product->is_active || $product->fulfillment_mode !== 'AUTO_PROVIDER'
+                    || $locked === null || ! $locked->is_active
+                    || (int) $locked->product_id !== (int) $product->id
+                    || $locked->nominal_value === null || (int) $locked->nominal_value <= 0) {
+                    return;
+                }
+
+                $freshFields = $product->fields()->orderBy('id')->lockForUpdate()
+                    ->get(['id', 'field_key', 'is_required']);
+                if ($freshFields->count() !== 1 || ! (bool) $freshFields->first()->is_required) {
+                    return;
+                }
+
+                // Re-evaluate the complete catalog identity under current DB
+                // locking reads, not only the original chosen row. New variants,
+                // seller ownership and retagged regions can change the choice.
+                $freshMatches = DB::table('digiflazz_catalog_items')
+                    ->where('is_present', true)->orderBy('buyer_sku_code')
+                    ->lockForUpdate()->get()
+                    ->filter(fn (object $candidate): bool => app(DigiflazzCatalogService::class)->sellable($candidate)
+                        && $this->matchesPackage($locked, $product, $candidate));
+                if ($freshMatches->groupBy(fn (object $candidate): string => $this->key($candidate))->count() !== 1
+                    || ProviderMapping::where('product_package_id', $locked->id)
+                        ->where('provider_id', $provider->id)->exists()) {
+                    return;
+                }
+
+                $freshItem = $freshMatches->filter(
+                    fn (object $candidate): bool => ProviderMapping::where('provider_id', $provider->id)
+                        ->where('external_sku', $candidate->buyer_sku_code)->doesntExist()
+                )->sort(fn (object $a, object $b): int => (int) $a->price_idr <=> (int) $b->price_idr
+                    ?: strcmp((string) $a->buyer_sku_code, (string) $b->buyer_sku_code))->first();
+                if ($freshItem === null) {
+                    return;
+                }
+                $mapping = app(DigiflazzCatalogImport::class)->upsert(
+                    $locked, (string) $freshItem->buyer_sku_code,
+                    (int) $freshItem->price_idr, (int) $freshItem->price_idr
+                );
+                $before = $mapping->toArray();
+                $config = $mapping->fulfillment_config ?? [];
+                // Pin the verified supplier identity. A reused SKU code must
+                // never silently sell/deliver a different brand or service.
+                $config['auto_source_group'] = $this->key($freshItem);
+                $mapping->update([
+                    'is_active' => true, 'priority' => 0, 'is_manual_price' => false,
+                    'cost_idr' => (int) $freshItem->price_idr, 'max_price_idr' => (int) $freshItem->price_idr,
+                    'fulfillment_config' => $config,
+                ]);
+                app(AdminAuditService::class)->record(
+                    $request, 'catalog.fulfillment_source.auto_bootstrapped',
+                    'provider_mapping', $mapping->id, $before, $mapping->fresh()->toArray()
+                );
                 $added++;
-            }
-            if ($key) {
-                $this->rankAutomaticSources($package, (int) $provider->id, (string) $key, $request);
-            }
+            }, 3);
         }
 
         return $added;
+    }
+
+    private function matchesPackage(ProductPackage $package, Product $product, object $item): bool
+    {
+        $productName = $this->normalizedIdentity((string) $product->name);
+        $brand = $this->normalizedIdentity((string) $item->brand);
+        $catalogName = $this->normalizedIdentity((string) $item->product_name);
+        if ($productName === '' || ($brand !== $productName && ! str_starts_with($catalogName, $productName))) {
+            return false;
+        }
+        if ($this->skuNominal((string) $item->buyer_sku_code) !== (int) $package->nominal_value) {
+            return false;
+        }
+
+        $group = $this->normalizedIdentity((string) ($package->group_name ?? ''));
+
+        return $group === '' || $group === $this->normalizedIdentity((string) $item->type)
+            || str_contains($catalogName, $group);
+    }
+
+    private function normalizedIdentity(string $name): string
+    {
+        return mb_strtolower(preg_replace('/[^\\pL\\pN]+/u', '', $name) ?: '');
+    }
+
+    private function skuNominal(string $sku): ?int
+    {
+        // The SKU is supplier-controlled; ambiguous multi-number codes are skipped.
+        preg_match_all('/(?<!\\d)(\\d{1,3}(?:[.,]\\d{3})+|\\d+)(?!\\d)/', $sku, $matches);
+        if (count($matches[1]) !== 1) {
+            return null;
+        }
+        $digits = str_replace(['.', ','], '', $matches[1][0]);
+
+        return strlen($digits) < 16 ? (int) $digits : null;
+    }
+
+    private function warnDuplicateMappings(ProductPackage $package, int $providerId): void
+    {
+        $active = $package->mappings->filter(
+            fn (ProviderMapping $mapping): bool => (int) $mapping->provider_id === $providerId && $mapping->is_active
+        );
+        if ($active->count() < 2) {
+            return;
+        }
+        Log::warning('Digiflazz package has duplicate active mappings; admin action required.', [
+            'package_id' => $package->id, 'active_count' => $active->count(),
+        ]);
+        $key = 'digiflazz.mapping.duplicates.'.$package->id;
+        if (Cache::add($key, true, now()->addHour())) {
+            app(AdminNotificationService::class)->record(
+                'digiflazz.mapping.duplicate_active', 'Mapping Digiflazz aktif ganda',
+                'Paket #'.$package->id.' memiliki '.$active->count().' mapping aktif. Periksa di panel admin.',
+                'WARNING', 'product_package', $package->id
+            );
+        }
     }
 }

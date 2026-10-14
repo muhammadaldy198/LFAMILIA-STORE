@@ -3,10 +3,42 @@
 namespace App\Services;
 
 use App\Jobs\SendAdminNotificationJob;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class AdminNotificationService
 {
+    /** Dedupe safe supplier sync alerts for one rolling hour. */
+    public function recordDigiflazzSyncFailure(\Throwable $error): void
+    {
+        $reason = $error instanceof ValidationException ? ($error->errors()['sync'][0] ?? null) : null;
+        $known = [
+            'Sinkronisasi masih berjalan.',
+            'Lengkapi dan aktifkan Digiflazz di Integrasi.',
+            'Digiflazz tidak merespons. Data sebelumnya tetap tersimpan.',
+            'Daftar harga Digiflazz kosong atau tidak valid.',
+            'Format daftar harga tidak valid. Tidak ada perubahan disimpan.',
+            'Jumlah SKU Digiflazz turun drastis. Data lama tidak diubah; ulangi sinkronisasi setelah memeriksa penyedia.',
+        ];
+        $safeReason = in_array($reason, $known, true)
+            ? $reason : 'Sinkronisasi gagal ('.$error::class.').';
+        $key = 'digiflazz.sync.failed.'.hash('sha256', $safeReason);
+        if (! Cache::add($key, true, now()->addHour())) {
+            return;
+        }
+        try {
+            $this->record(
+                'digiflazz.sync.failed', 'Sinkronisasi Digiflazz gagal',
+                'Sinkronisasi katalog Digiflazz gagal: '.$safeReason,
+                'ERROR', 'provider', 'DIGIFLAZZ', ['reason' => $safeReason]
+            );
+        } catch (\Throwable $notificationError) {
+            Cache::forget($key);
+            throw $notificationError;
+        }
+    }
+
     public function record(
         string $eventType,
         string $title,

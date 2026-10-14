@@ -107,11 +107,50 @@ const legacyDigiflazzPercent = computed(() => products.value
     .flatMap(item=>item.packages)
     .filter(pack=>pack.pricing_mode==='PERCENT' && String(pack.code||'').startsWith('DF_')
         && pack.mappings.some(mapping=>mapping.provider_code==='DIGIFLAZZ')).length);
-const applyGlobalMargin=()=>{
-    const message=globalMarginForm.include_imported_percent
-        ? 'Terapkan margin global dan alihkan '+legacyDigiflazzPercent.value+' nominal impor Digiflazz lama ke mode mengikuti margin produk? PERHATIAN: margin persen khusus yang pernah disetel pada nominal impor ini juga akan diganti. Harga tetap/rupiah dan produk manual tidak diubah.'
-        : 'Terapkan margin global ke produk otomatis yang sudah mengikuti margin produk? Nominal dengan margin persen khusus tidak berubah.';
-    if(confirm(message)) globalMarginForm.put('/admin/catalog/margin',{preserveScroll:true});
+const globalMarginPreview = ref(null);
+const globalMarginError = ref('');
+const globalMarginBusy = ref(false);
+const csrfToken = () => document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+const formatAdminMoney = value => 'Rp' + Number(value || 0).toLocaleString('id-ID');
+const requestAdminPreview = async (url, payload) => {
+    const response = await fetch(url, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken() },
+        body: JSON.stringify(payload),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+        throw new Error(Object.values(result.errors || {})?.[0]?.[0] || result.message || 'Preview tidak dapat dibuat.');
+    }
+    return result;
+};
+const previewGlobalMargin = async () => {
+    globalMarginPreview.value = null;
+    globalMarginError.value = '';
+    globalMarginBusy.value = true;
+    try {
+        globalMarginPreview.value = await requestAdminPreview('/admin/catalog/margin/preview', {
+            margin_percent: globalMarginForm.margin_percent,
+            include_imported_percent: globalMarginForm.include_imported_percent,
+        });
+    } catch (error) {
+        globalMarginError.value = error.message;
+    } finally {
+        globalMarginBusy.value = false;
+    }
+};
+watch(() => [globalMarginForm.margin_percent, globalMarginForm.include_imported_percent], () => {
+    globalMarginPreview.value = null;
+});
+const applyGlobalMargin = () => {
+    if (!globalMarginPreview.value) return;
+    if (!confirm('Konfirmasi eksekusi perubahan yang ditampilkan pada preview Global Margin?')) return;
+    router.put('/admin/catalog/margin', { preview_token: globalMarginPreview.value.token }, {
+        preserveScroll: true,
+        onSuccess: () => { globalMarginPreview.value = null; },
+        onError: errors => { globalMarginError.value = errors.preview_token || 'Perubahan tidak dapat diterapkan. Ulangi preview.'; },
+    });
 };
 const applyFixedDigiflazzPrices = () => {
     const rows = props.fixedPriceProposals;
@@ -390,7 +429,28 @@ const deleteNotice = (notice) => {
                     <div v-for="row in fixedPriceAlerts" :key="row.package_id" class="border-b py-1">{{row.product_name}} / {{row.package_name}} · jual Rp{{Number(row.sell_price_idr).toLocaleString('id-ID')}} · batas modal manual {{row.maximum_cost_idr===null?'tidak ditetapkan':'Rp'+Number(row.maximum_cost_idr).toLocaleString('id-ID')}} · modal tersedia {{row.lowest_cost_idr===null?'tidak ada':'Rp'+Number(row.lowest_cost_idr).toLocaleString('id-ID')}}</div>
                 </div>
             </Card>
-            <Card class="p-4"><form class="flex flex-wrap items-end gap-3" @submit.prevent="applyGlobalMargin"><label class="text-sm">Margin global produk otomatis (%)<Input v-model.number="globalMarginForm.margin_percent" type="number" min="0" max="1000" step="0.0001" class="mt-1"/><span v-if="globalMarginForm.errors.margin_percent" role="alert" class="text-sm font-normal text-destructive">{{ globalMarginForm.errors.margin_percent }}</span></label><Button :disabled="globalMarginForm.processing">Terapkan margin otomatis</Button><label class="flex w-full items-start gap-2 text-xs"><input v-model="globalMarginForm.include_imported_percent" type="checkbox" class="mt-0.5"/><span>Alihkan {{legacyDigiflazzPercent}} nominal impor Digiflazz lama dengan margin % tersendiri agar mengikuti Global Margin. Ini termasuk margin % khusus yang pernah diedit; centang hanya bila ingin menggantinya secara massal.</span></label><p class="w-full text-xs text-muted-foreground">Tanpa opsi migrasi, hanya nominal yang mengikuti margin produk berubah. Produk manual, harga tetap, dan margin rupiah tidak diubah.</p></form></Card>
+            <Card class="p-4">
+                <form class="flex flex-wrap items-end gap-3" @submit.prevent="previewGlobalMargin">
+                    <label class="text-sm">Margin global produk otomatis (%)
+                        <Input v-model.number="globalMarginForm.margin_percent" type="number" min="0" max="1000" step="0.0001" class="mt-1"/>
+                    </label>
+                    <Button :disabled="globalMarginBusy">{{globalMarginBusy ? 'Membuat preview…' : 'Pratinjau Global Margin'}}</Button>
+                    <label class="flex w-full items-start gap-2 text-xs"><input v-model="globalMarginForm.include_imported_percent" type="checkbox" class="mt-0.5"/><span>Alihkan {{legacyDigiflazzPercent}} nominal impor Digiflazz lama dengan margin % tersendiri agar mengikuti Global Margin. Ini termasuk margin % khusus yang pernah diedit; centang hanya bila ingin menggantinya secara massal.</span></label>
+                    <p class="w-full text-xs text-muted-foreground">Preview tidak menyimpan perubahan. Produk manual, harga tetap, dan margin rupiah tidak diubah.</p>
+                    <p v-if="globalMarginError" class="w-full text-sm text-destructive" role="alert">{{globalMarginError}}</p>
+                </form>
+                <div v-if="globalMarginPreview" class="mt-4 space-y-3 rounded border p-3">
+                    <strong>Preview wajib — {{globalMarginPreview.summary.affected_mappings}} mapping berubah dari {{globalMarginPreview.summary.previewed_mappings}} yang diperiksa</strong>
+                    <p class="text-sm">Produk: {{globalMarginPreview.summary.products}} · Nominal yang beralih mode: {{globalMarginPreview.summary.converted_packages}} · Total selisih harga jual per mapping: {{formatAdminMoney(globalMarginPreview.summary.total_sell_difference_idr)}}</p>
+                    <div class="max-h-72 space-y-1 overflow-auto text-xs">
+                        <div v-for="row in globalMarginPreview.mappings" :key="row.mapping_id" class="border-b py-2">
+                            <b>{{row.product}} / {{row.package}} · {{row.sku}}</b>
+                            <p>Modal {{formatAdminMoney(row.cost_idr)}} · Sebelum {{formatAdminMoney(row.before_sell_idr)}} → Sesudah {{formatAdminMoney(row.after_sell_idr)}} · Selisih {{formatAdminMoney(row.difference_idr)}}</p>
+                        </div>
+                    </div>
+                    <Button type="button" variant="outline" @click="applyGlobalMargin">Konfirmasi &amp; terapkan sesuai preview</Button>
+                </div>
+            </Card>
             <section v-show="catalogTab === 'products'" class="lf-admin-catalog-section space-y-5 rounded-xl border border-slate-800 bg-slate-900 p-5">
                 <div class="flex flex-wrap items-start justify-between gap-3"><div><h2 class="text-xl font-semibold">Produk</h2><p class="mt-1 text-sm text-muted-foreground">Kelola produk otomatis dan manual. Kode SKU penyedia hanya dikelola dari panel admin dan tidak ditampilkan kepada pelanggan.</p></div><div class="flex gap-2"><Button v-for="mode in ['AUTO_PROVIDER', 'MANUAL']" :key="mode" type="button" :variant="tab===mode?'default':'outline'" @click="tab = mode">{{ mode === 'MANUAL' ? 'Produk Manual' : 'Produk Otomatis' }}</Button></div></div>
                 <Card class="p-4">

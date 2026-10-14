@@ -9,9 +9,11 @@ use App\Models\ProviderMapping;
 use App\Services\AdminAuditService;
 use App\Services\AdminDigiflazzMonitorService;
 use App\Services\AdminPermissionService;
+use App\Services\AdminPricingPreviewService;
 use App\Services\DigiflazzAutoSources;
 use App\Services\DigiflazzCatalogImport;
 use App\Services\DigiflazzCatalogService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -268,8 +270,8 @@ class AdminDigiflazzController
         $audit->record($request, 'digiflazz.catalog.synced', 'provider', 'DIGIFLAZZ', null, ['count' => $count, 'sku' => $sku]);
 
         return back()->with('status', $sku !== null && $count === 0
-            ? 'SKU tidak dikembalikan oleh Digiflazz; data katalog disimpan sebagai tidak tersedia.'
-            : $count.' SKU berhasil disinkronkan. SKU hilang ditandai tidak tersedia tanpa menghapus data.');
+            ? 'SKU tidak dikembalikan Digiflazz. Baris katalog dihapus; mapping aktif tetap dilindungi.'
+            : $count.' SKU berhasil disinkronkan. SKU yang hilang dihapus dari katalog.');
     }
 
     public function syncMapping(Request $request, ProviderMapping $mapping, DigiflazzCatalogService $service, AdminAuditService $audit): RedirectResponse
@@ -280,8 +282,26 @@ class AdminDigiflazzController
         $audit->record($request, 'digiflazz.mapping.synced', 'provider_mapping', $mapping->id, $before, $mapping->fresh()->toArray());
 
         return back()->with('status', $count === 0
-            ? 'SKU tidak dikembalikan Digiflazz. Data katalog disimpan dan mapping dinonaktifkan.'
+            ? 'SKU tidak dikembalikan Digiflazz. Baris katalog dihapus; mapping aktif tetap dilindungi.'
             : 'Harga nominal berhasil disinkronkan.');
+    }
+
+    public function previewMaxPrices(Request $request, AdminPricingPreviewService $previews): JsonResponse
+    {
+        $data = $request->validate(['sku_text' => ['required', 'string', 'max:200000']]);
+
+        return response()->json($previews->previewMaxPrices($request, $data['sku_text']));
+    }
+
+    public function applyMaxPrices(
+        Request $request,
+        AdminPricingPreviewService $previews,
+        AdminAuditService $audit,
+    ): RedirectResponse {
+        $data = $request->validate(['preview_token' => ['required', 'string', 'size:48']]);
+        $previews->executeMaxPrices($request, $data['preview_token'], $audit);
+
+        return back()->with('status', 'Harga Max Buyer Area diterapkan sesuai SKU dan preview yang dikonfirmasi.');
     }
 
     public function baseline(Request $request, int $id, AdminAuditService $audit): RedirectResponse
@@ -345,13 +365,18 @@ class AdminDigiflazzController
                 ->orderBy('priority')
                 ->value('fulfillment_config');
 
+            $config = is_string($primaryConfig)
+                ? json_decode($primaryConfig, true)
+                : $primaryConfig;
+            $config = is_array($config) ? $config : [];
+            // The destination template can be shared, but a manually chosen
+            // backup must not inherit the primary SKU's verified identity.
+            $config['auto_source_group'] = app(DigiflazzAutoSources::class)->key($item);
             $before = $mapping->toArray();
             $mapping->update([
                 'priority' => $priority,
                 'is_active' => false,
-                'fulfillment_config' => is_string($primaryConfig)
-                    ? json_decode($primaryConfig, true)
-                    : $primaryConfig,
+                'fulfillment_config' => $config,
             ]);
             $audit->record(
                 $request,
@@ -421,7 +446,7 @@ class AdminDigiflazzController
         abort_unless($product->fulfillment_mode === 'AUTO_PROVIDER', 422);
         $added = $sources->enableProduct($product, $request);
 
-        return back()->with('status', 'Pelengkapan cadangan selesai. '.$added.' sumber baru ditambahkan untuk nominal produk.');
+        return back()->with('status', 'Pemeriksaan sumber otomatis selesai. '.$added.' sumber awal ditambahkan pada nominal yang belum dipetakan.');
     }
 
     private function importCustomerTemplate(Product $product, ?string $value, bool $publish): ?string

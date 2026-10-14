@@ -85,6 +85,8 @@ class StorefrontParityTest extends TestCase
             'updated_at' => now(),
         ]);
 
+        $this->seedCheckoutDigiflazzCatalog($package->id);
+
         return ['product' => $product, 'package_id' => $package->id];
     }
 
@@ -162,6 +164,10 @@ class StorefrontParityTest extends TestCase
                 'priority' => 0, 'is_active' => true,
                 'created_at' => now(), 'updated_at' => now(),
             ]);
+        }
+
+        foreach ($ids as $packageId) {
+            $this->seedCheckoutDigiflazzCatalog($packageId);
         }
 
         $pricing = app(CheckoutPricing::class);

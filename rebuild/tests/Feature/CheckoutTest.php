@@ -76,6 +76,8 @@ class CheckoutTest extends TestCase
             'updated_at' => now(),
         ]);
 
+        $this->seedCheckoutDigiflazzCatalog($package->id);
+
         return ['product' => $product, 'package_id' => $package->id, 'mapping_id' => $mappingId];
     }
 
@@ -180,6 +182,9 @@ class CheckoutTest extends TestCase
                 'updated_at' => $now,
             ],
         ]);
+
+        // Backups also need current supplier rows under the new sellable() rule.
+        $this->seedCheckoutDigiflazzCatalog($catalog['package_id']);
 
         $key = 'checkout-multiple-digiflazz-maxprice';
         // Test the real checkout service directly, without consuming the shared
