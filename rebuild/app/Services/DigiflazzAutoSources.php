@@ -225,9 +225,12 @@ class DigiflazzAutoSources
                     return false;
                 }
 
-                return $this->skuNominal((string) $item->buyer_sku_code) === (int) $package->nominal_value
-                    && ! ProviderMapping::where('provider_id', $provider->id)
-                        ->where('external_sku', $item->buyer_sku_code)->exists();
+                if ($this->skuNominal((string) $item->buyer_sku_code) !== (int) $package->nominal_value) {
+                    return false;
+                }
+
+                return ProviderMapping::where('provider_id', $provider->id)
+                    ->where('external_sku', $item->buyer_sku_code)->doesntExist();
             })->sort(fn (object $a, object $b): int => (int) $a->price_idr <=> (int) $b->price_idr
                 ?: strcmp((string) $a->buyer_sku_code, (string) $b->buyer_sku_code));
             $item = $candidates->first();
@@ -237,7 +240,8 @@ class DigiflazzAutoSources
 
             DB::transaction(function () use ($package, $provider, $item, $request, &$added): void {
                 $locked = ProductPackage::whereKey($package->id)->lockForUpdate()->first();
-                if (! $locked || ! $locked->is_active || ! $locked->product()->where('is_active', true)->exists()
+                if (! $locked || ! $locked->is_active
+                    || $locked->product()->where('is_active', true)->doesntExist()
                     || ProviderMapping::where('product_package_id', $package->id)
                         ->where('provider_id', $provider->id)->exists()
                     || ProviderMapping::where('provider_id', $provider->id)

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Product;
 use App\Models\ProductPackage;
 use App\Models\Provider;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -193,7 +194,7 @@ class AdminPricingPreviewService
         ];
     }
 
-    private function mappingRows(): \Illuminate\Database\Query\Builder
+    private function mappingRows(): Builder
     {
         return DB::table('provider_mappings as mappings')
             ->join('product_packages as packages', 'packages.id', '=', 'mappings.product_package_id')

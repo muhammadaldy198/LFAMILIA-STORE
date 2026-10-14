@@ -233,7 +233,7 @@ Artisan::command('lfamilia:sync-digiflazz-catalog', function (DigiflazzCatalogSe
         ];
         // Same dedupe key as DigiflazzCatalogService; no duplicate channel delivery.
         try {
-            app(\App\Services\AdminNotificationService::class)->recordDigiflazzSyncFailure($error);
+            app(AdminNotificationService::class)->recordDigiflazzSyncFailure($error);
         } catch (Throwable $notificationError) {
             Log::warning('Automatic Digiflazz sync notification failed.', ['exception_class' => $notificationError::class]);
         }
