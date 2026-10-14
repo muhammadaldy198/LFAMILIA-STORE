@@ -148,7 +148,21 @@ class DigiflazzAutoSources
     {
         // The admin action uses the same safe one-source bootstrap as full sync.
         // It may add an initial mapping, but never auto-add a second mapping.
-        return $this->sync((int) $product->id);
+        // Supplier sync already owns this lock while calling sync().
+        // The standalone admin action must share that exclusion to prevent
+        // new/retagged catalog identities appearing during candidate selection.
+        $lock = Cache::lock('digiflazz.catalog.sync', 60);
+        if (! $lock->get()) {
+            throw ValidationException::withMessages([
+                'auto_sources' => 'Sinkronisasi Digiflazz sedang berlangsung. Coba lagi setelah selesai.',
+            ]);
+        }
+
+        try {
+            return $this->sync((int) $product->id);
+        } finally {
+            $lock->release();
+        }
     }
 
     /**
@@ -200,15 +214,20 @@ class DigiflazzAutoSources
             if ($productName === '') {
                 continue;
             }
-            $candidates = $catalog->filter(
+            // Identity ambiguity is evaluated across ALL matching supplier SKUs,
+            // including those already mapped to another package. Ownership does
+            // not prove which region/service the unmapped package intends.
+            $matching = $catalog->filter(
                 fn (object $item): bool => $this->matchesPackage($package, $package->product, $item)
-                    && ProviderMapping::where('provider_id', $provider->id)
-                        ->where('external_sku', $item->buyer_sku_code)->doesntExist()
+            );
+            $candidates = $matching->filter(
+                fn (object $item): bool => ProviderMapping::where('provider_id', $provider->id)
+                    ->where('external_sku', $item->buyer_sku_code)->doesntExist()
             )->sort(fn (object $a, object $b): int => (int) $a->price_idr <=> (int) $b->price_idr
                 ?: strcmp((string) $a->buyer_sku_code, (string) $b->buyer_sku_code));
             // Multiple distinct catalog identities (including region or type)
             // are ambiguous. Never guess which service to fulfill by lowest cost.
-            if ($candidates->groupBy(fn (object $item): string => $this->key($item))->count() > 1) {
+            if ($matching->groupBy(fn (object $item): string => $this->key($item))->count() > 1) {
                 Log::warning('Digiflazz auto-source skipped: ambiguous supplier identity.', [
                     'package_id' => $package->id,
                 ]);
@@ -220,7 +239,7 @@ class DigiflazzAutoSources
                 continue;
             }
 
-            DB::transaction(function () use ($package, $provider, $item, $request, &$added): void {
+            DB::transaction(function () use ($package, $provider, $request, &$added): void {
                 // Lock and recheck the actual inputs, not the optimistic snapshot
                 // selected before this transaction. Match global pricing lock order.
                 $product = Product::whereKey($package->product_id)->lockForUpdate()->first();
@@ -238,14 +257,26 @@ class DigiflazzAutoSources
                     return;
                 }
 
-                $freshItem = DB::table('digiflazz_catalog_items')
-                    ->where('buyer_sku_code', $item->buyer_sku_code)->lockForUpdate()->first();
-                if ($freshItem === null || ! app(DigiflazzCatalogService::class)->sellable($freshItem)
-                    || ! $this->matchesPackage($locked, $product, $freshItem)
+                // Re-evaluate the complete catalog identity under current DB
+                // locking reads, not only the original chosen row. New variants,
+                // seller ownership and retagged regions can change the choice.
+                $freshMatches = DB::table('digiflazz_catalog_items')
+                    ->where('is_present', true)->orderBy('buyer_sku_code')
+                    ->lockForUpdate()->get()
+                    ->filter(fn (object $candidate): bool => app(DigiflazzCatalogService::class)->sellable($candidate)
+                        && $this->matchesPackage($locked, $product, $candidate));
+                if ($freshMatches->groupBy(fn (object $candidate): string => $this->key($candidate))->count() !== 1
                     || ProviderMapping::where('product_package_id', $locked->id)
-                        ->where('provider_id', $provider->id)->exists()
-                    || ProviderMapping::where('provider_id', $provider->id)
-                        ->where('external_sku', $freshItem->buyer_sku_code)->exists()) {
+                        ->where('provider_id', $provider->id)->exists()) {
+                    return;
+                }
+
+                $freshItem = $freshMatches->filter(
+                    fn (object $candidate): bool => ProviderMapping::where('provider_id', $provider->id)
+                        ->where('external_sku', $candidate->buyer_sku_code)->doesntExist()
+                )->sort(fn (object $a, object $b): int => (int) $a->price_idr <=> (int) $b->price_idr
+                    ?: strcmp((string) $a->buyer_sku_code, (string) $b->buyer_sku_code))->first();
+                if ($freshItem === null) {
                     return;
                 }
                 $mapping = app(DigiflazzCatalogImport::class)->upsert(
