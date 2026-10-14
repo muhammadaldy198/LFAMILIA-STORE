@@ -183,6 +183,9 @@ class CheckoutTest extends TestCase
             ],
         ]);
 
+        // Backups also need current supplier rows under the new sellable() rule.
+        $this->seedCheckoutDigiflazzCatalog($catalog['package_id']);
+
         $key = 'checkout-multiple-digiflazz-maxprice';
         // Test the real checkout service directly, without consuming the shared
         // HTTP rate-limit budget used by the existing security regression tests.
