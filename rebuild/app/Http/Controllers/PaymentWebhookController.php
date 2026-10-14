@@ -12,6 +12,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class PaymentWebhookController
 {
@@ -172,7 +173,7 @@ class PaymentWebhookController
             'FAILED' => 'FAILED',
             'REFUNDED', 'REFUND' => 'REFUNDED',
             'PENDING', 'REDIRECT', 'TIMEOUT' => 'PENDING',
-            default => throw new \Symfony\Component\HttpKernel\Exception\HttpException(503, 'Unrecognized DOKU status.'),
+            default => throw new HttpException(503, 'Unrecognized DOKU status.'),
         };
         // DOKU's status inquiry can lag notifications by 60s. A terminal
         // notification cannot become trusted merely because the GET says PENDING.
