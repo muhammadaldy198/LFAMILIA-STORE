@@ -368,39 +368,35 @@ class AdminDigiflazzRestorationTest extends TestCase
         $this->travelBack();
     }
 
-    public function test_full_sync_keeps_missing_supplier_rows_and_restores_sync_disabled_mappings(): void
+    public function test_full_sync_removes_missing_catalog_and_inactive_orphan_but_preserves_active_mapping(): void
     {
         $this->login();
-        $gone = $this->mappedItem('removed-mapped');
+        $active = $this->mappedItem('removed-active');
+        $inactive = $this->mappedItem('removed-inactive');
+        ProviderMapping::where('external_sku', 'removed-inactive')->update(['is_active' => false]);
         $this->mappedItem('removed-unmapped');
         ProviderMapping::where('external_sku', 'removed-unmapped')->delete();
         $this->mappedItem('retained');
+
         $this->fakeCatalog([$this->row(['buyer_sku_code' => 'retained', 'price' => 9500])]);
-
         $this->assertSame(1, app(DigiflazzCatalogService::class)->sync());
-        $this->assertDatabaseHas('digiflazz_catalog_items', ['buyer_sku_code' => 'removed-mapped', 'is_present' => false]);
-        $this->assertDatabaseHas('digiflazz_catalog_items', ['buyer_sku_code' => 'removed-unmapped', 'is_present' => false]);
-        $this->assertDatabaseHas('provider_mappings', ['external_sku' => 'removed-mapped', 'is_active' => false, 'disabled_by_sync' => true, 'cost_idr' => 10000]);
-        $this->assertDatabaseHas('product_packages', ['id' => $gone['package']->id, 'is_active' => true]);
+        foreach (['removed-active', 'removed-inactive', 'removed-unmapped'] as $sku) {
+            $this->assertDatabaseMissing('digiflazz_catalog_items', ['buyer_sku_code' => $sku]);
+        }
+        $this->assertDatabaseHas('provider_mappings', ['external_sku' => 'removed-active', 'is_active' => true]);
+        $this->assertDatabaseMissing('provider_mappings', ['external_sku' => 'removed-inactive']);
+        $this->assertDatabaseHas('product_packages', ['id' => $active['package']->id, 'is_active' => true]);
+        $this->assertDatabaseHas('product_packages', ['id' => $inactive['package']->id, 'is_active' => true]);
         $this->assertDatabaseHas('provider_mappings', ['external_sku' => 'retained', 'is_active' => true, 'cost_idr' => 9500]);
-        $this->assertSame(3, DB::table('digiflazz_catalog_items')->count());
+        $this->assertSame(1, DB::table('digiflazz_catalog_items')->count());
         $sync = json_decode((string) DB::table('system_settings')->where('key', 'digiflazz.last_catalog_sync')->value('value'), true);
-        $this->assertSame(2, $sync['missing']);
-        $this->assertSame(1, $sync['disabled_mappings']);
+        $this->assertSame(3, $sync['missing_deleted']);
+        $this->assertSame(1, $sync['inactive_mappings_deleted']);
 
-        $response = $this->get('/admin/digiflazz');
-        $response->assertOk();
-        $response->assertInertia(function (Assert $page): void {
-            $page->where('items.total', 3);
-            $page->where('summary.critical', 2);
-            $page->where('catalogSync.missing', 2);
-        });
-
-        $this->fakeCatalog([$this->row(['buyer_sku_code' => 'removed-mapped'])]);
+        $this->fakeCatalog([$this->row(['buyer_sku_code' => 'removed-active'])]);
         app(DigiflazzCatalogService::class)->sync();
-        $this->assertDatabaseHas('digiflazz_catalog_items', ['buyer_sku_code' => 'removed-mapped']);
-        $this->assertDatabaseHas('digiflazz_catalog_items', ['buyer_sku_code' => 'removed-mapped', 'is_present' => true]);
-        $this->assertDatabaseHas('provider_mappings', ['external_sku' => 'removed-mapped', 'is_active' => true, 'disabled_by_sync' => false]);
+        $this->assertDatabaseHas('digiflazz_catalog_items', ['buyer_sku_code' => 'removed-active', 'is_present' => true]);
+        $this->assertDatabaseHas('provider_mappings', ['external_sku' => 'removed-active', 'is_active' => true]);
     }
 
     public function test_single_sku_sync_does_not_delete_other_supplier_rows(): void
@@ -414,38 +410,29 @@ class AdminDigiflazzRestorationTest extends TestCase
 
         $this->fakeCatalog([]);
         $this->assertSame(0, app(DigiflazzCatalogService::class)->sync('single-target'));
-        $this->assertDatabaseHas('digiflazz_catalog_items', ['buyer_sku_code' => 'single-target', 'is_present' => false]);
-        $this->assertDatabaseHas('provider_mappings', ['external_sku' => 'single-target', 'is_active' => false, 'disabled_by_sync' => true]);
+        $this->assertDatabaseMissing('digiflazz_catalog_items', ['buyer_sku_code' => 'single-target']);
+        $this->assertDatabaseHas('provider_mappings', ['external_sku' => 'single-target', 'is_active' => true]);
         $this->assertDatabaseHas('digiflazz_catalog_items', ['buyer_sku_code' => 'other-sku', 'buyer_active' => true]);
     }
 
-    public function test_manual_disable_after_missing_sync_prevents_automatic_reactivation(): void
+    public function test_admin_disabled_mapping_is_never_reenabled_by_catalog_sync(): void
     {
         $this->login();
         $this->mappedItem('user-disabled-after-sync');
         $this->mappedItem('still-live');
+        ProviderMapping::where('external_sku', 'user-disabled-after-sync')->update(['is_active' => false]);
+
         $this->fakeCatalog([$this->row(['buyer_sku_code' => 'still-live'])]);
         app(DigiflazzCatalogService::class)->sync();
-
-        $mapping = ProviderMapping::where('external_sku', 'user-disabled-after-sync')->firstOrFail();
-        $this->assertTrue((bool) $mapping->fresh()->disabled_by_sync);
-        $this->put('/admin/catalog/mappings/'.$mapping->id, [
-            'priority' => 0, 'is_active' => false, 'customer_no_template' => '',
-        ])->assertRedirect()->assertSessionHasNoErrors();
-        $this->assertFalse((bool) $mapping->fresh()->disabled_by_sync);
+        $this->assertDatabaseMissing('provider_mappings', ['external_sku' => 'user-disabled-after-sync']);
 
         $this->fakeCatalog([
             $this->row(['buyer_sku_code' => 'still-live']),
             $this->row(['buyer_sku_code' => 'user-disabled-after-sync']),
         ]);
         app(DigiflazzCatalogService::class)->sync();
-        $this->assertDatabaseHas('digiflazz_catalog_items', [
-            'buyer_sku_code' => 'user-disabled-after-sync', 'is_present' => true,
-        ]);
-        $this->assertDatabaseHas('provider_mappings', [
-            'external_sku' => 'user-disabled-after-sync',
-            'is_active' => false, 'disabled_by_sync' => false,
-        ]);
+        $this->assertDatabaseHas('digiflazz_catalog_items', ['buyer_sku_code' => 'user-disabled-after-sync']);
+        $this->assertDatabaseMissing('provider_mappings', ['external_sku' => 'user-disabled-after-sync']);
     }
 
     public function test_large_unexpected_catalog_drop_is_rejected_without_changes(): void
