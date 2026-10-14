@@ -31,6 +31,7 @@ class PaymentPageController
                 'orders.fee_idr',
                 'orders.total_idr',
                 'orders.created_at',
+                'orders.expires_at',
                 'products.name as product_name',
                 'product_packages.name as package_name',
             )
@@ -56,9 +57,11 @@ class PaymentPageController
                 'fee_idr' => (int) $order->fee_idr,
                 'total_idr' => (int) $order->total_idr,
                 'created_at' => $order->created_at,
+                'expires_at' => $order->expires_at ? \Illuminate\Support\Carbon::parse($order->expires_at)->toIso8601String() : null,
             ],
             'payment' => $payments->forOrder((int) $order->id),
             'statusUrl' => $statusUrl,
+            'serverNow' => now()->toIso8601String(),
             'pageSettings' => $settings->read(),
         ]);
     }
