@@ -52,7 +52,7 @@ class CheckoutInputValidator
                     'customer_input.'.$field->field_key => $field->label.' harus berupa email valid.',
                 ]);
             }
-            if ($field->type === 'tel' && ! preg_match('/^[0-9+().\-\s]{6,32}$/', $value)) {
+            if ($field->type === 'tel' && ! preg_match('/^(?=(?:[^0-9]*[0-9]){10})[0-9+().\-\s]{6,32}$/', $value)) {
                 throw ValidationException::withMessages([
                     'customer_input.'.$field->field_key => $field->label.' tidak valid.',
                 ]);

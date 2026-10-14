@@ -165,3 +165,15 @@ test('customer payment page never promises an automatic refund', () => {
     assert.match(source, /if \(refunded\.value \|\| blocked\.value\)/);
     assert.doesNotMatch(source, /Pesanan masuk proses pengembalian dana/);
 });
+
+test('payment page shows a separate fee row between subtotal and total', () => {
+    const source = read('Pages/Payment/Show.vue');
+    assert.match(source, /Biaya pembayaran/);
+    assert.match(source, /formatIdr\(order\.fee_idr\)/);
+    // Urutan: subtotal -> fee -> total. Total tetap dari server.
+    const subtotal = source.indexOf('order.product_total_idr');
+    const fee = source.indexOf('order.fee_idr');
+    const total = source.indexOf('order.total_idr');
+    assert.ok(subtotal > -1 && fee > subtotal && total > fee);
+    assert.doesNotMatch(source, /order\.total_idr\s*=\s*order\.product_total_idr/);
+});

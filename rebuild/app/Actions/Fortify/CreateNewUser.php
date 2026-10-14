@@ -19,7 +19,7 @@ class CreateNewUser implements CreatesNewUsers
         Validator::make($input, [
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')],
-            'phone' => ['required', 'regex:/^\+?[0-9]{8,16}$/'],
+            'phone' => ['required', 'regex:/^\+?[0-9]{10,16}$/'],
             'password' => ['required', 'string', 'min:12', 'confirmed'],
         ])->validate();
 

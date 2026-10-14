@@ -34,6 +34,163 @@ class CatalogTest extends TestCase
         ]);
     }
 
+    public function test_index_hides_products_without_buyable_packages(): void
+    {
+        $category = Category::where('slug', 'game')->firstOrFail();
+        DB::table('providers')->where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
+        $providerId = DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
+        $suffix = bin2hex(random_bytes(3));
+
+        $buyable = Product::create([
+            'category_id' => $category->id,
+            'name' => 'Buyable Catalog '.$suffix,
+            'slug' => 'buyable-catalog-'.$suffix,
+            'fulfillment_mode' => 'AUTO_PROVIDER',
+            'margin_percent' => 10,
+            'sort_order' => -100,
+            'is_active' => true,
+        ]);
+        $buyablePackage = $buyable->packages()->create([
+            'code' => 'BUYABLE'.$suffix, 'name' => 'Buyable Package', 'is_active' => true,
+        ]);
+        DB::table('provider_mappings')->insert([
+            'product_package_id' => $buyablePackage->id,
+            'provider_id' => $providerId,
+            'external_sku' => 'BUYABLE-SKU-'.$suffix,
+            'cost_idr' => 10000,
+            'max_price_idr' => 12000,
+            'priority' => 1,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $this->seedCheckoutDigiflazzCatalog($buyablePackage->id);
+
+        $deadPrice = Product::create([
+            'category_id' => $category->id,
+            'name' => 'Dead Price Catalog '.$suffix,
+            'slug' => 'dead-price-catalog-'.$suffix,
+            'fulfillment_mode' => 'AUTO_PROVIDER',
+            'margin_percent' => 10,
+            'sort_order' => -100,
+            'is_active' => true,
+        ]);
+        $deadPricePackage = $deadPrice->packages()->create([
+            'code' => 'DEADPRICE'.$suffix, 'name' => 'Dead Price Package', 'is_active' => true,
+        ]);
+        DB::table('provider_mappings')->insert([
+            'product_package_id' => $deadPricePackage->id,
+            'provider_id' => $providerId,
+            'external_sku' => 'DEADPRICE-SKU-'.$suffix,
+            'cost_idr' => 13000,
+            'max_price_idr' => 12000,
+            'priority' => 1,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $deadNone = Product::create([
+            'category_id' => $category->id,
+            'name' => 'Dead None Catalog '.$suffix,
+            'slug' => 'dead-none-catalog-'.$suffix,
+            'fulfillment_mode' => 'AUTO_PROVIDER',
+            'margin_percent' => 10,
+            'sort_order' => -100,
+            'is_active' => true,
+        ]);
+        $deadNone->packages()->create([
+            'code' => 'DEADNONE'.$suffix, 'name' => 'Dead None Package', 'is_active' => true,
+        ]);
+
+        $this->get('/')->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Catalog/Index')
+                ->where('products.data', function (array $items) use ($buyable, $deadPrice, $deadNone): bool {
+                    $slugs = collect($items)->pluck('slug')->all();
+
+                    return in_array($buyable->slug, $slugs, true)
+                        && ! in_array($deadPrice->slug, $slugs, true)
+                        && ! in_array($deadNone->slug, $slugs, true);
+                })
+                ->etc());
+    }
+
+    public function test_search_matches_category_description_and_package_name_and_hides_unbuyable(): void
+    {
+        DB::table('providers')->where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
+        $providerId = DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
+        $suffix = bin2hex(random_bytes(3));
+
+        $category = Category::create([
+            'name' => 'Kategori Cari '.$suffix,
+            'slug' => 'kategori-cari-'.$suffix,
+            'sort_order' => 0,
+            'is_active' => true,
+        ]);
+        $product = Product::create([
+            'category_id' => $category->id,
+            'name' => 'Produk Cari '.$suffix,
+            'slug' => 'produk-cari-'.$suffix,
+            'description' => 'Deskripsi unik cari '.$suffix,
+            'fulfillment_mode' => 'AUTO_PROVIDER',
+            'margin_percent' => 10,
+            'is_active' => true,
+        ]);
+        $package = $product->packages()->create([
+            'code' => 'CARI'.$suffix, 'name' => 'Nominal Cari '.$suffix, 'is_active' => true,
+        ]);
+        DB::table('provider_mappings')->insert([
+            'product_package_id' => $package->id,
+            'provider_id' => $providerId,
+            'external_sku' => 'CARI-SKU-'.$suffix,
+            'cost_idr' => 10000,
+            'max_price_idr' => 12000,
+            'priority' => 1,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $this->seedCheckoutDigiflazzCatalog($package->id);
+
+        $dead = Product::create([
+            'category_id' => $category->id,
+            'name' => 'Produk Mati '.$suffix,
+            'slug' => 'produk-mati-'.$suffix,
+            'fulfillment_mode' => 'AUTO_PROVIDER',
+            'margin_percent' => 10,
+            'is_active' => true,
+        ]);
+        $dead->packages()->create([
+            'code' => 'MATI'.$suffix, 'name' => 'Nominal Mati', 'is_active' => true,
+        ]);
+
+        // Kategori.
+        $this->getJson('/catalog/search?q=Kategori Cari '.$suffix)
+            ->assertOk()
+            ->assertJsonCount(1, 'products')
+            ->assertJsonPath('products.0.slug', $product->slug);
+        // Deskripsi.
+        $this->getJson('/catalog/search?q=Deskripsi unik cari '.$suffix)
+            ->assertOk()
+            ->assertJsonCount(1, 'products')
+            ->assertJsonPath('products.0.slug', $product->slug);
+        // Nama paket.
+        $this->getJson('/catalog/search?q=Nominal Cari '.$suffix)
+            ->assertOk()
+            ->assertJsonCount(1, 'products')
+            ->assertJsonPath('products.0.slug', $product->slug);
+        // Produk mati tidak muncul meski namanya cocok.
+        $this->getJson('/catalog/search?q=Produk Mati '.$suffix)
+            ->assertOk()
+            ->assertJsonCount(0, 'products');
+        // Filter q di halaman katalog ikut perluasan yang sama.
+        $this->get('/?q=Nominal Cari '.$suffix)->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('products.data', fn (array $items) => collect($items)->contains('slug', $product->slug))
+                ->etc());
+    }
+
     public function test_default_categories_are_extensible_and_exclude_ewallet(): void
     {
         $this->assertSame([
@@ -76,16 +233,32 @@ class CatalogTest extends TestCase
     public function test_instant_search_returns_only_active_orderable_products(): void
     {
         $category = Category::where('slug', 'game')->firstOrFail();
+        DB::table('providers')->where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
+        $providerId = DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
         $active = Product::create([
             'category_id' => $category->id,
             'name' => 'LiveSearch Regression Game',
             'slug' => 'livesearch-regression-game',
             'margin_percent' => 10,
+            'fulfillment_mode' => 'AUTO_PROVIDER',
             'is_active' => true,
         ]);
-        $active->packages()->create([
+        $activePackage = $active->packages()->create([
             'code' => 'SEARCHLIVE1', 'name' => 'Search Package', 'is_active' => true,
         ]);
+        // D11: "orderable" berarti punya paket yang benar-benar bisa dibeli.
+        DB::table('provider_mappings')->insert([
+            'product_package_id' => $activePackage->id,
+            'provider_id' => $providerId,
+            'external_sku' => 'SEARCHLIVE-SKU-'.bin2hex(random_bytes(3)),
+            'cost_idr' => 10000,
+            'max_price_idr' => 12000,
+            'priority' => 1,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $this->seedCheckoutDigiflazzCatalog($activePackage->id);
         $hidden = Product::create([
             'category_id' => $category->id,
             'name' => 'LiveSearch Hidden Game',
@@ -179,16 +352,31 @@ class CatalogTest extends TestCase
         $admin = $this->admin();
         $this->actingAs($admin, 'admin');
         $category = Category::where('slug', 'game')->firstOrFail();
+        DB::table('providers')->where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
+        $providerId = DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
         $product = Product::create([
             'category_id' => $category->id, 'name' => 'Diamond Test', 'slug' => 'diamond-test',
-            'margin_percent' => 10, 'is_active' => true,
+            'margin_percent' => 10, 'fulfillment_mode' => 'AUTO_PROVIDER', 'is_active' => true,
         ]);
-        $product->packages()->create([
-            'code' => 'D100', 'name' => '100 Diamonds', 'nominal_value' => 100, 'is_active' => true,
-        ]);
-        $product->packages()->create([
-            'code' => 'D5', 'name' => '5 Diamonds', 'nominal_value' => 5, 'is_active' => true,
-        ]);
+        // D11: nominal tanpa mapping yang bisa dibeli tidak tampil — beri
+        // mapping agar kedua nominal tetap tampil dan urutannya bisa dites.
+        foreach ([['D100', '100 Diamonds', 100], ['D5', '5 Diamonds', 5]] as [$code, $name, $nominal]) {
+            $package = $product->packages()->create([
+                'code' => $code, 'name' => $name, 'nominal_value' => $nominal, 'is_active' => true,
+            ]);
+            DB::table('provider_mappings')->insert([
+                'product_package_id' => $package->id,
+                'provider_id' => $providerId,
+                'external_sku' => 'DIAMOND-SKU-'.$code.'-'.bin2hex(random_bytes(3)),
+                'cost_idr' => 10000,
+                'max_price_idr' => 12000,
+                'priority' => 1,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->seedCheckoutDigiflazzCatalog($package->id);
+        }
         $this->put('/admin/catalog/products/'.$product->id.'/fields', [
             'fields' => [
                 ['field_key' => 'user_id', 'label' => 'User ID', 'type' => 'text', 'is_required' => true],
@@ -386,19 +574,15 @@ class CatalogTest extends TestCase
             'updated_at' => now(),
         ]);
 
+        // D11: nominal yang tidak bisa dibeli tidak tampil sama sekali
+        // (bukan lagi label "Tidak tersedia"), jadi deep link tidak bisa
+        // memilihnya — dan daftar paketnya kosong.
         $this->get('/catalog/'.$product->slug.'?package='.$package->id)
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Catalog/Show')
                 ->where('initialPackageId', '')
-                ->where('packages.0.id', $package->id)
-                ->where('packages.0.is_available', false)
-                ->where('packages.0.price_idr', null)
-                ->missing('packages.0.code')
-                ->missing('packages.0.external_sku')
-                ->missing('packages.0.provider_mapping_id')
-                ->missing('packages.0.cost_idr')
-                ->missing('packages.0.max_price_idr')
+                ->has('packages', 0)
                 ->etc());
     }
 }

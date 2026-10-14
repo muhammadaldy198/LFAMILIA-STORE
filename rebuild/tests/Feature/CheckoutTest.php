@@ -458,8 +458,9 @@ class CheckoutTest extends TestCase
             'email' => 'stage74-member-'.bin2hex(random_bytes(4)).'@example.test',
             'phone' => '081234567899',
             'password' => Hash::make('StrongPassword123!'),
-            'email_verified_at' => now(),
         ]);
+        // D7: checkout mensyaratkan email terverifikasi.
+        $user->forceFill(['email_verified_at' => now()]);
         $user->forceFill([
             'membership_mode' => 'MANUAL',
             'membership_override_code' => 'SILVER',

@@ -50,7 +50,7 @@ class CustomerAccountController
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
-            'phone' => ['required', 'regex:/^\+?[0-9]{8,16}$/'],
+            'phone' => ['required', 'regex:/^\+?[0-9]{10,16}$/'],
             'current_password' => ['nullable', 'string'],
             'leaderboard_opt_in' => ['sometimes', 'boolean'],
         ]);

@@ -17,7 +17,7 @@ class CustomerPhoneController
     public function update(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'phone' => ['required', 'string', 'regex:/^\\+?[0-9]{8,16}$/'],
+            'phone' => ['required', 'string', 'regex:/^\\+?[0-9]{10,16}$/'],
         ]);
 
         $digits = preg_replace('/[^0-9]+/', '', $data['phone']) ?: null;

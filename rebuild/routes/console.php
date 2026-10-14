@@ -9,6 +9,7 @@ use App\Models\IntegrationCredential;
 use App\Services\AdminNotificationService;
 use App\Services\CustomerCleanupService;
 use App\Services\DigiflazzCatalogService;
+use App\Services\ExternalNotificationService;
 use App\Services\PaymentStateService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
@@ -249,3 +250,77 @@ Artisan::command('lfamilia:sync-digiflazz-catalog', function (DigiflazzCatalogSe
 })->purpose('Refresh supplier costs and availability while preserving customer margin settings');
 
 Schedule::command('lfamilia:sync-digiflazz-catalog')->everyFiveMinutes()->withoutOverlapping();
+
+// D8: healthcheck (deploy/healthcheck.sh) memanggil command ini saat
+// gagal (down) dan saat pulih (up). Alert down di-dedupe 30 menit agar
+// tidak spam tiap 5 menit; kabar pulih hanya bila ada alert down yang
+// belum ditutup kabar pulih. Pengiriman sinkron best-effort agar kabar
+// keluar segera meski queue worker sedang mati — job antrean yang
+// dikirim record() tetap jalan belakangan dan dedupe mencegah kirim
+// ganda per channel.
+Artisan::command('lfamilia:notify-healthcheck {state} {--reason=}', function (
+    AdminNotificationService $notifications,
+    ExternalNotificationService $external,
+): int {
+    $state = (string) $this->argument('state');
+    if (! in_array($state, ['down', 'up'], true)) {
+        $this->error('State harus down atau up.');
+
+        return 1;
+    }
+
+    if ($state === 'down') {
+        $recent = DB::table('admin_notifications')
+            ->where('event_type', 'system.healthcheck.failed')
+            ->where('created_at', '>=', now()->subMinutes(30))
+            ->exists();
+        if ($recent) {
+            $this->info('Alert healthcheck gagal sudah dikirim dalam 30 menit terakhir.');
+
+            return 0;
+        }
+
+        $reason = trim((string) ($this->option('reason') ?? ''));
+        $id = $notifications->record(
+            'system.healthcheck.failed',
+            'Website tidak sehat - healthcheck gagal',
+            'Healthcheck gagal'.($reason !== '' ? ': '.$reason : '').'. Periksa VPS / layanan.',
+            'ERROR',
+            'system',
+            'healthcheck',
+        );
+        try {
+            $external->deliver($id);
+        } catch (Throwable) {
+            // Job antrean mencoba ulang channel yang gagal.
+        }
+
+        return 0;
+    }
+
+    $latestDown = DB::table('admin_notifications')
+        ->where('event_type', 'system.healthcheck.failed')
+        ->orderByDesc('id')->value('id');
+    $latestRecovered = DB::table('admin_notifications')
+        ->where('event_type', 'system.healthcheck.recovered')
+        ->orderByDesc('id')->value('id');
+    if ($latestDown === null || ($latestRecovered !== null && (int) $latestRecovered > (int) $latestDown)) {
+        return 0;
+    }
+
+    $id = $notifications->record(
+        'system.healthcheck.recovered',
+        'Website pulih - healthcheck lolos',
+        'Healthcheck kembali lolos setelah sebelumnya gagal.',
+        'INFO',
+        'system',
+        'healthcheck',
+    );
+    try {
+        $external->deliver($id);
+    } catch (Throwable) {
+        // Job antrean mencoba ulang channel yang gagal.
+    }
+
+    return 0;
+})->purpose('Notify admin when the production healthcheck fails or recovers');

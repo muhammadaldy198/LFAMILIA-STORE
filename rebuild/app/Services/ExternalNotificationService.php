@@ -22,7 +22,7 @@ class ExternalNotificationService
         $text = '['.$notification->severity.'] '.$notification->title."\n".$notification->message;
         $results = [
             $this->telegram($notificationId, $text),
-            $this->discord($notificationId, $text),
+            $this->discord($notification, $text),
             $this->resend($notificationId, $notification->title, $text),
         ];
 
@@ -51,15 +51,22 @@ class ExternalNotificationService
         });
     }
 
-    private function discord(int $id, string $text): ?bool
+    private function discord(object $notification, string $text): ?bool
     {
         $config = $this->config('discord');
-        $url = (string) ($config['webhook_url'] ?? '');
-        if (! $config || ! DiscordWebhookUrl::valid($url)) {
+        if (! $config) {
             return null;
         }
 
-        return $this->attempt($id, 'discord', $url, fn () => Http::acceptJson()->withOptions(['allow_redirects' => false])->timeout(8)->post($url, [
+        // Discord dipecah per jenis notif; tiap channel dilacak terpisah
+        // di notification_deliveries agar retry tidak tertukar.
+        $channel = DiscordNotificationRouting::channelFor((string) $notification->event_type);
+        $url = DiscordNotificationRouting::webhookUrl($config, $channel);
+        if ($url === null) {
+            return null;
+        }
+
+        return $this->attempt((int) $notification->id, 'discord:'.$channel, $url, fn () => Http::acceptJson()->withOptions(['allow_redirects' => false])->timeout(8)->post($url, [
             'content' => mb_substr($text, 0, 1900),
             'allowed_mentions' => ['parse' => []],
         ]));

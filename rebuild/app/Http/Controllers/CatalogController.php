@@ -13,6 +13,7 @@ use App\Services\CatalogNominalOrder;
 use App\Services\CheckoutPricing;
 use App\Services\PaymentRoutingService;
 use App\Services\StorefrontContentService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -20,6 +21,51 @@ use Inertia\Response;
 
 class CatalogController
 {
+    /**
+     * D12: pencarian mencakup nama produk, deskripsi, nama kategori,
+     * dan nama paket (bukan cuma nama produk).
+     */
+    private function searchScope(Builder $query, string $needle): void
+    {
+        $query->where(function (Builder $nested) use ($needle): void {
+            $nested->where('name', 'like', '%'.$needle.'%')
+                ->orWhere('description', 'like', '%'.$needle.'%')
+                ->orWhereHas('category', fn (Builder $category) => $category
+                    ->where('name', 'like', '%'.$needle.'%'))
+                ->orWhereHas('packages', fn (Builder $package) => $package
+                    ->where('is_active', true)
+                    ->where('name', 'like', '%'.$needle.'%'));
+        });
+    }
+
+    /**
+     * D11: produk hanya tampil bila minimal satu paketnya benar-benar
+     * bisa dibeli. Keterbelian diputuskan CheckoutPricing::forPackages —
+     * cek yang sama dengan yang dipakai checkout (bukan cuma paket aktif).
+     *
+     * @return array<int>
+     */
+    private function buyableProductIds(Builder $products): array
+    {
+        $packageIds = ProductPackage::whereIn('product_id', (clone $products)->pluck('id'))
+            ->where('is_active', true)
+            ->pluck('id')
+            ->all();
+        if ($packageIds === []) {
+            return [];
+        }
+        $quotes = app(CheckoutPricing::class)->forPackages($packageIds);
+        if ($quotes === []) {
+            return [];
+        }
+
+        return ProductPackage::whereIn('id', array_keys($quotes))
+            ->pluck('product_id')
+            ->unique()
+            ->values()
+            ->all();
+    }
+
     public function index(Request $request, StorefrontContentService $content): Response
     {
         $filters = $request->validate([
@@ -35,13 +81,16 @@ class CatalogController
                 'image_url' => $category->getFirstMediaUrl('image'),
             ]);
 
-        $products = Product::with(['category', 'media'])->where('is_active', true)
+        $baseProducts = Product::with(['category', 'media'])->where('is_active', true)
             ->whereHas('category', fn ($query) => $query->where('is_active', true))
             ->whereHas('packages', fn ($query) => $query->where('is_active', true))
             ->when(($filters['category'] ?? null), fn ($query, $slug) => $query->whereHas('category',
                 fn ($category) => $category->where('slug', $slug)))
             ->when(($filters['mode'] ?? null) === 'manual', fn ($query) => $query->where('fulfillment_mode', 'MANUAL'))
-            ->when($search !== '', fn ($query) => $query->where('name', 'like', '%'.$search.'%'))
+            ->when($search !== '', fn ($query) => $this->searchScope($query, $search));
+
+        $products = $baseProducts
+            ->whereIn('id', $this->buyableProductIds($baseProducts))
             ->orderBy('sort_order')->orderBy('name')->paginate(24)
             ->withQueryString()
             ->through(fn (Product $product): array => [
@@ -51,11 +100,13 @@ class CatalogController
                 'image_url' => $product->getFirstMediaUrl('image'),
             ]);
 
-        $popularProducts = Product::with(['category', 'media'])
+        $basePopular = Product::with(['category', 'media'])
             ->withCount(['reviews as active_reviews_count' => fn ($query) => $query->where('is_active', true)])
             ->where('is_active', true)
             ->whereHas('category', fn ($query) => $query->where('is_active', true))
-            ->whereHas('packages', fn ($query) => $query->where('is_active', true))
+            ->whereHas('packages', fn ($query) => $query->where('is_active', true));
+        $popularProducts = $basePopular
+            ->whereIn('id', $this->buyableProductIds($basePopular))
             ->orderByDesc('popular')
             ->orderByDesc('active_reviews_count')
             ->orderBy('sort_order')
@@ -113,11 +164,13 @@ class CatalogController
             return response()->json(['products' => []]);
         }
 
-        $products = Product::with(['category', 'media'])
+        $baseProducts = Product::with(['category', 'media'])
             ->where('is_active', true)
             ->whereHas('category', fn ($query) => $query->where('is_active', true))
-            ->whereHas('packages', fn ($query) => $query->where('is_active', true))
-            ->where('name', 'like', '%'.$needle.'%')
+            ->whereHas('packages', fn ($query) => $query->where('is_active', true));
+        $this->searchScope($baseProducts, $needle);
+        $products = $baseProducts
+            ->whereIn('id', $this->buyableProductIds($baseProducts))
             ->orderBy('sort_order')
             ->orderBy('name')
             ->limit(8)
@@ -162,7 +215,10 @@ class CatalogController
                     'is_available' => $available,
                     'price_idr' => $price,
                 ];
-            });
+            })
+            // D11: nominal yang tidak bisa dibeli tidak tampil sama sekali.
+            ->filter(fn (array $package): bool => $package['is_available'])
+            ->values();
 
         $user = auth('web')->user();
         $reviews = ProductReview::where('product_id', $product->id)->where('is_active', true)

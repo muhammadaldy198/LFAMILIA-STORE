@@ -416,7 +416,7 @@ function localAccountErrors() {
             validation[key] = [field.label + ' harus berupa email valid.'];
             continue;
         }
-        if (field.type === 'tel' && !/^[0-9+().\-\s]{6,32}$/.test(value)) {
+        if (field.type === 'tel' && !/^(?=(?:[^0-9]*[0-9]){10})[0-9+().\-\s]{6,32}$/.test(value)) {
             validation[key] = [field.label + ' tidak valid.'];
         }
     }

@@ -49,3 +49,11 @@ test('integration empty state is meaningful', () => {
     assert.match(source, /v-if="!items\.length" role="status"/);
     assert.match(source, /v-if="items\.length" class="lf-admin-tabs"/);
 });
+
+test('per-product sync button label admits it syncs the whole catalog', () => {
+    const source = read('Catalog.vue');
+    assert.match(source, /Sinkron seluruh katalog/);
+    assert.match(source, /Menyinkronkan seluruh katalog Digiflazz, bukan hanya produk ini/);
+    assert.doesNotMatch(source, /Sinkron semua nominal produk/);
+    assert.match(source, /router\.post\('\/admin\/catalog\/products\/'\+item\.id\+'\/sync'/);
+});

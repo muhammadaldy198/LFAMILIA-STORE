@@ -146,7 +146,7 @@ class AdminOrdersController
     {
         $data = $request->validate([
             'customer_name' => ['required', 'string', 'min:2', 'max:120'],
-            'phone' => ['required', 'string', 'min:5', 'max:32'],
+            'phone' => ['required', 'string', 'regex:/^\+?[0-9]{10,16}$/'],
             'email' => ['nullable', 'email', 'max:255'],
             'product_name' => ['required', 'string', 'min:2', 'max:120'],
             'package_name' => ['required', 'string', 'min:2', 'max:120'],

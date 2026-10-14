@@ -513,7 +513,7 @@ class AdminCatalogController
         }
 
         if (($data['pricing_mode'] ?? $package->pricing_mode) === 'SELL_PRICE'
-            && (int) ($data['sell_price_idr'] ?? $package->sell_price_idr) < (int) $package->mappings()->max('cost_idr')) {
+            && (int) ($data['sell_price_idr'] ?? $package->sell_price_idr) < (int) $package->mappings()->where('is_active', true)->max('cost_idr')) {
             throw ValidationException::withMessages(['sell_price_idr' => 'Harga jual tidak boleh di bawah modal.']);
         }
         DB::transaction(function () use ($request, $package, $data, $audit): void {
