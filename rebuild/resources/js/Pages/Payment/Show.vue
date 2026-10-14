@@ -27,6 +27,7 @@ const failedStatuses = ['FAILED', 'REJECTED', 'DENIED', 'DENY'];
 
 const paymentStatus = computed(() => String(props.payment?.status || '').toUpperCase());
 const orderStatus = computed(() => String(props.order.status || '').toUpperCase());
+const blocked = computed(() => orderStatus.value === 'BLOCKED');
 const refunded = computed(() => paymentStatus.value === 'REFUNDED' || ['REFUND', 'REFUNDED'].includes(orderStatus.value));
 const expired = computed(() => expiredStatuses.includes(paymentStatus.value) || orderStatus.value === 'EXPIRED');
 const cancelled = computed(() => cancelledStatuses.includes(paymentStatus.value) || orderStatus.value === 'CANCELLED');
@@ -36,7 +37,7 @@ const latePaid = computed(() => paidStatuses.includes(paymentStatus.value) && ['
 const paid = computed(() => !refunded.value && !expired.value && !cancelled.value && !failed.value
     && (paidStatuses.includes(paymentStatus.value) || ['PAID', 'PROCESSING', 'SUCCESS'].includes(orderStatus.value)));
 const uncertain = computed(() => ['UNKNOWN', 'CREATING'].includes(paymentStatus.value) && !paid.value && !refunded.value);
-const terminal = computed(() => paid.value || expired.value || cancelled.value || failed.value || refunded.value);
+const terminal = computed(() => paid.value || expired.value || cancelled.value || failed.value || refunded.value || blocked.value);
 const canOrderAgain = computed(() => !latePaid.value && (expired.value || failed.value || cancelled.value));
 const clockOffset = Date.parse(props.serverNow) - Date.now();
 const clockTick = ref(Date.now());
@@ -54,7 +55,8 @@ const expiryWib = computed(() => Number.isFinite(expiryTimestamp.value)
     : null);
 const canResume = computed(() => !terminal.value && (!props.payment || retryRejected.value));
 const title = computed(() => {
-    if (refunded.value) return 'Pengembalian dana';
+    if (refunded.value) return 'Perlu pemeriksaan admin';
+    if (blocked.value) return 'Gagal diproses';
     if (latePaid.value) return 'Pembayaran perlu diperiksa';
     if (paid.value) return settings.value.paidTitle || 'Pembayaran berhasil';
     if (expired.value) return settings.value.expiredTitle || 'Pembayaran kedaluwarsa';
@@ -89,7 +91,7 @@ const paymentLabel = computed(() => {
     return name || '-';
 });
 const statusText = computed(() => {
-    if (refunded.value) return 'Pesanan masuk proses pengembalian dana. Periksa status invoice atau hubungi bantuan.';
+    if (refunded.value || blocked.value) return 'Sudah bayar tapi barang belum masuk? Hubungi admin, pesanan diselesaikan manual. Sertakan ID order dan bukti bayar.';
     if (latePaid.value) return 'Pembayaran terverifikasi setelah pesanan ditutup. Admin perlu memeriksa transaksi ini. Jangan membayar lagi.';
     if (paid.value) return settings.value.paidStatusText || 'Pembayaran sudah diterima. Status pesanan akan diperbarui otomatis.';
     if (expired.value) return 'Pesanan ini sudah berakhir. Cek status invoice jika ragu, lalu buat pesanan baru untuk membayar.';
@@ -316,7 +318,7 @@ onBeforeUnmount(() => {
 
             <button v-if="canResume" type="button" :disabled="startingPayment || refreshingStatus" class="lf-payment-primary mt-5 flex h-12 w-full items-center justify-center rounded-xl bg-[#b9ff35] font-black text-[#091006] disabled:opacity-50" @click="resumePayment">{{startingPayment ? 'Menyiapkan…' : 'Siapkan pembayaran'}}</button>
             <button v-if="!terminal && !uncertain && paymentUrl" type="button" :disabled="openingPayment" class="lf-payment-primary mt-5 flex h-12 w-full items-center justify-center rounded-xl bg-[#b9ff35] font-black text-[#091006] disabled:opacity-50" @click="openPayment">{{openingPayment ? 'Memproses…' : (settings.payButtonText || 'Bayar Sekarang')}}</button>
-            <Link v-if="paid || latePaid || refunded" :href="statusUrl" class="lf-payment-primary mt-5 flex h-12 w-full items-center justify-center rounded-xl bg-[#b9ff35] font-black text-[#091006]">{{ customerText("pages.payment.show.2fdc5653", "Lihat status pesanan") }}</Link>
+            <Link v-if="paid || latePaid || refunded || blocked" :href="statusUrl" class="lf-payment-primary mt-5 flex h-12 w-full items-center justify-center rounded-xl bg-[#b9ff35] font-black text-[#091006]">{{ customerText("pages.payment.show.2fdc5653", "Lihat status pesanan") }}</Link>
             <Link v-if="canOrderAgain" href="/" class="lf-payment-primary mt-5 flex h-12 w-full items-center justify-center rounded-xl bg-[#b9ff35] font-black text-[#091006]">Buat pesanan baru</Link>
 
             <div class="lf-payment-actions mt-3 grid grid-cols-2 gap-2">
