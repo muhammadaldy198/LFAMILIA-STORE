@@ -493,6 +493,32 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertDatabaseHas('audit_logs', ['action' => 'catalog.margin.global_updated']);
     }
 
+    public function test_global_margin_confirmation_rejects_supplier_cost_changes_after_preview(): void
+    {
+        $this->login();
+        $product = $this->product();
+        $package = ProductPackage::create([
+            'product_id' => $product->id, 'code' => 'PREVIEW-LOCK', 'name' => 'Preview Lock',
+            'pricing_mode' => 'PRODUCT_MARGIN', 'is_active' => true,
+        ]);
+        $mapping = ProviderMapping::create([
+            'provider_id' => Provider::where('code', 'DIGIFLAZZ')->value('id'),
+            'product_package_id' => $package->id,
+            'external_sku' => 'preview-'.bin2hex(random_bytes(3)),
+            'cost_idr' => 10000, 'max_price_idr' => 10000, 'priority' => 0,
+            'is_active' => false,
+        ]);
+        $preview = $this->postJson('/admin/catalog/margin/preview', [
+            'margin_percent' => 15,
+        ])->assertOk();
+        $mapping->update(['cost_idr' => 12000, 'max_price_idr' => 12000]);
+
+        $this->put('/admin/catalog/margin', [
+            'preview_token' => $preview->json('token'),
+        ])->assertSessionHasErrors('preview_token');
+        $this->assertSame('10.0000', (string) $product->fresh()->margin_percent);
+    }
+
     public function test_global_margin_explicitly_converts_legacy_digiflazz_imported_percent_only(): void
     {
         $this->login();
