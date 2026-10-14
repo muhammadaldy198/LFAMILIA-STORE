@@ -101,7 +101,7 @@ class AdminOrdersController
                 ['label' => 'Gagal', 'value' => (int) ($counts['FAILED'] ?? 0)],
                 ['label' => 'Perlu perhatian', 'value' => $attention],
             ],
-            'statuses' => collect(AdminOrderPresentation::STATUSES)->only(['PENDING_PAYMENT', 'PAID', 'PROCESSING', 'SUCCESS', 'FAILED', 'EXPIRED', 'CANCELLED', 'BLOCKED'])->all(),
+            'statuses' => collect(AdminOrderPresentation::STATUSES)->only(['PENDING_PAYMENT', 'PAID', 'PROCESSING', 'SUCCESS', 'FAILED', 'EXPIRED', 'CANCELLED', 'BLOCKED', 'REFUND'])->all(),
             'providers' => DB::table('providers')->orderBy('code')->pluck('code'),
             'channels' => DB::table('payment_channels')->orderBy('sort_order')->get(['code', 'name']),
             'canCreateManual' => $canManage && $canPay, 'updatedAt' => now()->toIso8601String(),
