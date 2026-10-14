@@ -36,7 +36,20 @@ class AdminPricingPreviewService
         $convert = $preview['input']['convert'];
 
         DB::transaction(function () use ($request, $preview, $margin, $convert, $audit): void {
-            Product::where('fulfillment_mode', 'AUTO_PROVIDER')->lockForUpdate()->get(['id']);
+            // Lock every data source whose values appear in the preview fingerprint.
+            // Supplier sync and catalog edits must not change those rows between
+            // verification and committing the confirmed global margin.
+            Product::where('fulfillment_mode', 'AUTO_PROVIDER')
+                ->orderBy('id')->lockForUpdate()->get(['id']);
+            ProductPackage::whereHas('product', fn ($query) => $query->where('fulfillment_mode', 'AUTO_PROVIDER'))
+                ->orderBy('id')->lockForUpdate()->get(['id']);
+            DB::table('provider_mappings as mappings')
+                ->join('product_packages as packages', 'packages.id', '=', 'mappings.product_package_id')
+                ->join('products', 'products.id', '=', 'packages.product_id')
+                ->where('products.fulfillment_mode', 'AUTO_PROVIDER')
+                ->orderBy('mappings.id')->lockForUpdate()->get(['mappings.id']);
+            DB::table('system_settings')->where('key', 'catalog.default_margin_percent')
+                ->lockForUpdate()->first();
             $plan = $this->globalPlan($margin, $convert);
             $this->assertUnchanged($preview['fingerprint'], $plan);
             $before = $plan['products'];
@@ -290,7 +303,22 @@ class AdminPricingPreviewService
 
     private function consumePreview(Request $request, string $type, string $token): array
     {
-        $preview = Cache::pull($this->previewKey($request, $type, $token));
+        $key = $this->previewKey($request, $type, $token);
+        // Cache::pull alone is a non-atomic read followed by delete.
+        // Claiming the cache lock prevents concurrent confirmations of one token.
+        $lock = Cache::lock($key.'.consume-lock', 15);
+        if (! $lock->get()) {
+            throw ValidationException::withMessages([
+                'preview_token' => 'Preview sedang dikonfirmasi. Jangan kirim ulang.',
+            ]);
+        }
+
+        try {
+            $preview = Cache::pull($key);
+        } finally {
+            $lock->release();
+        }
+
         if (! is_array($preview)) {
             throw ValidationException::withMessages([
                 'preview_token' => 'Preview sudah kedaluwarsa atau belum dibuat. Buat preview baru.',
