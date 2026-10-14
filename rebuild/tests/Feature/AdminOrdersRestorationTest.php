@@ -287,11 +287,11 @@ class AdminOrdersRestorationTest extends TestCase
         Queue::fake();
         Http::swap(new Factory);
         Http::fake(['*' => Http::response(['order_id' => 'WRONG', 'gross_amount' => '15000.00', 'status_code' => '200', 'transaction_status' => 'settlement'])]);
-        $this->post('/admin/orders/'.$id.'/check-payment')->assertSessionHasErrors('payment');
+        $this->post('/admin/orders/'.$id.'/check-payment')->assertStatus(422);
         $this->assertSame('PENDING', DB::table('payment_transactions')->where('id', $paymentId)->value('status'));
         Http::swap(new Factory);
         Http::fake(['*' => Http::response(['order_id' => 'CHECK-ORDER-REGRESSION', 'gross_amount' => '14000.00', 'status_code' => '200', 'transaction_status' => 'settlement'])]);
-        $this->post('/admin/orders/'.$id.'/check-payment')->assertSessionHasErrors('payment');
+        $this->post('/admin/orders/'.$id.'/check-payment')->assertStatus(422);
         $this->assertSame('PENDING_PAYMENT', DB::table('orders')->where('id', $id)->value('status'));
         Http::swap(new Factory);
         Http::fake(['*' => Http::response(['order_id' => 'CHECK-ORDER-REGRESSION', 'gross_amount' => '15000.00', 'status_code' => '200', 'transaction_status' => 'settlement'])]);
