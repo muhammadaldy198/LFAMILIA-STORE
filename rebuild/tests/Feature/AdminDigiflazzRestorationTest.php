@@ -751,6 +751,55 @@ class AdminDigiflazzRestorationTest extends TestCase
         $this->assertDatabaseMissing('provider_mappings', ['external_sku' => 'BLOCK2.000']);
     }
 
+    public function test_auto_source_never_publishes_mapping_for_unverified_multi_field_destination(): void
+    {
+        $sample = $this->mappedItem('TWOFIELDS3.000', [
+            'brand' => 'Twofields', 'product_name' => 'Twofields 3.000',
+        ]);
+        $sample['product']->update(['name' => 'Twofields']);
+        $sample['product']->fields()->create([
+            'field_key' => 'user_id', 'label' => 'User ID', 'type' => 'text',
+            'is_required' => true, 'sort_order' => 0,
+        ]);
+        $sample['product']->fields()->create([
+            'field_key' => 'zone_id', 'label' => 'Zone ID', 'type' => 'text',
+            'is_required' => true, 'sort_order' => 1,
+        ]);
+        $sample['package']->update(['nominal_value' => 3000]);
+        ProviderMapping::where('external_sku', 'TWOFIELDS3.000')->delete();
+
+        $this->assertSame(0, app(DigiflazzAutoSources::class)->sync());
+        $this->assertDatabaseMissing('provider_mappings', [
+            'product_package_id' => $sample['package']->id,
+            'external_sku' => 'TWOFIELDS3.000',
+        ]);
+    }
+
+    public function test_admin_auto_source_action_bootstraps_initial_unmapped_source_only(): void
+    {
+        $this->login();
+        $sample = $this->mappedItem('ENABLE4.000', [
+            'brand' => 'Enable', 'product_name' => 'Enable 4.000',
+        ]);
+        $sample['product']->update(['name' => 'Enable']);
+        $sample['product']->fields()->create([
+            'field_key' => 'user_id', 'label' => 'User ID', 'type' => 'text',
+            'is_required' => true, 'sort_order' => 0,
+        ]);
+        $sample['package']->update(['nominal_value' => 4000]);
+        ProviderMapping::where('external_sku', 'ENABLE4.000')->delete();
+
+        $this->post('/admin/catalog/products/'.$sample['product']->id.'/auto-sources')
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('provider_mappings', [
+            'product_package_id' => $sample['package']->id,
+            'external_sku' => 'ENABLE4.000', 'priority' => 0, 'is_active' => true,
+        ]);
+        $this->post('/admin/catalog/products/'.$sample['product']->id.'/auto-sources')
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame(1, ProviderMapping::where('product_package_id', $sample['package']->id)->count());
+    }
+
     public function test_duplicate_active_mappings_are_reported_but_never_changed_by_auto_sources(): void
     {
         $sample = $this->mappedItem('DUPE-A');
@@ -794,6 +843,31 @@ class AdminDigiflazzRestorationTest extends TestCase
             $before + 1,
             DB::table('admin_notifications')->where('event_type', 'digiflazz.sync.failed')->count()
         );
+    }
+
+    public function test_max_price_confirmation_rejects_token_while_atomic_claim_is_held(): void
+    {
+        $admin = $this->login();
+        $this->mappedItem('claim-test');
+        $preview = $this->postJson('/admin/digiflazz/max-prices/preview', [
+            'sku_text' => 'claim-test,12500',
+        ])->assertOk();
+        $token = $preview->json('token');
+        $key = 'admin.pricing.preview.'.$admin->id.'.max_price.'.hash('sha256', $token).'.consume-lock';
+        $lock = Cache::lock($key, 15);
+        $this->assertTrue($lock->get());
+        try {
+            $this->post('/admin/digiflazz/max-prices/apply', [
+                'preview_token' => $token,
+            ])->assertSessionHasErrors('preview_token');
+        } finally {
+            $lock->release();
+        }
+        $this->assertDatabaseHas('provider_mappings', ['external_sku' => 'claim-test', 'cost_idr' => 10000]);
+        $this->post('/admin/digiflazz/max-prices/apply', [
+            'preview_token' => $token,
+        ])->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('provider_mappings', ['external_sku' => 'claim-test', 'cost_idr' => 12500]);
     }
 
     public function test_admin_buyer_area_max_price_requires_preview_and_only_changes_selected_sku(): void
