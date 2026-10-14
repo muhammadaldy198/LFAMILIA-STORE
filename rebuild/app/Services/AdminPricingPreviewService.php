@@ -90,10 +90,10 @@ class AdminPricingPreviewService
         // Ordinary reads within it would pin an old snapshot before row locks.
         $providerId = Provider::where('code', 'DIGIFLAZZ')->value('id');
         $dependencies = DB::table('provider_mappings as mappings')
-                ->join('product_packages as packages', 'packages.id', '=', 'mappings.product_package_id')
-                ->where('mappings.provider_id', $providerId)
-                ->whereIn('mappings.external_sku', array_keys($prices))
-                ->get(['packages.id as package_id', 'packages.product_id']);
+            ->join('product_packages as packages', 'packages.id', '=', 'mappings.product_package_id')
+            ->where('mappings.provider_id', $providerId)
+            ->whereIn('mappings.external_sku', array_keys($prices))
+            ->get(['packages.id as package_id', 'packages.product_id']);
 
         DB::transaction(function () use ($request, $preview, $audit, $prices, $providerId, $dependencies): void {
             // Match the global-margin confirmation lock order: product, package,
