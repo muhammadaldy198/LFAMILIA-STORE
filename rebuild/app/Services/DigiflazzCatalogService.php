@@ -202,6 +202,32 @@ class DigiflazzCatalogService
         return null;
     }
 
+    /**
+     * Bootstrap and managed-import mappings retain a snapshot of the supplier's
+     * brand, category, type and product name. A reused SKU must be rejected
+     * without modifying an active mapping or its locked price.
+     */
+    public function verifiedIdentityMatches(object $item, mixed $fulfillmentConfig): bool
+    {
+        $config = is_string($fulfillmentConfig)
+            ? json_decode($fulfillmentConfig, true)
+            : $fulfillmentConfig;
+        if ($config === null) {
+            return true;
+        }
+        if (! is_array($config)) {
+            return false;
+        }
+        if (! array_key_exists('auto_source_group', $config)) {
+            return true;
+        }
+
+        $identity = $config['auto_source_group'];
+
+        return is_string($identity) && preg_match('/\A[a-f0-9]{64}\z/D', $identity) === 1
+            && hash_equals($identity, app(DigiflazzAutoSources::class)->key($item));
+    }
+
     public function sellable(object $item): bool
     {
         return $this->available($item) && now()->diffInHours($item->synced_at, true) <= 24;
