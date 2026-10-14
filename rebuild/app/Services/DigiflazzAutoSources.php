@@ -146,48 +146,16 @@ class DigiflazzAutoSources
 
     public function enableProduct(Product $product, Request $request): int
     {
-        return DB::transaction(function () use ($product, $request): int {
-            $product = Product::whereKey($product->id)->lockForUpdate()->firstOrFail();
-            $catalog = $this->catalog();
-            $provider = Provider::where('code', 'DIGIFLAZZ')->firstOrFail();
-            $added = 0;
-            foreach ($product->packages()->with('mappings')->get() as $package) {
-                $mappings = $package->mappings->where('provider_id', $provider->id);
-                // Only the admin can intentionally add or change additional sources.
-                if ($mappings->isNotEmpty()) {
-                    $this->warnDuplicateMappings($package, $provider->id);
-
-                    continue;
-                }
-                $rows = DB::table('digiflazz_catalog_items')->whereIn('buyer_sku_code', $mappings->pluck('external_sku'))->get();
-                $keys = $rows->map(fn (object $item): string => $this->key($item))->unique();
-                if ($keys->count() > 1) {
-                    throw ValidationException::withMessages(['auto_sources' => 'Nominal '.$package->name.' memiliki sumber dari varian berbeda. Tidak ada sumber yang dipindahkan.']);
-                }
-                if ($keys->isEmpty()) {
-                    continue;
-                }
-                $peers = $catalog->get($keys->first(), collect());
-                $template = $mappings->map(fn (ProviderMapping $mapping) => data_get($mapping->fulfillment_config, 'customer_no_template'))
-                    ->filter()->unique();
-                if ($template->count() > 1 || ($product->fields()->count() > 1 && $template->isEmpty())) {
-                    throw ValidationException::withMessages(['auto_sources' => 'Format ID tujuan nominal '.$package->name.' harus seragam sebelum cadangan otomatis diaktifkan.']);
-                }
-                $before = $mappings->count();
-                $this->importGroup($product, $peers, $template->first(), $package->is_active && $mappings->contains('is_active', true), (string) $product->margin_percent, true, $request);
-                $added += $package->mappings()->where('provider_id', $provider->id)->count() - $before;
-            }
-            $this->orderProduct($product);
-
-            return $added;
-        });
+        // The admin action uses the same safe one-source bootstrap as full sync.
+        // It may add an initial mapping, but never auto-add a second mapping.
+        return $this->sync((int) $product->id);
     }
 
     /**
      * Observe existing mappings without changing their state. Bootstrap exactly one
      * safe, uniquely identified Digiflazz mapping for an active unmapped package.
      */
-    public function sync(): int
+    public function sync(?int $productId = null): int
     {
         $provider = Provider::where('code', 'DIGIFLAZZ')->first();
         if ($provider === null || $provider->is_active === false) {
@@ -203,6 +171,7 @@ class DigiflazzAutoSources
             ->where('is_active', true)
             ->whereHas('product', fn ($query) => $query->where('is_active', true)
                 ->where('fulfillment_mode', 'AUTO_PROVIDER'))
+            ->when($productId !== null, fn ($query) => $query->where('product_id', $productId))
             ->get();
         $added = 0;
 
@@ -211,6 +180,17 @@ class DigiflazzAutoSources
             // Bootstrap ONLY when there are no Digiflazz mappings of any state.
             if ($package->mappings->contains(fn (ProviderMapping $mapping): bool => (int) $mapping->provider_id === (int) $provider->id)
                 || $package->nominal_value === null || (int) $package->nominal_value <= 0) {
+                continue;
+            }
+
+            // A multi-field destination cannot be safely built without a verified
+            // provider-specific customer_no template. Never expose a paid-but-blocked SKU.
+            if ($package->product->fields()->count() > 1) {
+                Log::warning('Digiflazz auto-source skipped: destination template needs admin verification.', [
+                    'product_id' => $package->product_id,
+                    'package_id' => $package->id,
+                ]);
+
                 continue;
             }
 
