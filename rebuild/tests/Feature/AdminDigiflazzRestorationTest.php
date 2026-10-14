@@ -722,6 +722,10 @@ class AdminDigiflazzRestorationTest extends TestCase
             'brand' => 'Bootstrap', 'product_name' => 'Bootstrap 1.000',
         ]);
         $sample['product']->update(['name' => 'Bootstrap']);
+        $sample['product']->fields()->create([
+            'field_key' => 'user_id', 'label' => 'User ID', 'type' => 'text',
+            'is_required' => true, 'sort_order' => 0,
+        ]);
         $sample['package']->update(['nominal_value' => 1000]);
         ProviderMapping::where('external_sku', 'BOOT1.000')->delete();
 
@@ -749,6 +753,43 @@ class AdminDigiflazzRestorationTest extends TestCase
         $blocked['product']->update(['is_active' => false]);
         $this->assertSame(0, app(DigiflazzAutoSources::class)->sync());
         $this->assertDatabaseMissing('provider_mappings', ['external_sku' => 'BLOCK2.000']);
+    }
+
+    public function test_auto_bootstrap_requires_one_required_field_and_unambiguous_identity(): void
+    {
+        $sample = $this->mappedItem('ZERO5.000', [
+            'brand' => 'Zero', 'product_name' => 'Zero 5.000',
+        ]);
+        $sample['product']->update(['name' => 'Zero']);
+        $sample['package']->update(['nominal_value' => 5000]);
+        ProviderMapping::where('external_sku', 'ZERO5.000')->delete();
+        $this->assertSame(0, app(DigiflazzAutoSources::class)->sync());
+
+        $field = $sample['product']->fields()->create([
+            'field_key' => 'user_id', 'label' => 'User ID', 'type' => 'text',
+            'is_required' => false, 'sort_order' => 0,
+        ]);
+        $this->assertSame(0, app(DigiflazzAutoSources::class)->sync());
+        $field->update(['is_required' => true]);
+
+        $variant = (array) DB::table('digiflazz_catalog_items')
+            ->where('buyer_sku_code', 'ZERO5.000')->first();
+        unset($variant['id']);
+        $variant['buyer_sku_code'] = 'ZERO5.000B';
+        $variant['product_name'] = 'Zero 5.000 Region B';
+        $variant['type'] = 'Region B';
+        DB::table('digiflazz_catalog_items')->insert($variant);
+        $this->assertSame(0, app(DigiflazzAutoSources::class)->sync());
+        $this->assertDatabaseMissing('provider_mappings', ['external_sku' => 'ZERO5.000']);
+
+        DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'ZERO5.000B')->delete();
+        $sample['package']->update(['group_name' => 'Region B']);
+        $this->assertSame(0, app(DigiflazzAutoSources::class)->sync());
+        $sample['package']->update(['group_name' => null]);
+        $this->assertSame(1, app(DigiflazzAutoSources::class)->sync());
+        $this->assertDatabaseHas('provider_mappings', [
+            'external_sku' => 'ZERO5.000', 'is_active' => true, 'priority' => 0,
+        ]);
     }
 
     public function test_auto_source_never_publishes_mapping_for_unverified_multi_field_destination(): void
