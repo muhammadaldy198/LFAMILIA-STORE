@@ -200,28 +200,11 @@ class DigiflazzAutoSources
             if ($productName === '') {
                 continue;
             }
-            $candidates = $catalog->filter(function (object $item) use ($package, $productName, $provider): bool {
-                $brand = $this->normalizedIdentity((string) $item->brand);
-                $catalogName = $this->normalizedIdentity((string) $item->product_name);
-                // Never attach a same-nominal SKU belonging to a different game/service.
-                if ($brand !== $productName && str_starts_with($catalogName, $productName) === false) {
-                    return false;
-                }
-
-                if ($this->skuNominal((string) $item->buyer_sku_code) !== (int) $package->nominal_value) {
-                    return false;
-                }
-
-                // Regions/service variants must match the package's group when set.
-                $group = $this->normalizedIdentity((string) ($package->group_name ?? ''));
-                if ($group !== '' && $group !== $this->normalizedIdentity((string) $item->type)
-                    && ! str_contains($catalogName, $group)) {
-                    return false;
-                }
-
-                return ProviderMapping::where('provider_id', $provider->id)
-                    ->where('external_sku', $item->buyer_sku_code)->doesntExist();
-            })->sort(fn (object $a, object $b): int => (int) $a->price_idr <=> (int) $b->price_idr
+            $candidates = $catalog->filter(
+                fn (object $item): bool => $this->matchesPackage($package, $package->product, $item)
+                    && ProviderMapping::where('provider_id', $provider->id)
+                        ->where('external_sku', $item->buyer_sku_code)->doesntExist()
+            )->sort(fn (object $a, object $b): int => (int) $a->price_idr <=> (int) $b->price_idr
                 ?: strcmp((string) $a->buyer_sku_code, (string) $b->buyer_sku_code));
             // Multiple distinct catalog identities (including region or type)
             // are ambiguous. Never guess which service to fulfill by lowest cost.
@@ -238,22 +221,41 @@ class DigiflazzAutoSources
             }
 
             DB::transaction(function () use ($package, $provider, $item, $request, &$added): void {
+                // Lock and recheck the actual inputs, not the optimistic snapshot
+                // selected before this transaction. Match global pricing lock order.
+                $product = Product::whereKey($package->product_id)->lockForUpdate()->first();
                 $locked = ProductPackage::whereKey($package->id)->lockForUpdate()->first();
-                if ($locked === null || $locked->is_active === false
-                    || $locked->product()->where('is_active', true)->doesntExist()
-                    || ProviderMapping::where('product_package_id', $package->id)
+                if ($product === null || ! $product->is_active || $product->fulfillment_mode !== 'AUTO_PROVIDER'
+                    || $locked === null || ! $locked->is_active
+                    || (int) $locked->product_id !== (int) $product->id
+                    || $locked->nominal_value === null || (int) $locked->nominal_value <= 0) {
+                    return;
+                }
+
+                $freshFields = $product->fields()->orderBy('id')->lockForUpdate()
+                    ->get(['id', 'field_key', 'is_required']);
+                if ($freshFields->count() !== 1 || ! (bool) $freshFields->first()->is_required) {
+                    return;
+                }
+
+                $freshItem = DB::table('digiflazz_catalog_items')
+                    ->where('buyer_sku_code', $item->buyer_sku_code)->lockForUpdate()->first();
+                if ($freshItem === null || ! app(DigiflazzCatalogService::class)->sellable($freshItem)
+                    || ! $this->matchesPackage($locked, $product, $freshItem)
+                    || ProviderMapping::where('product_package_id', $locked->id)
                         ->where('provider_id', $provider->id)->exists()
                     || ProviderMapping::where('provider_id', $provider->id)
-                        ->where('external_sku', $item->buyer_sku_code)->exists()) {
+                        ->where('external_sku', $freshItem->buyer_sku_code)->exists()) {
                     return;
                 }
                 $mapping = app(DigiflazzCatalogImport::class)->upsert(
-                    $locked, (string) $item->buyer_sku_code, (int) $item->price_idr, (int) $item->price_idr
+                    $locked, (string) $freshItem->buyer_sku_code,
+                    (int) $freshItem->price_idr, (int) $freshItem->price_idr
                 );
                 $before = $mapping->toArray();
                 $mapping->update([
                     'is_active' => true, 'priority' => 0, 'is_manual_price' => false,
-                    'cost_idr' => (int) $item->price_idr, 'max_price_idr' => (int) $item->price_idr,
+                    'cost_idr' => (int) $freshItem->price_idr, 'max_price_idr' => (int) $freshItem->price_idr,
                 ]);
                 app(AdminAuditService::class)->record(
                     $request, 'catalog.fulfillment_source.auto_bootstrapped',
@@ -264,6 +266,24 @@ class DigiflazzAutoSources
         }
 
         return $added;
+    }
+
+    private function matchesPackage(ProductPackage $package, Product $product, object $item): bool
+    {
+        $productName = $this->normalizedIdentity((string) $product->name);
+        $brand = $this->normalizedIdentity((string) $item->brand);
+        $catalogName = $this->normalizedIdentity((string) $item->product_name);
+        if ($productName === '' || ($brand !== $productName && ! str_starts_with($catalogName, $productName))) {
+            return false;
+        }
+        if ($this->skuNominal((string) $item->buyer_sku_code) !== (int) $package->nominal_value) {
+            return false;
+        }
+
+        $group = $this->normalizedIdentity((string) ($package->group_name ?? ''));
+
+        return $group === '' || $group === $this->normalizedIdentity((string) $item->type)
+            || str_contains($catalogName, $group);
     }
 
     private function normalizedIdentity(string $name): string
