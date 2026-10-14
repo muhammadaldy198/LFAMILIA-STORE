@@ -31,6 +31,22 @@ class DokuSignature
         return 'HMACSHA256='.base64_encode(hash_hmac('sha256', $component, $secretKey, true));
     }
 
+    /** Non-SNAP GET Check Status requests do not include a Digest field. */
+    public function signGet(
+        string $clientId,
+        string $requestId,
+        string $timestamp,
+        string $target,
+        string $secretKey,
+    ): string {
+        return 'HMACSHA256='.base64_encode(hash_hmac('sha256', implode("\n", [
+            'Client-Id:'.$clientId,
+            'Request-Id:'.$requestId,
+            'Request-Timestamp:'.$timestamp,
+            'Request-Target:'.$target,
+        ]), $secretKey, true));
+    }
+
     public function signResponse(
         string $clientId,
         string $requestId,
