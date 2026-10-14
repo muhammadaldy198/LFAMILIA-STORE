@@ -74,7 +74,7 @@ class DigiflazzAutoSources
         foreach ($items as $item) {
             // Automatic grouping may never attach a second active source.
             if ($automatic && $existingBySku->has($item->buyer_sku_code) === false
-                && $package->mappings()->where('provider_id', $provider->id)->where('is_active', true)->exists()) {
+                && $package->mappings()->where('provider_id', $provider->id)->exists()) {
                 continue;
             }
             if (! app(DigiflazzCatalogService::class)->sellable($item)) {
