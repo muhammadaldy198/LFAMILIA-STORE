@@ -365,13 +365,18 @@ class AdminDigiflazzController
                 ->orderBy('priority')
                 ->value('fulfillment_config');
 
+            $config = is_string($primaryConfig)
+                ? json_decode($primaryConfig, true)
+                : $primaryConfig;
+            $config = is_array($config) ? $config : [];
+            // The destination template can be shared, but a manually chosen
+            // backup must not inherit the primary SKU's verified identity.
+            $config['auto_source_group'] = app(DigiflazzAutoSources::class)->key($item);
             $before = $mapping->toArray();
             $mapping->update([
                 'priority' => $priority,
                 'is_active' => false,
-                'fulfillment_config' => is_string($primaryConfig)
-                    ? json_decode($primaryConfig, true)
-                    : $primaryConfig,
+                'fulfillment_config' => $config,
             ]);
             $audit->record(
                 $request,
