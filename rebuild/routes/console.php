@@ -9,6 +9,7 @@ use App\Models\IntegrationCredential;
 use App\Services\AdminNotificationService;
 use App\Services\CustomerCleanupService;
 use App\Services\DigiflazzCatalogService;
+use App\Services\PaymentStateService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -108,6 +109,35 @@ Artisan::command('lfamilia:recover-fulfillment', function (): void {
 })->purpose('Recover paid orders and reconcile uncertain provider attempts without creating duplicate fulfillment');
 
 Schedule::command('lfamilia:recover-fulfillment')->everyMinute()->withoutOverlapping();
+
+Artisan::command('lfamilia:expire-unpaid-orders', function (PaymentStateService $states): int {
+    $expired = 0;
+    DB::table('orders')
+        ->where('status', 'PENDING_PAYMENT')
+        ->whereNotNull('expires_at')
+        ->where('expires_at', '<=', now())
+        ->orderBy('id')
+        ->chunkById(100, function ($orders) use ($states, &$expired): void {
+            foreach ($orders as $candidate) {
+                DB::transaction(function () use ($states, $candidate, &$expired): void {
+                    $order = DB::table('orders')->where('id', $candidate->id)->lockForUpdate()->first();
+                    if (! $order || $order->status !== 'PENDING_PAYMENT'
+                        || ! $order->expires_at || now()->lt($order->expires_at)) {
+                        return;
+                    }
+
+                    $states->expireOrder($order);
+                    $expired++;
+                }, 3);
+            }
+        });
+    $this->info("Expired unpaid orders: {$expired}");
+
+    return 0;
+})->purpose('Expire overdue unpaid orders once and release vouchers using the existing state service');
+
+Schedule::command('lfamilia:expire-unpaid-orders')->everyMinute()->withoutOverlapping();
+
 
 Schedule::job(new QueueHeartbeatJob)->everyMinute()->name('lfamilia-queue-worker-heartbeat');
 
