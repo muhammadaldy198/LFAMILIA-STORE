@@ -6,10 +6,13 @@ import { Head, Link } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import AccountShell from '../../Components/AccountShell.vue';
 import { rupiah } from '../../lib/money';
+import { manualHelpMessage, nextOrderAction, orderStatusInfo, paymentStatusLabel } from '../../lib/orderStatus';
 
 const props = defineProps({ order: Object, payment: Object, review: Object });
 
 const paymentState = ref(props.payment);
+const statusInfo = computed(() => orderStatusInfo(props.order.status));
+const nextAction = computed(() => nextOrderAction(props.order.status, paymentState.value?.status, props.order.paid_at));
 const paymentIssue = computed(() => {
     const status = String(paymentState.value?.status || '').toUpperCase();
     if (['REJECTED', 'FAILED', 'DENIED', 'DENY'].includes(status)) return 'rejected';
@@ -51,7 +54,7 @@ async function submitReview() {
         <h1 class="text-3xl font-semibold">Pesanan {{ order.order_number }}</h1>
         <dl class="grid gap-4 rounded-xl border border-slate-800 bg-slate-900 p-5 sm:grid-cols-2">
             <div><dt class="text-sm text-slate-400">{{ customerText("pages.customer.orderdetail.ceb4d888", "Produk") }}</dt><dd>{{ order.product_name }} · {{ order.package_name }}</dd></div>
-            <div><dt class="text-sm text-slate-400">{{ customerText("pages.customer.orderdetail.5ef20f", "Status") }}</dt><dd>{{ order.status }}</dd></div>
+            <div><dt class="text-sm text-slate-400">{{ customerText("pages.customer.orderdetail.5ef20f", "Status") }}</dt><dd><strong>{{ statusInfo.label }}</strong><p class="mt-1 text-sm text-slate-400">{{ statusInfo.description }}</p></dd></div>
             <div><dt class="text-sm text-slate-400">{{ customerText("pages.customer.orderdetail.ad066d9d", "Total") }}</dt><dd>{{ rupiah(order.total_idr) }}</dd></div>
             <div><dt class="text-sm text-slate-400">{{ customerText("pages.customer.orderdetail.e378eb96", "Dibuat") }}</dt><dd>{{ order.created_at }}</dd></div>
             <div v-if="order.paid_at"><dt class="text-sm text-slate-400">{{ customerText("pages.customer.orderdetail.144e2781", "Dibayar") }}</dt><dd>{{ order.paid_at }}</dd></div>
@@ -59,7 +62,7 @@ async function submitReview() {
 
         <section v-if="order.status === 'PENDING_PAYMENT'" class="space-y-3 rounded-xl border border-cyan-500/30 bg-cyan-500/10 p-5">
             <h2 class="text-lg font-semibold">{{ customerText("pages.customer.orderdetail.3527df23", "Pembayaran") }}</h2>
-            <p v-if="paymentState" class="text-sm">{{ customerText("pages.customer.orderdetail.ca77496f", "Status:") }} <strong>{{ paymentState.status }}</strong><span v-if="paymentState.channel_name"> · {{ paymentState.channel_name }}</span></p>
+            <p v-if="paymentState" class="text-sm">{{ customerText("pages.customer.orderdetail.ca77496f", "Status:") }} <strong>{{ paymentStatusLabel(paymentState.status) }}</strong><span v-if="paymentState.channel_name"> · {{ paymentState.channel_name }}</span></p>
             <img v-if="paymentState?.status === 'PENDING' && paymentState?.instructions?.qr_url" :src="paymentState.instructions.qr_url" :alt="customerText('pages.customer.orderdetail.attribute.alt.dfd028b8', 'QRIS pembayaran')" class="max-h-72 rounded-lg bg-white p-2">
             <p v-if="paymentState?.status === 'PENDING' && paymentState?.instructions?.va_number" class="text-sm">{{ customerText("pages.customer.orderdetail.d5aec755", "Nomor VA:") }} <strong>{{ paymentState.instructions.va_number }}</strong></p>
             <p v-if="paymentState?.status === 'PENDING' && paymentState?.instructions?.payment_code" class="text-sm">{{ customerText("pages.customer.orderdetail.6af68bec", "Kode pembayaran:") }} <strong>{{ paymentState.instructions.payment_code }}</strong></p>
@@ -68,6 +71,12 @@ async function submitReview() {
             <p v-if="paymentIssue" role="alert" class="text-sm text-red-300">{{ paymentIssue === 'closed'
                 ? customerText('pages.customer.orderdetail.payment_closed', 'Percobaan pembayaran telah berakhir. Periksa status invoice untuk langkah berikutnya.')
                 : customerText('pages.customer.orderdetail.payment_rejected', 'Percobaan pembayaran gagal atau ditolak. Periksa status invoice sebelum mencoba lagi.') }}</p>
+        </section>
+
+        <section v-if="nextAction" class="space-y-3 rounded-xl border border-slate-800 bg-slate-900 p-5">
+            <p v-if="nextAction === 'support'" class="text-sm text-slate-300">{{ manualHelpMessage }}</p>
+            <Link v-if="nextAction === 'support'" href="/account/tickets" class="lf-primary">Hubungi admin</Link>
+            <Link v-else href="/" class="lf-primary">Buat pesanan baru</Link>
         </section>
 
         <section v-if="order.status === 'SUCCESS' && order.delivery" class="space-y-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-5">

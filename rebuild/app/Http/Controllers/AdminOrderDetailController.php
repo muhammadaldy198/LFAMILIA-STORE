@@ -35,7 +35,8 @@ class AdminOrderDetailController
                 'created_at' => $presentation->date($attempt->created_at), 'checked_at' => $presentation->date($attempt->last_checked_at),
                 'can_manual' => $canFulfill && $attempt->status === 'MANUAL_PENDING' && in_array($row->status, ['PAID', 'PROCESSING'], true),
                 'can_retry' => $canFulfill && in_array($row->status, ['PAID', 'PROCESSING'], true)
-                    && ($attempt->status === 'BLOCKED' || ($attempt->status === 'FAILED_CONFIRMED' && $attempt->safe_to_failover)),
+                    && (($attempt->status === 'BLOCKED' && $attempt->last_error !== 'Semua SKU yang diizinkan telah gagal. Hubungi superadmin.')
+                        || ($attempt->status === 'FAILED_CONFIRMED' && $attempt->safe_to_failover)),
             ]);
         // Only the newest attempt can be acted upon.
         $attempts = $attempts->map(fn (array $attempt, int $index): array => [...$attempt,

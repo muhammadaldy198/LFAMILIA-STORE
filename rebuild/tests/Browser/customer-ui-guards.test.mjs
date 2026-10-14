@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { manualHelpMessage, nextOrderAction, orderStatusInfo, paymentStatusLabel } from '../../resources/js/lib/orderStatus.js';
 
 const read = path => readFileSync(new URL('../../resources/js/' + path, import.meta.url), 'utf8');
 
@@ -113,4 +114,54 @@ test('wallet payment status is never a fake perpetual quote and checkout descrip
     assert.match(checkout, /:loading-quotes="busy==='quote'"/);
     assert.doesNotMatch(checkout, /lfx-description-box/);
     assert.match(checkout, /lf-product-description-legacy/);
+});
+
+test('all eight order statuses display Indonesian labels and descriptions', () => {
+    for (const status of ['PENDING_PAYMENT', 'PAID', 'PROCESSING', 'SUCCESS', 'FAILED', 'EXPIRED', 'CANCELLED', 'BLOCKED']) {
+        const label = orderStatusInfo(status);
+        assert.ok(label.label && label.description);
+        assert.notEqual(label.label, status);
+    }
+    for (const status of ['REFUND', 'REFUNDED']) {
+        const label = orderStatusInfo(status);
+        assert.notEqual(label.label, 'Status sedang diperbarui');
+        assert.match(label.description, /admin/i);
+    }
+    const detail = read('Pages/Customer/OrderDetail.vue');
+    assert.doesNotMatch(detail, /{{\s*order\.status\s*}}|{{\s*paymentState\.status\s*}}/);
+    assert.match(detail, /statusInfo\.label/);
+    assert.match(detail, /paymentStatusLabel\(paymentState\.status\)/);
+    assert.equal(paymentStatusLabel('REJECTED'), 'Pembayaran ditolak');
+});
+
+test('paid or uncertain failed orders cannot be encouraged to pay again', () => {
+    for (const status of ['failed', 'expired', 'cancelled']) {
+        assert.equal(nextOrderAction(status, 'failed'), 'new');
+        assert.equal(nextOrderAction(status, 'paid'), 'support');
+        assert.equal(nextOrderAction(status, 'unknown'), null);
+    }
+    assert.equal(nextOrderAction('FAILED', null, '2026-10-14T01:00:00Z'), 'support');
+    assert.equal(nextOrderAction('blocked', 'paid'), 'support');
+    assert.equal(nextOrderAction('blocked', 'failed'), 'support');
+    assert.equal(nextOrderAction('cancelled', 'cancelled', true), 'support');
+    assert.equal(nextOrderAction('processing', 'paid'), null);
+    assert.match(manualHelpMessage, /ID order dan bukti bayar/);
+    const tracking = read('Pages/Guest/Track.vue');
+    assert.match(tracking, /nextOrderAction\(detail\.value\.fulfillmentStatus,detail\.value\.paymentStatus,detail\.value\.wasPaid\)/);
+    assert.match(tracking, /nextAction==='support'/);
+    assert.match(tracking, /Buat pesanan baru/);
+    assert.match(tracking, /Hubungi admin/);
+    assert.doesNotMatch(tracking, /Pengembalian dana sedang atau telah diproses/);
+});
+
+test('modal summary payment button is disabled during busy checkout', () => {
+    const checkout = read('Pages/Catalog/Show.vue');
+    assert.match(checkout, /v-else type="button" :disabled="Boolean\(busy\)" @click="prepareOrder"/);
+    assert.match(checkout, /id="lfx-bottom-pay"/);
+});
+
+test('customer payment page never promises an automatic refund', () => {
+    const source = read('Pages/Payment/Show.vue');
+    assert.match(source, /if \(refunded\.value \|\| blocked\.value\)/);
+    assert.doesNotMatch(source, /Pesanan masuk proses pengembalian dana/);
 });

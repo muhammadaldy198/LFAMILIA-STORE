@@ -1025,7 +1025,7 @@ function closeReview() { summaryOpen.value = false; closeConfirmation(); }
       <p v-if="firstCheckoutError" role="alert" class="lfx-error">{{firstCheckoutError}}</p><label v-if="confirmOpen" class="lfx-agreement"><input v-model="agreed" type="checkbox"/> Dengan melanjutkan, saya menyetujui <Link href="/terms">syarat & ketentuan</Link>.</label><div class="lfx-modal-buttons">
         <button type="button" @click="closeReview">{{confirmOpen ? 'Kembali' : 'Tutup'}}</button>
         <button v-if="confirmOpen" type="button" :disabled="Boolean(busy)||!agreed" @click="createOrder">{{busy?'Memproses…':'Bayar Sekarang →'}}</button>
-        <button v-else type="button" @click="prepareOrder">Bayar Sekarang →</button>
+        <button v-else type="button" :disabled="Boolean(busy)" @click="prepareOrder">Bayar Sekarang →</button>
       </div>
 
     </div>
