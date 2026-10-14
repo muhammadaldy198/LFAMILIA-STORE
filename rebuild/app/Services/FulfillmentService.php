@@ -991,7 +991,10 @@ class FulfillmentService
             $item = DB::table('digiflazz_catalog_items')
                 ->where('buyer_sku_code', $mapping->external_sku)
                 ->first();
-            if ($item && ! $this->digiflazzCatalog->available($item)) {
+            if (! $item) {
+                return 'SKU Digiflazz tidak lagi ditemukan pada katalog supplier.';
+            }
+            if (! $this->digiflazzCatalog->available($item)) {
                 return 'SKU Digiflazz sedang nonaktif, stok habis, atau cut-off.';
             }
             if ($mapping->is_manual_price) {
