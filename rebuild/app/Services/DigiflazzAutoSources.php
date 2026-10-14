@@ -284,9 +284,14 @@ class DigiflazzAutoSources
                     (int) $freshItem->price_idr, (int) $freshItem->price_idr
                 );
                 $before = $mapping->toArray();
+                $config = $mapping->fulfillment_config ?? [];
+                // Pin the verified supplier identity. A reused SKU code must
+                // never silently sell/deliver a different brand or service.
+                $config['auto_source_group'] = $this->key($freshItem);
                 $mapping->update([
                     'is_active' => true, 'priority' => 0, 'is_manual_price' => false,
                     'cost_idr' => (int) $freshItem->price_idr, 'max_price_idr' => (int) $freshItem->price_idr,
+                    'fulfillment_config' => $config,
                 ]);
                 app(AdminAuditService::class)->record(
                     $request, 'catalog.fulfillment_source.auto_bootstrapped',
