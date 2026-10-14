@@ -136,6 +136,10 @@ class DigiflazzCatalogService
                     $removedMappings = DB::table('provider_mappings')->where('provider_id', $providerId)
                         ->where('is_active', false)->whereNotNull('external_sku')
                         ->whereNotIn('external_sku', DB::table('digiflazz_catalog_items')->select('buyer_sku_code'))
+                        // Historical transactions have restrictive foreign keys to source mappings.
+                        // Never delete such mappings or interrupt the entire supplier sync.
+                        ->whereNotIn('id', DB::table('orders')->whereNotNull('provider_mapping_id')->select('provider_mapping_id'))
+                        ->whereNotIn('id', DB::table('fulfillment_attempts')->select('provider_mapping_id'))
                         ->delete();
                     if ($sku === null) {
                         DB::table('system_settings')->updateOrInsert(['key' => 'digiflazz.last_catalog_sync'], [
