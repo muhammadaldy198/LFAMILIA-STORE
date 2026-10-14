@@ -73,6 +73,8 @@ class AdminPromotionRestorationTest extends TestCase
             'updated_at' => now(),
         ]);
 
+        $this->seedCheckoutDigiflazzCatalog($package->id);
+
         return ['product' => $product, 'package_id' => $package->id];
     }
 

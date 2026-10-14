@@ -440,6 +440,7 @@ class FulfillmentTest extends TestCase
             'updated_at' => now(),
         ]);
 
+        $this->seedCheckoutDigiflazzCatalog($catalog['package_id']);
         $checkout = app(CheckoutPricing::class)->forPackage($catalog['package_id']);
         $this->assertSame(13130, $checkout['max_price_idr']);
         $this->assertSame(11000, $checkout['subtotal_idr']);

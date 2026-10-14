@@ -72,6 +72,8 @@ class CheckoutFlowRegressionTest extends TestCase
             'updated_at' => now(),
         ]);
 
+        $this->seedCheckoutDigiflazzCatalog($package->id);
+
         DB::table('payment_gateways')->where('code', 'MIDTRANS')->update([
             'is_active' => true,
             'is_maintenance' => false,

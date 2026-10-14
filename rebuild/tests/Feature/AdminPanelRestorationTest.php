@@ -442,6 +442,7 @@ class AdminPanelRestorationTest extends TestCase
         $provider = Provider::where('code', 'DIGIFLAZZ')->firstOrFail();
         $provider->forceFill(['is_active' => true])->save();
         ProviderMapping::create(['product_package_id' => $package->id, 'provider_id' => $provider->id, 'external_sku' => 'restore-sku', 'cost_idr' => 10000, 'max_price_idr' => 10000, 'is_active' => true]);
+        $this->seedCheckoutDigiflazzCatalog($package->id);
         $pricing = app(CheckoutPricing::class);
         $this->assertSame(11000, $pricing->forPackage($package->id)['subtotal_idr']);
         $package->update(['pricing_mode' => 'PERCENT', 'margin_percent' => 5]);
