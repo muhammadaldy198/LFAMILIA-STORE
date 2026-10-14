@@ -240,7 +240,7 @@ class DigiflazzAutoSources
 
             DB::transaction(function () use ($package, $provider, $item, $request, &$added): void {
                 $locked = ProductPackage::whereKey($package->id)->lockForUpdate()->first();
-                if ($locked === null || $locked->is_active === false)
+                if ($locked === null || $locked->is_active === false
                     || $locked->product()->where('is_active', true)->doesntExist()
                     || ProviderMapping::where('product_package_id', $package->id)
                         ->where('provider_id', $provider->id)->exists()
