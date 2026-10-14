@@ -911,6 +911,23 @@ class AdminDigiflazzRestorationTest extends TestCase
         $this->assertDatabaseHas('provider_mappings', ['external_sku' => 'claim-test', 'cost_idr' => 12500]);
     }
 
+    public function test_max_price_confirmation_rejects_product_pricing_changes_after_preview(): void
+    {
+        $this->login();
+        $catalog = $this->mappedItem('max-drift');
+        $preview = $this->postJson('/admin/digiflazz/max-prices/preview', [
+            'sku_text' => 'max-drift,12500',
+        ])->assertOk();
+        $catalog['product']->update(['margin_percent' => 17]);
+
+        $this->post('/admin/digiflazz/max-prices/apply', [
+            'preview_token' => $preview->json('token'),
+        ])->assertSessionHasErrors('preview_token');
+        $this->assertDatabaseHas('provider_mappings', [
+            'external_sku' => 'max-drift', 'cost_idr' => 10000, 'max_price_idr' => 10000,
+        ]);
+    }
+
     public function test_admin_buyer_area_max_price_requires_preview_and_only_changes_selected_sku(): void
     {
         $this->login();
