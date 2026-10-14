@@ -85,14 +85,17 @@ class AdminPricingPreviewService
     public function executeMaxPrices(Request $request, string $token, AdminAuditService $audit): void
     {
         $preview = $this->consumePreview($request, 'max_price', $token);
-        DB::transaction(function () use ($request, $preview, $audit): void {
-            $prices = $preview['input']['prices'];
-            $providerId = Provider::where('code', 'DIGIFLAZZ')->value('id');
-            $dependencies = DB::table('provider_mappings as mappings')
+        $prices = $preview['input']['prices'];
+        // Resolve dependency IDs BEFORE starting the repeatable-read transaction.
+        // Ordinary reads within it would pin an old snapshot before row locks.
+        $providerId = Provider::where('code', 'DIGIFLAZZ')->value('id');
+        $dependencies = DB::table('provider_mappings as mappings')
                 ->join('product_packages as packages', 'packages.id', '=', 'mappings.product_package_id')
                 ->where('mappings.provider_id', $providerId)
                 ->whereIn('mappings.external_sku', array_keys($prices))
                 ->get(['packages.id as package_id', 'packages.product_id']);
+
+        DB::transaction(function () use ($request, $preview, $audit, $prices, $providerId, $dependencies): void {
             // Match the global-margin confirmation lock order: product, package,
             // then mapping. All selling-price dependencies remain stable until commit.
             Product::whereIn('id', $dependencies->pluck('product_id')->unique()->all())
