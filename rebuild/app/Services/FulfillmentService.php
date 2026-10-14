@@ -997,6 +997,9 @@ class FulfillmentService
             if (! $this->digiflazzCatalog->available($item)) {
                 return 'SKU Digiflazz sedang nonaktif, stok habis, atau cut-off.';
             }
+            if (! $this->digiflazzCatalog->verifiedIdentityMatches($item, $mapping->fulfillment_config)) {
+                return 'Identitas produk SKU Digiflazz berubah. Periksa ulang mapping di panel admin.';
+            }
             if ($mapping->is_manual_price) {
                 if (! $item || (int) $item->price_idr <= 0) {
                     return 'Harga supplier Digiflazz belum tersedia untuk sumber terkunci.';
