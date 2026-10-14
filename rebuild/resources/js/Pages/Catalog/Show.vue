@@ -15,6 +15,7 @@ const props = defineProps({
     fields: Array,
     customer: Object,
     paymentChannels: Array,
+    checkoutReservationMinutes: { type: Number, required: true },
     notices: Array,
     savedAccounts: Array,
     reviews: Array,
@@ -37,6 +38,22 @@ const accountValidationSignature = ref('');
 let accountValidationRequest = 0;
 let quoteRequest = 0;
 const checkoutResult = ref(null);
+const checkoutClockTick = ref(Date.now());
+const checkoutExpiryOffset = ref(0);
+let checkoutClockTimer;
+const checkoutExpiresWib = computed(() => {
+    const date = Date.parse(checkoutResult.value?.expires_at || '');
+    return Number.isFinite(date) ? new Intl.DateTimeFormat('id-ID', {
+        timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', hour12: false,
+    }).format(date) : null;
+});
+const checkoutSecondsLeft = computed(() => {
+    const date = Date.parse(checkoutResult.value?.expires_at || '');
+    return Number.isFinite(date) ? Math.max(0, Math.ceil((date - checkoutClockTick.value - checkoutExpiryOffset.value) / 1000)) : null;
+});
+const checkoutCountdown = computed(() => checkoutSecondsLeft.value === null ? '' :
+    String(Math.floor(checkoutSecondsLeft.value / 60)).padStart(2, '0') + ':' +
+    String(checkoutSecondsLeft.value % 60).padStart(2, '0'));
 const errors = ref({});
 const busy = ref('');
 const activeTab = ref('transaction');
@@ -698,6 +715,8 @@ async function createOrder() {
                 idempotency_key: confirmationSnapshot.value.idempotency_key,
             }),
         });
+        checkoutExpiryOffset.value = Date.parse(checkoutResult.value.server_now) - Date.now();
+        checkoutClockTick.value = Date.now();
     } catch (error) {
         errors.value = error.validation || { checkout: [error.message || 'Pesanan gagal dibuat.'] };
         busy.value = '';
@@ -738,6 +757,7 @@ async function createOrder() {
 }
 
 onMounted(() => {
+    checkoutClockTimer = window.setInterval(() => { checkoutClockTick.value = Date.now(); }, 1000);
 
     const preferredGroups = ['qris', 'ewallet', 'va', 'retail', 'other', 'wallet'];
     if (!paymentChannelCode.value) {
@@ -763,6 +783,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+    if (checkoutClockTimer) window.clearInterval(checkoutClockTimer);
     if (summaryOpen.value || confirmOpen.value || voucherOpen.value) document.documentElement.style.overflow = dialogPreviousOverflow;
     window.removeEventListener('keydown', onDialogKey);
     if (contactQuoteTimer) window.clearTimeout(contactQuoteTimer);
@@ -985,6 +1006,11 @@ function closeReview() { summaryOpen.value = false; closeConfirmation(); }
         <button type="button" aria-label="Tutup ringkasan" @click="closeReview">×</button>
       </div>
       <p class="lfx-modal-description">{{confirmOpen ? 'Periksa kembali rincian pesanan sebelum melanjutkan.' : 'Rincian produk dan estimasi pembayaran sebelum checkout.'}}</p>
+       <div class="lfx-modal-description text-xs leading-5">
+         <p v-if="checkoutExpiresWib">Bayar sebelum {{checkoutExpiresWib}} WIB · Sisa {{checkoutCountdown}}</p>
+         <p v-else>Batas pembayaran: {{checkoutReservationMinutes}} menit sejak pesanan dibuat. Jam pasti dan countdown tersedia di halaman pembayaran.</p>
+         <p>Pembayaran terlambat tidak diproses otomatis dan masuk peninjauan admin.</p>
+       </div>
       <div class="lfx-confirm-rows">
         <div><span>Produk</span><b>{{product.name}}</b></div>
         <div v-for="field in fields" :key="field.field_key" v-show="String(customerInput[field.field_key]||'').trim()"><span>{{field.label}}</span><b>{{customerInput[field.field_key]}}</b></div>

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\IntegrationRuntimeConfig;
 use App\Services\MidtransStatusVerification;
+use App\Services\Payment\DokuDirectGateway;
 use App\Services\Payment\DokuSignature;
 use App\Services\Payment\MidtransGateway;
 use App\Services\PaymentStateService;
@@ -11,6 +12,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class PaymentWebhookController
 {
@@ -96,6 +98,7 @@ class PaymentWebhookController
     public function doku(
         Request $request,
         DokuSignature $signature,
+        DokuDirectGateway $doku,
         PaymentStateService $states,
         IntegrationRuntimeConfig $runtime,
     ): JsonResponse {
@@ -144,10 +147,48 @@ class PaymentWebhookController
         }
 
         $eventId = hash('sha256', $requestId);
+        if (DB::table('payment_callbacks')->where('gateway_code', 'DOKU')
+            ->where('event_id', $eventId)->exists()) {
+            return response()->json(['status' => 'duplicate']);
+        }
+
+        // HMAC protects notification integrity, but the gateway's live state
+        // must independently agree before any money/order state transition.
+        try {
+            $verified = $doku->status((string) $payment->merchant_reference);
+        } catch (\RuntimeException) {
+            abort(503, 'Payment status verification unavailable.');
+        }
+
+        abort_unless(hash_equals((string) $payment->merchant_reference, (string) data_get($verified, 'order.invoice_number')), 422);
+        if (app(MidtransStatusVerification::class)->amount(data_get($verified, 'order.amount')) !== (int) $payment->amount_idr) {
+            $this->logRejected('DOKU', 'VERIFIED_AMOUNT_MISMATCH', (int) $payment->id);
+            abort(422, 'Verified payment amount mismatch.');
+        }
+
+        $verifiedStatus = match (strtoupper((string) data_get($verified, 'transaction.status'))) {
+            'SUCCESS' => 'PAID',
+            'EXPIRED' => 'EXPIRED',
+            'CANCELLED', 'CANCELED' => 'CANCELLED',
+            'FAILED' => 'FAILED',
+            'REFUNDED', 'REFUND' => 'REFUNDED',
+            'PENDING', 'REDIRECT', 'TIMEOUT' => 'PENDING',
+            default => throw new HttpException(503, 'Unrecognized DOKU status.'),
+        };
+        // DOKU's status inquiry can lag notifications by 60s. A terminal
+        // notification cannot become trusted merely because the GET says PENDING.
+        if ($verifiedStatus === 'PENDING' && in_array($transactionStatus, [
+            'SUCCESS', 'EXPIRED', 'FAILED', 'CANCELLED', 'CANCELED', 'REFUNDED', 'REFUND',
+        ], true)) {
+            abort(503, 'Gateway status not final yet.');
+        }
+
         $processed = DB::transaction(function () use (
             $payment,
             $eventId,
             $payload,
+            $verified,
+            $verifiedStatus,
             $transactionStatus,
             $states,
         ): bool {
@@ -155,17 +196,10 @@ class PaymentWebhookController
                 return false;
             }
 
-            $status = match ($transactionStatus) {
-                'SUCCESS' => 'PAID',
-                'EXPIRED' => 'EXPIRED',
-                'CANCELLED', 'CANCELED' => 'CANCELLED',
-                'FAILED' => 'FAILED',
-                'REFUNDED', 'REFUND' => 'REFUNDED',
-                default => 'PENDING',
-            };
-            $result = $states->apply($payment->id, $status, [
-                'source' => 'doku_callback',
-                'transaction_status' => $transactionStatus,
+            $result = $states->apply($payment->id, $verifiedStatus, [
+                'source' => 'doku_status_challenge',
+                'notification_status' => $transactionStatus,
+                'verified_status' => (string) data_get($verified, 'transaction.status'),
             ]);
             $this->finishCallback('DOKU', $eventId, (string) $result['result']);
 

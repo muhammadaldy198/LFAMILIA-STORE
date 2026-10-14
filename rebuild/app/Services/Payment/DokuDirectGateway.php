@@ -16,6 +16,57 @@ class DokuDirectGateway
     ) {}
 
     /**
+     * Independent Non-SNAP inquiry before accepting payment notifications.
+     * A failed inquiry never proves that an order is unpaid.
+     *
+     * @return array<string, mixed>
+     */
+    public function status(string $merchantReference): array
+    {
+        $resolved = $this->runtime->resolve('doku');
+        $config = $resolved['config'] ?? [];
+        $environment = (string) ($resolved['environment'] ?? '');
+        if (! is_array($config) || empty($config['client_id']) || empty($config['secret_key'])
+            || ! in_array($environment, ['sandbox', 'production'], true)) {
+            throw new RuntimeException('DOKU_STATUS_UNAVAILABLE');
+        }
+
+        $path = '/orders/v1/status/'.rawurlencode($merchantReference);
+        $requestId = (string) Str::uuid();
+        $timestamp = now('UTC')->format('Y-m-d\TH:i:s\Z');
+        $clientId = trim((string) $config['client_id']);
+        $signature = $this->signature->signGet(
+            $clientId, $requestId, $timestamp, $path, (string) $config['secret_key']
+        );
+
+        try {
+            $response = Http::acceptJson()->withHeaders([
+                'Client-Id' => $clientId,
+                'Request-Id' => $requestId,
+                'Request-Timestamp' => $timestamp,
+                'Signature' => $signature,
+            ])->connectTimeout(2)->timeout(5)
+                ->get($this->runtime->dokuApiBase($environment, $config).$path);
+        } catch (\Throwable $exception) {
+            throw new RuntimeException('DOKU_STATUS_UNAVAILABLE', previous: $exception);
+        }
+
+        if (! $response->successful()) {
+            throw new RuntimeException('DOKU_STATUS_UNAVAILABLE');
+        }
+
+        $data = $response->json();
+        if (! is_array($data)
+            || ! is_string(data_get($data, 'order.invoice_number'))
+            || ! is_scalar(data_get($data, 'order.amount'))
+            || ! is_string(data_get($data, 'transaction.status'))) {
+            throw new RuntimeException('DOKU_STATUS_INVALID');
+        }
+
+        return $data;
+    }
+
+    /**
      * @param  array<string, mixed>  $context
      * @return array<string, mixed>
      */

@@ -230,18 +230,18 @@ class AdminOrdersController
     {
         $payment = DB::table('payment_transactions')->where('order_id', $id)->orderByDesc('id')->first();
         abort_unless(DB::table('orders')->where('id', $id)->exists(), 404);
-        if (! $payment || $payment->gateway_code !== 'MIDTRANS' || ! in_array($payment->status, ['PENDING', 'CREATING', 'SENDING'], true)) {
+        if (! $payment || $payment->gateway_code !== 'MIDTRANS' || ! in_array($payment->status, ['PENDING', 'CREATING', 'SENDING', 'UNKNOWN'], true)) {
             throw ValidationException::withMessages(['payment' => 'Pembayaran ini tidak memerlukan pemeriksaan langsung. Pembayaran otomatis diperbarui setelah konfirmasi penyedia diterima.']);
         }
         try {
             $verified = app(MidtransGateway::class)->status((string) $payment->merchant_reference);
         } catch (\RuntimeException) {
-            throw ValidationException::withMessages(['payment' => 'Penyedia pembayaran belum dapat dihubungi. Status pesanan tidak diubah. Coba lagi nanti.']);
+            abort(503, 'Penyedia pembayaran belum dapat dihubungi. Status pesanan tidak diubah.');
         }
         $verification = app(MidtransStatusVerification::class);
         if (! hash_equals((string) $payment->merchant_reference, (string) $verified['order_id'])
             || $verification->amount($verified['gross_amount']) !== (int) $payment->amount_idr) {
-            throw ValidationException::withMessages(['payment' => 'Hasil pemeriksaan tidak sesuai dengan pesanan. Status pembayaran tidak diubah.']);
+            abort(422, 'Hasil pemeriksaan tidak sesuai dengan pesanan. Status pembayaran tidak diubah.');
         }
         $result = app(PaymentStateService::class)->apply((int) $payment->id, $verification->status($verified), [
             'source' => 'admin_status_check', 'admin_id' => $request->user('admin')->id,

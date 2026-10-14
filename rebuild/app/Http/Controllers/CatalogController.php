@@ -206,6 +206,7 @@ class CatalogController
                 'balance_idr' => (int) ($user->wallet?->balance_idr ?? 0),
             ] : null,
             'paymentChannels' => $paymentRouting->publicOrderChannels($user),
+            'checkoutReservationMinutes' => max(5, min(120, (int) config('lfamilia.checkout_reservation_minutes', 30))),
             'notices' => $product->notices()->where('is_active', true)->orderBy('sort_order')
                 ->get(['id', 'title', 'body'])
                 ->map(function ($notice) use ($product): array {
