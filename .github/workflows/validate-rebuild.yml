@@ -120,12 +120,6 @@ jobs:
       - name: Audit frontend dependencies
         run: npm audit --audit-level=high
 
-      - name: Temporary Pint formatting diagnostics
-        run: |
-          php vendor/bin/pint app/Services/DigiflazzAutoSources.php tests/Feature/AdminDigiflazzRestorationTest.php tests/Feature/FulfillmentTest.php
-          git diff -- app/Services/DigiflazzAutoSources.php tests/Feature/AdminDigiflazzRestorationTest.php tests/Feature/FulfillmentTest.php
-          git restore -- app/Services/DigiflazzAutoSources.php tests/Feature/AdminDigiflazzRestorationTest.php tests/Feature/FulfillmentTest.php
-
       - name: Validate local Git hooks
         env:
           LFAMILIA_ENABLE_HOOKS: '1'

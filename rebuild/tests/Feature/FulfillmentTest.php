@@ -3,8 +3,8 @@
 namespace Tests\Feature;
 
 use App\Jobs\ReconcileFulfillmentJob;
-use App\Jobs\SendTransactionalEmailJob;
 use App\Jobs\SendFulfillmentJob;
+use App\Jobs\SendTransactionalEmailJob;
 use App\Jobs\StartFulfillmentJob;
 use App\Models\Category;
 use App\Models\IntegrationCredential;

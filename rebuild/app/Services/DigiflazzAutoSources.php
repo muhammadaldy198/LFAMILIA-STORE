@@ -156,6 +156,7 @@ class DigiflazzAutoSources
                 // Only the admin can intentionally add or change additional sources.
                 if ($mappings->isNotEmpty()) {
                     $this->warnDuplicateMappings($package, $provider->id);
+
                     continue;
                 }
                 $rows = DB::table('digiflazz_catalog_items')->whereIn('buyer_sku_code', $mappings->pluck('external_sku'))->get();
