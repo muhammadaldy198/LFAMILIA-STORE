@@ -87,6 +87,30 @@ class AdminOrdersRestorationTest extends TestCase
             ])->assertSessionHasErrors('order');
     }
 
+    public function test_admin_retry_hides_exhausted_blocked_but_allows_retriable_blocked(): void
+    {
+        $admin = $this->login();
+        $id = $this->order($admin);
+        $number = DB::table('orders')->where('id', $id)->value('order_number');
+        DB::table('fulfillment_attempts')->where('order_id', $id)->update([
+            'status' => 'BLOCKED', 'last_error' => 'Semua SKU yang diizinkan telah gagal. Hubungi superadmin.',
+        ]);
+        DB::table('orders')->where('id', $id)->update(['status' => 'BLOCKED']);
+        $this->get('/admin/orders/'.$id)->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('attempts.0.can_retry', false)->where('canCancel', true));
+        $this->get('/admin/fulfillment?scope=all&q='.urlencode($number))->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('attempts.data.0.can_retry', false));
+
+        DB::table('orders')->where('id', $id)->update(['status' => 'PROCESSING']);
+        DB::table('fulfillment_attempts')->where('order_id', $id)->update([
+            'last_error' => 'Penyedia belum bisa dihubungi.',
+        ]);
+        $this->get('/admin/orders/'.$id)->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('attempts.0.can_retry', true));
+        $this->get('/admin/fulfillment?scope=all&q='.urlencode($number))->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('attempts.data.0.can_retry', true));
+    }
+
     public function test_manual_order_is_paid_queued_once_and_never_sent_to_an_external_provider(): void
     {
         $admin = $this->login();
