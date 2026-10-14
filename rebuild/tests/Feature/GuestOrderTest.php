@@ -61,6 +61,19 @@ class GuestOrderTest extends TestCase
         $this->assertFalse(app(GuestOrderAccess::class)->matches($second, $code));
     }
 
+    public function test_public_tracking_preserves_blocked_state_and_paid_payment(): void
+    {
+        $orderId = $this->guestOrder('LFTRACK-BLOCKED-100');
+        DB::table('orders')->where('id', $orderId)->update([
+            'status' => 'BLOCKED',
+            'paid_at' => now(),
+        ]);
+        $this->post('/orders/track/search', ['query' => 'LFTRACK-BLOCKED-100'])
+            ->assertOk()
+            ->assertJsonPath('order.fulfillmentStatus', 'blocked')
+            ->assertJsonPath('order.paymentStatus', 'paid');
+    }
+
     public function test_reissuing_code_invalidates_old_code(): void
     {
         $id = $this->guestOrder('GUEST-300');
