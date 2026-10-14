@@ -27,6 +27,7 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class PaymentTest extends TestCase
@@ -1506,9 +1507,7 @@ class PaymentTest extends TestCase
             ->where('event_type', 'ORDER_EXPIRED')->count());
     }
 
-    /**
-     * @dataProvider adminUnknownStatuses
-     */
+    #[DataProvider('adminUnknownStatuses')]
     public function test_admin_can_verify_unknown_midtrans_payment_without_creating_another_payment(
         string $gatewayStatus,
         string $expectedOrderStatus
