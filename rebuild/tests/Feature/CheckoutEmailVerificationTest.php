@@ -72,34 +72,20 @@ class CheckoutEmailVerificationTest extends TestCase
         return ['package_id' => $package->id];
     }
 
-    private function enableQrisRoute(): void
+    private function enableManualQrisRoute(): void
     {
-        DB::table('payment_gateways')->where('code', 'MIDTRANS')->update([
+        // Pola yang sama dengan CheckoutTest: QRIS manual (gateway MANUAL,
+        // bukan eksternal) — MIDTRANS tanpa kredensial integrasi selalu
+        // masuk daftar gateway unavailable sehingga route-nya terfilter.
+        DB::table('payment_gateways')->where('code', 'MANUAL_QRIS')->update([
             'is_active' => true,
             'is_maintenance' => false,
             'updated_at' => now(),
         ]);
-        DB::table('payment_channels')->where('code', 'qris')->update([
+        DB::table('payment_channels')->where('code', 'manual_qris')->update([
             'is_active' => true,
-            'fee_flat_idr' => 0,
-            'fee_percent_bps' => 70,
             'updated_at' => now(),
         ]);
-        $channelId = DB::table('payment_channels')->where('code', 'qris')->value('id');
-        $gatewayId = DB::table('payment_gateways')->where('code', 'MIDTRANS')->value('id');
-        DB::table('payment_routes')->updateOrInsert(
-            ['payment_channel_id' => $channelId, 'payment_gateway_id' => $gatewayId],
-            [
-                'provider_channel' => 'qris',
-                'configuration' => null,
-                'priority' => 0,
-                'fee_flat_idr' => 0,
-                'fee_percent_bps' => 70,
-                'is_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]
-        );
     }
 
     private function makeUser(?string $verifiedAt): User
@@ -107,6 +93,7 @@ class CheckoutEmailVerificationTest extends TestCase
         $user = User::create([
             'name' => 'Member Verifikasi',
             'email' => 'verifikasi-'.bin2hex(random_bytes(4)).'@example.test',
+            'phone' => '081234567890',
             'password' => 'password',
         ]);
         $user->forceFill(['email_verified_at' => $verifiedAt])->save();
@@ -118,12 +105,12 @@ class CheckoutEmailVerificationTest extends TestCase
     {
         $catalog = $this->catalog();
         $this->seedCheckoutDigiflazzCatalog($catalog['package_id']);
-        $this->enableQrisRoute();
+        $this->enableManualQrisRoute();
         $user = $this->makeUser(null);
 
         $response = $this->actingAs($user)->postJson('/checkout/orders', [
             'package_id' => $catalog['package_id'],
-            'payment_channel_code' => 'qris',
+            'payment_channel_code' => 'manual_qris',
             'customer_input' => ['user_id' => '123456'],
             'idempotency_key' => 'verify-'.bin2hex(random_bytes(8)),
         ]);
@@ -137,12 +124,12 @@ class CheckoutEmailVerificationTest extends TestCase
     {
         $catalog = $this->catalog();
         $this->seedCheckoutDigiflazzCatalog($catalog['package_id']);
-        $this->enableQrisRoute();
+        $this->enableManualQrisRoute();
         $user = $this->makeUser(now()->toDateTimeString());
 
         $response = $this->actingAs($user)->postJson('/checkout/orders', [
             'package_id' => $catalog['package_id'],
-            'payment_channel_code' => 'qris',
+            'payment_channel_code' => 'manual_qris',
             'customer_input' => ['user_id' => '123456'],
             'idempotency_key' => 'verify-'.bin2hex(random_bytes(8)),
         ]);
@@ -155,11 +142,11 @@ class CheckoutEmailVerificationTest extends TestCase
     {
         $catalog = $this->catalog();
         $this->seedCheckoutDigiflazzCatalog($catalog['package_id']);
-        $this->enableQrisRoute();
+        $this->enableManualQrisRoute();
 
         $response = $this->postJson('/checkout/orders', [
             'package_id' => $catalog['package_id'],
-            'payment_channel_code' => 'qris',
+            'payment_channel_code' => 'manual_qris',
             'customer_input' => ['user_id' => '123456'],
             'guest_email' => 'guest-verifikasi@example.test',
             'guest_phone' => '081234567890',

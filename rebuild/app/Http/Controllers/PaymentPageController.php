@@ -40,11 +40,26 @@ class PaymentPageController
 
         abort_unless($order, 404);
 
+        // Link bayar dari email adalah signed URL (lihat
+        // TransactionalEmailService::payUrl): signature valid = bukti
+        // pengunjung memegang link dari email order itu, jadi halaman
+        // boleh dibuka lintas sesi — tanpa session checkout (guest) atau
+        // tanpa login dulu (member). Tanpa signature, jalur lama tetap
+        // berlaku: session guest_order_id untuk guest, owner login
+        // untuk member.
+        $signed = $request->hasValidSignature();
+
         if ($order->user_id === null) {
-            abort_unless((int) $request->session()->get('guest_order_id') === (int) $order->id, 403);
+            if ($signed) {
+                $request->session()->put('guest_order_id', $order->id);
+            } else {
+                abort_unless((int) $request->session()->get('guest_order_id') === (int) $order->id, 403);
+            }
             $statusUrl = route('guest.orders.show', $order->order_number);
         } else {
-            abort_unless($request->user() && (int) $request->user()->id === (int) $order->user_id, 403);
+            if (! $signed) {
+                abort_unless($request->user() && (int) $request->user()->id === (int) $order->user_id, 403);
+            }
             $statusUrl = route('account.orders.show', $order->id);
         }
 

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Jobs\SendTransactionalEmailJob;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\URL;
 
 class TransactionalEmailService
 {
@@ -74,7 +75,7 @@ class TransactionalEmailService
             ];
         }
         $lines = [...$lines,
-            'Bayar sekarang: '.$this->payUrl($details['invoice']),
+            'Bayar sekarang: '.$this->payUrl($details['invoice'], $details['expires_at']),
             'Lacak pesanan: '.$this->trackingUrl(),
             '',
             'Sudah bayar? Abaikan email ini — kamu akan menerima email konfirmasi begitu pembayaranmu terverifikasi.',
@@ -130,6 +131,15 @@ class TransactionalEmailService
      * Momen 3a (D3): pesanan selesai. Dipanggil dari ketiga jalur
      * FulfillmentService yang menutup order sebagai SUCCESS
      * (Digiflazz, stok kode, manual).
+     *
+     * delivery_payload punya DUA bentuk yang jangan dicampur:
+     * - ['code' => ...] (stok kode VOUCHER_STOCK / manual): kode
+     *   REDEEMABLE — customer sendiri yang menukarkannya. Ditampilkan
+     *   sebagai "Kode voucher" + petunjuk tukar, BUKAN sebagai nomor
+     *   referensi, dan tanpa klaim "sudah masuk akun".
+     * - ['serial_number' => ...] (Digiflazz): nomor referensi
+     *   diagnostik dari penyedia — tetap "No. Referensi Pengiriman"
+     *   + "periksa saldo di dalam game".
      */
     public function queueOrderCompleted(int $orderId): void
     {
@@ -138,10 +148,13 @@ class TransactionalEmailService
             return;
         }
 
+        $hasCode = $details['delivery_code'] !== null;
         $lines = [
             'Halo,',
             '',
-            'Pesananmu sudah selesai diproses dan item sudah terkirim ke akun tujuan:',
+            $hasCode
+                ? 'Pesananmu sudah selesai diproses. Kode produkmu ada di bawah — tukarkan sendiri:'
+                : 'Pesananmu sudah selesai diproses dan item sudah terkirim ke akun tujuan:',
             '',
             'Nomor Invoice: '.$details['invoice'],
             'Produk: '.$details['product'].' — '.$details['package'],
@@ -149,13 +162,20 @@ class TransactionalEmailService
         if ($details['destination'] !== null) {
             $lines[] = 'ID Tujuan: '.$details['destination'];
         }
-        if ($details['delivery_reference'] !== null) {
+        if ($hasCode) {
+            $lines[] = 'Kode voucher: '.$details['delivery_code'];
+            if ($details['delivery_note'] !== null) {
+                $lines[] = 'Catatan: '.$details['delivery_note'];
+            }
+        } elseif ($details['delivery_reference'] !== null) {
             $lines[] = 'No. Referensi Pengiriman: '.$details['delivery_reference'];
         }
         $lines = [...$lines,
             'Total Transaksi: '.$this->rupiah($details['total']),
             '',
-            'Silakan periksa saldo di dalam game. Kalau belum masuk setelah beberapa menit, sampaikan nomor invoice dan nomor referensi di atas ke CS kami.',
+            $hasCode
+                ? 'Simpan kode ini baik-baik — jangan dibagikan ke orang lain. Kode ini yang ditukarkan untuk memakai produkmu; kode tidak terkirim otomatis ke akun game. Kalau kode tidak bisa ditukarkan, sampaikan nomor invoice di atas ke CS kami.'
+                : 'Silakan periksa saldo di dalam game. Kalau belum masuk setelah beberapa menit, sampaikan nomor invoice dan nomor referensi di atas ke CS kami.',
             '',
             'Lihat detail pesanan: '.$this->trackingUrl(),
             '',
@@ -164,7 +184,9 @@ class TransactionalEmailService
 
         $this->queueForOrder(
             $orderId,
-            'Pesanan selesai — '.$details['package'].' sudah masuk ke akunmu',
+            $hasCode
+                ? 'Pesanan selesai — kode '.$details['package'].' sudah siap ditukarkan'
+                : 'Pesanan selesai — '.$details['package'].' sudah masuk ke akunmu',
             implode("\n", $lines)
         );
     }
@@ -210,7 +232,7 @@ class TransactionalEmailService
     }
 
     /**
-     * @return array{invoice:string,product:string,package:string,destination:?string,method:string,subtotal:int,fee:int,total:int,expires_at:?string,delivery_reference:?string}|null
+     * @return array{invoice:string,product:string,package:string,destination:?string,method:string,subtotal:int,fee:int,total:int,expires_at:?string,delivery_code:?string,delivery_note:?string,delivery_reference:?string}|null
      */
     private function orderDetails(int $orderId): ?array
     {
@@ -256,6 +278,8 @@ class TransactionalEmailService
             'fee' => (int) $order->fee_idr,
             'total' => (int) $order->total_idr,
             'expires_at' => is_string($order->expires_at) ? $order->expires_at : null,
+            'delivery_code' => $this->deliveryCode($delivery),
+            'delivery_note' => $this->deliveryNote($delivery),
             'delivery_reference' => $this->deliveryReference($delivery),
         ];
     }
@@ -277,11 +301,46 @@ class TransactionalEmailService
     }
 
     /**
+     * Kode redeemable dari stok kode / penyelesaian manual. BUKAN
+     * nomor referensi — customer sendiri yang menukarkannya.
+     *
+     * @param  array<string, mixed>  $delivery
+     */
+    private function deliveryCode(array $delivery): ?string
+    {
+        $code = $delivery['code'] ?? null;
+        if (! is_string($code) || trim($code) === '') {
+            return null;
+        }
+
+        return trim($code);
+    }
+
+    /**
+     * Catatan admin saat penyelesaian manual (boleh kosong).
+     *
+     * @param  array<string, mixed>  $delivery
+     */
+    private function deliveryNote(array $delivery): ?string
+    {
+        $note = $delivery['note'] ?? null;
+        if (! is_string($note) || trim($note) === '') {
+            return null;
+        }
+
+        return trim($note);
+    }
+
+    /**
+     * Nomor referensi diagnostik dari penyedia (Digiflazz `sn`).
+     * Sengaja TIDAK fallback ke `code`: kode redeemable bukan
+     * referensi dan tidak boleh dilabeli sebagai referensi.
+     *
      * @param  array<string, mixed>  $delivery
      */
     private function deliveryReference(array $delivery): ?string
     {
-        $reference = $delivery['serial_number'] ?? $delivery['code'] ?? null;
+        $reference = $delivery['serial_number'] ?? null;
         if (! is_string($reference) || trim($reference) === '') {
             return null;
         }
@@ -303,9 +362,23 @@ class TransactionalEmailService
             .' pukul '.$date->format('H.i').' WIB';
     }
 
-    private function payUrl(string $invoice): string
+    /**
+     * Link bayar lintas sesi: signed URL (pola yang sama dengan link
+     * verifikasi email di User::sendEmailVerificationNotification).
+     * Tanpa signature, halaman pembayaran menolak pengunjung yang
+     * sesinya beda dengan sesi checkout (guest: tanpa guest_order_id;
+     * member: belum login) — persis keluhan Codex: link dari email
+     * tidak jalan saat dibuka di browser/HP lain. Signature kedaluwarsa
+     * mengikuti expires_at order; tanpa expiry yang valid, pakai
+     * signed URL tanpa batas waktu.
+     */
+    private function payUrl(string $invoice, ?string $expiresAt): string
     {
-        return route('payment.show', ['invoice' => $invoice]);
+        $expires = $expiresAt !== null ? Carbon::parse($expiresAt) : null;
+
+        return $expires !== null && $expires->isFuture()
+            ? URL::temporarySignedRoute('payment.show', $expires, ['invoice' => $invoice])
+            : URL::signedRoute('payment.show', ['invoice' => $invoice]);
     }
 
     private function trackingUrl(): string

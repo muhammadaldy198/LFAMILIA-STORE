@@ -58,6 +58,12 @@ class AdminAuditService
 
             $array[$key] = in_array($normalized, self::SECRET_KEYS, true)
                 || collect($knownSecrets)->contains(fn (string $secret): bool => str_ends_with($compact, $secret))
+                // webhook_url_order / webhook_url_qris: compact-nya
+                // 'webhookurlorder' — tidak BERAKHIRAN 'webhookurl' sehingga
+                // lolos dari cek ends_with di atas. Semua URL webhook
+                // mengandung token di query-nya → redaksi semua yang
+                // diawali 'webhookurl'.
+                || str_starts_with($compact, 'webhookurl')
                 || str_contains($normalized, 'password')
                 || str_contains($normalized, 'credential')
                 || str_contains($normalized, 'secret')

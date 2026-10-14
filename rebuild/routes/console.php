@@ -270,11 +270,22 @@ Artisan::command('lfamilia:notify-healthcheck {state} {--reason=}', function (
     }
 
     if ($state === 'down') {
-        $recent = DB::table('admin_notifications')
+        // Redam HANYA selama outage yang sama belum pulih: ada alert
+        // gagal ≤30 menit lalu DAN belum ada recovery setelahnya.
+        // down → up → down dalam 30 menit adalah outage BARU dan
+        // wajib bunyi lagi — versi lama menelannya karena hanya
+        // melihat failed terbaru tanpa membandingkannya dengan
+        // recovery terbaru.
+        $latestRecoveredId = DB::table('admin_notifications')
+            ->where('event_type', 'system.healthcheck.recovered')
+            ->orderByDesc('id')->value('id');
+        $downQuery = DB::table('admin_notifications')
             ->where('event_type', 'system.healthcheck.failed')
-            ->where('created_at', '>=', now()->subMinutes(30))
-            ->exists();
-        if ($recent) {
+            ->where('created_at', '>=', now()->subMinutes(30));
+        if ($latestRecoveredId !== null) {
+            $downQuery->where('id', '>', (int) $latestRecoveredId);
+        }
+        if ($downQuery->exists()) {
             $this->info('Alert healthcheck gagal sudah dikirim dalam 30 menit terakhir.');
 
             return 0;

@@ -940,7 +940,10 @@ class AdminPanelRestorationTest extends TestCase
         $this->login();
         $product = $this->product();
         $package = ProductPackage::create(['product_id' => $product->id, 'code' => 'FLOOR', 'name' => 'Floor']);
-        ProviderMapping::create(['product_package_id' => $package->id, 'provider_id' => Provider::where('code', 'DIGIFLAZZ')->value('id'), 'external_sku' => 'floor-sku', 'cost_idr' => 10000, 'max_price_idr' => 10000, 'is_active' => false]);
+        // Mapping AKTIF: guard D17.3 hanya menghitung mapping aktif — mapping
+        // nonaktif memang sengaja tidak ikut guard (kasus nonaktif sudah
+        // dicover AdminPackagePriceGuardTest).
+        ProviderMapping::create(['product_package_id' => $package->id, 'provider_id' => Provider::where('code', 'DIGIFLAZZ')->value('id'), 'external_sku' => 'floor-sku', 'cost_idr' => 10000, 'max_price_idr' => 10000, 'is_active' => true]);
         $this->put('/admin/catalog/packages/'.$package->id, ['code' => 'FLOOR', 'name' => 'Floor', 'sort_order' => 0, 'is_active' => false,
             'pricing_mode' => 'SELL_PRICE', 'sell_price_idr' => 9000])->assertSessionHasErrors('sell_price_idr');
         $this->assertSame('PRODUCT_MARGIN', $package->fresh()->pricing_mode);

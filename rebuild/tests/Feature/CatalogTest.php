@@ -47,7 +47,6 @@ class CatalogTest extends TestCase
             'slug' => 'buyable-catalog-'.$suffix,
             'fulfillment_mode' => 'AUTO_PROVIDER',
             'margin_percent' => 10,
-            'sort_order' => -100,
             'is_active' => true,
         ]);
         $buyablePackage = $buyable->packages()->create([
@@ -72,7 +71,6 @@ class CatalogTest extends TestCase
             'slug' => 'dead-price-catalog-'.$suffix,
             'fulfillment_mode' => 'AUTO_PROVIDER',
             'margin_percent' => 10,
-            'sort_order' => -100,
             'is_active' => true,
         ]);
         $deadPricePackage = $deadPrice->packages()->create([
@@ -96,7 +94,6 @@ class CatalogTest extends TestCase
             'slug' => 'dead-none-catalog-'.$suffix,
             'fulfillment_mode' => 'AUTO_PROVIDER',
             'margin_percent' => 10,
-            'sort_order' => -100,
             'is_active' => true,
         ]);
         $deadNone->packages()->create([
@@ -106,7 +103,7 @@ class CatalogTest extends TestCase
         $this->get('/')->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Catalog/Index')
-                ->where('products.data', function (array $items) use ($buyable, $deadPrice, $deadNone): bool {
+                ->where('products.data', function ($items) use ($buyable, $deadPrice, $deadNone): bool {
                     $slugs = collect($items)->pluck('slug')->all();
 
                     return in_array($buyable->slug, $slugs, true)
@@ -187,7 +184,7 @@ class CatalogTest extends TestCase
         // Filter q di halaman katalog ikut perluasan yang sama.
         $this->get('/?q=Nominal Cari '.$suffix)->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->where('products.data', fn (array $items) => collect($items)->contains('slug', $product->slug))
+                ->where('products.data', fn ($items) => collect($items)->contains('slug', $product->slug))
                 ->etc());
     }
 
@@ -292,6 +289,9 @@ class CatalogTest extends TestCase
     public function test_only_super_admin_can_manage_a_manual_product_and_customer_sees_no_provider_data(): void
     {
         $category = Category::where('slug', 'game')->firstOrFail();
+        // D11: keterbelian memakai CheckoutPricing yang sama dengan checkout —
+        // provider MANUAL harus aktif agar produk manual bisa dibeli (dan tampil).
+        DB::table('providers')->where('code', 'MANUAL')->update(['is_active' => true]);
         $admin = $this->admin();
         $this->actingAs($admin, 'admin');
         $this->post('/admin/catalog/products', [
@@ -324,6 +324,11 @@ class CatalogTest extends TestCase
         $this->put('/admin/catalog/packages/'.$package->id, [
             'code' => 'GIFT10', 'name' => '10 Gift', 'nominal_value' => 10,
             'sort_order' => 0, 'is_active' => true,
+        ])->assertRedirect();
+        // Mapping MANUAL dibuat nonaktif oleh endpoint tambah nominal —
+        // admin mengaktifkannya lewat endpoint mapping (alur admin asli).
+        $this->put('/admin/catalog/mappings/'.$mapping->id, [
+            'priority' => 0, 'is_active' => true, 'cost_idr' => 8000,
         ])->assertRedirect();
 
         $this->get('/?mode=manual')->assertOk()->assertSee('Manual Gift');

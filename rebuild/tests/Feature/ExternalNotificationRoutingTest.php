@@ -7,6 +7,7 @@ use App\Services\AdminNotificationService;
 use App\Services\ExternalNotificationService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 /**
@@ -28,6 +29,9 @@ class ExternalNotificationRoutingTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // Hermetik: tanpa fake, job notif ikut jalan sync dan kirim ke
+        // webhook betulan (ganda + bergantung jaringan).
+        Queue::fake();
         Http::fake();
         IntegrationCredential::create([
             'code' => 'telegram',
@@ -59,7 +63,7 @@ class ExternalNotificationRoutingTest extends TestCase
 
     private function telegramSends(): int
     {
-        return Http::sent(fn ($request) => str_contains($request->url(), 'sendMessage'))->count();
+        return Http::recorded(fn ($request, $response) => str_contains($request->url(), 'sendMessage'))->count();
     }
 
     public function test_telegram_receives_every_notification_while_discord_skips_unconfigured_channel(): void

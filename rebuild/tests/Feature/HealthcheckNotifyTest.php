@@ -56,6 +56,21 @@ class HealthcheckNotifyTest extends TestCase
             ->where('event_type', 'system.healthcheck.failed')->count());
     }
 
+    public function test_down_after_recovery_alerts_again_within_thirty_minutes(): void
+    {
+        // down → up → down dalam 30 menit = outage BARU: alert kedua
+        // wajib bunyi, bukan ditelan dedupe (dedupe hanya untuk outage
+        // yang sama yang belum pulih).
+        $this->notify('down', 'Edge readiness is not healthy');
+        $this->notify('up');
+        $this->notify('down', 'Origin readiness is not healthy');
+
+        $this->assertSame(2, DB::table('admin_notifications')
+            ->where('event_type', 'system.healthcheck.failed')->count());
+        $this->assertSame(1, DB::table('admin_notifications')
+            ->where('event_type', 'system.healthcheck.recovered')->count());
+    }
+
     public function test_up_without_prior_down_records_nothing(): void
     {
         $this->assertSame(0, $this->notify('up'));

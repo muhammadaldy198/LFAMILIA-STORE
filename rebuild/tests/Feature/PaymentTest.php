@@ -750,8 +750,10 @@ class PaymentTest extends TestCase
             'email' => 'wallet@example.test',
             'phone' => '081234567891',
             'password' => Hash::make('StrongPassword123!'),
-            'email_verified_at' => now(),
         ]);
+        // email_verified_at TIDAK fillable — create di atas diam-diam
+        // membuangnya; gate D7 lalu menolak checkout member tak terverifikasi.
+        $user->forceFill(['email_verified_at' => now()])->save();
         DB::table('wallets')->where('user_id', $user->id)->update(['balance_idr' => 50000]);
 
         $checkout = $this->actingAs($user)->postJson('/checkout/orders', [
@@ -789,8 +791,9 @@ class PaymentTest extends TestCase
             'email' => 'low-balance@example.test',
             'phone' => '081234567893',
             'password' => Hash::make('StrongPassword123!'),
-            'email_verified_at' => now(),
         ]);
+        // email_verified_at TIDAK fillable — lihat catatan di test wallet di atas.
+        $user->forceFill(['email_verified_at' => now()])->save();
         DB::table('wallets')->where('user_id', $user->id)->update(['balance_idr' => 5000]);
 
         $checkout = $this->actingAs($user)->postJson('/checkout/orders', [
@@ -826,8 +829,9 @@ class PaymentTest extends TestCase
             'email' => 'refund-hold@example.test',
             'phone' => '081234567895',
             'password' => Hash::make('StrongPassword123!'),
-            'email_verified_at' => now(),
         ]);
+        // email_verified_at TIDAK fillable — lihat catatan di test wallet di atas.
+        $user->forceFill(['email_verified_at' => now()])->save();
         $wallet = DB::table('wallets')->where('user_id', $user->id)->firstOrFail();
         DB::table('wallets')->where('id', $wallet->id)->update(['balance_idr' => 50000]);
         $channelId = DB::table('payment_channels')->where('code', 'qris')->value('id');

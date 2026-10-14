@@ -6,6 +6,7 @@ use App\Jobs\SendTransactionalEmailJob;
 use App\Models\Category;
 use App\Models\IntegrationCredential;
 use App\Models\Product;
+use App\Models\User;
 use App\Services\FulfillmentService;
 use App\Services\PaymentStateService;
 use App\Services\TransactionalEmailService;
@@ -88,45 +89,31 @@ class CustomerEmailMomentsTest extends TestCase
         return ['product' => $product, 'package_id' => $package->id, 'mapping_id' => $mappingId];
     }
 
-    private function enableQrisRoute(): void
+    private function enableManualQrisRoute(): void
     {
-        DB::table('payment_gateways')->where('code', 'MIDTRANS')->update([
+        // Pola yang sama dengan CheckoutTest: QRIS manual (gateway MANUAL,
+        // bukan eksternal) — MIDTRANS tanpa kredensial integrasi selalu
+        // masuk daftar gateway unavailable sehingga route-nya terfilter.
+        DB::table('payment_gateways')->where('code', 'MANUAL_QRIS')->update([
             'is_active' => true,
             'is_maintenance' => false,
             'updated_at' => now(),
         ]);
-        DB::table('payment_channels')->where('code', 'qris')->update([
+        DB::table('payment_channels')->where('code', 'manual_qris')->update([
             'is_active' => true,
-            'fee_flat_idr' => 0,
-            'fee_percent_bps' => 70,
             'updated_at' => now(),
         ]);
-        $channelId = DB::table('payment_channels')->where('code', 'qris')->value('id');
-        $gatewayId = DB::table('payment_gateways')->where('code', 'MIDTRANS')->value('id');
-        DB::table('payment_routes')->updateOrInsert(
-            ['payment_channel_id' => $channelId, 'payment_gateway_id' => $gatewayId],
-            [
-                'provider_channel' => 'qris',
-                'configuration' => null,
-                'priority' => 0,
-                'fee_flat_idr' => 0,
-                'fee_percent_bps' => 70,
-                'is_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]
-        );
     }
 
     public function test_order_created_email_is_queued_with_full_details(): void
     {
         $catalog = $this->catalog();
         $this->seedCheckoutDigiflazzCatalog($catalog['package_id']);
-        $this->enableQrisRoute();
+        $this->enableManualQrisRoute();
 
         $order = $this->postJson('/checkout/orders', [
             'package_id' => $catalog['package_id'],
-            'payment_channel_code' => 'qris',
+            'payment_channel_code' => 'manual_qris',
             'customer_input' => ['user_id' => '123456', 'zone_id' => '9876'],
             'guest_email' => 'moments-created@example.test',
             'guest_phone' => '081234567890',
@@ -146,14 +133,97 @@ class CustomerEmailMomentsTest extends TestCase
                 && str_contains($job->text, '9876')
                 && str_contains($job->text, (string) $channelName)
                 && str_contains($job->text, 'Rp 11.000')
-                && str_contains($job->text, 'Rp 78')
-                && str_contains($job->text, 'Rp 11.078')
+                && str_contains($job->text, 'Rp 0')
+                && str_contains($job->text, 'Rp 11.000')
                 && str_contains($job->text, 'Selesaikan pembayaran sebelum')
                 && str_contains($job->text, 'WIB')
                 && str_contains($job->text, 'invoice='.$invoice)
                 && str_contains($job->text, '/orders/check')
                 && str_contains($job->text, 'support@lfamiliastore.my.id');
         });
+    }
+
+    /**
+     * Link "Bayar sekarang" di email harus jalan lintas sesi: guest yang
+     * membuka email di browser/HP lain (tanpa session checkout) dan
+     * member yang belum login tetap bisa membuka halaman pembayaran,
+     * karena link-nya signed URL. Tanpa signature, jalur lama tetap
+     * menolak (403) — link tanpa signature bukan jalan pintas.
+     */
+    public function test_payment_link_from_email_opens_without_checkout_session(): void
+    {
+        $catalog = $this->catalog();
+        $this->seedCheckoutDigiflazzCatalog($catalog['package_id']);
+        $this->enableManualQrisRoute();
+
+        $order = $this->postJson('/checkout/orders', [
+            'package_id' => $catalog['package_id'],
+            'payment_channel_code' => 'manual_qris',
+            'customer_input' => ['user_id' => '123456', 'zone_id' => '9876'],
+            'guest_email' => 'moments-paylink@example.test',
+            'guest_phone' => '081234567890',
+            'idempotency_key' => 'email-moments-paylink-'.bin2hex(random_bytes(6)),
+        ])->assertCreated();
+
+        $invoice = (string) $order->json('order_number');
+        $payUrl = null;
+        Queue::assertPushed(SendTransactionalEmailJob::class, function (SendTransactionalEmailJob $job) use (&$payUrl): bool {
+            if (preg_match('/Bayar sekarang: (\S+)/', $job->text, $matches) === 1) {
+                $payUrl = $matches[1];
+            }
+
+            return $job->recipient === 'moments-paylink@example.test';
+        });
+        $this->assertIsString($payUrl);
+        $this->assertStringContainsString('signature=', $payUrl);
+
+        // Simulasi browser lain: sesi checkout dibuang.
+        session()->flush();
+
+        // Tanpa signature tetap ditolak.
+        $this->get('/payment?invoice='.$invoice)->assertForbidden();
+        // Dengan signature dari email: halaman pembayaran terbuka.
+        $this->get($payUrl)->assertOk();
+    }
+
+    public function test_payment_link_from_email_opens_for_logged_out_member(): void
+    {
+        $catalog = $this->catalog();
+        $this->seedCheckoutDigiflazzCatalog($catalog['package_id']);
+        $this->enableManualQrisRoute();
+
+        $user = User::create([
+            'name' => 'Member Paylink',
+            'email' => 'moments-paylink-member-'.bin2hex(random_bytes(4)).'@example.test',
+            'phone' => '081234567890',
+            'password' => 'password',
+        ]);
+        $user->forceFill(['email_verified_at' => now()])->save();
+
+        $order = $this->actingAs($user)->postJson('/checkout/orders', [
+            'package_id' => $catalog['package_id'],
+            'payment_channel_code' => 'manual_qris',
+            'customer_input' => ['user_id' => '123456', 'zone_id' => '9876'],
+            'idempotency_key' => 'email-moments-paylink-member-'.bin2hex(random_bytes(6)),
+        ])->assertCreated();
+
+        $invoice = (string) $order->json('order_number');
+        $payUrl = null;
+        Queue::assertPushed(SendTransactionalEmailJob::class, function (SendTransactionalEmailJob $job) use ($user, &$payUrl): bool {
+            if ($job->recipient === $user->email && preg_match('/Bayar sekarang: (\S+)/', $job->text, $matches) === 1) {
+                $payUrl = $matches[1];
+            }
+
+            return $job->recipient === $user->email;
+        });
+        $this->assertIsString($payUrl);
+
+        // Simulasi member membuka email tanpa login.
+        auth()->logout();
+        session()->flush();
+
+        $this->get('/payment?invoice='.$invoice)->assertForbidden();
+        $this->get($payUrl)->assertOk();
     }
 
     public function test_payment_confirmed_email_contains_amount_and_details(): void
@@ -207,7 +277,7 @@ class CustomerEmailMomentsTest extends TestCase
                 && str_contains($job->text, '100 Diamonds')
                 && str_contains($job->text, '123456')
                 && str_contains($job->text, 'Rp 11.078')
-                && str_contains($job->text, 'sedang diproses')
+                && str_contains($job->subject, 'sedang diproses')
                 && str_contains($job->text, '/orders/check')
                 && str_contains($job->text, 'support@lfamiliastore.my.id');
         });
@@ -237,7 +307,7 @@ class CustomerEmailMomentsTest extends TestCase
             'currency' => 'IDR',
             'customer_input' => json_encode(['user_id' => '123456', 'zone_id' => '7890'], JSON_THROW_ON_ERROR),
             'snapshot' => json_encode([
-                'product' => ['id' => $catalog['product']->id, 'name' => $catalog['product']->name],
+                'product' => ['id' => $catalog['product']->id, 'name' => $catalog['product']->name, 'fulfillment_mode' => 'AUTO_PROVIDER'],
                 'package' => ['id' => $catalog['package_id'], 'name' => '100 Diamonds'],
                 'provider' => ['mapping_id' => $catalog['mapping_id'], 'code' => 'DIGIFLAZZ', 'sku' => 'EML-SKU', 'cost_idr' => 10000, 'max_price_idr' => 12000],
                 'pricing' => ['cost_idr' => 10000, 'total_idr' => 11000],
@@ -285,6 +355,53 @@ class CustomerEmailMomentsTest extends TestCase
         });
     }
 
+    public function test_order_completed_email_shows_voucher_stock_code_as_redeemable(): void
+    {
+        $catalog = $this->catalog();
+        $orderId = DB::table('orders')->insertGetId([
+            'order_number' => 'ORD-EMAIL-CODE-'.bin2hex(random_bytes(4)),
+            'guest_email' => 'moments-code@example.test',
+            'guest_phone' => '081234567890',
+            'product_id' => $catalog['product']->id,
+            'product_package_id' => $catalog['package_id'],
+            'provider_mapping_id' => $catalog['mapping_id'],
+            'status' => 'SUCCESS',
+            'currency' => 'IDR',
+            'customer_input' => json_encode(['user_id' => '123456', 'zone_id' => '7890'], JSON_THROW_ON_ERROR),
+            'snapshot' => json_encode([
+                'product' => ['id' => $catalog['product']->id, 'name' => $catalog['product']->name, 'fulfillment_mode' => 'VOUCHER_STOCK'],
+                'package' => ['id' => $catalog['package_id'], 'name' => '100 Diamonds'],
+                'provider' => ['mapping_id' => $catalog['mapping_id'], 'code' => 'VOUCHER_STOCK', 'sku' => 'EML-SKU', 'cost_idr' => 10000, 'max_price_idr' => 12000],
+                'customer_input' => ['user_id' => '123456', 'zone_id' => '7890'],
+            ], JSON_THROW_ON_ERROR),
+            // Bentuk payload stok kode: ['code' => kode redeemable].
+            'delivery_payload' => json_encode(['code' => 'VOUCHER-ABC-123'], JSON_THROW_ON_ERROR),
+            'cost_idr' => 10000,
+            'margin_idr' => 1000,
+            'discount_idr' => 0,
+            'fee_idr' => 0,
+            'total_idr' => 11000,
+            'idempotency_key' => 'email-moments-code-'.bin2hex(random_bytes(6)),
+            'paid_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        app(TransactionalEmailService::class)->queueOrderCompleted($orderId);
+
+        Queue::assertPushed(SendTransactionalEmailJob::class, function (SendTransactionalEmailJob $job): bool {
+            return $job->recipient === 'moments-code@example.test'
+                && str_contains($job->subject, 'siap ditukarkan')
+                && str_contains($job->text, 'Kode voucher: VOUCHER-ABC-123')
+                && str_contains($job->text, 'tukarkan sendiri')
+                // Kode redeemable bukan nomor referensi diagnostik,
+                // dan belum "masuk akun" — customer yang menukarkannya.
+                && ! str_contains($job->text, 'No. Referensi Pengiriman')
+                && ! str_contains($job->text, 'sudah masuk ke akunmu')
+                && ! str_contains($job->text, 'periksa saldo di dalam game');
+        });
+    }
+
     public function test_order_failed_email_directs_to_cs_without_refund_promise(): void
     {
         $catalog = $this->catalog();
@@ -299,7 +416,7 @@ class CustomerEmailMomentsTest extends TestCase
             'currency' => 'IDR',
             'customer_input' => json_encode(['user_id' => '123456', 'zone_id' => '7890'], JSON_THROW_ON_ERROR),
             'snapshot' => json_encode([
-                'product' => ['id' => $catalog['product']->id, 'name' => $catalog['product']->name],
+                'product' => ['id' => $catalog['product']->id, 'name' => $catalog['product']->name, 'fulfillment_mode' => 'AUTO_PROVIDER'],
                 'package' => ['id' => $catalog['package_id'], 'name' => '100 Diamonds'],
                 'provider' => ['mapping_id' => $catalog['mapping_id'], 'code' => 'DIGIFLAZZ', 'sku' => 'EML-SKU', 'cost_idr' => 10000, 'max_price_idr' => 12000],
                 'customer_input' => ['user_id' => '123456', 'zone_id' => '7890'],
@@ -371,7 +488,7 @@ class CustomerEmailMomentsTest extends TestCase
             'currency' => 'IDR',
             'customer_input' => json_encode(['user_id' => '123456', 'zone_id' => '7890'], JSON_THROW_ON_ERROR),
             'snapshot' => json_encode([
-                'product' => ['id' => $catalog['product']->id, 'name' => $catalog['product']->name],
+                'product' => ['id' => $catalog['product']->id, 'name' => $catalog['product']->name, 'fulfillment_mode' => 'AUTO_PROVIDER'],
                 'package' => ['id' => $catalog['package_id'], 'name' => '100 Diamonds'],
                 'provider' => ['mapping_id' => $catalog['mapping_id'], 'code' => 'DIGIFLAZZ', 'sku' => 'EML-SKU', 'cost_idr' => 10000, 'max_price_idr' => 12000],
                 'customer_input' => ['user_id' => '123456', 'zone_id' => '7890'],

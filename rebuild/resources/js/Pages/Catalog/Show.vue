@@ -56,6 +56,12 @@ const checkoutCountdown = computed(() => checkoutSecondsLeft.value === null ? ''
     String(checkoutSecondsLeft.value % 60).padStart(2, '0'));
 const errors = ref({});
 const busy = ref('');
+// D7: checkout ditolak karena email belum terverifikasi — flag dari
+// backend (requires_email_verification) diteruskan ke sini agar user
+// dapat aksi, bukan cuma pesan error generik.
+const requiresEmailVerification = ref(false);
+const verificationResending = ref(false);
+const verificationResendStatus = ref('');
 const activeTab = ref('transaction');
 const idempotencyKey = ref('');
 const paymentIdempotencyKey = ref(newIdempotencyKey());
@@ -484,6 +490,9 @@ async function requestJson(url, options = {}) {
         const message = (response.status === 419 ? 'Sesi berakhir. Muat ulang halaman sebelum melanjutkan.' : null) || data.message || Object.values(data.errors || {})?.[0]?.[0] || 'Permintaan gagal.';
         const error = new Error(message);
         error.validation = data.errors || { checkout: [message] };
+        // Teruskan flag D7 (CheckoutController::store) — tanpa ini,
+        // penolakan verifikasi email jadi error generik tanpa aksi.
+        error.requiresEmailVerification = data.requires_email_verification === true;
         throw error;
     }
     return data;
@@ -680,6 +689,8 @@ async function createOrder() {
     if (!agreed.value || !confirmationSnapshot.value || busy.value) return;
 
     errors.value = {};
+    requiresEmailVerification.value = false;
+    verificationResendStatus.value = '';
 
     if (confirmationSnapshot.value.state_signature !== confirmationStateSignature()) {
         closeConfirmation();
@@ -719,6 +730,7 @@ async function createOrder() {
         checkoutClockTick.value = Date.now();
     } catch (error) {
         errors.value = error.validation || { checkout: [error.message || 'Pesanan gagal dibuat.'] };
+        requiresEmailVerification.value = error.requiresEmailVerification === true;
         busy.value = '';
         return;
     }
@@ -753,6 +765,21 @@ async function createOrder() {
         window.location.assign('/payment?invoice=' + encodeURIComponent(checkoutResult.value.order_number) + '&resume=1');
     } finally {
         busy.value = '';
+    }
+}
+
+async function resendVerificationEmail() {
+    if (verificationResending.value) return;
+    verificationResending.value = true;
+    verificationResendStatus.value = '';
+    try {
+        // Rute Fortify yang sama dengan tombol di halaman /email/verify.
+        await requestJson('/email/verification-notification', { method: 'POST', body: JSON.stringify({}) });
+        verificationResendStatus.value = 'Link verifikasi baru dikirim ke email kamu. Cek inbox (dan spam).';
+    } catch (error) {
+        verificationResendStatus.value = error.message || 'Gagal mengirim ulang. Coba lagi sebentar.';
+    } finally {
+        verificationResending.value = false;
     }
 }
 
@@ -832,7 +859,7 @@ function closeReview() { summaryOpen.value = false; closeConfirmation(); }
       <div class="lfx-product-intro"><div class="lfx-breadcrumb"><Link href="/">Beranda</Link><span>›</span><span>{{product.category_name}}</span><span>›</span><strong>{{product.name}}</strong></div><div class="lfx-overline">DIGITAL TOP UP · PREMIUM EXPERIENCE</div><h1>{{product.name}}</h1><p>{{product.publisher||'LFAMILIA STORE'}}</p></div><div class="lfx-trust"><span><b>⚡</b> Proses Cepat</span><span><b>✧</b> {{customerText("checkout.support_label", "Layanan Chat 24/7")}}</span><span><b>◷</b> Pembayaran Aman</span></div>
 
     </div></section>
-    <div class="lfx-container lfx-content"><p v-if="firstCheckoutError" role="alert" class="lfx-error">{{firstCheckoutError}}</p>
+    <div class="lfx-container lfx-content"><p v-if="firstCheckoutError" role="alert" class="lfx-error">{{firstCheckoutError}}</p><div v-if="requiresEmailVerification" role="alert" class="lfx-error">Belum menerima email? <button type="button" :disabled="verificationResending" @click="resendVerificationEmail">Kirim ulang link verifikasi</button> atau <a href="/email/verify">buka halaman verifikasi</a>.<span v-if="verificationResendStatus"> {{verificationResendStatus}}</span></div>
       <div class="lfx-mobile-tabs"><button :class="{active:activeTab==='transaction'}" @click="activeTab='transaction'">Transaksi</button><button :class="{active:activeTab==='details'}" @click="activeTab='details'">Keterangan</button></div>
       <div class="lfx-layout">
         <div class="lfx-sections">
@@ -1022,7 +1049,7 @@ function closeReview() { summaryOpen.value = false; closeConfirmation(); }
         <div v-if="selectedPackage && selectedPaymentChannel"><span>Biaya pembayaran</span><b>{{formatIdr(reviewQuote?.fee_idr || 0)}}</b></div>
         <div v-if="reviewQuote?.member_discount_idr"><span>Diskon {{reviewQuote.member_tier_code || 'Member'}}</span><b class="lfx-saved">− {{formatIdr(reviewQuote.member_discount_idr)}}</b></div><div class="lfx-confirm-final"><span>Total Pembayaran</span><b>{{selectedPackage ? (displayTotal===null ? 'Menghitung…' : formatIdr(displayTotal)) : 'Rp 0'}}</b></div>
       </div>
-      <p v-if="firstCheckoutError" role="alert" class="lfx-error">{{firstCheckoutError}}</p><label v-if="confirmOpen" class="lfx-agreement"><input v-model="agreed" type="checkbox"/> Dengan melanjutkan, saya menyetujui <Link href="/terms">syarat & ketentuan</Link>.</label><div class="lfx-modal-buttons">
+      <p v-if="firstCheckoutError" role="alert" class="lfx-error">{{firstCheckoutError}}</p><div v-if="requiresEmailVerification" role="alert" class="lfx-error">Belum menerima email? <button type="button" :disabled="verificationResending" @click="resendVerificationEmail">Kirim ulang link verifikasi</button> atau <a href="/email/verify">buka halaman verifikasi</a>.<span v-if="verificationResendStatus"> {{verificationResendStatus}}</span></div><label v-if="confirmOpen" class="lfx-agreement"><input v-model="agreed" type="checkbox"/> Dengan melanjutkan, saya menyetujui <Link href="/terms">syarat & ketentuan</Link>.</label><div class="lfx-modal-buttons">
         <button type="button" @click="closeReview">{{confirmOpen ? 'Kembali' : 'Tutup'}}</button>
         <button v-if="confirmOpen" type="button" :disabled="Boolean(busy)||!agreed" @click="createOrder">{{busy?'Memproses…':'Bayar Sekarang →'}}</button>
         <button v-else type="button" :disabled="Boolean(busy)" @click="prepareOrder">Bayar Sekarang →</button>

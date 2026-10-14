@@ -3,7 +3,10 @@
 namespace Tests\Feature;
 
 use App\Jobs\SendTransactionalEmailJob;
+use App\Models\Category;
+use App\Models\Product;
 use App\Services\FulfillmentService;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
@@ -11,6 +14,8 @@ use Tests\TestCase;
 
 class FulfillmentAdminNotificationsTest extends TestCase
 {
+    use DatabaseTransactions;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -19,75 +24,77 @@ class FulfillmentAdminNotificationsTest extends TestCase
 
     private function makeOrder(string $email, string $status = 'PAID'): array
     {
-        $key = 'D53-'.uniqid();
-        $packageId = DB::table('packages')->insertGetId([
+        $key = 'D53-'.bin2hex(random_bytes(4));
+        $category = Category::where('slug', 'game')->firstOrFail();
+        DB::table('providers')->where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
+        $providerId = DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
+
+        $product = Product::create([
+            'category_id' => $category->id,
             'name' => 'Paket '.$key,
             'slug' => 'paket-'.strtolower($key),
-            'category_id' => DB::table('categories')->insertGetId([
-                'name' => 'Kategori '.$key,
-                'slug' => 'kategori-'.strtolower($key),
-            ]),
-            'is_active' => 1,
-            'created_at' => now(),
-            'updated_at' => now(),
+            'margin_percent' => 10,
+            'fulfillment_mode' => 'AUTO_PROVIDER',
+            'is_active' => true,
         ]);
-        $mappingId = DB::table('product_mappings')->insertGetId([
-            'package_id' => $packageId,
-            'provider_code' => 'DIGIFLAZZ',
+        $product->fields()->create([
+            'field_key' => 'user_id', 'label' => 'User ID', 'type' => 'text',
+            'is_required' => true, 'sort_order' => 0,
+        ]);
+        $product->fields()->create([
+            'field_key' => 'zone_id', 'label' => 'Zone ID', 'type' => 'text',
+            'is_required' => true, 'sort_order' => 1,
+        ]);
+        $package = $product->packages()->create([
+            'code' => 'D53'.strtoupper(bin2hex(random_bytes(3))),
+            'name' => 'Paket '.$key,
+            'nominal_value' => 100,
+            'is_active' => true,
+        ]);
+        $mappingId = DB::table('provider_mappings')->insertGetId([
+            'product_package_id' => $package->id,
+            'provider_id' => $providerId,
             'external_sku' => 'D53-SKU-'.$key,
-            'is_active' => 1,
-            'priority' => 1,
+            'cost_idr' => 10000,
+            'max_price_idr' => 12000,
             'fulfillment_config' => json_encode(['customer_no_template' => '{{user_id}}{{zone_id}}']),
+            'priority' => 1,
+            'is_active' => true,
             'created_at' => now(),
             'updated_at' => now(),
         ]);
-        DB::table('digiflazz_catalog_items')->insert([
-            'buyer_sku_code' => 'D53-SKU-'.$key,
-            'product_name' => 'Paket '.$key,
-            'category' => 'Games',
-            'brand' => 'GameX',
-            'type' => 'Umum',
-            'seller_name' => 'SellerX',
-            'seller_rating' => 4.9,
-            'price' => 12000,
-            'buyer_product_status' => true,
-            'seller_product_status' => true,
-            'unlimited_stock' => true,
-            'is_present' => 1,
-            'last_synced_at' => now(),
-        ]);
+        $this->seedCheckoutDigiflazzCatalog($package->id);
         $orderId = DB::table('orders')->insertGetId([
             'order_number' => 'LF-'.strtoupper($key),
-            'invoice' => 'INV-'.strtoupper($key),
-            'user_id' => null,
             'guest_email' => $email,
             'guest_phone' => '081234567890',
-            'status' => $status,
-            'subtotal_idr' => 11000,
-            'fee_idr' => 78,
-            'total_idr' => 11078,
-            'payment_channel' => 'qris',
+            'product_id' => $product->id,
+            'product_package_id' => $package->id,
             'provider_mapping_id' => $mappingId,
+            'status' => $status,
+            'currency' => 'IDR',
+            'customer_input' => json_encode(['user_id' => '123456', 'zone_id' => '9876'], JSON_THROW_ON_ERROR),
             'snapshot' => json_encode([
                 'product' => [
+                    'id' => $product->id,
                     'name' => 'Paket '.$key,
-                    'package_id' => $packageId,
                     'fulfillment_mode' => 'AUTO_PROVIDER',
                 ],
                 'package' => [
-                    'id' => $packageId,
+                    'id' => $package->id,
                     'name' => 'Paket '.$key,
                     'is_active' => true,
                 ],
                 'provider' => [
                     'mapping_id' => $mappingId,
-                    'cost' => 11000,
-                    'max_price' => 12000,
+                    'code' => 'DIGIFLAZZ',
+                    'sku' => 'D53-SKU-'.$key,
+                    'cost_idr' => 10000,
+                    'max_price_idr' => 12000,
                 ],
                 'pricing' => [
-                    'subtotal' => 11000,
-                    'fee' => 78,
-                    'total' => 11078,
+                    'cost_idr' => 10000,
+                    'total_idr' => 11078,
                 ],
                 'payment' => [
                     'channel' => 'qris',
@@ -98,6 +105,13 @@ class FulfillmentAdminNotificationsTest extends TestCase
                     'zone_id' => '9876',
                 ],
             ]),
+            'cost_idr' => 10000,
+            'margin_idr' => 1000,
+            'discount_idr' => 0,
+            'fee_idr' => 78,
+            'total_idr' => 11078,
+            'idempotency_key' => 'd53-order-'.bin2hex(random_bytes(8)),
+            'paid_at' => $status === 'PAID' ? now() : null,
             'expires_at' => now()->addHour(),
             'created_at' => now(),
             'updated_at' => now(),
