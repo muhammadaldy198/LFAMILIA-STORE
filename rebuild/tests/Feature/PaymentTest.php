@@ -1472,6 +1472,10 @@ class PaymentTest extends TestCase
         Queue::fake();
         $catalog = $this->catalog();
         $this->route('qris', 'MIDTRANS', 0, 0, 'qris');
+        IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
+            'config_ciphertext' => ['server_key' => 'server-test', 'is_production' => false],
+            'is_active' => true,
+        ]);
         $voucherId = DB::table('vouchers')->insertGetId([
             'code' => 'SWEEPER-TEST-'.bin2hex(random_bytes(4)),
             'discount_type' => 'FIXED',
