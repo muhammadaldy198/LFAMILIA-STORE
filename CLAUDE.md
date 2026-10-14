@@ -867,3 +867,56 @@ For applicable work, completion requires evidence for:
 Never report a PR as merged when it is only open.
 
 Never report production as deployed when only repository changes were merged.
+
+## 41. Agent skills and roles
+
+`AGENTS.md` (repo root) is the operating manual for any agent working in this repo. Read it plus this file before starting. If they conflict, this file wins on invariants; an explicit user instruction wins over both.
+
+### 41.1 Vendored skills (`.claude/skills/`)
+
+Twenty skills are vendored in this repo (copies of upstream skills, scanned before import). Read the `SKILL.md` of the relevant skill before starting a task — skills do not auto-run.
+
+| Skill | Use for |
+|---|---|
+| laravel-best-practices | Laravel code conventions, queries, caching, auth/security |
+| pest-testing | Pest PHP testing |
+| fortify-development | Auth: login, 2FA, passkeys, profile, password |
+| debug-using-debugbar | Slow requests, N+1, duplicate queries |
+| inertia-vue-development | Inertia v2 Vue pages, forms, navigation |
+| wayfinder-development | Frontend ↔ backend routes (typed) |
+| tailwindcss-development | Tailwind styling |
+| medialibrary-development | Spatie Media Library uploads/collections |
+| karpathy-coder | Coding discipline: assumptions first, simple, surgical, verifiable |
+| zero-hallucination-coder | Discuss → Map → Decompose → Execute → Verify |
+| strict-api | Only call APIs provably existing in the installed version |
+| code-tour | Code walkthroughs (.tour): architecture, PR review, RCA |
+| grill-me | Stress-test a plan/design before coding |
+| code-scaffolding | Convention-first scaffolding: components, routes, CRUD, modules |
+| cicd-deployment | CI/CD pipelines, deployment, release, rollback |
+| data-fetch-analysis | Safe read-only DB/log analysis, reconciliation |
+| frontend-design | Visual design direction (distinctive, non-templated) |
+| webapp-testing | Browser testing with Playwright |
+| integrate-midtrans-payments | Midtrans integration (Snap, webhooks, verification) |
+| skill-security-auditor | Scan skills/code for vulnerabilities and malicious instructions |
+
+**Conflict rule:** owner rules always win over skills. The Midtrans skill's refund content is REJECTED for this store (no-refund policy) — use only its Snap/webhook/verification/status parts. Do not edit vendored skill files to change their meaning; note conflicts in the task/PR report instead.
+
+### 41.2 Specialist roles (`.claude/agents/`)
+
+One file per role. Pick the role matching the task and read its file before starting.
+
+| Role | File | Use for |
+|---|---|---|
+| Coder | `coder.md` | Writing Laravel code |
+| Reviewer | `reviewer.md` | Review + audit + security |
+| Payment | `payment.md` | Midtrans, no-refund policy |
+| Frontend | `frontend.md` | Vue/Inertia/Tailwind + design |
+| Tester | `tester.md` | Pest + webapp-testing |
+| Deployer | `deployer.md` | CI/CD + deploy runbook |
+| Data | `data.md` | Queries + reconciliation (read-only default) |
+| Planner | `planner.md` | grill-me, plan before coding |
+
+### 41.3 Mandatory skill report
+
+At the end of every coding/audit task, state which skills were used + which were skipped and why. If a mandatory skill (per `AGENTS.md` §1) wasn't used, the reason must be written — no silent skipping. The user can force a skill by naming it.
+
