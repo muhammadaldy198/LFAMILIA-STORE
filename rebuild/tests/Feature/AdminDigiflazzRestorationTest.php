@@ -861,7 +861,8 @@ class AdminDigiflazzRestorationTest extends TestCase
             app(DigiflazzAutoSources::class)->key($item),
             data_get($mapping->fulfillment_config, 'auto_source_group')
         );
-        $this->assertSame($sample['package']->id,
+        $this->assertSame(
+            $sample['package']->id,
             app(CheckoutPricing::class)->forPackage($sample['package']->id)['package_id']
         );
 
@@ -881,7 +882,8 @@ class AdminDigiflazzRestorationTest extends TestCase
 
         DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'PINNED8.000')
             ->update(['brand' => 'Pinned', 'product_name' => 'Pinned 8.000']);
-        $this->assertSame($sample['package']->id,
+        $this->assertSame(
+            $sample['package']->id,
             app(CheckoutPricing::class)->forPackage($sample['package']->id)['package_id']
         );
     }
