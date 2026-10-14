@@ -10,6 +10,7 @@ use App\Models\Category;
 use App\Models\IntegrationCredential;
 use App\Models\Product;
 use App\Services\CheckoutPricing;
+use App\Services\DigiflazzAutoSources;
 use App\Services\FulfillmentService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
@@ -240,7 +241,7 @@ class FulfillmentTest extends TestCase
         $orderId = $this->paidOrder($catalog);
 
         $item = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'DF-PRIMARY')->first();
-        $identity = app(\App\Services\DigiflazzAutoSources::class)->key($item);
+        $identity = app(DigiflazzAutoSources::class)->key($item);
         DB::table('provider_mappings')->where('id', $catalog['mapping_id'])->update([
             'fulfillment_config' => json_encode([
                 'customer_no_template' => '{{user_id}}{{zone_id}}',
