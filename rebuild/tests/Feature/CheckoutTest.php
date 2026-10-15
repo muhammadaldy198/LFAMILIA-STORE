@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\SendTransactionalEmailJob;
 use App\Models\Category;
 use App\Models\IntegrationCredential;
 use App\Models\NicknameGameCode;
@@ -12,11 +13,18 @@ use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class CheckoutTest extends TestCase
 {
     use DatabaseTransactions;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        Queue::fake([SendTransactionalEmailJob::class]);
+    }
 
     /**
      * @return array{product:Product,package_id:int,mapping_id:int}

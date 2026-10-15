@@ -98,6 +98,13 @@ class CustomerOrderController
             return redirect()->guest(route('login'));
         }
 
+        // A valid signed status link grants a guest order's detail/payment
+        // page access without requiring the original checkout session.
+        // Never grant guest session access for member-owned orders.
+        if ($record->user_id === null) {
+            $request->session()->put('guest_order_id', (int) $record->id);
+        }
+
         return $this->detail($record, $payments);
     }
 

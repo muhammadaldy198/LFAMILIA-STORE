@@ -3,12 +3,14 @@
 namespace Tests\Feature;
 
 use App\Actions\Fortify\CreateNewUser;
+use App\Jobs\SendTransactionalEmailJob;
 use App\Models\Category;
 use App\Models\Product;
 use App\Services\CheckoutInputValidator;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
@@ -25,6 +27,7 @@ class PhoneValidationTest extends TestCase
     {
         parent::setUp();
         $this->withoutMiddleware(ThrottleRequests::class);
+        Queue::fake([SendTransactionalEmailJob::class]);
     }
 
     private function quoteFixture(): int

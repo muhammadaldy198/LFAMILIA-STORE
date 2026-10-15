@@ -859,7 +859,7 @@ class PaymentTest extends TestCase
         // payment dibuat-lalu-ditolak, melainkan 401 + login_url, dan
         // TIDAK ada payment_transactions yang dibuat.
         auth()->logout();
-        $signed = URL::signedRoute('payments.orders.create', ['orderNumber' => $order['order_number']]);
+        $signed = URL::temporarySignedRoute('payments.orders.create', now()->addMinutes(30), ['orderNumber' => $order['order_number']]);
 
         $this->postJson($signed, ['idempotency_key' => 'wallet-signed-payment-0001'])
             ->assertUnauthorized()
@@ -883,7 +883,7 @@ class PaymentTest extends TestCase
         ]);
         $other->forceFill(['email_verified_at' => now()])->save();
 
-        $signed = URL::signedRoute('payments.orders.create', ['orderNumber' => $order['order_number']]);
+        $signed = URL::temporarySignedRoute('payments.orders.create', now()->addMinutes(30), ['orderNumber' => $order['order_number']]);
 
         $this->actingAs($other)->postJson($signed, ['idempotency_key' => 'wallet-other-payment-0001'])
             ->assertUnauthorized()
@@ -895,7 +895,7 @@ class PaymentTest extends TestCase
         $order = $this->walletOrder('wallet-page@example.test', 'wallet-page-order-0001');
         auth()->logout();
 
-        $signedPage = URL::signedRoute('payment.show', ['invoice' => $order['order_number']]);
+        $signedPage = URL::temporarySignedRoute('payment.show', now()->addMinutes(30), ['invoice' => $order['order_number']]);
 
         $this->get($signedPage)
             ->assertRedirect(route('login'));
@@ -908,7 +908,7 @@ class PaymentTest extends TestCase
     {
         $order = $this->walletOrder('wallet-page-owner@example.test', 'wallet-page-owner-order-0001');
 
-        $signedPage = URL::signedRoute('payment.show', ['invoice' => $order['order_number']]);
+        $signedPage = URL::temporarySignedRoute('payment.show', now()->addMinutes(30), ['invoice' => $order['order_number']]);
 
         $this->actingAs($order['user'])->get($signedPage)->assertOk();
     }
@@ -925,7 +925,7 @@ class PaymentTest extends TestCase
         ]);
         $other->forceFill(['email_verified_at' => now()])->save();
 
-        $signedPage = URL::signedRoute('payment.show', ['invoice' => $order['order_number']]);
+        $signedPage = URL::temporarySignedRoute('payment.show', now()->addMinutes(30), ['invoice' => $order['order_number']]);
 
         // TANPA fix, user yang login sebagai akun lain dilempar ke
         // /login lalu middleware guest Fortify melempar balik ke
@@ -983,7 +983,7 @@ class PaymentTest extends TestCase
         // Alur nyata: member buka link signed email saat logout,
         // lalu membuat pembayaran lewat URL signed itu.
         auth()->logout();
-        $signedCreate = URL::signedRoute('payments.orders.create', ['orderNumber' => $orderNumber]);
+        $signedCreate = URL::temporarySignedRoute('payments.orders.create', now()->addMinutes(30), ['orderNumber' => $orderNumber]);
         $this->postJson($signedCreate, ['idempotency_key' => 'return-payment-0001'])
             ->assertOk()
             ->assertJsonPath('status', 'PENDING');
@@ -1066,7 +1066,7 @@ class PaymentTest extends TestCase
         $orderNumber = $checkout->json('order_number');
 
         auth()->logout();
-        $signedCreate = URL::signedRoute('payments.orders.create', ['orderNumber' => $orderNumber]);
+        $signedCreate = URL::temporarySignedRoute('payments.orders.create', now()->addMinutes(30), ['orderNumber' => $orderNumber]);
         $this->postJson($signedCreate, ['idempotency_key' => 'params-payment-0001'])->assertOk();
 
         $snap = Http::recorded(fn ($request) => $request->url() === 'https://app.sandbox.midtrans.com/snap/v1/transactions')->first();
@@ -1152,7 +1152,7 @@ class PaymentTest extends TestCase
         $orderNumber = $checkout->json('order_number');
         auth()->logout();
         $this->postJson(
-            URL::signedRoute('payments.orders.create', ['orderNumber' => $orderNumber]),
+            URL::temporarySignedRoute('payments.orders.create', now()->addMinutes(30), ['orderNumber' => $orderNumber]),
             ['idempotency_key' => 'revisit-payment-0001']
         )->assertOk();
         $snap = Http::recorded(fn ($request) => $request->url() === 'https://app.sandbox.midtrans.com/snap/v1/transactions')->first();
@@ -1206,7 +1206,7 @@ class PaymentTest extends TestCase
         $orderNumber = $checkout->json('order_number');
         auth()->logout();
         $this->postJson(
-            URL::signedRoute('payments.orders.create', ['orderNumber' => $orderNumber]),
+            URL::temporarySignedRoute('payments.orders.create', now()->addMinutes(30), ['orderNumber' => $orderNumber]),
             ['idempotency_key' => 'expired-payment-0001']
         )->assertOk();
         $snap = Http::recorded(fn ($request) => $request->url() === 'https://app.sandbox.midtrans.com/snap/v1/transactions')->first();
@@ -1262,7 +1262,7 @@ class PaymentTest extends TestCase
             ->assertCreated();
         $orderNumber = $checkout->json('order_number');
         $this->postJson(
-            URL::signedRoute('payments.orders.create', ['orderNumber' => $orderNumber]),
+            URL::temporarySignedRoute('payments.orders.create', now()->addMinutes(30), ['orderNumber' => $orderNumber]),
             ['idempotency_key' => 'guest-params-payment-0001']
         )->assertOk();
         $snap = Http::recorded(fn ($request) => $request->url() === 'https://app.sandbox.midtrans.com/snap/v1/transactions')->first();
@@ -1293,13 +1293,38 @@ class PaymentTest extends TestCase
         ]);
         $other->forceFill(['email_verified_at' => now()])->save();
 
-        $signedWithParams = URL::signedRoute('payment.show', ['invoice' => $order['order_number']])
+        $signedWithParams = URL::temporarySignedRoute('payment.show', now()->addMinutes(30), ['invoice' => $order['order_number']])
             .'&merchant_id=Mxxxxx&order_id=wallet-params&status_code=200&transaction_status=settlement';
 
         auth()->logout();
         $this->get($signedWithParams)->assertRedirect(route('login'));
         $this->actingAs($other)->get($signedWithParams)->assertRedirect(route('login'));
         $this->actingAs($order['user'])->get($signedWithParams)->assertOk();
+    }
+
+    public function test_signed_guest_status_sets_guest_session_only_for_its_order(): void
+    {
+        $catalog = $this->catalog();
+        $this->route('manual_qris', 'MANUAL_QRIS');
+        $checkout = $this->postJson('/checkout/orders', $this->guestCheckout(
+            $catalog['package_id'], 'manual_qris', 'signed-guest-session-order-0001'
+        ))->assertCreated();
+        $orderNumber = (string) $checkout->json('order_number');
+        $orderId = (int) DB::table('orders')->where('order_number', $orderNumber)->value('id');
+        $this->flushSession();
+
+        $url = URL::temporarySignedRoute('orders.status.signed', now()->addMinutes(30), [
+            'orderNumber' => $orderNumber,
+        ]);
+        $this->get($url)->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->component('Customer/OrderDetail')
+            ->where('order.order_number', $orderNumber));
+        $this->assertSame($orderId, (int) session('guest_order_id'));
+        $this->get(route('guest.orders.show', $orderNumber))->assertOk();
+
+        $this->flushSession();
+        $this->get(route('guest.orders.show', $orderNumber))->assertNotFound();
+        $this->get(route('orders.status.signed', ['orderNumber' => $orderNumber]))->assertForbidden();
     }
 
     public function test_signed_status_link_opens_member_order_without_login(): void
@@ -1335,7 +1360,7 @@ class PaymentTest extends TestCase
         // (bisa dibuka), BUKAN ke route auth yang hanya melempar
         // ke login.
         auth()->logout();
-        $signedPage = URL::signedRoute('payment.show', ['invoice' => $orderNumber]);
+        $signedPage = URL::temporarySignedRoute('payment.show', now()->addMinutes(30), ['invoice' => $orderNumber]);
         $page = $this->get($signedPage)->assertOk();
         $statusUrl = $page->viewData('page')['props']['statusUrl'] ?? null;
         $this->assertIsString($statusUrl);
@@ -1347,6 +1372,8 @@ class PaymentTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Customer/OrderDetail')
                 ->where('order.order_number', $orderNumber));
+        // Signed member order must not grant a guest checkout session.
+        $this->assertNull(session('guest_order_id'));
 
         // Tanpa signature → 403 (status tidak dibuka tanpa otorisasi).
         $this->get(route('orders.status.signed', ['orderNumber' => $orderNumber]))->assertForbidden();
@@ -1389,7 +1416,7 @@ class PaymentTest extends TestCase
         ]);
         $other->forceFill(['email_verified_at' => now()])->save();
 
-        $signedStatus = URL::signedRoute('orders.status.signed', ['orderNumber' => $order['order_number']]);
+        $signedStatus = URL::temporarySignedRoute('orders.status.signed', now()->addMinutes(30), ['orderNumber' => $order['order_number']]);
 
         auth()->logout();
         $this->get($signedStatus)->assertRedirect(route('login'));
@@ -1550,7 +1577,7 @@ class PaymentTest extends TestCase
         $orderNumber = $checkout->json('order_number');
 
         $this->actingAs($other)
-            ->get(URL::signedRoute('orders.status.signed', ['orderNumber' => $orderNumber]))->assertOk()
+            ->get(URL::temporarySignedRoute('orders.status.signed', now()->addMinutes(30), ['orderNumber' => $orderNumber]))->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Customer/OrderDetail')
                 ->where('order.order_number', $orderNumber));

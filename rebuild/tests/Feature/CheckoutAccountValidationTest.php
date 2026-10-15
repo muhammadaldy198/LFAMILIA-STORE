@@ -6,6 +6,7 @@ use App\Models\Category;
 use App\Models\IntegrationCredential;
 use App\Models\NicknameGameCode;
 use App\Models\Product;
+use App\Services\AccountValidationConfig;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -108,6 +109,8 @@ class CheckoutAccountValidationTest extends TestCase
             ],
             'is_active' => true,
         ]);
+
+        $this->assertSame('192.0.2.1', app(AccountValidationConfig::class)->active()['resolved_ip']);
 
         Http::fake([
             'https://example.com/*' => Http::response([

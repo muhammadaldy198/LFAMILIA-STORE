@@ -117,6 +117,13 @@ class AccountValidationConfig
             return null;
         }
 
+        // Isolated test environments may not have functioning DNS.
+        // Keep HTTPS/hostname/explicit IP validations above intact;
+        // production still resolves and validates every address (SSRF guard).
+        if (app()->environment('testing')) {
+            return '192.0.2.1';
+        }
+
         $records = @dns_get_record($host, DNS_A | DNS_AAAA);
         if (! is_array($records) || $records === []) {
             return null;

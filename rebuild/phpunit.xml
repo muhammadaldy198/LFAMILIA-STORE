@@ -16,6 +16,10 @@
         <env name="SESSION_DRIVER" value="array" force="true"/>
         <env name="CACHE_STORE" value="array" force="true"/>
         <env name="QUEUE_CONNECTION" value="sync" force="true"/>
+        <!-- CI can export these into $_SERVER; override both namespaces. -->
+        <server name="QUEUE_CONNECTION" value="sync" force="true"/>
+        <server name="SESSION_DRIVER" value="array" force="true"/>
+        <server name="CACHE_STORE" value="array" force="true"/>
         <env name="TRUSTED_PROXIES" value="*" force="true"/>
     </php>
 </phpunit>

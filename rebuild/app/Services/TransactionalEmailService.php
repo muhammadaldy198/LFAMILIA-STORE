@@ -5,14 +5,25 @@ namespace App\Services;
 use App\Jobs\SendTransactionalEmailJob;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\URL;
 
 class TransactionalEmailService
 {
     public function queue(string $email, string $subject, string $text): void
     {
-        if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return;
+        }
+
+        // Enqueue is best-effort for customer events; direct job dispatch
+        // (verification and admin test-email) must still propagate failures.
+        try {
             SendTransactionalEmailJob::dispatch(strtolower($email), $subject, $text)->afterCommit();
+        } catch (\Throwable $exception) {
+            Log::warning('Could not queue customer transactional email.', [
+                'exception' => get_class($exception),
+            ]);
         }
     }
 
