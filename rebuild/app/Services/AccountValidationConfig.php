@@ -117,6 +117,13 @@ class AccountValidationConfig
             return null;
         }
 
+        // Only the explicit test fixture domain bypasses DNS in testing.
+        // All other hostnames follow the production DNS/SSRF checks so
+        // security tests can exercise private or mixed-address rejection.
+        if (app()->environment('testing') && $host === 'example.com') {
+            return '192.0.2.1';
+        }
+
         $records = @dns_get_record($host, DNS_A | DNS_AAAA);
         if (! is_array($records) || $records === []) {
             return null;

@@ -284,6 +284,11 @@ class SecurityM10Test extends TestCase
                 'credential_blob' => 'credential-value',
                 'safe' => 'visible',
             ],
+            // URL webhook per-channel mengandung token di query-nya.
+            // Key-nya tidak berakhiran 'webhookurl' ('webhookurlorder')
+            // sehingga dulu lolos dari redaksi dan bocor ke audit log.
+            'webhook_url_order' => 'https://discord.com/api/webhooks/111/secret-token',
+            'webhook_url_qris' => 'https://discord.com/api/webhooks/222/secret-token',
         ]);
 
         $this->assertSame('[REDACTED]', $redacted['password_confirmation']);
@@ -291,6 +296,8 @@ class SecurityM10Test extends TestCase
         $this->assertSame('[REDACTED]', $redacted['nested']['payment_signature']);
         $this->assertSame('[REDACTED]', $redacted['nested']['credential_blob']);
         $this->assertSame('visible', $redacted['nested']['safe']);
+        $this->assertSame('[REDACTED]', $redacted['webhook_url_order']);
+        $this->assertSame('[REDACTED]', $redacted['webhook_url_qris']);
     }
 
     public function test_doku_rejects_stale_signed_callback_before_state_lookup(): void

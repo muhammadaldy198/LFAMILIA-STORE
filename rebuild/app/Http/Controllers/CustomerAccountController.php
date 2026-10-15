@@ -50,7 +50,7 @@ class CustomerAccountController
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
-            'phone' => ['required', 'regex:/^\+?[0-9]{8,16}$/'],
+            'phone' => ['required', 'regex:/^\+?[0-9]{10,16}$/'],
             'current_password' => ['nullable', 'string'],
             'leaderboard_opt_in' => ['sometimes', 'boolean'],
         ]);
@@ -108,8 +108,16 @@ class CustomerAccountController
         if (is_string($user->email)) {
             $emails->queue(
                 $user->email,
-                'Password LFAMILIA STORE diperbarui',
-                'Password akun LFAMILIA STORE Anda baru saja diubah.'
+                'Kata sandi LFAMILIA STORE berhasil diperbarui',
+                implode("\n", [
+                    'Halo,',
+                    '',
+                    'Kata sandi akun LFAMILIA STORE berhasil diperbarui.',
+                    '',
+                    'Jika kamu tidak melakukan perubahan ini, segera hubungi CS: support@lfamiliastore.my.id',
+                    '',
+                    'Jangan bagikan kata sandi atau kode keamanan kepada siapa pun.',
+                ])
             );
         }
 

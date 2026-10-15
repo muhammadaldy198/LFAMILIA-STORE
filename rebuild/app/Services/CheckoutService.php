@@ -21,6 +21,7 @@ class CheckoutService
         private readonly PaymentRoutingService $paymentRouting,
         private readonly MembershipService $membership,
         private readonly AdminNotificationService $notifications,
+        private readonly TransactionalEmailService $emails,
     ) {}
 
     /**
@@ -356,6 +357,7 @@ class CheckoutService
             $result['order']->id,
             ['order_number' => $result['order']->order_number]
         );
+        $this->emails->queueOrderCreated((int) $result['order']->id);
 
         return [
             'order' => $result['order'],

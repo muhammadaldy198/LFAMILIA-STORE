@@ -479,11 +479,7 @@ class PaymentStateService
             'order',
             $order->id
         );
-        $this->emails->queueForOrder(
-            (int) $order->id,
-            'Pembayaran berhasil',
-            'Pembayaran order '.$order->order_number.' telah terverifikasi dan pesanan akan diproses.'
-        );
+        $this->emails->queuePaymentConfirmed((int) $order->id);
         StartFulfillmentJob::dispatch((int) $order->id)->afterCommit();
 
         return ['result' => 'PAID', 'status' => 'PAID'];

@@ -46,7 +46,7 @@ class CheckoutController
             'voucher_code' => ['nullable', 'string', 'max:100'],
             'guest_email' => $guest ? ['nullable', 'email:rfc', 'max:255'] : ['prohibited'],
             'guest_phone' => $guest
-                ? ['nullable', 'string', 'max:32', 'regex:/^[0-9+().\-\s]{6,32}$/']
+                ? ['nullable', 'string', 'max:32', 'regex:/^(?=(?:[^0-9]*[0-9]){10})[0-9+().\-\s]{6,32}$/']
                 : ['prohibited'],
             'total_idr' => ['prohibited'],
             'cost_idr' => ['prohibited'],
@@ -107,7 +107,7 @@ class CheckoutController
             'package_id' => ['required', 'integer'],
             'guest_email' => $guest ? ['nullable', 'email:rfc', 'max:255'] : ['prohibited'],
             'guest_phone' => $guest
-                ? ['nullable', 'string', 'max:32', 'regex:/^[0-9+().\-\s]{6,32}$/']
+                ? ['nullable', 'string', 'max:32', 'regex:/^(?=(?:[^0-9]*[0-9]){10})[0-9+().\-\s]{6,32}$/']
                 : ['prohibited'],
         ]);
 
@@ -124,6 +124,14 @@ class CheckoutController
     public function store(Request $request, CheckoutService $checkout): JsonResponse
     {
         $guest = ! $request->user();
+        // D7: akun member yang belum verifikasi email tidak bisa checkout.
+        // Login tidak dikunci; guest tidak kena gate ini.
+        if (! $guest && $request->user()->email_verified_at === null) {
+            return response()->json([
+                'message' => 'Verifikasi email kamu dulu sebelum checkout. Cek inbox email kamu, atau kirim ulang link verifikasi dari halaman verifikasi email.',
+                'requires_email_verification' => true,
+            ], 403);
+        }
         $data = $request->validate([
             'package_id' => ['required', 'integer'],
             'payment_channel_code' => ['required', 'string', 'max:60'],
@@ -132,7 +140,7 @@ class CheckoutController
             'voucher_code' => ['nullable', 'string', 'max:100'],
             'guest_email' => $guest ? ['required', 'email:rfc', 'max:255'] : ['prohibited'],
             'guest_phone' => $guest
-                ? ['required', 'string', 'max:32', 'regex:/^[0-9+().\-\s]{6,32}$/']
+                ? ['required', 'string', 'max:32', 'regex:/^(?=(?:[^0-9]*[0-9]){10})[0-9+().\-\s]{6,32}$/']
                 : ['prohibited'],
             'idempotency_key' => ['required', 'string', 'min:16', 'max:120', 'regex:/^[A-Za-z0-9:_-]+$/'],
             'total_idr' => ['prohibited'],

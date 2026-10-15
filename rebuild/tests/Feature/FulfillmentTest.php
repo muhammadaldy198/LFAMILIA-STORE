@@ -202,7 +202,7 @@ class FulfillmentTest extends TestCase
         $this->assertSame('SUCCESS', DB::table('fulfillment_attempts')->where('id', $attempt->id)->value('status'));
         $delivery = json_decode(DB::table('orders')->where('id', $orderId)->value('delivery_payload'), true);
         $this->assertSame('SERIAL-123', $delivery['serial_number']);
-        Queue::assertNotPushed(SendTransactionalEmailJob::class, fn (SendTransactionalEmailJob $job): bool => $job->subject === 'Pesanan LFAMILIA gagal diproses');
+        Queue::assertNotPushed(SendTransactionalEmailJob::class, fn (SendTransactionalEmailJob $job): bool => str_contains($job->subject, 'gagal diproses'));
         Http::assertSentCount(1);
     }
 
@@ -357,7 +357,7 @@ class FulfillmentTest extends TestCase
         $this->assertSame('BLOCKED', DB::table('fulfillment_attempts')->where('id', $backup->id)->value('status'));
         $this->assertSame(2, DB::table('fulfillment_attempts')->where('order_id', $orderId)->count());
         Queue::assertPushed(SendTransactionalEmailJob::class, fn (SendTransactionalEmailJob $job): bool => $job->recipient === 'blocked@example.test'
-            && $job->subject === 'Pesanan LFAMILIA gagal diproses');
+            && str_contains($job->subject, 'gagal diproses'));
         Http::assertSentCount(2);
         $service->startOrder($orderId);
         $service->reconcileAttempt((int) $backup->id);

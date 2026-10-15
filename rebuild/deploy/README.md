@@ -78,6 +78,28 @@ MariaDB ditolak; target runtime adalah MySQL 8.
 
 Production audit 2026-10-04 menunjukkan healthcheck timer/service terakhir sukses dan queue/scheduler aktif.
 
+### Kabar saat website mati (D8)
+
+Healthcheck jalan tiap 5 menit via timer. Bila gagal, script memanggil
+`php artisan lfamilia:notify-healthcheck down --reason="..."` (best-effort,
+tidak pernah membuat healthcheck itu sendiri gagal). Command itu mencatat
+notif admin `system.healthcheck.failed` yang dikirim ke Telegram +
+Discord channel VPS + email admin, lewat routing notif aplikasi. Alert
+gagal di-dedupe 30 menit agar tidak spam tiap 5 menit. Saat healthcheck
+kembali lolos setelah gagal, script memanggil `... up` dan command
+mencatat `system.healthcheck.recovered` (sekali per kejadian gagal).
+
+Batasan: bila aplikasi/DB ikut mati, command artisan gagal dan tidak ada
+kabar dari jalur ini — itulah kenapa ada monitor eksternal sebagai
+lapis kedua:
+
+- **Better Stack (paket gratis):** buat monitor untuk
+  `https://<domain>/health/ready`, ekspektasi HTTP 200 + body mengandung
+  `"status":"healthy"`, cek tiap 3 menit, alert ke email + Slack.
+  Monitor eksternal ini yang mengabari bila VPS mati total (timer
+  healthcheck ikut mati) — jangan pakai UptimeRobot gratis untuk situs
+  bisnis (dilarang sejak Okt 2024, akun bisa kena suspend).
+
 ## Backup
 
 `deploy/backup.sh`:

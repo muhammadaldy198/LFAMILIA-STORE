@@ -7,6 +7,7 @@ use App\Services\Payment\ManualQrisGateway;
 use App\Services\Payment\MidtransGateway;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -266,6 +267,20 @@ class PaymentService
         return $payment;
     }
 
+    /**
+     * Use the same provider checkout duration passed to the gateway,
+     * plus a five-minute redirect grace period. Never issue permanent
+     * signatures; the maximum TTL is 125 minutes (120 + 5).
+     */
+    private function signedReturnUrl(string $orderNumber, int $providerExpiresMinutes): string
+    {
+        return URL::temporarySignedRoute(
+            'payment.show',
+            now()->addMinutes($providerExpiresMinutes + 5),
+            ['invoice' => $orderNumber],
+        );
+    }
+
     private function createExternal(object $payment, object $target, array $route): array
     {
         if ($payment->status !== 'CREATING') {
@@ -288,21 +303,37 @@ class PaymentService
 
         $payment = DB::table('payment_transactions')->where('id', $payment->id)->firstOrFail();
         $user = $target->user_id ? DB::table('users')->where('id', $target->user_id)->first() : null;
+        // Gateway mengembalikan pengguna ke return/finish URL ini
+        // setelah bayar (Midtrans callbacks.finish, DOKU
+        // callback_url_result). URL-nya DITANDATANGANI sementara
+        // (lihat signedReturnUrl): tanpa signature, member yang
+        // membuka halaman lewat link signed (logout) akan kena 403
+        // di PaymentPageController karena sesi/login-nya tidak ada,
+        // padahal order sudah dibayar.
+        $orderNumber = $payment->order_id
+            ? DB::table('orders')->where('id', $payment->order_id)->value('order_number')
+            : null;
+        // Midtrans Snap requires at least five minutes for its page and
+        // payment expiry. DOKU retains the existing minimum of one minute.
+        // Use this exact duration for both gateway creation and return URL.
+        $providerExpiresMinutes = $this->expiresMinutes($target->expires_at ?? null);
+        if ($route['gateway_code'] === 'MIDTRANS') {
+            $providerExpiresMinutes = max(5, $providerExpiresMinutes);
+        }
+        $returnUrl = $orderNumber !== null
+            ? $this->signedReturnUrl((string) $orderNumber, $providerExpiresMinutes)
+            : null;
         $context = [
             'merchant_reference' => $payment->merchant_reference,
-            'return_url' => $payment->order_id
-                ? route('payment.show', ['invoice' => DB::table('orders')->where('id', $payment->order_id)->value('order_number')])
-                : null,
-            'finish_url' => $payment->order_id
-                ? route('payment.show', ['invoice' => DB::table('orders')->where('id', $payment->order_id)->value('order_number')])
-                : null,
+            'return_url' => $returnUrl,
+            'finish_url' => $returnUrl,
             'amount_idr' => (int) $payment->amount_idr,
             'customer_name' => $target->customer_name ?? $user?->name ?? 'Customer LFAMILIA',
             'customer_email' => $target->guest_email ?? $user?->email,
             'customer_phone' => $target->guest_phone ?? $user?->phone,
             'provider_channel' => $route['provider_channel'],
             'route_configuration' => $route['configuration'],
-            'expires_minutes' => $this->expiresMinutes($target->expires_at ?? null),
+            'expires_minutes' => $providerExpiresMinutes,
         ];
 
         try {

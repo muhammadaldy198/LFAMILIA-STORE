@@ -9,6 +9,7 @@ use App\Models\IntegrationCredential;
 use App\Services\AdminNotificationService;
 use App\Services\CustomerCleanupService;
 use App\Services\DigiflazzCatalogService;
+use App\Services\ExternalNotificationService;
 use App\Services\PaymentStateService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
@@ -249,3 +250,127 @@ Artisan::command('lfamilia:sync-digiflazz-catalog', function (DigiflazzCatalogSe
 })->purpose('Refresh supplier costs and availability while preserving customer margin settings');
 
 Schedule::command('lfamilia:sync-digiflazz-catalog')->everyFiveMinutes()->withoutOverlapping();
+
+// D8: healthcheck (deploy/healthcheck.sh) memanggil command ini saat
+// gagal (down) dan saat pulih (up). Alert down di-dedupe 30 menit agar
+// tidak spam tiap 5 menit — satu baris per outage, dan delivery yang
+// gagal DICOBA LAGI tiap healthcheck (kirim ulang ID yang sama;
+// deliver() idempotent per-channel via baris SENT) sampai sukses.
+// Kabar pulih hanya bila ada alert down yang belum ditutup kabar pulih.
+// Pengiriman sinkron best-effort agar kabar keluar segera meski queue
+// worker sedang mati. SELURUH jalur ini bebas Redis: record() tanpa
+// dispatch job + deliver() tanpa Cache::lock. Bila Redis yang mati,
+// dispatch job ke antrean Redis melempar (dan tidak ada sweeper yang
+// mengirimkan ulang), dan lock Redis melempar — alert hilang total.
+// Dedupe tetap jalan via DB (cek 30 menit di bawah + cek SENT di
+// notification_deliveries).
+Artisan::command('lfamilia:notify-healthcheck {state} {--reason=}', function (
+    AdminNotificationService $notifications,
+    ExternalNotificationService $external,
+): int {
+    $state = (string) $this->argument('state');
+    if (! in_array($state, ['down', 'up'], true)) {
+        $this->error('State harus down atau up.');
+
+        return 1;
+    }
+
+    if ($state === 'down') {
+        // Redam HANYA selama outage yang sama belum pulih: ada alert
+        // gagal ≤30 menit lalu DAN belum ada recovery setelahnya.
+        // down → up → down dalam 30 menit adalah outage BARU dan
+        // wajib bunyi lagi — versi lama menelannya karena hanya
+        // melihat failed terbaru tanpa membandingkannya dengan
+        // recovery terbaru.
+        //
+        // Satu baris per outage — TAPI baris itu bukan tanda
+        // "sudah terkirim": bila delivery pertama gagal (error
+        // transport / respons non-sukses), healthcheck berikutnya
+        // mengirim ULANG notifikasi yang SAMA (ID sama), bukan
+        // dibungkam hanya karena barisnya ada. deliver() idempotent
+        // per-channel via baris SENT di notification_deliveries —
+        // channel yang sudah SENT dilewati, yang FAILED dicoba lagi
+        // — jadi retry tidak spam, dan satu kegagalan transient
+        // tidak menekan semua retry sampai 30 menit.
+        $latestRecoveredId = DB::table('admin_notifications')
+            ->where('event_type', 'system.healthcheck.recovered')
+            ->orderByDesc('id')->value('id');
+        $downQuery = DB::table('admin_notifications')
+            ->where('event_type', 'system.healthcheck.failed')
+            ->where('created_at', '>=', now()->subMinutes(30));
+        if ($latestRecoveredId !== null) {
+            $downQuery->where('id', '>', (int) $latestRecoveredId);
+        }
+        $existingId = $downQuery->orderByDesc('id')->value('id');
+        if ($existingId !== null) {
+            try {
+                $external->deliver((int) $existingId, withLock: false);
+                $this->info('Alert healthcheck gagal sudah dikirim dalam 30 menit terakhir.');
+            } catch (Throwable) {
+                $this->info('Pengiriman alert healthcheck gagal — akan dicoba lagi pada healthcheck berikutnya.');
+            }
+
+            return 0;
+        }
+
+        $reason = trim((string) ($this->option('reason') ?? ''));
+        $id = $notifications->record(
+            'system.healthcheck.failed',
+            'Website tidak sehat - healthcheck gagal',
+            'Healthcheck gagal'.($reason !== '' ? ': '.$reason : '').'. Periksa VPS / layanan.',
+            'ERROR',
+            'system',
+            'healthcheck',
+            dispatchJob: false,
+        );
+        try {
+            $external->deliver($id, withLock: false);
+        } catch (Throwable) {
+            // Pengiriman sinkron gagal (mis. provider down) — tidak
+            // ada job antrean yang mencoba ulang untuk jalur ini.
+        }
+
+        return 0;
+    }
+
+    $latestDown = DB::table('admin_notifications')
+        ->where('event_type', 'system.healthcheck.failed')
+        ->orderByDesc('id')->value('id');
+    $latestRecovered = DB::table('admin_notifications')
+        ->where('event_type', 'system.healthcheck.recovered')
+        ->orderByDesc('id')->value('id');
+    if ($latestDown === null) {
+        return 0;
+    }
+    if ($latestRecovered !== null && (int) $latestRecovered > (int) $latestDown) {
+        // A recovery row marks the outage as closed, not its delivery as
+        // complete. Retry that SAME notification ID on subsequent 'up'
+        // checks: deliver() skips SENT channels and retries FAILED ones.
+        // Keep healthcheck delivery synchronous and Redis-independent.
+        try {
+            $external->deliver((int) $latestRecovered, withLock: false);
+        } catch (Throwable) {
+            $this->info('Pengiriman kabar healthcheck pulih akan dicoba lagi pada healthcheck berikutnya.');
+        }
+
+        return 0;
+    }
+
+    $id = $notifications->record(
+        'system.healthcheck.recovered',
+        'Website pulih - healthcheck lolos',
+        'Healthcheck kembali lolos setelah sebelumnya gagal.',
+        'INFO',
+        'system',
+        'healthcheck',
+        dispatchJob: false,
+    );
+    try {
+        $external->deliver($id, withLock: false);
+    } catch (Throwable) {
+        // Pengiriman sinkron gagal (mis. provider down) — tidak
+        // ada job antrean yang mencoba ulang untuk jalur ini.
+    }
+
+    return 0;
+})->purpose('Notify admin when the production healthcheck fails or recovers');

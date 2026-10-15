@@ -12,6 +12,12 @@ const props = defineProps({
     statusUrl: { type: String, required: true },
     serverNow: { type: String, required: true },
     pageSettings: { type: Object, default: () => ({}) },
+    // Signed URL untuk POST pembuatan pembayaran — hanya terisi bila
+    // halaman ini dibuka lewat link signed dari email. Tanpa ini,
+    // POST ke /payments/orders ditolak 403 untuk member yang belum
+    // login (PaymentController::create mensyaratkan owner login),
+    // padahal halaman GET-nya sudah terbuka lewat signature.
+    createPaymentUrl: { type: String, default: null },
 });
 
 const page = usePage();
@@ -162,7 +168,14 @@ async function resumePayment() {
 
     try {
         const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-        const response = await fetch('/payments/orders/' + encodeURIComponent(props.order.order_number), {
+        // Pakai signed URL bila halaman dibuka lewat link email —
+        // signature yang sama mengotorisasi POST ini
+        // (PaymentController::create menerima signature valid sebagai
+        // alternatif login owner). Tanpa signature, URL biasa dipakai
+        // dan jalur otorisasi lama (owner login / sesi guest /
+        // access_code) yang berlaku.
+        const createUrl = props.createPaymentUrl || ('/payments/orders/' + encodeURIComponent(props.order.order_number));
+        const response = await fetch(createUrl, {
             method: 'POST',
             cache: 'no-store',
             headers: {
@@ -176,6 +189,16 @@ async function resumePayment() {
             }),
         });
         const data = await response.json().catch(() => ({}));
+
+        // Pembayaran wallet wajib owner login (PaymentController):
+        // arahkan ke login, bukan sekadar tampilkan error. Return
+        // destination sudah disetel halaman ini sebagai intended
+        // (PaymentPageController), jadi setelah login pengguna
+        // kembali ke halaman pembayaran ini.
+        if (response.status === 401 && typeof data.login_url === 'string' && data.login_url !== '') {
+            window.location.href = data.login_url;
+            return;
+        }
 
         if (!response.ok) {
             throw new Error(data.message || Object.values(data.errors || {})?.[0]?.[0] || 'Pembayaran belum dapat disiapkan.');
@@ -273,6 +296,7 @@ onBeforeUnmount(() => {
                 <div class="flex items-start justify-between gap-4"><dt class="text-white/35">{{ customerText("pages.payment.show.9eb68c25", "Metode") }}</dt><dd class="max-w-[65%] text-right font-bold">{{paymentLabel}}</dd></div>
                 <div class="h-px bg-white/[0.08]"></div>
                 <div class="flex items-start justify-between gap-4"><dt class="text-white/35">{{ customerText("pages.payment.show.8269538b", "Harga setelah promo") }}</dt><dd class="font-bold">{{formatIdr(order.product_total_idr)}}</dd></div>
+                <div class="flex items-start justify-between gap-4"><dt class="text-white/35">{{ customerText("pages.payment.show.eae2b0b6", "Biaya pembayaran") }}</dt><dd class="font-bold">{{formatIdr(order.fee_idr)}}</dd></div>
                 <div class="flex items-start justify-between gap-4"><dt class="text-white/35">{{ customerText("pages.payment.show.87378529", "Total pembayaran") }}</dt><dd class="text-lg font-black text-[#b9ff35]">{{formatIdr(order.total_idr)}}</dd></div>
             </dl>
 

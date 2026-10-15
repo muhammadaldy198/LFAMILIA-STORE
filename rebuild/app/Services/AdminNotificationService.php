@@ -47,6 +47,14 @@ class AdminNotificationService
         ?string $targetType = null,
         string|int|null $targetId = null,
         array $data = [],
+        // Healthcheck alert (lfamilia:notify-healthcheck) memanggil
+        // dengan dispatchJob: false — jalur alert itu tidak boleh
+        // bergantung Redis: bila Redis mati, dispatch() ke antrean
+        // Redis melempar, baris notif tertulis tapi job tidak pernah
+        // ter-enqueue dan tidak ada sweeper yang mengirimkan ulang —
+        // alert hilang total. Tanpa job, pengiriman ditangani
+        // langsung oleh pemanggil (deliver sinkron).
+        bool $dispatchJob = true,
     ): int {
         $id = DB::table('admin_notifications')->insertGetId([
             'event_type' => $eventType,
@@ -59,7 +67,9 @@ class AdminNotificationService
             'created_at' => now(),
         ]);
 
-        SendAdminNotificationJob::dispatch($id)->afterCommit();
+        if ($dispatchJob) {
+            SendAdminNotificationJob::dispatch($id)->afterCommit();
+        }
 
         return $id;
     }

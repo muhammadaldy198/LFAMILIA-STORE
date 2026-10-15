@@ -240,6 +240,8 @@ class FulfillmentService
             }
 
             if ($manual === false && (int) $attempt->reconcile_checks >= 3) {
+                $this->escalateStalledReconciliation($attempt, $order);
+
                 return null;
             }
 
@@ -303,7 +305,42 @@ class FulfillmentService
             DB::table('fulfillment_attempts')->where('id', $attemptId)->update([
                 'reconcile_claimed_at' => null,
             ]);
+
+            // Escalation point (D5.3): the scheduler only queues attempts
+            // with reconcile_checks < 3, so the top-of-function branch
+            // (checks >= 3) is never reached from production — the 3rd
+            // check is the last one that runs. If that check completes
+            // without a terminal result, escalate HERE instead of waiting
+            // for a 4th call that never comes. This MUST live in the
+            // finally: every check path ends in an early `return` inside
+            // the try, and a return skips code placed after try/finally.
+            // Manual reconciles never escalate (an admin is already
+            // looking at the attempt).
+            if (! $manual) {
+                $this->escalateIfStalled($attemptId);
+            }
         }
+    }
+
+    /**
+     * Escalate an attempt that exhausted its automatic checks without
+     * a terminal result. Deduped inside escalateStalledReconciliation.
+     */
+    private function escalateIfStalled(int $attemptId): void
+    {
+        $attempt = DB::table('fulfillment_attempts')->where('id', $attemptId)->first();
+        if (! $attempt
+            || ! in_array($attempt->status, ['PENDING', 'UNKNOWN', 'SENDING'], true)
+            || (int) $attempt->reconcile_checks < 3) {
+            return;
+        }
+
+        $order = DB::table('orders')->where('id', $attempt->order_id)->first();
+        if (! $order) {
+            return;
+        }
+
+        $this->escalateStalledReconciliation($attempt, $order);
     }
 
     /**
@@ -390,11 +427,7 @@ class FulfillmentService
                     'order',
                     $order->id
                 );
-                $this->emails->queueForOrder(
-                    (int) $order->id,
-                    'Pesanan LFAMILIA berhasil',
-                    'Order '.$order->order_number.' telah berhasil diproses.'
-                );
+                $this->emails->queueOrderCompleted((int) $order->id, 'digiflazz');
 
                 if ($price !== null && $price > (int) ($request['max_price'] ?? PHP_INT_MAX)) {
                     // Successful delivery cannot be reversed; raise an urgent accounting alert.
@@ -600,11 +633,7 @@ class FulfillmentService
                 'order',
                 $order->id
             );
-            $this->emails->queueForOrder(
-                (int) $order->id,
-                'Pesanan LFAMILIA berhasil',
-                'Order '.$order->order_number.' telah berhasil diproses.'
-            );
+            $this->emails->queueOrderCompleted((int) $order->id, 'stock');
         }, 3);
     }
 
@@ -654,11 +683,7 @@ class FulfillmentService
                 'order',
                 $order->id
             );
-            $this->emails->queueForOrder(
-                (int) $order->id,
-                'Pesanan LFAMILIA berhasil',
-                'Order '.$order->order_number.' telah berhasil diproses.'
-            );
+            $this->emails->queueOrderCompleted((int) $order->id, 'manual');
         }, 3);
     }
 
@@ -701,6 +726,7 @@ class FulfillmentService
                 'order',
                 $order->id
             );
+            $this->emails->queueOrderFailed((int) $order->id);
         }, 3);
     }
 
@@ -765,12 +791,7 @@ class FulfillmentService
                     'order',
                     $order->id
                 );
-                $this->emails->queueForOrder(
-                    (int) $order->id,
-                    'Pesanan LFAMILIA gagal diproses',
-                    'Pesanan '.$order->order_number.' gagal diproses karena semua SKU penyedia yang diizinkan gagal. '
-                    .'Silakan hubungi admin LFAMILIA STORE dengan nomor pesanan tersebut agar dapat ditangani secara manual.'
-                );
+                $this->emails->queueOrderFailed((int) $order->id);
 
                 return null;
             }
@@ -802,6 +823,7 @@ class FulfillmentService
                 return;
             }
 
+            $wasBlocked = $attempt->status === 'BLOCKED';
             $order = DB::table('orders')->where('id', $attempt->order_id)->lockForUpdate()->first();
             DB::table('fulfillment_attempts')->where('id', $attempt->id)->update([
                 'status' => 'BLOCKED',
@@ -810,7 +832,8 @@ class FulfillmentService
                 'last_checked_at' => now(),
                 'updated_at' => now(),
             ]);
-            if ($order && $order->status === 'PROCESSING') {
+            $orderWasProcessing = $order && $order->status === 'PROCESSING';
+            if ($orderWasProcessing) {
                 DB::table('orders')->where('id', $order->id)->update([
                     'status' => 'PAID',
                     'updated_at' => now(),
@@ -818,6 +841,23 @@ class FulfillmentService
                 $this->event((int) $order->id, 'FULFILLMENT_BLOCKED', 'PROCESSING', 'PAID', [
                     'attempt_id' => $attempt->id,
                 ]);
+            }
+            if ($order && ! $wasBlocked) {
+                // A block that did not move the order to PAID still needs a trace.
+                if (! $orderWasProcessing) {
+                    $this->event((int) $order->id, 'FULFILLMENT_BLOCKED', $order->status, $order->status, [
+                        'attempt_id' => $attempt->id,
+                    ]);
+                }
+                $this->notifications->record(
+                    'fulfillment.blocked',
+                    'Pengiriman tertahan - perlu penanganan manual',
+                    'Order '.$order->order_number.' tertahan (BLOCKED) dan perlu penanganan manual. Alasan: '.substr($reason, 0, 500).($orderWasProcessing ? ' Order kembali ke status PAID.' : ''),
+                    'ERROR',
+                    'order',
+                    $order->id,
+                    ['attempt_id' => $attempt->id]
+                );
             }
         }, 3);
     }
@@ -860,6 +900,37 @@ class FulfillmentService
             'last_checked_at' => now(),
             'updated_at' => now(),
         ]);
+    }
+
+    /**
+     * Automatic reconciliation stopped after 3 checks without a result.
+     * Escalate to admin exactly once per attempt (deduped on the stored
+     * notification); the scheduler may call reconcileAttempt repeatedly.
+     */
+    private function escalateStalledReconciliation(object $attempt, object $order): void
+    {
+        $alreadyEscalated = DB::table('admin_notifications')
+            ->where('event_type', 'fulfillment.reconcile.stalled')
+            ->where('target_type', 'fulfillment_attempt')
+            ->where('target_id', (string) $attempt->id)
+            ->exists();
+        if ($alreadyEscalated) {
+            return;
+        }
+
+        $this->event((int) $order->id, 'FULFILLMENT_RECONCILE_STALLED', $order->status, $order->status, [
+            'attempt_id' => $attempt->id,
+            'reconcile_checks' => (int) $attempt->reconcile_checks,
+        ]);
+        $this->notifications->record(
+            'fulfillment.reconcile.stalled',
+            'Reconciliation mentok - perlu penanganan manual',
+            'Order '.$order->order_number.' sudah dicek otomatis 3 kali tanpa hasil dan tidak lagi dicek otomatis. Tangani manual dari panel fulfillment.',
+            'ERROR',
+            'fulfillment_attempt',
+            $attempt->id,
+            ['order_id' => (int) $order->id]
+        );
     }
 
     private function blockedWithoutSend(object $order, object $mapping, string $reason): object

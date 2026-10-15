@@ -3,7 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Services\PaymentPresentationService;
+use App\Services\PaymentRoutingService;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -37,6 +40,76 @@ class CustomerOrderController
                 'products.name as product_name', 'product_packages.name as package_name')->first();
 
         abort_unless($record, 404);
+
+        return $this->detail($record, $payments);
+    }
+
+    /**
+     * Halaman status order bertanda tangan untuk pemegang link
+     * email (PaymentPageController::signedStatusUrl): member yang
+     * membuka lewat link signed saat logout tidak bisa membuka
+     * /account/orders/* (auth:web), jadi statusnya dibuka lewat
+     * sini dengan otorisasi yang sama — signature atas invoice
+     * ini + expiry. Tanpa signature → 403; signature dipalsu /
+     * invoice ditukar → 403 (signature terikat ke invoice ini).
+     * BUKAN pembuka status tanpa otorisasi: pola yang sama dengan
+     * akses signed halaman payment.
+     *
+     * Wallet TIDAK ikut pola ini: saldo milik akun owner —
+     * signature saja tidak cukup (sama seperti halaman payment).
+     * Order WALLET yang dibuka lewat status signed saat bukan
+     * owner dialihkan ke login (dengan intended + logout akun
+     * salah dulu, mirror PaymentPageController), jadi destination
+     * baru tidak nge-bypass proteksi wallet.
+     */
+    public function showSigned(
+        Request $request,
+        string $orderNumber,
+        PaymentPresentationService $payments,
+        PaymentRoutingService $routing,
+    ): Response|RedirectResponse {
+        abort_unless($request->hasValidSignature(), 403);
+
+        $record = DB::table('orders')
+            ->join('products', 'products.id', '=', 'orders.product_id')
+            ->join('product_packages', 'product_packages.id', '=', 'orders.product_package_id')
+            ->where('orders.order_number', strtoupper(trim($orderNumber)))
+            ->select('orders.id', 'orders.order_number', 'orders.user_id', 'orders.payment_route_id',
+                'orders.status', 'orders.total_idr',
+                'orders.created_at', 'orders.paid_at', 'orders.delivery_payload',
+                'products.name as product_name', 'product_packages.name as package_name')->first();
+
+        abort_unless($record, 404);
+
+        if ($record->user_id !== null
+            && $routing->gatewayCodeForRoute((int) $record->payment_route_id) === 'WALLET'
+            && (! $request->user() || (int) $request->user()->id !== (int) $record->user_id)) {
+            if ($request->user()) {
+                Auth::logout();
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+
+                return redirect()->guest(route('login'))->with(
+                    'status',
+                    'Sesi akun sebelumnya diakhiri karena link status ini milik akun lain. Masuk sebagai pemilik pesanan untuk melanjutkan.'
+                );
+            }
+
+            return redirect()->guest(route('login'));
+        }
+
+        // A valid signed status link grants a guest order's detail/payment
+        // page access without requiring the original checkout session.
+        // Never grant guest session access for member-owned orders.
+        if ($record->user_id === null) {
+            $request->session()->put('guest_order_id', (int) $record->id);
+        }
+
+        return $this->detail($record, $payments);
+    }
+
+    private function detail(object $record, PaymentPresentationService $payments): Response
+    {
         $record->delivery = $record->status === 'SUCCESS' && is_string($record->delivery_payload)
             ? (json_decode($record->delivery_payload, true) ?: null) : null;
         unset($record->delivery_payload);

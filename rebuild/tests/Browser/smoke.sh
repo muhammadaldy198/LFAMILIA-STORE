@@ -43,16 +43,31 @@ assert_page() {
   local expected="$2"
   local width="$3"
   local height="$4"
-  local output
-  # Prevent a stalled Chromium process from blocking GitHub CI indefinitely.
-  output="$(timeout --signal=TERM --kill-after=5s 30s "$CHROME_BIN" \
-    --headless=new \
-    --no-sandbox \
-    --disable-gpu \
-    --disable-dev-shm-usage \
-    --window-size="$width,$height" \
-    --virtual-time-budget=3000 \
-    --dump-dom "$APP_URL$path" 2>/dev/null)"
+  local output=""
+  local attempt=""
+  # One retry per page: the FIRST Chrome invocation on a fresh CI runner
+  # can stall past 30s on cold start (empty profile/cache, contended
+  # 2-core runner) even though the page itself renders in seconds —
+  # observed once as exit 124 with no failing message. A genuinely hung
+  # page still fails: the retry stalls the same way and the grep below
+  # reports it. The per-attempt echo names the page BEFORE Chrome runs,
+  # so a timeout in CI logs exactly where it happened instead of
+  # failing silently. The 30s per-attempt bound is unchanged.
+  for attempt in 1 2; do
+    echo "Browser smoke: asserting $path at ${width}x${height} (attempt ${attempt}/2)"
+    # Prevent a stalled Chromium process from blocking GitHub CI indefinitely.
+    if output="$(timeout --signal=TERM --kill-after=5s 30s "$CHROME_BIN" \
+      --headless=new \
+      --no-sandbox \
+      --disable-gpu \
+      --disable-dev-shm-usage \
+      --window-size="$width,$height" \
+      --virtual-time-budget=3000 \
+      --dump-dom "$APP_URL$path" 2>/dev/null)"; then
+      break
+    fi
+    echo "Browser smoke: Chrome timed out on $path (attempt ${attempt}/2)"
+  done
 
   if ! grep -Fq "$expected" <<<"$output"; then
     echo "Browser smoke failed for $path at $width x $height; expected: $expected"
