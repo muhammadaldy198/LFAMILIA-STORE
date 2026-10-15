@@ -188,6 +188,71 @@ class CatalogTest extends TestCase
                 ->etc());
     }
 
+    public function test_search_package_name_matches_only_buyable_packages(): void
+    {
+        DB::table('providers')->where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
+        $providerId = DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
+        $suffix = bin2hex(random_bytes(3));
+
+        $category = Category::create([
+            'name' => 'Kategori Campur '.$suffix,
+            'slug' => 'kategori-campur-'.$suffix,
+            'sort_order' => 0,
+            'is_active' => true,
+        ]);
+        $product = Product::create([
+            'category_id' => $category->id,
+            'name' => 'Produk Campur '.$suffix,
+            'slug' => 'produk-campur-'.$suffix,
+            'fulfillment_mode' => 'AUTO_PROVIDER',
+            'margin_percent' => 10,
+            'is_active' => true,
+        ]);
+        // Paket TERBELI bernama "Terlihat".
+        $visible = $product->packages()->create([
+            'code' => 'TERLIHAT'.$suffix, 'name' => 'Paket Terlihat '.$suffix, 'is_active' => true,
+        ]);
+        DB::table('provider_mappings')->insert([
+            'product_package_id' => $visible->id,
+            'provider_id' => $providerId,
+            'external_sku' => 'TERLIHAT-SKU-'.$suffix,
+            'cost_idr' => 10000,
+            'max_price_idr' => 12000,
+            'priority' => 1,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $this->seedCheckoutDigiflazzCatalog($visible->id);
+        // Paket AKTIF tapi TAK TERBELI (tanpa mapping) bernama
+        // "Tersembunyi" — nominalnya sengaja tidak tampil di halaman
+        // produk (D11). Sebelum fix, cari "Tersembunyi" tetap
+        // mengembalikan produk ini: searchScope mencocokkan nama
+        // paket tak terbeli, sementara syarat buyableProductIds
+        // dipenuhi lewat paket Terlihat.
+        $product->packages()->create([
+            'code' => 'TERSEMBUNYI'.$suffix, 'name' => 'Paket Tersembunyi '.$suffix, 'is_active' => true,
+        ]);
+
+        // Jalur instant search.
+        $this->getJson('/catalog/search?q=Tersembunyi '.$suffix)
+            ->assertOk()
+            ->assertJsonCount(0, 'products');
+        $this->getJson('/catalog/search?q=Terlihat '.$suffix)
+            ->assertOk()
+            ->assertJsonCount(1, 'products')
+            ->assertJsonPath('products.0.slug', $product->slug);
+        // Jalur listing (filter q halaman katalog).
+        $this->get('/?q=Tersembunyi '.$suffix)->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('products.data', fn ($items) => ! collect($items)->contains('slug', $product->slug))
+                ->etc());
+        $this->get('/?q=Terlihat '.$suffix)->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('products.data', fn ($items) => collect($items)->contains('slug', $product->slug))
+                ->etc());
+    }
+
     public function test_default_categories_are_extensible_and_exclude_ewallet(): void
     {
         $this->assertSame([

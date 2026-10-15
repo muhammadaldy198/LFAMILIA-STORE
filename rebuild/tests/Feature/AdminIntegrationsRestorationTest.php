@@ -864,4 +864,59 @@ class AdminIntegrationsRestorationTest extends TestCase
         $this->assertFalse($saved['verified']);
         $this->assertStringContainsString('order', $saved['message']);
     }
+
+    public function test_discord_connection_test_is_bounded_when_webhooks_stall(): void
+    {
+        $this->loginSuperAdmin();
+        $this->clearIntegrationState();
+
+        IntegrationCredential::create([
+            'code' => 'discord',
+            'is_active' => true,
+            'config_ciphertext' => [
+                'webhook_url' => 'https://discord.com/api/webhooks/111/aaa',
+                'webhook_url_order' => 'https://discord.com/api/webhooks/222/bbb',
+            ],
+        ]);
+
+        // Kedua endpoint stall 8 detik (simulasi timeout per-probe).
+        // TANPA deadline keseluruhan: 2 x 8 = 16 detik. DENGAN
+        // deadline 7 detik: probe pertama jalan sampai habis (8 dtk),
+        // probe kedua dilewati — total ~8 detik, dan channel kedua
+        // TETAP dilaporkan (DEGRADED, PROBE_DEADLINE_EXCEEDED),
+        // bukan hilang dari diagnosis.
+        Http::fake([
+            'https://discord.com/api/webhooks/111/aaa' => function () {
+                sleep(8);
+
+                return Http::response(['id' => '111'], 200);
+            },
+            'https://discord.com/api/webhooks/222/bbb' => function () {
+                sleep(8);
+
+                return Http::response(['id' => '222'], 200);
+            },
+        ]);
+
+        $started = microtime(true);
+        $this->postJson('/admin/integrations/discord/test')
+            ->assertOk()
+            ->assertJson([
+                'verified' => false,
+                'status' => 'DEGRADED',
+            ])
+            ->assertJsonPath('channels.0.channel', 'default')
+            ->assertJsonPath('channels.0.verified', true)
+            ->assertJsonPath('channels.1.channel', 'order')
+            ->assertJsonPath('channels.1.verified', false)
+            ->assertJsonPath('channels.1.message', 'Webhook Discord tidak sempat di-probe — batas waktu tes koneksi tercapai.');
+        $elapsed = microtime(true) - $started;
+
+        // Probe pertama benar-benar jalan (tidur 8 detik), tapi total
+        // tetap bounded — jauh di bawah 16 detik sekuensial tanpa
+        // deadline, dan di bawah batas ~15 detik (deadline 7 + satu
+        // timeout probe 8).
+        $this->assertGreaterThanOrEqual(7.0, $elapsed);
+        $this->assertLessThan(12.0, $elapsed);
+    }
 }

@@ -24,6 +24,15 @@ class CatalogController
     /**
      * D12: pencarian mencakup nama produk, deskripsi, nama kategori,
      * dan nama paket (bukan cuma nama produk).
+     *
+     * Nama paket HANYA dicocokkan pada paket yang benar-benar bisa
+     * dibeli (set buyablePackageIds): pencocokan dengan syarat
+     * is_active saja membuat produk lolos untuk query yang hanya
+     * cocok dengan nama paket TAK TERBELI — produk itu tetap lolos
+     * syarat buyableProductIds lewat paket LAIN yang terbeli, dan
+     * nominal yang sengaja disembunyikan di halaman produk muncul
+     * di hasil pencarian. Nama produk / deskripsi / kategori tidak
+     * dibatasi buyable (tidak berubah).
      */
     private function searchScope(Builder $query, string $needle): void
     {
@@ -34,6 +43,7 @@ class CatalogController
                     ->where('name', 'like', '%'.$needle.'%'))
                 ->orWhereHas('packages', fn (Builder $package) => $package
                     ->where('is_active', true)
+                    ->whereIn('id', $this->buyablePackageIds())
                     ->where('name', 'like', '%'.$needle.'%'));
         });
     }
@@ -56,10 +66,20 @@ class CatalogController
      */
     private ?array $buyableProductIdsMemo = null;
 
-    private function buyableProductIds(): array
+    private ?array $buyablePackageIdsMemo = null;
+
+    /**
+     * ID paket yang benar-benar bisa dibeli (punya quote dari
+     * CheckoutPricing::forPackages). Dihitung sekali per request
+     * bersama buyableProductIds — satu panggilan forPackages untuk
+     * keduanya, dipakai listing + search + pencocokan nama paket.
+     *
+     * @return array<int>
+     */
+    private function buyablePackageIds(): array
     {
-        if ($this->buyableProductIdsMemo !== null) {
-            return $this->buyableProductIdsMemo;
+        if ($this->buyablePackageIdsMemo !== null) {
+            return $this->buyablePackageIdsMemo;
         }
 
         $packageIds = ProductPackage::where('is_active', true)
@@ -67,14 +87,25 @@ class CatalogController
             ->pluck('id')
             ->all();
         if ($packageIds === []) {
-            return $this->buyableProductIdsMemo = [];
+            return $this->buyablePackageIdsMemo = [];
         }
         $quotes = app(CheckoutPricing::class)->forPackages($packageIds);
-        if ($quotes === []) {
+
+        return $this->buyablePackageIdsMemo = array_keys($quotes);
+    }
+
+    private function buyableProductIds(): array
+    {
+        if ($this->buyableProductIdsMemo !== null) {
+            return $this->buyableProductIdsMemo;
+        }
+
+        $buyablePackageIds = $this->buyablePackageIds();
+        if ($buyablePackageIds === []) {
             return $this->buyableProductIdsMemo = [];
         }
 
-        return $this->buyableProductIdsMemo = ProductPackage::whereIn('id', array_keys($quotes))
+        return $this->buyableProductIdsMemo = ProductPackage::whereIn('id', $buyablePackageIds)
             ->pluck('product_id')
             ->unique()
             ->values()

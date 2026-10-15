@@ -16,8 +16,10 @@ use App\Services\PaymentRoutingService;
 use App\Services\PaymentService;
 use App\Services\PaymentStateService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Routing\Middleware\ThrottleRequests;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -939,6 +941,91 @@ class PaymentTest extends TestCase
         $intended = session('url.intended');
         $this->assertIsString($intended);
         $this->assertStringContainsString('/payment?invoice='.$order['order_number'], $intended);
+    }
+
+    public function test_gateway_return_url_is_signed_so_logged_out_member_is_not_blocked_after_paying(): void
+    {
+        $catalog = $this->catalog();
+        $this->route('qris', 'MIDTRANS', 0, 70, 'qris');
+        IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
+            'config_ciphertext' => ['server_key' => 'server-test', 'is_production' => false],
+            'is_active' => true,
+        ]);
+
+        Http::fake(function ($request) {
+            if ($request->url() === 'https://app.sandbox.midtrans.com/snap/v1/transactions') {
+                return Http::response([
+                    'token' => 'snap-token-test',
+                    'redirect_url' => 'https://sandbox.midtrans.test/pay',
+                ]);
+            }
+
+            return Http::response([], 404);
+        });
+
+        $user = User::create([
+            'name' => 'Return Buyer',
+            'email' => 'return-buyer@example.test',
+            'phone' => '081234567891',
+            'password' => Hash::make('StrongPassword123!'),
+        ]);
+        $user->forceFill(['email_verified_at' => now()])->save();
+
+        $checkout = $this->actingAs($user)->postJson('/checkout/orders', [
+            'package_id' => $catalog['package_id'],
+            'payment_channel_code' => 'qris',
+            'customer_input' => ['user_id' => '888888'],
+            'voucher_code' => null,
+            'idempotency_key' => 'return-order-0001',
+        ])->assertCreated();
+        $orderNumber = $checkout->json('order_number');
+
+        // Alur nyata: member buka link signed email saat logout,
+        // lalu membuat pembayaran lewat URL signed itu.
+        auth()->logout();
+        $signedCreate = URL::signedRoute('payments.orders.create', ['orderNumber' => $orderNumber]);
+        $this->postJson($signedCreate, ['idempotency_key' => 'return-payment-0001'])
+            ->assertOk()
+            ->assertJsonPath('status', 'PENDING');
+
+        // Gateway (Midtrans Snap) menerima finish_url dari konteks.
+        $snap = Http::recorded(fn ($request) => $request->url() === 'https://app.sandbox.midtrans.com/snap/v1/transactions')->first();
+        $this->assertNotNull($snap);
+        $finishUrl = json_decode($snap[0]->body(), true, 512, JSON_THROW_ON_ERROR)['callbacks']['finish'] ?? null;
+        $this->assertIsString($finishUrl);
+
+        // Signature valid, terikat ke invoice ini, kedaluwarsa =
+        // expires_at order.
+        $this->assertTrue(URL::hasValidSignature(Request::create($finishUrl)));
+        parse_str((string) parse_url($finishUrl, PHP_URL_QUERY), $query);
+        $order = DB::table('orders')->where('order_number', $orderNumber)->firstOrFail();
+        $this->assertSame((int) Carbon::parse($order->expires_at)->timestamp, (int) $query['expires']);
+
+        // Kembali dari gateway saat logout: BUKAN 403, halaman
+        // order terlihat (Inertia 200).
+        $this->get($finishUrl)->assertOk();
+
+        // Tanpa signature, order member tetap 403 untuk pengunjung
+        // logout — otorisasi tidak dilonggarkan.
+        $this->get(route('payment.show', ['invoice' => $orderNumber]))->assertForbidden();
+
+        // Signature terikat ke invoice ini saja: menukar invoice
+        // ke order lain merusak signature → 403.
+        $checkout2 = $this->actingAs($user)->postJson('/checkout/orders', [
+            'package_id' => $catalog['package_id'],
+            'payment_channel_code' => 'qris',
+            'customer_input' => ['user_id' => '888888'],
+            'voucher_code' => null,
+            'idempotency_key' => 'return-order-0002',
+        ])->assertCreated();
+        auth()->logout();
+        $tampered = preg_replace(
+            '/invoice=[^&]+/',
+            'invoice='.$checkout2->json('order_number'),
+            $finishUrl
+        );
+        $this->assertIsString($tampered);
+        $this->get($tampered)->assertForbidden();
     }
 
     public function test_wallet_checkout_is_blocked_while_topup_refund_review_is_open(): void

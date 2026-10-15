@@ -266,8 +266,31 @@ class IntegrationConnectionService
             }
         }
 
+        // Batas waktu KESELURUHAN yang bounded: probe jalan sekuensial,
+        // tiap probe dibatasi timeout 8 detik — tanpa deadline, 11 URL
+        // distinct yang semuanya stall makan ~88 detik dan tes
+        // umumnya timeout sebelum mengembalikan diagnosis
+        // per-channel. Deadline 7 detik + satu probe terakhir yang
+        // boleh berjalan sampai timeout-nya (8 detik) = total
+        // MAKSIMAL ~15 detik, berapa pun jumlah webhook yang stall.
+        // Probe yang tidak sempat jalan tetap dilaporkan per-channel
+        // (status DEGRADED, reason PROBE_DEADLINE_EXCEEDED), bukan
+        // dihilangkan — diagnosis per-channel tidak boleh hilang.
+        // (Alternatif probe konkuren ditolak: konkurensi tidak bisa
+        // dibuktikan dengan Http::fake — callback fake jalan sinkron
+        // saat promise dibangun — sementara deadline bisa dibuktikan
+        // test dengan fake lambat.)
+        $startedAt = microtime(true);
         $probed = [];
         foreach (array_unique(array_values($urls)) as $url) {
+            if (microtime(true) - $startedAt >= 7.0) {
+                $probed[$url] = $this->unverified(
+                    'Webhook Discord tidak sempat di-probe — batas waktu tes koneksi tercapai.',
+                    'PROBE_DEADLINE_EXCEEDED'
+                );
+
+                continue;
+            }
             $probed[$url] = $this->probeDiscordWebhook($url);
         }
 
