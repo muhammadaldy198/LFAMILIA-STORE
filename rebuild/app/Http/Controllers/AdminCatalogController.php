@@ -66,7 +66,7 @@ class AdminCatalogController
                         'image_url' => $package->getFirstMediaUrl('image'),
                         'mappings' => $package->mappings->map(fn (ProviderMapping $mapping): array => [
                             ...$mapping->only('id', 'provider_id', 'external_sku', 'cost_idr',
-                                'max_price_idr', 'is_manual_price', 'priority', 'is_active'),
+                                'max_price_idr', 'is_manual_price', 'priority', 'is_active', 'disabled_by_sync'),
                             'provider_code' => $providers->get($mapping->provider_id)?->code,
                             'provider_name' => $providers->get($mapping->provider_id)?->display_name ?: $providers->get($mapping->provider_id)?->code,
                             'customer_no_template' => data_get($mapping->fulfillment_config, 'customer_no_template'),

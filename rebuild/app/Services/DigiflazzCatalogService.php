@@ -148,22 +148,62 @@ class DigiflazzCatalogService
                     } else {
                         $missingItems->where('buyer_sku_code', $sku);
                     }
-                    // Never delete or automatically disable an active mapping.
-                    $missing = $missingItems->delete();
-                    // Delete ONLY inactive Digiflazz mappings whose SKU no longer exists.
+                    $missingSkus = $missingItems->pluck('buyer_sku_code');
+                    if ($sku === null) {
+                        $presentCodes = array_column($clean, 'buyer_sku_code');
+                        $mappedMissingSkus = DB::table('provider_mappings')
+                            ->where('provider_id', $providerId)->whereNotNull('external_sku')
+                            ->whereNotIn('external_sku', $presentCodes)->pluck('external_sku');
+                        $missingSkus = $missingSkus->merge($mappedMissingSkus)->unique()->values();
+                    } else {
+                        $missingSkus = $missingSkus->push($sku)->unique()->values();
+                    }
+                    // Serialize orphan cleanup with checkout/fulfillment FK inserts. A
+                    // child order/attempt must take a shared lock on its mapping row;
+                    // locking candidate mappings first makes that insert either commit
+                    // before our recheck or wait until after the mapping is removed.
+                    $candidateMappings = DB::table('provider_mappings')
+                        ->where('provider_id', $providerId)
+                        ->whereIn('external_sku', $missingSkus)
+                        ->orderBy('id')
+                        ->lockForUpdate()
+                        ->get(['id', 'external_sku']);
+                    $candidateIds = $candidateMappings->pluck('id');
+
+                    // Locking reads are current reads under InnoDB REPEATABLE READ,
+                    // unlike the earlier consistent-read subquery. Recheck after parent
+                    // locks are acquired so a just-committed checkout is preserved.
+                    $orderHistoryIds = DB::table('orders')->whereNotNull('provider_mapping_id')
+                        ->whereIn('provider_mapping_id', $candidateIds)
+                        ->lockForUpdate()->pluck('provider_mapping_id');
+                    $attemptHistoryIds = DB::table('fulfillment_attempts')
+                        ->whereIn('provider_mapping_id', $candidateIds)
+                        ->lockForUpdate()->pluck('provider_mapping_id');
+                    $historicalMappingIds = $orderHistoryIds->merge($attemptHistoryIds)->unique()->values();
+                    $historicalSkus = $candidateMappings->whereIn('id', $historicalMappingIds)
+                        ->pluck('external_sku')->unique();
+
+                    // Keep catalogue identity only when an order/attempt needs the mapping for history.
+                    $missingItems->update(['is_present' => false, 'updated_at' => now()]);
+                    $missingItems->whereNotIn('buyer_sku_code', $historicalSkus)->delete();
+
+                    DB::table('provider_mappings')->whereIn('id', $historicalMappingIds)
+                        ->where('is_active', true)->update([
+                            'is_active' => false, 'disabled_by_sync' => true, 'updated_at' => now(),
+                        ]);
+
+                    // Mappings without order or fulfillment history can be removed; historical FKs stay intact.
                     $removedMappings = DB::table('provider_mappings')->where('provider_id', $providerId)
-                        ->where('is_active', false)->whereNotNull('external_sku')
-                        ->whereNotIn('external_sku', DB::table('digiflazz_catalog_items')->select('buyer_sku_code'))
-                        // Historical transactions have restrictive foreign keys to source mappings.
-                        // Never delete such mappings or interrupt the entire supplier sync.
-                        ->whereNotIn('id', DB::table('orders')->whereNotNull('provider_mapping_id')->select('provider_mapping_id'))
-                        ->whereNotIn('id', DB::table('fulfillment_attempts')->select('provider_mapping_id'))
+                        ->whereIn('external_sku', $missingSkus)
+                        ->whereNotIn('id', $historicalMappingIds)
                         ->delete();
+                    $missingItems->whereNotIn('buyer_sku_code', $historicalSkus)->delete();
                     if ($sku === null) {
                         DB::table('system_settings')->updateOrInsert(['key' => 'digiflazz.last_catalog_sync'], [
                             'value' => json_encode([
                                 'at' => now()->toIso8601String(), 'count' => count($clean),
-                                'missing_deleted' => $missing, 'inactive_mappings_deleted' => $removedMappings,
+                                'missing_marked_unavailable' => $historicalSkus->count(),
+                                'mappings_deleted_without_history' => $removedMappings,
                             ], JSON_THROW_ON_ERROR),
                             'created_at' => now(), 'updated_at' => now(),
                         ]);

@@ -295,13 +295,17 @@ class AdminPanelRestorationTest extends TestCase
         ]);
         app(DigiflazzCatalogService::class)->sync();
         $this->assertDatabaseMissing('digiflazz_catalog_items', ['buyer_sku_code' => 'sync-A']);
-        $this->assertDatabaseHas('provider_mappings', ['external_sku' => 'sync-A', 'is_active' => true]);
+        // Mapping tanpa riwayat order/fulfillment dibersihkan saat sync (D-SKU rule).
+        $this->assertDatabaseMissing('provider_mappings', ['external_sku' => 'sync-A']);
         $this->assertDatabaseMissing('provider_mappings', ['external_sku' => 'sync-C']);
         $this->assertArrayNotHasKey($package->id, app(CheckoutPricing::class)->forPackages([$package->id]));
         $this->fakeCatalog([$this->row(['buyer_sku_code' => 'sync-A'])]);
         app(DigiflazzCatalogService::class)->sync();
-        $this->assertSame('sync-A', app(CheckoutPricing::class)->forPackage($package->id)['provider_sku']);
-        $this->assertSame(1, $package->mappings()->count());
+        // Mapping tanpa riwayat sudah dihapus — sync tidak bisa membuatnya
+        // kembali secara otomatis; catalog item sync-A kembali hadir tapi
+        // perlu di-import ulang oleh admin bila diperlukan.
+        $this->assertDatabaseHas('digiflazz_catalog_items', ['buyer_sku_code' => 'sync-A', 'is_present' => true]);
+        $this->assertArrayNotHasKey($package->id, app(CheckoutPricing::class)->forPackages([$package->id]));
     }
 
     public function test_bulk_auto_sources_does_not_add_mapping_to_existing_nominal(): void
@@ -958,9 +962,10 @@ class AdminPanelRestorationTest extends TestCase
         $this->fakeCatalog([$this->row()]);
         app(DigiflazzCatalogService::class)->sync();
         $this->assertDatabaseMissing('digiflazz_catalog_items', ['buyer_sku_code' => 'gone-sku']);
-        $this->assertDatabaseHas('provider_mappings', ['external_sku' => 'gone-sku', 'is_active' => true]);
-        $this->expectException(ValidationException::class);
-        app(CheckoutPricing::class)->forPackage($package->id);
+        // Mapping tanpa riwayat order/fulfillment dibersihkan saat sync (D-SKU rule).
+        $this->assertDatabaseMissing('provider_mappings', ['external_sku' => 'gone-sku']);
+        // Checkout untuk package ini tidak tersedia karena mapping sudah hilang.
+        $this->assertArrayNotHasKey($package->id, app(CheckoutPricing::class)->forPackages([$package->id]));
     }
 
     public function test_new_operations_are_permission_gated(): void
