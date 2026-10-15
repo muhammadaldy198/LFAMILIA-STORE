@@ -31,8 +31,10 @@ class ResetUserPassword implements ResetsUserPasswords
         if (is_string($user->email)) {
             app(TransactionalEmailService::class)->queue(
                 $user->email,
-                'Password LFAMILIA STORE diperbarui',
-                'Password akun LFAMILIA STORE Anda baru saja direset.'
+                'Kata sandi LFAMILIA STORE berhasil diatur ulang',
+                "Halo,\n\nKata sandi akun LFAMILIA STORE berhasil diatur ulang.\n\n".
+                "Jika kamu tidak melakukan ini, segera hubungi CS: support@lfamiliastore.my.id\n\n".
+                "Jangan bagikan kata sandi atau kode keamanan kepada siapa pun."
             );
         }
     }

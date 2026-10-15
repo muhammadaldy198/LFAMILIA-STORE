@@ -64,8 +64,11 @@ class User extends Authenticatable implements MustVerifyEmailContract
         ]);
         SendTransactionalEmailJob::dispatch(
             $this->email,
-            'Reset password LFAMILIA STORE',
-            "Reset password akun LFAMILIA STORE melalui tautan berikut:\n".$url
+            'Atur ulang kata sandi LFAMILIA STORE',
+            "Halo,\n\nKami menerima permintaan untuk mengatur ulang kata sandi akun LFAMILIA STORE.\n\n".
+            "Atur ulang kata sandi: ".$url."\n\n".
+            "Jika kamu tidak meminta ini, abaikan email ini dan jangan bagikan tautan kepada siapa pun.\n\n".
+            "Butuh bantuan? Hubungi CS: support@lfamiliastore.my.id"
         )->afterCommit();
     }
 

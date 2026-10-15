@@ -108,8 +108,10 @@ class CustomerAccountController
         if (is_string($user->email)) {
             $emails->queue(
                 $user->email,
-                'Password LFAMILIA STORE diperbarui',
-                'Password akun LFAMILIA STORE Anda baru saja diubah.'
+                'Kata sandi LFAMILIA STORE berhasil diperbarui',
+                "Halo,\n\nKata sandi akun LFAMILIA STORE berhasil diperbarui.\n\n".
+                "Jika kamu tidak melakukan perubahan ini, segera hubungi CS: support@lfamiliastore.my.id\n\n".
+                "Jangan bagikan kata sandi atau kode keamanan kepada siapa pun."
             );
         }
 

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\SendTransactionalEmailJob;
 use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Hash;
@@ -54,6 +55,19 @@ class CustomerAuthTest extends TestCase
             'password' => Hash::make('old-password-123'),
         ]);
 
+        // Reset request notification preserves existing token URL and
+        // includes the full customer-facing security/help copy.
+        $user->sendPasswordResetNotification('example-reset-token');
+        Queue::assertPushed(SendTransactionalEmailJob::class, fn (SendTransactionalEmailJob $job): bool =>
+            $job->recipient === $user->email
+            && str_contains($job->subject, 'Atur ulang kata sandi')
+            && str_contains($job->text, route('password.reset', [
+                'token' => 'example-reset-token', 'email' => $user->email,
+            ]))
+            && str_contains($job->text, 'Jika kamu tidak meminta ini')
+            && str_contains($job->text, 'support@lfamiliastore.my.id')
+        );
+
         $token = Password::broker('users')->createToken($user);
 
         $this->post('/reset-password', [
@@ -65,6 +79,12 @@ class CustomerAuthTest extends TestCase
 
         $this->assertTrue(Hash::check('new-password-123', $user->fresh()->password));
         $this->assertFalse(Hash::check('old-password-123', $user->fresh()->password));
+        Queue::assertPushed(SendTransactionalEmailJob::class, fn (SendTransactionalEmailJob $job): bool =>
+            $job->recipient === $user->email
+            && str_contains($job->subject, 'berhasil diatur ulang')
+            && str_contains($job->text, 'Kata sandi akun LFAMILIA STORE berhasil diatur ulang')
+            && str_contains($job->text, 'support@lfamiliastore.my.id')
+        );
     }
 
     public function test_sanctum_api_requires_a_customer_token(): void
