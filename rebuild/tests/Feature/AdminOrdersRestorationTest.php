@@ -250,6 +250,7 @@ class AdminOrdersRestorationTest extends TestCase
 
     public function test_detail_includes_guest_contact_nullable_provider_attempt_delivery_and_translated_events(): void
     {
+        Queue::fake([SendTransactionalEmailJob::class]);
         $admin = $this->login();
         $id = $this->order($admin);
         $attempt = DB::table('fulfillment_attempts')->where('order_id', $id)->first();
@@ -299,6 +300,7 @@ class AdminOrdersRestorationTest extends TestCase
 
     public function test_resend_delivery_queues_saved_result_without_reprocessing_provider(): void
     {
+        Queue::fake([SendTransactionalEmailJob::class]);
         $admin = $this->login();
         $id = $this->order($admin);
         $attempt = DB::table('fulfillment_attempts')->where('order_id', $id)->first();

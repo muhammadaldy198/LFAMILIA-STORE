@@ -901,7 +901,9 @@ class PaymentTest extends TestCase
             ->assertRedirect(route('login'));
         $intended = session('url.intended');
         $this->assertIsString($intended);
-        $this->assertStringContainsString('/payment?invoice='.$order['order_number'], $intended);
+        $this->assertStringContainsString('/payment?', $intended);
+        $this->assertStringContainsString('invoice='.$order['order_number'], $intended);
+        $this->assertTrue(URL::hasValidSignature(Request::create($intended)));
     }
 
     public function test_wallet_pay_page_opens_for_owner(): void
@@ -940,7 +942,9 @@ class PaymentTest extends TestCase
         $this->assertGuest();
         $intended = session('url.intended');
         $this->assertIsString($intended);
-        $this->assertStringContainsString('/payment?invoice='.$order['order_number'], $intended);
+        $this->assertStringContainsString('/payment?', $intended);
+        $this->assertStringContainsString('invoice='.$order['order_number'], $intended);
+        $this->assertTrue(URL::hasValidSignature(Request::create($intended)));
     }
 
     public function test_gateway_return_url_is_signed_so_logged_out_member_is_not_blocked_after_paying(): void
