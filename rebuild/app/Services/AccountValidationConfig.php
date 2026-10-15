@@ -117,10 +117,10 @@ class AccountValidationConfig
             return null;
         }
 
-        // Isolated test environments may not have functioning DNS.
-        // Keep HTTPS/hostname/explicit IP validations above intact;
-        // production still resolves and validates every address (SSRF guard).
-        if (app()->environment('testing')) {
+        // Only the explicit test fixture domain bypasses DNS in testing.
+        // All other hostnames follow the production DNS/SSRF checks so
+        // security tests can exercise private or mixed-address rejection.
+        if (app()->environment('testing') && $host === 'example.com') {
             return '192.0.2.1';
         }
 

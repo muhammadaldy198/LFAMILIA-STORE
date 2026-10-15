@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Services\Payment\DokuDirectGateway;
 use App\Services\Payment\ManualQrisGateway;
 use App\Services\Payment\MidtransGateway;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\URL;
@@ -269,19 +268,15 @@ class PaymentService
     }
 
     /**
-     * Return URL bertanda tangan sementara untuk gateway. Signature
-     * diikat ke invoice ini saja (mengubah invoice merusak
-     * signature → PaymentPageController menolak 403) dan WAJIB
-     * kedaluwarsa: pakai expires_at order; bila order tanpa /
-     * melewati expires_at, pakai jendela 30 menit — jangan pernah
-     * signature tanpa expiry.
+     * The return link is still temporary, but it must outlive the
+     * provider's *effective* checkout window. Providers are given at least
+     * one minute (expiresMinutes), even if the order has seconds left.
+     * Allow five minutes for the provider to finish redirecting back.
+     * The maximum signed lifetime is 125 minutes (120 + 5).
      */
     private function signedReturnUrl(string $orderNumber, ?string $expiresAt): string
     {
-        $expires = $expiresAt !== null ? Carbon::parse($expiresAt) : null;
-        if ($expires === null || ! $expires->isFuture()) {
-            $expires = now()->addMinutes(30);
-        }
+        $expires = now()->addMinutes($this->expiresMinutes($expiresAt) + 5);
 
         return URL::temporarySignedRoute('payment.show', $expires, ['invoice' => $orderNumber]);
     }

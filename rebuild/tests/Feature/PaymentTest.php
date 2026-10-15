@@ -1170,16 +1170,12 @@ class PaymentTest extends TestCase
         $this->get($withParams)->assertOk();
     }
 
-    public function test_gateway_return_url_for_expired_order_is_rejected_but_email_link_still_opens(): void
+    public function test_gateway_return_url_outlives_order_deadline_but_remains_temporary(): void
     {
-        // Order kedaluwarsa saat kembali dari gateway: return URL
-        // (expiry = expires_at order) → 403 karena signature
-        // kedaluwarsa — KONSISTEN dengan keputusan siklus 5
-        // (return URL wajib kedaluwarsa, tanpa fallback tanpa
-        // expiry). Link email untuk order yang SUDAH kedaluwarsa
-        // mendapat jendela 30 menit (keputusan user: SEMUA link
-        // bertanda tangan WAJIB berexpiry): dibuka dalam jendela
-        // → 200; sesudah jendela → 403.
+        // Return signatures must remain valid until the provider checkout
+        // window plus a bounded redirect grace period. Otherwise payment
+        // might succeed but a logged-out buyer returns to a 403.
+        // The signed URL must still expire; email links have their own TTL.
         $catalog = $this->catalog();
         $this->route('qris', 'MIDTRANS', 0, 70, 'qris');
         IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
@@ -1220,10 +1216,15 @@ class PaymentTest extends TestCase
         $withParams = $finishUrl.'&merchant_id=Mxxxxx&order_id='.$payment->merchant_reference
             .'&status_code=200&transaction_status=settlement';
 
-        // Simulasikan waktu lewat: 31 menit kemudian, order sudah
-        // kedaluwarsa (expires_at = +30 menit) — return URL yang
-        // sama kini signature-nya kedaluwarsa → 403.
+        // After the order deadline, the return link is still usable
+        // during provider redirect grace, but not indefinitely.
         Carbon::setTestNow(now()->addMinutes(31));
+        try {
+            $this->get($withParams)->assertOk();
+        } finally {
+            Carbon::setTestNow();
+        }
+        Carbon::setTestNow(now()->addMinutes(36));
         try {
             $this->get($withParams)->assertForbidden();
         } finally {
@@ -1238,6 +1239,64 @@ class PaymentTest extends TestCase
         Carbon::setTestNow(now()->addMinutes(31));
         try {
             $this->get($emailLink)->assertForbidden();
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
+    public function test_gateway_return_signature_covers_minimum_one_minute_provider_window(): void
+    {
+        $catalog = $this->catalog();
+        $this->route('qris', 'MIDTRANS', 0, 70, 'qris');
+        IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
+            'config_ciphertext' => ['server_key' => 'server-test', 'is_production' => false],
+            'is_active' => true,
+        ]);
+        Http::fake(function ($request) {
+            if ($request->url() === 'https://app.sandbox.midtrans.com/snap/v1/transactions') {
+                return Http::response(['token' => 'snap-token-test', 'redirect_url' => 'https://sandbox.midtrans.test/pay']);
+            }
+
+            return Http::response([], 404);
+        });
+        $user = User::create([
+            'name' => 'Near Deadline Buyer',
+            'email' => 'near-deadline-buyer@example.test',
+            'phone' => '081234567895',
+            'password' => Hash::make('StrongPassword123!'),
+        ]);
+        $user->forceFill(['email_verified_at' => now()])->save();
+        $checkout = $this->actingAs($user)->postJson('/checkout/orders', [
+            'package_id' => $catalog['package_id'],
+            'payment_channel_code' => 'qris',
+            'customer_input' => ['user_id' => '888888'],
+            'idempotency_key' => 'near-deadline-order-0001',
+        ])->assertCreated();
+        $orderNumber = $checkout->json('order_number');
+        DB::table('orders')->where('order_number', $orderNumber)->update([
+            'expires_at' => now()->addSeconds(30),
+        ]);
+        auth()->logout();
+
+        $this->postJson(
+            URL::temporarySignedRoute('payments.orders.create', now()->addMinutes(1), ['orderNumber' => $orderNumber]),
+            ['idempotency_key' => 'near-deadline-payment-0001']
+        )->assertOk();
+        $snap = Http::recorded(fn ($request) => $request->url() === 'https://app.sandbox.midtrans.com/snap/v1/transactions')->first();
+        $finishUrl = json_decode($snap[0]->body(), true, 512, JSON_THROW_ON_ERROR)['callbacks']['finish'] ?? null;
+        $this->assertIsString($finishUrl);
+        $this->assertStringContainsString('expires=', $finishUrl);
+
+        Carbon::setTestNow(now()->addSeconds(90));
+        try {
+            $this->get($finishUrl)->assertOk();
+        } finally {
+            Carbon::setTestNow();
+        }
+
+        Carbon::setTestNow(now()->addMinutes(7));
+        try {
+            $this->get($finishUrl)->assertForbidden();
         } finally {
             Carbon::setTestNow();
         }
