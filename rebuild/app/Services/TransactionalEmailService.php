@@ -395,16 +395,19 @@ class TransactionalEmailService
      * sesinya beda dengan sesi checkout (guest: tanpa guest_order_id;
      * member: belum login) — persis keluhan Codex: link dari email
      * tidak jalan saat dibuka di browser/HP lain. Signature kedaluwarsa
-     * mengikuti expires_at order; tanpa expiry yang valid, pakai
-     * signed URL tanpa batas waktu.
+     * mengikuti expires_at order; order yang sudah kedaluwarsa
+     * mendapat jendela 30 menit (keputusan user: SEMUA link
+     * bertanda tangan WAJIB berexpiry, tanpa fallback tanpa expiry).
      */
     private function payUrl(string $invoice, ?string $expiresAt): string
     {
         $expires = $expiresAt !== null ? Carbon::parse($expiresAt) : null;
 
-        return $expires !== null && $expires->isFuture()
-            ? URL::temporarySignedRoute('payment.show', $expires, ['invoice' => $invoice])
-            : URL::signedRoute('payment.show', ['invoice' => $invoice]);
+        return URL::temporarySignedRoute(
+            'payment.show',
+            $expires !== null && $expires->isFuture() ? $expires : now()->addMinutes(30),
+            ['invoice' => $invoice],
+        );
     }
 
     private function trackingUrl(): string

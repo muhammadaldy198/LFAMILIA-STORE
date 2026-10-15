@@ -22,27 +22,45 @@ class PaymentPageController
      * menempelkan param ini ke finish redirect-nya SETELAH URL
      * ditandatangani, sehingga signature yang mencakup semua query
      * param jadi tidak valid dan member logout yang kembali dari
-     * gateway kena 403. Nama-nama ini dibuktikan dari kode client
-     * Midtrans repo — MidtransGateway::status() memvalidasi
-     * order_id, status_code, gross_amount, transaction_status pada
-     * respons status, dan PaymentWebhookController memakai field
-     * yang sama pada payload notifikasi. Param ini TIDAK dipakai
-     * untuk otorisasi — otorisasi tetap dari `invoice` (yang
-     * ditandatangani) + `expires` — jadi mengabaikannya tidak
-     * membuka akses ke order lain, dan expiry tetap ditegakkan
-     * (hasValidSignatureWhileIgnoring tetap memeriksa expires).
-     * Allowlist EXACT: param lain apa pun (mis. foo=bar) tetap
-     * merusak signature → 403.
+     * gateway kena 403.
      *
-     * DOKU tidak punya entri: integrasi DOKU repo ini adalah
-     * Direct VA (DokuDirectGateway, tanpa halaman hosted /
-     * redirect browser) — callback_url_result dikirim ke DOKU
-     * tapi tidak pernah memicu browser return dengan param
-     * tambahan di alur Direct. Bila alur hosted DOKU ditambah,
-     * param return-nya wajib ditambahkan ke sini dengan bukti
-     * dari kode client-nya.
+     * SELALU ADA (docs Midtrans, Window Redirection: finish URL
+     * ditempeli merchant_id, order_id, status_code,
+     * transaction_status; docs Snap lama: order_id, status_code,
+     * transaction_status): merchant_id, order_id, status_code,
+     * transaction_status.
+     *
+     * KADANG ADA: gross_amount — tidak ada di daftar resmi finish
+     * redirect, tapi muncul pada payload redirect gaya 3DS dan
+     * pada respons status / notifikasi Midtrans
+     * (MidtransGateway::status() memvalidasi keempat field
+     * order_id, status_code, gross_amount, transaction_status;
+     * PaymentWebhookController memakai field yang sama). Disimpan
+     * sebagai jaring pengaman — tidak pernah dibaca untuk
+     * otorisasi.
+     *
+     * Param ini TIDAK dipakai untuk otorisasi — otorisasi tetap
+     * dari `invoice` (yang ditandatangani) + `expires` — jadi
+     * mengabaikannya tidak membuka akses ke order lain, dan
+     * expiry tetap ditegakkan (hasValidSignatureWhileIgnoring
+     * tetap memeriksa expires). Allowlist EXACT: param lain apa
+     * pun — mis. foo=bar, atau signature_key (field notifikasi
+     * server-to-server, BUKAN finish redirect) — tetap merusak
+     * signature → 403 (fail-closed).
+     *
+     * DOKU tidak punya entri: TIDAK ADA bukti (kode repo maupun
+     * docs DOKU yang ditemukan) DOKU menempel query param ke
+     * browser return. Jalur hosted DOKU (/checkout/v1/payment)
+     * mengirim callback_url_result + auto_redirect, tapi DOKU
+     * tidak menspesifikasikan param tambahan pada redirect-nya;
+     * kanal notifikasi DOKU adalah JSON server-to-server
+     * (webhook), bukan browser return. Bila DOKU terbukti
+     * menempel param, tambahkan ke sini dengan bukti — sampai
+     * saat itu fail-closed: return DOKU ber-param → 403, user
+     * tetap bisa membuka halaman via link email (tanpa param
+     * gateway).
      */
-    private const GATEWAY_RESULT_PARAMS = ['order_id', 'status_code', 'gross_amount', 'transaction_status'];
+    private const GATEWAY_RESULT_PARAMS = ['merchant_id', 'order_id', 'status_code', 'gross_amount', 'transaction_status'];
 
     public function show(Request $request, PaymentPresentationService $payments, PaymentPageSettingsService $settings, PaymentRoutingService $routing): Response|RedirectResponse
     {
@@ -183,26 +201,29 @@ class PaymentPageController
     {
         $expires = $order->expires_at !== null ? Carbon::parse($order->expires_at) : null;
 
-        return $expires !== null && $expires->isFuture()
-            ? URL::temporarySignedRoute('payments.orders.create', $expires, ['orderNumber' => $order->order_number])
-            : URL::signedRoute('payments.orders.create', ['orderNumber' => $order->order_number]);
+        return URL::temporarySignedRoute(
+            'payments.orders.create',
+            $expires !== null && $expires->isFuture() ? $expires : now()->addMinutes(30),
+            ['orderNumber' => $order->order_number],
+        );
     }
 
     /**
      * Tujuan status bertanda tangan untuk pengunjung yang membuka
      * lewat link signed tapi bukan owner yang login. Pola expiry
      * mirror createPaymentUrl: sementara selama order masih bisa
-     * dibayar (expires_at di masa depan), tanpa expiry sesudahnya
-     * — sama seperti link email itu sendiri (pemegang link email
-     * sudah diotorisasi melihat info order ini; halaman status
-     * tidak membuka apa pun yang tidak dibuka halaman payment).
+     * dibayar (expires_at di masa depan), jendela 30 menit
+     * sesudahnya (keputusan user: SEMUA link bertanda tangan
+     * WAJIB berexpiry, tanpa fallback tanpa expiry).
      */
     private function signedStatusUrl(object $order): string
     {
         $expires = $order->expires_at !== null ? Carbon::parse($order->expires_at) : null;
 
-        return $expires !== null && $expires->isFuture()
-            ? URL::temporarySignedRoute('orders.status.signed', $expires, ['orderNumber' => $order->order_number])
-            : URL::signedRoute('orders.status.signed', ['orderNumber' => $order->order_number]);
+        return URL::temporarySignedRoute(
+            'orders.status.signed',
+            $expires !== null && $expires->isFuture() ? $expires : now()->addMinutes(30),
+            ['orderNumber' => $order->order_number],
+        );
     }
 }

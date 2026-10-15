@@ -1079,12 +1079,19 @@ class PaymentTest extends TestCase
 
         // Midtrans menempelkan param hasil ke finish redirect
         // SETELAH URL ditandatangani — signature harus tetap valid.
-        $withParams = $finishUrl.'&order_id='.$payment->merchant_reference
+        // Param selalu ada: merchant_id, order_id, status_code,
+        // transaction_status. Kadang ada: gross_amount.
+        $withParams = $finishUrl.'&merchant_id=Mxxxxx&order_id='.$payment->merchant_reference
             .'&status_code=200&transaction_status=settlement&gross_amount='.(int) $order->total_idr;
         $this->get($withParams)->assertOk();
 
         // Param tambahan SEMBARANG tetap merusak signature → 403.
         $this->get($finishUrl.'&foo=bar')->assertForbidden();
+
+        // signature_key adalah field notifikasi server-to-server,
+        // BUKAN finish redirect — di luar allowlist → 403
+        // (fail-closed, bukan ditebak masuk allowlist).
+        $this->get($finishUrl.'&signature_key='.hash('sha512', 'fake'))->assertForbidden();
 
         // Invoice ditukar (ke order lain) + param gateway → 403:
         // param gateway tidak bisa dipakai untuk mengakses order lain.
@@ -1109,6 +1116,190 @@ class PaymentTest extends TestCase
         $expired = URL::temporarySignedRoute('payment.show', now()->subMinute(), ['invoice' => $orderNumber])
             .'&order_id='.$payment->merchant_reference.'&status_code=200&transaction_status=settlement';
         $this->get($expired)->assertForbidden();
+    }
+
+    public function test_gateway_return_url_can_be_revisited_with_params(): void
+    {
+        // Refresh / revisit return URL setelah bayar (param gateway
+        // masih ada) → tetap bisa dibuka, bukan sekali pakai.
+        $catalog = $this->catalog();
+        $this->route('qris', 'MIDTRANS', 0, 70, 'qris');
+        IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
+            'config_ciphertext' => ['server_key' => 'server-test', 'is_production' => false],
+            'is_active' => true,
+        ]);
+        Http::fake(function ($request) {
+            if ($request->url() === 'https://app.sandbox.midtrans.com/snap/v1/transactions') {
+                return Http::response(['token' => 'snap-token-test', 'redirect_url' => 'https://sandbox.midtrans.test/pay']);
+            }
+
+            return Http::response([], 404);
+        });
+        $user = User::create([
+            'name' => 'Revisit Buyer',
+            'email' => 'revisit-buyer@example.test',
+            'phone' => '081234567894',
+            'password' => Hash::make('StrongPassword123!'),
+        ]);
+        $user->forceFill(['email_verified_at' => now()])->save();
+        $checkout = $this->actingAs($user)->postJson('/checkout/orders', [
+            'package_id' => $catalog['package_id'],
+            'payment_channel_code' => 'qris',
+            'customer_input' => ['user_id' => '888888'],
+            'voucher_code' => null,
+            'idempotency_key' => 'revisit-order-0001',
+        ])->assertCreated();
+        $orderNumber = $checkout->json('order_number');
+        auth()->logout();
+        $this->postJson(
+            URL::signedRoute('payments.orders.create', ['orderNumber' => $orderNumber]),
+            ['idempotency_key' => 'revisit-payment-0001']
+        )->assertOk();
+        $snap = Http::recorded(fn ($request) => $request->url() === 'https://app.sandbox.midtrans.com/snap/v1/transactions')->first();
+        $finishUrl = json_decode($snap[0]->body(), true, 512, JSON_THROW_ON_ERROR)['callbacks']['finish'] ?? null;
+        $this->assertIsString($finishUrl);
+        $payment = DB::table('payment_transactions')->where('idempotency_key', 'revisit-payment-0001')->firstOrFail();
+        $withParams = $finishUrl.'&merchant_id=Mxxxxx&order_id='.$payment->merchant_reference
+            .'&status_code=200&transaction_status=settlement';
+
+        $this->get($withParams)->assertOk();
+        $this->get($withParams)->assertOk();
+    }
+
+    public function test_gateway_return_url_for_expired_order_is_rejected_but_email_link_still_opens(): void
+    {
+        // Order kedaluwarsa saat kembali dari gateway: return URL
+        // (expiry = expires_at order) → 403 karena signature
+        // kedaluwarsa — KONSISTEN dengan keputusan siklus 5
+        // (return URL wajib kedaluwarsa, tanpa fallback tanpa
+        // expiry). Link email untuk order yang SUDAH kedaluwarsa
+        // mendapat jendela 30 menit (keputusan user: SEMUA link
+        // bertanda tangan WAJIB berexpiry): dibuka dalam jendela
+        // → 200; sesudah jendela → 403.
+        $catalog = $this->catalog();
+        $this->route('qris', 'MIDTRANS', 0, 70, 'qris');
+        IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
+            'config_ciphertext' => ['server_key' => 'server-test', 'is_production' => false],
+            'is_active' => true,
+        ]);
+        Http::fake(function ($request) {
+            if ($request->url() === 'https://app.sandbox.midtrans.com/snap/v1/transactions') {
+                return Http::response(['token' => 'snap-token-test', 'redirect_url' => 'https://sandbox.midtrans.test/pay']);
+            }
+
+            return Http::response([], 404);
+        });
+        $user = User::create([
+            'name' => 'Expired Buyer',
+            'email' => 'expired-buyer@example.test',
+            'phone' => '081234567895',
+            'password' => Hash::make('StrongPassword123!'),
+        ]);
+        $user->forceFill(['email_verified_at' => now()])->save();
+        $checkout = $this->actingAs($user)->postJson('/checkout/orders', [
+            'package_id' => $catalog['package_id'],
+            'payment_channel_code' => 'qris',
+            'customer_input' => ['user_id' => '888888'],
+            'voucher_code' => null,
+            'idempotency_key' => 'expired-order-0001',
+        ])->assertCreated();
+        $orderNumber = $checkout->json('order_number');
+        auth()->logout();
+        $this->postJson(
+            URL::signedRoute('payments.orders.create', ['orderNumber' => $orderNumber]),
+            ['idempotency_key' => 'expired-payment-0001']
+        )->assertOk();
+        $snap = Http::recorded(fn ($request) => $request->url() === 'https://app.sandbox.midtrans.com/snap/v1/transactions')->first();
+        $finishUrl = json_decode($snap[0]->body(), true, 512, JSON_THROW_ON_ERROR)['callbacks']['finish'] ?? null;
+        $this->assertIsString($finishUrl);
+        $payment = DB::table('payment_transactions')->where('idempotency_key', 'expired-payment-0001')->firstOrFail();
+        $withParams = $finishUrl.'&merchant_id=Mxxxxx&order_id='.$payment->merchant_reference
+            .'&status_code=200&transaction_status=settlement';
+
+        // Simulasikan waktu lewat: 31 menit kemudian, order sudah
+        // kedaluwarsa (expires_at = +30 menit) — return URL yang
+        // sama kini signature-nya kedaluwarsa → 403.
+        Carbon::setTestNow(now()->addMinutes(31));
+        try {
+            $this->get($withParams)->assertForbidden();
+        } finally {
+            Carbon::setTestNow();
+        }
+
+        // Link email untuk order kedaluwarsa: jendela 30 menit
+        // dari pembuatan (pola payUrl fallback) — dalam jendela
+        // terbuka, sesudah jendela 403.
+        $emailLink = URL::temporarySignedRoute('payment.show', now()->addMinutes(30), ['invoice' => $orderNumber]);
+        $this->get($emailLink)->assertOk();
+        Carbon::setTestNow(now()->addMinutes(31));
+        try {
+            $this->get($emailLink)->assertForbidden();
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
+    public function test_guest_return_url_with_gateway_params_opens_and_unsigned_is_blocked(): void
+    {
+        // Allowlist berlaku juga untuk jalur guest (bukan hanya
+        // member): guest kembali dari gateway dengan param hasil
+        // → 200. Tanpa signature DAN tanpa session → tetap 403
+        // (guest tidak lolos tanpa session).
+        $catalog = $this->catalog();
+        $this->route('qris', 'MIDTRANS', 0, 70, 'qris');
+        IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
+            'config_ciphertext' => ['server_key' => 'server-test', 'is_production' => false],
+            'is_active' => true,
+        ]);
+        Http::fake(function ($request) {
+            if ($request->url() === 'https://app.sandbox.midtrans.com/snap/v1/transactions') {
+                return Http::response(['token' => 'snap-token-test', 'redirect_url' => 'https://sandbox.midtrans.test/pay']);
+            }
+
+            return Http::response([], 404);
+        });
+        $checkout = $this->postJson('/checkout/orders', $this->guestCheckout($catalog['package_id'], 'qris', 'guest-params-order-0001'))
+            ->assertCreated();
+        $orderNumber = $checkout->json('order_number');
+        $this->postJson(
+            URL::signedRoute('payments.orders.create', ['orderNumber' => $orderNumber]),
+            ['idempotency_key' => 'guest-params-payment-0001']
+        )->assertOk();
+        $snap = Http::recorded(fn ($request) => $request->url() === 'https://app.sandbox.midtrans.com/snap/v1/transactions')->first();
+        $finishUrl = json_decode($snap[0]->body(), true, 512, JSON_THROW_ON_ERROR)['callbacks']['finish'] ?? null;
+        $this->assertIsString($finishUrl);
+        $payment = DB::table('payment_transactions')->where('idempotency_key', 'guest-params-payment-0001')->firstOrFail();
+
+        $this->get($finishUrl.'&merchant_id=Mxxxxx&order_id='.$payment->merchant_reference
+            .'&status_code=200&transaction_status=pending')->assertOk();
+
+        // Sesi baru tanpa signature → 403 (tidak ada session guest).
+        $this->flushSession();
+        $this->get(route('payment.show', ['invoice' => $orderNumber]))->assertForbidden();
+    }
+
+    public function test_wallet_payment_page_with_gateway_params_still_requires_owner(): void
+    {
+        // Allowlist TIDAK membuat wallet bisa dibayar pakai
+        // signature saja: order WALLET + param gateway + logout →
+        // redirect login; login akun lain → redirect login;
+        // owner login → 200.
+        $order = $this->walletOrder('wallet-params@example.test', 'wallet-params-order-0001');
+        $other = User::create([
+            'name' => 'Other Account',
+            'email' => 'wallet-params-other@example.test',
+            'phone' => '081234567899',
+            'password' => Hash::make('StrongPassword123!'),
+        ]);
+        $other->forceFill(['email_verified_at' => now()])->save();
+
+        $signedWithParams = URL::signedRoute('payment.show', ['invoice' => $order['order_number']])
+            .'&merchant_id=Mxxxxx&order_id=wallet-params&status_code=200&transaction_status=settlement';
+
+        auth()->logout();
+        $this->get($signedWithParams)->assertRedirect(route('login'));
+        $this->actingAs($other)->get($signedWithParams)->assertRedirect(route('login'));
+        $this->actingAs($order['user'])->get($signedWithParams)->assertOk();
     }
 
     public function test_signed_status_link_opens_member_order_without_login(): void
@@ -1178,6 +1369,188 @@ class PaymentTest extends TestCase
             $ownerPage->viewData('page')['props']['statusUrl'] ?? null
         );
         $this->actingAs($user)->get($accountUrl)->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Customer/OrderDetail')
+                ->where('order.order_number', $orderNumber));
+    }
+
+    public function test_signed_status_link_for_wallet_order_still_requires_owner_login(): void
+    {
+        // Destination baru TIDAK BOLEH nge-bypass proteksi wallet:
+        // order WALLET + status signed + logout → redirect login;
+        // login akun lain → redirect login (sesi akun salah
+        // diakhiri dulu, mirror halaman payment); owner → 200.
+        $order = $this->walletOrder('wallet-status@example.test', 'wallet-status-order-0001');
+        $other = User::create([
+            'name' => 'Other Account',
+            'email' => 'wallet-status-other@example.test',
+            'phone' => '081234567899',
+            'password' => Hash::make('StrongPassword123!'),
+        ]);
+        $other->forceFill(['email_verified_at' => now()])->save();
+
+        $signedStatus = URL::signedRoute('orders.status.signed', ['orderNumber' => $order['order_number']]);
+
+        auth()->logout();
+        $this->get($signedStatus)->assertRedirect(route('login'));
+        $this->assertStringContainsString(
+            '/orders/'.$order['order_number'].'/status',
+            (string) session('url.intended')
+        );
+
+        $this->actingAs($other)->get($signedStatus)
+            ->assertRedirect(route('login'))
+            ->assertSessionHas('status');
+        $this->assertGuest();
+
+        $this->actingAs($order['user'])->get($signedStatus)->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Customer/OrderDetail')
+                ->where('order.order_number', $order['order_number']));
+    }
+
+    public function test_signed_status_link_opens_expired_order_without_broken_page(): void
+    {
+        // Order kedaluwarsa / terminal saat CTA diklik → halaman
+        // status tetap tampil (status kedaluwarsa), bukan rusak.
+        // Link untuk order kedaluwarsa mendapat jendela 30 menit
+        // (keputusan user: SEMUA link bertanda tangan WAJIB
+        // berexpiry): statusUrl yang digenerate controller untuk
+        // order kedaluwarsa WAJIB punya param expires (bukan
+        // tanpa-expiry) — dibuka dalam jendela → 200, sesudah
+        // jendela → 403. createPaymentUrl yang sama juga wajib
+        // berexpiry.
+        $catalog = $this->catalog();
+        $this->route('qris', 'MIDTRANS', 0, 70, 'qris');
+        IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
+            'config_ciphertext' => ['server_key' => 'server-test', 'is_production' => false],
+            'is_active' => true,
+        ]);
+        $user = User::create([
+            'name' => 'Expired Status Buyer',
+            'email' => 'expired-status-buyer@example.test',
+            'phone' => '081234567896',
+            'password' => Hash::make('StrongPassword123!'),
+        ]);
+        $user->forceFill(['email_verified_at' => now()])->save();
+        $checkout = $this->actingAs($user)->postJson('/checkout/orders', [
+            'package_id' => $catalog['package_id'],
+            'payment_channel_code' => 'qris',
+            'customer_input' => ['user_id' => '888888'],
+            'voucher_code' => null,
+            'idempotency_key' => 'expired-status-order-0001',
+        ])->assertCreated();
+        $orderNumber = $checkout->json('order_number');
+        DB::table('orders')->where('order_number', $orderNumber)
+            ->update(['status' => 'EXPIRED', 'expires_at' => now()->subMinute()]);
+
+        auth()->logout();
+        $response = $this->get(URL::temporarySignedRoute('payment.show', now()->addMinutes(30), ['invoice' => $orderNumber]))
+            ->assertOk();
+        $statusUrl = $response->inertiaProps('statusUrl');
+        $createUrl = $response->inertiaProps('createPaymentUrl');
+        $this->assertIsString($statusUrl);
+        $this->assertStringContainsString('expires=', $statusUrl);
+        $this->assertIsString($createUrl);
+        $this->assertStringContainsString('expires=', $createUrl);
+
+        $this->get($statusUrl)->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Customer/OrderDetail')
+                ->where('order.order_number', $orderNumber)
+                ->where('order.status', 'EXPIRED'));
+
+        // Sesudah jendela 30 menit, link yang sama → 403.
+        Carbon::setTestNow(now()->addMinutes(31));
+        try {
+            $this->get($statusUrl)->assertForbidden();
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
+    public function test_account_order_login_preserves_intended_to_order(): void
+    {
+        // Alur penuh login-dengan-return-target: logout → buka
+        // URL akun → redirect login dengan intended = order →
+        // login sebagai owner → mendarat di order itu, bukan
+        // halaman generik. Intended selamat melewati login
+        // Fortify (regenerasi sesi mempertahankan data sesi).
+        $catalog = $this->catalog();
+        $this->route('qris', 'MIDTRANS', 0, 70, 'qris');
+        IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
+            'config_ciphertext' => ['server_key' => 'server-test', 'is_production' => false],
+            'is_active' => true,
+        ]);
+        $user = User::create([
+            'name' => 'Intended Buyer',
+            'email' => 'intended-buyer@example.test',
+            'phone' => '081234567897',
+            'password' => Hash::make('StrongPassword123!'),
+        ]);
+        $user->forceFill(['email_verified_at' => now()])->save();
+        $checkout = $this->actingAs($user)->postJson('/checkout/orders', [
+            'package_id' => $catalog['package_id'],
+            'payment_channel_code' => 'qris',
+            'customer_input' => ['user_id' => '888888'],
+            'voucher_code' => null,
+            'idempotency_key' => 'intended-order-0001',
+        ])->assertCreated();
+        $orderNumber = $checkout->json('order_number');
+        $accountUrl = route('account.orders.show', DB::table('orders')->where('order_number', $orderNumber)->value('id'));
+
+        auth()->logout();
+        $this->get($accountUrl)->assertRedirect(route('login'));
+        $this->assertSame($accountUrl, session('url.intended'));
+
+        $this->post('/login', ['email' => 'intended-buyer@example.test', 'password' => 'StrongPassword123!'])
+            ->assertRedirect($accountUrl);
+        $this->assertAuthenticatedAs($user);
+        $this->get($accountUrl)->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Customer/OrderDetail')
+                ->where('order.order_number', $orderNumber));
+    }
+
+    public function test_signed_status_link_opened_by_other_logged_in_user_with_signature(): void
+    {
+        // Signature adalah otorisasinya (sama seperti link email):
+        // akun lain yang MEMEGANG link signed tetap bisa membuka
+        // status order itu — yang diblokir adalah tanpa signature /
+        // signature order lain (sudah dites di test status utama).
+        // Ini mendokumentasikan batas desain: bukan kebocoran,
+        // melainkan otorisasi berbasis kepemilikan link.
+        $catalog = $this->catalog();
+        $this->route('qris', 'MIDTRANS', 0, 70, 'qris');
+        IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
+            'config_ciphertext' => ['server_key' => 'server-test', 'is_production' => false],
+            'is_active' => true,
+        ]);
+        $user = User::create([
+            'name' => 'Owner Buyer',
+            'email' => 'owner-buyer@example.test',
+            'phone' => '081234567898',
+            'password' => Hash::make('StrongPassword123!'),
+        ]);
+        $user->forceFill(['email_verified_at' => now()])->save();
+        $other = User::create([
+            'name' => 'Other Buyer',
+            'email' => 'other-buyer@example.test',
+            'phone' => '081234567899',
+            'password' => Hash::make('StrongPassword123!'),
+        ]);
+        $other->forceFill(['email_verified_at' => now()])->save();
+        $checkout = $this->actingAs($user)->postJson('/checkout/orders', [
+            'package_id' => $catalog['package_id'],
+            'payment_channel_code' => 'qris',
+            'customer_input' => ['user_id' => '888888'],
+            'voucher_code' => null,
+            'idempotency_key' => 'owner-buyer-order-0001',
+        ])->assertCreated();
+        $orderNumber = $checkout->json('order_number');
+
+        $this->actingAs($other)
+            ->get(URL::signedRoute('orders.status.signed', ['orderNumber' => $orderNumber]))->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Customer/OrderDetail')
                 ->where('order.order_number', $orderNumber));
