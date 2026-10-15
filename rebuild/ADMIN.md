@@ -83,9 +83,9 @@ Audit source/history dan rencana komponen dicatat di `ADMIN-UI-AUDIT.md`.
 
 ## Digiflazz: sinkronisasi dan kesegaran katalog
 
-Panel memakai daftar harga buyer dari API Digiflazz. Sinkron lengkap yang berhasil memperbarui harga/status dan otomatis menghapus baris katalog untuk SKU yang tidak ada dalam respons. Mapping SKU yang hilang dinonaktifkan; mapping, nominal lokal, dan snapshot pesanan tetap disimpan untuk menjaga riwayat transaksi. SKU yang kembali muncul tidak otomatis mengaktifkan mapping lama.
+Panel memakai daftar harga buyer dari API Digiflazz. Sinkron lengkap yang berhasil memperbarui harga/status. SKU yang hilang ditangani menurut riwayat: mapping yang direferensikan order atau fulfillment dipertahankan tetapi dinonaktifkan oleh sync (`disabled_by_sync=true`), katalog historis ditandai tidak hadir, dan mapping tanpa riwayat order/fulfillment dihapus. Snapshot/order dan fulfillment yang sudah tersimpan tetap dipertahankan. Jika SKU historis kembali, hanya mapping yang dinonaktifkan oleh sync yang dapat aktif kembali otomatis; penonaktifan manual admin tidak diubah.
 
-Respons gagal, format tidak valid, dan daftar lengkap kosong tidak menghapus data tersimpan. Sinkron satu SKU tidak menghapus SKU lain; respons kosong yang valid untuk SKU tersebut menghapus hanya SKU itu dan menonaktifkan mapping-nya.
+Respons gagal, format tidak valid, dan daftar lengkap kosong tidak menghapus data tersimpan. Sinkron satu SKU tidak menghapus SKU lain; respons kosong yang valid hanya memperbarui katalog dan mapping untuk SKU tersebut memakai aturan riwayat yang sama. Pesan hasil sync menampilkan jumlah mapping historis yang dibuat tidak tersedia dan jumlah mapping tanpa riwayat yang dibersihkan.
 
 Interval API diatur pada Pengaturan monitor & sinkron otomatis (minimal 5 menit). Halaman menampilkan waktu sinkron lengkap dan otomatis memuat ulang data tersimpan setiap 30 detik saat terlihat. Muat ulang layar tidak memanggil daftar harga API. Gunakan Sinkron daftar harga untuk pembaruan API manual. Katalog mengikuti respons API akun buyer, bukan scraping marketplace publik. Dokumentasi Digiflazz: https://developer.digiflazz.com/api/buyer/daftar-harga/.
 

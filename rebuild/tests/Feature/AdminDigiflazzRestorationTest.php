@@ -159,6 +159,23 @@ class AdminDigiflazzRestorationTest extends TestCase
         ], $overrides);
     }
 
+    public function test_single_mapping_sync_deletion_is_audited_without_server_error(): void
+    {
+        $this->login();
+        $catalog = $this->mappedItem('sync-delete-no-history');
+        $mapping = ProviderMapping::where('external_sku', 'sync-delete-no-history')->firstOrFail();
+        $this->fakeCatalog([]);
+
+        $this->post('/admin/catalog/mappings/'.$mapping->id.'/sync')
+            ->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertDatabaseMissing('provider_mappings', ['id' => $mapping->id]);
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'digiflazz.mapping.synced',
+            'target_id' => (string) $mapping->id,
+        ]);
+    }
+
     public function test_admin_manual_price_lock_survives_sync_and_source_import_until_unlocked(): void
     {
         $this->login();

@@ -246,7 +246,7 @@ onUnmounted(() => {
             <div class="mb-3 space-y-1 text-xs text-muted-foreground">
                 <p>Sinkron daftar harga lengkap: {{ date(catalogSync?.at || lastSyncedAt) }} · Sinkron otomatis {{ autoSync ? 'setiap ' + monitorSettings.sync_interval_minutes + ' menit' : 'nonaktif' }}.</p>
                 <p>Daftar di layar dimuat ulang setiap 30 detik. SKU yang hilang tetapi punya riwayat transaksi disimpan sebagai tidak tersedia; mapping tanpa riwayat dibersihkan.</p>
-                <p v-if="catalogSync?.missing_marked_unavailable">Sinkron terakhir menandai {{ catalogSync.missing_marked_unavailable }} SKU hilang yang memiliki riwayat sebagai tidak tersedia. {{ catalogSync.mappings_deleted_without_history }} mapping tanpa riwayat dibersihkan.</p>
+                <p v-if="Number(catalogSync?.missing_marked_unavailable || 0) > 0 || Number(catalogSync?.mappings_deleted_without_history || 0) > 0">Sinkron terakhir menandai {{ catalogSync.missing_marked_unavailable || 0 }} SKU hilang yang memiliki riwayat sebagai tidak tersedia. {{ catalogSync.mappings_deleted_without_history || 0 }} mapping tanpa riwayat dibersihkan.</p>
             </div>
             <details><summary class="cursor-pointer font-semibold">Pengaturan monitor & sinkron otomatis</summary>
             <form class="grid gap-4 md:grid-cols-2 xl:grid-cols-4" @submit.prevent="autoSyncForm.put('/admin/digiflazz/settings', { preserveScroll: true })">
