@@ -268,17 +268,17 @@ class PaymentService
     }
 
     /**
-     * The return link is still temporary, but it must outlive the
-     * provider's *effective* checkout window. Providers are given at least
-     * one minute (expiresMinutes), even if the order has seconds left.
-     * Allow five minutes for the provider to finish redirecting back.
-     * The maximum signed lifetime is 125 minutes (120 + 5).
+     * Use the same provider checkout duration passed to the gateway,
+     * plus a five-minute redirect grace period. Never issue permanent
+     * signatures; the maximum TTL is 125 minutes (120 + 5).
      */
-    private function signedReturnUrl(string $orderNumber, ?string $expiresAt): string
+    private function signedReturnUrl(string $orderNumber, int $providerExpiresMinutes): string
     {
-        $expires = now()->addMinutes($this->expiresMinutes($expiresAt) + 5);
-
-        return URL::temporarySignedRoute('payment.show', $expires, ['invoice' => $orderNumber]);
+        return URL::temporarySignedRoute(
+            'payment.show',
+            now()->addMinutes($providerExpiresMinutes + 5),
+            ['invoice' => $orderNumber],
+        );
     }
 
     private function createExternal(object $payment, object $target, array $route): array
@@ -313,8 +313,15 @@ class PaymentService
         $orderNumber = $payment->order_id
             ? DB::table('orders')->where('id', $payment->order_id)->value('order_number')
             : null;
+        // Midtrans Snap requires at least five minutes for its page and
+        // payment expiry. DOKU retains the existing minimum of one minute.
+        // Use this exact duration for both gateway creation and return URL.
+        $providerExpiresMinutes = $this->expiresMinutes($target->expires_at ?? null);
+        if ($route['gateway_code'] === 'MIDTRANS') {
+            $providerExpiresMinutes = max(5, $providerExpiresMinutes);
+        }
         $returnUrl = $orderNumber !== null
-            ? $this->signedReturnUrl((string) $orderNumber, $target->expires_at ?? null)
+            ? $this->signedReturnUrl((string) $orderNumber, $providerExpiresMinutes)
             : null;
         $context = [
             'merchant_reference' => $payment->merchant_reference,
@@ -326,7 +333,7 @@ class PaymentService
             'customer_phone' => $target->guest_phone ?? $user?->phone,
             'provider_channel' => $route['provider_channel'],
             'route_configuration' => $route['configuration'],
-            'expires_minutes' => $this->expiresMinutes($target->expires_at ?? null),
+            'expires_minutes' => $providerExpiresMinutes,
         ];
 
         try {

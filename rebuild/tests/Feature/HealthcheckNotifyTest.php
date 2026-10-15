@@ -77,6 +77,74 @@ class HealthcheckNotifyTest extends TestCase
             ->where('event_type', 'system.healthcheck.recovered')->count());
     }
 
+    public function test_up_retries_only_failed_delivery_channels_without_redis_or_duplicate_rows(): void
+    {
+        IntegrationCredential::create([
+            'code' => 'telegram',
+            'is_active' => true,
+            'config_ciphertext' => [
+                'environment' => 'test',
+                'profiles' => ['test' => ['bot_token' => '111:test-token', 'chat_id' => 'test-chat']],
+            ],
+        ]);
+        IntegrationCredential::create([
+            'code' => 'discord',
+            'is_active' => true,
+            'config_ciphertext' => ['webhook_url' => 'https://discord.com/api/webhooks/123/test-token'],
+        ]);
+
+        Http::swap(new Factory);
+        $discordAttempts = 0;
+        Http::fake([
+            '*' => function ($request) use (&$discordAttempts) {
+                if (str_contains($request->url(), 'sendMessage')) {
+                    return Http::response(['ok' => true], 200);
+                }
+                if (str_contains($request->url(), 'discord.com/api/webhooks')) {
+                    $discordAttempts++;
+
+                    return $discordAttempts === 2
+                        ? Http::response([], 500)
+                        : Http::response([], 204);
+                }
+
+                return Http::response([], 200);
+            },
+        ]);
+        Queue::fake();
+        Cache::shouldReceive('lock')->never();
+        $telegramPosts = fn () => Http::recorded(fn ($r) => str_contains($r->url(), 'sendMessage'))->count();
+        $discordPosts = fn () => Http::recorded(fn ($r) => str_contains($r->url(), 'discord.com/api/webhooks'))->count();
+
+        $this->assertSame(0, $this->notify('down', 'Outage'));
+        $this->assertSame(0, $this->notify('up'));
+        $recoveryId = (int) DB::table('admin_notifications')
+            ->where('event_type', 'system.healthcheck.recovered')->value('id');
+        $this->assertDatabaseHas('notification_deliveries', [
+            'admin_notification_id' => $recoveryId, 'channel' => 'telegram', 'status' => 'SENT',
+        ]);
+        $this->assertDatabaseHas('notification_deliveries', [
+            'admin_notification_id' => $recoveryId, 'channel' => 'discord:vps', 'status' => 'FAILED',
+        ]);
+        $this->assertSame(2, $telegramPosts());
+        $this->assertSame(2, $discordPosts());
+
+        $this->assertSame(0, $this->notify('up'));
+        $this->assertSame(2, $telegramPosts());
+        $this->assertSame(3, $discordPosts());
+        $this->assertDatabaseHas('notification_deliveries', [
+            'admin_notification_id' => $recoveryId, 'channel' => 'discord:vps', 'status' => 'SENT',
+        ]);
+
+        // All channels are now SENT; a fourth 'up' does not resend.
+        $this->assertSame(0, $this->notify('up'));
+        $this->assertSame(2, $telegramPosts());
+        $this->assertSame(3, $discordPosts());
+        $this->assertSame(1, DB::table('admin_notifications')
+            ->where('event_type', 'system.healthcheck.recovered')->count());
+        Queue::assertNotPushed(SendAdminNotificationJob::class);
+    }
+
     public function test_up_without_prior_down_records_nothing(): void
     {
         $this->assertSame(0, $this->notify('up'));

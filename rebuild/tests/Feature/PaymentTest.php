@@ -1246,7 +1246,7 @@ class PaymentTest extends TestCase
         }
     }
 
-    public function test_gateway_return_signature_covers_minimum_one_minute_provider_window(): void
+    public function test_gateway_return_signature_covers_minimum_five_minute_midtrans_window(): void
     {
         $catalog = $this->catalog();
         $this->route('qris', 'MIDTRANS', 0, 70, 'qris');
@@ -1285,9 +1285,18 @@ class PaymentTest extends TestCase
             ['idempotency_key' => 'near-deadline-payment-0001']
         )->assertOk();
         $snap = Http::recorded(fn ($request) => $request->url() === 'https://app.sandbox.midtrans.com/snap/v1/transactions')->first();
-        $finishUrl = json_decode($snap[0]->body(), true, 512, JSON_THROW_ON_ERROR)['callbacks']['finish'] ?? null;
+        $snapPayload = json_decode($snap[0]->body(), true, 512, JSON_THROW_ON_ERROR);
+        $finishUrl = $snapPayload['callbacks']['finish'] ?? null;
         $this->assertIsString($finishUrl);
         $this->assertStringContainsString('expires=', $finishUrl);
+        $this->assertSame(5, $snapPayload['expiry']['duration']);
+        $this->assertSame('minutes', $snapPayload['expiry']['unit']);
+        $this->assertSame(5, $snapPayload['page_expiry']['duration']);
+        $this->assertSame('minutes', $snapPayload['page_expiry']['unit']);
+        $this->assertMatchesRegularExpression(
+            '/^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2} \\+0700$/',
+            $snapPayload['expiry']['start_time']
+        );
 
         Carbon::setTestNow(now()->addSeconds(90));
         try {
@@ -1296,7 +1305,14 @@ class PaymentTest extends TestCase
             Carbon::setTestNow();
         }
 
-        Carbon::setTestNow(now()->addMinutes(7));
+        Carbon::setTestNow(now()->addMinutes(9));
+        try {
+            $this->get($finishUrl)->assertOk();
+        } finally {
+            Carbon::setTestNow();
+        }
+
+        Carbon::setTestNow(now()->addMinutes(11));
         try {
             $this->get($finishUrl)->assertForbidden();
         } finally {

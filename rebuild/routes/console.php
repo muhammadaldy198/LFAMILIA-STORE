@@ -339,7 +339,20 @@ Artisan::command('lfamilia:notify-healthcheck {state} {--reason=}', function (
     $latestRecovered = DB::table('admin_notifications')
         ->where('event_type', 'system.healthcheck.recovered')
         ->orderByDesc('id')->value('id');
-    if ($latestDown === null || ($latestRecovered !== null && (int) $latestRecovered > (int) $latestDown)) {
+    if ($latestDown === null) {
+        return 0;
+    }
+    if ($latestRecovered !== null && (int) $latestRecovered > (int) $latestDown) {
+        // A recovery row marks the outage as closed, not its delivery as
+        // complete. Retry that SAME notification ID on subsequent 'up'
+        // checks: deliver() skips SENT channels and retries FAILED ones.
+        // Keep healthcheck delivery synchronous and Redis-independent.
+        try {
+            $external->deliver((int) $latestRecovered, withLock: false);
+        } catch (Throwable) {
+            $this->info('Pengiriman kabar healthcheck pulih akan dicoba lagi pada healthcheck berikutnya.');
+        }
+
         return 0;
     }
 

@@ -68,6 +68,7 @@ class MidtransGateway
 
         $url = $this->runtime->midtransSnapBase($environment).'/snap/v1/transactions';
 
+        $expiresMinutes = max(5, min(120, (int) ($context['expires_minutes'] ?? 30)));
         $payload = [
             'transaction_details' => [
                 'order_id' => $context['merchant_reference'],
@@ -78,6 +79,18 @@ class MidtransGateway
                 'email' => $context['customer_email'],
                 'phone' => $context['customer_phone'],
             ]),
+            // Explicit start_time prevents pending VA/QRIS expiry from
+            // starting only when the customer selects a payment method.
+            // Both Snap page and payment methods use the same window.
+            'expiry' => [
+                'start_time' => now()->timezone('Asia/Jakarta')->format('Y-m-d H:i:s O'),
+                'unit' => 'minutes',
+                'duration' => $expiresMinutes,
+            ],
+            'page_expiry' => [
+                'unit' => 'minutes',
+                'duration' => $expiresMinutes,
+            ],
         ];
 
         if (! empty($context['finish_url'])) {
