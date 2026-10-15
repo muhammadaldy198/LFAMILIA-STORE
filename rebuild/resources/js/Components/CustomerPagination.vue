@@ -16,14 +16,12 @@ defineProps({
                 :class="link.active ? 'bg-cyan-400 text-slate-950' : 'bg-slate-800 text-slate-400 opacity-50'"
                 :aria-current="link.active ? 'page' : undefined"
                 :aria-disabled="!link.url ? 'true' : undefined"
-                v-html="link.label"
-            />
+            >{{ link.label }}</span>
             <Link
                 v-else
                 :href="link.url"
                 class="rounded-md bg-slate-800 px-3 py-2 text-sm text-slate-200"
-                v-html="link.label"
-            />
+            >{{ link.label }}</Link>
         </template>
     </nav>
 </template>

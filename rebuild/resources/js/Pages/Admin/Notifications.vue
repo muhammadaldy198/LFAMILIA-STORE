@@ -37,7 +37,7 @@ const base = page.props.adminPanel?.base_path || '/admin';
                 <p class="mt-2 break-words text-sm text-muted-foreground">{{ item.message }}</p>
                 <Button v-if="!item.read_at" variant="outline" size="sm" class="mt-3" @click="router.post(base + '/notifications/' + item.id + '/read')">Tandai dibaca</Button>
             </article><p v-if="!notifications.data.length" class="lf-admin-empty">Belum ada notifikasi operasional.</p></div>
-            <nav v-if="notifications.links?.length > 3" class="flex flex-wrap gap-2" aria-label="Halaman notifikasi"><Link v-for="link in notifications.links" :key="link.label" :href="link.url || '#'" :class="['rounded-md border px-3 py-2 text-sm', link.active ? 'bg-primary text-primary-foreground' : 'bg-white', !link.url ? 'pointer-events-none opacity-40' : '']" v-html="link.label" /></nav>
+            <nav v-if="notifications.links?.length > 3" class="flex flex-wrap gap-2" aria-label="Halaman notifikasi"><Link v-for="link in notifications.links" :key="link.label" :href="link.url || '#'" :class="['rounded-md border px-3 py-2 text-sm', link.active ? 'bg-primary text-primary-foreground' : 'bg-white', !link.url ? 'pointer-events-none opacity-40' : '']">{{ link.label }}</Link></nav>
         </div>
     </AdminShell>
 </template>
