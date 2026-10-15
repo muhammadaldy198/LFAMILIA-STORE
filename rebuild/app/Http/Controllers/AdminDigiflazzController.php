@@ -269,8 +269,10 @@ class AdminDigiflazzController
         $count = $service->sync($sku);
         $audit->record($request, 'digiflazz.catalog.synced', 'provider', 'DIGIFLAZZ', null, ['count' => $count, 'sku' => $sku]);
 
-        if ($sku !== null && $count === 0) {
-            $status = 'SKU tidak tersedia dari Digiflazz; data katalog dan mapping diperbarui sesuai riwayat transaksi.';
+        if ($sku !== null) {
+            $status = $count === 0
+                ? 'SKU tidak tersedia dari Digiflazz; data katalog dan mapping diperbarui sesuai riwayat transaksi.'
+                : 'Harga dan ketersediaan SKU berhasil disinkronkan.';
         } else {
             $sync = json_decode((string) DB::table('system_settings')->where('key', 'digiflazz.last_catalog_sync')->value('value'), true) ?? [];
             $status = $count.' SKU berhasil disinkronkan. '

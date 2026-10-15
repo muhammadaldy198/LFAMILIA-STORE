@@ -159,6 +159,25 @@ class AdminDigiflazzRestorationTest extends TestCase
         ], $overrides);
     }
 
+    public function test_single_sku_sync_does_not_report_stale_full_sync_cleanup_counts(): void
+    {
+        $this->login();
+        $this->mappedItem('single-sync-current');
+        $itemId = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'single-sync-current')->value('id');
+        DB::table('system_settings')->insert([
+            'key' => 'digiflazz.last_catalog_sync',
+            'value' => json_encode(['missing_marked_unavailable' => 7, 'mappings_deleted_without_history' => 4], JSON_THROW_ON_ERROR),
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $this->fakeCatalog([$this->row(['buyer_sku_code' => 'single-sync-current'])]);
+
+        $this->post('/admin/digiflazz/sync', ['item_id' => $itemId])
+            ->assertRedirect()->assertSessionHasNoErrors()
+            ->assertSessionHas('status', function (string $status): bool {
+                return ! str_contains($status, '7 mapping') && ! str_contains($status, '4 mapping');
+            });
+    }
+
     public function test_single_mapping_sync_deletion_is_audited_without_server_error(): void
     {
         $this->login();
