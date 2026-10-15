@@ -16,6 +16,34 @@ use Inertia\Response;
 
 class PaymentPageController
 {
+    /**
+     * Nama param hasil gateway yang diabaikan saat validasi
+     * signature (hasValidSignatureWhileIgnoring): Midtrans
+     * menempelkan param ini ke finish redirect-nya SETELAH URL
+     * ditandatangani, sehingga signature yang mencakup semua query
+     * param jadi tidak valid dan member logout yang kembali dari
+     * gateway kena 403. Nama-nama ini dibuktikan dari kode client
+     * Midtrans repo — MidtransGateway::status() memvalidasi
+     * order_id, status_code, gross_amount, transaction_status pada
+     * respons status, dan PaymentWebhookController memakai field
+     * yang sama pada payload notifikasi. Param ini TIDAK dipakai
+     * untuk otorisasi — otorisasi tetap dari `invoice` (yang
+     * ditandatangani) + `expires` — jadi mengabaikannya tidak
+     * membuka akses ke order lain, dan expiry tetap ditegakkan
+     * (hasValidSignatureWhileIgnoring tetap memeriksa expires).
+     * Allowlist EXACT: param lain apa pun (mis. foo=bar) tetap
+     * merusak signature → 403.
+     *
+     * DOKU tidak punya entri: integrasi DOKU repo ini adalah
+     * Direct VA (DokuDirectGateway, tanpa halaman hosted /
+     * redirect browser) — callback_url_result dikirim ke DOKU
+     * tapi tidak pernah memicu browser return dengan param
+     * tambahan di alur Direct. Bila alur hosted DOKU ditambah,
+     * param return-nya wajib ditambahkan ke sini dengan bukti
+     * dari kode client-nya.
+     */
+    private const GATEWAY_RESULT_PARAMS = ['order_id', 'status_code', 'gross_amount', 'transaction_status'];
+
     public function show(Request $request, PaymentPresentationService $payments, PaymentPageSettingsService $settings, PaymentRoutingService $routing): Response|RedirectResponse
     {
         $invoice = strtoupper(trim((string) $request->query('invoice', '')));
@@ -52,7 +80,15 @@ class PaymentPageController
         // tanpa login dulu (member). Tanpa signature, jalur lama tetap
         // berlaku: session guest_order_id untuk guest, owner login
         // untuk member.
-        $signed = $request->hasValidSignature();
+        //
+        // Gateway menempelkan param HASIL (Midtrans: order_id,
+        // status_code, transaction_status, ...) ke return URL
+        // SETELAH URL ditandatangani — validasi signature yang
+        // mencakup semua query param akan menolaknya. Abaikan
+        // param hasil gateway yang exact (GATEWAY_RESULT_PARAMS)
+        // saat validasi; invoice + expires tetap ditandatangani.
+        $signed = $request->hasValidSignature()
+            || $request->hasValidSignatureWhileIgnoring(self::GATEWAY_RESULT_PARAMS);
 
         if ($order->user_id === null) {
             if ($signed) {
@@ -62,10 +98,21 @@ class PaymentPageController
             }
             $statusUrl = route('guest.orders.show', $order->order_number);
         } else {
+            $isOwner = $request->user() && (int) $request->user()->id === (int) $order->user_id;
             if (! $signed) {
-                abort_unless($request->user() && (int) $request->user()->id === (int) $order->user_id, 403);
+                abort_unless($isOwner, 403);
             }
-            $statusUrl = route('account.orders.show', $order->id);
+            // CTA status: pengunjung yang membuka lewat link signed
+            // tapi bukan owner yang login (logout, atau login akun
+            // lain) TIDAK BISA membuka /account/orders/* (auth:web)
+            // — mengarahkannya ke sana hanya melempar ke login.
+            // Arahkan ke tujuan status bertanda tangan yang bisa
+            // dibuka dengan otorisasi yang sama (signature link
+            // email), bukan ke route auth. Owner yang login tetap
+            // ke halaman akun. Guest tidak berubah (di cabang atas).
+            $statusUrl = ($signed && ! $isOwner)
+                ? $this->signedStatusUrl($order)
+                : route('account.orders.show', $order->id);
         }
 
         // Wallet: saldo milik akun owner — signature saja tidak cukup
@@ -139,5 +186,23 @@ class PaymentPageController
         return $expires !== null && $expires->isFuture()
             ? URL::temporarySignedRoute('payments.orders.create', $expires, ['orderNumber' => $order->order_number])
             : URL::signedRoute('payments.orders.create', ['orderNumber' => $order->order_number]);
+    }
+
+    /**
+     * Tujuan status bertanda tangan untuk pengunjung yang membuka
+     * lewat link signed tapi bukan owner yang login. Pola expiry
+     * mirror createPaymentUrl: sementara selama order masih bisa
+     * dibayar (expires_at di masa depan), tanpa expiry sesudahnya
+     * — sama seperti link email itu sendiri (pemegang link email
+     * sudah diotorisasi melihat info order ini; halaman status
+     * tidak membuka apa pun yang tidak dibuka halaman payment).
+     */
+    private function signedStatusUrl(object $order): string
+    {
+        $expires = $order->expires_at !== null ? Carbon::parse($order->expires_at) : null;
+
+        return $expires !== null && $expires->isFuture()
+            ? URL::temporarySignedRoute('orders.status.signed', $expires, ['orderNumber' => $order->order_number])
+            : URL::signedRoute('orders.status.signed', ['orderNumber' => $order->order_number]);
     }
 }

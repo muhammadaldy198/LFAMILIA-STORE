@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Jobs\SendAdminNotificationJob;
 use App\Models\IntegrationCredential;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Http\Client\Factory;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -122,6 +123,61 @@ class HealthcheckNotifyTest extends TestCase
         $this->assertSame(1, Http::recorded(
             fn ($request) => str_contains($request->url(), 'sendMessage')
         )->count());
+    }
+
+    public function test_down_retries_failed_delivery_on_next_run_and_does_not_resend_after_success(): void
+    {
+        // Satu kegagalan transient TIDAK BOLEH membungkam retry
+        // sampai 30 menit: run berikutnya mengirim ULANG notifikasi
+        // yang SAMA (ID sama, tanpa baris baru), dan setelah sukses
+        // run berikutnya diam (tidak spam — channel SENT dilewati).
+        IntegrationCredential::create([
+            'code' => 'telegram',
+            'is_active' => true,
+            'config_ciphertext' => [
+                'environment' => 'test',
+                'profiles' => [
+                    'test' => ['bot_token' => '111:test-token', 'chat_id' => 'test-chat'],
+                ],
+            ],
+        ]);
+        Http::swap(new Factory);
+        $attempts = 0;
+        Http::fake([
+            '*' => function ($request) use (&$attempts) {
+                if (str_contains($request->url(), 'sendMessage')) {
+                    $attempts++;
+
+                    return $attempts === 1
+                        ? Http::response([], 500)
+                        : Http::response(['ok' => true], 200);
+                }
+
+                return Http::response([], 200);
+            },
+        ]);
+        $sent = fn () => Http::recorded(
+            fn ($request) => str_contains($request->url(), 'sendMessage')
+        )->count();
+
+        // Run 1: delivery gagal (respons non-sukses).
+        $this->assertSame(0, $this->notify('down', 'Flaky provider'));
+        $this->assertSame(1, $sent());
+        $this->assertSame(1, DB::table('admin_notifications')
+            ->where('event_type', 'system.healthcheck.failed')->count());
+
+        // Run 2 (outage sama, 5 menit kemudian): RETRY, bukan diam.
+        $this->assertSame(0, $this->notify('down', 'Flaky provider'));
+        $this->assertSame(2, $sent());
+        $this->assertSame(1, DB::table('admin_notifications')
+            ->where('event_type', 'system.healthcheck.failed')->count());
+        $this->assertDatabaseHas('notification_deliveries', ['status' => 'SENT']);
+
+        // Run 3: sudah SENT → diam, tidak kirim ulang.
+        $this->assertSame(0, $this->notify('down', 'Flaky provider'));
+        $this->assertSame(2, $sent());
+        $this->assertSame(1, DB::table('admin_notifications')
+            ->where('event_type', 'system.healthcheck.failed')->count());
     }
 
     public function test_invalid_state_fails(): void

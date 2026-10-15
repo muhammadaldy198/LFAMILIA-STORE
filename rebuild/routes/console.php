@@ -253,14 +253,17 @@ Schedule::command('lfamilia:sync-digiflazz-catalog')->everyFiveMinutes()->withou
 
 // D8: healthcheck (deploy/healthcheck.sh) memanggil command ini saat
 // gagal (down) dan saat pulih (up). Alert down di-dedupe 30 menit agar
-// tidak spam tiap 5 menit; kabar pulih hanya bila ada alert down yang
-// belum ditutup kabar pulih. Pengiriman sinkron best-effort agar kabar
-// keluar segera meski queue worker sedang mati. SELURUH jalur ini
-// bebas Redis: record() tanpa dispatch job + deliver() tanpa
-// Cache::lock. Bila Redis yang mati, dispatch job ke antrean Redis
-// melempar (dan tidak ada sweeper yang mengirimkan ulang), dan lock
-// Redis melempar — alert hilang total. Dedupe tetap jalan via DB
-// (cek 30 menit di bawah + cek SENT di notification_deliveries).
+// tidak spam tiap 5 menit — satu baris per outage, dan delivery yang
+// gagal DICOBA LAGI tiap healthcheck (kirim ulang ID yang sama;
+// deliver() idempotent per-channel via baris SENT) sampai sukses.
+// Kabar pulih hanya bila ada alert down yang belum ditutup kabar pulih.
+// Pengiriman sinkron best-effort agar kabar keluar segera meski queue
+// worker sedang mati. SELURUH jalur ini bebas Redis: record() tanpa
+// dispatch job + deliver() tanpa Cache::lock. Bila Redis yang mati,
+// dispatch job ke antrean Redis melempar (dan tidak ada sweeper yang
+// mengirimkan ulang), dan lock Redis melempar — alert hilang total.
+// Dedupe tetap jalan via DB (cek 30 menit di bawah + cek SENT di
+// notification_deliveries).
 Artisan::command('lfamilia:notify-healthcheck {state} {--reason=}', function (
     AdminNotificationService $notifications,
     ExternalNotificationService $external,
@@ -279,6 +282,16 @@ Artisan::command('lfamilia:notify-healthcheck {state} {--reason=}', function (
         // wajib bunyi lagi — versi lama menelannya karena hanya
         // melihat failed terbaru tanpa membandingkannya dengan
         // recovery terbaru.
+        //
+        // Satu baris per outage — TAPI baris itu bukan tanda
+        // "sudah terkirim": bila delivery pertama gagal (error
+        // transport / respons non-sukses), healthcheck berikutnya
+        // mengirim ULANG notifikasi yang SAMA (ID sama), bukan
+        // dibungkam hanya karena barisnya ada. deliver() idempotent
+        // per-channel via baris SENT di notification_deliveries —
+        // channel yang sudah SENT dilewati, yang FAILED dicoba lagi
+        // — jadi retry tidak spam, dan satu kegagalan transient
+        // tidak menekan semua retry sampai 30 menit.
         $latestRecoveredId = DB::table('admin_notifications')
             ->where('event_type', 'system.healthcheck.recovered')
             ->orderByDesc('id')->value('id');
@@ -288,8 +301,14 @@ Artisan::command('lfamilia:notify-healthcheck {state} {--reason=}', function (
         if ($latestRecoveredId !== null) {
             $downQuery->where('id', '>', (int) $latestRecoveredId);
         }
-        if ($downQuery->exists()) {
-            $this->info('Alert healthcheck gagal sudah dikirim dalam 30 menit terakhir.');
+        $existingId = $downQuery->orderByDesc('id')->value('id');
+        if ($existingId !== null) {
+            try {
+                $external->deliver((int) $existingId, withLock: false);
+                $this->info('Alert healthcheck gagal sudah dikirim dalam 30 menit terakhir.');
+            } catch (Throwable) {
+                $this->info('Pengiriman alert healthcheck gagal — akan dicoba lagi pada healthcheck berikutnya.');
+            }
 
             return 0;
         }

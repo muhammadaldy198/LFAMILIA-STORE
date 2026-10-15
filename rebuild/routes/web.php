@@ -114,6 +114,12 @@ Route::get('/orders/guest/{orderNumber}', [GuestOrderController::class, 'show'])
     ->name('guest.orders.show');
 Route::get('/orders/guest/{orderNumber}/events', [GuestOrderController::class, 'events'])
     ->middleware('throttle:guest-order')->name('guest.orders.events');
+// Status order bertanda tangan untuk pemegang link email member
+// (lihat CustomerOrderController::showSigned): di luar grup
+// auth:web — otorisasinya signature atas invoice ini, bukan
+// sesi login. Tanpa signature → 403.
+Route::get('/orders/{orderNumber}/status', [CustomerOrderController::class, 'showSigned'])
+    ->name('orders.status.signed');
 
 Route::middleware('guest:web')->group(function (): void {
     Route::get('/auth/google/redirect', [GoogleAuthController::class, 'redirect'])
