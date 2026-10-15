@@ -158,18 +158,30 @@ class DigiflazzCatalogService
                     } else {
                         $missingSkus = $missingSkus->push($sku)->unique()->values();
                     }
-                    $historicalMappingIds = DB::table('provider_mappings as mappings')
-                        ->where('mappings.provider_id', $providerId)
-                        ->whereIn('mappings.external_sku', $missingSkus)
-                        ->where(function ($history): void {
-                            $history->whereIn('mappings.id', DB::table('orders')
-                                ->whereNotNull('provider_mapping_id')->select('provider_mapping_id'))
-                                ->orWhereIn('mappings.id', DB::table('fulfillment_attempts')
-                                    ->select('provider_mapping_id'));
-                        })
-                        ->pluck('mappings.id');
-                    $historicalSkus = DB::table('provider_mappings')
-                        ->whereIn('id', $historicalMappingIds)->pluck('external_sku')->unique();
+                    // Serialize orphan cleanup with checkout/fulfillment FK inserts. A
+                    // child order/attempt must take a shared lock on its mapping row;
+                    // locking candidate mappings first makes that insert either commit
+                    // before our recheck or wait until after the mapping is removed.
+                    $candidateMappings = DB::table('provider_mappings')
+                        ->where('provider_id', $providerId)
+                        ->whereIn('external_sku', $missingSkus)
+                        ->orderBy('id')
+                        ->lockForUpdate()
+                        ->get(['id', 'external_sku']);
+                    $candidateIds = $candidateMappings->pluck('id');
+
+                    // Locking reads are current reads under InnoDB REPEATABLE READ,
+                    // unlike the earlier consistent-read subquery. Recheck after parent
+                    // locks are acquired so a just-committed checkout is preserved.
+                    $orderHistoryIds = DB::table('orders')->whereNotNull('provider_mapping_id')
+                        ->whereIn('provider_mapping_id', $candidateIds)
+                        ->lockForUpdate()->pluck('provider_mapping_id');
+                    $attemptHistoryIds = DB::table('fulfillment_attempts')
+                        ->whereIn('provider_mapping_id', $candidateIds)
+                        ->lockForUpdate()->pluck('provider_mapping_id');
+                    $historicalMappingIds = $orderHistoryIds->merge($attemptHistoryIds)->unique()->values();
+                    $historicalSkus = $candidateMappings->whereIn('id', $historicalMappingIds)
+                        ->pluck('external_sku')->unique();
 
                     // Keep catalogue identity only when an order/attempt needs the mapping for history.
                     $missingItems->update(['is_present' => false, 'updated_at' => now()]);
