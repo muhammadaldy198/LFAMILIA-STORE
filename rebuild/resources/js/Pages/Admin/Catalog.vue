@@ -339,6 +339,7 @@ const saveMapping = (mapping) => router.put('/admin/catalog/mappings/' + mapping
 });
 const providerLabel = (mapping) => mapping.provider_name || mapping.provider_code || 'Provider';
 const fulfillmentRole = (pack, mapping) => {
+    if (mapping.disabled_by_sync) return 'SKU hilang · dinonaktifkan sync';
     if (!mapping.is_active) return 'Nonaktif';
     const active = pack.mappings.filter((entry) => entry.is_active).sort(bySourcePriority);
     const index = active.findIndex((entry) => Number(entry.id) === Number(mapping.id));
