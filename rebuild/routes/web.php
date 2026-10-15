@@ -347,7 +347,8 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
 
     Route::middleware('admin.permission:providers.manage')->group(function (): void {
         Route::get('/admin/digiflazz', [AdminDigiflazzController::class, 'index'])->name('admin.digiflazz');
-        Route::put('/admin/digiflazz/settings', [AdminDigiflazzController::class, 'settings'])->name('admin.digiflazz.settings.update');
+        Route::put('/admin/digiflazz/settings', [AdminDigiflazzController::class, 'settings'])
+            ->middleware('throttle:admin-mutation')->name('admin.digiflazz.settings.update');
         Route::post('/admin/digiflazz/sync', [AdminDigiflazzController::class, 'sync'])->middleware('throttle:admin-sensitive');
         Route::post('/admin/digiflazz/max-prices/preview', [AdminDigiflazzController::class, 'previewMaxPrices'])
             ->middleware('throttle:admin-sensitive');
@@ -357,7 +358,8 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
             ->middleware('throttle:admin-sensitive');
 
         Route::get('/admin/providers', [AdminProviderController::class, 'index'])->name('admin.providers');
-        Route::put('/admin/providers/{provider}', [AdminProviderController::class, 'update'])->name('admin.providers.update');
+        Route::put('/admin/providers/{provider}', [AdminProviderController::class, 'update'])
+            ->middleware('throttle:admin-mutation')->name('admin.providers.update');
     });
 
     Route::get('/admin/orders/export', [AdminOrdersController::class, 'export'])
@@ -384,7 +386,7 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
 
     Route::middleware(['admin.permission:customers.view', 'admin.super'])->group(function (): void {
         Route::put('/admin/customers/cleanup/settings', [AdminCustomerController::class, 'cleanupSettings'])
-            ->name('admin.customers.cleanup.settings');
+            ->middleware('throttle:admin-mutation')->name('admin.customers.cleanup.settings');
         Route::post('/admin/customers/cleanup/run', [AdminCustomerController::class, 'cleanup'])
             ->middleware('throttle:admin-sensitive')->name('admin.customers.cleanup.run');
         Route::delete('/admin/customers/{userId}', [AdminCustomerController::class, 'destroy'])
