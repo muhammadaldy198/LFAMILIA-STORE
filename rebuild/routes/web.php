@@ -293,53 +293,53 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
                 ->middleware('throttle:admin-sensitive')->name('margin.update');
             Route::post('/digiflazz/lock-prices', [AdminCatalogController::class, 'lockDigiflazzPrices'])
                 ->middleware('throttle:admin-sensitive')->name('digiflazz.lock-prices');
-            Route::put('/products/{product}/packages/reorder', [AdminCatalogController::class, 'reorderPackages'])->name('packages.reorder');
+            Route::put('/products/{product}/packages/reorder', [AdminCatalogController::class, 'reorderPackages'])->middleware('throttle:admin-mutation')->name('packages.reorder');
             Route::post('/products/{product}/sync', [AdminDigiflazzController::class, 'syncProduct'])->middleware('throttle:admin-sensitive')->name('products.sync');
             Route::post('/products/{product}/import', [AdminDigiflazzController::class, 'import'])->name('products.import');
             Route::post('/products/{product}/auto-sources', [AdminDigiflazzController::class, 'autoSources'])->middleware('throttle:admin-sensitive')->name('products.auto-sources');
             Route::post('/packages/{package}/sources/digiflazz', [AdminDigiflazzController::class, 'attachSource'])->middleware('throttle:admin-sensitive')->name('packages.sources.attach');
             Route::post('/mappings/{mapping}/sync', [AdminDigiflazzController::class, 'syncMapping'])->middleware('throttle:admin-sensitive')->name('mappings.sync');
-            Route::post('/categories', [AdminCatalogController::class, 'category'])->name('categories.store');
-            Route::put('/categories/{category}', [AdminCatalogController::class, 'updateCategory'])->name('categories.update');
-            Route::delete('/categories/{category}', [AdminCatalogController::class, 'destroyCategory'])->name('categories.destroy');
-            Route::post('/products', [AdminCatalogController::class, 'product'])->name('products.store');
-            Route::put('/products/{product}', [AdminCatalogController::class, 'updateProduct'])->name('products.update');
-            Route::delete('/products/{product}', [AdminCatalogController::class, 'destroyProduct'])->name('products.destroy');
-            Route::post('/products/{product}/packages', [AdminCatalogController::class, 'package'])->name('packages.store');
+            Route::post('/categories', [AdminCatalogController::class, 'category'])->middleware('throttle:admin-mutation')->name('categories.store');
+            Route::put('/categories/{category}', [AdminCatalogController::class, 'updateCategory'])->middleware('throttle:admin-mutation')->name('categories.update');
+            Route::delete('/categories/{category}', [AdminCatalogController::class, 'destroyCategory'])->middleware('throttle:admin-mutation')->name('categories.destroy');
+            Route::post('/products', [AdminCatalogController::class, 'product'])->middleware('throttle:admin-mutation')->name('products.store');
+            Route::put('/products/{product}', [AdminCatalogController::class, 'updateProduct'])->middleware('throttle:admin-mutation')->name('products.update');
+            Route::delete('/products/{product}', [AdminCatalogController::class, 'destroyProduct'])->middleware('throttle:admin-mutation')->name('products.destroy');
+            Route::post('/products/{product}/packages', [AdminCatalogController::class, 'package'])->middleware('throttle:admin-mutation')->name('packages.store');
             Route::post('/packages/{package}/voucher-stock', [AdminCatalogController::class, 'voucherStock'])->name('packages.voucher-stock');
-            Route::put('/packages/{package}', [AdminCatalogController::class, 'updatePackage'])->name('packages.update');
-            Route::delete('/packages/{package}', [AdminCatalogController::class, 'destroyPackage'])->name('packages.destroy');
-            Route::post('/packages/{package}/duplicate', [AdminCatalogController::class, 'duplicatePackage'])->name('packages.duplicate');
-            Route::put('/products/{product}/fields', [AdminCatalogController::class, 'fields'])->name('fields.update');
-            Route::post('/products/{product}/notices', [AdminCatalogController::class, 'storeNotice'])->name('notices.store');
-            Route::put('/notices/{notice}', [AdminCatalogController::class, 'updateNotice'])->name('notices.update');
-            Route::delete('/notices/{notice}', [AdminCatalogController::class, 'destroyNotice'])->name('notices.destroy');
-            Route::put('/mappings/{mapping}', [AdminCatalogController::class, 'mapping'])->name('mappings.update');
+            Route::put('/packages/{package}', [AdminCatalogController::class, 'updatePackage'])->middleware('throttle:admin-mutation')->name('packages.update');
+            Route::delete('/packages/{package}', [AdminCatalogController::class, 'destroyPackage'])->middleware('throttle:admin-mutation')->name('packages.destroy');
+            Route::post('/packages/{package}/duplicate', [AdminCatalogController::class, 'duplicatePackage'])->middleware('throttle:admin-mutation')->name('packages.duplicate');
+            Route::put('/products/{product}/fields', [AdminCatalogController::class, 'fields'])->middleware('throttle:admin-mutation')->name('fields.update');
+            Route::post('/products/{product}/notices', [AdminCatalogController::class, 'storeNotice'])->middleware('throttle:admin-mutation')->name('notices.store');
+            Route::put('/notices/{notice}', [AdminCatalogController::class, 'updateNotice'])->middleware('throttle:admin-mutation')->name('notices.update');
+            Route::delete('/notices/{notice}', [AdminCatalogController::class, 'destroyNotice'])->middleware('throttle:admin-mutation')->name('notices.destroy');
+            Route::put('/mappings/{mapping}', [AdminCatalogController::class, 'mapping'])->middleware('throttle:admin-mutation')->name('mappings.update');
         });
 
     Route::middleware('admin.permission:content.manage')->group(function (): void {
         Route::get('/admin/content/presentation', [AdminPresentationController::class, 'index'])->name('admin.content.presentation');
-        Route::put('/admin/content/theme', [AdminPresentationController::class, 'theme'])->name('admin.content.theme.update');
-        Route::put('/admin/content/presentation', [AdminPresentationController::class, 'update'])->name('admin.content.presentation.update');
+        Route::put('/admin/content/theme', [AdminPresentationController::class, 'theme'])->middleware('throttle:admin-mutation')->name('admin.content.theme.update');
+        Route::put('/admin/content/presentation', [AdminPresentationController::class, 'update'])->middleware('throttle:admin-mutation')->name('admin.content.presentation.update');
         Route::get('/admin/content', [AdminContentController::class, 'index'])->name('admin.content');
-        Route::put('/admin/content/settings', [AdminContentController::class, 'updateSettings'])->name('admin.content.settings');
-        Route::post('/admin/content/banners', [AdminContentController::class, 'storeBanner'])->name('admin.content.banners.store');
-        Route::put('/admin/content/banners/{banner}', [AdminContentController::class, 'updateBanner'])->name('admin.content.banners.update');
-        Route::delete('/admin/content/banners/{banner}', [AdminContentController::class, 'destroyBanner'])->name('admin.content.banners.destroy');
-        Route::post('/admin/content/popups', [AdminContentController::class, 'storePopup'])->name('admin.content.popups.store');
-        Route::put('/admin/content/popups/{popup}', [AdminContentController::class, 'updatePopup'])->name('admin.content.popups.update');
-        Route::delete('/admin/content/popups/{popup}', [AdminContentController::class, 'destroyPopup'])->name('admin.content.popups.destroy');
-        Route::post('/admin/content/news', [AdminContentController::class, 'storeNews'])->name('admin.content.news.store');
-        Route::put('/admin/content/news/{news}', [AdminContentController::class, 'updateNews'])->name('admin.content.news.update');
-        Route::delete('/admin/content/news/{news}', [AdminContentController::class, 'destroyNews'])->name('admin.content.news.destroy');
-        Route::post('/admin/content/faqs', [AdminContentController::class, 'storeFaq'])->name('admin.content.faqs.store');
-        Route::put('/admin/content/faqs/{faq}', [AdminContentController::class, 'updateFaq'])->name('admin.content.faqs.update');
-        Route::delete('/admin/content/faqs/{faq}', [AdminContentController::class, 'destroyFaq'])->name('admin.content.faqs.destroy');
-        Route::put('/admin/content/reviews/{review}', [AdminContentController::class, 'updateReview'])->name('admin.content.reviews.update');
-        Route::put('/admin/content/pages/{key}', [AdminContentController::class, 'updatePage'])->name('admin.content.pages.update');
+        Route::put('/admin/content/settings', [AdminContentController::class, 'updateSettings'])->middleware('throttle:admin-mutation')->name('admin.content.settings');
+        Route::post('/admin/content/banners', [AdminContentController::class, 'storeBanner'])->middleware('throttle:admin-mutation')->name('admin.content.banners.store');
+        Route::put('/admin/content/banners/{banner}', [AdminContentController::class, 'updateBanner'])->middleware('throttle:admin-mutation')->name('admin.content.banners.update');
+        Route::delete('/admin/content/banners/{banner}', [AdminContentController::class, 'destroyBanner'])->middleware('throttle:admin-mutation')->name('admin.content.banners.destroy');
+        Route::post('/admin/content/popups', [AdminContentController::class, 'storePopup'])->middleware('throttle:admin-mutation')->name('admin.content.popups.store');
+        Route::put('/admin/content/popups/{popup}', [AdminContentController::class, 'updatePopup'])->middleware('throttle:admin-mutation')->name('admin.content.popups.update');
+        Route::delete('/admin/content/popups/{popup}', [AdminContentController::class, 'destroyPopup'])->middleware('throttle:admin-mutation')->name('admin.content.popups.destroy');
+        Route::post('/admin/content/news', [AdminContentController::class, 'storeNews'])->middleware('throttle:admin-mutation')->name('admin.content.news.store');
+        Route::put('/admin/content/news/{news}', [AdminContentController::class, 'updateNews'])->middleware('throttle:admin-mutation')->name('admin.content.news.update');
+        Route::delete('/admin/content/news/{news}', [AdminContentController::class, 'destroyNews'])->middleware('throttle:admin-mutation')->name('admin.content.news.destroy');
+        Route::post('/admin/content/faqs', [AdminContentController::class, 'storeFaq'])->middleware('throttle:admin-mutation')->name('admin.content.faqs.store');
+        Route::put('/admin/content/faqs/{faq}', [AdminContentController::class, 'updateFaq'])->middleware('throttle:admin-mutation')->name('admin.content.faqs.update');
+        Route::delete('/admin/content/faqs/{faq}', [AdminContentController::class, 'destroyFaq'])->middleware('throttle:admin-mutation')->name('admin.content.faqs.destroy');
+        Route::put('/admin/content/reviews/{review}', [AdminContentController::class, 'updateReview'])->middleware('throttle:admin-mutation')->name('admin.content.reviews.update');
+        Route::put('/admin/content/pages/{key}', [AdminContentController::class, 'updatePage'])->middleware('throttle:admin-mutation')->name('admin.content.pages.update');
 
         Route::prefix('admin/catalog')->name('admin.catalog.')->group(function (): void {
-            Route::put('/assets/{asset}', [AdminCatalogController::class, 'asset'])->name('assets.update');
+            Route::put('/assets/{asset}', [AdminCatalogController::class, 'asset'])->middleware('throttle:admin-mutation')->name('assets.update');
             Route::post('/media/{type}/{id}', [AdminCatalogMediaController::class, 'store'])->name('media.store');
             Route::delete('/media/{type}/{id}', [AdminCatalogMediaController::class, 'destroy'])->name('media.destroy');
         });
@@ -347,7 +347,8 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
 
     Route::middleware('admin.permission:providers.manage')->group(function (): void {
         Route::get('/admin/digiflazz', [AdminDigiflazzController::class, 'index'])->name('admin.digiflazz');
-        Route::put('/admin/digiflazz/settings', [AdminDigiflazzController::class, 'settings'])->name('admin.digiflazz.settings.update');
+        Route::put('/admin/digiflazz/settings', [AdminDigiflazzController::class, 'settings'])
+            ->middleware('throttle:admin-mutation')->name('admin.digiflazz.settings.update');
         Route::post('/admin/digiflazz/sync', [AdminDigiflazzController::class, 'sync'])->middleware('throttle:admin-sensitive');
         Route::post('/admin/digiflazz/max-prices/preview', [AdminDigiflazzController::class, 'previewMaxPrices'])
             ->middleware('throttle:admin-sensitive');
@@ -357,7 +358,8 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
             ->middleware('throttle:admin-sensitive');
 
         Route::get('/admin/providers', [AdminProviderController::class, 'index'])->name('admin.providers');
-        Route::put('/admin/providers/{provider}', [AdminProviderController::class, 'update'])->name('admin.providers.update');
+        Route::put('/admin/providers/{provider}', [AdminProviderController::class, 'update'])
+            ->middleware('throttle:admin-mutation')->name('admin.providers.update');
     });
 
     Route::get('/admin/orders/export', [AdminOrdersController::class, 'export'])
@@ -384,7 +386,7 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
 
     Route::middleware(['admin.permission:customers.view', 'admin.super'])->group(function (): void {
         Route::put('/admin/customers/cleanup/settings', [AdminCustomerController::class, 'cleanupSettings'])
-            ->name('admin.customers.cleanup.settings');
+            ->middleware('throttle:admin-mutation')->name('admin.customers.cleanup.settings');
         Route::post('/admin/customers/cleanup/run', [AdminCustomerController::class, 'cleanup'])
             ->middleware('throttle:admin-sensitive')->name('admin.customers.cleanup.run');
         Route::delete('/admin/customers/{userId}', [AdminCustomerController::class, 'destroy'])
@@ -398,19 +400,20 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
     Route::middleware('admin.permission:vouchers.manage')->prefix('admin/vouchers')
         ->name('admin.vouchers.')->group(function (): void {
             Route::get('/', [AdminPromotionController::class, 'index'])->name('index');
-            Route::post('/', [AdminPromotionController::class, 'store'])->name('store');
+            Route::post('/', [AdminPromotionController::class, 'store'])->middleware('throttle:admin-mutation')->name('store');
             Route::put('/popular/{productId}', [AdminPromotionController::class, 'updatePopular'])
-                ->name('popular.update');
-            Route::put('/{id}', [AdminPromotionController::class, 'update'])->name('update');
-            Route::delete('/{id}', [AdminPromotionController::class, 'destroy'])->name('destroy');
+                ->middleware('throttle:admin-mutation')->name('popular.update');
+            Route::put('/{id}', [AdminPromotionController::class, 'update'])->middleware('throttle:admin-mutation')->name('update');
+            Route::delete('/{id}', [AdminPromotionController::class, 'destroy'])->middleware('throttle:admin-mutation')->name('destroy');
         });
 
     Route::middleware('admin.permission:support.manage')->prefix('admin/support')
         ->name('admin.support.')->group(function (): void {
             Route::get('/', [AdminSupportController::class, 'index'])->name('index');
             Route::put('/quick-replies', [AdminSupportController::class, 'quickReplies'])
-                ->name('quick-replies.update');
-            Route::put('/{id}', [AdminSupportController::class, 'update'])->name('update');
+                ->middleware('throttle:admin-mutation')->name('quick-replies.update');
+            Route::put('/{id}', [AdminSupportController::class, 'update'])
+                ->middleware('throttle:admin-mutation')->name('update');
         });
 
     Route::middleware('admin.permission:reports.view')->group(function (): void {
