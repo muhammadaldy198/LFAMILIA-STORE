@@ -865,6 +865,38 @@ class AdminIntegrationsRestorationTest extends TestCase
         $this->assertStringContainsString('order', $saved['message']);
     }
 
+    public function test_discord_connection_test_does_not_promise_fallback_when_default_is_broken(): void
+    {
+        $this->loginSuperAdmin();
+        $this->clearIntegrationState();
+
+        IntegrationCredential::create([
+            'code' => 'discord',
+            'is_active' => true,
+            'config_ciphertext' => [
+                'webhook_url' => 'https://discord.com/api/webhooks/111/aaa',
+                'webhook_url_order' => 'https://discord.com/api/webhooks/222/bbb',
+            ],
+        ]);
+
+        Http::fake([
+            'https://discord.com/api/webhooks/111/aaa' => Http::response([], 404),
+            'https://discord.com/api/webhooks/222/bbb' => Http::response(['id' => '222'], 200),
+        ]);
+
+        $response = $this->postJson('/admin/integrations/discord/test')
+            ->assertOk()
+            ->assertJson(['verified' => false, 'status' => 'DEGRADED'])
+            ->assertJsonPath('channels.0.channel', 'default')
+            ->assertJsonPath('channels.0.verified', false)
+            ->assertJsonPath('channels.1.channel', 'order')
+            ->assertJsonPath('channels.1.verified', true);
+
+        $message = (string) $response->json('message');
+        $this->assertStringContainsString('tidak dapat dikirim', $message);
+        $this->assertStringNotContainsString('jatuh ke webhook default', $message);
+    }
+
     public function test_discord_connection_test_is_bounded_when_webhooks_stall(): void
     {
         $this->loginSuperAdmin();

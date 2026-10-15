@@ -310,10 +310,15 @@ class IntegrationConnectionService
         }
 
         if ($failed !== []) {
+            $defaultVerified = isset($urls['default'])
+                && ($probed[$urls['default']]['verified'] ?? false);
+            $message = 'Webhook Discord bermasalah di channel: '.implode(', ', $failed).'. ';
+            $message .= $defaultVerified
+                ? 'Webhook channel yang gagal dapat mencoba fallback ke webhook default yang terverifikasi.'
+                : 'Webhook default tidak terverifikasi atau tidak tersedia; notifikasi untuk channel yang bergantung padanya tidak dapat dikirim sampai webhook diperbaiki.';
+
             return [
-                ...$this->unverified(
-                    'Webhook Discord bermasalah di channel: '.implode(', ', $failed).'. Notif channel tersebut jatuh ke webhook default.'
-                ),
+                ...$this->unverified($message),
                 'channels' => $channels,
             ];
         }
