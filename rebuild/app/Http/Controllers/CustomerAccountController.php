@@ -109,9 +109,15 @@ class CustomerAccountController
             $emails->queue(
                 $user->email,
                 'Kata sandi LFAMILIA STORE berhasil diperbarui',
-                "Halo,\n\nKata sandi akun LFAMILIA STORE berhasil diperbarui.\n\n".
-                "Jika kamu tidak melakukan perubahan ini, segera hubungi CS: support@lfamiliastore.my.id\n\n".
-                "Jangan bagikan kata sandi atau kode keamanan kepada siapa pun."
+                implode("\n", [
+                    'Halo,',
+                    '',
+                    'Kata sandi akun LFAMILIA STORE berhasil diperbarui.',
+                    '',
+                    'Jika kamu tidak melakukan perubahan ini, segera hubungi CS: support@lfamiliastore.my.id',
+                    '',
+                    'Jangan bagikan kata sandi atau kode keamanan kepada siapa pun.',
+                ])
             );
         }
 

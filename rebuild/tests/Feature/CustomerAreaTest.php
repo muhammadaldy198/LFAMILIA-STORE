@@ -157,12 +157,10 @@ class CustomerAreaTest extends TestCase
             'password_confirmation' => 'new-password-123',
         ])->assertRedirect();
         $this->assertTrue(Hash::check('new-password-123', $user->fresh()->password));
-        Queue::assertPushed(SendTransactionalEmailJob::class, fn (SendTransactionalEmailJob $job): bool =>
-            $job->recipient === $user->fresh()->email
+        Queue::assertPushed(SendTransactionalEmailJob::class, fn (SendTransactionalEmailJob $job): bool => $job->recipient === $user->fresh()->email
             && str_contains($job->subject, 'berhasil diperbarui')
             && str_contains($job->text, 'Kata sandi akun LFAMILIA STORE berhasil diperbarui')
-            && str_contains($job->text, 'support@lfamiliastore.my.id')
-        );
+            && str_contains($job->text, 'support@lfamiliastore.my.id'));
 
         SupportTicket::create([
             'user_id' => $user->id, 'subject' => 'Help', 'message' => 'My account',
