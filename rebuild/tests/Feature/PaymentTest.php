@@ -911,6 +911,36 @@ class PaymentTest extends TestCase
         $this->actingAs($order['user'])->get($signedPage)->assertOk();
     }
 
+    public function test_wallet_pay_page_logs_out_wrong_account_before_login_redirect(): void
+    {
+        $order = $this->walletOrder('wallet-page-wrong@example.test', 'wallet-page-wrong-order-0001');
+
+        $other = User::create([
+            'name' => 'Other Account',
+            'email' => 'wallet-page-wrong-account@example.test',
+            'phone' => '081234567899',
+            'password' => Hash::make('StrongPassword123!'),
+        ]);
+        $other->forceFill(['email_verified_at' => now()])->save();
+
+        $signedPage = URL::signedRoute('payment.show', ['invoice' => $order['order_number']]);
+
+        // TANPA fix, user yang login sebagai akun lain dilempar ke
+        // /login lalu middleware guest Fortify melempar balik ke
+        // /account — form login pemilik tidak pernah tampil dan
+        // intended hilang saat logout dari /account. DENGAN fix:
+        // sesi akun salah diakhiri dulu, redirect mendarat di form
+        // login (bukan /account), intended terjaga, dan pengunjung
+        // sudah guest.
+        $this->actingAs($other)->get($signedPage)
+            ->assertRedirect(route('login'))
+            ->assertSessionHas('status');
+        $this->assertGuest();
+        $intended = session('url.intended');
+        $this->assertIsString($intended);
+        $this->assertStringContainsString('/payment?invoice='.$order['order_number'], $intended);
+    }
+
     public function test_wallet_checkout_is_blocked_while_topup_refund_review_is_open(): void
     {
         $catalog = $this->catalog();

@@ -12,7 +12,16 @@ class ExternalNotificationService
 {
     public function __construct(private readonly IntegrationRuntimeConfig $runtime) {}
 
-    public function deliver(int $notificationId): void
+    /**
+     * @param  bool  $withLock  false = lewati Cache::lock (Redis) dan
+     *                          panggil attemptLocked langsung. Dipakai
+     *                          jalur alert healthcheck yang tidak boleh
+     *                          bergantung Redis: bila Redis mati, lock
+     *                          melempar dan alert hilang. Dedupe tetap
+     *                          jalan via DB (cek SENT di attemptLocked
+     *                          + dedupe 30 menit di pemanggil).
+     */
+    public function deliver(int $notificationId, bool $withLock = true): void
     {
         $notification = DB::table('admin_notifications')->where('id', $notificationId)->first();
         if (! $notification) {
@@ -21,9 +30,9 @@ class ExternalNotificationService
 
         $text = '['.$notification->severity.'] '.$notification->title."\n".$notification->message;
         $results = [
-            $this->telegram($notificationId, $text),
-            $this->discord($notification, $text),
-            $this->resend($notificationId, $notification->title, $text),
+            $this->telegram($notificationId, $text, $withLock),
+            $this->discord($notification, $text, $withLock),
+            $this->resend($notificationId, $notification->title, $text, $withLock),
         ];
 
         if (in_array(false, $results, true)) {
@@ -31,7 +40,7 @@ class ExternalNotificationService
         }
     }
 
-    private function telegram(int $id, string $text): ?bool
+    private function telegram(int $id, string $text, bool $withLock): ?bool
     {
         $resolved = $this->runtime->resolve('telegram');
         $config = $resolved['config'] ?? [];
@@ -43,7 +52,7 @@ class ExternalNotificationService
             return null;
         }
 
-        return $this->attempt($id, 'telegram', (string) $config['chat_id'], function () use ($config, $environment, $text) {
+        return $this->attempt($id, 'telegram', (string) $config['chat_id'], $withLock, function () use ($config, $environment, $text) {
             return Http::acceptJson()->timeout(8)->post(
                 $this->runtime->telegramBotBase($environment, (string) $config['bot_token']).'/sendMessage',
                 ['chat_id' => (string) $config['chat_id'], 'text' => $text]
@@ -51,7 +60,7 @@ class ExternalNotificationService
         });
     }
 
-    private function discord(object $notification, string $text): ?bool
+    private function discord(object $notification, string $text, bool $withLock): ?bool
     {
         $config = $this->config('discord');
         if (! $config) {
@@ -66,13 +75,37 @@ class ExternalNotificationService
             return null;
         }
 
-        return $this->attempt((int) $notification->id, 'discord:'.$channel, $url, fn () => Http::acceptJson()->withOptions(['allow_redirects' => false])->timeout(8)->post($url, [
+        $post = fn (string $target) => Http::acceptJson()->withOptions(['allow_redirects' => false])->timeout(8)->post($target, [
             'content' => mb_substr($text, 0, 1900),
             'allowed_mentions' => ['parse' => []],
-        ]));
+        ]);
+
+        $sent = $this->attempt((int) $notification->id, 'discord:'.$channel, $url, $withLock, fn () => $post($url));
+
+        if ($sent) {
+            return true;
+        }
+
+        // Fallback nyata ke webhook default: webhookUrl() hanya
+        // menjatuhkan ke default bila URL per-channel formatnya
+        // tidak valid. URL per-channel yang formatnya valid tapi
+        // tidak terjangkau (dihapus di Discord → 404, timeout)
+        // tetap dipilih webhookUrl(), dan tanpa fallback di sini
+        // notif channel itu hilang padahal webhook default sehat —
+        // padahal tes koneksi menjanjikan "jatuh ke webhook
+        // default". Coba sekali ke default (bila ada dan berbeda)
+        // sebelum menyerah; baris notification_deliveries untuk
+        // channel ini mencatat percobaan terakhir (SENT ke default
+        // bila fallback berhasil).
+        $default = DiscordNotificationRouting::defaultWebhookUrl($config);
+        if ($default === null || $default === $url) {
+            return false;
+        }
+
+        return $this->attempt((int) $notification->id, 'discord:'.$channel, $default, $withLock, fn () => $post($default));
     }
 
-    private function resend(int $id, string $subject, string $text): ?bool
+    private function resend(int $id, string $subject, string $text, bool $withLock): ?bool
     {
         $config = $this->config('resend');
         $recipients = $config['admin_recipients'] ?? [];
@@ -84,7 +117,7 @@ class ExternalNotificationService
             return null;
         }
 
-        return $this->attempt($id, 'email', implode(',', $recipients), fn () => Http::withToken((string) $config['api_key'])
+        return $this->attempt($id, 'email', implode(',', $recipients), $withLock, fn () => Http::withToken((string) $config['api_key'])
             ->acceptJson()->timeout(8)->post('https://api.resend.com/emails', [
                 'from' => (string) $config['from_email'],
                 'to' => $recipients,
@@ -93,8 +126,12 @@ class ExternalNotificationService
             ]));
     }
 
-    private function attempt(int $id, string $channel, string $destination, callable $callback): bool
+    private function attempt(int $id, string $channel, string $destination, bool $withLock, callable $callback): bool
     {
+        if (! $withLock) {
+            return $this->attemptLocked($id, $channel, $destination, $callback);
+        }
+
         // Serialize external sends across queued workers. The HTTP timeouts are 8 seconds,
         // so the 30-second lease outlives each network operation.
         return Cache::lock('lfamilia:notify:'.$id.':'.$channel, 30)

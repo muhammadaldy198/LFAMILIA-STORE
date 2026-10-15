@@ -239,9 +239,11 @@ class IntegrationConnectionService
     {
         // Probe SETIAP webhook yang dideklarasikan (default + per-channel),
         // bukan cuma default: URL per-channel yang mati (mis. webhook
-        // dihapus di Discord → 404) lolos validasi format saat save,
-        // dan delivery diam-diam menjatuhkan notif channel itu ke
-        // webhook default. Tes koneksi harus menunjukkannya.
+        // dihapus di Discord → 404) lolos validasi format saat save.
+        // Delivery mencoba webhook default bila kirim ke per-channel
+        // gagal (fallback di ExternalNotificationService::discord) —
+        // tes koneksi harus menunjukkan channel mana yang bermasalah
+        // agar admin memperbaikinya, bukan mengandalkan fallback diam-diam.
         // URL yang sama (mis. beberapa channel pakai webhook yang sama)
         // di-probe sekali saja.
         $urls = [];

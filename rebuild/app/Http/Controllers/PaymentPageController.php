@@ -8,6 +8,7 @@ use App\Services\PaymentRoutingService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\URL;
 use Inertia\Inertia;
@@ -69,15 +70,38 @@ class PaymentPageController
 
         // Wallet: saldo milik akun owner — signature saja tidak cukup
         // untuk membayar. Halaman wallet yang dibuka lewat link signed
-        // saat logout / akun lain dialihkan ke login dengan intended =
-        // URL halaman ini (redirect()->guest), jadi setelah login
-        // sebagai owner pengguna kembali ke halaman ini dan tombol
-        // "Siapkan pembayaran" bisa jalan. Tanpa ini tombol itu hanya
+        // saat logout dialihkan ke login dengan intended = URL halaman
+        // ini (redirect()->guest), jadi setelah login sebagai owner
+        // pengguna kembali ke halaman ini dan tombol "Siapkan
+        // pembayaran" bisa jalan. Tanpa ini tombol itu hanya
         // menghasilkan 422 sesudah payment dibuat-lalu-ditolak
         // (lihat PaymentController::create).
+        //
+        // Bila pengunjung SUDAH login sebagai akun yang salah, sesi
+        // akun salah itu diakhiri DULU sebelum redirect ke login:
+        // route login Fortify itu guest-only — redirect langsung ke
+        // sana membuat middleware guest melempar balik ke /account
+        // (Fortify HOME), form login pemilik tidak pernah tampil, dan
+        // logout dari /account kemudian menghapus intended (session
+        // invalidate), jadi order wallet tidak bisa dilanjutkan.
+        // Akhiri sesi dulu, lalu redirect()->guest() menaruh intended
+        // di sesi baru dan form login pemilik benar-benar tampil.
+        // Pesan status menjelaskan pergantian ini agar logout tidak
+        // terasa diam-diam (Login.vue menampilkan page.props.status).
         if ($order->user_id !== null
             && $routing->gatewayCodeForRoute((int) $order->payment_route_id) === 'WALLET'
             && (! $request->user() || (int) $request->user()->id !== (int) $order->user_id)) {
+            if ($request->user()) {
+                Auth::logout();
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+
+                return redirect()->guest(route('login'))->with(
+                    'status',
+                    'Sesi akun sebelumnya diakhiri karena link pembayaran ini milik akun lain. Masuk sebagai pemilik pesanan untuk melanjutkan.'
+                );
+            }
+
             return redirect()->guest(route('login'));
         }
 

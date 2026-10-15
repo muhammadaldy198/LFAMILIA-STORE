@@ -255,9 +255,12 @@ Schedule::command('lfamilia:sync-digiflazz-catalog')->everyFiveMinutes()->withou
 // gagal (down) dan saat pulih (up). Alert down di-dedupe 30 menit agar
 // tidak spam tiap 5 menit; kabar pulih hanya bila ada alert down yang
 // belum ditutup kabar pulih. Pengiriman sinkron best-effort agar kabar
-// keluar segera meski queue worker sedang mati — job antrean yang
-// dikirim record() tetap jalan belakangan dan dedupe mencegah kirim
-// ganda per channel.
+// keluar segera meski queue worker sedang mati. SELURUH jalur ini
+// bebas Redis: record() tanpa dispatch job + deliver() tanpa
+// Cache::lock. Bila Redis yang mati, dispatch job ke antrean Redis
+// melempar (dan tidak ada sweeper yang mengirimkan ulang), dan lock
+// Redis melempar — alert hilang total. Dedupe tetap jalan via DB
+// (cek 30 menit di bawah + cek SENT di notification_deliveries).
 Artisan::command('lfamilia:notify-healthcheck {state} {--reason=}', function (
     AdminNotificationService $notifications,
     ExternalNotificationService $external,
@@ -299,11 +302,13 @@ Artisan::command('lfamilia:notify-healthcheck {state} {--reason=}', function (
             'ERROR',
             'system',
             'healthcheck',
+            dispatchJob: false,
         );
         try {
-            $external->deliver($id);
+            $external->deliver($id, withLock: false);
         } catch (Throwable) {
-            // Job antrean mencoba ulang channel yang gagal.
+            // Pengiriman sinkron gagal (mis. provider down) — tidak
+            // ada job antrean yang mencoba ulang untuk jalur ini.
         }
 
         return 0;
@@ -326,11 +331,13 @@ Artisan::command('lfamilia:notify-healthcheck {state} {--reason=}', function (
         'INFO',
         'system',
         'healthcheck',
+        dispatchJob: false,
     );
     try {
-        $external->deliver($id);
+        $external->deliver($id, withLock: false);
     } catch (Throwable) {
-        // Job antrean mencoba ulang channel yang gagal.
+        // Pengiriman sinkron gagal (mis. provider down) — tidak
+        // ada job antrean yang mencoba ulang untuk jalur ini.
     }
 
     return 0;

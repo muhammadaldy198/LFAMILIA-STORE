@@ -78,6 +78,15 @@ final class DiscordNotificationRouting
      * Webhook untuk channel: URL per-channel bila terisi dan valid,
      * bila tidak pakai webhook default. URL tidak valid di mana-mana
      * berarti channel Discord tidak terkirim (Telegram + email jalan).
+     *
+     * CATATAN: fallback ke default di sini HANYA untuk URL per-channel
+     * yang formatnya tidak valid. URL per-channel yang formatnya
+     * valid tapi tidak terjangkau (webhook dihapus di Discord → 404,
+     * timeout) tetap DIPILIH oleh method ini — fallback untuk kasus
+     * itu ada di pengiriman (ExternalNotificationService::discord),
+     * yang mencoba webhook default sekali bila kirim ke per-channel
+     * gagal. Tanpa fallback di pengiriman, janji "jatuh ke webhook
+     * default" di tes koneksi akan salah untuk URL mati.
      */
     public static function webhookUrl(array $config, string $channel): ?string
     {
@@ -86,6 +95,12 @@ final class DiscordNotificationRouting
             return $perChannel;
         }
 
+        return self::defaultWebhookUrl($config);
+    }
+
+    /** Webhook default (fallback) bila terisi dan formatnya valid. */
+    public static function defaultWebhookUrl(array $config): ?string
+    {
         $default = trim((string) ($config['webhook_url'] ?? ''));
 
         return $default !== '' && DiscordWebhookUrl::valid($default) ? $default : null;

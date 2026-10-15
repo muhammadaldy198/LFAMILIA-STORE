@@ -2,10 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\SendAdminNotificationJob;
+use App\Models\IntegrationCredential;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 /**
@@ -89,6 +93,35 @@ class HealthcheckNotifyTest extends TestCase
             ->where('event_type', 'system.healthcheck.failed')->count());
         $this->assertSame(1, DB::table('admin_notifications')
             ->where('event_type', 'system.healthcheck.recovered')->count());
+    }
+
+    public function test_down_delivers_synchronously_without_redis_queue_or_lock(): void
+    {
+        // Jalur alert healthcheck tidak boleh bergantung Redis: bila
+        // Redis mati, dispatch job ke antrean Redis melempar dan lock
+        // Redis melempar — alert hilang total (tidak ada sweeper yang
+        // mengirimkan ulang baris tertunda). Bukti jalur baru:
+        // job TIDAK di-push, Cache::lock TIDAK PERNAH dipanggil,
+        // tapi pengiriman sinkron tetap jalan (post Telegram terkirim).
+        IntegrationCredential::create([
+            'code' => 'telegram',
+            'is_active' => true,
+            'config_ciphertext' => [
+                'environment' => 'test',
+                'profiles' => [
+                    'test' => ['bot_token' => '111:test-token', 'chat_id' => 'test-chat'],
+                ],
+            ],
+        ]);
+        Queue::fake();
+        Cache::shouldReceive('lock')->never();
+
+        $this->assertSame(0, $this->notify('down', 'Redis is down'));
+
+        Queue::assertNotPushed(SendAdminNotificationJob::class);
+        $this->assertSame(1, Http::recorded(
+            fn ($request) => str_contains($request->url(), 'sendMessage')
+        )->count());
     }
 
     public function test_invalid_state_fails(): void

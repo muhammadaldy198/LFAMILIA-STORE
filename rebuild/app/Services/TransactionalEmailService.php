@@ -130,31 +130,45 @@ class TransactionalEmailService
     /**
      * Momen 3a (D3): pesanan selesai. Dipanggil dari ketiga jalur
      * FulfillmentService yang menutup order sebagai SUCCESS
-     * (Digiflazz, stok kode, manual).
+     * (Digiflazz, stok kode, manual). Pemanggil WAJIB menyebut
+     * jalurnya lewat $deliveryKind — wording email ditentukan
+     * JALUR, bukan ada/tidaknya code di delivery_payload:
      *
-     * delivery_payload punya DUA bentuk yang jangan dicampur:
-     * - ['code' => ...] (stok kode VOUCHER_STOCK / manual): kode
-     *   REDEEMABLE — customer sendiri yang menukarkannya. Ditampilkan
-     *   sebagai "Kode voucher" + petunjuk tukar, BUKAN sebagai nomor
+     * - 'stock' (VOUCHER_STOCK): code adalah kode REDEEMABLE —
+     *   customer sendiri yang menukarkannya. Ditampilkan sebagai
+     *   "Kode voucher" + petunjuk tukar, BUKAN sebagai nomor
      *   referensi, dan tanpa klaim "sudah masuk akun".
-     * - ['serial_number' => ...] (Digiflazz): nomor referensi
-     *   diagnostik dari penyedia — tetap "No. Referensi Pengiriman"
-     *   + "periksa saldo di dalam game".
+     * - 'manual': code (bila ada) adalah teks bukti/hasil bebas
+     *   yang diketik admin (maks 2000 karakter) — BUKAN kode
+     *   redeemable. Ditampilkan sebagai "Bukti pengiriman",
+     *   TANPA kata "tukarkan sendiri". Note admin SELALU
+     *   ditampilkan bila ada, di kedua sub-cabang manual (dengan
+     *   code maupun note-only). Menentukan manual dari
+     *   ada/tidaknya code SALAH: manual note-only (code null)
+     *   kehilangan note-nya, dan manual code-only tidak bisa
+     *   dibedakan dari stok kode hanya dari payload.
+     * - 'digiflazz': serial_number = nomor referensi diagnostik
+     *   dari penyedia — "No. Referensi Pengiriman" + "periksa
+     *   saldo di dalam game".
      */
-    public function queueOrderCompleted(int $orderId): void
+    public function queueOrderCompleted(int $orderId, string $deliveryKind): void
     {
         $details = $this->orderDetails($orderId);
         if (! $details) {
             return;
         }
 
-        $hasCode = $details['delivery_code'] !== null;
+        $isStock = $deliveryKind === 'stock';
+        $isManual = $deliveryKind === 'manual';
+
         $lines = [
             'Halo,',
             '',
-            $hasCode
+            $isStock
                 ? 'Pesananmu sudah selesai diproses. Kode produkmu ada di bawah — tukarkan sendiri:'
-                : 'Pesananmu sudah selesai diproses dan item sudah terkirim ke akun tujuan:',
+                : ($isManual
+                    ? 'Pesananmu sudah selesai diproses dan sudah kami kirimkan secara manual:'
+                    : 'Pesananmu sudah selesai diproses dan item sudah terkirim ke akun tujuan:'),
             '',
             'Nomor Invoice: '.$details['invoice'],
             'Produk: '.$details['product'].' — '.$details['package'],
@@ -162,8 +176,14 @@ class TransactionalEmailService
         if ($details['destination'] !== null) {
             $lines[] = 'ID Tujuan: '.$details['destination'];
         }
-        if ($hasCode) {
-            $lines[] = 'Kode voucher: '.$details['delivery_code'];
+        if ($isStock) {
+            if ($details['delivery_code'] !== null) {
+                $lines[] = 'Kode voucher: '.$details['delivery_code'];
+            }
+        } elseif ($isManual) {
+            if ($details['delivery_code'] !== null) {
+                $lines[] = 'Bukti pengiriman: '.$details['delivery_code'];
+            }
             if ($details['delivery_note'] !== null) {
                 $lines[] = 'Catatan: '.$details['delivery_note'];
             }
@@ -173,9 +193,11 @@ class TransactionalEmailService
         $lines = [...$lines,
             'Total Transaksi: '.$this->rupiah($details['total']),
             '',
-            $hasCode
+            $isStock
                 ? 'Simpan kode ini baik-baik — jangan dibagikan ke orang lain. Kode ini yang ditukarkan untuk memakai produkmu; kode tidak terkirim otomatis ke akun game. Kalau kode tidak bisa ditukarkan, sampaikan nomor invoice di atas ke CS kami.'
-                : 'Silakan periksa saldo di dalam game. Kalau belum masuk setelah beberapa menit, sampaikan nomor invoice dan nomor referensi di atas ke CS kami.',
+                : ($isManual
+                    ? 'Pengiriman sudah kami lakukan secara manual. Kalau ada yang belum sesuai, sampaikan nomor invoice di atas ke CS kami.'
+                    : 'Silakan periksa saldo di dalam game. Kalau belum masuk setelah beberapa menit, sampaikan nomor invoice dan nomor referensi di atas ke CS kami.'),
             '',
             'Lihat detail pesanan: '.$this->trackingUrl(),
             '',
@@ -184,9 +206,11 @@ class TransactionalEmailService
 
         $this->queueForOrder(
             $orderId,
-            $hasCode
+            $isStock
                 ? 'Pesanan selesai — kode '.$details['package'].' sudah siap ditukarkan'
-                : 'Pesanan selesai — '.$details['package'].' sudah masuk ke akunmu',
+                : ($isManual
+                    ? 'Pesanan selesai — '.$details['package'].' sudah dikirim'
+                    : 'Pesanan selesai — '.$details['package'].' sudah masuk ke akunmu'),
             implode("\n", $lines)
         );
     }
@@ -301,8 +325,10 @@ class TransactionalEmailService
     }
 
     /**
-     * Kode redeemable dari stok kode / penyelesaian manual. BUKAN
-     * nomor referensi — customer sendiri yang menukarkannya.
+     * Kode dari delivery_payload. Artinya tergantung JALUR
+     * fulfillment (lihat queueOrderCompleted): redeemable bila
+     * stok kode, teks bukti bila penyelesaian manual. BUKAN nomor
+     * referensi — customer tidak menukar nomor referensi.
      *
      * @param  array<string, mixed>  $delivery
      */

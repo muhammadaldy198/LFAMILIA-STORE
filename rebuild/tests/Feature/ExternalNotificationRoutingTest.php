@@ -6,8 +6,10 @@ use App\Models\IntegrationCredential;
 use App\Services\AdminNotificationService;
 use App\Services\ExternalNotificationService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Http\Client\Factory;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use RuntimeException;
 use Tests\TestCase;
 
 /**
@@ -134,6 +136,72 @@ class ExternalNotificationRoutingTest extends TestCase
             'status' => 'SENT',
         ]);
         $this->assertSame(2, $this->telegramSends());
+    }
+
+    public function test_discord_falls_back_to_default_when_per_channel_webhook_is_unreachable(): void
+    {
+        // URL per-channel formatnya VALID tapi webhook-nya sudah
+        // dihapus di Discord (404) — webhookUrl() tetap memilihnya
+        // (fallback di sana hanya untuk format tidak valid). Tanpa
+        // fallback nyata di pengiriman, notif channel ini hilang
+        // padahal webhook default sehat — padahal tes koneksi
+        // menjanjikan "jatuh ke webhook default". Bukti fallback:
+        // per-channel dicoba sekali, default dicoba sekali dan SENT.
+        $this->seedDiscord([
+            'webhook_url' => self::LEGACY_WEBHOOK,
+            'webhook_url_order' => self::ORDER_WEBHOOK,
+        ]);
+        // CATATAN: setUp sudah mendaftarkan stub catch-all `*` (200)
+        // lewat Http::fake(), dan fake() APPEND ke stubCallbacks —
+        // stub pertama yang merespons menang, jadi fake per-URL
+        // sesudahnya tidak pernah tercapai. Reset dulu dengan
+        // Http::swap(new Factory) (pola yang dipakai test lain),
+        // lalu daftarkan fake per-URL.
+        Http::swap(new Factory);
+        Http::fake([
+            self::ORDER_WEBHOOK => Http::response(null, 404),
+            self::LEGACY_WEBHOOK => Http::response(null, 204),
+            // Catch-all untuk channel lain (Telegram di setUp):
+            // tanpa ini request-nya jatuh ke jaringan asli.
+            '*' => Http::response(),
+        ]);
+
+        $orderId = $this->record('order.created');
+        app(ExternalNotificationService::class)->deliver($orderId);
+
+        $this->assertSame(1, Http::recorded(fn ($request) => $request->url() === self::ORDER_WEBHOOK)->count());
+        $this->assertSame(1, Http::recorded(fn ($request) => $request->url() === self::LEGACY_WEBHOOK)->count());
+        $this->assertDatabaseHas('notification_deliveries', [
+            'admin_notification_id' => $orderId,
+            'channel' => 'discord:order',
+            'status' => 'SENT',
+        ]);
+    }
+
+    public function test_discord_reports_failure_when_both_per_channel_and_default_fail(): void
+    {
+        $this->seedDiscord([
+            'webhook_url' => self::LEGACY_WEBHOOK,
+            'webhook_url_order' => self::ORDER_WEBHOOK,
+        ]);
+        Http::swap(new Factory);
+        Http::fake([
+            self::ORDER_WEBHOOK => Http::response(null, 404),
+            self::LEGACY_WEBHOOK => Http::response(null, 404),
+            // Catch-all untuk channel lain (Telegram di setUp):
+            // tanpa ini request-nya jatuh ke jaringan asli.
+            '*' => Http::response(),
+        ]);
+
+        $orderId = $this->record('order.created');
+
+        $this->expectException(RuntimeException::class);
+        try {
+            app(ExternalNotificationService::class)->deliver($orderId);
+        } finally {
+            // Fallback TETAP dicoba (default kena 1 POST) sebelum menyerah.
+            $this->assertSame(1, Http::recorded(fn ($request) => $request->url() === self::LEGACY_WEBHOOK)->count());
+        }
     }
 
     public function test_discord_falls_back_to_legacy_webhook_at_deliver_level(): void

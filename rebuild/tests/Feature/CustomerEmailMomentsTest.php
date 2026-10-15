@@ -442,7 +442,7 @@ class CustomerEmailMomentsTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        app(TransactionalEmailService::class)->queueOrderCompleted($orderId);
+        app(TransactionalEmailService::class)->queueOrderCompleted($orderId, 'stock');
 
         Queue::assertPushed(SendTransactionalEmailJob::class, function (SendTransactionalEmailJob $job): bool {
             return $job->recipient === 'moments-code@example.test'
@@ -454,6 +454,100 @@ class CustomerEmailMomentsTest extends TestCase
                 && ! str_contains($job->text, 'No. Referensi Pengiriman')
                 && ! str_contains($job->text, 'sudah masuk ke akunmu')
                 && ! str_contains($job->text, 'periksa saldo di dalam game');
+        });
+    }
+
+    public function test_order_completed_email_shows_manual_evidence_not_voucher_code(): void
+    {
+        $catalog = $this->catalog();
+        $orderId = DB::table('orders')->insertGetId([
+            'order_number' => 'ORD-EMAIL-MANUAL-'.bin2hex(random_bytes(4)),
+            'guest_email' => 'moments-manual@example.test',
+            'guest_phone' => '081234567890',
+            'product_id' => $catalog['product']->id,
+            'product_package_id' => $catalog['package_id'],
+            'provider_mapping_id' => $catalog['mapping_id'],
+            'status' => 'SUCCESS',
+            'currency' => 'IDR',
+            'customer_input' => json_encode(['user_id' => '123456', 'zone_id' => '7890'], JSON_THROW_ON_ERROR),
+            'snapshot' => json_encode([
+                'product' => ['id' => $catalog['product']->id, 'name' => $catalog['product']->name, 'fulfillment_mode' => 'MANUAL'],
+                'package' => ['id' => $catalog['package_id'], 'name' => '100 Diamonds'],
+                'provider' => ['mapping_id' => $catalog['mapping_id'], 'code' => 'MANUAL', 'sku' => 'EML-SKU', 'cost_idr' => 10000, 'max_price_idr' => 12000],
+                'customer_input' => ['user_id' => '123456', 'zone_id' => '7890'],
+            ], JSON_THROW_ON_ERROR),
+            // Bentuk payload manual: code = teks bukti bebas yang
+            // diketik admin (BUKAN kode redeemable) + note admin.
+            'delivery_payload' => json_encode([
+                'code' => 'Sudah ditransfer manual, bukti: TRX-999',
+                'note' => 'Diamond masuk 10 menit setelah bayar.',
+            ], JSON_THROW_ON_ERROR),
+            'cost_idr' => 10000,
+            'margin_idr' => 1000,
+            'discount_idr' => 0,
+            'fee_idr' => 0,
+            'total_idr' => 11000,
+            'idempotency_key' => 'email-moments-manual-'.bin2hex(random_bytes(6)),
+            'paid_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        app(TransactionalEmailService::class)->queueOrderCompleted($orderId, 'manual');
+
+        Queue::assertPushed(SendTransactionalEmailJob::class, function (SendTransactionalEmailJob $job): bool {
+            return $job->recipient === 'moments-manual@example.test'
+                && str_contains($job->subject, 'sudah dikirim')
+                && str_contains($job->text, 'Bukti pengiriman: Sudah ditransfer manual, bukti: TRX-999')
+                && str_contains($job->text, 'Catatan: Diamond masuk 10 menit setelah bayar.')
+                // Bukti manual BUKAN kode redeemable: jangan suruh
+                // customer menukarkan apa pun, jangan labeli voucher.
+                && ! str_contains($job->text, 'Kode voucher')
+                && ! str_contains($job->text, 'tukarkan sendiri')
+                && ! str_contains($job->text, 'siap ditukarkan');
+        });
+    }
+
+    public function test_order_completed_email_shows_manual_note_without_code(): void
+    {
+        $catalog = $this->catalog();
+        $orderId = DB::table('orders')->insertGetId([
+            'order_number' => 'ORD-EMAIL-NOTE-'.bin2hex(random_bytes(4)),
+            'guest_email' => 'moments-note@example.test',
+            'guest_phone' => '081234567890',
+            'product_id' => $catalog['product']->id,
+            'product_package_id' => $catalog['package_id'],
+            'provider_mapping_id' => $catalog['mapping_id'],
+            'status' => 'SUCCESS',
+            'currency' => 'IDR',
+            'customer_input' => json_encode(['user_id' => '123456', 'zone_id' => '7890'], JSON_THROW_ON_ERROR),
+            'snapshot' => json_encode([
+                'product' => ['id' => $catalog['product']->id, 'name' => $catalog['product']->name, 'fulfillment_mode' => 'MANUAL'],
+                'package' => ['id' => $catalog['package_id'], 'name' => '100 Diamonds'],
+                'provider' => ['mapping_id' => $catalog['mapping_id'], 'code' => 'MANUAL', 'sku' => 'EML-SKU', 'cost_idr' => 10000, 'max_price_idr' => 12000],
+                'customer_input' => ['user_id' => '123456', 'zone_id' => '7890'],
+            ], JSON_THROW_ON_ERROR),
+            // Penyelesaian note-only: code null, note terisi. Email
+            // lama masuk cabang non-code dan note TIDAK PERNAH tampil.
+            'delivery_payload' => json_encode(['note' => 'Sudah dikirim via WA admin.'], JSON_THROW_ON_ERROR),
+            'cost_idr' => 10000,
+            'margin_idr' => 1000,
+            'discount_idr' => 0,
+            'fee_idr' => 0,
+            'total_idr' => 11000,
+            'idempotency_key' => 'email-moments-note-'.bin2hex(random_bytes(6)),
+            'paid_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        app(TransactionalEmailService::class)->queueOrderCompleted($orderId, 'manual');
+
+        Queue::assertPushed(SendTransactionalEmailJob::class, function (SendTransactionalEmailJob $job): bool {
+            return $job->recipient === 'moments-note@example.test'
+                && str_contains($job->text, 'Catatan: Sudah dikirim via WA admin.')
+                && ! str_contains($job->text, 'Kode voucher')
+                && ! str_contains($job->text, 'tukarkan sendiri');
         });
     }
 

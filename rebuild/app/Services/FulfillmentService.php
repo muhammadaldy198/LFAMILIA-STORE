@@ -427,7 +427,7 @@ class FulfillmentService
                     'order',
                     $order->id
                 );
-                $this->emails->queueOrderCompleted((int) $order->id);
+                $this->emails->queueOrderCompleted((int) $order->id, 'digiflazz');
 
                 if ($price !== null && $price > (int) ($request['max_price'] ?? PHP_INT_MAX)) {
                     // Successful delivery cannot be reversed; raise an urgent accounting alert.
@@ -633,7 +633,7 @@ class FulfillmentService
                 'order',
                 $order->id
             );
-            $this->emails->queueOrderCompleted((int) $order->id);
+            $this->emails->queueOrderCompleted((int) $order->id, 'stock');
         }, 3);
     }
 
@@ -683,7 +683,7 @@ class FulfillmentService
                 'order',
                 $order->id
             );
-            $this->emails->queueOrderCompleted((int) $order->id);
+            $this->emails->queueOrderCompleted((int) $order->id, 'manual');
         }, 3);
     }
 
