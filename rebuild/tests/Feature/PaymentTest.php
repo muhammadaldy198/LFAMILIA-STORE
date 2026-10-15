@@ -998,12 +998,14 @@ class PaymentTest extends TestCase
         $finishUrl = json_decode($snap[0]->body(), true, 512, JSON_THROW_ON_ERROR)['callbacks']['finish'] ?? null;
         $this->assertIsString($finishUrl);
 
-        // Signature valid, terikat ke invoice ini, kedaluwarsa =
-        // expires_at order.
+        // Signature is valid and invoice-bound. Unlike an email link,
+        // the provider return URL must outlive the order deadline but
+        // remain bounded by the 120-minute provider cap plus five minutes.
         $this->assertTrue(URL::hasValidSignature(Request::create($finishUrl)));
         parse_str((string) parse_url($finishUrl, PHP_URL_QUERY), $query);
         $order = DB::table('orders')->where('order_number', $orderNumber)->firstOrFail();
-        $this->assertSame((int) Carbon::parse($order->expires_at)->timestamp, (int) $query['expires']);
+        $this->assertGreaterThan((int) Carbon::parse($order->expires_at)->timestamp, (int) $query['expires']);
+        $this->assertLessThanOrEqual((int) now()->addMinutes(125)->timestamp, (int) $query['expires']);
 
         // Kembali dari gateway saat logout: BUKAN 403, halaman
         // order terlihat (Inertia 200).
