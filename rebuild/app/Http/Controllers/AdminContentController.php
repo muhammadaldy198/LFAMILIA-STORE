@@ -224,6 +224,15 @@ class AdminContentController
         return back();
     }
 
+    public function deleteReview(Request $request, ProductReview $review, AdminAuditService $audit): RedirectResponse
+    {
+        $before = $review->toArray();
+        $review->delete();
+        $audit->record($request, 'content.review.deleted', 'product_review', $review->id, $before, null);
+
+        return back();
+    }
+
     public function updatePage(Request $request, string $key, AdminAuditService $audit): RedirectResponse
     {
         abort_unless(in_array($key, ['terms', 'refund', 'privacy'], true), 404);

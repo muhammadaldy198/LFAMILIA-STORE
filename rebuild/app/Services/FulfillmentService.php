@@ -453,7 +453,7 @@ class FulfillmentService
                 DB::table('fulfillment_attempts')->where('id', $attempt->id)->update([
                     ...$common,
                     'status' => 'FAILED_CONFIRMED',
-                    'safe_to_failover' => true,
+                    'safe_to_failover' => false,
                     'last_error' => isset($response['message']) ? substr((string) $response['message'], 0, 1000) : null,
                     'completed_at' => now(),
                 ]);
@@ -464,14 +464,40 @@ class FulfillmentService
                 $this->notifications->record(
                     'fulfillment.failed',
                     'Provider mengonfirmasi gagal',
-                    'Fulfillment order '.$order->order_number.' gagal dan baru boleh failover dari state ini.',
+                    'Fulfillment order '.$order->order_number.' gagal definitif dari provider. Perlu penanganan manual.',
                     'ERROR',
                     'fulfillment_attempt',
                     $attempt->id,
                     ['order_id' => (int) $order->id]
                 );
 
-                return true;
+                // Per PRD §47: Single SKU per nominal, no auto-switch to another SKU.
+                // Mark fulfillment attempt and order as BLOCKED for manual resolution.
+                DB::table('fulfillment_attempts')->where('id', $attempt->id)->update([
+                    'status' => 'BLOCKED',
+                    'safe_to_failover' => false,
+                    'last_error' => 'Penyedia mengonfirmasi gagal. Tidak ada failover otomatis.',
+                    'updated_at' => now(),
+                ]);
+                DB::table('orders')->where('id', $order->id)->update([
+                    'status' => 'BLOCKED',
+                    'updated_at' => now(),
+                ]);
+                $this->event((int) $order->id, 'FULFILLMENT_EXHAUSTED', $order->status, 'BLOCKED', [
+                    'attempt_id' => $attempt->id,
+                    'automatic_retries_stopped' => true,
+                ]);
+                $this->notifications->record(
+                    'fulfillment.exhausted',
+                    'Pengiriman tertahan - perlu penanganan manual',
+                    'Order '.$order->order_number.' gagal pada provider. Hubungi pelanggan; refund tidak otomatis.',
+                    'ERROR',
+                    'order',
+                    $order->id
+                );
+                $this->emails->queueOrderFailed((int) $order->id);
+
+                return false;
             }
 
             $previousAttemptStatus = $attempt->status;
@@ -506,7 +532,9 @@ class FulfillmentService
             return false;
         }, 3);
 
-        if ($failover) {
+        // Automatic failover is intentionally disabled per PRD §47.
+        // Orders with FAILED_CONFIRMED remain BLOCKED for manual resolution.
+        if (false && $failover) {
             $this->failoverIfSafe($attemptId);
         }
     }

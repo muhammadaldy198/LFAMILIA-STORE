@@ -100,9 +100,9 @@ class ProductReviewController
             'rating' => (int) $data['rating'],
             'title' => filled($data['title'] ?? null) ? trim((string) $data['title']) : null,
             'body' => trim($data['body']),
-            // Moderation is required before a customer review becomes public.
-            'is_active' => false,
-            'published_at' => null,
+            // Customer review is published immediately; admin retains controls to deactivate or delete.
+            'is_active' => true,
+            'published_at' => now(),
         ]);
 
         return response()->json([

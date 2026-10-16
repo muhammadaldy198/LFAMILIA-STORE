@@ -336,6 +336,7 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
         Route::put('/admin/content/faqs/{faq}', [AdminContentController::class, 'updateFaq'])->middleware('throttle:admin-mutation')->name('admin.content.faqs.update');
         Route::delete('/admin/content/faqs/{faq}', [AdminContentController::class, 'destroyFaq'])->middleware('throttle:admin-mutation')->name('admin.content.faqs.destroy');
         Route::put('/admin/content/reviews/{review}', [AdminContentController::class, 'updateReview'])->middleware('throttle:admin-mutation')->name('admin.content.reviews.update');
+        Route::delete('/admin/content/reviews/{review}', [AdminContentController::class, 'deleteReview'])->middleware('throttle:admin-mutation')->name('admin.content.reviews.delete');
         Route::put('/admin/content/pages/{key}', [AdminContentController::class, 'updatePage'])->middleware('throttle:admin-mutation')->name('admin.content.pages.update');
 
         Route::prefix('admin/catalog')->name('admin.catalog.')->group(function (): void {

@@ -140,6 +140,12 @@ const saveReview = (item) => router.put(base + '/content/reviews/' + item.id, {
     is_active: Boolean(item.is_active),
 }, { preserveScroll: true });
 
+const deleteReview = (item) => {
+    if (confirm('Hapus ulasan ini secara permanen?')) {
+        router.delete(base + '/content/reviews/' + item.id, { preserveScroll: true });
+    }
+};
+
 const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
     title: item.title,
     intro: item.intro || '',
@@ -325,7 +331,12 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                                 <TableCell class="p-3 text-amber-500">{{'★'.repeat(item.rating)}}{{'☆'.repeat(5-item.rating)}}</TableCell>
                                 <TableCell class="max-w-[360px] p-3 text-slate-600">{{item.body}}</TableCell>
                                 <TableCell class="p-3"><label class="flex items-center gap-2"><AdminSwitch v-model="item.is_active" /> Tampil</label></TableCell>
-                                <TableCell class="p-3"><Button type="button" class="rounded bg-slate-800 px-3 py-2 text-xs font-bold text-white" @click="saveReview(item)">Simpan</Button></TableCell>
+                                <TableCell class="p-3">
+                                    <div class="flex items-center gap-2">
+                                        <Button type="button" class="rounded bg-slate-800 px-3 py-2 text-xs font-bold text-white" @click="saveReview(item)">Simpan</Button>
+                                        <Button type="button" class="rounded bg-red-50 px-3 py-2 text-xs font-bold text-red-700" @click="deleteReview(item)">Hapus</Button>
+                                    </div>
+                                </TableCell>
                             </TableRow>
                             <TableRow v-if="!reviews.length"><TableCell colspan="6" class="p-6 text-center text-slate-400">Belum ada ulasan.</TableCell></TableRow>
                         </TableBody>
