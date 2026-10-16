@@ -305,7 +305,7 @@ class FulfillmentTest extends TestCase
         $this->assertSame($firstRequest['ref_id'], $recorded[1][0]->data()['ref_id']);
     }
 
-    public function test_two_confirmed_failed_skus_block_without_sending_third_mapping(): void
+    public function test_confirmed_failure_does_not_switch_to_another_mapping(): void
     {
         Queue::fake();
         $this->credentials();
@@ -344,23 +344,21 @@ class FulfillmentTest extends TestCase
 
         $service = app(FulfillmentService::class);
         $service->startOrder($orderId);
-        $first = DB::table('fulfillment_attempts')->where('order_id', $orderId)->firstOrFail();
-        $service->sendAttempt((int) $first->id);
-        $backup = DB::table('fulfillment_attempts')->where('order_id', $orderId)
-            ->where('attempt_no', 2)->firstOrFail();
-        $this->assertSame('DF-BACKUP', DB::table('provider_mappings')
-            ->where('id', $backup->provider_mapping_id)->value('external_sku'));
-        $service->sendAttempt((int) $backup->id);
+        $attempt = DB::table('fulfillment_attempts')->where('order_id', $orderId)->firstOrFail();
+        $this->assertSame('DF-PRIMARY', DB::table('provider_mappings')
+            ->where('id', $attempt->provider_mapping_id)->value('external_sku'));
+        $service->sendAttempt((int) $attempt->id);
 
         $this->assertSame('BLOCKED', DB::table('orders')->where('id', $orderId)->value('status'));
-        $this->assertSame('BLOCKED', DB::table('fulfillment_attempts')->where('id', $backup->id)->value('status'));
-        $this->assertSame(2, DB::table('fulfillment_attempts')->where('order_id', $orderId)->count());
+        $this->assertSame('FAILED_CONFIRMED', DB::table('fulfillment_attempts')->where('id', $attempt->id)->value('status'));
+        $this->assertFalse((bool) DB::table('fulfillment_attempts')->where('id', $attempt->id)->value('safe_to_failover'));
+        $this->assertSame(1, DB::table('fulfillment_attempts')->where('order_id', $orderId)->count());
         Queue::assertPushed(SendTransactionalEmailJob::class, fn (SendTransactionalEmailJob $job): bool => $job->recipient === 'blocked@example.test'
             && str_contains($job->subject, 'gagal diproses'));
-        Http::assertSentCount(2);
+        Http::assertSentCount(1);
         $service->startOrder($orderId);
-        $service->reconcileAttempt((int) $backup->id);
-        Http::assertSentCount(2);
+        $service->reconcileAttempt((int) $attempt->id);
+        Http::assertSentCount(1);
     }
 
     public function test_uncertain_sku_uses_three_automatic_status_checks_without_failover(): void
