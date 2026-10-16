@@ -618,7 +618,11 @@ async function loadQuote() {
 
 async function openVoucherPicker() {
     if (!selectedPackage.value) {
-        errors.value = { package_id: ['Pilih nominal terlebih dahulu.'] };
+        errors.value = { ...errors.value, voucher_code: ['Pilih nominal terlebih dahulu untuk melihat voucher yang tersedia.'] };
+        const nominalEl = document.getElementById('lfx-nominal');
+        if (nominalEl) {
+            nominalEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
         return;
     }
     voucherOpen.value = true;

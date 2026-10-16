@@ -21,6 +21,21 @@ class CustomerPhoneController
         ]);
 
         $digits = preg_replace('/[^0-9]+/', '', $data['phone']) ?: null;
+
+        if ($digits !== null) {
+            $conflict = User::query()
+                ->where('id', '!=', $request->user()->id)
+                ->where(function ($query) use ($data, $digits): void {
+                    $query->where('phone', $data['phone'])
+                        ->orWhere('phone_normalized', $digits);
+                })
+                ->exists();
+
+            if ($conflict) {
+                return back()->withErrors(['phone' => 'Nomor WhatsApp sudah digunakan oleh akun lain.']);
+            }
+        }
+
         $request->user()->forceFill([
             'phone' => $data['phone'],
             'phone_normalized' => $digits,
