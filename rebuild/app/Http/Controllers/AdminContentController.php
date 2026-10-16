@@ -224,6 +224,23 @@ class AdminContentController
         return back();
     }
 
+    public function deleteReview(Request $request, ProductReview $review, AdminAuditService $audit): RedirectResponse
+    {
+        $before = $review->toArray();
+        // Tombstone deletion: blank out public fields, permanently deactivate, and preserve order_id
+        // so the customer cannot reuse the successful invoice to repost spam or abusive content.
+        $review->update([
+            'display_name' => 'Pengguna',
+            'title' => null,
+            'body' => '[Ulasan dihapus oleh admin]',
+            'is_active' => false,
+            'published_at' => null,
+        ]);
+        $audit->record($request, 'content.review.deleted', 'product_review', $review->id, $before, $review->toArray());
+
+        return back();
+    }
+
     public function updatePage(Request $request, string $key, AdminAuditService $audit): RedirectResponse
     {
         abort_unless(in_array($key, ['terms', 'refund', 'privacy'], true), 404);

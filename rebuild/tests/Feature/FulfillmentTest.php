@@ -446,7 +446,7 @@ class FulfillmentTest extends TestCase
         $this->assertSame('PROCESSING', DB::table('orders')->where('id', $orderId)->value('status'));
     }
 
-    public function test_confirmed_failure_can_failover_to_next_mapping_within_price_guard(): void
+    public function test_confirmed_failure_marks_blocked_without_automatic_failover(): void
     {
         Queue::fake();
         $this->credentials();
@@ -468,172 +468,6 @@ class FulfillmentTest extends TestCase
 
         Http::fake(function ($request) {
             $payload = $request->data();
-            $success = $payload['buyer_sku_code'] === 'DF-SECOND';
-
-            return Http::response(['data' => [
-                'ref_id' => $payload['ref_id'],
-                'customer_no' => $payload['customer_no'],
-                'buyer_sku_code' => $payload['buyer_sku_code'],
-                'message' => $success ? 'Sukses' : 'Gagal',
-                'status' => $success ? 'Sukses' : 'Gagal',
-                'rc' => $success ? '00' : '44',
-                'sn' => $success ? 'FAILOVER-SN' : '',
-                'price' => $success ? 11000 : 10000,
-            ]]);
-        });
-
-        $service = app(FulfillmentService::class);
-        $service->startOrder($orderId);
-        $first = DB::table('fulfillment_attempts')->where('order_id', $orderId)->first();
-        $service->sendAttempt((int) $first->id);
-
-        $second = DB::table('fulfillment_attempts')->where('order_id', $orderId)
-            ->where('provider_mapping_id', $secondId)->first();
-        $this->assertNotNull($second);
-        $this->assertSame('FAILED_CONFIRMED', DB::table('fulfillment_attempts')->where('id', $first->id)->value('status'));
-        $this->assertTrue((bool) DB::table('fulfillment_attempts')->where('id', $first->id)->value('safe_to_failover'));
-
-        $service->sendAttempt((int) $second->id);
-
-        $this->assertSame('SUCCESS', DB::table('orders')->where('id', $orderId)->value('status'));
-        $this->assertSame(2, DB::table('fulfillment_attempts')->where('order_id', $orderId)->count());
-    }
-
-    public function test_confirmed_failure_can_send_more_expensive_backup_with_checkout_max_price_snapshot(): void
-    {
-        Queue::fake();
-        $this->credentials();
-        $catalog = $this->automaticCatalog();
-        $providerId = DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
-        $backupId = DB::table('provider_mappings')->insertGetId([
-            'product_package_id' => $catalog['package_id'],
-            'provider_id' => $providerId,
-            'external_sku' => 'DF-EXPENSIVE-BACKUP',
-            'cost_idr' => 13000,
-            'max_price_idr' => 13000,
-            'fulfillment_config' => json_encode(['customer_no_template' => '{{user_id}}{{zone_id}}'], JSON_THROW_ON_ERROR),
-            'priority' => 2,
-            'is_active' => true,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        $this->seedCheckoutDigiflazzCatalog($catalog['package_id']);
-        $checkout = app(CheckoutPricing::class)->forPackage($catalog['package_id']);
-        $this->assertSame(13130, $checkout['max_price_idr']);
-        $this->assertSame(11000, $checkout['subtotal_idr']);
-
-        $orderId = $this->paidOrder($catalog, $checkout['max_price_idr']);
-        Http::fake(function ($request) {
-            $payload = $request->data();
-            $success = $payload['buyer_sku_code'] === 'DF-EXPENSIVE-BACKUP';
-
-            return Http::response(['data' => [
-                'ref_id' => $payload['ref_id'],
-                'customer_no' => $payload['customer_no'],
-                'buyer_sku_code' => $payload['buyer_sku_code'],
-                'status' => $success ? 'Sukses' : 'Gagal',
-                'message' => $success ? 'Sukses' : 'Gagal definitif',
-                'rc' => $success ? '00' : '44',
-                'sn' => $success ? 'BACKUP-SN' : '',
-                'price' => $success ? 13000 : 10000,
-            ]]);
-        });
-
-        $service = app(FulfillmentService::class);
-        $service->startOrder($orderId);
-        $first = DB::table('fulfillment_attempts')->where('order_id', $orderId)->firstOrFail();
-        $service->sendAttempt((int) $first->id);
-
-        $backup = DB::table('fulfillment_attempts')->where('order_id', $orderId)
-            ->where('provider_mapping_id', $backupId)->first();
-        $this->assertNotNull($backup);
-        $service->sendAttempt((int) $backup->id);
-
-        $this->assertSame('SUCCESS', DB::table('orders')->where('id', $orderId)->value('status'));
-        $this->assertSame(2, DB::table('fulfillment_attempts')->where('order_id', $orderId)->count());
-        $this->assertSame(2, count(Http::recorded()));
-        foreach (Http::recorded() as [$request]) {
-            $this->assertSame(13130, $request->data()['max_price']);
-        }
-    }
-
-    public function test_confirmed_failure_skips_unavailable_backup_before_queuing_next_safe_source(): void
-    {
-        Queue::fake();
-        $this->credentials();
-        $catalog = $this->automaticCatalog();
-        $providerId = DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
-
-        $unavailableId = DB::table('provider_mappings')->insertGetId([
-            'product_package_id' => $catalog['package_id'],
-            'provider_id' => $providerId,
-            'external_sku' => 'DF-BACKUP-OOS',
-            'cost_idr' => 10500,
-            'max_price_idr' => 12000,
-            'fulfillment_config' => json_encode(['customer_no_template' => '{{user_id}}{{zone_id}}']),
-            'priority' => 2,
-            'is_active' => true,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-        $safeId = DB::table('provider_mappings')->insertGetId([
-            'product_package_id' => $catalog['package_id'],
-            'provider_id' => $providerId,
-            'external_sku' => 'DF-BACKUP-SAFE',
-            'cost_idr' => 11000,
-            'max_price_idr' => 12000,
-            'fulfillment_config' => json_encode(['customer_no_template' => '{{user_id}}{{zone_id}}']),
-            'priority' => 3,
-            'is_active' => true,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        DB::table('digiflazz_catalog_items')->insert([
-            [
-                'buyer_sku_code' => 'DF-BACKUP-OOS',
-                'product_name' => 'Backup OOS',
-                'category' => 'Games',
-                'brand' => 'Test',
-                'type' => 'Diamonds',
-                'seller_name' => 'Seller OOS',
-                'price_idr' => 10500,
-                'baseline_price_idr' => 10500,
-                'buyer_active' => true,
-                'seller_active' => true,
-                'unlimited_stock' => false,
-                'stock' => 0,
-                'start_cut_off' => '00:00',
-                'end_cut_off' => '00:00',
-                'synced_at' => now(),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'buyer_sku_code' => 'DF-BACKUP-SAFE',
-                'product_name' => 'Backup safe',
-                'category' => 'Games',
-                'brand' => 'Test',
-                'type' => 'Diamonds',
-                'seller_name' => 'Seller Safe',
-                'price_idr' => 11000,
-                'baseline_price_idr' => 11000,
-                'buyer_active' => true,
-                'seller_active' => true,
-                'unlimited_stock' => true,
-                'stock' => 0,
-                'start_cut_off' => '00:00',
-                'end_cut_off' => '00:00',
-                'synced_at' => now(),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-        ]);
-
-        $orderId = $this->paidOrder($catalog);
-        Http::fake(function ($request) {
-            $payload = $request->data();
 
             return Http::response(['data' => [
                 'ref_id' => $payload['ref_id'],
@@ -649,22 +483,24 @@ class FulfillmentTest extends TestCase
 
         $service = app(FulfillmentService::class);
         $service->startOrder($orderId);
-        $first = DB::table('fulfillment_attempts')->where('order_id', $orderId)->firstOrFail();
+        $first = DB::table('fulfillment_attempts')->where('order_id', $orderId)->first();
         $service->sendAttempt((int) $first->id);
 
-        $this->assertSame(0, DB::table('fulfillment_attempts')
-            ->where('order_id', $orderId)
-            ->where('provider_mapping_id', $unavailableId)
-            ->count());
+        // Per PRD §47: No auto-switch to DF-SECOND. Order becomes BLOCKED and attempt remains terminal FAILED_CONFIRMED.
+        $this->assertSame(1, DB::table('fulfillment_attempts')->where('order_id', $orderId)->count());
+        $this->assertSame('FAILED_CONFIRMED', DB::table('fulfillment_attempts')->where('id', $first->id)->value('status'));
+        $this->assertSame('BLOCKED', DB::table('orders')->where('id', $orderId)->value('status'));
+        $this->assertFalse((bool) DB::table('fulfillment_attempts')->where('id', $first->id)->value('safe_to_failover'));
+    }
 
-        $next = DB::table('fulfillment_attempts')
-            ->where('order_id', $orderId)
-            ->where('provider_mapping_id', $safeId)
-            ->first();
-        $this->assertNotNull($next);
-        $this->assertSame('CREATED', $next->status);
-        $this->assertSame(2, (int) $next->attempt_no);
-        Queue::assertPushed(SendFulfillmentJob::class, fn ($job) => $job->attemptId === (int) $next->id);
+    public function test_confirmed_failure_can_send_more_expensive_backup_with_checkout_max_price_snapshot(): void
+    {
+        $this->markTestSkipped('Per PRD §47, automatic failover to another SKU is disabled.');
+    }
+
+    public function test_confirmed_failure_skips_unavailable_backup_before_queuing_next_safe_source(): void
+    {
+        $this->markTestSkipped('Per PRD §47, automatic failover to another SKU is disabled.');
     }
 
     public function test_unusable_primary_source_is_skipped_before_any_provider_send(): void

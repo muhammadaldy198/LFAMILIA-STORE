@@ -386,6 +386,7 @@ class StorefrontParityTest extends TestCase
             'order_id' => $orderId,
             'rating' => 5,
             'display_name' => 'Guest Review',
+            'is_active' => true,
         ]);
 
         $this->withSession(['guest_order_id' => $orderId])
@@ -473,6 +474,13 @@ class StorefrontParityTest extends TestCase
         ]);
 
         $this->put('/admin/content/reviews/'.$review->id, ['is_active' => false])->assertRedirect();
-        $this->assertFalse($review->fresh()->is_active);
+        $this->assertFalse((bool) $review->fresh()->is_active);
+
+        $this->delete('/admin/content/reviews/'.$review->id)->assertRedirect();
+        $this->assertDatabaseHas('product_reviews', [
+            'id' => $review->id,
+            'is_active' => false,
+            'body' => '[Ulasan dihapus oleh admin]',
+        ]);
     }
 }

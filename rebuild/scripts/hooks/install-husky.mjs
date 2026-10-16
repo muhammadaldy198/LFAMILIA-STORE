@@ -6,7 +6,7 @@ const appDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..
 const repoRoot = path.resolve(appDir, '..');
 const forceInCi = process.env.LFAMILIA_ENABLE_HOOKS === '1';
 const disabled =
-    process.env.HUSKY === '0'
+    (process.env.HUSKY === '0' && !forceInCi)
     || process.env.NODE_ENV === 'production'
     || process.env.APP_ENV === 'production'
     || (process.env.CI === 'true' && !forceInCi);
