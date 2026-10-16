@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Fortify\CreateNewUser;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,32 +19,19 @@ class CustomerPhoneController
     public function update(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'phone' => ['required', 'string', 'regex:/^\\+?[0-9]{10,16}$/'],
+            'phone' => ['required', 'string', 'regex:/^\+?[0-9]{10,16}$/'],
         ]);
 
-        $digits = preg_replace('/[^0-9]+/', '', $data['phone']) ?: null;
+        $normalized = CreateNewUser::normalizePhone($data['phone']);
 
-        if ($digits !== null) {
-            $variants = [$data['phone'], $digits];
-            if (str_starts_with($digits, '62') && strlen($digits) > 2) {
-                $local = substr($digits, 2);
-                $variants[] = '0'.$local;
-                $variants[] = $local;
-            } elseif (str_starts_with($digits, '0') && strlen($digits) > 1) {
-                $local = substr($digits, 1);
-                $variants[] = '62'.$local;
-                $variants[] = $local;
-            } elseif (str_starts_with($digits, '8')) {
-                $variants[] = '0'.$digits;
-                $variants[] = '62'.$digits;
-            }
-            $uniqueVariants = array_values(array_unique($variants));
+        if ($normalized !== null) {
+            $variants = CreateNewUser::phoneVariants($data['phone']);
 
             $conflict = User::query()
                 ->where('id', '!=', $request->user()->id)
-                ->where(function ($query) use ($uniqueVariants): void {
-                    $query->whereIn('phone', $uniqueVariants)
-                        ->orWhereIn('phone_normalized', $uniqueVariants);
+                ->where(function ($query) use ($variants): void {
+                    $query->whereIn('phone', $variants)
+                        ->orWhereIn('phone_normalized', $variants);
                 })
                 ->exists();
 
@@ -54,7 +42,7 @@ class CustomerPhoneController
 
         $request->user()->forceFill([
             'phone' => $data['phone'],
-            'phone_normalized' => $digits,
+            'phone_normalized' => $normalized,
         ])->save();
 
         $request->session()->forget([

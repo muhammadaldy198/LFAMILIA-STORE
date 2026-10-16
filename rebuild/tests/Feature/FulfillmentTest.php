@@ -9,7 +9,6 @@ use App\Jobs\StartFulfillmentJob;
 use App\Models\Category;
 use App\Models\IntegrationCredential;
 use App\Models\Product;
-use App\Services\CheckoutPricing;
 use App\Services\DigiflazzAutoSources;
 use App\Services\FulfillmentService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;

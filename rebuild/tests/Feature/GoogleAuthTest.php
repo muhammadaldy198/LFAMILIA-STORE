@@ -144,7 +144,7 @@ class GoogleAuthTest extends TestCase
             'name' => 'Existing Phone Owner',
             'email' => 'phone-owner@example.test',
             'phone' => '081234567890',
-            'phone_normalized' => '081234567890',
+            'phone_normalized' => '81234567890',
             'password' => Hash::make('password123'),
         ]);
 
@@ -166,6 +166,36 @@ class GoogleAuthTest extends TestCase
             ->put('/account/phone', ['phone' => '6281234567890'])
             ->assertSessionHasErrors('phone');
 
+        // Bare digits without prefix (81...)
+        $this->actingAs($newUser, 'web')
+            ->withSession(['auth.password_confirmed_at' => time()])
+            ->put('/account/phone', ['phone' => '81234567890'])
+            ->assertSessionHasErrors('phone');
+
         $this->assertNull($newUser->fresh()->phone);
+    }
+
+    public function test_registration_rejects_phone_already_taken_by_another_account(): void
+    {
+        User::create([
+            'name' => 'Original Owner',
+            'email' => 'original-owner@example.test',
+            'phone' => '081234567890',
+            'phone_normalized' => '81234567890',
+            'password' => Hash::make('password-strong-123'),
+            'membership_tier_code' => 'BASIC',
+        ]);
+
+        // Same number via 62... prefix — registration must reject it
+        $response = $this->post('/register', [
+            'name' => 'Duplicate Registrant',
+            'email' => 'new-registrant@example.test',
+            'phone' => '6281234567890',
+            'password' => 'strong-password-123',
+            'password_confirmation' => 'strong-password-123',
+        ]);
+
+        $response->assertSessionHasErrors('phone');
+        $this->assertNull(User::where('email', 'new-registrant@example.test')->first());
     }
 }

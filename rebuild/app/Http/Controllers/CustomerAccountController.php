@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Fortify\CreateNewUser;
 use App\Models\MembershipTier;
 use App\Models\Product;
 use App\Models\User;
@@ -63,28 +64,15 @@ class CustomerAccountController
             throw ValidationException::withMessages(['current_password' => 'Kata sandi saat ini salah.']);
         }
 
-        $digits = preg_replace('/[^0-9]+/', '', $data['phone']) ?: null;
-        if ($digits !== null) {
-            $variants = [$data['phone'], $digits];
-            if (str_starts_with($digits, '62') && strlen($digits) > 2) {
-                $local = substr($digits, 2);
-                $variants[] = '0'.$local;
-                $variants[] = $local;
-            } elseif (str_starts_with($digits, '0') && strlen($digits) > 1) {
-                $local = substr($digits, 1);
-                $variants[] = '62'.$local;
-                $variants[] = $local;
-            } elseif (str_starts_with($digits, '8')) {
-                $variants[] = '0'.$digits;
-                $variants[] = '62'.$digits;
-            }
-            $uniqueVariants = array_values(array_unique($variants));
+        $normalized = CreateNewUser::normalizePhone($data['phone']);
+        if ($normalized !== null) {
+            $variants = CreateNewUser::phoneVariants($data['phone']);
 
             $conflict = User::query()
                 ->where('id', '!=', $user->id)
-                ->where(function ($query) use ($uniqueVariants): void {
-                    $query->whereIn('phone', $uniqueVariants)
-                        ->orWhereIn('phone_normalized', $uniqueVariants);
+                ->where(function ($query) use ($variants): void {
+                    $query->whereIn('phone', $variants)
+                        ->orWhereIn('phone_normalized', $variants);
                 })
                 ->exists();
 
@@ -98,7 +86,7 @@ class CustomerAccountController
             'name' => $data['name'],
             'email' => $email,
             'phone' => $data['phone'],
-            'phone_normalized' => preg_replace('/[^0-9]+/', '', $data['phone']) ?: null,
+            'phone_normalized' => $normalized,
             'leaderboard_opt_in' => array_key_exists('leaderboard_opt_in', $data)
                 ? (bool) $data['leaderboard_opt_in']
                 : (bool) $user->leaderboard_opt_in,
