@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\MembershipTier;
 use App\Models\Product;
+use App\Models\User;
 use App\Models\Wallet;
 use App\Services\CustomerAccountDeletion;
 use App\Services\MembershipService;
@@ -60,6 +61,36 @@ class CustomerAccountController
             && (! isset($data['current_password'])
                 || ! Hash::check($data['current_password'], $user->password))) {
             throw ValidationException::withMessages(['current_password' => 'Kata sandi saat ini salah.']);
+        }
+
+        $digits = preg_replace('/[^0-9]+/', '', $data['phone']) ?: null;
+        if ($digits !== null) {
+            $variants = [$data['phone'], $digits];
+            if (str_starts_with($digits, '62') && strlen($digits) > 2) {
+                $local = substr($digits, 2);
+                $variants[] = '0'.$local;
+                $variants[] = $local;
+            } elseif (str_starts_with($digits, '0') && strlen($digits) > 1) {
+                $local = substr($digits, 1);
+                $variants[] = '62'.$local;
+                $variants[] = $local;
+            } elseif (str_starts_with($digits, '8')) {
+                $variants[] = '0'.$digits;
+                $variants[] = '62'.$digits;
+            }
+            $uniqueVariants = array_values(array_unique($variants));
+
+            $conflict = User::query()
+                ->where('id', '!=', $user->id)
+                ->where(function ($query) use ($uniqueVariants): void {
+                    $query->whereIn('phone', $uniqueVariants)
+                        ->orWhereIn('phone_normalized', $uniqueVariants);
+                })
+                ->exists();
+
+            if ($conflict) {
+                throw ValidationException::withMessages(['phone' => 'Nomor WhatsApp sudah digunakan oleh akun lain.']);
+            }
         }
 
         $oldEmail = $user->email;

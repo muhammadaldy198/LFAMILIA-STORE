@@ -137,4 +137,35 @@ class GoogleAuthTest extends TestCase
             ->assertRedirect(route('password.confirm'));
         $this->assertSame('081234567890', $user->fresh()->phone);
     }
+
+    public function test_cannot_use_phone_number_already_taken_by_another_user(): void
+    {
+        User::create([
+            'name' => 'Existing Phone Owner',
+            'email' => 'phone-owner@example.test',
+            'phone' => '081234567890',
+            'phone_normalized' => '081234567890',
+            'password' => Hash::make('password123'),
+        ]);
+
+        $newUser = User::create([
+            'name' => 'New User',
+            'email' => 'new-user@example.test',
+            'password' => Hash::make('password123'),
+        ]);
+
+        // Same raw phone
+        $this->actingAs($newUser, 'web')
+            ->withSession(['auth.password_confirmed_at' => time()])
+            ->put('/account/phone', ['phone' => '081234567890'])
+            ->assertSessionHasErrors('phone');
+
+        // Equivalent Indonesian format (62...)
+        $this->actingAs($newUser, 'web')
+            ->withSession(['auth.password_confirmed_at' => time()])
+            ->put('/account/phone', ['phone' => '6281234567890'])
+            ->assertSessionHasErrors('phone');
+
+        $this->assertNull($newUser->fresh()->phone);
+    }
 }
