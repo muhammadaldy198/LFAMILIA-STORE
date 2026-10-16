@@ -486,9 +486,9 @@ class FulfillmentTest extends TestCase
         $first = DB::table('fulfillment_attempts')->where('order_id', $orderId)->first();
         $service->sendAttempt((int) $first->id);
 
-        // Per PRD §47: No auto-switch to DF-SECOND. Order and attempt become BLOCKED.
+        // Per PRD §47: No auto-switch to DF-SECOND. Order becomes BLOCKED and attempt remains terminal FAILED_CONFIRMED.
         $this->assertSame(1, DB::table('fulfillment_attempts')->where('order_id', $orderId)->count());
-        $this->assertSame('BLOCKED', DB::table('fulfillment_attempts')->where('id', $first->id)->value('status'));
+        $this->assertSame('FAILED_CONFIRMED', DB::table('fulfillment_attempts')->where('id', $first->id)->value('status'));
         $this->assertSame('BLOCKED', DB::table('orders')->where('id', $orderId)->value('status'));
         $this->assertFalse((bool) DB::table('fulfillment_attempts')->where('id', $first->id)->value('safe_to_failover'));
     }

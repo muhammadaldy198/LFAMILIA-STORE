@@ -472,13 +472,7 @@ class FulfillmentService
                 );
 
                 // Per PRD §47: Single SKU per nominal, no auto-switch to another SKU.
-                // Mark fulfillment attempt and order as BLOCKED for manual resolution.
-                DB::table('fulfillment_attempts')->where('id', $attempt->id)->update([
-                    'status' => 'BLOCKED',
-                    'safe_to_failover' => false,
-                    'last_error' => 'Penyedia mengonfirmasi gagal. Tidak ada failover otomatis.',
-                    'updated_at' => now(),
-                ]);
+                // Keep the attempt terminal state as FAILED_CONFIRMED, but mark the order as BLOCKED.
                 DB::table('orders')->where('id', $order->id)->update([
                     'status' => 'BLOCKED',
                     'updated_at' => now(),

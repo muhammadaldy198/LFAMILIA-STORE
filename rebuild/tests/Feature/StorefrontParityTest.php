@@ -477,6 +477,10 @@ class StorefrontParityTest extends TestCase
         $this->assertFalse((bool) $review->fresh()->is_active);
 
         $this->delete('/admin/content/reviews/'.$review->id)->assertRedirect();
-        $this->assertDatabaseMissing('product_reviews', ['id' => $review->id]);
+        $this->assertDatabaseHas('product_reviews', [
+            'id' => $review->id,
+            'is_active' => false,
+            'body' => '[Ulasan dihapus oleh admin]',
+        ]);
     }
 }
