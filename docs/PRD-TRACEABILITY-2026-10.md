@@ -158,9 +158,9 @@ Temuan F-01/F-02 **telah dibereskan** dalam PR #279 (baseline `780e9dc`), sehing
 ### §17 Pricing & Snapshot
 | Status | Keterangan |
 |---|---|
-| IMPLEMENTED | Formula modal + margin + fee = harga final. Margin per produk (%) → configurable. Fee gateway dibebankan ke customer. Kalkulasi final dilakukan backend. Snapshot disimpan saat order (modal, margin, discount, fee, total, provider, package, customer input). Harga order tidak berubah setelah dibuat. `max_price` berhentikan fulfillment otomatis. **ML = modal × 1,06 tanpa pembulatan** (§47). Harga jual game lain **belum diputuskan** — jangan diciptakan. |
+| PARTIAL / UNVERIFIED (untuk ML ×1,06) | Formula modal + margin + fee = harga final. Margin per produk (%) configurable. Fee gateway dibebankan ke customer. Kalkulasi final backend. Snapshot disimpan (modal, margin, discount, fee, total, provider, package, customer input). Harga order tidak berubah setelah dibuat. `max_price` menghentikan fulfillment. **Temuan:** keputusan §47 "**ML = modal × 1,06 tanpa pembulatan**" **belum terbukti diimplementasikan**: `CheckoutPricing::margin()` menerapkan `margin_percent`/`margin_fixed`/`sell_price` apa pun yang dikonfigurasi (bukan memaksa 6% untuk ML), `DigiflazzFixedPricePolicy::fixedPriceFromCost()` generik dan membulatkan hasil ke integer, dan tidak ada kode/seed yang mengidentifikasi produk ML lalu memaksa `cost × 1.06`. Sehingga kode hanya membuktikan 6% **bisa** dikonfigurasi, bukan invariant ML di-enforce. Harga jual game lain belum diputuskan — jangan diciptakan. |
 
-*Bukti:* `database/migrations/2026_09_29_000002_create_commerce_tables.php` (kolom `snapshot` JSON + `customer_input`); `app/Services/CheckoutPricing.php`; `app/Services/DigiflazzFixedPricePolicy.php` (max_price cost comparator); `app/Services/AdminPricingPreviewService.php` (preview max price). **Note:** harga lengkap non-ML ditunda ke pembahasan produk — bukan GAP, keputusan sadar.
+*Bukti:* `database/migrations/2026_09_29_000002_create_commerce_tables.php` (kolom `snapshot` JSON + `customer_input`); `app/Services/CheckoutPricing.php:246-254` (margin dari `pricing_mode` generic); `app/Services/DigiflazzFixedPricePolicy.php:13-31` (`fixedPriceFromCost` generic + `intdiv` rounding); `app/Services/AdminPricingPreviewService.php` (preview max price). **Aksi:** verifikasi konfigurasi margin ML di produksi ATAU enforce & test invariant `cost × 1,06`; tidak diubah pada PR-C (dokumen). Note: harga lengkap non-ML ditunda ke pembahasan produk.
 
 ### §18 Voucher
 | Status | Keterangan |
@@ -312,9 +312,9 @@ Temuan F-01/F-02 **telah dibereskan** dalam PR #279 (baseline `780e9dc`), sehing
 ### §39 Main Branch Policy
 | Status | Keterangan |
 |---|---|
-| IMPLEMENTED | main selalu deployable. Merge ditolak bila build, automated tests, migration validation, lint/type check, atau critical security checks gagal. |
+| POLICY (bukan enforcement) / UNVERIFIED | main selalu deployable. Merge ditolak bila build, automated tests, migration validation, lint/type check, atau critical security checks gagal. **Temuan:** ini adalah **aturan prosedural** (`AGENTS.md` §4 + CI workflow), BUKAN enforcement GitHub yang terbukti. `validate-rebuild.yml` mendefinisikan job/trigger, tetapi **tidak ada ruleset/branch-protection yang memverifikasi** bahwa check gagal benar-benar menolak merge. Pemeriksaan GitHub API `GET /branches/main/protection` → `404 Branch not protected`, sehingga maintainer masih bisa merge perubahan yang gagal check. |
 
-*Bukti:* `.github/workflows/validate-rebuild.yml` (required checks — lint, phpunit, build, audit, hooks); `AGENTS.md` §4; merge dengan failing checks diblokir.
+*Bukti:* `.github/workflows/validate-rebuild.yml` (jobs & trigger, tanpa ruleset); `AGENTS.md` §4 (prosedur); `gh api repos/.../branches/main/protection` → 404 (tidak diproteksi). **Aksi:** aktifkan required status checks di branch protection `main`, atau tandai sebagai policy yang belum di-enforce; tidak diubah pada PR-C (dokumen).
 
 ### §40 Milestone Pembangunan
 | Status | Keterangan |
