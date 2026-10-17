@@ -216,7 +216,7 @@ Temuan F-01/F-02 **telah dibereskan** dalam PR #279 (baseline `780e9dc`), sehing
 |---|---|
 | IMPLEMENTED | 18 menu: Dashboard, Pesanan, Produk, Manual, Banner & Konten, Digiflazz, Provider, Pembayaran, Pelanggan, Promo, Layanan Pelanggan, Laporan, Admin & Akses, Pengaturan, Integrasi, System Health, Audit Log, **Validasi Akun** (addendum §47). |
 
-*Bukti:* Route admin (`routes/web.php` grup `admin`): `/admin/health`, `/admin/digiflazz`, `/admin/nickname-tools`, `/admin/provider`, `/admin/content/reviews`, dst. Menu "Validasi Akun" = AccountValidationConfig + `AdminDigiflazzController`/`AdminNicknameToolsService`.
+*Bukti:* Route admin (`routes/web.php` grup `admin`): `/admin/health`, `/admin/digiflazz`, `/admin/nickname-tools`, `/admin/providers` (`AdminProviderController`, baris 361-362), `/admin/content/reviews`, dst. Menu "Validasi Akun" = AccountValidationConfig + `AdminDigiflazzController`/`AdminNicknameToolsService`.
 
 ### §26 Audit Log
 | Status | Keterangan |
@@ -244,7 +244,7 @@ Temuan F-01/F-02 **telah dibereskan** dalam PR #279 (baseline `780e9dc`), sehing
 |---|---|
 | PARTIAL / GAP (untuk event refund) | Provider: **Resend**. Email via queue untuk verification, reset password, payment success (confirmed), transaction success (completed), support ticket, security notification. **GAP:** PRD §29 mencantumkan event "refund", tetapi `TransactionalEmailService` **tidak punya metode email refund** — `queueOrderFailed()` berkomentar "refund — topik refund ditutup, tindak lanjut lewat CS", dan cabang refund di `PaymentStateService` hanya membuat notifikasi admin, bukan email. Ini konsisten dengan kebijakan no-refund (§13/§47) yang menghapus jalur refund; PRD event refund dianggap digantikan keputusan pasca-PRD. `MAIL_MAILER=log` di `.env.example` — provider produksi belum diverifikasi. |
 
-*Bukti:* `app/Services/TransactionalEmailService.php:51,105,165,233` (`queueOrderCreated`/`queuePaymentConfirmed`/`queueOrderCompleted`/`queueOrderFailed`); `app/Services/PaymentStateService.php:281-298,388-412` (cabang refund = notifikasi admin saja); `config/mail.php`; `.env.example:36`. **Catatan:** kekurangan email refund tidak dianggap bug karena no-refund; tetap dicatat sebagai gap terhadap teks PRD §29 secara literal.
+*Bukti:* `app/Jobs/SendTransactionalEmailJob.php:28,35` (fetch kredensial `IntegrationCredential` code `resend`, POST `https://api.resend.com/emails`); `app/Services/TransactionalEmailService.php:51,105,165,233` (`queueOrderCreated`/`queuePaymentConfirmed`/`queueOrderCompleted`/`queueOrderFailed`); `app/Services/PaymentStateService.php:281-298,388-412` (cabang refund = notifikasi admin saja); `.env.example:36` (`MAIL_MAILER=log` — tanpa `config/mail.php` ter-commit; pengiriman Resend via job + kredensial). **Catatan:** kekurangan email refund tidak dianggap bug karena no-refund; tetap dicatat sebagai gap terhadap teks PRD §29 secara literal.
 
 ### §30 Infrastruktur VPS & CloudPanel
 | Status | Keterangan |
@@ -319,9 +319,9 @@ Temuan F-01/F-02 **telah dibereskan** dalam PR #279 (baseline `780e9dc`), sehing
 ### §40 Milestone Pembangunan
 | Status | Keterangan |
 |---|---|
-| IMPLEMENTED M1–M11, PARTIAL M12–M13 | M1 Foundation … M11 Testing tercapai. **M12 Deployment = PARTIAL:** PRD §40 mencakup backup dalam M12, tetapi §35 masih mencatat external storage sebagai gap (F-07) dan §41 membiarkan automatic backup + periodic restore-test belum tercentang; migration/asset/deploy scripts saja belum membuktikan M12 penuh. **M13 Acceptance = PARTIAL** (uji E2E sandbox ditunda ke terakhir — addendum §47). |
+| PARTIAL M1–M11, PARTIAL M12–M13 | Milestone belum bisa diklaim penuh karena matriks ini sendiri menandai sub-requirement yang masih gap di **M5** (multi-SKU Digiflazz, §5), **M6** (harga ML ×1,06 belum di-enforce, §17), dan **M10** (controlled secret reveal, §33). Hingga gap tiap milestone dibereskan, milestone terkait dicatat **PARTIAL**. **M12 Deployment = PARTIAL:** §40 mencakup backup dalam M12, tetapi §35 masih mencatat external storage sebagai gap (F-07) dan §41 membiarkan automatic backup + periodic restore-test belum tercentang; migration/asset/deploy scripts saja belum membuktikan M12 penuh. **M13 Acceptance = PARTIAL** (uji E2E sandbox ditunda ke terakhir — addendum §47). |
 
-*Bukti:* Baseline main ter-validasi CI (foundation + frontend-static). Migration/asset/schema ada (M12); deploy scripts (`deploy/*.sh`, systemd units) ada. Gap backup: F-07; E2E sandbox belum dijalankan penuh (M13).
+*Bukti:* Baseline main ter-validasi CI (foundation + frontend-static). Migration/asset/schema ada (M12); deploy scripts (`deploy/*.sh`, systemd units) ada. Gap: M5 (§5 multi-SKU), M6 (§17 ML pricing), M10 (§33 no-reveal); backup F-07; E2E sandbox belum dijalankan penuh (M13).
 
 ### §41 Definition of Done
 | Status | Keterangan |
