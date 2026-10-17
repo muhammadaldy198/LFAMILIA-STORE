@@ -46,7 +46,9 @@ function selectPhoneCountry(country) {
     phoneCountrySearch.value = '';
     if (guestPhone.value.startsWith('+')) {
         const digits = guestPhone.value.replace(/\D/g, '');
-        guestPhone.value = digits.startsWith(country.dial) ? digits.slice(country.dial.length) : digits;
+        if (digits.startsWith(country.dial)) {
+            guestPhone.value = digits.slice(country.dial.length);
+        }
     }
 }
 function phoneWithCountryCode(value = guestPhone.value) {
@@ -55,10 +57,13 @@ function phoneWithCountryCode(value = guestPhone.value) {
     // ditambahi kode negara lagi, cukup tampilkan apa adanya.
     if (props.customer) return raw;
     let local = raw.replace(/\D/g, '');
-    if (local.startsWith(phoneCountry.value.dial) && local.length > phoneCountry.value.dial.length + 6) {
-        local = local.slice(phoneCountry.value.dial.length);
+    if (!local) return '';
+
+    // Hanya buang leading zero untuk Indonesia (dial 62)
+    if (phoneCountry.value.dial === '62' && local.startsWith('0')) {
+        local = local.replace(/^0+/, '');
     }
-    local = local.replace(/^0+/, '');
+
     return local ? `+${phoneCountry.value.dial}${local}` : '';
 }
 const voucherCode = ref('');

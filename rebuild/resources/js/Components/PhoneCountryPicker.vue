@@ -20,46 +20,57 @@ let lastEmitted = null;
 const flag = (item) => String.fromCodePoint(...item.iso.toUpperCase().split('').map((char) => 127397 + char.charCodeAt(0)));
 const filtered = computed(() => phoneCountries.filter((item) => `${item.name} +${item.dial}`.toLowerCase().includes(search.value.trim().toLowerCase())));
 
-/** Nomor yang dikirim: kode negara terpilih + nomor lokal tanpa nol depan. */
+/** Nomor yang dikirim: kode negara terpilih + nomor lokal.
+ * Hanya buang leading zero untuk negara yang secara format membuang nol lokal (seperti Indonesia).
+ * Untuk negara yang mempertahankan 0 (seperti Italia +39), angka 0 dipertahankan.
+ * Tidak memotong digit lokal yang kebetulan sama dengan dial code.
+ */
 const composed = computed(() => {
     let digits = local.value.replace(/\D/g, '');
-    if (digits.length > country.value.dial.length + 6 && digits.startsWith(country.value.dial)) {
-        digits = digits.slice(country.value.dial.length);
+    if (!digits) return '';
+
+    // Untuk Indonesia (dial 62), jika user mengetik 0812..., strip angka 0 pembuka
+    if (country.value.dial === '62' && digits.startsWith('0')) {
+        digits = digits.replace(/^0+/, '');
     }
-    digits = digits.replace(/^0+/, '');
+
     return digits ? `+${country.value.dial}${digits}` : '';
 });
 
 /** Pecah nomor tersimpan menjadi negara + nomor lokal. */
 function hydrate(value) {
-    const text = String(value || '');
-    const digits = text.replace(/\D/g, '');
-    if (!digits) {
+    const text = String(value || '').trim();
+    if (!text) {
         country.value = phoneCountries[0];
         local.value = '';
         return;
     }
 
-    if (text.trim().startsWith('+')) {
+    const digits = text.replace(/\D/g, '');
+
+    // Format eksplisit internasional dengan awalan +
+    if (text.startsWith('+')) {
         const match = [...phoneCountries]
             .sort((a, b) => b.dial.length - a.dial.length)
             .find((item) => digits.startsWith(item.dial));
-        country.value = match || phoneCountries[0];
-        local.value = match ? digits.slice(match.dial.length) : digits;
-        emitValue();
-        return;
+        if (match) {
+            country.value = match;
+            local.value = digits.slice(match.dial.length);
+            emitValue();
+            return;
+        }
     }
 
+    // Default Indonesia: jika berawalan 62 atau 0
     const indonesia = phoneCountries[0];
-    if ((digits.startsWith('62') || digits.startsWith('0')) && digits.length > indonesia.dial.length + 6) {
-        country.value = indonesia;
-        local.value = digits.startsWith('62') ? digits.slice(2) : digits.slice(1);
-        emitValue();
-        return;
-    }
-
     country.value = indonesia;
-    local.value = digits;
+    if (digits.startsWith('62') && digits.length >= 10) {
+        local.value = digits.slice(2);
+    } else if (digits.startsWith('0')) {
+        local.value = digits.slice(1);
+    } else {
+        local.value = digits;
+    }
     emitValue();
 }
 

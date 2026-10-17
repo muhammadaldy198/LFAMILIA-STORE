@@ -40,6 +40,11 @@ class CustomerPhoneController
             ])->save();
         } catch (QueryException $exception) {
             if (($exception->errorInfo[1] ?? null) === 1062) {
+                $message = $exception->getMessage();
+                if (str_contains($message, 'users_email_unique') || str_contains($message, 'email')) {
+                    return back()->withErrors(['email' => 'Email sudah digunakan oleh akun lain.']);
+                }
+
                 return back()->withErrors(['phone' => 'Nomor WhatsApp sudah digunakan oleh akun lain.']);
             }
 

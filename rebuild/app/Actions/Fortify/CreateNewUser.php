@@ -15,12 +15,12 @@ use Laravel\Fortify\Contracts\CreatesNewUsers;
 class CreateNewUser implements CreatesNewUsers
 {
     /**
-     * Bentuk kanonik nomor telepon: digit saja.
+     * Bentuk kanonik nomor telepon dalam format digit internasional (E.164 tanpa +).
      *
-     * Nomor Indonesia (0812…, 62812…, 812…) dipetakan ke bentuk lokal 8…,
-     * sedangkan nomor negara lain dipertahankan lengkap bersama kode
-     * negaranya (contoh +1 5551234567 -> 15551234567) supaya pemilik nomor
-     * dari semua negara tetap bisa didaftarkan dan tetap unik.
+     * Nomor Indonesia (0812…, 62812…, 812…) dipetakan ke bentuk kanonik 62812…,
+     * sedangkan nomor internasional lain tetap membawa kode negaranya lengkap
+     * (contoh +1 5551234567 -> 15551234567, +81 23456789 -> 8123456789).
+     * Dengan demikian, namespace telepon antar-negara tidak bertabrakan di database.
      */
     public static function normalizePhone(string $phone): ?string
     {
@@ -29,12 +29,19 @@ class CreateNewUser implements CreatesNewUsers
             return null;
         }
 
-        if (str_starts_with($digits, '62') && strlen($digits) > 2) {
-            return substr($digits, 2);
+        // Jika input diawali tanda + eksplisit, nomor sudah membawa kode negara internasional
+        // sehingga jangan perlakukan sebagai awalan lokal Indonesia 8...
+        if (str_starts_with(trim($phone), '+')) {
+            return $digits;
         }
 
+        // Variasi lokal Indonesia (tanpa tanda +):
+        // 0812... -> 62812...
+        // 812...  -> 62812...
         if (str_starts_with($digits, '0') && strlen($digits) > 1) {
-            return substr($digits, 1);
+            $digits = '62'.substr($digits, 1);
+        } elseif (str_starts_with($digits, '8') && strlen($digits) >= 8 && strlen($digits) <= 13) {
+            $digits = '62'.$digits;
         }
 
         return $digits;
@@ -120,6 +127,11 @@ class CreateNewUser implements CreatesNewUsers
             ]));
         } catch (QueryException $exception) {
             if (($exception->errorInfo[1] ?? null) === 1062) {
+                $message = $exception->getMessage();
+                if (str_contains($message, 'users_email_unique') || str_contains($message, 'email')) {
+                    throw ValidationException::withMessages(['email' => 'Email sudah digunakan oleh akun lain.']);
+                }
+
                 throw ValidationException::withMessages(['phone' => 'Nomor WhatsApp sudah digunakan oleh akun lain.']);
             }
 

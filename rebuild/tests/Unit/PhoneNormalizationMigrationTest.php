@@ -45,6 +45,13 @@ class PhoneNormalizationMigrationTest extends TestCase
         $this->assertSame(CreateNewUser::normalizePhone('+62 813 0000 1111'), DB::table($this->migrationTable)->where('id', 2)->value('phone_normalized'));
         $this->assertNull(DB::table($this->migrationTable)->where('id', 3)->value('phone_normalized'));
         $this->assertNotFalse(collect(Schema::getIndexes($this->migrationTable))->firstWhere('name', $this->migrationTable.'_phone_normalized_unique'));
+
+        $this->assertSame('6281234567890', CreateNewUser::normalizePhone('081234567890'));
+        $this->assertSame('6281234567890', CreateNewUser::normalizePhone('+62 81234567890'));
+        $this->assertSame('6281234567890', CreateNewUser::normalizePhone('81234567890'));
+        $this->assertSame('15551234567', CreateNewUser::normalizePhone('+1 555-123-4567'));
+        $this->assertSame('8123456789', CreateNewUser::normalizePhone('+81 23456789'));
+        $this->assertSame('390612345678', CreateNewUser::normalizePhone('+39 0612345678'));
     }
 
     public function test_migration_aborts_on_duplicate_phones_without_deleting_or_merging_users(): void
@@ -63,15 +70,17 @@ class PhoneNormalizationMigrationTest extends TestCase
 
         $this->assertSame(2, DB::table($this->migrationTable)->count());
         $this->assertSame([
-            CreateNewUser::normalizePhone('081234567890'),
-            CreateNewUser::normalizePhone('+62 81234567890'),
+            '6281234567890',
+            '6281234567890',
         ], DB::table($this->migrationTable)->orderBy('id')->pluck('phone_normalized')->all());
     }
 
     private function runMigrationForTable(): void
     {
-        $file = file_get_contents(database_path('migrations/2026_10_16_000001_unique_phone_normalized_on_users.php'));
-        $source = str_replace("'users'", var_export($this->migrationTable, true), $file);
+        $file = database_path('migrations/2026_10_16_000001_unique_phone_normalized_on_users.php');
+        $source = file_get_contents($file);
+        $source = str_replace("from('users')", "from('{$this->migrationTable}')", $source);
+        $source = str_replace("table('users'", "table('{$this->migrationTable}'", $source);
         $path = tempnam(sys_get_temp_dir(), 'phone-migration-');
         file_put_contents($path, $source);
 

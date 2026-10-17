@@ -146,7 +146,7 @@ class GoogleAuthTest extends TestCase
             'name' => 'Existing Phone Owner',
             'email' => 'phone-owner@example.test',
             'phone' => '081234567890',
-            'phone_normalized' => '81234567890',
+            'phone_normalized' => '6281234567890',
             'password' => Hash::make('password123'),
         ]);
 
@@ -183,7 +183,7 @@ class GoogleAuthTest extends TestCase
             'name' => 'Original Owner',
             'email' => 'original-owner@example.test',
             'phone' => '081234567890',
-            'phone_normalized' => '81234567890',
+            'phone_normalized' => '6281234567890',
             'password' => Hash::make('password-strong-123'),
             'membership_tier_code' => 'BASIC',
         ]);
