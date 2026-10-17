@@ -5,10 +5,10 @@
  * Catatan E.164:
  * Mayoritas negara menggunakan trunk prefix '0' untuk panggilan domestik yang HARUS
  * dibuang saat format internasional (misal: ID 0812->+62812, UK 0712->+44712, AU 0412->+61412).
- * Hanya segelintir negara (seperti Italia IT/Vatican VA/San Marino SM dial 39) yang
- * mempertahankan angka 0 pembuka pada format internasional (+39 06...).
+ * Hanya segelintir negara (Italia IT dial 39, San Marino SM dial 378) yang
+ * mempertahankan angka 0 pembuka pada format internasional (+39 06..., +378 0549...).
  */
-export const LEADING_ZERO_PRESERVED_DIALS = new Set(['39']);
+export const LEADING_ZERO_PRESERVED_DIALS = new Set(['39', '378']);
 export const phoneCountries = [
     { name: 'Indonesia', iso: 'id', dial: '62' },
     { name: 'Afghanistan', iso: 'af', dial: '93' }, { name: 'Albania', iso: 'al', dial: '355' },

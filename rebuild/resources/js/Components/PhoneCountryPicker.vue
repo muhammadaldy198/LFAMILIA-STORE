@@ -36,6 +36,13 @@ const composed = computed(() => {
     return digits ? `+${country.value.dial}${digits}` : '';
 });
 
+/** Deteksi negara dari digit berawalan dial code terpanjang (untuk nomor '+...' atau bare internasional). */
+function matchCountryForDigits(digits) {
+    return [...phoneCountries]
+        .sort((a, b) => b.dial.length - a.dial.length)
+        .find((item) => digits.startsWith(item.dial));
+}
+
 /** Pecah nomor tersimpan menjadi negara + nomor lokal. */
 function hydrate(value) {
     const text = String(value || '').trim();
@@ -49,9 +56,7 @@ function hydrate(value) {
 
     // Format eksplisit internasional dengan awalan +
     if (text.startsWith('+')) {
-        const match = [...phoneCountries]
-            .sort((a, b) => b.dial.length - a.dial.length)
-            .find((item) => digits.startsWith(item.dial));
+        const match = matchCountryForDigits(digits);
         if (match) {
             country.value = match;
             local.value = digits.slice(match.dial.length);
@@ -60,17 +65,30 @@ function hydrate(value) {
         }
     }
 
-    // Default Indonesia: jika berawalan 62 atau 0
-    const indonesia = phoneCountries[0];
-    country.value = indonesia;
-    if (digits.startsWith('62') && digits.length >= 10) {
-        local.value = digits.slice(2);
-    } else if (digits.startsWith('0')) {
-        local.value = digits.slice(1);
-    } else {
-        local.value = digits;
+    // Nomor Indonesia canonical +62 / lokal 0 handled secara eksplisit
+    if ((digits.startsWith('62') && digits.length >= 10) || digits.startsWith('0')) {
+        const indonesia = phoneCountries[0];
+        country.value = indonesia;
+        local.value = digits.startsWith('62') ? digits.slice(2) : digits.slice(1);
+        emitValue();
+        return;
     }
-    emitValue();
+
+    // Nomor internasional polos (tanpa '+') yang disimpan oleh normalizePhone(),
+    // mis. nomor Jepang +81 -> 81223456789. Coba infer negara dari dial code:
+    // di sini nilai yang seharusnya dipertahankan dan tidak di-rewrite ke +62... di mount.
+    const bareMatch = matchCountryForDigits(digits);
+    if (bareMatch) {
+        country.value = bareMatch;
+        local.value = digits.slice(bareMatch.dial.length);
+        emitValue();
+        return;
+    }
+
+    // Tidak teridentifikasi: tampilkan apa adanya, JANGAN emit agar nilai asli
+    // di parent tidak di-rewrite membabi buta.
+    country.value = phoneCountries[0];
+    local.value = digits;
 }
 
 function emitValue() {
