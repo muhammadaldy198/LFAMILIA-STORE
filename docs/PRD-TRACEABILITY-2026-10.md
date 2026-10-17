@@ -221,9 +221,9 @@ Temuan F-01/F-02 **telah dibereskan** dalam PR #279 (baseline `780e9dc`), sehing
 ### §26 Audit Log
 | Status | Keterangan |
 |---|---|
-| IMPLEMENTED | Catat actor, role, action, target, before, after, IP, user agent, timestamp, correlation ID. Sensitif: harga, saldo, refund, provider, gateway, integration credential, reveal secret, role/admin, manual payment confirmation, perubahan membership. Log tersensor secret. |
+| IMPLEMENTED / PARTIAL (untuk event "reveal secret") | Catat actor, role, action, target, before, after, IP, user agent, timestamp, correlation ID. Sensitif: harga, saldo, refund, provider, gateway, integration credential, role/admin, manual payment confirmation, perubahan membership. Log tersensor secret. **Temuan:** row menyebut "reveal secret" sebagai event audit, padahal §33 menetapkan **tidak ada endpoint reveal** (`SecurityM10Test` assert 404) — sehingga tidak ada aksi reveal yang dapat menghasilkan audit record. Konsisten dengan keputusan no-reveal §33; rujukan "reveal secret" di sini adalah sisa teks PRD §26, bukan capability aktif. |
 
-*Bukti:* `app/Services/AdminAuditService.php:12-13` (list secret keys), `:55-69` (redact); `app/Http/Controllers/AdminAuditController.php`; middleware `AssignCorrelationId.php`; `Middleware` `admin.password.confirm` untuk sensitive actions.
+*Bukti:* `app/Services/AdminAuditService.php:12-13` (list secret keys), `:55-69` (redact); `app/Http/Controllers/AdminAuditController.php`; middleware `AssignCorrelationId.php`; `Middleware` `admin.password.confirm` untuk sensitive actions. Tidak ada event reveal di `AdminAuditService` karena tidak ada reveal endpoint (§33).
 
 ### §27 Frontend Customer
 | Status | Keterangan |
@@ -319,7 +319,7 @@ Temuan F-01/F-02 **telah dibereskan** dalam PR #279 (baseline `780e9dc`), sehing
 ### §40 Milestone Pembangunan
 | Status | Keterangan |
 |---|---|
-| PARTIAL M1–M11, PARTIAL M12–M13 | Milestone belum bisa diklaim penuh karena matriks ini sendiri menandai sub-requirement yang masih gap di **M5** (multi-SKU Digiflazz, §5), **M6** (harga ML ×1,06 belum di-enforce, §17), dan **M10** (controlled secret reveal, §33). Hingga gap tiap milestone dibereskan, milestone terkait dicatat **PARTIAL**. **M12 Deployment = PARTIAL:** §40 mencakup backup dalam M12, tetapi §35 masih mencatat external storage sebagai gap (F-07) dan §41 membiarkan automatic backup + periodic restore-test belum tercentang; migration/asset/deploy scripts saja belum membuktikan M12 penuh. **M13 Acceptance = PARTIAL** (uji E2E sandbox ditunda ke terakhir — addendum §47). |
+| PARTIAL M5/M6/M10, IMPLEMENTED M1–M4/M7–M9/M11, PARTIAL M12–M13 | Per-milestone: **M1 Foundation, M2 Auth & Keamanan, M3 Katalog, M4 Checkout & Payment, M7 Order & Tracking, M8 Notifikasi, M9 Admin Panel, M11 Testing** = tercapai (tanpa gap terdokumentasi di matriks ini). **M5 Multi-Provider = PARTIAL** (multi-SKU Digiflazz, §5), **M6 Harga = PARTIAL** (ML ×1,06 belum di-enforce, §17), **M10 Secret Management = PARTIAL** (controlled reveal tidak ada, §33). **M12 Deployment = PARTIAL:** §40 mencakup backup dalam M12, tetapi §35 masih mencatat external storage sebagai gap (F-07) dan §41 membiarkan automatic backup + periodic restore-test belum tercentang; migration/asset/deploy scripts saja belum membuktikan M12 penuh. **M13 Acceptance = PARTIAL** (uji E2E sandbox ditunda ke terakhir — addendum §47). |
 
 *Bukti:* Baseline main ter-validasi CI (foundation + frontend-static). Migration/asset/schema ada (M12); deploy scripts (`deploy/*.sh`, systemd units) ada. Gap: M5 (§5 multi-SKU), M6 (§17 ML pricing), M10 (§33 no-reveal); backup F-07; E2E sandbox belum dijalankan penuh (M13).
 
