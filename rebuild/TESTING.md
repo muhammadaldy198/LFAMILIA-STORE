@@ -1,6 +1,6 @@
 # Testing & CI
 
-Dokumen ini mencatat gate yang benar-benar tersedia di repository. Jangan menyebut Playwright/Cypress karena project tidak menggunakannya.
+Dokumen ini mencatat gate yang benar-benar tersedia di repository. Project menggunakan Playwright untuk visual comparison dan browser smoke, namun tidak menggunakan Cypress.
 
 ## Frontend
 
@@ -44,7 +44,7 @@ CI juga memvalidasi Laravel config cache/clear.
 bash tests/Browser/smoke.sh
 ```
 
-Smoke menggunakan headless Chromium tooling di repository untuk customer dan Admin flow yang didefinisikan test. Ini bukan Playwright/Cypress.
+Suite browser smoke menggunakan kombinasi tool: Playwright digunakan khusus untuk perbandingan visual (`rebuild/tests/Browser/checkout-visual.mjs`), sedangkan skenario responsif customer dan Admin (`customer-ui.mjs`, `admin-ui.mjs`) dijalankan langsung melalui headless Chromium via Chrome DevTools Protocol. Cypress tidak digunakan.
 
 ## Security/secret guardrails
 

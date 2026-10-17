@@ -64,10 +64,13 @@ Lifecycle internal creation mencakup `CREATING` dan `SENDING`; public response m
 
 `PaymentStateService` menerima status provider tervalidasi: `PENDING`, `PAID`, `FAILED`, `CANCELLED`, `EXPIRED`, `REFUNDED`.
 
+**Kebijakan Refund Toko (DE-2026-10-17-05):**
+Status `REFUNDED` dan `PARTIAL_REFUND_REVIEW` adalah **adapter penerima status masuk dari gateway pembayaran pihak ketiga**, BUKAN operasi pengembalian dana keluar secara otomatis. Status `REFUND_REVIEW` adalah **state peninjauan internal** yang diproduksi sistem ketika top-up wallet yang sudah berstatus `PAID` menerima notifikasi `REFUNDED` dari gateway (`rebuild/app/Services/PaymentStateService.php:388-412`) untuk mencegah penarikan saldo sepihak. LFAMILIA Store menerapkan kebijakan bahwa penyelesaian pesanan bermasalah dilayani **100% secara manual via CS / penyesuaian saldo**. Sistem aplikasi tidak mengotomatiskan transfer pengembalian dana keluar ke rekening customer.
+
 Proteksi final/stale antara lain:
 
 - `REFUNDED` tidak dibuka kembali;
-- `PAID` tidak didowngrade selain flow refund;
+- `PAID` tidak didowngrade selain flow review/refund manual;
 - payment yang sudah FAILED/CANCELLED/EXPIRED tidak dikembalikan ke PENDING oleh callback lama;
 - late PAID setelah order terminal tidak otomatis memproses ulang order; masuk review path;
 - amount callback harus cocok dengan amount lokal.
