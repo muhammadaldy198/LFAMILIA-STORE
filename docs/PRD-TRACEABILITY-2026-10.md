@@ -19,7 +19,25 @@
   - `UNVERIFIED` — tidak ada bukti yang bisa diverifikasi dari baseline ini; ditandai untuk verifikasi lanjut.
   - `GAP` — ditemukan selisih antara keputusan PRD dan perilaku kode.
 - Kolom **Bukti** merujuk ke file/route/konstanta, bukan klaim tanpa dasar.
-- Temuan audit F-01…F-09 dari Roadmap Audit disebutkan sebagai pelengkap; dokumen ini **tidak** mengubah runtime.
+- Temuan audit di bawah (F-01…F-09) dirujuk lintas dokumen sebagai pelengkap; definisinya disertakan di sini agar self-contained. Sumber: Roadmap Audit PRD v1.1 (2026-10-17), Register Temuan Audit.
+
+### Referensi temuan audit (F-01…F-09)
+
+| ID | Level | Temuan | Status solusi |
+|---|---|---|---|
+| F-01 | P0 | Main foundation gagal pada `Validate local Git hooks`; Pint `no_unused_imports` pada `FulfillmentTest.php`. | SOLVED via PR #279 (CI hijau). |
+| F-02 | P0 | PR #279 foundation gagal: 5 error PHPUnit (4 fixture duplicate `users_phone_normalized_unique`, 1 test backup SKU lama). | SOLVED via PR #279 (para fixture/ekspektasi dikoreksi tanpa melonggarkan unik/anti-failover). |
+| F-03 | P1 | PRD v1.1 §47: satu SKU / no auto-switch; `FULFILLMENT.md` masih merinci failover definitif + max-price backup; `ADMIN.md` menjelaskan cadangan otomatis. | OPEN — menunggu PR-E (dokumen domain drift). |
+| F-04 | P1 | `FulfillmentService.php` masih punya `if (false && $failover)` + jalur failover lama. | OPEN — menunggu audit/refactor terkendali setelah regression hijau. |
+| F-05 | P1 | `PAYMENT.md` dan `PaymentStateService` memuat `REFUNDED`/`REFUND_REVIEW`; PRD v1.1 no-refund. | OPEN — pisahkan rekonsiliasi incoming gateway dari operasi refund. |
+| F-06 | P1 | Digiflazz mapping nonmanual menerima refresh harga supplier; manual-lock dikecualikan. | OPEN — butuh regression test lock harga. |
+| F-07 | P1 | PRD §35 mensyaratkan external backup; deploy README pernah mencatat `BACKUP_REQUIRE_REMOTE=false`. | OPEN — verifikasi konfigurasi aktual + bukti restore + backup media. |
+| F-08 | P2 | `TESTING.md` menyatakan bukan Playwright, tetapi `checkout-visual.mjs` memakai Playwright. | OPEN — koreksi dokumentasi jalur Chromium. |
+| F-09 | P2 | `CLAUDE.md` bertanggal verified 4 Okt; 20 skill repo + 8 roles belum punya matriks bersama skills tambahan VM. | OPEN — menunggu PR-D (AGENTS.md + CLAUDE.md + skill discovery). |
+
+### Lampiran: catatan status per temuan
+
+Temuan F-01/F-02 **telah dibereskan** dalam PR #279 (baseline `780e9dc`), sehingga tidak lagi terbuka. Temuan F-03…F-09 tetap terbuka dan dilacak pada PR-D (F-09, sebagian F-03) dan PR-E (F-03, F-05, F-08) sesuai urutan roadmap. Temuan level P1 (F-03…F-07) tidak boleh diklaim selesai tanpa bukti regression/operasional.
 
 ---
 
@@ -105,9 +123,9 @@
 ### §12 Lifecycle Akun
 | Status | Keterangan |
 |---|---|
-| IMPLEMENTED | Cleanup akun otomatis bila saldo Rp0, belum transaksi, tidak aktif ≥30 hari; backend verifikasi tidak ada saldo/transaksi/tiket/kewajiban; customer boleh hapus sendiri. |
+| PARTIAL / GAP | Cleanup akun otomatis bila saldo Rp0, belum transaksi, tidak aktif ≥30 hari; backend verifikasi tidak ada saldo/transaksi/tiket/kewajiban; customer boleh hapus sendiri. **GAP:** `CustomerAccountDeletion.php:26` menolak deletion bila ada baris `support_tickets` **apapun** (termasuk tiket yang sudah CLOSED), sedangkan PRD §12 hanya mensyaratkan "tidak ada tiket **aktif**". Akibatnya akun tak aktif yang hanya punya tiket lama tutup tidak bisa dibersihkan. |
 
-*Bukti:* `app/Services/CustomerCleanupService.php`; `app/Services/CustomerAccountDeletion.php`; migrasi lifetime terkait.
+*Bukti:* `app/Services/CustomerCleanupService.php`; `app/Services/CustomerAccountDeletion.php:26` (`support_tickets->where('user_id')->exists()` tanpa filter status); migrasi lifetime terkait. **Aksi:** samakan filter tiket aktif (mis. `status != closed`) ATAU tandai gap; tidak diubah pada PR-C (dokumen saja).
 
 ### §13 Wallet / Saldo
 | Status | Keterangan |
@@ -161,16 +179,16 @@
 ### §20 Manual QRIS
 | Status | Keterangan |
 |---|---|
-| DEFERRED | Dideskripsikan dalam PRD tetapi **pekerjaan penambahannya ditunda** sesuai arahan pemilik pada rangkaian tugas. Jangan dikerjakan tanpa izin baru. |
+| IMPLEMENTED | Manual QRIS dibangun via `PaymentService` + `ManualQrisGateway`. Order dibuat → QRIS LFAMILIA ditampilkan → status Menunggu Pembayaran → notifikasi admin → konfirmasi manual → Dibayar → Diproses → Berhasil. Route internal `manual_qris` → `MANUAL_QRIS` di-seed aktif (`supports_order=true`, `is_active=true`). |
 
-*Bukti:* Tidak ada jalur "manual QRIS generate" aktif yang memenuhi alur §20 pada baseline. Keputusan delegasi pemilik (Roadmap Audit / §47 context). **Note:** jangan dikonfirmasi sebagai bugs — ini deferral eksplisit.
+*Bukti:* `app/Services/Payment/ManualQrisGateway.php:13-26` (`create()` → asset `manual_qris` + `public_payload.kind=manual_qris`); `app/Services/PaymentService.php:345` (`'MANUAL_QRIS' => $this->manualQris->create()`); `app/Http/Controllers/AdminPaymentController.php:800-824` (`ensureInternalRoutes()` — route `manual_qris`/`saldo`). **Catatan:** tidak mengubah PRD; koreksi klasifikasi dari DEFERRED (Roadmap Audit menyebut "pekerjaan penambahannya ditunda" — tetapi pada baseline `780e9dc` jalur ini sudah ada dan dipakai oleh test payment). Perilaku konfirmasi manual diverifikasi manual oleh admin/CS; tidak ada gateway webhook asli (sesuai PRD §20).
 
 ### §21 Notifikasi
 | Status | Keterangan |
 |---|---|
 | IMPLEMENTED | Notifikasi Panel, Telegram webhook, Discord webhook. Event: order baru, pembayaran berhasil, manual QRIS, provider gagal, pending lama, order berhasil, refund, tiket baru, integration/system error. Telegram/Discord bisa diaktif-nonaktifkan dari konfigurasi Super Admin. |
 
-*Bukti:* `app/Services/ExternalNotificationService.php` (telegram + discord send); `app/Services/DiscordNotificationRouting.php`; `app/Services/AdminNotificationService.php`; `app/Services/TransactionEmailService.php`; route admin webhook config.
+*Bukti:* `app/Services/ExternalNotificationService.php` (telegram + discord send); `app/Services/DiscordNotificationRouting.php`; `app/Services/AdminNotificationService.php`; `app/Services/TransactionalEmailService.php`; route admin webhook config.
 
 ### §22 Fulfillment & Reconciliation
 | Status | Keterangan |
@@ -224,9 +242,9 @@
 ### §29 Email
 | Status | Keterangan |
 |---|---|
-| IMPLEMENTED (queue) / UNVERIFIED (provider produksi) | Provider: **Resend**. Event verification, reset password, payment success, transaction success, refund, support ticket, security notification. Email dikirim via queue. `MAIL_MAILER=log` di `.env.example` — provider produksi belum diverifikasi pada baseline ini. |
+| PARTIAL / GAP (untuk event refund) | Provider: **Resend**. Email via queue untuk verification, reset password, payment success (confirmed), transaction success (completed), support ticket, security notification. **GAP:** PRD §29 mencantumkan event "refund", tetapi `TransactionalEmailService` **tidak punya metode email refund** — `queueOrderFailed()` berkomentar "refund — topik refund ditutup, tindak lanjut lewat CS", dan cabang refund di `PaymentStateService` hanya membuat notifikasi admin, bukan email. Ini konsisten dengan kebijakan no-refund (§13/§47) yang menghapus jalur refund; PRD event refund dianggap digantikan keputusan pasca-PRD. `MAIL_MAILER=log` di `.env.example` — provider produksi belum diverifikasi. |
 
-*Bukti:* `app/Services/TransactionEmailService.php`; `config/mail.php`; `.env.example:36` (`MAIL_MAILER=log`); queue job email. **Note:** provider Resend perlu diverifikasi dari env produksi — bukan rekaan.
+*Bukti:* `app/Services/TransactionalEmailService.php:51,105,165,233` (`queueOrderCreated`/`queuePaymentConfirmed`/`queueOrderCompleted`/`queueOrderFailed`); `app/Services/PaymentStateService.php:281-298,388-412` (cabang refund = notifikasi admin saja); `config/mail.php`; `.env.example:36`. **Catatan:** kekurangan email refund tidak dianggap bug karena no-refund; tetap dicatat sebagai gap terhadap teks PRD §29 secara literal.
 
 ### §30 Infrastruktur VPS & CloudPanel
 | Status | Keterangan |
