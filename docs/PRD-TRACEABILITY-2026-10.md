@@ -55,7 +55,7 @@ Temuan F-01/F-02 **telah dibereskan** dalam PR #279 (baseline `780e9dc`), sehing
 |---|---|
 | IMPLEMENTED | Backend Laravel 12 / PHP 8.4; Frontend Vue 3 + Inertia v2 + Tailwind v4; MySQL 8; Redis; Nginx; Fortify + Sanctum; Spatie Media Library; CloudPanel; Cloudflare. |
 
-*Bukti:* `composer.json` (`laravel/framework` ^12, `spatie/laravel-medialibrary` ^11); `package.json` (vue@3, `@inertiajs/vue`); `config/mail.php`; `rebuild/` layout; deploy runbook CloudPanel/VPS.
+*Bukti:* `composer.json` (`laravel/framework` ^12, `spatie/laravel-medialibrary` ^11); `package.json` (vue@3, `@inertiajs/vue`); `rebuild/` layout; deploy runbook CloudPanel/VPS. (Email via job Resend — `config/mail.php` tidak ada di repo, lihat §29.)
 
 ### §3 Arsitektur Sistem
 | Status | Keterangan |
@@ -223,7 +223,7 @@ Temuan F-01/F-02 **telah dibereskan** dalam PR #279 (baseline `780e9dc`), sehing
 |---|---|
 | IMPLEMENTED / PARTIAL (untuk event "reveal secret") | Catat actor, role, action, target, before, after, IP, user agent, timestamp, correlation ID. Sensitif: harga, saldo, refund, provider, gateway, integration credential, role/admin, manual payment confirmation, perubahan membership. Log tersensor secret. **Temuan:** row menyebut "reveal secret" sebagai event audit, padahal §33 menetapkan **tidak ada endpoint reveal** (`SecurityM10Test` assert 404) — sehingga tidak ada aksi reveal yang dapat menghasilkan audit record. Konsisten dengan keputusan no-reveal §33; rujukan "reveal secret" di sini adalah sisa teks PRD §26, bukan capability aktif. |
 
-*Bukti:* `app/Services/AdminAuditService.php:12-13` (list secret keys), `:55-69` (redact); `app/Http/Controllers/AdminAuditController.php`; middleware `AssignCorrelationId.php`; `Middleware` `admin.password.confirm` untuk sensitive actions. Tidak ada event reveal di `AdminAuditService` karena tidak ada reveal endpoint (§33).
+*Bukti:* `app/Services/AdminAuditService.php:12-13` (list secret keys), `:55-69` (redact); `app/Http/Controllers/AdminAuditController.php`; middleware `app/Http/Middleware/AssignCorrelationId.php`; `Middleware` `admin.password.confirm` untuk sensitive actions. Tidak ada event reveal di `AdminAuditService` karena tidak ada reveal endpoint (§33).
 
 ### §27 Frontend Customer
 | Status | Keterangan |
@@ -265,7 +265,7 @@ Temuan F-01/F-02 **telah dibereskan** dalam PR #279 (baseline `780e9dc`), sehing
 |---|---|
 | IMPLEMENTED | Session Admin/Super Admin 24 jam. 2FA ditunda (v1) tapi arsitektur siap. Turnstile selektif (register, forgot password, suspicious login, form publik). Rate limit minimal: login, register, forgot password, nickname, order lookup, payment create, wallet top-up, voucher validation, API publik sensitif. |
 
-*Bukti:* `config/session.php:7` (lifetime 1440 min = 24h); `app/Services/TurnstileService.php`; middleware `PublicAbuseProtection.php`; `routes/web.php` throttle groups (admin/account/support/checkout/wallet/guest/google/payment). **Note:** 2FA tidak aktif — keputusan v1.
+*Bukti:* `config/session.php:7` (lifetime 1440 min = 24h); `app/Services/TurnstileService.php`; middleware `app/Http/Middleware/PublicAbuseProtection.php`; `routes/web.php` throttle groups (admin/account/support/checkout/wallet/guest/google/payment). **Note:** 2FA tidak aktif — keputusan v1.
 
 ### §33 Secret & Integration Credential
 | Status | Keterangan |
@@ -279,7 +279,7 @@ Temuan F-01/F-02 **telah dibereskan** dalam PR #279 (baseline `780e9dc`), sehing
 |---|---|
 | IMPLEMENTED (check) / partial (population) | Pantau Laravel, MySQL, Redis, Queue, Scheduler, disk/storage, Digiflazz, KokinPay, Midtrans, DOKU, Resend. Status: Healthy, Degraded, Down, Not Configured, Maintenance. Correlation ID untuk setiap request/transaksi penting. |
 
-*Bukti:* `app/Http/Controllers/AdminHealthController.php:23-130` (states HEALTHY/DEGRADED/DOWN/UNKNOWN); /health/ready route; middleware `AssignCorrelationId.php`; `app/Http/Controllers/CheckoutController.php` (corr ID). **Note:** coverage penuh semua monitor perlu verifikasi lanjut — label `partial` agar tidak mengklaim lebih.
+*Bukti:* `app/Http/Controllers/AdminHealthController.php:23-130` (states HEALTHY/DEGRADED/DOWN/UNKNOWN); /health/ready route; middleware `app/Http/Middleware/AssignCorrelationId.php`; `app/Http/Controllers/CheckoutController.php` (corr ID). **Note:** coverage penuh semua monitor perlu verifikasi lanjut — label `partial` agar tidak mengklaim lebih.
 
 ### §35 Backup & Recovery
 | Status | Keterangan |
