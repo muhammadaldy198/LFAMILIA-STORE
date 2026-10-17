@@ -319,16 +319,16 @@ Temuan F-01/F-02 **telah dibereskan** dalam PR #279 (baseline `780e9dc`), sehing
 ### §40 Milestone Pembangunan
 | Status | Keterangan |
 |---|---|
-| PARTIAL M5/M6/M10, IMPLEMENTED M1–M4/M7–M9/M11, PARTIAL M12–M13 | Per-milestone: **M1 Foundation, M2 Auth & Keamanan, M3 Katalog, M4 Checkout & Payment, M7 Order & Tracking, M8 Notifikasi, M9 Admin Panel, M11 Testing** = tercapai (tanpa gap terdokumentasi di matriks ini). **M5 Multi-Provider = PARTIAL** (multi-SKU Digiflazz, §5), **M6 Harga = PARTIAL** (ML ×1,06 belum di-enforce, §17), **M10 Secret Management = PARTIAL** (controlled reveal tidak ada, §33). **M12 Deployment = PARTIAL:** §40 mencakup backup dalam M12, tetapi §35 masih mencatat external storage sebagai gap (F-07) dan §41 membiarkan automatic backup + periodic restore-test belum tercentang; migration/asset/deploy scripts saja belum membuktikan M12 penuh. **M13 Acceptance = PARTIAL** (uji E2E sandbox ditunda ke terakhir — addendum §47). |
+| Per-milestone (nama sesuai PRD §40) | **IMPLEMENTED:** M1 Foundation, M2 Database, M3 Authentication, M9 Admin, M11 Testing. **PARTIAL:** M4 Customer (gap lifecycle §12 — `CustomerAccountDeletion` menolak bila ada tiket closed), M5 Product (multi-SKU Digiflazz, §5), M6 Checkout (harga ML ×1,06 belum di-enforce, §17), M7 Payment (status DOKU disabled belum terbukti di repo, §19), M8 Fulfillment (dead-code failover, F-04), M10 Security (controlled reveal tidak ada, §33), M12 Deployment (backup, F-07), M13 Acceptance (E2E sandbox ditunda). |
 
-*Bukti:* Baseline main ter-validasi CI (foundation + frontend-static). Migration/asset/schema ada (M12); deploy scripts (`deploy/*.sh`, systemd units) ada. Gap: M5 (§5 multi-SKU), M6 (§17 ML pricing), M10 (§33 no-reveal); backup F-07; E2E sandbox belum dijalankan penuh (M13).
+*Bukti:* Baseline main ter-validasi CI (foundation + frontend-static). Migration/asset/schema ada; deploy scripts (`deploy/*.sh`, systemd units) ada. Gap per milstone: M4 (§12 lifecycle tiket closed), M5 (§5 multi-SKU), M6 (§17 ML pricing), M7 (§19 DOKU unverified), M8 (F-04 dead-code failover), M10 (§33 no-reveal), M12 (backup F-07), M13 (E2E sandbox belum dijalankan).
 
 ### §41 Definition of Done
 | Status | Keterangan |
 |---|---|
 | PARTIAL | Checklist DoD: item yang sudah dicentang — [x] customer desktop, [x] register/login/google/forgot, [x] guest checkout, [x] wallet & membership, [x] catalog/nickname/voucher/pricing/snapshot, [x] multi-provider abstraction & reconciliation, [x] Super Admin/Admin permissions, [x] Telegram/Discord/email/health/audit, [x] queue & scheduler stabil, [x] tidak ada critical security issue, [x] abuse test & full checkout smoke, [x] build production & test wajib hijau. **Belum dicentang:** customer mobile responsive; Midtrans/DOKU/Manual QRIS/Digiflazz manual fulfillment (_DOKU disabled — sisanya jalan_); backup otomatis & restore berkala (restore-verify ada, bukti eksekusi berkala belum diverifikasi — F-07). |
 
-*Bukti:* `docs/PRD-LFAMILIA-STORE-v1.md` §41; temuan **F-01, F-02** (CI) & **F-07** (backup) memengaruhi item yang belum dicentang.
+*Bukti:* `docs/PRD-LFAMILIA-STORE-v1.md` §41; item yang masih terbuka berhubungan dengan **F-07** (backup otomatis & restore berkala belum terbukti). F-01/F-02 (CI) sudah SOLVED via PR #279 dan tidak lagi memengaruhi DoD.
 
 ### §42 Non-Negotiable Requirements
 | Status | Keterangan |
