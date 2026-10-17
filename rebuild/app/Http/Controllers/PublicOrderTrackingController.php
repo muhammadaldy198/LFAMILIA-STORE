@@ -191,30 +191,30 @@ class PublicOrderTrackingController
         // Jika nomor diawali '+' eksplisit internasional:
         // Cek apakah benar nomor internasional Indonesia (+62) atau negara lain (+81, +1, dsb).
         // Jangan pernah meng-expand nomor internasional non-ID ke variasi lokal Indonesia!
+        // Untuk Indonesia (+62), JANGAN masukkan varian '8...' polos ($local) agar tidak collision dengan +81 Jepang.
         if (str_starts_with($raw, '+')) {
             if (str_starts_with($digits, '62') && strlen($digits) > 2) {
                 $local = substr($digits, 2);
                 $variants[] = '0'.$local;
-                $variants[] = $local;
             }
 
             return array_values(array_unique($variants));
         }
 
-        // Variasi lokal Indonesia (tanpa tanda '+'):
+        // Variasi lokal Indonesia:
         // Hanya ekspansi ke varian Indonesia jika input eksplisit menggunakan format lokal Indo:
-        // - Diawali '08...' (khas nomor lokal domestik Indonesia)
         // - Diawali '628...' (khas kode negara Indonesia)
-        // Angka yang diawali '8...' polos TIDAK di-expand ke '628...' agar tidak ambigu dengan
-        // nomor luar negeri yang dial codenya diawali 8 (misal Jepang +81, dsb).
+        // - Diawali '08...' (khas nomor lokal domestik Indonesia)
+        // JANGAN masukkan varian '8...' polos ($local) ke dalam variants agar nomor Indonesia
+        // tidak pernah menabrak nomor internasional (seperti nomor Jepang +81 yang canonicalnya 81...).
         if (str_starts_with($digits, '628') && strlen($digits) >= 10) {
             $local = substr($digits, 2);
             $variants[] = '0'.$local;
-            $variants[] = $local;
+            $variants[] = '+'.$digits;
         } elseif (str_starts_with($digits, '08') && strlen($digits) >= 10) {
             $local = substr($digits, 1);
             $variants[] = '62'.$local;
-            $variants[] = $local;
+            $variants[] = '+62'.$local;
         }
 
         return array_values(array_unique($variants));

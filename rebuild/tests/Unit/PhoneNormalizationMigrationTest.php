@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use App\Actions\Fortify\CreateNewUser;
+use App\Http\Controllers\PublicOrderTrackingController;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -64,6 +65,23 @@ class PhoneNormalizationMigrationTest extends TestCase
         $variantsPlain = CreateNewUser::phoneVariants('81223456789');
         $this->assertNotContains('6281223456789', $variantsPlain);
         $this->assertNotContains('081223456789', $variantsPlain);
+
+        // Tracking lookup phone variants for Indonesian number must NOT expand to bare local 8...
+        // to prevent collision with international namespaces like Japan (+81)
+        $controller = new PublicOrderTrackingController;
+        $reflection = new \ReflectionClass($controller);
+        $method = $reflection->getMethod('phoneVariants');
+        $method->setAccessible(true);
+
+        $idVariants = $method->invoke($controller, '+6281234567890');
+        $this->assertNotContains('81234567890', $idVariants);
+        $this->assertContains('6281234567890', $idVariants);
+        $this->assertContains('081234567890', $idVariants);
+
+        $idLocalVariants = $method->invoke($controller, '081234567890');
+        $this->assertNotContains('81234567890', $idLocalVariants);
+        $this->assertContains('6281234567890', $idLocalVariants);
+        $this->assertContains('081234567890', $idLocalVariants);
     }
 
     public function test_migration_aborts_on_duplicate_phones_without_deleting_or_merging_users(): void
