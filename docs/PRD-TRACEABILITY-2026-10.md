@@ -37,7 +37,7 @@
 
 ### Lampiran: catatan status per temuan
 
-Temuan F-01/F-02 **telah dibereskan** dalam PR #279 (baseline `780e9dc`), sehingga tidak lagi terbuka. Temuan F-03…F-09 tetap terbuka dan dilacak pada PR-D (F-09, sebagian F-03) dan PR-E (F-03, F-05, F-08) sesuai urutan roadmap. Temuan level P1 (F-03…F-07) tidak boleh diklaim selesai tanpa bukti regression/operasional.
+Temuan F-01/F-02 **telah dibereskan** dalam PR #279 (baseline `780e9dc`), sehingga tidak lagi terbuka. Temuan F-03…F-09 tetap terbuka dan dilacak pada PR-D (F-09, sebagian F-03) dan PR-E (F-03, F-05, F-08) sesuai urutan roadmap. Temuan level P1 yang benar-benar **P1** (F-03, F-04, F-06, F-07 — **F-05 adalah P3 kosmetik**, bukan P1) tidak boleh diklaim selesai tanpa bukti regression/operasional.
 
 ---
 
