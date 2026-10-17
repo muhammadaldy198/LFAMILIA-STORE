@@ -74,9 +74,9 @@ Temuan F-01/F-02 **telah dibereskan** dalam PR #279 (baseline `780e9dc`), sehing
 ### §5 Model Katalog & Multi-Provider
 | Status | Keterangan |
 |---|---|
-| IMPLEMENTED (utama) / GAP (dead-code failover) | Struktur Kategori → Produk → Nominal → Provider Mapping. Satu nominal boleh punya banyak provider. Khusus Digiflazz: 1 SKU per nominal (model `_A`), tanpa `_B`. Fulfillment tidak terkunci hanya Digiflazz. **Auto-failover dinonaktifkan penuh** — F-04 menandai jalur `if (false && $failover)`. |
+| PARTIAL / GAP | Struktur Kategori → Produk → Nominal → Provider Mapping. Satu nominal boleh punya banyak provider. Khusus Digiflazz: 1 SKU per nominal (model `_A`), tanpa `_B`. Fulfillment tidak terkunci hanya Digiflazz. **Auto-failover dinonaktifkan penuh** (F-04, `if (false && $failover)`). **GAP:** invariant "1 SKU Digiflazz per nominal" hanya dijaga di sisi **send** (no auto-switch/no failover), TETAPI sisi **konfigurasi** masih mengizinkan multi-SKU: `AdminDigiflazzController::attachSource()` dapat menambah mapping Digiflazz kedua, route `/admin/catalog/mappings/{mapping}` bisa mengaktifkannya tanpa cek sibling Digiflazz, dan schema hanya `unique(provider_id, external_sku)`. |
 
-*Bukti:* `app/Models/ProductPackage.php`, `app/Models/ProviderMapping.php`; `app/Services/DigiflazzCatalogImport.php`; `app/Services/FulfillmentService.php:529-533` (`if (false && $failover)` + komentar "Per PRD §47"); `app/Services/FulfillmentService.php:474` ("Single SKU per nominal, no auto-switch"). Temuan **F-04**: dead-code failover masih ada (lihat Temuan).
+*Bukti:* `app/Models/ProductPackage.php`, `app/Models/ProviderMapping.php`; `app/Services/DigiflazzCatalogImport.php`; `app/Services/FulfillmentService.php:529-533` (`if (false && $failover)` + komentar "Per PRD §47"); `app/Http/Controllers/AdminDigiflazzController.php` (`attachSource`, `auto_sync`); `database/migrations/2026_09_29_000001_create_identity_catalog_tables.php:134` (`unique(['provider_id','external_sku'])` — bukan unique per nominal). **Temuan:** F-04 dead-code failover + invarian multi-SKU dibiarkan terbuka (PR §5).
 
 ### §6 Digiflazz
 | Status | Keterangan |
@@ -151,9 +151,9 @@ Temuan F-01/F-02 **telah dibereskan** dalam PR #279 (baseline `780e9dc`), sehing
 ### §16 Status Order
 | Status | Keterangan |
 |---|---|
-| IMPLEMENTED | Status: Menunggu Pembayaran, Dibayar, Diproses, Berhasil, Gagal, Dibatalkan, Kedaluwarsa, BLOCKED. **"Refund" bukan status order** (addendum §47); handler partial-refund hanya mencatat review, tidak mengubah status → no-refund. |
+| PARTIAL / GAP | Status resmi §16: Menunggu Pembayaran, Dibayar, Diproses, Berhasil, Gagal, Dibatalkan, Kedaluwarsa, BLOCKED. **"Refund" bukan status order** (addendum §47): handler partial-refund hanya mencatat review, tidak mengubah status/saldo → no-refund. **GAP:** meskipun §47 meniadakan "refund" sebagai status order, **runtime masih memperlakukan `REFUND` sebagai order-state**: `AdminOrderPresentation::STATUSES` masih mendefinisikan `REFUND`/`REFUNDED`, `AdminOrdersController` memakainya sebagai filter, `PublicOrderTrackingController` merender harfiah "Perlu pemeriksaan admin" dan menyertainya di query status, dan `PaymentStateService::markOrderPaid()` punya guard khusus. |
 
-*Bukti:* `app/Services/PaymentStateService.php:33` (accepts PENDING/PAID/FAILED/CANCELLED/EXPIRED/REFUNDED/PARTIAL_REFUND_REVIEW); `app/Services/PaymentStateService.php:37-51` (partial-refund hanya event/log, **tidak** ubah saldo/status); `app/Services/AdminOrderPresentation.php` (label status, termasuk BLOCKED). **Mesin status memakai nama `REFUNDED`/`PARTIAL_REFUND_REVIEW` sebagai status masuk gateway** — lihat F-05 (bedakan penerimaan status dari operasi refund).
+*Bukti:* `app/Services/PaymentStateService.php:33` (accepts PENDING/PAID/FAILED/CANCELLED/EXPIRED/REFUNDED/PARTIAL_REFUND_REVIEW), `:37-51` (partial-refund hanya event/log); `app/Services/AdminOrderPresentation.php:15,17,27,41` (`STATUSES` berisi `REFUND`/`REFUNDED`/`PAYMENT_REFUNDED`); `app/Http/Controllers/AdminOrdersController.php:104` (filter status); `app/Http/Controllers/PublicOrderTrackingController.php:160,299,307,361`. **Temuan:** F-05 — bedakan status masuk gateway (`REFUNDED`) dari status order (`REFUND`) yang masih dipakai runtime; setidaknya dokumentasikan, idealnya hapus dari filter/render bila no-refund.
 
 ### §17 Pricing & Snapshot
 | Status | Keterangan |
@@ -172,9 +172,9 @@ Temuan F-01/F-02 **telah dibereskan** dalam PR #279 (baseline `780e9dc`), sehing
 ### §19 Payment Architecture
 | Status | Keterangan |
 |---|---|
-| IMPLEMENTED | Gateways awal: Midtrans Snap + DOKU Direct API. **DOKU dinonaktifkan sementara** (addendum §47). Customer pilih channel, bukan gateway. Super Admin atur routing channel → gateway. Panel enable/disable gateway, channel, fee per channel, maintenance mode. Webhook backend = otoritas paid; redirect frontend bukan bukti. |
+| IMPLEMENTED (Midtrans) / UNVERIFIED (DOKU disabled) | Gateway awal: Midtrans Snap + DOKU Direct API. **DOKU dinonaktifkan sementara** (addendum §47) — **namun status disabled TIDAK terbukti dari kode repo**: `IntegrationRuntimeConfig.php:216` hanya menginfer environment production/sandbox dari `base_url`, tidak menonaktifkan gateway; selama kredensial DOKU terisi, `PaymentRoutingService::gatewayReady('DOKU')` (baris 282) tetap menerima DOKU dan admin dapat mengaktifkan gateway/route-nya. Keputusan §47 tetap berlaku sebagai arahan; bukti disabled harus dari state operasional (cek `payment_gateways.is_active` di produksi) atau kode guard. Customer pilih channel bukan gateway; Super Admin kelola routing/fee/maintenance; webhook = otoritas paid. |
 
-*Bukti:* `app/Services/PaymentService.php`; `app/Services/PaymentRoutingService.php:282` (`'DOKU' => $this->credentialHasKeys(...)`); `app/Services/IntegrationRuntimeConfig.php:216` (`'doku' => str_starts_with(...)` — disabled check); `app/Services/Payment/*` (MidtransGateway, DokuDirectGateway, DokuSignature); migrasi `payment_route_fees_and_method_labels`.
+*Bukti:* `app/Services/PaymentService.php:340-345` (dispatch MIDTRANS/DOKU/MANUAL_QRIS); `app/Services/PaymentRoutingService.php:278-282` (`gatewayReady()` DOKU = credentialHasKeys); `app/Services/IntegrationRuntimeConfig.php:210-222` (infer environment, bukan disable); `app/Services/Payment/*` (MidtransGateway, DokuDirectGateway, DokuSignature); migrasi `payment_route_fees_and_method_labels`. **Aksi:** verifikasi `payment_gateways.is_active` untuk DOKU di produksi, atau tambahkan guard kode bila perlu; tidak diubah pada PR-C (dokumen).
 
 ### §20 Manual QRIS
 | Status | Keterangan |
@@ -319,9 +319,9 @@ Temuan F-01/F-02 **telah dibereskan** dalam PR #279 (baseline `780e9dc`), sehing
 ### §40 Milestone Pembangunan
 | Status | Keterangan |
 |---|---|
-| IMPLEMENTED M1–M12 | M1 Foundation … M12 Deployment. **M13 Acceptance = PARTIAL** (uji E2E sandbox ditunda ke terakhir — addendum §47). |
+| IMPLEMENTED M1–M11, PARTIAL M12–M13 | M1 Foundation … M11 Testing tercapai. **M12 Deployment = PARTIAL:** PRD §40 mencakup backup dalam M12, tetapi §35 masih mencatat external storage sebagai gap (F-07) dan §41 membiarkan automatic backup + periodic restore-test belum tercentang; migration/asset/deploy scripts saja belum membuktikan M12 penuh. **M13 Acceptance = PARTIAL** (uji E2E sandbox ditunda ke terakhir — addendum §47). |
 
-*Bukti:* Baseline main ter-validasi CI (foundation + frontend-static). Migration/asset/schema ada (M12). E2E sandbox belum dijalankan penuh (M13).
+*Bukti:* Baseline main ter-validasi CI (foundation + frontend-static). Migration/asset/schema ada (M12); deploy scripts (`deploy/*.sh`, systemd units) ada. Gap backup: F-07; E2E sandbox belum dijalankan penuh (M13).
 
 ### §41 Definition of Done
 | Status | Keterangan |
@@ -363,14 +363,14 @@ Temuan F-01/F-02 **telah dibereskan** dalam PR #279 (baseline `780e9dc`), sehing
 |---|---|
 | PARTIAL / UNVERIFIED | CTA & tombol Hubungi Kami; banner bottom tanpa crop/space; logo/tagline/4 kanal sosial config; semua link Layanan/Kalkulator/Informasi benar; floating support tidak menutup konten; tidak ada link dummy/404; penggantian logo/banner/link dari panel ter-refleksi; visual konsisten tema dark. |
 
-*Bukti:* Komponen + route di atas; **belum ada bukti UI acceptance penuh (desktop/mobile) yang tervalidasi pada baseline.** Lihat Finding F-09 & DoD §41 (mobile belum dicentang, verifikasi link/visual belum diverifikasi).
+*Bukti:* Komponen + route di atas; **belum ada bukti UI acceptance penuh (desktop/mobile) yang tervalidasi pada baseline.** Item belum terverifikasi: CTA/button aktif, banner tanpa crop, 4 kanal sosial config, semua link Layanan/Kalkulator/Informasi benar (bukan dummy/404), floating support tidak menutup konten, refleksi perubahan panel ke frontend, visual konsisten tema dark. DoD §41 juga belum mencentang mobile responsive. Ini dilacak sebagai gap UI acceptance, bukan F-09 (F-09 = stale CLAUDE.md/skill-matrix, tidak menyentuh visual).
 
 ### §47 Keputusan Pasca-PRD
 | Status | Keterangan |
 |---|---|
 | IMPLEMENTED (sebagai log) | Log keputusan bersumber pada PRD §47 & dokumen ini. Pool keputusan: source-of-truth = PRD + log; no-refund; `_B` removed; ML = modal × 1,06 (tidak dibulatkan); satu nominal multi-provider; Digiflazz Tools + auto-switch belum ada; DOKU disabled temporarily; Menu Validasi Akun; Website Live / M13 partial; Android tetap rencana. |
 
-*Bukti:* `docs/PRD-LFAMILIA-STORE-v1.md` §47 table; implementasi aktif terhadap tiap keputusan: `FulfillmentService.php:474,529-533` (no auto-switch), `PaymentStateService.php:37-51` (no-refund), `DigiflazzFixedPricePolicy` (cost/max_price), `IntegrationRuntimeConfig.php:216` (DOKU disabled), `AccountValidationConfig` (menu Validasi Akun), `MembershipService` (terpisah dari RBAC).
+*Bukti:* `docs/PRD-LFAMILIA-STORE-v1.md` §47 table; implementasi aktif terhadap tiap keputusan: `FulfillmentService.php:474,529-533` (no auto-switch), `PaymentStateService.php:37-51` (no-refund), `DigiflazzFixedPricePolicy` (cost/max_price), `PaymentRoutingService.php:278-282` + `IntegrationRuntimeConfig.php:210-222` (DOKU — environment inference saja; status disabled TIDAK terbukti dari repo, lihat §19), `AccountValidationConfig` (menu Validasi Akun), `MembershipService` (terpisah dari RBAC).
 
 ---
 
@@ -381,6 +381,6 @@ Temuan F-01/F-02 **telah dibereskan** dalam PR #279 (baseline `780e9dc`), sehing
 | DEC-2026-10-17-01 | 2026-10-17 | PRD v1.1 adalah master; dokumen traceability ini adalah peta bukti, bukan sumber keputusan baru. | Hierarki dokumen mengikuti AGENTS.md §0 & PRD §44. | Roadmap Audit, PR-C. |
 | DEC-2026-10-17-02 | 2026-10-17 | Item yang belum diverifikasi (F-07 external backup, F-08 TESTING.md Playwright, F-04 dead-code failover, M13 E2E, mobile acceptance §46) tidak boleh diklaim "selesai" — harus punya bukti operasi/regression hijau. | Mencegah over-claim; baris DoD yang belum dicentang tetap terbuka. | PRD §41, Temuan F-*. |
 | DEC-2026-10-17-03 | 2026-10-17 | Status `REFUNDED`/`PARTIAL_REFUND_REVIEW` pada state machine menerima status masuk dari gateway — **tidak** berarti operasi refund otomatis (no-refund §47). Pemisahan konsep ini wajib agar F-05 tidak salah interpretasi. | Menghindari menambah jalur refund keluar; hanya logging/review. | PRD §13, §16, §47; F-05. |
-| DEC-2026-10-17-04 | 2026-10-17 | Semua temuan F-01…F-09 tetap terbuka sampai tiap temuan punya bukti implementasi/regression (bukan hanya tangkapan layar). | PR-D/PR-E menangani dokumen drift; F-04/F-06 menunggu regression test; F-07 menunggu bukti eksekusi backup eksternal. | Roadmap Audit. |
+| DEC-2026-10-17-04 | 2026-10-17 | Temuan yang **belum** dibereskan (F-03…F-09) tetap terbuka sampai tiap temuan punya bukti implementasi/regression (bukan hanya tangkapan layar). **F-01/F-02 sudah SOLVED via PR #279** dan tidak lagi terbuka. | PR-D/PR-E menangani dokumen drift; F-04/F-06 menunggu regression test; F-07 menunggu bukti eksekusi backup eksternal; F-01/F-02 tidak dijadwalkan ulang. | Roadmap Audit. |
 
 Dokumen ini hanya observasi & traceability. Tidak ada perubahan runtime; tidak ada deploy yang dibutuhkan (AGENTS.md §6: dokumentasi murni).
