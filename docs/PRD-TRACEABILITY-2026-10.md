@@ -2,10 +2,11 @@
 
 **Repo:** muhammadaldy198/LFAMILIA-STORE
 **Tanggal:** 2026-10-17
-**Baseline main:** `780e9dc` (post PR #279 merger)
+**Baseline runtime:** `780e9dc` (post PR #279 merger — status kode yang dievaluasi).
+**Baseline kebijakan:** `be250100` (post PR #283 merger — kebijakan refund manual via CS yang terevaluasi di §16/§29/§45/§47).
 **Dokumen sumber:** `docs/PRD-LFAMILIA-STORE-v1.md` (MASTER v1.1, changelog 2026-10-15)
 **Bagian dari:** Roadmap Audit FASE 2 (PR-C) — dokumentasi murni, tidak mengubah runtime.
-**Prioritas dokumen:** PRD v1.1 = master. Dokumen ini adalah peta bukti (traceability) yang menautkan setiap keputusan PRD ke implementasi yang ada, bukan sumber keputusan baru.
+**Prioritas dokumen:** PRD v1.1 = master untuk **kebijakan produk** (business intent). Untuk **perilaku implementasi aktual**, bukti runtime terverifikasi (kode/migrasi/test) lebih tinggi melampaui teks PRD/decision-log (CLAUDE.md §3). Dokumen ini adalah peta bukti (traceability) yang menautkan setiap keputusan PRD ke implementasi yang ada, bukan sumber keputusan baru.
 
 ---
 
@@ -251,7 +252,7 @@ Temuan F-01/F-02 **telah dibereskan** dalam PR #279 (baseline `780e9dc`), sehing
 |---|---|
 | IMPLEMENTED | Satu VPS: Nginx, PHP-FPM, Laravel, MySQL, Redis, Queue Worker, Scheduler, CloudPanel. Cloudflare di depan (DNS, proxy, WAF, rate-limit, Turnstile, edge). |
 
-*Bukti:* service aktif di produksi (nginx, php8.4-fpm, mysql, redis-server, lfamilia-queue, lfamilia-scheduler); `.github/workflows/validate-rebuild.yml` (M12 deployment assets check); `deploy/*.sh`.
+*Bukti:* service aktif di produksi (nginx, php8.4-fpm, mysql, redis-server, lfamilia-queue, lfamilia-scheduler); `.github/workflows/validate-rebuild.yml` (M12 deployment assets check); `rebuild/deploy/*.sh`.
 
 ### §31 GitHub & Deployment
 | Status | Keterangan |
@@ -321,7 +322,7 @@ Temuan F-01/F-02 **telah dibereskan** dalam PR #279 (baseline `780e9dc`), sehing
 |---|---|
 | Per-milestone (nama sesuai PRD §40) | **IMPLEMENTED:** M1 Foundation, M2 Database, M3 Authentication, M9 Admin, M11 Testing. **PARTIAL:** M4 Customer (gap lifecycle §12 — `CustomerAccountDeletion` menolak bila ada tiket closed), M5 Product (multi-SKU Digiflazz, §5), M6 Checkout (harga ML ×1,06 belum di-enforce, §17), M7 Payment (status DOKU disabled belum terbukti di repo, §19), M8 Fulfillment (retry-failover legacy masih hidup — F-04), M10 Security (controlled reveal tidak ada, §33), M12 Deployment (backup, F-07), M13 Acceptance (E2E sandbox ditunda). |
 
-*Bukti:* Baseline main ter-validasi CI (foundation + frontend-static). Migration/asset/schema ada; deploy scripts (`deploy/*.sh`, systemd units) ada. Gap per milstone: M4 (§12 lifecycle tiket closed), M5 (§5 multi-SKU), M6 (§17 ML pricing), M7 (§19 DOKU unverified), M8 (F-04 retry-failover legacy — active gap), M10 (§33 no-reveal), M12 (backup F-07), M13 (E2E sandbox belum dijalankan).
+*Bukti:* Baseline main ter-validasi CI (foundation + frontend-static). Migration/asset/schema ada; deploy scripts (`rebuild/deploy/*.sh`, systemd units) ada. Gap per milstone: M4 (§12 lifecycle tiket closed), M5 (§5 multi-SKU), M6 (§17 ML pricing), M7 (§19 DOKU unverified), M8 (F-04 retry-failover legacy — active gap), M10 (§33 no-reveal), M12 (backup F-07), M13 (E2E sandbox belum dijalankan).
 
 ### §41 Definition of Done
 | Status | Keterangan |
@@ -347,7 +348,7 @@ Temuan F-01/F-02 **telah dibereskan** dalam PR #279 (baseline `780e9dc`), sehing
 ### §44 Prinsip Implementasi
 | Status | Keterangan |
 |---|---|
-| IMPLEMENTED | Sumber kebenaran = PRD + log keputusan pasca-PRD (§47). Implementasi boleh memperbaiki struktur/keamanan/performansi tetapi tidak mengubah alur bisnis tanpa keputusan eksplisit. Frontend mengejar kemiripan Ourastore; backend mandiri, aman, provider-agnostic. |
+| IMPLEMENTED | Untuk **perilaku implementasi aktual**, hierarki bukti mengikuti CLAUDE.md §3: kode/migrasi/test/runtime-config → dokumentasi operasional `rebuild/` → **product intent** (PRD v1.1 + log keputusan §47). PRD v1.1 adalah sumber **kebijakan produk & business intent**; kode yang sudah terverifikasi adalah bukti perilaku aktual — jika berbeda, telaah dulu apakah perbedaan itu keputusan baru / gap / stale doc / bug (CLAUDE.md:61-68), bukan otomatis menangkan salah satu. Implementasi boleh memperbaiki struktur/keamanan/performansi tetapi tidak mengubah alur bisnis tanpa keputusan eksplisit. Frontend mengejar kemiripan Ourastore; backend mandiri, aman, provider-agnostic. |
 
 *Bukti:* `AGENTS.md`, `CLAUDE.md` (hierarki dokumen); dokumen ini (traceability) menautkan PRD → bukti. Perilaku aktif server-side pada `rebuild/`.
 
@@ -368,7 +369,7 @@ Temuan F-01/F-02 **telah dibereskan** dalam PR #279 (baseline `780e9dc`), sehing
 ### §47 Keputusan Pasca-PRD
 | Status | Keterangan |
 |---|---|
-| IMPLEMENTED (sebagai log) | Log keputusan bersumber pada PRD §47 & dokumen ini. Pool keputusan: source-of-truth = PRD + log; **refund tidak otomatis — penyelesaian pesanan bermasalah via manual CS/tambah saldo (DE-2026-10-17-05)**; `_B` removed; ML = modal × 1,06 (tidak dibulatkan); satu nominal multi-provider; Digiflazz Tools + auto-switch belum ada; DOKU disabled temporarily; Menu Validasi Akun; Website Live / M13 partial; Android tetap rencana. |
+| IMPLEMENTED (sebagai log) | Log keputusan bersumber pada PRD §47 & dokumen ini. **Untuk business intent**, source-of-truth = PRD + log keputusan; **untuk perilaku implementasi aktual**, kode/runtime terverifikasi adalah bukti (CLAUDE.md §3) dan menang bila berbeda dengan teks PRD yang stale. Pool keputusan: **refund tidak otomatis — penyelesaian pesanan bermasalah via manual CS/tambah saldo (DE-2026-10-17-05)**; `_B` removed; ML = modal × 1,06 (tidak dibulatkan); satu nominal multi-provider; Digiflazz Tools + auto-switch belum ada; DOKU disabled temporarily; Menu Validasi Akun; Website Live / M13 partial; Android tetap rencana. |
 
 *Bukti:* `docs/PRD-LFAMILIA-STORE-v1.md` §47 table; implementasi aktif terhadap tiap keputusan: `FulfillmentService.php:474,529-533` (no auto-switch), `PaymentStateService.php:37-51` (refund tidak otomatis — status masuk gateway, eksekusi manual via CS, DE-2026-10-17-05), `DigiflazzFixedPricePolicy` (cost/max_price), `PaymentRoutingService.php:278-282` + `IntegrationRuntimeConfig.php:210-222` (DOKU — environment inference saja; status disabled TIDAK terbukti dari repo, lihat §19), `AccountValidationConfig` (menu Validasi Akun), `MembershipService` (terpisah dari RBAC).
 
@@ -378,7 +379,7 @@ Temuan F-01/F-02 **telah dibereskan** dalam PR #279 (baseline `780e9dc`), sehing
 
 | ID | Tanggal | Keputusan / Observasi | Dampak | Sumber |
 |---|---|---|---|---|
-| DEC-2026-10-17-01 | 2026-10-17 | PRD v1.1 adalah master; dokumen traceability ini adalah peta bukti, bukan sumber keputusan baru. | Hierarki dokumen mengikuti AGENTS.md §0 & PRD §44. | Roadmap Audit, PR-C. |
+| DEC-2026-10-17-01 | 2026-10-17 | PRD v1.1 adalah master **kebijakan produk**; dokumen traceability ini adalah peta bukti, bukan sumber keputusan baru. Untuk perilaku implementasi aktual, bukti runtime terverifikasi menang atas teks PRD yang stale (CLAUDE.md §3). | Hierarki dokumen mengikuti AGENTS.md §0 & PRD §44; hierarki bukti runtime mengikuti CLAUDE.md §3. | Roadmap Audit, PR-C. |
 | DEC-2026-10-17-02 | 2026-10-17 | Item yang belum diverifikasi (F-07 external backup, F-08 TESTING.md Playwright, F-04 retry-failover legacy belum dibersihkan, M13 E2E, mobile acceptance §46) tidak boleh diklaim "selesai" — harus punya bukti operasi/regression hijau. | Mencegah over-claim; baris DoD yang belum dicentang tetap terbuka. | PRD §41, Temuan F-*. |
 | DEC-2026-10-17-03 | 2026-10-17 | Status `REFUNDED`/`PARTIAL_REFUND_REVIEW` pada state machine menerima status masuk dari gateway — **bukan** operasi refund otomatis. Refund = **keputusan manual via CS** (review kelayakan, lalu cair transfer balik/saldo). Pemisahan konsep ini penting agar tidak ada yang mengira sistem mengeksekusi refund. | Tidak menambah jalur refund otomatis; refund manual via CS. | PRD §13, §16, §29, §47; keputusan owner. |
 | DEC-2026-10-17-04 | 2026-10-17 | Temuan yang **belum** dibereskan (F-03…F-09) tetap terbuka sampai tiap temuan punya bukti implementasi/regression (bukan hanya tangkapan layar). **F-01/F-02 sudah SOLVED via PR #279** dan tidak lagi terbuka. | PR-D/PR-E menangani dokumen drift; F-04/F-06 menunggu regression test; F-07 menunggu bukti eksekusi backup eksternal; F-01/F-02 tidak dijadwalkan ulang. | Roadmap Audit. |
