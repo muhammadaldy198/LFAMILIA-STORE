@@ -442,7 +442,8 @@ Keputusan bisnis yang dibuat setelah PRD v1.0 dan menggantikan/menyempurnakan ba
 | Tanggal | Keputusan | Dampak ke PRD |
 |---|---|---|
 | 2026-10-15 | Sumber kebenaran = PRD + log keputusan pasca-PRD | §44 |
-| 2026-10-14 | Tidak ada refund (no-refund) | §13, §16: refund bukan sumber saldo / bukan status order |
+| 2026-10-14 | ~~Tidak ada refund (no-refund)~~ — **SUPERSEDED oleh 2026-10-17** | §13, §16: refund bukan sumber saldo / bukan status order |
+| 2026-10-17 | Refund **dilayani manual via CS** (DE-2026-10-17-05): 5 kondisi, ajukan ≤7 hari kalender via Hubungi Kami, review 1–7 hari kerja, dana 1–14 hari kerja; sistem **tidak mengotomatiskan** refund. Halaman `/refund` dipertahankan. | §13, §16; menggantikan entri 2026-10-14 |
 | 2026-10-12 | Konsep SKU cadangan `_B` dihapus | §5, §6: 1 SKU Digiflazz per nominal (model `_A`) |
 | 2026-10-12 | Harga jual ML = modal × 1,06, tidak dibulatkan | §17: perumusan harga lengkap DITUNDA ke pembahasan produk |
 | 2026-10-15 | Satu nominal boleh punya beberapa provider | §5 |
