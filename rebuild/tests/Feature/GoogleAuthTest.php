@@ -168,10 +168,10 @@ class GoogleAuthTest extends TestCase
             ->put('/account/phone', ['phone' => '6281234567890'])
             ->assertSessionHasErrors('phone');
 
-        // Bare digits without prefix (81...)
+        // Equivalent Indonesian format with plus (+62...)
         $this->actingAs($newUser, 'web')
             ->withSession(['auth.password_confirmed_at' => time()])
-            ->put('/account/phone', ['phone' => '81234567890'])
+            ->put('/account/phone', ['phone' => '+6281234567890'])
             ->assertSessionHasErrors('phone');
 
         $this->assertNull($newUser->fresh()->phone);

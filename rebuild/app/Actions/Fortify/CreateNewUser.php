@@ -30,18 +30,17 @@ class CreateNewUser implements CreatesNewUsers
         }
 
         // Jika input diawali tanda + eksplisit, nomor sudah membawa kode negara internasional
-        // sehingga jangan perlakukan sebagai awalan lokal Indonesia 8...
+        // sehingga jangan perlakukan sebagai awalan lokal Indonesia
         if (str_starts_with(trim($phone), '+')) {
             return $digits;
         }
 
         // Variasi lokal Indonesia (tanpa tanda +):
-        // 0812... -> 62812...
-        // 812...  -> 62812...
+        // Hanya angka yang diawali '08...' atau '0...' domestik yang distandarkan ke '62...'.
+        // Angka berawalan '8...' polos TIDAK di-expand ke '628...' agar selaras dengan
+        // kebijakan tracking publik dan tidak menabrak nomor internasional lain (seperti Jepang +81).
         if (str_starts_with($digits, '0') && strlen($digits) > 1) {
             $digits = '62'.substr($digits, 1);
-        } elseif (str_starts_with($digits, '8') && strlen($digits) >= 8 && strlen($digits) <= 13) {
-            $digits = '62'.$digits;
         }
 
         return $digits;

@@ -48,10 +48,12 @@ class PhoneNormalizationMigrationTest extends TestCase
 
         $this->assertSame('6281234567890', CreateNewUser::normalizePhone('081234567890'));
         $this->assertSame('6281234567890', CreateNewUser::normalizePhone('+62 81234567890'));
-        $this->assertSame('6281234567890', CreateNewUser::normalizePhone('81234567890'));
         $this->assertSame('15551234567', CreateNewUser::normalizePhone('+1 555-123-4567'));
         $this->assertSame('8123456789', CreateNewUser::normalizePhone('+81 23456789'));
         $this->assertSame('390612345678', CreateNewUser::normalizePhone('+39 0612345678'));
+
+        // Input 8... polos tidak di-expand ke 628... agar sinkron dengan namespace internasional
+        $this->assertSame('81223456789', CreateNewUser::normalizePhone('81223456789'));
 
         // Pastikan nomor internasional non-ID tidak di-expand ke variasi lokal Indonesia
         // baik ketika diprefix '+' maupun ketika diinput digit polos (contoh Jepang 81 223456789)

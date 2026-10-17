@@ -83,10 +83,16 @@ function onInput(event) {
     const isPastedInternational = raw.trim().startsWith('+');
     let digits = raw.replace(/\D/g, '').slice(0, 16);
 
-    // Jika user menempelkan (paste) nomor lengkap internasional diawali '+'
-    // yang membawa kode negara terpilih, potong dial code negaranya agar tidak ter-dobel
-    if (isPastedInternational && digits.startsWith(country.value.dial)) {
-        digits = digits.slice(country.value.dial.length);
+    // Jika user menempelkan (paste) nomor lengkap internasional yang diawali '+':
+    // Deteksi kode negara secara otomatis dan alihkan pilihan negara ke negara tersebut
+    if (isPastedInternational) {
+        const match = [...phoneCountries]
+            .sort((a, b) => b.dial.length - a.dial.length)
+            .find((item) => digits.startsWith(item.dial));
+        if (match) {
+            country.value = match;
+            digits = digits.slice(match.dial.length);
+        }
     }
 
     local.value = digits.slice(0, 15);

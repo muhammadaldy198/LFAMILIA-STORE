@@ -58,20 +58,29 @@ function phoneWithCountryCode(value = guestPhone.value) {
     if (props.customer) return raw;
 
     const isPastedInternational = raw.startsWith('+');
-    let local = raw.replace(/\D/g, '');
-    if (!local) return '';
+    let digits = raw.replace(/\D/g, '');
+    if (!digits) return '';
 
-    // Jika user menempelkan format internasional dengan dial code terpilih, potong dial-nya
-    if (isPastedInternational && local.startsWith(phoneCountry.value.dial)) {
-        local = local.slice(phoneCountry.value.dial.length);
+    let activeDial = phoneCountry.value.dial;
+
+    // Jika user menempelkan format internasional dengan '+'
+    if (isPastedInternational) {
+        const match = [...phoneCountries]
+            .sort((a, b) => b.dial.length - a.dial.length)
+            .find((item) => digits.startsWith(item.dial));
+        if (match) {
+            phoneCountry.value = match;
+            activeDial = match.dial;
+            digits = digits.slice(match.dial.length);
+        }
     }
 
     // Buang trunk prefix '0' jika negara tidak mempertahankan angka nol pembuka
-    if (!LEADING_ZERO_PRESERVED_DIALS.has(phoneCountry.value.dial)) {
-        local = local.replace(/^0+/, '');
+    if (!LEADING_ZERO_PRESERVED_DIALS.has(activeDial)) {
+        digits = digits.replace(/^0+/, '');
     }
 
-    return local ? `+${phoneCountry.value.dial}${local}` : '';
+    return digits ? `+${activeDial}${digits}` : '';
 }
 const voucherCode = ref('');
 const paymentChannelCode = ref('');
