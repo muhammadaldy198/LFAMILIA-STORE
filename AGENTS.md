@@ -24,7 +24,7 @@ Skills live in `.claude/skills/`. Read the `SKILL.md`, not just the skill name.
 | Connect frontend to backend routes | wayfinder-development |
 | Write/change tests | pest-testing (+ webapp-testing for browser tests) |
 | Audit/review code | data-fetch-analysis + karpathy-coder + skill-security-auditor (for security) |
-| Payment/Midtrans | integrate-midtrans-payments (refund section REJECTED — no-refund policy) + fortify-development (if auth) |
+| Payment/Midtrans | integrate-midtrans-payments (hanya Snap/webhook/verifikasi/status; bagian refund TIDAK berlaku — refund manual via CS, DE-2026-10-17-05) + fortify-development (if auth) |
 | Build new feature/module | code-scaffolding + stack skills above |
 | Deploy/CI | cicd-deployment |
 | Walkthrough / big PR review | code-tour |
@@ -32,11 +32,10 @@ Skills live in `.claude/skills/`. Read the `SKILL.md`, not just the skill name.
 | Slow debug / N+1 | debug-using-debugbar |
 | Media/upload | medialibrary-development |
 | Auth (login/2FA/passkey) | fortify-development |
-| GitHub | github-oauth |
 
 **Mandatory report:** at the end of every coding/audit task, state which skills were used + which were skipped and why. If a mandatory skill wasn't used, the reason must be written — no silent skipping.
 
-**Conflict rule:** owner instructions (this file, `CLAUDE.md`, explicit task) always win over skills. Example: the Midtrans skill teaches refund implementation → rejected, the store's no-refund policy applies.
+**Conflict rule:** owner instructions (this file, `CLAUDE.md`, explicit task) always win over skills. Example: the Midtrans skill teaches automatic refund implementation → rejected, the store's refund is manual via CS (DE-2026-10-17-05), never automatic.
 
 **Override:** the user can force a skill by naming it ("pake skill X") — that overrides the table.
 
@@ -66,7 +65,7 @@ Bugs (even minor) must be audited and discussed with the user BEFORE being fixed
 - **Do NOT use the built-in GitHub connector** — use the custom GitHub OAuth connector.
 - **Do NOT commit secrets** (`.env`, API keys, tokens, passwords, private keys, backup encryption material). Never put real secrets in Markdown, screenshots, fixtures, logs, PR comments, issues, or CI output.
 - **Payment tests ONLY simulation/sandbox.** No real production payment transactions without user approval.
-- **NO-REFUND policy.** The store does not serve refunds. Never build/trigger automatic refund paths. Never promise refund in customer-facing text. Failed/expired payments are handled via retry, not refund. Problem paid orders: manual settlement via Super Admin wallet adjustment (members) or direct contact (guests). Never initiate gateway refunds.
+- **REFUND = manual via CS (DE-2026-10-17-05).** Refund DILAYANI untuk kondisi tertentu (Kebijakan Pengembalian Dana: gagal tak diproses ulang, pembayaran ganda, produk tak tersedia, nominal kurang, transaksi tak sah; ajukan ≤7 hari kalender via Hubungi Kami; review 1–7 hari kerja; dana 1–14 hari kerja). **Jangan pernah bangun/trigger refund OTOMATIS di sistem** — sistem nggak mengotomatiskan refund. Failed/expired payments handled via retry, bukan refund. Masalah order berbayar: settlement manual via Super Admin wallet adjustment (member) atau kontak langsung (guest). Jangan pernah initiate gateway refund otomatis.
 - **Digiflazz rules.** Cheapest seller with rating ≥ 4.8. Harga Max = seller price × 1.02, rounded to nearest rupiah. Save one-by-one (not bulk). Navigate Buyer Area → Produk. Single browser session. All products ON. No seller ≥ 4.8 → delete the product. The `_A`/`_B` backup-SKU concept is DEAD — 1 SKU per nominal (model `_A`).
 - **Pricing.** Cost (`cost_idr`) = Harga Max Digiflazz (fixed, not the fluctuating seller price). ML sell price = cost × 1.06, NOT rounded (owner decision 2026-10-12). Other games' sell prices are NOT decided — do not invent them.
 - **Real customer data:** never use as fixtures, screenshots, or public issue content.
@@ -119,7 +118,7 @@ main → focused branch → structured commit(s) → PR → CI → review/fix �
 |---|---|---|
 | Coder | `coder.md` | Writing Laravel code |
 | Reviewer | `reviewer.md` | Review + audit + security |
-| Payment | `payment.md` | Midtrans, no-refund policy |
+| Payment | `payment.md` | Midtrans + refund manual via CS (no auto-refund) |
 | Frontend | `frontend.md` | Vue/Inertia/Tailwind + design |
 | Tester | `tester.md` | Pest + webapp-testing |
 | Deployer | `deployer.md` | CI/CD + deploy runbook |
