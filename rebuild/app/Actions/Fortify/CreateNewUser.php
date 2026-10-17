@@ -49,12 +49,29 @@ class CreateNewUser implements CreatesNewUsers
 
     public static function phoneVariants(string $phone): array
     {
-        $digits = preg_replace('/[^0-9]+/', '', $phone) ?: null;
+        $raw = trim($phone);
+        $digits = preg_replace('/[^0-9]+/', '', $raw) ?: null;
         if ($digits === null) {
             return [$phone];
         }
 
         $variants = [$phone, $digits, '+'.$digits];
+
+        // Jika nomor diawali '+' eksplisit internasional:
+        // Cek apakah benar nomor internasional Indonesia (+62) atau negara lain (+81, +1, dsb).
+        // Jangan pernah meng-expand nomor internasional non-ID ke variasi lokal Indonesia!
+        if (str_starts_with($raw, '+')) {
+            if (str_starts_with($digits, '62') && strlen($digits) > 2) {
+                $local = substr($digits, 2);
+                $variants[] = '0'.$local;
+                $variants[] = $local;
+            }
+
+            return array_values(array_unique($variants));
+        }
+
+        // Variasi lokal Indonesia (tanpa tanda '+'):
+        // 62812..., 0812..., atau 812...
         if (str_starts_with($digits, '62') && strlen($digits) > 2) {
             $local = substr($digits, 2);
             $variants[] = '0'.$local;
@@ -63,7 +80,7 @@ class CreateNewUser implements CreatesNewUsers
             $local = substr($digits, 1);
             $variants[] = '62'.$local;
             $variants[] = $local;
-        } elseif (str_starts_with($digits, '8')) {
+        } elseif (str_starts_with($digits, '8') && strlen($digits) <= 13) {
             $variants[] = '0'.$digits;
             $variants[] = '62'.$digits;
         }
@@ -128,7 +145,9 @@ class CreateNewUser implements CreatesNewUsers
         } catch (QueryException $exception) {
             if (($exception->errorInfo[1] ?? null) === 1062) {
                 $message = $exception->getMessage();
-                if (str_contains($message, 'users_email_unique') || str_contains($message, 'email')) {
+                // Periksa spesifik index/constraint yang gagal, jangan hanya mencocokkan substring
+                // dari query INSERT (yang selalu memuat nama kolom `email` dan `phone`).
+                if (preg_match('/key [\'`"]?[^\'`"]*users_email_unique/i', $message) || preg_match('/for key [\'`"]?email/i', $message)) {
                     throw ValidationException::withMessages(['email' => 'Email sudah digunakan oleh akun lain.']);
                 }
 

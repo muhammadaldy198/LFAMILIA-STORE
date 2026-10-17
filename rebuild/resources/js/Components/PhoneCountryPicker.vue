@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
-import { phoneCountries } from '../Data/phoneCountries';
+import { phoneCountries, LEADING_ZERO_PRESERVED_DIALS } from '../Data/phoneCountries';
 
 const props = defineProps({
     modelValue: { type: String, default: '' },
@@ -20,17 +20,16 @@ let lastEmitted = null;
 const flag = (item) => String.fromCodePoint(...item.iso.toUpperCase().split('').map((char) => 127397 + char.charCodeAt(0)));
 const filtered = computed(() => phoneCountries.filter((item) => `${item.name} +${item.dial}`.toLowerCase().includes(search.value.trim().toLowerCase())));
 
-/** Nomor yang dikirim: kode negara terpilih + nomor lokal.
- * Hanya buang leading zero untuk negara yang secara format membuang nol lokal (seperti Indonesia).
- * Untuk negara yang mempertahankan 0 (seperti Italia +39), angka 0 dipertahankan.
- * Tidak memotong digit lokal yang kebetulan sama dengan dial code.
+/**
+ * Nomor yang dikirim ke backend: kode negara terpilih + nomor lokal format internasional.
+ * Jika negara terpilih tidak mempertahankan angka nol (misal bukan dial 39 Italia),
+ * trunk prefix '0' domestik dibuang (contoh UK 0712... -> +44712..., ID 0812... -> +62812...).
  */
 const composed = computed(() => {
     let digits = local.value.replace(/\D/g, '');
     if (!digits) return '';
 
-    // Untuk Indonesia (dial 62), jika user mengetik 0812..., strip angka 0 pembuka
-    if (country.value.dial === '62' && digits.startsWith('0')) {
+    if (!LEADING_ZERO_PRESERVED_DIALS.has(country.value.dial)) {
         digits = digits.replace(/^0+/, '');
     }
 
@@ -80,7 +79,17 @@ function emitValue() {
 }
 
 function onInput(event) {
-    local.value = String(event.target.value).replace(/\D/g, '').slice(0, 15);
+    const raw = String(event.target.value || '');
+    const isPastedInternational = raw.trim().startsWith('+');
+    let digits = raw.replace(/\D/g, '').slice(0, 16);
+
+    // Jika user menempelkan (paste) nomor lengkap internasional diawali '+'
+    // yang membawa kode negara terpilih, potong dial code negaranya agar tidak ter-dobel
+    if (isPastedInternational && digits.startsWith(country.value.dial)) {
+        digits = digits.slice(country.value.dial.length);
+    }
+
+    local.value = digits.slice(0, 15);
     emitValue();
 }
 

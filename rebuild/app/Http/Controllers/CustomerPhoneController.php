@@ -41,7 +41,7 @@ class CustomerPhoneController
         } catch (QueryException $exception) {
             if (($exception->errorInfo[1] ?? null) === 1062) {
                 $message = $exception->getMessage();
-                if (str_contains($message, 'users_email_unique') || str_contains($message, 'email')) {
+                if (preg_match('/key [\'`"]?[^\'`"]*users_email_unique/i', $message) || preg_match('/for key [\'`"]?email/i', $message)) {
                     return back()->withErrors(['email' => 'Email sudah digunakan oleh akun lain.']);
                 }
 

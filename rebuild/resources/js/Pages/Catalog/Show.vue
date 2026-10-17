@@ -8,7 +8,7 @@ import CustomerShell from '../../Components/CustomerShell.vue';
 import CheckoutPaymentMethods from '../../Components/Checkout/PaymentMethods.vue';
 import CheckoutVoucherModal from '../../Components/Checkout/VoucherModal.vue';
 import '../../../css/checkout.css';
-import { phoneCountries } from '../../Data/phoneCountries';
+import { phoneCountries, LEADING_ZERO_PRESERVED_DIALS } from '../../Data/phoneCountries';
 
 const props = defineProps({
     product: Object,
@@ -56,11 +56,18 @@ function phoneWithCountryCode(value = guestPhone.value) {
     // Nomor akun yang sudah login disimpan lengkap di server — jangan
     // ditambahi kode negara lagi, cukup tampilkan apa adanya.
     if (props.customer) return raw;
+
+    const isPastedInternational = raw.startsWith('+');
     let local = raw.replace(/\D/g, '');
     if (!local) return '';
 
-    // Hanya buang leading zero untuk Indonesia (dial 62)
-    if (phoneCountry.value.dial === '62' && local.startsWith('0')) {
+    // Jika user menempelkan format internasional dengan dial code terpilih, potong dial-nya
+    if (isPastedInternational && local.startsWith(phoneCountry.value.dial)) {
+        local = local.slice(phoneCountry.value.dial.length);
+    }
+
+    // Buang trunk prefix '0' jika negara tidak mempertahankan angka nol pembuka
+    if (!LEADING_ZERO_PRESERVED_DIALS.has(phoneCountry.value.dial)) {
         local = local.replace(/^0+/, '');
     }
 

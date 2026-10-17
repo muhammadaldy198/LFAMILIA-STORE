@@ -180,12 +180,29 @@ class PublicOrderTrackingController
 
     private function phoneVariants(string $value): array
     {
-        $digits = preg_replace('/\D+/', '', $value) ?: '';
+        $raw = trim($value);
+        $digits = preg_replace('/\D+/', '', $raw) ?: '';
         if (strlen($digits) < 6) {
             return [];
         }
 
         $variants = [$digits, '+'.$digits];
+
+        // Jika nomor diawali '+' eksplisit internasional:
+        // Cek apakah benar nomor internasional Indonesia (+62) atau negara lain (+81, +1, dsb).
+        // Jangan pernah meng-expand nomor internasional non-ID ke variasi lokal Indonesia!
+        if (str_starts_with($raw, '+')) {
+            if (str_starts_with($digits, '62') && strlen($digits) > 2) {
+                $local = substr($digits, 2);
+                $variants[] = '0'.$local;
+                $variants[] = $local;
+            }
+
+            return array_values(array_unique($variants));
+        }
+
+        // Variasi lokal Indonesia (tanpa tanda '+'):
+        // 62812..., 0812..., atau 812...
         if (str_starts_with($digits, '62') && strlen($digits) > 2) {
             $local = substr($digits, 2);
             $variants[] = '0'.$local;
@@ -194,7 +211,7 @@ class PublicOrderTrackingController
             $local = substr($digits, 1);
             $variants[] = '62'.$local;
             $variants[] = $local;
-        } elseif (str_starts_with($digits, '8')) {
+        } elseif (str_starts_with($digits, '8') && strlen($digits) <= 13) {
             $variants[] = '0'.$digits;
             $variants[] = '62'.$digits;
         }

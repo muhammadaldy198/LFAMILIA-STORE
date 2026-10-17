@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Fortify\CreateNewUser;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -9,20 +10,12 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // Rebuild the derived value from phone, not a potentially empty/stale
-        // phone_normalized value. Canonical form keeps the international country
-        // code prefix (e.g. 62812... for Indonesia) so phone namespaces across
-        // 248 countries never collide.
+        // Gunakan langsung implementasi kanonikal yang sama dengan aplikasi
+        // (CreateNewUser::normalizePhone) agar penanganan awalan internasional '+'
+        // dan nomor Indonesia konsisten 100%, tanpa salah konversi nomor luar negeri (+81 dsb).
         DB::table('users')->whereNotNull('phone')->orderBy('id')->chunkById(500, function ($users): void {
             foreach ($users as $user) {
-                $digits = preg_replace('/[^0-9]+/', '', (string) $user->phone) ?: null;
-                if ($digits !== null) {
-                    if (str_starts_with($digits, '0') && strlen($digits) > 1) {
-                        $digits = '62'.substr($digits, 1);
-                    } elseif (str_starts_with($digits, '8') && strlen($digits) >= 8) {
-                        $digits = '62'.$digits;
-                    }
-                }
+                $digits = CreateNewUser::normalizePhone((string) $user->phone);
                 DB::table('users')->where('id', $user->id)->update(['phone_normalized' => $digits]);
             }
         });

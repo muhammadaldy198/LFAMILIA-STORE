@@ -1,7 +1,14 @@
 /**
  * Daftar kode panggilan negara (ISO 3166-1 alpha-2) untuk pemilih nomor WhatsApp.
  * Indonesia berada di urutan pertama sebagai default.
+ *
+ * Catatan E.164:
+ * Mayoritas negara menggunakan trunk prefix '0' untuk panggilan domestik yang HARUS
+ * dibuang saat format internasional (misal: ID 0812->+62812, UK 0712->+44712, AU 0412->+61412).
+ * Hanya segelintir negara (seperti Italia IT/Vatican VA/San Marino SM dial 39) yang
+ * mempertahankan angka 0 pembuka pada format internasional (+39 06...).
  */
+export const LEADING_ZERO_PRESERVED_DIALS = new Set(['39']);
 export const phoneCountries = [
     { name: 'Indonesia', iso: 'id', dial: '62' },
     { name: 'Afghanistan', iso: 'af', dial: '93' }, { name: 'Albania', iso: 'al', dial: '355' },

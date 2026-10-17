@@ -52,6 +52,11 @@ class PhoneNormalizationMigrationTest extends TestCase
         $this->assertSame('15551234567', CreateNewUser::normalizePhone('+1 555-123-4567'));
         $this->assertSame('8123456789', CreateNewUser::normalizePhone('+81 23456789'));
         $this->assertSame('390612345678', CreateNewUser::normalizePhone('+39 0612345678'));
+
+        // Pastikan nomor internasional non-ID dengan awalan + tidak di-expand ke variasi lokal Indonesia
+        $variants = CreateNewUser::phoneVariants('+81 223456789');
+        $this->assertNotContains('6281223456789', $variants);
+        $this->assertNotContains('081223456789', $variants);
     }
 
     public function test_migration_aborts_on_duplicate_phones_without_deleting_or_merging_users(): void
