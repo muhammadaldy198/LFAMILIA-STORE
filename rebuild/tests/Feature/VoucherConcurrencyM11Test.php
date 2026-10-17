@@ -178,7 +178,7 @@ class VoucherConcurrencyM11Test extends TestCase
             DB::table('provider_mappings')->where('id', $mappingId)->delete();
             DB::table('digiflazz_catalog_items')->where('buyer_sku_code', $externalSku)->delete();
             DB::table('product_packages')->where('id', $package->id)->delete();
-            DB::table('product_fields')->where('id', $field->id)->delete();
+            DB::table('product_input_fields')->where('id', $field->id)->delete();
             DB::table('products')->where('id', $product->id)->delete();
         }
     }
