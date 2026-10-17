@@ -26,14 +26,14 @@
 
 | ID | Level | Temuan | Status solusi |
 |---|---|---|---|
-| F-01 | P0 | Main foundation gagal pada `Validate local Git hooks`; Pint `no_unused_imports` pada `tests/Feature/FulfillmentTest.php`. | SOLVED via PR #279 (CI hijau). |
+| F-01 | P0 | Main foundation gagal pada `Validate local Git hooks`; Pint `no_unused_imports` pada `rebuild/tests/Feature/FulfillmentTest.php`. | SOLVED via PR #279 (CI hijau). |
 | F-02 | P0 | PR #279 foundation gagal: 5 error PHPUnit (4 fixture duplicate `users_phone_normalized_unique`, 1 test backup SKU lama). | SOLVED via PR #279 (para fixture/ekspektasi dikoreksi tanpa melonggarkan unik/anti-failover). |
-| F-03 | P1 | PRD v1.1 §47: satu SKU / no auto-switch; `FULFILLMENT.md` masih merinci failover definitif + max-price backup; `ADMIN.md` menjelaskan cadangan otomatis. | OPEN — menunggu PR-E (dokumen domain drift). |
-| F-04 | P1 | `app/Services/FulfillmentService.php:531` punya `if (false && $failover)` (dead), TETAPI jalur **retry failover masih hidup**: `retrySafeAttempt()` di line 577–578 memanggil `failoverIfSafe()` saat `$attempt->safe_to_failover=true`. Commit #278 mengubah tulisan baru ke `false` tapi **tidak ada migrasi untuk data lama** — baris `safe_to_failover=true` pasca-#278 masih reachable lewat action Admin retry. **Ini active gap, bukan dead code.** | OPEN — butuh migrasi/guard baris lama + regression; jangan klaim failover fully disabled. |
-| F-05 | P3 | `PAYMENT.md` dan `PaymentStateService` memuat `REFUNDED`/`REFUND_REVIEW` sebagai status. Ini adapter status masuk gateway, bukan jalur refund otomatis. Refund = **manual via CS** (keputusan owner, lihat DE-2026-10-17-05). | OPEN (kosmetik) — tidak perlu pisahkan rekonsiliasi; status masuk tetap, operasi refund tetap manual. |
+| F-03 | P1 | PRD v1.1 §47: satu SKU / no auto-switch; `rebuild/FULFILLMENT.md` masih merinci failover definitif + max-price backup; `rebuild/ADMIN.md` menjelaskan cadangan otomatis. | OPEN — menunggu PR-E (dokumen domain drift). |
+| F-04 | P1 | `rebuild/app/Services/FulfillmentService.php:531` punya `if (false && $failover)` (dead), TETAPI jalur **retry failover masih hidup**: `retrySafeAttempt()` di line 577–578 memanggil `failoverIfSafe()` saat `$attempt->safe_to_failover=true`. Commit #278 mengubah tulisan baru ke `false` tapi **tidak ada migrasi untuk data lama** — baris `safe_to_failover=true` pasca-#278 masih reachable lewat action Admin retry. **Ini active gap, bukan dead code.** | OPEN — butuh migrasi/guard baris lama + regression; jangan klaim failover fully disabled. |
+| F-05 | P3 | `rebuild/PAYMENT.md` dan `PaymentStateService` memuat `REFUNDED`/`REFUND_REVIEW` sebagai status. Ini adapter status masuk gateway, bukan jalur refund otomatis. Refund = **manual via CS** (keputusan owner, lihat DE-2026-10-17-05). | OPEN (kosmetik) — tidak perlu pisahkan rekonsiliasi; status masuk tetap, operasi refund tetap manual. |
 | F-06 | P1 | Digiflazz mapping nonmanual menerima refresh harga supplier; manual-lock dikecualikan. **Bukan gap test**: `DigiflazzCatalogImport::upsert()` (baris 48–51) tetap menimpa `cost_idr`/`max_price_idr` untuk mapping dengan `is_manual_price=false` pada tiap refresh; `AdminDigiflazzRestorationTest` sudah memverifikasi lock maupun perubahan harga unlocked. | OPEN — butuh **enforcement harga tetap** untuk mapping unlocked (cost_idr = Harga Max konstan, tidak mengikuti harga supplier), plus coverage; test lock tambahan tidak menutup gap ini. |
 | F-07 | P1 | PRD §35 mensyaratkan external backup; deploy README pernah mencatat `BACKUP_REQUIRE_REMOTE=false`. | OPEN — verifikasi konfigurasi aktual + bukti restore + backup media. |
-| F-08 | P2 | `TESTING.md` menyatakan bukan Playwright, tetapi `checkout-visual.mjs` memakai Playwright. | OPEN — koreksi dokumentasi jalur Chromium. |
+| F-08 | P2 | `rebuild/TESTING.md` menyatakan bukan Playwright, tetapi `rebuild/tests/Browser/checkout-visual.mjs` memakai Playwright. | OPEN — koreksi dokumentasi jalur Chromium. |
 | F-09 | P2 | `CLAUDE.md` bertanggal verified 4 Okt; 20 skill repo + 8 roles belum punya matriks bersama skills tambahan VM. | OPEN — menunggu PR-D (AGENTS.md + CLAUDE.md + skill discovery). |
 
 ### Lampiran: catatan status per temuan
@@ -56,12 +56,12 @@ Temuan F-01/F-02 **telah dibereskan** dalam PR #279 (baseline `780e9dc`), sehing
 |---|---|
 | IMPLEMENTED | Backend Laravel 12 / PHP 8.4; Frontend Vue 3 + Inertia v2 + Tailwind v4; MySQL 8; Redis; Nginx; Fortify + Sanctum; Spatie Media Library; CloudPanel; Cloudflare. |
 
-*Bukti:* `composer.json` (`laravel/framework` ^12, `spatie/laravel-medialibrary` ^11); `package.json` (vue@3, `@inertiajs/vue`); `rebuild/` layout; deploy runbook CloudPanel/VPS. (Email via job Resend — `config/mail.php` tidak ada di repo, lihat §29.)
+*Bukti:* `rebuild/composer.json` (`laravel/framework` ^12, `spatie/laravel-medialibrary` ^11); `rebuild/package.json` (vue@3, `@inertiajs/vue`); `rebuild/` layout; deploy runbook CloudPanel/VPS. (Email via job Resend — `rebuild/config/mail.php` tidak ada di repo, lihat §29.)
 
 ### §3 Arsitektur Sistem
 | Status | Keterangan |
 |---|---|
-| IMPLEMENTED | Arsitektur layer services + controllers; struktur `app/Services`, `app/Models`, `routes/web.php`, `resources/js/Pages`, `database/migrations`. |
+| IMPLEMENTED | Arsitektur layer services + controllers; struktur `rebuild/app/Services`, `rebuild/app/Models`, `rebuild/routes/web.php`, `rebuild/resources/js/Pages`, `rebuild/database/migrations`. |
 
 *Bukti:* Peta layanan (PaymentService, FulfillmentService, CheckoutService, WalletTopupService, MembershipService, dst.) + migrasi terstruktur.
 
@@ -70,70 +70,70 @@ Temuan F-01/F-02 **telah dibereskan** dalam PR #279 (baseline `780e9dc`), sehing
 |---|---|
 | IMPLEMENTED | Kategori: Game, Pulsa, Paket Data, PLN, Voucher, Entertainment, PPOB. E-wallet tidak menjadi kategori awal. Kategori extensible dari panel. |
 
-*Bukti:* `app/Models/Category.php`; route admin kategori `routes/web.php:302-304` (`AdminCatalogController::category/updateCategory/destroyCategory`).
+*Bukti:* `rebuild/app/Models/Category.php`; route admin kategori `rebuild/routes/web.php:302-304` (`AdminCatalogController::category/updateCategory/destroyCategory`).
 
 ### §5 Model Katalog & Multi-Provider
 | Status | Keterangan |
 |---|---|
 | PARTIAL / GAP | Struktur Kategori → Produk → Nominal → Provider Mapping. Satu nominal boleh punya banyak provider. Khusus Digiflazz: 1 SKU per nominal (model `_A`), tanpa `_B`. Fulfillment tidak terkunci hanya Digiflazz. **Auto-switch nonaktif** (data baru tidak pernah auto-switch ke SKU lain — PRD §47); **jalur retry-failover legacy tetap hidup** (F-04: baris data lama `safe_to_failover=true` masih reachable via Admin retry). **GAP:** invariant "1 SKU Digiflazz per nominal" hanya dijaga di sisi **send** (no auto-switch/no auto-failover baru), TETAPI sisi **konfigurasi** masih mengizinkan multi-SKU: `AdminDigiflazzController::attachSource()` dapat menambah mapping Digiflazz kedua, route `/admin/catalog/mappings/{mapping}` bisa mengaktifkannya tanpa cek sibling Digiflazz, dan schema hanya `unique(provider_id, external_sku)`. |
 
-*Bukti:* `app/Models/ProductPackage.php`, `app/Models/ProviderMapping.php`; `app/Services/DigiflazzCatalogImport.php`; `app/Services/FulfillmentService.php:529-533` (`if (false && $failover)` dead + komentar "Per PRD §47") **dan `:577-578`** (`retrySafeAttempt` → `failoverIfSafe()` saat `safe_to_failover=true` — jalur retry legacy masih hidup, F-04 active gap); `app/Http/Controllers/AdminDigiflazzController.php` (`attachSource`, `auto_sync`); `database/migrations/2026_09_29_000001_create_identity_catalog_tables.php:134` (`unique(['provider_id','external_sku'])` — bukan unique per nominal). **Temuan:** F-04 retry-failover legacy (active gap) + invarian multi-SKU dibiarkan terbuka (PR §5).
+*Bukti:* `rebuild/app/Models/ProductPackage.php`, `rebuild/app/Models/ProviderMapping.php`; `rebuild/app/Services/DigiflazzCatalogImport.php`; `rebuild/app/Services/FulfillmentService.php:529-533` (`if (false && $failover)` dead + komentar "Per PRD §47") **dan `:577-578`** (`retrySafeAttempt` → `failoverIfSafe()` saat `safe_to_failover=true` — jalur retry legacy masih hidup, F-04 active gap); `rebuild/app/Http/Controllers/AdminDigiflazzController.php` (`attachSource`, `auto_sync`); `rebuild/database/migrations/2026_09_29_000001_create_identity_catalog_tables.php:134` (`unique(['provider_id','external_sku'])` — bukan unique per nominal). **Temuan:** F-04 retry-failover legacy (active gap) + invarian multi-SKU dibiarkan terbuka (PR §5).
 
 ### §6 Digiflazz
 | Status | Keterangan |
 |---|---|
 | PARTIAL (karena F-04) | Panel import/sync produk & SKU Digiflazz. `buyer_sku_code` berasal dari data Digiflazz, tidak dimanipulasi customer. Seller selection/ranking manual (Buyer Area → Produk). **Digiflazz Tools terpisah + auto-switch tidak ada** (persyaratan §47 "no backup SKU"), TETAPI jalur **retry-failover legacy masih reachable** (F-04) — sehingga nomor ini perlu dicatat partial sampai jalur itu dihapus/di-guard. |
 
-*Bukti:* `app/Services/DigiflazzCatalogImport.php`; `app/Services/AdminDigiflazzMonitorService.php`; `app/Http/Controllers/AdminDigiflazzController.php`; `app/Services/DigiflazzFixedPricePolicy.php`. Tidak ada route/service bersimbol `auto-switch` di `app/`.
+*Bukti:* `rebuild/app/Services/DigiflazzCatalogImport.php`; `rebuild/app/Services/AdminDigiflazzMonitorService.php`; `rebuild/app/Http/Controllers/AdminDigiflazzController.php`; `rebuild/app/Services/DigiflazzFixedPricePolicy.php`. Tidak ada route/service bersimbol `auto-switch` di `rebuild/app/`.
 
 ### §7 Produk Manual
 | Status | Keterangan |
 |---|---|
 | IMPLEMENTED | Tab Manual terpisah; tidak terbatas Roblox; gamepass/gift/custom/entertainment/voucher; mode `AUTO_PROVIDER` & `MANUAL`; ID internal DB LFAMILIA; dapat pakai Manual QRIS + notifikasi internal/webhook. |
 
-*Bukti:* `app/Services/AdminManualOrderService.php`; `app/Models/ProviderMapping.php` (mode fulfillment konstanta); menu panel "Manual".
+*Bukti:* `rebuild/app/Services/AdminManualOrderService.php`; `rebuild/app/Models/ProviderMapping.php` (mode fulfillment konstanta); menu panel "Manual".
 
 ### §8 Customer Input & Nickname
 | Status | Keterangan |
 |---|---|
 | IMPLEMENTED | Field per produk configurable (User ID, Zone, Server, HP, meter PLN, email, username). Hanya field yang dibutuhkan provider dikirim. Provider nickname utama KokinPay. Super Admin kelola game code/mapping/test nickname/enable-disable checker/status koneksi. **Checker gagal → customer tetap boleh lanjut dengan peringatan.** Nama provider tidak ditampilkan ke customer. |
 
-*Bukti:* `app/Models/ProductInputField.php`; `app/Services/NicknameService.php:63,130` (warning "Nickname tidak berhasil diverifikasi karena layanan pengecekan sedang tidak tersedia"); `resources/js` field per produk.
+*Bukti:* `rebuild/app/Models/ProductInputField.php`; `rebuild/app/Services/NicknameService.php:63,130` (warning "Nickname tidak berhasil diverifikasi karena layanan pengecekan sedang tidak tersedia"); `rebuild/resources/js` field per produk.
 
 ### §9 Akun Pelanggan
 | Status | Keterangan |
 |---|---|
 | IMPLEMENTED | Guest Checkout + Registered Customer. Login email/password + Google OAuth. Setelah Google login, nomor HP wajib diisi tetapi OTP tidak wajib (v1). Fitur: profil, wallet, membership tier, riwayat, detail pesanan, tiket komplain, ubah/lupa password, hapus akun. |
 
-*Bukti:* `app/Http/Controllers/GoogleAuthController.php:109` (redirect: phone ? account : account.phone.edit); `routes/web.php:125-128` (google redirect/callback); `app/Actions/Fortify/` (register/login); `app/Http/Controllers/Customer*/` (account, wallet, support).
+*Bukti:* `rebuild/app/Http/Controllers/GoogleAuthController.php:109` (redirect: phone ? account : account.phone.edit); `rebuild/routes/web.php:125-128` (google redirect/callback); `rebuild/app/Actions/Fortify/` (register/login); `rebuild/app/Http/Controllers/Customer*/` (account, wallet, support).
 
 ### §10 Membership Pelanggan
 | Status | Keterangan |
 |---|---|
 | IMPLEMENTED | Terpisah dari RBAC Admin. Tier BASIC→SILVER→GOLD→DIAMOND→PLATINUM→MAFIA. BASIC default. Threshold/benefit configurable dari panel; tidak di-hardcode. Perubahan tier manual wajib audit log. |
 
-*Bukti:* `app/Models/MembershipTier.php`; `app/Services/MembershipService.php:24` (`$tiers->firstWhere('code','BASIC') ?? $tiers->first()`); `app/Services/AdminAuditService.php` (audit perubahan membership).
+*Bukti:* `rebuild/app/Models/MembershipTier.php`; `rebuild/app/Services/MembershipService.php:24` (`$tiers->firstWhere('code','BASIC') ?? $tiers->first()`); `rebuild/app/Services/AdminAuditService.php` (audit perubahan membership).
 
 ### §11 Guest Customer
 | Status | Keterangan |
 |---|---|
 | IMPLEMENTED | Guest boleh membeli. Guest **tidak punya wallet/saldo**. Guest dapat order ID & cek status order. Guest dapat review setelah berhasil via token/signed link aman. Android tidak mendukung guest checkout. |
 
-*Bukti:* `app/Services/GuestOrderAccess.php` (token HMAC, `issue`/`issueStable`/`matches`/`store`); `app/Http/Controllers/GuestOrderController.php`; `app/Http/Controllers/ProductReviewController.php` (order check by `order_number`); `routes/web.php:111` (`/reviews` dalam grup `throttle:guest-order`).
+*Bukti:* `rebuild/app/Services/GuestOrderAccess.php` (token HMAC, `issue`/`issueStable`/`matches`/`store`); `rebuild/app/Http/Controllers/GuestOrderController.php`; `rebuild/app/Http/Controllers/ProductReviewController.php` (order check by `order_number`); `rebuild/routes/web.php:111` (`/reviews` dalam grup `throttle:guest-order`).
 
 ### §12 Lifecycle Akun
 | Status | Keterangan |
 |---|---|
-| PARTIAL / GAP | Cleanup akun otomatis bila saldo Rp0, belum transaksi, tidak aktif ≥30 hari; backend verifikasi tidak ada saldo/transaksi/tiket/kewajiban; customer boleh hapus sendiri. **GAP:** `app/Services/CustomerAccountDeletion.php:26` menolak deletion bila ada baris `support_tickets` **apapun** (termasuk tiket yang sudah CLOSED), sedangkan PRD §12 hanya mensyaratkan "tidak ada tiket **aktif**". Akibatnya akun tak aktif yang hanya punya tiket lama tutup tidak bisa dibersihkan. |
+| PARTIAL / GAP | Cleanup akun otomatis bila saldo Rp0, belum transaksi, tidak aktif ≥30 hari; backend verifikasi tidak ada saldo/transaksi/tiket/kewajiban; customer boleh hapus sendiri. **GAP:** `rebuild/app/Services/CustomerAccountDeletion.php:26` menolak deletion bila ada baris `support_tickets` **apapun** (termasuk tiket yang sudah CLOSED), sedangkan PRD §12 hanya mensyaratkan "tidak ada tiket **aktif**". Akibatnya akun tak aktif yang hanya punya tiket lama tutup tidak bisa dibersihkan. |
 
-*Bukti:* `app/Services/CustomerCleanupService.php`; `app/Services/CustomerAccountDeletion.php:26` (`support_tickets->where('user_id')->exists()` tanpa filter status); migrasi lifetime terkait. **Aksi:** samakan filter tiket aktif (mis. `status != closed`) ATAU tandai gap; tidak diubah pada PR-C (dokumen saja).
+*Bukti:* `rebuild/app/Services/CustomerCleanupService.php`; `rebuild/app/Services/CustomerAccountDeletion.php:26` (`support_tickets->where('user_id')->exists()` tanpa filter status); migrasi lifetime terkait. **Aksi:** samakan filter tiket aktif (mis. `status != closed`) ATAU tandai gap; tidak diubah pada PR-C (dokumen saja).
 
 ### §13 Wallet / Saldo
 | Status | Keterangan |
 |---|---|
 | IMPLEMENTED (sebagian besar) | Wallet wajib registered. Sumber saldo: top-up, penambahan Super Admin, penyelesaian pesanan bermasalah (tambah saldo). Min top-up default Rp10.000 configurable. Saldo tidak ditarik tunai. **Ledger** dengan amount, balance before/after, source, reference, actor, timestamp, idempotency key. Saldo negatif dilarang (locking/transaction). |
 
-*Bukti:* `database/migrations/2026_09_29_000002_create_commerce_tables.php` (tabel `wallets`, `wallet_ledger`, `wallet_topups`, index `wallet_source_reference_unique`); `app/Services/WalletTopupService.php:54-58` (lockForUpdate + idempotency); `app/Models/Wallet.php`. **Note:** SARAN per §47 tidak ada refund otomatis; penyelesaian pesanan = tambah saldo (dipisahkan dari webhook — lihat F-05).
+*Bukti:* `rebuild/database/migrations/2026_09_29_000002_create_commerce_tables.php` (tabel `wallets`, `wallet_ledger`, `wallet_topups`, index `wallet_source_reference_unique`); `rebuild/app/Services/WalletTopupService.php:54-58` (lockForUpdate + idempotency); `rebuild/app/Models/Wallet.php`. **Note:** SARAN per §47 tidak ada refund otomatis; penyelesaian pesanan = tambah saldo (dipisahkan dari webhook — lihat F-05).
 
 ### §14 Aplikasi Android (Fase Berikutnya)
 | Status | Keterangan |
@@ -147,105 +147,105 @@ Temuan F-01/F-02 **telah dibereskan** dalam PR #279 (baseline `780e9dc`), sehing
 |---|---|
 | IMPLEMENTED | Urutan: input ID → cek nickname → pilih produk/nominal → metode bayar → voucher → ringkasan harga → buat order → bayar → verifikasi backend → fulfillment → selesai. Produk dinominal diurutkan berdasar nilai nominal, bukan harga jual. |
 
-*Bukti:* `app/Services/CheckoutService.php`; `app/Services/CheckoutPricing.php`; `app/Services/CatalogNominalOrder.php`; `app/Services/VoucherStockService.php`; route `/checkout`; `resources/js/Pages/Catalog/Show.vue`.
+*Bukti:* `rebuild/app/Services/CheckoutService.php`; `rebuild/app/Services/CheckoutPricing.php`; `rebuild/app/Services/CatalogNominalOrder.php`; `rebuild/app/Services/VoucherStockService.php`; route `/checkout`; `rebuild/resources/js/Pages/Catalog/Show.vue`.
 
 ### §16 Status Order
 | Status | Keterangan |
 |---|---|
 | IMPLEMENTED (status order) / CATATAN (refund manual) | Status resmi §16: Menunggu Pembayaran, Dibayar, Diproses, Berhasil, Gagal, Dibatalkan, Kedaluwarsa, BLOCKED. **"Refund" bukan status order otomatis** (addendum §47) — tetapi **refund NYATA & dilayani manual via CS**: customer mengajukan (5 kondisi, ≤7 hari), CS tinjau (1–7 hari), dana dicairkan transfer balik/saldo. Label `REFUND`/`REFUNDED`/`PAYMENT_REFUNDED` di runtime adalah status masuk gateway + penanda order yang menunggu/passed review refund, BUKAN eksekusi otomatis. |
 
-*Bukti:* `app/Services/PaymentStateService.php:33` (accepts PENDING/PAID/FAILED/CANCELLED/EXPIRED/REFUNDED/PARTIAL_REFUND_REVIEW), `:37-51` (partial-refund hanya event/log, tidak ubah saldo); `app/Services/AdminOrderPresentation.php:15,17,27,41` (`STATUSES` berisi `REFUND`/`REFUNDED`/`PAYMENT_REFUNDED`); `app/Http/Controllers/AdminOrdersController.php:104` (filter status); `app/Http/Controllers/PublicOrderTrackingController.php:160,299,307,361`. **Refund manual via CS:** tidak ada endpoint refund otomatis; keputusan & pencairan dilakukan di panel/CS (DE-2026-10-17-05).
+*Bukti:* `rebuild/app/Services/PaymentStateService.php:33` (accepts PENDING/PAID/FAILED/CANCELLED/EXPIRED/REFUNDED/PARTIAL_REFUND_REVIEW), `:37-51` (partial-refund hanya event/log, tidak ubah saldo); `rebuild/app/Services/AdminOrderPresentation.php:15,17,27,41` (`STATUSES` berisi `REFUND`/`REFUNDED`/`PAYMENT_REFUNDED`); `rebuild/app/Http/Controllers/AdminOrdersController.php:104` (filter status); `rebuild/app/Http/Controllers/PublicOrderTrackingController.php:160,299,307,361`. **Refund manual via CS:** tidak ada endpoint refund otomatis; keputusan & pencairan dilakukan di panel/CS (DE-2026-10-17-05).
 
 ### §17 Pricing & Snapshot
 | Status | Keterangan |
 |---|---|
 | PARTIAL / UNVERIFIED (untuk ML ×1,06) | Formula modal + margin + fee = harga final. Margin per produk (%) configurable. Fee gateway dibebankan ke customer. Kalkulasi final backend. Snapshot disimpan (modal, margin, discount, fee, total, provider, package, customer input). Harga order tidak berubah setelah dibuat. `max_price` menghentikan fulfillment. **Temuan:** keputusan §47 "**ML = modal × 1,06 tanpa pembulatan**" **belum terbukti diimplementasikan**: `CheckoutPricing::margin()` menerapkan `margin_percent`/`margin_fixed`/`sell_price` apa pun yang dikonfigurasi (bukan memaksa 6% untuk ML), `DigiflazzFixedPricePolicy::fixedPriceFromCost()` generik dan membulatkan hasil ke integer, dan tidak ada kode/seed yang mengidentifikasi produk ML lalu memaksa `cost × 1.06`. Sehingga kode hanya membuktikan 6% **bisa** dikonfigurasi, bukan invariant ML di-enforce. Harga jual game lain belum diputuskan — jangan diciptakan. |
 
-*Bukti:* `database/migrations/2026_09_29_000002_create_commerce_tables.php` (kolom `snapshot` JSON + `customer_input`); `app/Services/CheckoutPricing.php:246-254` (margin dari `pricing_mode` generic); `app/Services/DigiflazzFixedPricePolicy.php:13-31` (`fixedPriceFromCost` generic + `intdiv` rounding); `app/Services/AdminPricingPreviewService.php` (preview max price). **Aksi:** verifikasi konfigurasi margin ML di produksi ATAU enforce & test invariant `cost × 1,06`; tidak diubah pada PR-C (dokumen). Note: harga lengkap non-ML ditunda ke pembahasan produk.
+*Bukti:* `rebuild/database/migrations/2026_09_29_000002_create_commerce_tables.php` (kolom `snapshot` JSON + `customer_input`); `rebuild/app/Services/CheckoutPricing.php:246-254` (margin dari `pricing_mode` generic); `rebuild/app/Services/DigiflazzFixedPricePolicy.php:13-31` (`fixedPriceFromCost` generic + `intdiv` rounding); `rebuild/app/Services/AdminPricingPreviewService.php` (preview max price). **Aksi:** verifikasi konfigurasi margin ML di produksi ATAU enforce & test invariant `cost × 1,06`; tidak diubah pada PR-C (dokumen). Note: harga lengkap non-ML ditunda ke pembahasan produk.
 
 ### §18 Voucher
 | Status | Keterangan |
 |---|---|
 | IMPLEMENTED | Voucher diskon. Periode aktif, min transaksi, limit per customer, total kuota, scope produk/kategori. Redemption atomic (anti double-use). |
 
-*Bukti:* **Discount voucher (atomic redemption)** → `app/Services/CheckoutService.php::voucher()` line 373–433 (`lockForUpdate` pada `vouchers`, hitung `voucher_redemptions` aktif, insert reservation di dalam transaction checkout — anti double-use); **voucher stock codes** (reserve inventory) → `app/Services/VoucherStockService.php:67-90` (`claim()` lock `voucher_stock_codes`); route voucher; migrasi promo.
+*Bukti:* **Discount voucher (atomic redemption)** → `rebuild/app/Services/CheckoutService.php::voucher()` line 373–433 (`lockForUpdate` pada `vouchers`, hitung `voucher_redemptions` aktif, insert reservation di dalam transaction checkout — anti double-use); **voucher stock codes** (reserve inventory) → `rebuild/app/Services/VoucherStockService.php:67-90` (`claim()` lock `voucher_stock_codes`); route voucher; migrasi promo.
 
 ### §19 Payment Architecture
 | Status | Keterangan |
 |---|---|
-| IMPLEMENTED (Midtrans) / UNVERIFIED (DOKU disabled) | Gateway awal: Midtrans Snap + DOKU Direct API. **DOKU dinonaktifkan sementara** (addendum §47) — **namun status disabled TIDAK terbukti dari kode repo**: `app/Services/IntegrationRuntimeConfig.php:216` hanya menginfer environment production/sandbox dari `base_url`, tidak menonaktifkan gateway; selama kredensial DOKU terisi, `app/Services/PaymentRoutingService::gatewayReady('DOKU')` (baris 282) tetap menerima DOKU dan admin dapat mengaktifkan gateway/route-nya. Keputusan §47 tetap berlaku sebagai arahan; bukti disabled harus dari state operasional (cek `payment_gateways.is_active` di produksi) atau kode guard. Customer pilih channel bukan gateway; Super Admin kelola routing/fee/maintenance; webhook = otoritas paid. |
+| IMPLEMENTED (Midtrans) / UNVERIFIED (DOKU disabled) | Gateway awal: Midtrans Snap + DOKU Direct API. **DOKU dinonaktifkan sementara** (addendum §47) — **namun status disabled TIDAK terbukti dari kode repo**: `rebuild/app/Services/IntegrationRuntimeConfig.php:216` hanya menginfer environment production/sandbox dari `base_url`, tidak menonaktifkan gateway; selama kredensial DOKU terisi, `rebuild/app/Services/PaymentRoutingService::gatewayReady('DOKU')` (baris 282) tetap menerima DOKU dan admin dapat mengaktifkan gateway/route-nya. Keputusan §47 tetap berlaku sebagai arahan; bukti disabled harus dari state operasional (cek `payment_gateways.is_active` di produksi) atau kode guard. Customer pilih channel bukan gateway; Super Admin kelola routing/fee/maintenance; webhook = otoritas paid. |
 
-*Bukti:* `app/Services/PaymentService.php:340-345` (dispatch MIDTRANS/DOKU/MANUAL_QRIS); `app/Services/PaymentRoutingService.php:278-282` (`gatewayReady()` DOKU = credentialHasKeys); `app/Services/IntegrationRuntimeConfig.php:210-222` (infer environment, bukan disable); `app/Services/Payment/*` (MidtransGateway, DokuDirectGateway, DokuSignature); migrasi `payment_route_fees_and_method_labels`. **Aksi:** verifikasi `payment_gateways.is_active` untuk DOKU di produksi, atau tambahkan guard kode bila perlu; tidak diubah pada PR-C (dokumen).
+*Bukti:* `rebuild/app/Services/PaymentService.php:340-345` (dispatch MIDTRANS/DOKU/MANUAL_QRIS); `rebuild/app/Services/PaymentRoutingService.php:278-282` (`gatewayReady()` DOKU = credentialHasKeys); `rebuild/app/Services/IntegrationRuntimeConfig.php:210-222` (infer environment, bukan disable); `rebuild/app/Services/Payment/*` (MidtransGateway, DokuDirectGateway, DokuSignature); migrasi `payment_route_fees_and_method_labels`. **Aksi:** verifikasi `payment_gateways.is_active` untuk DOKU di produksi, atau tambahkan guard kode bila perlu; tidak diubah pada PR-C (dokumen).
 
 ### §20 Manual QRIS
 | Status | Keterangan |
 |---|---|
 | IMPLEMENTED | Manual QRIS dibangun via `PaymentService` + `ManualQrisGateway`. Order dibuat → QRIS LFAMILIA ditampilkan → status Menunggu Pembayaran → notifikasi admin → konfirmasi manual → Dibayar → Diproses → Berhasil. Route internal `manual_qris` → `MANUAL_QRIS` di-seed aktif (`supports_order=true`, `is_active=true`). |
 
-*Bukti:* `app/Services/Payment/ManualQrisGateway.php:13-26` (`create()` → asset `manual_qris` + `public_payload.kind=manual_qris`); `app/Services/PaymentService.php:345` (`'MANUAL_QRIS' => $this->manualQris->create()`); `app/Http/Controllers/AdminPaymentController.php:800-824` (`ensureInternalRoutes()` — route `manual_qris`/`saldo`). **Catatan:** tidak mengubah PRD; koreksi klasifikasi dari DEFERRED (Roadmap Audit menyebut "pekerjaan penambahannya ditunda" — tetapi pada baseline `780e9dc` jalur ini sudah ada dan dipakai oleh test payment). Perilaku konfirmasi manual diverifikasi manual oleh admin/CS; tidak ada gateway webhook asli (sesuai PRD §20).
+*Bukti:* `rebuild/app/Services/Payment/ManualQrisGateway.php:13-26` (`create()` → asset `manual_qris` + `public_payload.kind=manual_qris`); `rebuild/app/Services/PaymentService.php:345` (`'MANUAL_QRIS' => $this->manualQris->create()`); `rebuild/app/Http/Controllers/AdminPaymentController.php:800-824` (`ensureInternalRoutes()` — route `manual_qris`/`saldo`). **Catatan:** tidak mengubah PRD; koreksi klasifikasi dari DEFERRED (Roadmap Audit menyebut "pekerjaan penambahannya ditunda" — tetapi pada baseline `780e9dc` jalur ini sudah ada dan dipakai oleh test payment). Perilaku konfirmasi manual diverifikasi manual oleh admin/CS; tidak ada gateway webhook asli (sesuai PRD §20).
 
 ### §21 Notifikasi
 | Status | Keterangan |
 |---|---|
 | IMPLEMENTED | Notifikasi Panel, Telegram webhook, Discord webhook. Event: order baru, pembayaran berhasil, manual QRIS, provider gagal, pending lama, order berhasil, refund, tiket baru, integration/system error. Telegram/Discord bisa diaktif-nonaktifkan dari konfigurasi Super Admin. |
 
-*Bukti:* `app/Services/ExternalNotificationService.php` (telegram + discord send); `app/Services/DiscordNotificationRouting.php`; `app/Services/AdminNotificationService.php`; `app/Services/TransactionalEmailService.php`; route admin webhook config.
+*Bukti:* `rebuild/app/Services/ExternalNotificationService.php` (telegram + discord send); `rebuild/app/Services/DiscordNotificationRouting.php`; `rebuild/app/Services/AdminNotificationService.php`; `rebuild/app/Services/TransactionalEmailService.php`; route admin webhook config.
 
 ### §22 Fulfillment & Reconciliation
 | Status | Keterangan |
 |---|---|
 | IMPLEMENTED (dengan F-04/F-03) | Produk otomatis dikirim via queue setelah payment terverifikasi. Pending dicek ulang oleh queue/job. **Timeout/unknown tidak memicu provider kedua** sampai selesai reconciliation. Duplicate request & fulfillment dicegah. Reference unik + audit trail. |
 
-*Bukti:* `app/Services/FulfillmentService.php` (ref_id unik, `hash_equals` di line 1158, reconciliation, `retrySafeAttempt` `:577-578`), `app/Services/Fulfillment/DigiflazzClient.php`, queue worker (lfamilia-queue). **GAP:** Temuan **F-04** jalur retry-failover legacy masih hidup (`safe_to_failover=true` baris lama, reachable via Admin retry) — active gap, bukan dead-code; **F-03** dokumentasi domain `FULFILLMENT.md` tidak sinkron.
+*Bukti:* `rebuild/app/Services/FulfillmentService.php` (ref_id unik, `hash_equals` di line 1158, reconciliation, `retrySafeAttempt` `:577-578`), `rebuild/app/Services/Fulfillment/DigiflazzClient.php`, queue worker (lfamilia-queue). **GAP:** Temuan **F-04** jalur retry-failover legacy masih hidup (`safe_to_failover=true` baris lama, reachable via Admin retry) — active gap, bukan dead-code; **F-03** dokumentasi domain `rebuild/FULFILLMENT.md` tidak sinkron.
 
 ### §23 Review Pelanggan
 | Status | Keterangan |
 |---|---|
 | IMPLEMENTED | Order Berhasil membuat eligible review. Sistem tidak membuat isi otomatis. Guest via signed token. Review langsung tampil (v1) tanpa moderasi awal. Admin dapat hapus. |
 
-*Bukti:* `app/Http/Controllers/ProductReviewController.php:15,41-85` (store; verifikasi `order_number`; guest via session `guest_order_id` ATAU `GuestOrderAccess::matches()` baris 71-79; dedup `ProductReview::where('order_id',...)->exists()` baris 83); `routes/web.php:111,338,339`; `app/Services/GuestOrderAccess.php:11,30` (`issue`/`matches`).
+*Bukti:* `rebuild/app/Http/Controllers/ProductReviewController.php:15,41-85` (store; verifikasi `order_number`; guest via session `guest_order_id` ATAU `GuestOrderAccess::matches()` baris 71-79; dedup `ProductReview::where('order_id',...)->exists()` baris 83); `rebuild/routes/web.php:111,338,339`; `rebuild/app/Services/GuestOrderAccess.php:11,30` (`issue`/`matches`).
 
 ### §24 Role & Akses Administrasi
 | Status | Keterangan |
 |---|---|
 | IMPLEMENTED | SUPER_ADMIN & ADMIN. ADMIN tidak boleh melihat secret/API credential sensitif. Staff tidak dipakai pada v1. Membership BASIC–MAFIA bukan role admin. |
 
-*Bukti:* `app/Models/AdminUser.php`; `app/Services/AdminPermissionService.php`; route middleware `admin.super` / `admin`; migrasi RBAC/auth.
+*Bukti:* `rebuild/app/Models/AdminUser.php`; `rebuild/app/Services/AdminPermissionService.php`; route middleware `admin.super` / `admin`; migrasi RBAC/auth.
 
 ### §25 Menu Panel
 | Status | Keterangan |
 |---|---|
 | IMPLEMENTED | 18 menu: Dashboard, Pesanan, Produk, Manual, Banner & Konten, Digiflazz, Provider, Pembayaran, Pelanggan, Promo, Layanan Pelanggan, Laporan, Admin & Akses, Pengaturan, Integrasi, System Health, Audit Log, **Validasi Akun** (addendum §47). |
 
-*Bukti:* Route admin (`routes/web.php` grup `admin`): `/admin/health`, `/admin/digiflazz`, `/admin/nickname-tools`, `/admin/providers` (`AdminProviderController`, baris 361-362), `/admin/content/reviews`, dst. Menu "Validasi Akun" = AccountValidationConfig + `AdminDigiflazzController`/`AdminNicknameToolsService`.
+*Bukti:* Route admin (`rebuild/routes/web.php` grup `admin`): `/admin/health`, `/admin/digiflazz`, `/admin/nickname-tools`, `/admin/providers` (`AdminProviderController`, baris 361-362), `/admin/content/reviews`, dst. Menu "Validasi Akun" = AccountValidationConfig + `AdminDigiflazzController`/`AdminNicknameToolsService`.
 
 ### §26 Audit Log
 | Status | Keterangan |
 |---|---|
 | IMPLEMENTED / PARTIAL (untuk event "reveal secret") | Catat actor, role, action, target, before, after, IP, user agent, timestamp, correlation ID. Sensitif: harga, saldo, refund, provider, gateway, integration credential, role/admin, manual payment confirmation, perubahan membership. Log tersensor secret. **Temuan:** row menyebut "reveal secret" sebagai event audit, padahal §33 menetapkan **tidak ada endpoint reveal** (`SecurityM10Test` assert 404) — sehingga tidak ada aksi reveal yang dapat menghasilkan audit record. Konsisten dengan keputusan no-reveal §33; rujukan "reveal secret" di sini adalah sisa teks PRD §26, bukan capability aktif. |
 
-*Bukti:* `app/Services/AdminAuditService.php:12-13` (list secret keys), `:55-69` (redact); `app/Http/Controllers/AdminAuditController.php`; middleware `app/Http/Middleware/AssignCorrelationId.php`; `Middleware` `admin.password.confirm` untuk sensitive actions. Tidak ada event reveal di `AdminAuditService` karena tidak ada reveal endpoint (§33).
+*Bukti:* `rebuild/app/Services/AdminAuditService.php:12-13` (list secret keys), `:55-69` (redact); `rebuild/app/Http/Controllers/AdminAuditController.php`; middleware `rebuild/app/Http/Middleware/AssignCorrelationId.php`; `Middleware` `admin.password.confirm` untuk sensitive actions. Tidak ada event reveal di `AdminAuditService` karena tidak ada reveal endpoint (§33).
 
 ### §27 Frontend Customer
 | Status | Keterangan |
 |---|---|
 | IMPLEMENTED (desktop) / PARTIAL (mobile belum tervalidasi visual) | Re-dibuat meniru Ourastore; branding LFAMILIA; tema dark modern gaming; buang kotak-kotak; desktop dulu, mobile setelah stabil. |
 
-*Bukti:* `resources/js/Pages/*`; `CustomerShell.vue`; App.css/tailwind theme dark. **Note:** DoD §41 belum centang mobile responsive — lihat Temuan/Acceptance.
+*Bukti:* `rebuild/resources/js/Pages/*`; `rebuild/resources/js/Components/CustomerShell.vue`; App.css/tailwind theme dark. **Note:** DoD §41 belum centang mobile responsive — lihat Temuan/Acceptance.
 
 ### §28 Media Management
 | Status | Keterangan |
 |---|---|
 | IMPLEMENTED | Spatie Media Library. Super Admin ganti logo, favicon, banner desktop/mobile, gambar produk/nominal, popup, aset konten. Storage local VPS dan/atau object storage. |
 
-*Bukti:* `composer.json` (`spatie/laravel-medialibrary` ^11); `app/Models/StoreAsset.php`, `app/Models/HomeBanner.php`, `app/Models/SitePopup.php`; route admin banner/popup/content.
+*Bukti:* `rebuild/composer.json` (`spatie/laravel-medialibrary` ^11); `rebuild/app/Models/StoreAsset.php`, `rebuild/app/Models/HomeBanner.php`, `rebuild/app/Models/SitePopup.php`; route admin banner/popup/content.
 
 ### §29 Email
 | Status | Keterangan |
 |---|---|
-| IMPLEMENTED / CATATAN (event refund) | Provider: **Resend**. Email via queue untuk verification, reset password, payment success (confirmed), transaction success (completed), support ticket, security notification. **Catatan (DE-2026-10-17-05):** PRD §29 mencantumkan "refund" sebagai event email, tetapi `TransactionalEmailService` tidak punya metode email refund — `queueOrderFailed()` berkomentar "refund — topik refund ditutup, tindak lanjut lewat CS". **Ini konsisten dengan proses nyata**: refund = manual via CS (bukan event sistem), jadi tidak ada email otomatis refund; komunikasi hasil review refund dilakukan CS langsung ke customer. Bukan GAP. `MAIL_MAILER=log` di `.env.example` — provider produksi belum diverifikasi. |
+| IMPLEMENTED / CATATAN (event refund) | Provider: **Resend**. Email via queue untuk verification, reset password, payment success (confirmed), transaction success (completed), support ticket, security notification. **Catatan (DE-2026-10-17-05):** PRD §29 mencantumkan "refund" sebagai event email, tetapi `TransactionalEmailService` tidak punya metode email refund — `queueOrderFailed()` berkomentar "refund — topik refund ditutup, tindak lanjut lewat CS". **Ini konsisten dengan proses nyata**: refund = manual via CS (bukan event sistem), jadi tidak ada email otomatis refund; komunikasi hasil review refund dilakukan CS langsung ke customer. Bukan GAP. `MAIL_MAILER=log` di `rebuild/.env.example` — provider produksi belum diverifikasi. |
 
-*Bukti:* `app/Jobs/SendTransactionalEmailJob.php:28,35` (fetch kredensial `IntegrationCredential` code `resend`, POST `https://api.resend.com/emails`); `app/Services/TransactionalEmailService.php:51,105,165,233` (`queueOrderCreated`/`queuePaymentConfirmed`/`queueOrderCompleted`/`queueOrderFailed`); `app/Services/PaymentStateService.php:281-298,388-412` (cabang refund = notifikasi admin saja); `.env.example:36` (`MAIL_MAILER=log` — tanpa `config/mail.php` ter-commit; pengiriman Resend via job + kredensial). **Catatan:** tidak ada email refund karena refund manual via CS (DE-2026-10-17-05), bukan bug.
+*Bukti:* `rebuild/app/Jobs/SendTransactionalEmailJob.php:28,35` (fetch kredensial `IntegrationCredential` code `resend`, POST `https://api.resend.com/emails`); `rebuild/app/Services/TransactionalEmailService.php:51,105,165,233` (`queueOrderCreated`/`queuePaymentConfirmed`/`queueOrderCompleted`/`queueOrderFailed`); `rebuild/app/Services/PaymentStateService.php:281-298,388-412` (cabang refund = notifikasi admin saja); `rebuild/.env.example:36` (`MAIL_MAILER=log` — tanpa `rebuild/config/mail.php` ter-commit; pengiriman Resend via job + kredensial). **Catatan:** tidak ada email refund karena refund manual via CS (DE-2026-10-17-05), bukan bug.
 
 ### §30 Infrastruktur VPS & CloudPanel
 | Status | Keterangan |
@@ -266,21 +266,21 @@ Temuan F-01/F-02 **telah dibereskan** dalam PR #279 (baseline `780e9dc`), sehing
 |---|---|
 | IMPLEMENTED | Session Admin/Super Admin 24 jam. 2FA ditunda (v1) tapi arsitektur siap. Turnstile selektif (register, forgot password, suspicious login, form publik). Rate limit minimal: login, register, forgot password, nickname, order lookup, payment create, wallet top-up, voucher validation, API publik sensitif. |
 
-*Bukti:* `config/session.php:7` (lifetime 1440 min = 24h); `app/Services/TurnstileService.php`; middleware `app/Http/Middleware/PublicAbuseProtection.php`; `routes/web.php` throttle groups (admin/account/support/checkout/wallet/guest/google/payment). **Note:** 2FA tidak aktif — keputusan v1.
+*Bukti:* `rebuild/config/session.php:7` (lifetime 1440 min = 24h); `rebuild/app/Services/TurnstileService.php`; middleware `rebuild/app/Http/Middleware/PublicAbuseProtection.php`; `rebuild/routes/web.php` throttle groups (admin/account/support/checkout/wallet/guest/google/payment). **Note:** 2FA tidak aktif — keputusan v1.
 
 ### §33 Secret & Integration Credential
 | Status | Keterangan |
 |---|---|
 | PARTIAL / GAP (controlled reveal) | Credential tidak hardcoded di repo; dikelola via Super Admin → Integrasi; nilai sensitif disimpan terenkripsi di DB; log menyensor password/key/secret/token/private-key/signature. **Temuan:** klaim "controlled reveal hanya Super Admin + audit" **tidak didukung baseline** — TIDAK ada route/controller reveal (`grep` route + controller + `AdminPermissionService` = tidak ada), dan `SecurityM10Test::test_secret_reveal_endpoint_is_not_exposed` (baris 252-274) justru meng-assert `404` untuk `POST /admin/integrations/midtrans/reveal/server_key` — bahkan dengan password yang benar. Jadi PRD mensyaratkan reveal auditable, baseline justru **tidak menyediakan reveal sama sekali** (defense-in-depth), tanpa keputusan supersede tertulis. Keputusan "no reveal" yang tersirat ini perlu didokumentasikan eksplisit (mis. addendum §47) atau fitur reveal ditambahkan dengan audit trail. |
 
-*Bukti:* `app/Models/IntegrationCredential.php:15` (`config_ciphertext` => `encrypted:array`); `tests/Feature/SecurityM10Test.php:252-274` (reveal endpoint di-assert 404); tidak ada token reveal di `routes/` maupun `AdminPermissionService`. Tidak ada secret di tracked source (composer audit + guardrails CI).
+*Bukti:* `rebuild/app/Models/IntegrationCredential.php:15` (`config_ciphertext` => `encrypted:array`); `rebuild/tests/Feature/SecurityM10Test.php:252-274` (reveal endpoint di-assert 404); tidak ada token reveal di `rebuild/routes/` maupun `AdminPermissionService`. Tidak ada secret di tracked source (composer audit + guardrails CI).
 
 ### §34 System Health & Observability
 | Status | Keterangan |
 |---|---|
 | IMPLEMENTED (check) / partial (population) | Pantau Laravel, MySQL, Redis, Queue, Scheduler, disk/storage, Digiflazz, KokinPay, Midtrans, DOKU, Resend. Status: Healthy, Degraded, Down, Not Configured, Maintenance. Correlation ID untuk setiap request/transaksi penting. |
 
-*Bukti:* `app/Http/Controllers/AdminHealthController.php:23-130` (states HEALTHY/DEGRADED/DOWN/UNKNOWN); /health/ready route; middleware `app/Http/Middleware/AssignCorrelationId.php`; `app/Http/Controllers/CheckoutController.php` (corr ID). **Note:** coverage penuh semua monitor perlu verifikasi lanjut — label `partial` agar tidak mengklaim lebih.
+*Bukti:* `rebuild/app/Http/Controllers/AdminHealthController.php:23-130` (states HEALTHY/DEGRADED/DOWN/UNKNOWN); /health/ready route; middleware `rebuild/app/Http/Middleware/AssignCorrelationId.php`; `rebuild/app/Http/Controllers/CheckoutController.php` (corr ID). **Note:** coverage penuh semua monitor perlu verifikasi lanjut — label `partial` agar tidak mengklaim lebih.
 
 ### §35 Backup & Recovery
 | Status | Keterangan |
@@ -294,26 +294,26 @@ Temuan F-01/F-02 **telah dibereskan** dalam PR #279 (baseline `780e9dc`), sehing
 |---|---|
 | IMPLEMENTED | Backend tolak harga dari frontend, SKU invalid, produk/nominal nonaktif, provider code manipulated, fee palsu, total Rp0 ilegal, voucher tidak sah/expired/over-quota, negative amount. Backend hitung ulang. Payment create + tombol bayar idempotent. Wallet credit/debit, refund, fulfillment, callback idempotent. |
 
-*Bukti:* `app/Services/PaymentService.php:29-121` (startOrder idempotency key + fingerprint + 409); `app/Services/CheckoutInputValidator.php`; `app/Services/WalletTopupService.php` (lockForUpdate + idempotency). **Note:** idempotency wallet debit; refund tidak otomatis (manual via CS — lihat DE-2026-10-17-05).
+*Bukti:* `rebuild/app/Services/PaymentService.php:29-121` (startOrder idempotency key + fingerprint + 409); `rebuild/app/Services/CheckoutInputValidator.php`; `rebuild/app/Services/WalletTopupService.php` (lockForUpdate + idempotency). **Note:** idempotency wallet debit; refund tidak otomatis (manual via CS — lihat DE-2026-10-17-05).
 
 ### §37 Callback / Webhook Security
 | Status | Keterangan |
 |---|---|
 | IMPLEMENTED | Verifikasi signature & source per provider; idempotency protection; callback disimpan sebagai audit/event; replay berbahaya ditolak; final state tidak di-downgrade. |
 
-*Bukti:* `app/Http/Controllers/PaymentWebhookController.php:42` (`hash_equals($expected, $payload['signature_key'])`), `:119-121` (Doku timestamp & client_id), `:74-75` (merchant_reference + amount match); `app/Services/MidtransStatusVerification.php`; `app/Services/Payment/DokuSignature.php`. **Note:** final-state guard ada (`IGNORED_FINAL`), guard anti-downgrade terverifikasi di PaymentStateService.
+*Bukti:* `rebuild/app/Http/Controllers/PaymentWebhookController.php:42` (`hash_equals($expected, $payload['signature_key'])`), `:119-121` (Doku timestamp & client_id), `:74-75` (merchant_reference + amount match); `rebuild/app/Services/MidtransStatusVerification.php`; `rebuild/app/Services/Payment/DokuSignature.php`. **Note:** final-state guard ada (`IGNORED_FINAL`), guard anti-downgrade terverifikasi di PaymentStateService.
 
 ### §38 Testing Wajib
 | Status | Keterangan |
 |---|---|
 | IMPLEMENTED (praktik) / PARTIAL (gap coverage) | Backend unit/feature, API, auth/RBAC, payment state, wallet & ledger, voucher concurrency, provider/reconciliation, queue/job, frontend smoke (customer & admin), abuse tests. |
 
-*Bukti:* `tests/Unit/*`, `tests/Feature/*`; `tests/Browser/*.mjs` (Playwright) + `tests/Browser/smoke.sh`; CI `validate-rebuild.yml` (foundation + frontend-static). **Note:** Temuan **F-08** — `TESTING.md` menyatakan bukan Playwright padahal checkout-visual.mjs memakai Playwright (documentation drift). Abuse-test coverage penuh perlu review.
+*Bukti:* `rebuild/tests/Unit/*`, `rebuild/tests/Feature/*`; `rebuild/tests/Browser/*.mjs` (Playwright) + `rebuild/tests/Browser/smoke.sh`; CI `.github/workflows/validate-rebuild.yml` (foundation + frontend-static). **Note:** Temuan **F-08** — `rebuild/TESTING.md` menyatakan bukan Playwright padahal checkout-visual.mjs memakai Playwright (documentation drift). Abuse-test coverage penuh perlu review.
 
 ### §39 Main Branch Policy
 | Status | Keterangan |
 |---|---|
-| POLICY (bukan enforcement) / UNVERIFIED | main selalu deployable. Merge ditolak bila build, automated tests, migration validation, lint/type check, atau critical security checks gagal. **Temuan:** ini adalah **aturan prosedural** (`AGENTS.md` §4 + CI workflow), BUKAN enforcement GitHub yang terbukti. `validate-rebuild.yml` mendefinisikan job/trigger, tetapi **tidak ada ruleset/branch-protection yang memverifikasi** bahwa check gagal benar-benar menolak merge. Pemeriksaan GitHub API `GET /branches/main/protection` → `404 Branch not protected`, sehingga maintainer masih bisa merge perubahan yang gagal check. |
+| POLICY (bukan enforcement) / UNVERIFIED | main selalu deployable. Merge ditolak bila build, automated tests, migration validation, lint/type check, atau critical security checks gagal. **Temuan:** ini adalah **aturan prosedural** (`AGENTS.md` §4 + CI workflow), BUKAN enforcement GitHub yang terbukti. `.github/workflows/validate-rebuild.yml` mendefinisikan job/trigger, tetapi **tidak ada ruleset/branch-protection yang memverifikasi** bahwa check gagal benar-benar menolak merge. Pemeriksaan GitHub API `GET /branches/main/protection` → `404 Branch not protected`, sehingga maintainer masih bisa merge perubahan yang gagal check. |
 
 *Bukti:* `.github/workflows/validate-rebuild.yml` (jobs & trigger, tanpa ruleset); `AGENTS.md` §4 (prosedur); `gh api repos/.../branches/main/protection` → 404 (tidak diproteksi). **Aksi:** aktifkan required status checks di branch protection `main`, atau tandai sebagai policy yang belum di-enforce; tidak diubah pada PR-C (dokumen).
 
@@ -336,14 +336,14 @@ Temuan F-01/F-02 **telah dibereskan** dalam PR #279 (baseline `780e9dc`), sehing
 |---|---|
 | IMPLEMENTED (dengan catatan F-04) | 11 non-negotiable: tidak percaya harga frontend; tidak simpan secret di GitHub; guest tidak punya wallet; nama provider tidak tampil; tidak double fulfillment; tidak failover sebelum status pasti; redirect bukan bukti paid; harga order tidak berubah; Android tidak buat DB customer terpisah; checkout tidak depend hardcoded satu provider; membership bukan akses admin. **Catatan:** invariant "tidak failover sebelum status pasti" terjaga untuk data baru; jalur retry-failover legacy tetap reachable (lihat F-04) sehingga belum bisa diklaim menyeluruh sampai jalur itu dibersihkan. |
 
-*Bukti:* `app/Services/CheckoutInputValidator.php` (harga/SKU); `config` (credential tidak tracked); `app/Services/GuestOrderAccess.php` (guest tanpa wallet); `app/Services/FulfillmentService.php` (no double, no auto-switch; jalur retry-failover legacy masih hidup — lihat F-04); `PaymentWebhookController` (webhook = otoritas paid); `Product` (`snapshot` harga); `app/Services/MembershipService.php` (terpisah); `ProviderMapping` (multi-provider).
+*Bukti:* `rebuild/app/Services/CheckoutInputValidator.php` (harga/SKU); `rebuild/config/` (credential tidak tracked); `rebuild/app/Services/GuestOrderAccess.php` (guest tanpa wallet); `rebuild/app/Services/FulfillmentService.php` (no double, no auto-switch; jalur retry-failover legacy masih hidup — lihat F-04); `rebuild/app/Http/Controllers/PaymentWebhookController.php` (webhook = otoritas paid); `rebuild/app/Models/Product.php` (`snapshot` harga); `rebuild/app/Services/MembershipService.php` (terpisah); `rebuild/app/Models/ProviderMapping.php` (multi-provider).
 
 ### §43 Keputusan yang Dapat Dikonfigurasi di Panel
 | Status | Keterangan |
 |---|---|
 | IMPLEMENTED | Min top-up; margin per produk; gateway & channel aktif; routing channel Midtrans/DOKU; fee per channel; maintenance mode; kategori/produk/nominal aktif; nickname mapping & game code; voucher rule; webhook Telegram/Discord; membership threshold/benefit; logo/favicon/banner/popup. |
 
-*Bukti:* `config` + `app/Services/*` (PaymentPageSettingsService, StorefrontContentService, VoucherStockService, MembershipService); tabel `settings`/`integration_credentials`, `payment_channels`, `payment_routes`, `membership_tiers`.
+*Bukti:* `rebuild/config/` + `rebuild/app/Services/*` (PaymentPageSettingsService, StorefrontContentService, VoucherStockService, MembershipService); tabel `settings`/`integration_credentials`, `payment_channels`, `payment_routes`, `membership_tiers`.
 
 ### §44 Prinsip Implementasi
 | Status | Keterangan |
@@ -357,7 +357,7 @@ Temuan F-01/F-02 **telah dibereskan** dalam PR #279 (baseline `780e9dc`), sehing
 |---|---|
 | IMPLEMENTED (struktur) / CATATAN (konten legal) | CTA/bantuan "BUTUH BANTUAN? / Tim LFAMILIA siap membantu"; banner/promotional strip configurable; identitas footer logo + tagline "Top up favoritmu, sat set tanpa ribet."; tautan sosial WhatsApp/Instagram/Email/Discord (edit dari panel, ikon tanpa config boleh disembunyikan); bagian LAYANAN (Top Up Game, Promo, Cek Transaksi, Hubungi Kami) menuju route/features berfungsi; bagian KALKULATOR (Win Rate, Zodiac, Magic Wheel, Semua Alat); bagian INFORMASI (FAQ, Syarat & Ketentuan, Kebijakan Pengembalian Dana, Kebijakan Privasi); copyright dinamis; floating support/chat button. **Catatan (keputusan owner, DE-2026-10-17-05):** halaman legal `/refund`, `/terms`, `/privacy` menyebut refund — **dibiarkan sebagaimana adanya**. Per §13/§47, penyelesaian pesanan bermasalah = tambah saldo/manual CS, bukan refund otomatis; konten legal ditangani di luar scope roadmap ini. Bukan GAP yang ditindaklanjuti di sini. |
 
-*Bukti:* `app/Services/StorefrontContentService.php:24-27` (supportWhatsapp/instagramUrl/discordUrl); `resources/js/Components/CustomerShell.vue:48-71` (kalkulator/social/nav); `routes/web.php:65-78,77-78` (`/faq`, `/tools`, `/tools/{tool}`, `/refund`); `app/Http/Controllers/PublicContentController.php:33,45,50,55,63` (faq/legal/refund); `database/migrations/2026_09_30_000010_create_customer_content_tables.php` + `database/migrations/2026_10_02_000002_sync_storefront_legal_pages.php` (seeded `content_pages`: refund/terms/privacy); `database/data/legal-pages-2026-10-02.json`; `app/Models/FaqEntry.php`, `app/Models/HomeBanner.php`, `app/Models/SitePopup.php`. **Keputusan owner:** konten legal dibiarkan, lihat DE-2026-10-17-05.
+*Bukti:* `rebuild/app/Services/StorefrontContentService.php:24-27` (supportWhatsapp/instagramUrl/discordUrl); `rebuild/resources/js/Components/CustomerShell.vue:48-71` (kalkulator/social/nav); `rebuild/routes/web.php:65-78,77-78` (`/faq`, `/tools`, `/tools/{tool}`, `/refund`); `rebuild/app/Http/Controllers/PublicContentController.php:33,45,50,55,63` (faq/legal/refund); `rebuild/database/migrations/2026_09_30_000010_create_customer_content_tables.php` + `rebuild/database/migrations/2026_10_02_000002_sync_storefront_legal_pages.php` (seeded `content_pages`: refund/terms/privacy); `rebuild/database/data/legal-pages-2026-10-02.json`; `rebuild/app/Models/FaqEntry.php`, `rebuild/app/Models/HomeBanner.php`, `rebuild/app/Models/SitePopup.php`. **Keputusan owner:** konten legal dibiarkan, lihat DE-2026-10-17-05.
 
 ### §46 Acceptance Criteria — Footer & Support Customer
 | Status | Keterangan |
@@ -371,7 +371,7 @@ Temuan F-01/F-02 **telah dibereskan** dalam PR #279 (baseline `780e9dc`), sehing
 |---|---|
 | IMPLEMENTED (sebagai log) | Log keputusan bersumber pada PRD §47 & dokumen ini. **Untuk business intent**, source-of-truth = PRD + log keputusan; **untuk perilaku implementasi aktual**, kode/runtime terverifikasi adalah bukti (CLAUDE.md §3) dan menang bila berbeda dengan teks PRD yang stale. Pool keputusan: **refund tidak otomatis — penyelesaian pesanan bermasalah via manual CS/tambah saldo (DE-2026-10-17-05)**; `_B` removed; ML = modal × 1,06 (tidak dibulatkan); satu nominal multi-provider; Digiflazz Tools + auto-switch belum ada; DOKU disabled temporarily; Menu Validasi Akun; Website Live / M13 partial; Android tetap rencana. |
 
-*Bukti:* `docs/PRD-LFAMILIA-STORE-v1.md` §47 table; implementasi aktif terhadap tiap keputusan: `app/Services/FulfillmentService.php:474,529-533` (no auto-switch), `app/Services/PaymentStateService.php:37-51` (refund tidak otomatis — status masuk gateway, eksekusi manual via CS, DE-2026-10-17-05), `app/Services/DigiflazzFixedPricePolicy` (cost/max_price), `app/Services/PaymentRoutingService.php:278-282` + `app/Services/IntegrationRuntimeConfig.php:210-222` (DOKU — environment inference saja; status disabled TIDAK terbukti dari repo, lihat §19), `app/Services/AccountValidationConfig` (menu Validasi Akun), `app/Services/MembershipService` (terpisah dari RBAC).
+*Bukti:* `docs/PRD-LFAMILIA-STORE-v1.md` §47 table; implementasi aktif terhadap tiap keputusan: `rebuild/app/Services/FulfillmentService.php:474,529-533` (no auto-switch), `rebuild/app/Services/PaymentStateService.php:37-51` (refund tidak otomatis — status masuk gateway, eksekusi manual via CS, DE-2026-10-17-05), `rebuild/app/Services/DigiflazzFixedPricePolicy` (cost/max_price), `rebuild/app/Services/PaymentRoutingService.php:278-282` + `rebuild/app/Services/IntegrationRuntimeConfig.php:210-222` (DOKU — environment inference saja; status disabled TIDAK terbukti dari repo, lihat §19), `rebuild/app/Services/AccountValidationConfig` (menu Validasi Akun), `rebuild/app/Services/MembershipService` (terpisah dari RBAC).
 
 ---
 
