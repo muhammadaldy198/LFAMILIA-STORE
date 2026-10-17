@@ -97,13 +97,12 @@ Pemilih SKU menyediakan **Langsung jual setelah impor** (aktif secara default). 
 
 Format tujuan diisi dari konfigurasi sumber existing, satu kolom pelanggan, atau format Mobile Legends yang dikenal (User ID diikuti Zone ID). Produk lain dengan beberapa kolom harus menetapkan format di pemilih SKU. Backend menolak placeholder asing, format kosong, dan kolom wajib yang terlewat. Tidak ada request pembayaran atau topup provider saat impor.
 
-## Urutan nominal dan cadangan Digiflazz otomatis
+## Urutan nominal dan kebijakan SKU Digiflazz
 
-Impor mengelompokkan SKU dengan identitas kategori, merek, jenis, dan nama produk yang sama. Nama dinormalisasi huruf besar/kecil dan spasi; SKU, harga, serta seller bukan identitas nominal. Varian, bonus, dan wilayah dengan nama/jenis berbeda tetap terpisah. Pilih satu nominal untuk mengimpor seluruh sumber yang tersedia dan segar dalam kelompoknya; nominal yang sudah ada digunakan kembali. SKU yang dimiliki produk lain tidak dipindahkan.
+Impor mengelompokkan SKU dengan identitas kategori, merek, jenis, dan nama produk yang sama. Nama dinormalisasi huruf besar/kecil dan spasi; SKU, harga, serta seller bukan identitas nominal. Varian, bonus, dan wilayah dengan nama/jenis berbeda tetap terpisah. Pilih satu nominal untuk mengimpor sumber yang tersedia dan segar dalam kelompoknya; nominal yang sudah ada digunakan kembali. SKU yang dimiliki produk lain tidak dipindahkan.
 
-Cadangan otomatis aktif secara default pada impor. Tombol **Pilih semua hasil filter** mencakup seluruh hasil, bukan hanya halaman terlihat; satu request menerima hingga 2.000 pilihan. Tombol **Lengkapi cadangan otomatis** melengkapi semua nominal produk existing sekaligus. Sinkron lengkap berikutnya menambahkan sumber baru pada kelompok yang telah diaktifkan. Mapping lama yang dinonaktifkan atau SKU yang hilang tidak otomatis diaktifkan kembali oleh sinkron. Format ID tujuan tetap disimpan saat pengaturan mapping diedit.
-
-Sumber otomatis berprioritas sama; resolver existing memilih biaya terendah yang tersedia, lalu ID. Cadangan tetap tunduk pada batas harga snapshot dan aturan pending/unknown/failure; fitur ini tidak mengirim transaksi atau mengubah aturan failover.
+**Kebijakan PRD v1.1 §47 (1 SKU per nominal & no auto-switch):**
+Toko LFAMILIA Store menerapkan kebijakan 1 SKU aktif per nominal Digiflazz (model `_A`), tanpa mengaktifkan SKU cadangan (`_B`). Meskipun UI admin memiliki kapabilitas pemetaan sumber, **alur fulfillment produksi tidak melakukan auto-switch atau failover otomatis** ke SKU lain saat pengiriman gagal. Setiap kegagalan pengiriman definitif masuk ke antrean penanganan manual admin/CS. Mapping lama yang dinonaktifkan atau SKU yang hilang tidak otomatis diaktifkan kembali oleh sinkron. Format ID tujuan tetap disimpan saat pengaturan mapping diedit.
 
 Nilai nominal angka diisi dari nama katalog pada impor. Urutan awal impor dan halaman customer memakai angka dari kecil ke besar (7, 10, 20, 100, 200, 2.000). Nama tanpa nilai angka memakai natural sort. Urutan manual editor tetap dapat disesuaikan, tetapi impor/pelengkapan ulang menyusun urutan awal menurut nominal. Halaman customer selalu memakai urutan nominal angka.
 

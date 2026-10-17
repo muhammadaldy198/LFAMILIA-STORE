@@ -62,7 +62,7 @@ Implementasi yang ditemukan di kode:
 
 ## Fulfillment
 
-Satu `ProductPackage` dapat mempunyai beberapa `provider_mappings`. Untuk Digiflazz, setiap mapping dapat memiliki `buyer_sku_code`/external SKU berbeda.
+Satu `ProductPackage` dapat mempunyai beberapa `provider_mappings`. Khusus Digiflazz, toko menerapkan kebijakan 1 SKU aktif per nominal (model `_A`, tanpa backup SKU `_B`) sesuai PRD v1.1 §47.
 
 Candidate dipilih dengan priority kecil lebih dahulu, lalu cost dan ID. Mapping nonaktif, provider nonaktif, SKU yang tidak usable, stok/cut-off bermasalah, adapter yang tidak didukung, atau cost di atas `max_price` dapat dilewati **sebelum request**.
 
@@ -70,11 +70,11 @@ Setelah request:
 
 - `PENDING`, `SENDING`, atau `UNKNOWN` tidak langsung memicu source berikutnya;
 - reconciliation memakai reference attempt yang sama;
-- source berikutnya hanya boleh dibuat ketika kegagalan sudah definitive/`FAILED_CONFIRMED` atau mapping belum pernah dikirim dan aman dilewati;
+- **auto-switch / failover otomatis dinonaktifkan (PRD §47):** kegagalan definitive (`FAILED_CONFIRMED`) tidak otomatis mengirim ke sumber cadangan, melainkan menahan pesanan pada status `BLOCKED` untuk penanganan manual admin/CS;
 - attempt sebelumnya dan mapping yang sudah dipakai tidak boleh diduplikasi;
 - customer tetap melihat satu nominal/order, bukan daftar provider internal.
 
-Mekanisme ini bukan klaim “failover universal semua provider”. Adapter otomatis yang ditemukan saat audit adalah Digiflazz dan stok kode internal; manual fulfillment memiliki flow sendiri.
+Sistem tidak mengimplementasikan failover universal antar-provider; adapter otomatis yang ada adalah Digiflazz dan stok kode internal, sedangkan penanganan pesanan bermasalah dilakukan secara manual melalui panel Admin.
 
 ## Auth boundary
 

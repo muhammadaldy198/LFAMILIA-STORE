@@ -4,9 +4,9 @@ Fulfillment dimulai setelah order berada pada state yang diizinkan oleh payment 
 
 ## Provider mappings
 
-Satu `ProductPackage` dapat mempunyai beberapa `provider_mappings`. Untuk Digiflazz, mapping dapat mempunyai `buyer_sku_code`/external SKU berbeda.
+Satu `ProductPackage` dapat mempunyai beberapa `provider_mappings`. Namun khusus untuk Digiflazz, toko menerapkan **kebijakan 1 SKU per nominal (model `_A`, tanpa backup SKU `_B`)** sesuai PRD v1.1 §47.
 
-Candidate berikutnya diurutkan:
+Jika ada multiple mapping terkonfigurasi, candidate diurutkan:
 
 1. `priority` kecil lebih dahulu;
 2. cost lebih kecil;
@@ -16,11 +16,11 @@ Customer tetap membeli satu nominal. Provider mapping dan SKU internal tidak men
 
 ## Digiflazz max_price snapshot
 
-Saat checkout, `provider.max_price_idr` untuk Digiflazz dihitung dari **harga modal tertinggi SKU Digiflazz aktif dan tersedia dalam nominal yang sama, ditambah 1% (dibulatkan ke atas)**. Ini mencakup SKU cadangan termahal. Jika hanya ada satu SKU yang layak, gunakan harga SKU itu +1%. SKU nonaktif/tidak tersedia tidak memperbesar batas.
+Saat checkout, `provider.max_price_idr` untuk Digiflazz dihitung dari **harga modal SKU Digiflazz aktif dan tersedia dalam nominal tersebut, ditambah 1% (dibulatkan ke atas)**. Batas ini disimpan sebagai snapshot order dan dikirim sebagai `max_price` pada setiap attempt Digiflazz serta reconciliation.
 
-Batas ini disimpan sebagai snapshot order dan dikirim sebagai `max_price` pada setiap attempt Digiflazz serta reconciliation. Harga jual tetap dihitung dari SKU utama dan tidak dinaikkan otomatis bila failover memakai seller lebih mahal; rugi karena diskon/promo adalah keputusan bisnis yang diterima. SKU dengan modal melebihi batas snapshot tetap tidak boleh dipilih, misalnya setelah kenaikan harga lebih dari toleransi.
+Harga jual tetap dihitung dari SKU utama; SKU dengan modal melebihi batas snapshot tidak boleh dipilih bila terjadi kenaikan harga supplier melebihi toleransi.
 
-Jangan membingungkan `provider_mappings.max_price_idr` (batas administratif per sumber saat sinkron) dengan `order.snapshot.provider.max_price_idr` (batas transaksi Digiflazz hasil perhitungan seluruh kandidat saat checkout).
+Jangan membingungkan `provider_mappings.max_price_idr` (batas administratif per sumber saat sinkron) dengan `order.snapshot.provider.max_price_idr` (batas transaksi Digiflazz hasil perhitungan saat checkout).
 
 ## Unsent mapping skip
 
@@ -56,13 +56,13 @@ Attempt uncertain direconcile menggunakan request/reference attempt yang sama. H
 
 Status provider sukses menjadi `SUCCESS`; kegagalan definitive menjadi `FAILED_CONFIRMED`; pending tetap `PENDING`; hasil yang tidak dapat dipastikan menjadi `UNKNOWN`.
 
-## Definitive-failure-only failover
+## Penanganan definitive failure dan kebijakan no auto-switch
 
-Source berikutnya hanya boleh dipilih ketika attempt sebelumnya sudah aman untuk failover, termasuk kegagalan definitive. Attempted mapping IDs dikecualikan agar source yang sama tidak dikirim dua kali.
+Sesuai keputusan PRD v1.1 §47, **automatic failover / auto-switch dinonaktifkan**. Toko tidak menggunakan SKU cadangan otomatis (`_B`), sehingga kegagalan pengiriman tidak otomatis memicu provider/mapping kedua.
 
-Order snapshot total/cost/max-price tidak ditulis ulang ketika source berikutnya dipilih.
+Ketika fulfillment attempt mencapai kegagalan pasti (`FAILED_CONFIRMED`), pesanan tidak otomatis dialihkan ke sumber lain, melainkan ditandai `BLOCKED` untuk penanganan manual oleh Admin/CS.
 
-Mekanisme ini **bukan universal failover semua provider**. Adapter otomatis yang ditemukan saat audit adalah Digiflazz dan voucher-stock internal; manual fulfillment mempunyai flow Admin sendiri.
+**Catatan teknis (F-04):** Pada implementasi `rebuild/app/Services/FulfillmentService.php`, failover otomatis dinonaktifkan (`if (false && $failover)`). Namun untuk baris attempt lama yang masih memiliki flag `safe_to_failover=true`, jalur retry Admin (`retrySafeAttempt()`) masih memanggil `failoverIfSafe()`. Dokumen ini mencatat hal tersebut sebagai celah teknis data lama yang menunggu migrasi/guard pembersihan.
 
 ## Double fulfillment prevention
 
