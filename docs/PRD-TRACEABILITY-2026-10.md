@@ -168,7 +168,7 @@ Temuan F-01/F-02 **telah dibereskan** dalam PR #279 (baseline `780e9dc`), sehing
 |---|---|
 | IMPLEMENTED | Voucher diskon. Periode aktif, min transaksi, limit per customer, total kuota, scope produk/kategori. Redemption atomic (anti double-use). |
 
-*Bukti:* `app/Services/VoucherStockService.php:63-83` (lockForUpdate + atomic, "Caller must wrap in transaction"); route voucher; migrasi promo.
+*Bukti:* **Discount voucher (atomic redemption)** → `app/Services/CheckoutService.php::voucher()` line 373–433 (`lockForUpdate` pada `vouchers`, hitung `voucher_redemptions` aktif, insert reservation di dalam transaction checkout — anti double-use); **voucher stock codes** (reserve inventory) → `app/Services/VoucherStockService.php:67-90` (`claim()` lock `voucher_stock_codes`); route voucher; migrasi promo.
 
 ### §19 Payment Architecture
 | Status | Keterangan |
