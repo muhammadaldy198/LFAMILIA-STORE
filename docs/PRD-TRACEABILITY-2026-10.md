@@ -69,7 +69,7 @@ Temuan F-01/F-02 **telah dibereskan** dalam PR #279 (baseline `780e9dc`), sehing
 |---|---|
 | IMPLEMENTED | Kategori: Game, Pulsa, Paket Data, PLN, Voucher, Entertainment, PPOB. E-wallet tidak menjadi kategori awal. Kategori extensible dari panel. |
 
-*Bukti:* `app/Models/Category.php`; route admin kategori (`AdminCatalogController`); `AdminController` untuk kategori.
+*Bukti:* `app/Models/Category.php`; route admin kategori `routes/web.php:302-304` (`AdminCatalogController::category/updateCategory/destroyCategory`).
 
 ### §5 Model Katalog & Multi-Provider
 | Status | Keterangan |
