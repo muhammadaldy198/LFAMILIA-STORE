@@ -71,18 +71,19 @@ class CreateNewUser implements CreatesNewUsers
         }
 
         // Variasi lokal Indonesia (tanpa tanda '+'):
-        // 62812..., 0812..., atau 812...
-        if (str_starts_with($digits, '62') && strlen($digits) > 2) {
+        // Hanya ekspansi ke varian Indonesia jika input eksplisit menggunakan format lokal Indo:
+        // - Diawali '08...' (khas nomor lokal domestik Indonesia)
+        // - Diawali '628...' (khas kode negara Indonesia)
+        // Angka yang diawali '8...' polos TIDAK di-expand ke '628...' agar tidak ambigu dengan
+        // nomor luar negeri yang dial codenya diawali 8 (misal Jepang +81, dsb).
+        if (str_starts_with($digits, '628') && strlen($digits) >= 10) {
             $local = substr($digits, 2);
             $variants[] = '0'.$local;
             $variants[] = $local;
-        } elseif (str_starts_with($digits, '0') && strlen($digits) > 1) {
+        } elseif (str_starts_with($digits, '08') && strlen($digits) >= 10) {
             $local = substr($digits, 1);
             $variants[] = '62'.$local;
             $variants[] = $local;
-        } elseif (str_starts_with($digits, '8') && strlen($digits) <= 13) {
-            $variants[] = '0'.$digits;
-            $variants[] = '62'.$digits;
         }
 
         return array_values(array_unique($variants));
