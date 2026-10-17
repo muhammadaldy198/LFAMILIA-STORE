@@ -202,7 +202,7 @@ Temuan F-01/F-02 **telah dibereskan** dalam PR #279 (baseline `780e9dc`), sehing
 |---|---|
 | IMPLEMENTED | Order Berhasil membuat eligible review. Sistem tidak membuat isi otomatis. Guest via signed token. Review langsung tampil (v1) tanpa moderasi awal. Admin dapat hapus. |
 
-*Bukti:* `app/Http/Controllers/ProductReviewController.php:95-109` (published immediately; admin controls via AdminContentController review update/delete); `routes/web.php:111,338,339`; `app/Services/GuestOrderAccess.php` (signed token). **Note:** guest review eligibility memakai `order_number` lookup + dedup check pada `ProductReview` — lihat `assets/session` untuk dogfood.
+*Bukti:* `app/Http/Controllers/ProductReviewController.php:15,41-85` (store; verifikasi `order_number`; guest via session `guest_order_id` ATAU `GuestOrderAccess::matches()` baris 71-79; dedup `ProductReview::where('order_id',...)->exists()` baris 83); `routes/web.php:111,338,339`; `app/Services/GuestOrderAccess.php:11,30` (`issue`/`matches`).
 
 ### §24 Role & Akses Administrasi
 | Status | Keterangan |
@@ -270,9 +270,9 @@ Temuan F-01/F-02 **telah dibereskan** dalam PR #279 (baseline `780e9dc`), sehing
 ### §33 Secret & Integration Credential
 | Status | Keterangan |
 |---|---|
-| IMPLEMENTED | Credential tidak hardcoded di repo; dikelola via Super Admin → Integrasi; nilai sensitif disimpan terenkripsi di DB; controlled reveal hanya Super Admin + audit; log menyensor password/key/secret/token/private-key/signature. |
+| PARTIAL / GAP (controlled reveal) | Credential tidak hardcoded di repo; dikelola via Super Admin → Integrasi; nilai sensitif disimpan terenkripsi di DB; log menyensor password/key/secret/token/private-key/signature. **Temuan:** klaim "controlled reveal hanya Super Admin + audit" **tidak didukung baseline** — TIDAK ada route/controller reveal (`grep` route + controller + `AdminPermissionService` = tidak ada), dan `SecurityM10Test::test_secret_reveal_endpoint_is_not_exposed` (baris 252-274) justru meng-assert `404` untuk `POST /admin/integrations/midtrans/reveal/server_key` — bahkan dengan password yang benar. Jadi PRD mensyaratkan reveal auditable, baseline justru **tidak menyediakan reveal sama sekali** (defense-in-depth), tanpa keputusan supersede tertulis. Keputusan "no reveal" yang tersirat ini perlu didokumentasikan eksplisit (mis. addendum §47) atau fitur reveal ditambahkan dengan audit trail. |
 
-*Bukti:* `app/Models/IntegrationCredential.php:15` (`config_ciphertext` => `encrypted:array`); `app/Services/AdminPermissionService.php` (reveal gate); `app/Services/AdminAuditService.php` (redaction). Tidak ada secret di tracked source (composer audit + guardrails CI).
+*Bukti:* `app/Models/IntegrationCredential.php:15` (`config_ciphertext` => `encrypted:array`); `tests/Feature/SecurityM10Test.php:252-274` (reveal endpoint di-assert 404); tidak ada token reveal di `routes/` maupun `AdminPermissionService`. Tidak ada secret di tracked source (composer audit + guardrails CI).
 
 ### §34 System Health & Observability
 | Status | Keterangan |
@@ -354,9 +354,9 @@ Temuan F-01/F-02 **telah dibereskan** dalam PR #279 (baseline `780e9dc`), sehing
 ### §45 Homepage Support, Footer & Navigasi Customer
 | Status | Keterangan |
 |---|---|
-| IMPLEMENTED | CTA/bantuan "BUTUH BANTUAN? / Tim LFAMILIA siap membantu"; banner/promotional strip configurable; identitas footer logo + tagline "Top up favoritmu, sat set tanpa ribet."; tautan sosial WhatsApp/Instagram/Email/Discord (edit dari panel, ikon tanpa config boleh disembunyikan); bagian LAYANAN (Top Up Game, Promo, Cek Transaksi, Hubungi Kami) menuju route/features berfungsi; bagian KALKULATOR (Win Rate, Zodiac, Magic Wheel, Semua Alat); bagian INFORMASI (FAQ, Syarat & Ketentuan, Kebijakan Pengembalian Dana, Kebijakan Privasi); copyright dinamis; floating support/chat button. |
+| IMPLEMENTED (struktur) / GAP (konten refund) | CTA/bantuan "BUTUH BANTUAN? / Tim LFAMILIA siap membantu"; banner/promotional strip configurable; identitas footer logo + tagline "Top up favoritmu, sat set tanpa ribet."; tautan sosial WhatsApp/Instagram/Email/Discord (edit dari panel, ikon tanpa config boleh disembunyikan); bagian LAYANAN (Top Up Game, Promo, Cek Transaksi, Hubungi Kami) menuju route/features berfungsi; bagian KALKULATOR (Win Rate, Zodiac, Magic Wheel, Semua Alat); bagian INFORMASI (FAQ, Syarat & Ketentuan, Kebijakan Pengembalian Dana, Kebijakan Privasi); copyright dinamis; floating support/chat button. **Temuan:** halaman `/refund` (menu INFORMASI → Kebijakan Pengembalian Dana) menampilkan konten seeded `content_pages` `key='refund'` yang **berjanji refund** ("Refund dapat diajukan jika pembayaran terverifikasi tetapi pesanan dinyatakan gagal dan tidak dapat diproses ulang, terjadi pembayaran ganda, atau produk tidak tersedia") — **kontradiksi langsung** dengan keputusan no-refund §13/§47. |
 
-*Bukti:* `app/Services/StorefrontContentService.php:24-27` (supportWhatsapp/instagramUrl/discordUrl); `resources/js/Components/CustomerShell.vue:48-71` (kalkulator/social/nav); `routes/web.php:65-78,77-78` (`/faq`, `/tools`, `/tools/{tool}`); `app/Http/Controllers/PublicContentController.php:33,45,50,55,63` (faq/legal); `app/Models/FaqEntry.php`, `HomeBanner.php`, `SitePopup.php`. **Note:** copyright tahun "sebaiknya dirender dinamis" — verifikasi apakah tahun di-render dinamis di `CustomerShell.vue`/footer.
+*Bukti:* `app/Services/StorefrontContentService.php:24-27` (supportWhatsapp/instagramUrl/discordUrl); `resources/js/Components/CustomerShell.vue:48-71` (kalkulator/social/nav); `routes/web.php:65-78,77-78` (`/faq`, `/tools`, `/tools/{tool}`, `/refund`); `app/Http/Controllers/PublicContentController.php:33,45,50,55,63` (faq/legal/refund); `database/migrations/2026_09_30_000010_create_customer_content_tables.php` (seeded `content_pages` baris `refund`, `terms`, `privacy`); `app/Models/FaqEntry.php`, `HomeBanner.php`, `SitePopup.php`. **Aksi:** perbaiki teks halaman `/refund` agar konsisten dengan no-refund (atau verifikasi konten produksi sudah diperbarui); tidak diubah pada PR-C (dokumen).
 
 ### §46 Acceptance Criteria — Footer & Support Customer
 | Status | Keterangan |
