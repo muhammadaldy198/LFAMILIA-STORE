@@ -1,4 +1,4 @@
-# Payment — Midtrans, no-refund policy
+# Payment — Midtrans, refund manual via CS
 
 ## When this role is used
 
@@ -10,12 +10,13 @@ Anything touching payment, gateway, webhook/callback, order payment state, walle
 - `fortify-development` — when auth is involved.
 - `data-fetch-analysis` — reconciliation queries (read-only default).
 
-## Hard rules — NO-REFUND POLICY (non-negotiable)
+## Hard rules — REFUND = MANUAL VIA CS (non-negotiable)
 
-- **The store does NOT serve refunds.** Never build, trigger, or propose an automatic refund path.
-- **The Midtrans skill's refund section is REJECTED.** Its `refund-operations` reference, refund endpoints, and refund runbooks must NOT be followed for this store. Use only its Snap / webhook / signature-verification / status-polling parts.
-- Never promise refund in customer-facing text. Failed/expired payments are handled via retry, not refund.
-- Problem paid orders: manual settlement only — Super Admin wallet adjustment (members) or direct contact via the contact stored on the order (guests). Never initiate gateway refunds.
+- **Refund DILAYANI, tapi manual via CS — sistem JANGAN pernah mengotomatiskan refund (DE-2026-10-17-05).** Never build, trigger, or propose an automatic refund path.
+- **The Midtrans skill's automatic-refund section is NOT used for this store.** Its `refund-operations` reference, refund endpoints, and refund runbooks must NOT be followed to build automatic refunds. Use only its Snap / webhook / signature-verification / status-polling parts.
+- Refund mengikuti Kebijakan Pengembalian Dana: 5 kondisi, ajukan ≤7 hari kalender via Hubungi Kami, review 1–7 hari kerja, dana 1–14 hari kerja.
+- Failed/expired payments are handled via retry, not automatic refund.
+- Problem paid orders: manual settlement only — Super Admin wallet adjustment (members) or direct contact via the contact stored on the order (guests). Never initiate automatic gateway refunds.
 - **Never invent tax/rates.** Use only verified merchant rates (e.g. QRIS MDR). A rate from a public list is not confirmation of the account's rate.
 - Payment tests ONLY simulation/sandbox. No real production payment transactions without user approval.
 

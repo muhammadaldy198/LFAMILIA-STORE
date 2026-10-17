@@ -899,7 +899,7 @@ Twenty skills are vendored in this repo (copies of upstream skills, scanned befo
 | integrate-midtrans-payments | Midtrans integration (Snap, webhooks, verification) |
 | skill-security-auditor | Scan skills/code for vulnerabilities and malicious instructions |
 
-**Conflict rule:** owner rules always win over skills. The Midtrans skill's refund content is REJECTED for this store (no-refund policy) — use only its Snap/webhook/verification/status parts. Do not edit vendored skill files to change their meaning; note conflicts in the task/PR report instead.
+**Conflict rule:** owner rules always win over skills. The Midtrans skill's automatic-refund content does NOT apply to this store — refund is manual via CS (DE-2026-10-17-05). Use only its Snap/webhook/verification/status parts. Do not edit vendored skill files to change their meaning; note conflicts in the task/PR report instead.
 
 ### 41.2 Specialist roles (`.claude/agents/`)
 
@@ -909,7 +909,7 @@ One file per role. Pick the role matching the task and read its file before star
 |---|---|---|
 | Coder | `coder.md` | Writing Laravel code |
 | Reviewer | `reviewer.md` | Review + audit + security |
-| Payment | `payment.md` | Midtrans, no-refund policy |
+| Payment | `payment.md` | Midtrans, refund manual via CS (no auto-refund) |
 | Frontend | `frontend.md` | Vue/Inertia/Tailwind + design |
 | Tester | `tester.md` | Pest + webapp-testing |
 | Deployer | `deployer.md` | CI/CD + deploy runbook |
