@@ -526,11 +526,8 @@ class FulfillmentService
             return false;
         }, 3);
 
-        // Automatic failover is intentionally disabled per PRD §47.
+        // Automatic failover is permanently disabled per PRD §47 (no auto-switch).
         // Orders with FAILED_CONFIRMED remain BLOCKED for manual resolution.
-        if (false && $failover) {
-            $this->failoverIfSafe($attemptId);
-        }
     }
 
     public function retrySafeAttempt(int $attemptId): void
@@ -574,11 +571,6 @@ class FulfillmentService
         }, 3);
 
         $attempt = DB::table('fulfillment_attempts')->where('id', $attemptId)->first();
-        if ($attempt?->status === 'FAILED_CONFIRMED' && $attempt->safe_to_failover) {
-            $this->failoverIfSafe($attemptId);
-
-            return;
-        }
 
         if ($sendAttemptId !== null) {
             SendFulfillmentJob::dispatch($sendAttemptId)->afterCommit();
