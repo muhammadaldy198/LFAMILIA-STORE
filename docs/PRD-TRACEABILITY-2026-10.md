@@ -82,7 +82,7 @@ Temuan F-01/F-02 **telah dibereskan** dalam PR #279 (baseline `780e9dc`), sehing
 ### §6 Digiflazz
 | Status | Keterangan |
 |---|---|
-| IMPLEMENTED | Panel import/sync produk & SKU Digiflazz. `buyer_sku_code` berasal dari data Digiflazz, tidak dimanipulasi customer. Seller selection/ranking manual (Buyer Area → Produk). **Digiflazz Tools terpisah + auto-switch tidak ada** — sesuai §47. |
+| PARTIAL (karena F-04) | Panel import/sync produk & SKU Digiflazz. `buyer_sku_code` berasal dari data Digiflazz, tidak dimanipulasi customer. Seller selection/ranking manual (Buyer Area → Produk). **Digiflazz Tools terpisah + auto-switch tidak ada** (persyaratan §47 "no backup SKU"), TETAPI jalur **retry-failover legacy masih reachable** (F-04) — sehingga nomor ini perlu dicatat partial sampai jalur itu dihapus/di-guard. |
 
 *Bukti:* `app/Services/DigiflazzCatalogImport.php`; `app/Services/AdminDigiflazzMonitorService.php`; `app/Http/Controllers/AdminDigiflazzController.php`; `app/Services/DigiflazzFixedPricePolicy.php`. Tidak ada route/service bersimbol `auto-switch` di `app/`.
 
@@ -334,7 +334,7 @@ Temuan F-01/F-02 **telah dibereskan** dalam PR #279 (baseline `780e9dc`), sehing
 ### §42 Non-Negotiable Requirements
 | Status | Keterangan |
 |---|---|
-| IMPLEMENTED | 11 non-negotiable: tidak percaya harga frontend; tidak simpan secret di GitHub; guest tidak punya wallet; nama provider tidak tampil; tidak double fulfillment; tidak failover sebelum status pasti; redirect bukan bukti paid; harga order tidak berubah; Android tidak buat DB customer terpisah; checkout tidak depend hardcoded satu provider; membership bukan akses admin. |
+| IMPLEMENTED (dengan catatan F-04) | 11 non-negotiable: tidak percaya harga frontend; tidak simpan secret di GitHub; guest tidak punya wallet; nama provider tidak tampil; tidak double fulfillment; tidak failover sebelum status pasti; redirect bukan bukti paid; harga order tidak berubah; Android tidak buat DB customer terpisah; checkout tidak depend hardcoded satu provider; membership bukan akses admin. **Catatan:** invariant "tidak failover sebelum status pasti" terjaga untuk data baru; jalur retry-failover legacy tetap reachable (lihat F-04) sehingga belum bisa diklaim menyeluruh sampai jalur itu dibersihkan. |
 
 *Bukti:* `app/Services/CheckoutInputValidator.php` (harga/SKU); `config` (credential tidak tracked); `app/Services/GuestOrderAccess.php` (guest tanpa wallet); `app/Services/FulfillmentService.php` (no double, no auto-switch; jalur retry-failover legacy masih hidup — lihat F-04); `PaymentWebhookController` (webhook = otoritas paid); `Product` (`snapshot` harga); `app/Services/MembershipService.php` (terpisah); `ProviderMapping` (multi-provider).
 
