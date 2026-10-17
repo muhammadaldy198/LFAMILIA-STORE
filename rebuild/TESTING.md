@@ -44,7 +44,7 @@ CI juga memvalidasi Laravel config cache/clear.
 bash tests/Browser/smoke.sh
 ```
 
-Smoke menggunakan Playwright (headless Chromium) via tool browser di repository (`tests/Browser/`) untuk customer dan Admin flow yang didefinisikan test. Cypress tidak digunakan.
+Suite browser smoke menggunakan kombinasi tool: Playwright digunakan khusus untuk perbandingan visual (`rebuild/tests/Browser/checkout-visual.mjs`), sedangkan skenario responsif customer dan Admin (`customer-ui.mjs`, `admin-ui.mjs`) dijalankan langsung melalui headless Chromium via Chrome DevTools Protocol. Cypress tidak digunakan.
 
 ## Security/secret guardrails
 
