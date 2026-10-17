@@ -330,7 +330,9 @@ class PaymentService
             'amount_idr' => (int) $payment->amount_idr,
             'customer_name' => $target->customer_name ?? $user?->name ?? 'Customer LFAMILIA',
             'customer_email' => $target->guest_email ?? $user?->email,
-            'customer_phone' => $target->guest_phone ?? $user?->phone,
+            // Gateway (Midtrans/Doku) hanya menerima digit pada field phone,
+            // jadi kode negara "+62..." dibersihkan di sini.
+            'customer_phone' => $this->phoneDigits($target->guest_phone ?? $user?->phone),
             'provider_channel' => $route['provider_channel'],
             'route_configuration' => $route['configuration'],
             'expires_minutes' => $providerExpiresMinutes,
@@ -451,5 +453,13 @@ class PaymentService
         }
 
         return max(1, min(120, (int) now()->diffInMinutes($expiresAt, false)));
+    }
+
+    /** Nomor untuk gateway pembayaran: hanya digit, tanpa "+" atau kode negara bersimbol. */
+    private function phoneDigits(?string $phone): ?string
+    {
+        $digits = preg_replace('/\D+/', '', (string) $phone);
+
+        return $digits === '' ? null : $digits;
     }
 }

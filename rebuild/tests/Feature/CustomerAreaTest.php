@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Actions\Fortify\CreateNewUser;
 use App\Jobs\SendTransactionalEmailJob;
 use App\Models\SupportTicket;
 use App\Models\User;
@@ -23,10 +24,13 @@ class CustomerAreaTest extends TestCase
 
     private function customer(string $email): User
     {
+        $phone = '08'.random_int(1000000000, 9999999999);
+
         return User::create([
             'name' => 'Customer',
             'email' => $email,
-            'phone' => '081234567890',
+            'phone' => $phone,
+            'phone_normalized' => CreateNewUser::normalizePhone($phone),
             'password' => Hash::make('old-password-123'),
         ]);
     }

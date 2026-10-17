@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Actions\Fortify\CreateNewUser;
 use App\Models\AdminUser;
 use App\Models\SupportTicket;
 use App\Models\User;
@@ -33,10 +34,13 @@ class AdminSupportRestorationTest extends TestCase
 
     private function user(string $name = 'Support Customer'): User
     {
+        $phone = '08'.random_int(1000000000, 9999999999);
+
         return User::create([
             'name' => $name,
             'email' => bin2hex(random_bytes(8)).'@example.test',
-            'phone' => '081234567890',
+            'phone' => $phone,
+            'phone_normalized' => CreateNewUser::normalizePhone($phone),
             'password' => Hash::make('customer-support-password'),
             'membership_tier_code' => 'BASIC',
         ]);

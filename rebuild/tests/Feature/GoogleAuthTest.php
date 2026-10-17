@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Actions\Fortify\CreateNewUser;
 use App\Models\IntegrationCredential;
 use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
@@ -130,11 +131,73 @@ class GoogleAuthTest extends TestCase
         $this->put('/account/phone', ['phone' => '081234567890'])
             ->assertRedirect(route('account'));
         $this->assertSame('081234567890', $user->fresh()->phone);
+        $this->assertSame(CreateNewUser::normalizePhone('081234567890'), $user->fresh()->phone_normalized);
         $this->assertNotNull($user->fresh()->password);
 
         // The one-time Google onboarding proof must not authorize later changes.
         $this->put('/account/phone', ['phone' => '081298765432'])
             ->assertRedirect(route('password.confirm'));
         $this->assertSame('081234567890', $user->fresh()->phone);
+    }
+
+    public function test_cannot_use_phone_number_already_taken_by_another_user(): void
+    {
+        User::create([
+            'name' => 'Existing Phone Owner',
+            'email' => 'phone-owner@example.test',
+            'phone' => '081234567890',
+            'phone_normalized' => '6281234567890',
+            'password' => Hash::make('password123'),
+        ]);
+
+        $newUser = User::create([
+            'name' => 'New User',
+            'email' => 'new-user@example.test',
+            'password' => Hash::make('password123'),
+        ]);
+
+        // Same raw phone
+        $this->actingAs($newUser, 'web')
+            ->withSession(['auth.password_confirmed_at' => time()])
+            ->put('/account/phone', ['phone' => '081234567890'])
+            ->assertSessionHasErrors('phone');
+
+        // Equivalent Indonesian format (62...)
+        $this->actingAs($newUser, 'web')
+            ->withSession(['auth.password_confirmed_at' => time()])
+            ->put('/account/phone', ['phone' => '6281234567890'])
+            ->assertSessionHasErrors('phone');
+
+        // Equivalent Indonesian format with plus (+62...)
+        $this->actingAs($newUser, 'web')
+            ->withSession(['auth.password_confirmed_at' => time()])
+            ->put('/account/phone', ['phone' => '+6281234567890'])
+            ->assertSessionHasErrors('phone');
+
+        $this->assertNull($newUser->fresh()->phone);
+    }
+
+    public function test_registration_rejects_phone_already_taken_by_another_account(): void
+    {
+        User::create([
+            'name' => 'Original Owner',
+            'email' => 'original-owner@example.test',
+            'phone' => '081234567890',
+            'phone_normalized' => '6281234567890',
+            'password' => Hash::make('password-strong-123'),
+            'membership_tier_code' => 'BASIC',
+        ]);
+
+        // Same number via 62... prefix — registration must reject it
+        $response = $this->post('/register', [
+            'name' => 'Duplicate Registrant',
+            'email' => 'new-registrant@example.test',
+            'phone' => '6281234567890',
+            'password' => 'strong-password-123',
+            'password_confirmation' => 'strong-password-123',
+        ]);
+
+        $response->assertSessionHasErrors('phone');
+        $this->assertNull(User::where('email', 'new-registrant@example.test')->first());
     }
 }

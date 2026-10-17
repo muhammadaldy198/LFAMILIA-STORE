@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Fortify\CreateNewUser;
 use App\Models\MembershipTier;
 use App\Models\Product;
 use App\Models\Wallet;
@@ -9,6 +10,7 @@ use App\Services\CustomerAccountDeletion;
 use App\Services\MembershipService;
 use App\Services\PaymentRoutingService;
 use App\Services\TransactionalEmailService;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -62,17 +64,36 @@ class CustomerAccountController
             throw ValidationException::withMessages(['current_password' => 'Kata sandi saat ini salah.']);
         }
 
+        $normalized = CreateNewUser::normalizePhone($data['phone']);
+        if (CreateNewUser::phoneAlreadyUsed($data['phone'], $user->id)
+            || CreateNewUser::phoneAlreadyUsedByVariant($data['phone'], $user->id)) {
+            throw ValidationException::withMessages(['phone' => 'Nomor WhatsApp sudah digunakan oleh akun lain.']);
+        }
+
         $oldEmail = $user->email;
-        $user->forceFill([
-            'name' => $data['name'],
-            'email' => $email,
-            'phone' => $data['phone'],
-            'phone_normalized' => preg_replace('/[^0-9]+/', '', $data['phone']) ?: null,
-            'leaderboard_opt_in' => array_key_exists('leaderboard_opt_in', $data)
-                ? (bool) $data['leaderboard_opt_in']
-                : (bool) $user->leaderboard_opt_in,
-            'email_verified_at' => $email === $user->email ? $user->email_verified_at : null,
-        ])->save();
+        try {
+            $user->forceFill([
+                'name' => $data['name'],
+                'email' => $email,
+                'phone' => $data['phone'],
+                'phone_normalized' => $normalized,
+                'leaderboard_opt_in' => array_key_exists('leaderboard_opt_in', $data)
+                    ? (bool) $data['leaderboard_opt_in']
+                    : (bool) $user->leaderboard_opt_in,
+                'email_verified_at' => $email === $user->email ? $user->email_verified_at : null,
+            ])->save();
+        } catch (QueryException $exception) {
+            if (($exception->errorInfo[1] ?? null) === 1062) {
+                $message = $exception->getMessage();
+                if (preg_match('/key [\'`"]?[^\'`"]*users_email_unique/i', $message) || preg_match('/for key [\'`"]?email/i', $message)) {
+                    throw ValidationException::withMessages(['email' => 'Email sudah digunakan oleh akun lain.']);
+                }
+
+                throw ValidationException::withMessages(['phone' => 'Nomor WhatsApp sudah digunakan oleh akun lain.']);
+            }
+
+            throw $exception;
+        }
 
         if ($oldEmail !== $email) {
             DB::table('password_reset_tokens')->where('email', $oldEmail)->delete();

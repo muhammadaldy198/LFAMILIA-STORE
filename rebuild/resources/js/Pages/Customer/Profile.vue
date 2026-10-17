@@ -4,6 +4,7 @@ const { customerText } = useCustomerPresentation();
 
 import { Head, useForm, usePage } from '@inertiajs/vue3';
 import AccountShell from '../../Components/AccountShell.vue';
+import PhoneCountryPicker from '../../Components/PhoneCountryPicker.vue';
 
 const props = defineProps({ customer: Object, hasPassword: Boolean });
 const page = usePage();
@@ -27,9 +28,13 @@ const remove = () => {
         <p v-if="page.props.status" role="status" class="text-cyan-300">{{ page.props.status }}</p>
         <form class="space-y-4 rounded-xl border border-slate-800 bg-slate-900 p-5" @submit.prevent="updateProfile">
             <h2 class="text-lg font-semibold">{{ customerText("pages.customer.profile.81176d44", "Data akun") }}</h2>
-            <label v-for="field in [{ key: 'name', label: 'Nama', type: 'text' }, { key: 'email', label: 'Email', type: 'email' }, { key: 'phone', label: 'Nomor HP', type: 'tel' }]" :key="field.key" class="block">{{ field.label }}
+            <label v-for="field in [{ key: 'name', label: 'Nama', type: 'text' }, { key: 'email', label: 'Email', type: 'email' }]" :key="field.key" class="block">{{ field.label }}
                 <input v-model="profile[field.key]" :type="field.type" required class="mt-1 block w-full rounded-md bg-slate-800 p-3 focus:outline-cyan-300">
                 <span v-if="profile.errors[field.key]" class="text-sm text-red-300">{{ profile.errors[field.key] }}</span>
+            </label>
+            <label class="block">Nomor HP
+                <PhoneCountryPicker v-model="profile.phone" required :invalid="Boolean(profile.errors.phone)" />
+                <span v-if="profile.errors.phone" class="text-sm text-red-300">{{ profile.errors.phone }}</span>
             </label>
             <label class="flex items-center justify-between gap-4 rounded-xl border border-slate-800 bg-slate-950/40 p-4">
                 <span><strong class="block text-sm">{{ customerText("pages.customer.profile.db175326", "Tampil di leaderboard") }}</strong><small class="mt-1 block text-xs text-slate-400">{{ customerText("pages.customer.profile.8c806ec", "Jika aktif, hanya nama singkat yang ditampilkan. Email, telepon, dan data game tidak pernah ditampilkan.") }}</small></span>

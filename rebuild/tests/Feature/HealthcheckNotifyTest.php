@@ -458,7 +458,9 @@ class HealthcheckNotifyTest extends TestCase
 
     public function test_invalid_state_fails(): void
     {
+        $notificationCount = DB::table('admin_notifications')->count();
+
         $this->assertSame(1, $this->notify('meh'));
-        $this->assertSame(0, DB::table('admin_notifications')->count());
+        $this->assertSame($notificationCount, DB::table('admin_notifications')->count());
     }
 }

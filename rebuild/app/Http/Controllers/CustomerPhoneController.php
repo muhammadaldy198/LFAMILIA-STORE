@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Fortify\CreateNewUser;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -17,14 +19,37 @@ class CustomerPhoneController
     public function update(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'phone' => ['required', 'string', 'regex:/^\\+?[0-9]{10,16}$/'],
+            'phone' => ['required', 'string', 'regex:/^\+?[0-9]{10,16}$/'],
         ]);
 
-        $digits = preg_replace('/[^0-9]+/', '', $data['phone']) ?: null;
-        $request->user()->forceFill([
-            'phone' => $data['phone'],
-            'phone_normalized' => $digits,
-        ])->save();
+        $normalized = CreateNewUser::normalizePhone($data['phone']);
+        $userId = $request->user()->id;
+
+        if ($normalized !== null && CreateNewUser::phoneAlreadyUsed($data['phone'], $userId)) {
+            return back()->withErrors(['phone' => 'Nomor WhatsApp sudah digunakan oleh akun lain.']);
+        }
+
+        if (CreateNewUser::phoneAlreadyUsedByVariant($data['phone'], $userId)) {
+            return back()->withErrors(['phone' => 'Nomor WhatsApp sudah digunakan oleh akun lain.']);
+        }
+
+        try {
+            $request->user()->forceFill([
+                'phone' => $data['phone'],
+                'phone_normalized' => $normalized,
+            ])->save();
+        } catch (QueryException $exception) {
+            if (($exception->errorInfo[1] ?? null) === 1062) {
+                $message = $exception->getMessage();
+                if (preg_match('/key [\'`"]?[^\'`"]*users_email_unique/i', $message) || preg_match('/for key [\'`"]?email/i', $message)) {
+                    return back()->withErrors(['email' => 'Email sudah digunakan oleh akun lain.']);
+                }
+
+                return back()->withErrors(['phone' => 'Nomor WhatsApp sudah digunakan oleh akun lain.']);
+            }
+
+            throw $exception;
+        }
 
         $request->session()->forget([
             'auth.google_phone_onboarding_at',

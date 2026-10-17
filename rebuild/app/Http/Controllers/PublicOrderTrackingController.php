@@ -180,26 +180,44 @@ class PublicOrderTrackingController
 
     private function phoneVariants(string $value): array
     {
-        $digits = preg_replace('/\D+/', '', $value) ?: '';
-        if ($digits === '') {
+        $raw = trim($value);
+        $digits = preg_replace('/\D+/', '', $raw) ?: '';
+        if (strlen($digits) < 6) {
             return [];
         }
 
-        if (str_starts_with($digits, '62')) {
+        $variants = [$digits, '+'.$digits];
+
+        // Jika nomor diawali '+' eksplisit internasional:
+        // Cek apakah benar nomor internasional Indonesia (+62) atau negara lain (+81, +1, dsb).
+        // Jangan pernah meng-expand nomor internasional non-ID ke variasi lokal Indonesia!
+        // Untuk Indonesia (+62), JANGAN masukkan varian '8...' polos ($local) agar tidak collision dengan +81 Jepang.
+        if (str_starts_with($raw, '+')) {
+            if (str_starts_with($digits, '62') && strlen($digits) > 2) {
+                $local = substr($digits, 2);
+                $variants[] = '0'.$local;
+            }
+
+            return array_values(array_unique($variants));
+        }
+
+        // Variasi lokal Indonesia:
+        // Hanya ekspansi ke varian Indonesia jika input eksplisit menggunakan format lokal Indo:
+        // - Diawali '628...' (khas kode negara Indonesia)
+        // - Diawali '08...' (khas nomor lokal domestik Indonesia)
+        // JANGAN masukkan varian '8...' polos ($local) ke dalam variants agar nomor Indonesia
+        // tidak pernah menabrak nomor internasional (seperti nomor Jepang +81 yang canonicalnya 81...).
+        if (str_starts_with($digits, '628') && strlen($digits) >= 10) {
             $local = substr($digits, 2);
-        } elseif (str_starts_with($digits, '0')) {
+            $variants[] = '0'.$local;
+            $variants[] = '+'.$digits;
+        } elseif (str_starts_with($digits, '08') && strlen($digits) >= 10) {
             $local = substr($digits, 1);
-        } elseif (str_starts_with($digits, '8')) {
-            $local = $digits;
-        } else {
-            return [];
+            $variants[] = '62'.$local;
+            $variants[] = '+62'.$local;
         }
 
-        if (! preg_match('/^8\d{7,14}$/', $local)) {
-            return [];
-        }
-
-        return array_values(array_unique(['62'.$local, '0'.$local, $local]));
+        return array_values(array_unique($variants));
     }
 
     private function trackingToken(int $orderId, bool $revealReference): string
