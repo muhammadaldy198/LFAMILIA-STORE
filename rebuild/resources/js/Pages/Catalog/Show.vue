@@ -8,6 +8,7 @@ import CustomerShell from '../../Components/CustomerShell.vue';
 import CheckoutPaymentMethods from '../../Components/Checkout/PaymentMethods.vue';
 import CheckoutVoucherModal from '../../Components/Checkout/VoucherModal.vue';
 import '../../../css/checkout.css';
+import { phoneCountries } from '../../Data/phoneCountries';
 
 const props = defineProps({
     product: Object,
@@ -30,6 +31,36 @@ const savedAccountItems = ref([...(props.savedAccounts || [])]);
 const customerInput = reactive(Object.fromEntries((props.fields || []).map((field) => [field.field_key, ''])));
 const guestEmail = ref(props.customer?.email || '');
 const guestPhone = ref(props.customer?.phone || '');
+const phoneCountry = ref(phoneCountries[0]);
+const phoneCountrySearch = ref('');
+const phoneCountryOpen = ref(false);
+const filteredPhoneCountries = computed(() => phoneCountries.filter(country =>
+    `${country.name} +${country.dial}`.toLowerCase().includes(phoneCountrySearch.value.trim().toLowerCase())));
+const phoneCountryFlag = country => String.fromCodePoint(...country.iso.toUpperCase().split('').map(char => 127397 + char.charCodeAt(0)));
+function onPhoneCountryKeydown(event) {
+    if (event.key === 'Escape') phoneCountryOpen.value = false;
+}
+function selectPhoneCountry(country) {
+    phoneCountry.value = country;
+    phoneCountryOpen.value = false;
+    phoneCountrySearch.value = '';
+    if (guestPhone.value.startsWith('+')) {
+        const digits = guestPhone.value.replace(/\D/g, '');
+        guestPhone.value = digits.startsWith(country.dial) ? digits.slice(country.dial.length) : digits;
+    }
+}
+function phoneWithCountryCode(value = guestPhone.value) {
+    const raw = String(value || '').trim();
+    // Nomor akun yang sudah login disimpan lengkap di server — jangan
+    // ditambahi kode negara lagi, cukup tampilkan apa adanya.
+    if (props.customer) return raw;
+    let local = raw.replace(/\D/g, '');
+    if (local.startsWith(phoneCountry.value.dial) && local.length > phoneCountry.value.dial.length + 6) {
+        local = local.slice(phoneCountry.value.dial.length);
+    }
+    local = local.replace(/^0+/, '');
+    return local ? `+${phoneCountry.value.dial}${local}` : '';
+}
 const voucherCode = ref('');
 const paymentChannelCode = ref('');
 const quote = ref(null);
@@ -118,9 +149,8 @@ const requiredFieldsComplete = computed(() => (props.fields || []).filter((field
 const guestContactComplete = computed(() => props.customer || (
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail.value.trim())
     // D17.1: server menolak HP di bawah 10 digit (422) — threshold
-    // client harus sama, supaya tombol quote/checkout tidak aktif
-    // untuk nomor yang pasti ditolak server.
-    && guestPhone.value.replace(/\D/g, '').length >= 10
+    // client dihitung dari nomor lengkap (+kode negara + nomor lokal).
+    && phoneWithCountryCode().replace(/\D/g, '').length >= 10
 ));
 const selectedPaymentChannel = computed(() => (props.paymentChannels || []).find((channel) =>
     channel.available !== false && channel.code === paymentChannelCode.value
@@ -294,7 +324,7 @@ function currentQuoteSignature() {
         normalizePromo(voucherCode.value),
         props.customer?.id ?? null,
         props.customer ? null : guestEmail.value.trim().toLowerCase(),
-        props.customer ? null : normalizeWhatsapp(guestPhone.value),
+        props.customer ? null : phoneWithCountryCode(),
     ]);
 }
 
@@ -340,7 +370,7 @@ function buildConfirmationSnapshot(currentQuote) {
             || selectedPaymentChannel.value?.code
             || '-',
         email: guestEmail.value.trim(),
-        phone: normalizeWhatsapp(guestPhone.value),
+        phone: phoneWithCountryCode(),
         voucher_code: currentQuote?.voucher_code || null,
     };
 }
@@ -508,7 +538,7 @@ function basePayload() {
         voucher_code: voucherCode.value.trim() || null,
         ...(props.customer ? {} : {
             guest_email: guestEmail.value.trim(),
-            guest_phone: guestPhone.value.trim(),
+            guest_phone: phoneWithCountryCode(),
         }),
     };
 }
@@ -563,6 +593,10 @@ async function checkNickname() {
 function choosePackage(item) {
     if (item.is_available === false || busy.value === 'order' || busy.value === 'payment') return;
     selectedPackageId.value = String(item.id);
+    if (errors.value.voucher_code?.[0] === 'Pilih nominal terlebih dahulu untuk melihat voucher yang tersedia.') {
+        const { voucher_code: _voucherCodeError, ...remainingErrors } = errors.value;
+        errors.value = remainingErrors;
+    }
     invalidateQuote();
     if (canQuote.value) void loadQuote();
 }
@@ -635,7 +669,7 @@ async function openVoucherPicker() {
                 package_id: selectedPackage.value.id,
                 ...(props.customer ? {} : {
                     guest_email: guestEmail.value.trim() || null,
-                    guest_phone: guestPhone.value.trim() || null,
+                    guest_phone: phoneWithCountryCode() || null,
                 }),
             }),
         });
@@ -904,7 +938,7 @@ function closeReview() { summaryOpen.value = false; closeConfirmation(); }
               <CheckoutPaymentMethods :payment-channels="paymentChannels" :selected-code="paymentChannelCode" :quotes="channelQuotes" :current-quote="quote" :locked="busy==='order'||busy==='payment'" :has-package="Boolean(selectedPackage)" :loading-quotes="busy==='quote'" :customer="customer" @select="choosePayment"/>
             </section>
             <section class="lfx-panel" id="lfx-voucher"><header class="lfx-panel-header"><span class="lfx-number">4</span><div><h2>{{customerText("checkout.voucher_title", "Voucher Diskon")}}</h2></div></header><div class="lfx-panel-content"><div class="lfx-voucher-input"><span>⌗</span><input  :value="voucherCode" @input="updateVoucherInput($event.target.value)" maxlength="100" placeholder="Masukkan kode voucher" aria-label="Kode voucher diskon" autocapitalize="characters" @keyup.enter="loadQuote"/><button @click="loadQuote">Gunakan</button></div><p v-if="errors.voucher_code" class="lfx-error">{{errors.voucher_code[0]}}</p><div v-if="quote?.voucher_code" class="lfx-applied"><span>✓</span><div><strong>{{quote.voucher_code}} berhasil dipakai</strong><small>Diskon {{formatIdr(reviewQuote?.voucher_discount_idr || 0)}}</small></div><button @click="updateVoucherInput('');loadQuote()">Hapus</button></div><button class="lfx-voucher-browse" @click="openVoucherPicker"><span>♧</span><strong>Lihat voucher yang tersedia</strong><b>→</b></button></div></section>
-            <section id="lfx-contact" class="lfx-panel"><header class="lfx-panel-header"><span class="lfx-number">5</span><div><h2>{{customerText("checkout.contact_title", "Detail Kontak")}}</h2></div></header><div class="lfx-panel-content"><div class="lfx-field-grid"><label class="lfx-field"><span>Nomor WhatsApp <b>*</b></span><input :value="guestPhone" @input="guestPhone=normalizeWhatsapp($event.target.value)" :readonly="Boolean(customer)" type="tel" inputmode="tel" placeholder="081234567890"/></label><label class="lfx-field"><span>Email <b>*</b></span><input v-model="guestEmail" :readonly="Boolean(customer)" type="email" placeholder="nama@email.com"/></label></div><div class="lfx-hint"><span>i</span> {{customerText("pages.catalog.show.efbf2ce0", "Kami hanya memakai kontak untuk invoice dan status transaksi.")}}</div></div></section>
+            <section id="lfx-contact" class="lfx-panel"><header class="lfx-panel-header"><span class="lfx-number">5</span><div><h2>{{customerText("checkout.contact_title", "Detail Kontak")}}</h2></div></header><div class="lfx-panel-content"><div class="lfx-field-grid"><label class="lfx-field"><span>Nomor WhatsApp <b>*</b></span><div class="lfx-phone-entry"><div class="lfx-country-control"><button type="button" class="lfx-country-trigger" :disabled="Boolean(customer)" :aria-expanded="phoneCountryOpen" aria-label="Pilih kode negara" @click="phoneCountryOpen=!phoneCountryOpen" @keydown="onPhoneCountryKeydown"><span>{{phoneCountryFlag(phoneCountry)}}</span><span>+{{phoneCountry.dial}}</span><span aria-hidden="true">⌄</span></button></div><input :value="guestPhone" @input="guestPhone=normalizeWhatsapp($event.target.value)" :readonly="Boolean(customer)" type="tel" inputmode="tel" placeholder="081234567890"/><div v-if="phoneCountryOpen" class="lfx-country-menu"><input v-model="phoneCountrySearch" class="lfx-country-search" type="search" placeholder="Cari negara..." aria-label="Cari negara" @keydown="onPhoneCountryKeydown"/><div class="lfx-country-options"><button v-for="country in filteredPhoneCountries" :key="country.iso" type="button" class="lfx-country-option" @click="selectPhoneCountry(country)"><span>{{phoneCountryFlag(country)}}</span><span>{{country.name}}</span><span>+{{country.dial}}</span></button><p v-if="!filteredPhoneCountries.length" class="lfx-country-empty">Negara tidak ditemukan</p></div></div></div></label><label class="lfx-field"><span>Email <b>*</b></span><input v-model="guestEmail" :readonly="Boolean(customer)" type="email" placeholder="nama@email.com"/></label></div><div class="lfx-hint"><span>i</span> {{customerText("pages.catalog.show.efbf2ce0", "Kami hanya memakai kontak untuk invoice dan status transaksi.")}}</div></div></section>
           </template>
 <section v-else class="lfx-panel lfx-details lf-product-details">
             <article class="lf-product-description lf-product-description-legacy">
@@ -1050,7 +1084,7 @@ function closeReview() { summaryOpen.value = false; closeConfirmation(); }
         <div v-for="field in fields" :key="field.field_key" v-show="String(customerInput[field.field_key]||'').trim()"><span>{{field.label}}</span><b>{{customerInput[field.field_key]}}</b></div>
         <div><span>Nominal</span><b>{{selectedPackage?.name || 'Belum dipilih'}}</b></div>
         <div><span>Pembayaran</span><b>{{selectedPaymentChannel?.name || 'Belum dipilih'}}</b></div>
-        <div v-if="guestPhone"><span>WhatsApp</span><b>{{guestPhone}}</b></div>
+        <div v-if="guestPhone"><span>WhatsApp</span><b>{{phoneWithCountryCode()}}</b></div>
         <div v-if="selectedPackage"><span>Harga produk</span><b>{{formatIdr(reviewQuote?.subtotal_idr ?? summarySubtotal)}}</b></div>
         <div v-if="selectedPackage && reviewQuote?.voucher_discount_idr"><span>Diskon {{reviewQuote?.voucher_code}}</span><b class="lfx-saved">− {{formatIdr(reviewQuote?.voucher_discount_idr || 0)}}</b></div>
         <div v-if="selectedPackage && selectedPaymentChannel"><span>Biaya pembayaran</span><b>{{formatIdr(reviewQuote?.fee_idr || 0)}}</b></div>

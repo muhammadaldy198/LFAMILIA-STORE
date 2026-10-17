@@ -3,6 +3,7 @@
 namespace App\Actions\Fortify;
 
 use App\Models\User;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
@@ -14,8 +15,12 @@ use Laravel\Fortify\Contracts\CreatesNewUsers;
 class CreateNewUser implements CreatesNewUsers
 {
     /**
-     * Normalize an Indonesian phone number to its canonical form (8xx...).
-     * Strips leading 0 or 62 so that 081..., 6281..., and 81... all map to the same value.
+     * Bentuk kanonik nomor telepon: digit saja.
+     *
+     * Nomor Indonesia (0812…, 62812…, 812…) dipetakan ke bentuk lokal 8…,
+     * sedangkan nomor negara lain dipertahankan lengkap bersama kode
+     * negaranya (contoh +1 5551234567 -> 15551234567) supaya pemilik nomor
+     * dari semua negara tetap bisa didaftarkan dan tetap unik.
      */
     public static function normalizePhone(string $phone): ?string
     {
@@ -35,9 +40,6 @@ class CreateNewUser implements CreatesNewUsers
         return $digits;
     }
 
-    /**
-     * Build all equivalent variant strings for duplicate detection.
-     */
     public static function phoneVariants(string $phone): array
     {
         $digits = preg_replace('/[^0-9]+/', '', $phone) ?: null;
@@ -45,8 +47,7 @@ class CreateNewUser implements CreatesNewUsers
             return [$phone];
         }
 
-        $variants = [$phone, $digits];
-
+        $variants = [$phone, $digits, '+'.$digits];
         if (str_starts_with($digits, '62') && strlen($digits) > 2) {
             $local = substr($digits, 2);
             $variants[] = '0'.$local;
@@ -63,6 +64,35 @@ class CreateNewUser implements CreatesNewUsers
         return array_values(array_unique($variants));
     }
 
+    public static function phoneAlreadyUsed(string $phone, ?int $exceptUserId = null): bool
+    {
+        $normalized = self::normalizePhone($phone);
+        $query = User::query()->where(function ($query) use ($normalized, $phone): void {
+            $query->where('phone_normalized', $normalized)
+                ->orWhereIn('phone', self::phoneVariants($phone));
+        });
+
+        if ($exceptUserId !== null) {
+            $query->where('id', '!=', $exceptUserId);
+        }
+
+        return $query->exists();
+    }
+
+    public static function phoneAlreadyUsedByVariant(string $phone, ?int $exceptUserId = null): bool
+    {
+        $variants = self::phoneVariants($phone);
+        $query = User::query()->where(function ($query) use ($variants): void {
+            $query->whereIn('phone', $variants)
+                ->orWhereIn('phone_normalized', $variants);
+        });
+        if ($exceptUserId !== null) {
+            $query->where('id', '!=', $exceptUserId);
+        }
+
+        return $query->exists();
+    }
+
     public function create(array $input): User
     {
         $input['email'] = Str::lower(trim((string) ($input['email'] ?? '')));
@@ -74,26 +104,26 @@ class CreateNewUser implements CreatesNewUsers
             'password' => ['required', 'string', 'min:12', 'confirmed'],
         ])->validate();
 
-        // Check for duplicate phone across all equivalent Indonesian formats.
-        $variants = self::phoneVariants((string) $input['phone']);
-        $conflict = User::query()
-            ->where(function ($query) use ($variants): void {
-                $query->whereIn('phone', $variants)
-                    ->orWhereIn('phone_normalized', $variants);
-            })
-            ->exists();
-
-        if ($conflict) {
+        if (self::phoneAlreadyUsed((string) $input['phone'])) {
             throw ValidationException::withMessages(['phone' => 'Nomor WhatsApp sudah digunakan oleh akun lain.']);
         }
 
-        return DB::transaction(fn (): User => User::create([
-            'name' => $input['name'],
-            'email' => $input['email'],
-            'phone' => $input['phone'],
-            'phone_normalized' => self::normalizePhone((string) $input['phone']),
-            'password' => Hash::make($input['password']),
-            'membership_tier_code' => 'BASIC',
-        ]));
+        $input['phone_normalized'] = self::normalizePhone((string) $input['phone']);
+        try {
+            return DB::transaction(fn (): User => User::create([
+                'name' => $input['name'],
+                'email' => $input['email'],
+                'phone' => $input['phone'],
+                'phone_normalized' => $input['phone_normalized'],
+                'password' => Hash::make($input['password']),
+                'membership_tier_code' => 'BASIC',
+            ]));
+        } catch (QueryException $exception) {
+            if (($exception->errorInfo[1] ?? null) === 1062) {
+                throw ValidationException::withMessages(['phone' => 'Nomor WhatsApp sudah digunakan oleh akun lain.']);
+            }
+
+            throw $exception;
+        }
     }
 }

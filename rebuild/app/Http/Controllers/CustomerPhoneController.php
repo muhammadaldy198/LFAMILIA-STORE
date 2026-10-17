@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Actions\Fortify\CreateNewUser;
-use App\Models\User;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -23,27 +23,28 @@ class CustomerPhoneController
         ]);
 
         $normalized = CreateNewUser::normalizePhone($data['phone']);
+        $userId = $request->user()->id;
 
-        if ($normalized !== null) {
-            $variants = CreateNewUser::phoneVariants($data['phone']);
-
-            $conflict = User::query()
-                ->where('id', '!=', $request->user()->id)
-                ->where(function ($query) use ($variants): void {
-                    $query->whereIn('phone', $variants)
-                        ->orWhereIn('phone_normalized', $variants);
-                })
-                ->exists();
-
-            if ($conflict) {
-                return back()->withErrors(['phone' => 'Nomor WhatsApp sudah digunakan oleh akun lain.']);
-            }
+        if ($normalized !== null && CreateNewUser::phoneAlreadyUsed($data['phone'], $userId)) {
+            return back()->withErrors(['phone' => 'Nomor WhatsApp sudah digunakan oleh akun lain.']);
         }
 
-        $request->user()->forceFill([
-            'phone' => $data['phone'],
-            'phone_normalized' => $normalized,
-        ])->save();
+        if (CreateNewUser::phoneAlreadyUsedByVariant($data['phone'], $userId)) {
+            return back()->withErrors(['phone' => 'Nomor WhatsApp sudah digunakan oleh akun lain.']);
+        }
+
+        try {
+            $request->user()->forceFill([
+                'phone' => $data['phone'],
+                'phone_normalized' => $normalized,
+            ])->save();
+        } catch (QueryException $exception) {
+            if (($exception->errorInfo[1] ?? null) === 1062) {
+                return back()->withErrors(['phone' => 'Nomor WhatsApp sudah digunakan oleh akun lain.']);
+            }
+
+            throw $exception;
+        }
 
         $request->session()->forget([
             'auth.google_phone_onboarding_at',

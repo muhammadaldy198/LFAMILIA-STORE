@@ -9,23 +9,32 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // Canonicalize existing phone_normalized values to the 8xx... form
-        // so that 081... and 6281... do not collide on the unique index.
-        DB::table('users')->whereNotNull('phone_normalized')->orderBy('id')->chunkById(500, function ($users): void {
+        // Rebuild the derived value from phone, not a potentially empty/stale
+        // phone_normalized value. This migration intentionally aborts (without
+        // merging accounts) if legacy phones collide in canonical form.
+        DB::table('users')->whereNotNull('phone')->orderBy('id')->chunkById(500, function ($users): void {
             foreach ($users as $user) {
-                $digits = $user->phone_normalized;
-                if (str_starts_with($digits, '62') && strlen($digits) > 2) {
-                    $canonical = substr($digits, 2);
-                } elseif (str_starts_with($digits, '0') && strlen($digits) > 1) {
-                    $canonical = substr($digits, 1);
-                } else {
-                    $canonical = $digits;
+                $digits = preg_replace('/[^0-9]+/', '', (string) $user->phone) ?: null;
+                if ($digits !== null && str_starts_with($digits, '62')) {
+                    $digits = substr($digits, 2);
+                } elseif ($digits !== null && str_starts_with($digits, '0')) {
+                    $digits = substr($digits, 1);
                 }
-                if ($canonical !== $digits) {
-                    DB::table('users')->where('id', $user->id)->update(['phone_normalized' => $canonical]);
-                }
+                DB::table('users')->where('id', $user->id)->update(['phone_normalized' => $digits]);
             }
         });
+
+        $duplicates = DB::table('users')
+            ->select('phone_normalized', DB::raw('COUNT(*) as aggregate'))
+            ->whereNotNull('phone_normalized')
+            ->groupBy('phone_normalized')
+            ->havingRaw('COUNT(*) > 1')
+            ->get();
+
+        if ($duplicates->isNotEmpty()) {
+            $examples = $duplicates->take(10)->pluck('phone_normalized')->implode(', ');
+            throw new RuntimeException('Duplicate canonical phone numbers prevent the unique index. Resolve accounts explicitly before retrying. Examples: '.$examples);
+        }
 
         Schema::table('users', function (Blueprint $table): void {
             $table->dropIndex(['phone_normalized']);

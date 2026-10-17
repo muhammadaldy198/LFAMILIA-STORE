@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Actions\Fortify\CreateNewUser;
 use App\Jobs\SendTransactionalEmailJob;
 use Illuminate\Auth\MustVerifyEmail;
 use Illuminate\Contracts\Auth\MustVerifyEmail as MustVerifyEmailContract;
@@ -16,7 +17,7 @@ class User extends Authenticatable implements MustVerifyEmailContract
     use HasApiTokens, MustVerifyEmail, Notifiable, SoftDeletes;
 
     protected $fillable = [
-        'name', 'email', 'phone', 'password', 'leaderboard_opt_in',
+        'name', 'email', 'phone', 'phone_normalized', 'password', 'leaderboard_opt_in',
     ];
 
     protected $hidden = ['password', 'remember_token', 'google_sub'];
@@ -24,8 +25,8 @@ class User extends Authenticatable implements MustVerifyEmailContract
     protected static function booted(): void
     {
         static::creating(function (self $user): void {
-            if ($user->phone !== null && $user->phone_normalized === null) {
-                $user->phone_normalized = preg_replace('/[^0-9]+/', '', (string) $user->phone) ?: null;
+            if ($user->phone !== null) {
+                $user->phone_normalized = CreateNewUser::normalizePhone((string) $user->phone);
             }
         });
 

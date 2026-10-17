@@ -181,25 +181,25 @@ class PublicOrderTrackingController
     private function phoneVariants(string $value): array
     {
         $digits = preg_replace('/\D+/', '', $value) ?: '';
-        if ($digits === '') {
+        if (strlen($digits) < 6) {
             return [];
         }
 
-        if (str_starts_with($digits, '62')) {
+        $variants = [$digits, '+'.$digits];
+        if (str_starts_with($digits, '62') && strlen($digits) > 2) {
             $local = substr($digits, 2);
-        } elseif (str_starts_with($digits, '0')) {
+            $variants[] = '0'.$local;
+            $variants[] = $local;
+        } elseif (str_starts_with($digits, '0') && strlen($digits) > 1) {
             $local = substr($digits, 1);
+            $variants[] = '62'.$local;
+            $variants[] = $local;
         } elseif (str_starts_with($digits, '8')) {
-            $local = $digits;
-        } else {
-            return [];
+            $variants[] = '0'.$digits;
+            $variants[] = '62'.$digits;
         }
 
-        if (! preg_match('/^8\d{7,14}$/', $local)) {
-            return [];
-        }
-
-        return array_values(array_unique(['62'.$local, '0'.$local, $local]));
+        return array_values(array_unique($variants));
     }
 
     private function trackingToken(int $orderId, bool $revealReference): string

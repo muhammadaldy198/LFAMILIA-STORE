@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Actions\Fortify\CreateNewUser;
 use App\Models\IntegrationCredential;
 use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
@@ -130,6 +131,7 @@ class GoogleAuthTest extends TestCase
         $this->put('/account/phone', ['phone' => '081234567890'])
             ->assertRedirect(route('account'));
         $this->assertSame('081234567890', $user->fresh()->phone);
+        $this->assertSame(CreateNewUser::normalizePhone('081234567890'), $user->fresh()->phone_normalized);
         $this->assertNotNull($user->fresh()->password);
 
         // The one-time Google onboarding proof must not authorize later changes.
