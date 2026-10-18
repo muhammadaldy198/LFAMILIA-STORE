@@ -83,9 +83,6 @@ class DigiflazzAutoSources
             $mapping = app(DigiflazzCatalogImport::class)->upsert($package, $item->buyer_sku_code, (int) $item->price_idr, (int) $item->price_idr);
             $before = $mapping->toArray();
             $config = $mapping->fulfillment_config ?? [];
-            if ($template !== null) {
-                $config['customer_no_template'] = $template;
-            }
             if ($automatic) {
                 $config['auto_source_group'] = $this->key($item);
             }

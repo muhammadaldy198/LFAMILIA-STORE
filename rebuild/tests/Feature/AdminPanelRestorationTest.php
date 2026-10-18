@@ -65,6 +65,29 @@ class AdminPanelRestorationTest extends TestCase
         Http::fake(['https://digiflazz.test/v1/price-list' => Http::response(['data' => $rows])]);
     }
 
+    public function test_template_backfill_requires_all_active_mappings_to_agree_and_preserves_existing_product_value(): void
+    {
+        $product = $this->product();
+        $product->update(['customer_no_template' => null]);
+        $firstPackage = $product->packages()->create(['code' => 'BACKFILL-1', 'name' => 'Nominal 1', 'is_active' => true]);
+        $secondPackage = $product->packages()->create(['code' => 'BACKFILL-2', 'name' => 'Nominal 2', 'is_active' => true]);
+        $providerId = Provider::where('code', 'DIGIFLAZZ')->value('id');
+        foreach ([[$firstPackage->id, '{{destination}}'], [$secondPackage->id, '{{destination}}']] as [$packageId, $template]) {
+            DB::table('provider_mappings')->insert([
+                'provider_id' => $providerId, 'product_package_id' => $packageId,
+                'external_sku' => 'backfill-'.$packageId, 'cost_idr' => 100, 'max_price_idr' => 100,
+                'fulfillment_config' => json_encode(['customer_no_template' => $template]),
+                'priority' => 1, 'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+            ]);
+        }
+        (require database_path('migrations/2026_10_18_134621_backfill_product_customer_no_templates.php'))->up();
+        $this->assertSame('{{destination}}', $product->fresh()->customer_no_template);
+
+        $product->update(['customer_no_template' => '{{already_set}}']);
+        (require database_path('migrations/2026_10_18_134621_backfill_product_customer_no_templates.php'))->up();
+        $this->assertSame('{{already_set}}', $product->fresh()->customer_no_template);
+    }
+
     public function test_sync_import_and_resync_preserve_baseline_and_inactive_import(): void
     {
         $this->login();
@@ -94,21 +117,20 @@ class AdminPanelRestorationTest extends TestCase
         Provider::where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
         $product = $this->product();
         $product->category->update(['is_active' => true]);
-        $product->update(['is_active' => false]);
+        $product->update(['is_active' => false, 'customer_no_template' => '{{user_id}}{{zone_id}}']);
         foreach (['user_id', 'zone_id'] as $index => $key) {
             $product->fields()->create(['field_key' => $key, 'label' => $key, 'type' => 'text', 'is_required' => true, 'sort_order' => $index]);
         }
         $id = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'restore-sku')->value('id');
         $this->post('/admin/catalog/products/'.$product->id.'/import', [
             'item_ids' => [$id], 'margin_percent' => 12, 'publish' => true,
-            'customer_no_template' => '{{user_id}}{{zone_id}}',
         ])->assertRedirect()->assertSessionHasNoErrors();
         $package = $product->packages()->firstOrFail();
         $mapping = $package->mappings()->firstOrFail();
         $this->assertTrue($product->fresh()->is_active);
         $this->assertTrue($package->is_active);
         $this->assertTrue($mapping->is_active);
-        $this->assertSame('{{user_id}}{{zone_id}}', data_get($mapping->fulfillment_config, 'customer_no_template'));
+        $this->assertSame('{{user_id}}{{zone_id}}', $product->fresh()->customer_no_template);
         $this->assertSame(11200, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
         $response = $this->get('/catalog/'.$product->slug);
         $response->assertOk();
@@ -129,12 +151,13 @@ class AdminPanelRestorationTest extends TestCase
         $product = $this->product();
         $product->category->update(['is_active' => true]);
         $product->fields()->create(['field_key' => 'destination', 'label' => 'ID tujuan', 'type' => 'text', 'is_required' => true, 'sort_order' => 0]);
+        $product->update(['customer_no_template' => '{{destination}}']);
         $id = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'restore-sku')->value('id');
         $this->post('/admin/catalog/products/'.$product->id.'/import', [
             'item_ids' => [$id], 'margin_percent' => 5, 'publish' => true,
         ])->assertRedirect()->assertSessionHasNoErrors();
         $package = $product->packages()->firstOrFail();
-        $this->assertSame('{{destination}}', data_get($package->mappings()->firstOrFail()->fulfillment_config, 'customer_no_template'));
+        $this->assertSame('{{destination}}', $product->fresh()->customer_no_template);
         $this->assertSame(10500, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
     }
 

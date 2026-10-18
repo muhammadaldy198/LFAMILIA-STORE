@@ -50,7 +50,7 @@ class AdminCatalogController
                 ->map(fn (Product $product): array => [
                     ...$product->only('id', 'category_id', 'name', 'publisher', 'slug', 'description', 'fulfillment_mode',
                         'initials', 'accent_color', 'instant', 'package_tabs_enabled', 'package_tabs',
-                        'manual_instructions', 'manual_open_time', 'manual_close_time', 'manual_timezone', 'margin_percent', 'sort_order', 'is_active',
+                        'customer_no_template', 'manual_instructions', 'manual_open_time', 'manual_close_time', 'manual_timezone', 'margin_percent', 'sort_order', 'is_active',
                         'nickname_check_enabled', 'nickname_game_code', 'nickname_user_field_key',
                         'nickname_server_field_key'),
                     'image_url' => $product->getFirstMediaUrl('image'),
@@ -169,6 +169,7 @@ class AdminCatalogController
             'publisher' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:5000'],
             'fulfillment_mode' => ['required', Rule::in(['AUTO_PROVIDER', 'MANUAL'])],
+            'customer_no_template' => ['nullable', 'string', 'max:500'],
             'manual_instructions' => ['nullable', 'string', 'max:5000'],
             'manual_open_time' => ['nullable', 'regex:/^([01]\\d|2[0-3]):[0-5]\\d$/'],
             'manual_close_time' => ['nullable', 'regex:/^([01]\\d|2[0-3]):[0-5]\\d$/'],
@@ -228,6 +229,19 @@ class AdminCatalogController
             'nickname_user_field_key' => ['nullable', 'string', 'max:80', 'regex:/^[a-z][a-z0-9_]*$/'],
             'nickname_server_field_key' => ['nullable', 'string', 'max:80', 'regex:/^[a-z][a-z0-9_]*$/'],
         ]);
+        $template = trim((string) ($data['customer_no_template'] ?? $product->customer_no_template ?? ''));
+        $fieldKeys = $product->fields()->pluck('field_key')->all();
+        preg_match_all('/\{\{([^}]+)\}\}/', $template, $templateMatches);
+        foreach ($templateMatches[1] ?? [] as $fieldKey) {
+            if (! preg_match('/^[a-z][a-z0-9_]*$/', $fieldKey) || ! in_array($fieldKey, $fieldKeys, true)) {
+                throw ValidationException::withMessages(['customer_no_template' => 'Placeholder {{'.$fieldKey.'}} tidak cocok dengan field produk.']);
+            }
+        }
+        if ($data['is_active'] && $product->fulfillment_mode === 'AUTO_PROVIDER'
+            && $product->fields()->count() > 1 && $template === '') {
+            throw ValidationException::withMessages(['customer_no_template' => 'Isi format tujuan Digiflazz untuk produk dengan dua kolom.']);
+        }
+        $data['customer_no_template'] = $template !== '' ? $template : null;
         $data['slug'] ??= $product->slug;
         $data['fulfillment_mode'] ??= $product->fulfillment_mode;
         $data['package_tabs_enabled'] ??= $product->package_tabs_enabled;
@@ -569,10 +583,8 @@ class AdminCatalogController
         if ($product->nickname_check_enabled) {
             $references = array_filter([$product->nickname_user_field_key, $product->nickname_server_field_key]);
         }
-        foreach (ProviderMapping::whereIn('product_package_id', $product->packages()->pluck('id'))->get() as $mapping) {
-            preg_match_all('/\{\{([^}]+)\}\}/', (string) data_get($mapping->fulfillment_config, 'customer_no_template'), $matches);
-            $references = array_merge($references, $matches[1] ?? []);
-        }
+        preg_match_all('/\{\{([^}]+)\}\}/', (string) $product->customer_no_template, $matches);
+        $references = array_merge($references, $matches[1] ?? []);
         if (array_diff($references, $keys)) {
             throw ValidationException::withMessages(['fields' => 'Kode kolom masih dipakai cek nickname atau template pengiriman. Ubah pengaturan tersebut dahulu.']);
         }
@@ -672,7 +684,6 @@ class AdminCatalogController
             'cost_idr' => [$provider->code === 'MANUAL' ? 'required' : 'prohibited', 'integer', 'min:0'],
             'is_manual_price' => [$provider->code === 'DIGIFLAZZ' ? 'sometimes' : 'prohibited', 'boolean'],
             'manual_price_idr' => [$provider->code === 'DIGIFLAZZ' ? 'sometimes' : 'prohibited', 'integer', 'min:1', 'max:1000000000'],
-            'customer_no_template' => [$provider->code === 'DIGIFLAZZ' ? 'nullable' : 'prohibited', 'string', 'max:500'],
         ]);
         if ($provider->code !== 'MANUAL') {
             unset($data['cost_idr']);
@@ -698,38 +709,8 @@ class AdminCatalogController
             }
             unset($data['manual_price_idr']);
 
-            $template = trim((string) ($data['customer_no_template'] ?? ''));
-            $productId = DB::table('product_packages')->where('id', $mapping->product_package_id)
-                ->value('product_id');
-            $fieldKeys = DB::table('product_input_fields')->where('product_id', $productId)
-                ->pluck('field_key')->all();
-
-            preg_match_all('/\{\{([^}]+)\}\}/', $template, $matches);
-            foreach ($matches[1] ?? [] as $fieldKey) {
-                if (! preg_match('/^[a-z][a-z0-9_]*$/', $fieldKey)
-                    || ! in_array($fieldKey, $fieldKeys, true)) {
-                    throw ValidationException::withMessages([
-                        'customer_no_template' => 'Placeholder {{'.$fieldKey.'}} tidak cocok dengan field produk.',
-                    ]);
-                }
-            }
-
-            if ($data['is_active'] && count($fieldKeys) > 1 && $template === '') {
-                throw ValidationException::withMessages([
-                    'customer_no_template' => 'Template customer_no wajib untuk produk dengan lebih dari satu field.',
-                ]);
-            }
-
-            $config = $mapping->fulfillment_config ?? [];
-            if ($template === '') {
-                unset($config['customer_no_template']);
-            } else {
-                $config['customer_no_template'] = $template;
-            }
-            $data['fulfillment_config'] = $config ?: null;
             // An explicit admin edit overrides any earlier sync-generated disable.
             $data['disabled_by_sync'] = false;
-            unset($data['customer_no_template']);
         }
 
         DB::transaction(function () use ($request, $mapping, $data, $audit): void {

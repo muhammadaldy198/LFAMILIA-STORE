@@ -42,6 +42,7 @@ class FulfillmentTest extends TestCase
             'margin_percent' => 10,
             'fulfillment_mode' => 'AUTO_PROVIDER',
             'is_active' => true,
+            'customer_no_template' => $template,
         ]);
         $product->fields()->create([
             'field_key' => 'user_id',
@@ -69,9 +70,7 @@ class FulfillmentTest extends TestCase
             'external_sku' => $sku,
             'cost_idr' => $cost,
             'max_price_idr' => $maxPrice,
-            'fulfillment_config' => $template === null ? null : json_encode([
-                'customer_no_template' => $template,
-            ], JSON_THROW_ON_ERROR),
+            'fulfillment_config' => json_encode(['provider_option' => 'preserve'], JSON_THROW_ON_ERROR),
             'priority' => 1,
             'is_active' => true,
             'created_at' => now(),
@@ -547,6 +546,29 @@ class FulfillmentTest extends TestCase
         $this->assertSame('BLOCKED', $attempt->status);
         $this->assertSame('PAID', DB::table('orders')->where('id', $orderId)->value('status'));
         Http::assertNothingSent();
+    }
+
+    public function test_product_customer_template_is_used_instead_of_mapping_template(): void
+    {
+        Queue::fake();
+        $this->credentials();
+        $catalog = $this->automaticCatalog(template: null);
+        $catalog['product']->update(['customer_no_template' => '{{user_id}}{{zone_id}}']);
+        $orderId = $this->paidOrder($catalog);
+
+        Http::fake(['*' => Http::response(['data' => [
+            'ref_id' => 'shared-template-ref', 'customer_no' => '1234567890',
+            'buyer_sku_code' => 'DF-PRIMARY', 'message' => 'Sukses', 'status' => 'Sukses',
+            'rc' => '00', 'sn' => 'TEST', 'price' => 10000,
+        ]])]);
+
+        $service = app(FulfillmentService::class);
+        $service->startOrder($orderId);
+        $attempt = DB::table('fulfillment_attempts')->where('order_id', $orderId)->first();
+        $service->sendAttempt((int) $attempt->id);
+
+        Http::assertSent(fn ($request): bool => ($request['customer_no'] ?? null) === '1234567890'
+            && ($request['buyer_sku_code'] ?? null) === 'DF-PRIMARY');
     }
 
     public function test_missing_customer_no_template_blocks_multi_field_product_before_send(): void

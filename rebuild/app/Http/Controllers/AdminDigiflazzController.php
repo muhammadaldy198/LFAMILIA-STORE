@@ -415,12 +415,11 @@ class AdminDigiflazzController
             'margin_percent' => ['sometimes', 'numeric', 'min:0', 'max:1000'],
             'publish' => ['sometimes', 'boolean'],
             'auto_sources' => ['sometimes', 'boolean'],
-            'customer_no_template' => ['nullable', 'string', 'max:500'],
         ]);
         DB::transaction(function () use ($request, $product, $service, $audit, $data): void {
             $product = $product->lockForUpdate()->findOrFail($product->id);
             $publish = (bool) ($data['publish'] ?? false);
-            $template = $this->importCustomerTemplate($product, $data['customer_no_template'] ?? null, $publish);
+            $template = $this->importCustomerTemplate($product, $product->customer_no_template, $publish);
             if ($publish && (! $product->category->is_active || ! Provider::where('code', 'DIGIFLAZZ')->where('is_active', true)->exists())) {
                 throw ValidationException::withMessages(['publish' => 'Aktifkan kategori produk dan integrasi Digiflazz sebelum menjual.']);
             }

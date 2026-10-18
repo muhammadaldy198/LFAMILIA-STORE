@@ -123,6 +123,17 @@ class FulfillmentService
                 }
 
                 $config = $this->json($mapping->fulfillment_config);
+                if ($mapping->provider_code === 'DIGIFLAZZ') {
+                    $product = DB::table('product_packages')
+                        ->join('products', 'products.id', '=', 'product_packages.product_id')
+                        ->where('product_packages.id', $order->product_package_id)
+                        ->select('products.customer_no_template', 'products.id')
+                        ->first();
+                    if ($product) {
+                        $config['customer_no_template'] = $product->customer_no_template
+                            ?: ($config['customer_no_template'] ?? null);
+                    }
+                }
                 if ($mapping->provider_code === 'VOUCHER_STOCK') {
                     $stockKey = trim((string) data_get($config, 'stock_key', ''));
                     $request = [

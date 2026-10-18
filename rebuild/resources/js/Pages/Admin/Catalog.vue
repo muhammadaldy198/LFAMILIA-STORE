@@ -159,20 +159,7 @@ const applyFixedDigiflazzPrices = () => {
     router.post('/admin/catalog/digiflazz/lock-prices', { package_ids: rows.map(row => row.package_id) }, { preserveScroll: true });
 };
 const autoSourcesForm = useForm({});
-const importForm = useForm({item_ids:[],margin_percent:props.defaultMargin||0,publish:true,auto_sources:true,customer_no_template:''});
-const suggestedTemplate = item => {
-    const fields = item.fields || [];
-    const previous = item.packages.flatMap(pack => pack.mappings).find(mapping => mapping.provider_code === 'DIGIFLAZZ' && mapping.customer_no_template);
-    if (previous) return previous.customer_no_template;
-    if (fields.length === 1) return '{{' + fields[0].field_key + '}}';
-    if (item.slug === 'mobile-legends') {
-        const keys = fields.map(field => field.field_key);
-        const user = ['user_id', 'destination'].find(key => keys.includes(key));
-        const server = ['zone_id', 'server'].find(key => keys.includes(key));
-        if (user && server) return '{{' + user + '}}{{' + server + '}}';
-    }
-    return '';
-};
+const importForm = useForm({item_ids:[],margin_percent:props.defaultMargin||0,publish:true,auto_sources:true});
 const importSearch=ref(''),importBrand=ref(''),showImport=ref(false);
 const importPage=ref(1);
 const importUrl = new URLSearchParams(page.url.split('?')[1] || '');
@@ -188,7 +175,6 @@ function openProductImport() {
     importForm.clearErrors();
     importForm.publish = true;
     importForm.auto_sources = true;
-    importForm.customer_no_template = suggestedTemplate(item);
     importSearch.value = '';
     importBrand.value = props.digiflazzItems.find(sku=>sku.brand.toLowerCase()===item.name.toLowerCase())?.brand || '';
     importPage.value = 1;
@@ -203,8 +189,7 @@ function toggleImport(item) {
         importForm.clearErrors();
         importForm.publish = true;
         importForm.auto_sources = true;
-        importForm.customer_no_template = suggestedTemplate(item);
-        importForm.margin_percent = Number(item.margin_percent || 0);
+            importForm.margin_percent = Number(item.margin_percent || 0);
         importBrand.value = props.digiflazzItems.find(sku=>sku.brand.toLowerCase()===item.name.toLowerCase())?.brand || '';
     }
 }
@@ -282,12 +267,23 @@ const moveField = (index, direction) => {
 const saveFields = () => {
     fieldsError.value = '';
     fieldsSaving.value = true;
+    const product = products.value.find(item => item.id === fieldsProductId.value);
+    const saveSharedFormat = (done) => {
+        if (!product || product.fulfillment_mode !== 'AUTO_PROVIDER') return done();
+        router.put('/admin/catalog/products/' + product.id, {
+            category_id: product.category_id, name: product.name, slug: product.slug, publisher: product.publisher || '', description: product.description,
+            fulfillment_mode: product.fulfillment_mode, manual_delivery_instructions: product.manual_delivery_instructions || '', manual_service_start_at: product.manual_service_start_at || null, manual_service_end_at: product.manual_service_end_at || null,
+            margin_percent: product.margin_percent, customer_no_template: product.customer_no_template || null,
+            sort_order: product.sort_order, is_active: product.is_active,
+        }, { preserveScroll: true, onFinish: done });
+    };
     router.put('/admin/catalog/products/' + fieldsProductId.value + '/fields', {
         fields: fieldRows.value.map(field => ({ ...field, field_key: field.field_key.trim(), label: field.label.trim(), placeholder: field.placeholder.trim() || null })),
     }, {
         preserveScroll: true,
         onError: errors => { fieldsError.value = Object.values(errors).join(' · '); },
-        onFinish: () => { fieldsSaving.value = false; },
+        onSuccess: () => saveSharedFormat(() => { fieldsSaving.value = false; }),
+        onFinish: () => { if (!product || product.fulfillment_mode !== 'AUTO_PROVIDER') fieldsSaving.value = false; },
     });
 };
 const saveCategory = (item) => router.put('/admin/catalog/categories/' + item.id, { name: item.name, slug: item.slug, icon: item.icon || 'grid', sort_order: item.sort_order, is_active: item.is_active });
@@ -317,6 +313,7 @@ const saveProduct = (item) => router.put('/admin/catalog/products/' + item.id, {
     manual_instructions: item.manual_instructions, manual_open_time: item.manual_open_time || null,
     manual_close_time: item.manual_close_time || null, manual_timezone: item.manual_timezone || 'Asia/Jakarta',
     margin_percent: item.margin_percent,
+    customer_no_template: item.customer_no_template || null,
     sort_order: item.sort_order, is_active: item.is_active,
     nickname_check_enabled: item.nickname_check_enabled,
     nickname_game_code: item.nickname_game_code || null,
@@ -332,7 +329,6 @@ const saveMapping = (mapping) => router.put('/admin/catalog/mappings/' + mapping
     priority: mapping.priority, is_active: mapping.is_active,
     ...(mapping.provider_code === 'MANUAL' ? { cost_idr: mapping.cost_idr } : {}),
     ...(mapping.provider_code === 'DIGIFLAZZ' ? {
-        customer_no_template: mapping.customer_no_template || null,
         is_manual_price: Boolean(mapping.is_manual_price),
         ...(mapping.is_manual_price ? { manual_price_idr: Number(mapping.manual_price_idr) } : {}),
     } : {}),
@@ -564,8 +560,8 @@ const deleteNotice = (notice) => {
                     </div>
 
                     </div>
-                    <div v-if="editorTab==='fields'" class="space-y-3"><h3>Data Pelanggan</h3><p class="text-muted-foreground">Atur data yang diminta saat pelanggan membeli produk ini.</p><AdminCustomerFields :rows="fieldRows" :error="fieldsError" :saving="fieldsSaving" @move="moveField" @remove="index=>fieldRows.splice(index,1)" @add="addField" @save="saveFields" /></div>
-                    <div v-show="editorTab==='fulfillment'" class="space-y-4"><h3 class="font-semibold">Penanganan {{item.fulfillment_mode==='MANUAL'?'manual':'otomatis'}}</h3><p class="text-sm text-slate-500">Instruksi dan jam layanan dikelola pada Informasi. Sumber pemenuhan, prioritas, modal, dan format tujuan dikelola per nominal.</p><Button v-if="item.fulfillment_mode==='AUTO_PROVIDER'" type="button" variant="outline" title="Menyinkronkan seluruh katalog Digiflazz, bukan hanya produk ini." @click="router.post('/admin/catalog/products/'+item.id+'/sync',{}, {preserveScroll:true})">Sinkron seluruh katalog</Button><AdminResponsiveTable :mobile-columns="[0,2,3]"><TableHeader><TableRow><TableHead>Nominal</TableHead><TableHead>Sumber / kode</TableHead><TableHead>Status koneksi</TableHead><TableHead>Aksi</TableHead></TableRow></TableHeader><TableBody><TableRow v-for="pack in visiblePackages(item)" :key="pack.id"><TableCell>{{pack.name}}</TableCell><TableCell><p v-for="mapping in pack.mappings" :key="mapping.id">{{providerLabel(mapping)}} · {{mapping.provider_code==='VOUCHER_STOCK' ? (mapping.stock_key||'-') : (mapping.external_sku||'Manual')}}</p></TableCell><TableCell><p v-for="mapping in pack.mappings" :key="mapping.id">{{ fulfillmentRole(pack,mapping) }}<span v-if="mapping.is_active"> · Posisi {{ sourcePosition(pack,mapping) }}</span></p></TableCell><TableCell><Button type="button" variant="outline" @click="selectedPackageId=pack.id;editorTab='nominal'">Kelola sumber</Button></TableCell></TableRow></TableBody></AdminResponsiveTable></div>
+                    <div v-if="editorTab==='fields'" class="space-y-3"><h3>Data Pelanggan</h3><p class="text-muted-foreground">Atur data yang diminta saat pelanggan membeli produk ini. Format Digiflazz diatur sekali untuk semua nominal game ini.</p><label v-if="item.fulfillment_mode==='AUTO_PROVIDER'" class="block max-w-xl text-sm">Format tujuan Digiflazz<Input v-model="item.customer_no_template" data-testid="product-customer-template" class="mt-1" placeholder="Contoh: {{user_id}}{{zone_id}}"/><span class="mt-1 block text-xs text-muted-foreground">Tambahkan kolom sesuai urutan yang diminta provider. Untuk dua kolom, keduanya akan dikirim berurutan tanpa pemisah.</span><div class="mt-2 flex flex-wrap gap-2"><Button v-for="field in item.fields" :key="field.field_key" type="button" variant="outline" size="sm" @click="item.customer_no_template=(item.customer_no_template||'')+'{{'+field.field_key+'}}'">{{field.label}}</Button></div><Button type="button" class="mt-2" :disabled="savingProduct" @click="saveProduct(item)">Simpan format game</Button></label><AdminCustomerFields :rows="fieldRows" :error="fieldsError" :saving="fieldsSaving" @move="moveField" @remove="index=>fieldRows.splice(index,1)" @add="addField" @save="saveFields" /></div>
+                    <div v-show="editorTab==='fulfillment'" class="space-y-4"><h3 class="font-semibold">Penanganan {{item.fulfillment_mode==='MANUAL'?'manual':'otomatis'}}</h3><p class="text-sm text-slate-500">Instruksi dan jam layanan dikelola pada Informasi. Format tujuan bersama diatur pada Data Pelanggan; sumber, prioritas, dan modal tetap dikelola per nominal.</p><Button v-if="item.fulfillment_mode==='AUTO_PROVIDER'" type="button" variant="outline" title="Menyinkronkan seluruh katalog Digiflazz, bukan hanya produk ini." @click="router.post('/admin/catalog/products/'+item.id+'/sync',{}, {preserveScroll:true})">Sinkron seluruh katalog</Button><AdminResponsiveTable :mobile-columns="[0,2,3]"><TableHeader><TableRow><TableHead>Nominal</TableHead><TableHead>Sumber / kode</TableHead><TableHead>Status koneksi</TableHead><TableHead>Aksi</TableHead></TableRow></TableHeader><TableBody><TableRow v-for="pack in visiblePackages(item)" :key="pack.id"><TableCell>{{pack.name}}</TableCell><TableCell><p v-for="mapping in pack.mappings" :key="mapping.id">{{providerLabel(mapping)}} · {{mapping.provider_code==='VOUCHER_STOCK' ? (mapping.stock_key||'-') : (mapping.external_sku||'Manual')}}</p></TableCell><TableCell><p v-for="mapping in pack.mappings" :key="mapping.id">{{ fulfillmentRole(pack,mapping) }}<span v-if="mapping.is_active"> · Posisi {{ sourcePosition(pack,mapping) }}</span></p></TableCell><TableCell><Button type="button" variant="outline" @click="selectedPackageId=pack.id;editorTab='nominal'">Kelola sumber</Button></TableCell></TableRow></TableBody></AdminResponsiveTable></div>
                     <div v-show="editorTab==='display'" class="space-y-4">
                     <div class="grid gap-3 md:grid-cols-2">
                         <div class="rounded-md border border-slate-200 p-3"><strong class="text-xs">Gambar produk / card</strong><div class="mt-2"><AdminMediaControl type="product" :id="item.id" :url="item.image_url" /></div></div>
@@ -613,8 +609,6 @@ const deleteNotice = (notice) => {
                             <p class="text-sm text-muted-foreground">SKU dengan nama, merek, jenis, dan kategori yang sama menjadi satu nominal. Sumber termurah yang tersedia dipilih lebih dahulu; cadangan baru ditambahkan saat sinkron.</p>
                             <div class="flex flex-wrap gap-2"><Button type="button" variant="outline" @click="importForm.item_ids=importMatches.map(sku=>sku.id)">Pilih semua hasil filter ({{ importMatches.length }})</Button><Button type="button" variant="outline" @click="importForm.item_ids=[]">Hapus pilihan</Button></div>
                             <label class="flex items-center gap-2 text-sm"><AdminSwitch v-model="importForm.publish" /> Langsung jual setelah impor</label>
-                            <label class="block text-sm">Format ID tujuan<Input v-model="importForm.customer_no_template" data-testid="import-customer-template" class="mt-1" placeholder="Pilih kolom pelanggan di bawah" /></label>
-                            <div class="flex flex-wrap gap-2"><Button v-for="field in item.fields" :key="field.field_key" type="button" size="sm" variant="outline" @click="importForm.customer_no_template += '{{' + field.field_key + '}}'">{{ field.label }}</Button></div>
                             <p class="text-sm text-muted-foreground">{{ importForm.publish ? 'Produk, nominal dan cadangan Digiflazz diaktifkan bersama. Harga jual tetap; batas transaksi supplier mengikuti modal manual yang admin isi.' : 'Nominal disimpan sebagai draf dan belum dijual.' }}</p>
                             <label v-for="sku in importItems" :key="sku.id" :data-sku="sku.buyer_sku_code" class="flex items-start gap-3 rounded border p-2 text-sm"><input v-model="importForm.item_ids" type="checkbox" :value="sku.id"><span>{{sku.product_name}}<small class="block">{{sku.buyer_sku_code}} · Rp{{Number(sku.price_idr).toLocaleString('id-ID')}}<span v-if="importForm.auto_sources"> · {{sku.source_count}} sumber otomatis</span></small></span></label>
                             <p v-if="!importMatches.length" class="text-sm">Tidak ada SKU tersedia yang sesuai dengan filter dan belum diimpor. Hapus filter atau sinkronkan daftar harga di menu Digiflazz.</p>
@@ -668,7 +662,6 @@ const deleteNotice = (notice) => {
                                         <label v-if="mapping.is_manual_price" class="block">Harga Modal = Max Price Digiflazz (Rp)<Input v-model.number="mapping.manual_price_idr" type="number" min="1" max="1000000000" required class="mt-1 block w-36 rounded bg-slate-800 p-2" /></label>
                                         <p class="max-w-64 text-[11px] text-slate-500">Modal yang lu isi akan sama persis dengan max_price Digiflazz dan tidak ditimpa sinkronisasi. Matikan kunci jika mau mengikuti harga supplier.</p>
                                     </div>
-                                    <label v-if="mapping.provider_code === 'DIGIFLAZZ'" class="min-w-72">Format ID tujuan<Input v-model="mapping.customer_no_template" placeholder="{{user_id}}{{zone_id}}" class="mt-1 block w-full rounded bg-slate-800 p-2" /><span class="mt-1 block text-[11px] text-slate-500">Gunakan kode kolom di dalam {{ }}.</span></label>
                                     <details class="text-xs"><summary class="cursor-pointer">Prioritas teknis (lanjutan)</summary><label class="mt-2 block">Skor internal<Input v-model.number="mapping.priority" type="number" min="0" max="1000" class="mt-1 block w-20 rounded bg-slate-800 p-2" /></label><p>Angka kecil dipilih lebih dulu. Pada sumber otomatis, skor dapat disusun ulang saat sinkronisasi.</p></details>
                                     <label class="flex gap-2"><AdminSwitch v-model="mapping.is_active" />Aktif</label>
                                     <Button type="button" class="rounded bg-slate-700 px-3 py-2" @click="saveMapping(mapping)">Simpan sumber</Button>
