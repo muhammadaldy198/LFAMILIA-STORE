@@ -492,9 +492,43 @@ class CatalogTest extends TestCase
             ->assertRedirect()->assertSessionHasNoErrors();
         $this->assertNull($product->fresh()->customer_no_template);
 
+        $product->update(['is_active' => true]);
+        $payload['is_active'] = true;
+        $payload['customer_no_template'] = '{{user_id}}';
+        $this->put('/admin/catalog/products/'.$product->id, $payload)
+            ->assertSessionHasErrors('customer_no_template');
+
         $this->put('/admin/catalog/products/'.$product->id.'/fields', [
-            'fields' => [['field_key' => 'user_id', 'label' => 'User ID', 'type' => 'text', 'is_required' => true]],
+            'fields' => [
+                ['field_key' => 'user_id', 'label' => 'User ID', 'type' => 'text', 'is_required' => true],
+                ['field_key' => 'zone_id', 'label' => 'Zone ID', 'type' => 'text', 'is_required' => true],
+                ['field_key' => 'region_id', 'label' => 'Region ID', 'type' => 'text', 'is_required' => true],
+            ],
         ])->assertSessionHasErrors('fields');
+
+        $product->update(['customer_no_template' => '{{user_id}}']);
+        $product->fields()->create(['field_key' => 'region_id', 'label' => 'Region ID', 'type' => 'text', 'is_required' => true, 'sort_order' => 2]);
+        $this->put('/admin/catalog/products/'.$product->id, $payload)
+            ->assertSessionHasErrors('customer_no_template');
+    }
+
+    public function test_shared_template_migration_rollback_restores_legacy_mapping_templates(): void
+    {
+        $category = Category::where('slug', 'game')->firstOrFail();
+        $providerId = DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
+        $product = Product::create([
+            'category_id' => $category->id, 'name' => 'Rollback Template Game', 'slug' => 'rollback-template-game',
+            'margin_percent' => 10, 'fulfillment_mode' => 'AUTO_PROVIDER', 'customer_no_template' => '{{user_id}}{{zone_id}}',
+        ]);
+        $package = $product->packages()->create(['code' => 'ROLLBACK1', 'name' => 'Paket']);
+        $mappingId = DB::table('provider_mappings')->insertGetId([
+            'product_package_id' => $package->id, 'provider_id' => $providerId, 'external_sku' => 'ROLLBACK-SKU',
+            'cost_idr' => 10000, 'max_price_idr' => 12000, 'fulfillment_config' => json_encode([]),
+            'priority' => 1, 'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        (require database_path('migrations/2026_10_18_134621_backfill_product_customer_no_templates.php'))->down();
+        $config = json_decode(DB::table('provider_mappings')->where('id', $mappingId)->value('fulfillment_config'), true);
+        $this->assertSame('{{user_id}}{{zone_id}}', $config['customer_no_template']);
     }
 
     public function test_digiflazz_sku_only_enters_through_trusted_import_service(): void

@@ -42,6 +42,31 @@ return new class extends Migration
      */
     public function down(): void
     {
-        // Existing mapping values remain intact, so this backfill is intentionally reversible without data loss.
+        $products = DB::table('products')->whereNotNull('customer_no_template')
+            ->where('customer_no_template', '<>', '')
+            ->get(['id', 'customer_no_template']);
+
+        foreach ($products as $product) {
+            $mappingRows = DB::table('provider_mappings as m')
+                ->join('providers as pr', 'pr.id', '=', 'm.provider_id')
+                ->join('product_packages as pp', 'pp.id', '=', 'm.product_package_id')
+                ->where('pr.code', 'DIGIFLAZZ')
+                ->where('pp.product_id', $product->id)
+                ->get(['m.id', 'm.fulfillment_config']);
+
+            foreach ($mappingRows as $mapping) {
+                $config = is_string($mapping->fulfillment_config)
+                    ? (json_decode($mapping->fulfillment_config, true) ?: [])
+                    : (array) $mapping->fulfillment_config;
+                if (trim((string) ($config['customer_no_template'] ?? '')) !== '') {
+                    continue;
+                }
+
+                $config['customer_no_template'] = $product->customer_no_template;
+                DB::table('provider_mappings')->where('id', $mapping->id)->update([
+                    'fulfillment_config' => json_encode($config, JSON_THROW_ON_ERROR),
+                ]);
+            }
+        }
     }
 };
