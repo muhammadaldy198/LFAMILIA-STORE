@@ -496,6 +496,30 @@ class CatalogTest extends TestCase
             ->where('product_package_id', $package->id)->value('fulfillment_config'), true);
         $this->assertArrayNotHasKey('customer_no_template', $legacyConfig);
 
+        DB::table('provider_mappings')->where('product_package_id', $package->id)->update([
+            'fulfillment_config' => json_encode(['customer_no_template' => '{{user_id}}{{zone_id}}']),
+        ]);
+        $this->put('/admin/catalog/products/'.$product->id.'/fields', [
+            'fields' => [
+                ['field_key' => 'user_id', 'label' => 'User ID', 'type' => 'text', 'is_required' => true],
+                ['field_key' => 'zone_id', 'label' => 'Zone ID', 'type' => 'text', 'is_required' => true],
+            ],
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $preservedConfig = json_decode((string) DB::table('provider_mappings')
+            ->where('product_package_id', $package->id)->value('fulfillment_config'), true);
+        $this->assertSame('{{user_id}}{{zone_id}}', $preservedConfig['customer_no_template']);
+
+        $this->put('/admin/catalog/products/'.$product->id.'/fields', [
+            'customer_no_template' => null,
+            'fields' => [
+                ['field_key' => 'user_id', 'label' => 'User ID', 'type' => 'text', 'is_required' => true],
+                ['field_key' => 'zone_id', 'label' => 'Zone ID', 'type' => 'text', 'is_required' => true],
+            ],
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $clearedConfig = json_decode((string) DB::table('provider_mappings')
+            ->where('product_package_id', $package->id)->value('fulfillment_config'), true);
+        $this->assertArrayNotHasKey('customer_no_template', $clearedConfig);
+
         $product->update(['is_active' => true]);
         $payload['is_active'] = true;
         $payload['customer_no_template'] = '{{user_id}}';

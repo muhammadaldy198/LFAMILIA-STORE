@@ -217,6 +217,15 @@ class CheckoutService
                 $correlationId = preg_match('/^[A-Za-z0-9._:-]{8,100}$/', (string) ($data['_correlation_id'] ?? ''))
                     ? (string) $data['_correlation_id']
                     : (string) Str::uuid();
+                $customerNoTemplate = $lockedProduct->customer_no_template;
+                if ($customerNoTemplate === null) {
+                    $legacyConfig = DB::table('provider_mappings')
+                        ->where('id', $price['provider_mapping_id'])->value('fulfillment_config');
+                    $legacyConfig = is_string($legacyConfig)
+                        ? (json_decode($legacyConfig, true) ?: [])
+                        : (array) $legacyConfig;
+                    $customerNoTemplate = $legacyConfig['customer_no_template'] ?? null;
+                }
                 $snapshot = [
                     'checkout_fingerprint' => $fingerprint,
                     'product' => [
@@ -239,6 +248,7 @@ class CheckoutService
                         'sku' => $price['provider_sku'],
                         'cost_idr' => $price['cost_idr'],
                         'max_price_idr' => $price['max_price_idr'],
+                        'customer_no_template' => $customerNoTemplate,
                     ],
                     'pricing' => [
                         'margin_percent' => $price['margin_percent'],

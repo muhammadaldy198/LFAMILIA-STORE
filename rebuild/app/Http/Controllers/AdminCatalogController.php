@@ -675,6 +675,9 @@ class AdminCatalogController
             $beforeTemplate = $product->customer_no_template;
             $product->customer_no_template = $template !== '' ? $template : null;
             $product->save();
+            if (array_key_exists('customer_no_template', $data) && $data['customer_no_template'] === null) {
+                $this->clearLegacyCustomerNoTemplates($product->id);
+            }
             $product->refresh();
             $before = ['fields' => $before, 'customer_no_template' => $beforeTemplate];
             $product->fields()->delete();

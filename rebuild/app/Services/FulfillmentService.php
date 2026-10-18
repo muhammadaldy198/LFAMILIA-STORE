@@ -130,8 +130,12 @@ class FulfillmentService
                         ->select('products.customer_no_template', 'products.id')
                         ->first();
                     if ($product) {
-                        $config['customer_no_template'] = $product->customer_no_template
-                            ?: ($config['customer_no_template'] ?? null);
+                        if (array_key_exists('customer_no_template', $snapshot['provider'] ?? [])) {
+                            $config['customer_no_template'] = $snapshot['provider']['customer_no_template'];
+                        } else {
+                            $config['customer_no_template'] = $product->customer_no_template
+                                ?: ($config['customer_no_template'] ?? null);
+                        }
                     }
                 }
                 if ($mapping->provider_code === 'VOUCHER_STOCK') {

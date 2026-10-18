@@ -105,6 +105,7 @@ class CheckoutTest extends TestCase
     public function test_server_calculates_price_and_idempotent_guest_retry_returns_same_order_and_access_code(): void
     {
         $catalog = $this->catalog();
+        $catalog['product']->update(['customer_no_template' => '{{user_id}}{{zone_id}}']);
         $payload = $this->guestPayload($catalog['package_id'], 'checkout-idempotency-0001');
 
         $first = $this->postJson('/checkout/orders', $payload)->assertCreated();
@@ -123,6 +124,7 @@ class CheckoutTest extends TestCase
         $this->assertSame(1000, (int) $order->margin_idr);
         $this->assertSame(11000, (int) $order->total_idr);
         $this->assertSame($catalog['mapping_id'], $snapshot['provider']['mapping_id']);
+        $this->assertSame('{{user_id}}{{zone_id}}', $snapshot['provider']['customer_no_template']);
         $this->assertSame('123456', $snapshot['customer_input']['user_id']);
         $this->assertSame('PENDING_PAYMENT', $order->status);
         $this->assertSame(1, DB::table('order_events')
