@@ -83,14 +83,13 @@ try {
                         if(!await evaluate(`document.querySelector('[data-testid="digiflazz-import"]')&&[...document.querySelectorAll('[data-testid="digiflazz-import"] button')].find(b=>/^Impor \\d+ nominal$/.test(b.textContent.trim()))?.disabled`))throw Error('Import picker missing or submit enabled without selection');
                         await pointerClick(`document.querySelector('[data-sku="${importSubmitted?'BROWSER-IMPORT-300':'BROWSER-IMPORT-200'}"] span')`);
                         if(!await evaluate(`Boolean([...document.querySelectorAll('[data-testid="digiflazz-import"] button')].find(b=>b.textContent.trim()==='Impor 1 nominal'&&!b.disabled))`))throw Error('Selecting supplier SKU did not enable import: '+JSON.stringify(await evaluate(`({events:window.__pointerEvents,ancestors:[...function*(e){while(e){yield e.tagName;e=e.parentElement;}}(document.querySelector('[data-testid="digiflazz-import"]'))],checked:document.querySelector('[data-sku="${importSubmitted?'BROWSER-IMPORT-300':'BROWSER-IMPORT-200'}"] input')?.checked,buttons:[...document.querySelectorAll('[data-testid="digiflazz-import"] button')].map(b=>({text:b.textContent.trim(),disabled:b.disabled}))})`)));
-                        await evaluate(`(()=>{const input=document.querySelector('[data-testid="import-customer-template"]');input.value='{{user_id}}';input.dispatchEvent(new Event('input',{bubbles:true}));})()`);
                         await inspect(width+'-import-picker');
                         if(!importSubmitted){
                             await pointerClick(`[...document.querySelectorAll('[data-testid="digiflazz-import"] button')].find(b=>b.textContent.trim()==='Impor 1 nominal')`);
                             let done=false;for(let i=0;i<60;i++){await pause(100);done=await evaluate(`!document.querySelector('[data-testid="digiflazz-import"]')`);if(done)break;}
                             if(!done)throw Error('Local SKU import did not finish');
                             await navigate('/admin/catalog?edit='+editor);
-                            const safe=await evaluate(`(()=>{const p=JSON.parse(document.getElementById('app').dataset.page).props.products.find(p=>p.slug==='browser-checkout-game');const pack=p.packages.find(p=>p.name==='Browser Import 200 Diamonds');return pack&&pack.is_active&&pack.nominal_value===200&&pack.mappings.length===1&&pack.mappings.some(m=>m.external_sku==='BROWSER-IMPORT-200'&&m.is_active&&m.customer_no_template==='{{user_id}}');})()`);
+                            const safe=await evaluate(`(()=>{const p=JSON.parse(document.getElementById('app').dataset.page).props.products.find(p=>p.slug==='browser-checkout-game');const pack=p.packages.find(p=>p.name==='Browser Import 200 Diamonds');return pack&&pack.is_active&&pack.nominal_value===200&&pack.mappings.length===1&&pack.mappings.some(m=>m.external_sku==='BROWSER-IMPORT-200'&&m.is_active);})()`);
                             if(!safe)throw Error('Import did not publish package and source with destination');
                             const storefront=await evaluate(`(async()=>{const r=await fetch('/catalog/browser-checkout-game');if(!r.ok)return {status:r.status};const doc=new DOMParser().parseFromString(await r.text(),'text/html');const page=JSON.parse(doc.getElementById('app').dataset.page);const pack=page.props.packages.find(p=>p.name==='Browser Import 200 Diamonds');return {status:r.status,available:pack?.is_available,price:pack?.price_idr};})()`);
                             if(storefront.status!==200||storefront.available!==true||storefront.price!==22000)throw Error('Imported package is not available at the expected storefront price: '+JSON.stringify(storefront));
@@ -99,7 +98,7 @@ try {
                         }else{await click('Impor nominal Digiflazz');}
                         await click('Edit nominal');await inspect(width+'-nominal-editor');await click('Tutup editor nominal');
                     }
-                    if(tab==='Data Pelanggan'&&!await evaluate(`Boolean(document.querySelector('input[placeholder="Contoh: User ID"]'))`))throw Error('Customer fields missing from editor');
+                    if(tab==='Data Pelanggan'&&!await evaluate(`Boolean(document.querySelector('input[placeholder="Masukkan User ID"]'))&&Boolean(document.querySelector('[data-testid="product-customer-template"]'))`))throw Error('Customer fields or shared product format missing from editor');
                 }
                 await click('Kembali ke produk');await inspect(width+'-product-return');
             }

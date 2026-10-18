@@ -66,6 +66,7 @@ DB::transaction(function (): void {
             'description' => 'Fixture khusus browser regression checkout.',
             'margin_percent' => 10,
             'fulfillment_mode' => 'AUTO_PROVIDER',
+            'customer_no_template' => '{{user_id}}{{zone_id}}',
             'nickname_check_enabled' => false,
             'is_active' => true,
         ]
