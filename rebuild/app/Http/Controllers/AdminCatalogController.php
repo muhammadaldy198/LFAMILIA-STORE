@@ -656,7 +656,10 @@ class AdminCatalogController
                 ]);
             }
             $audit->record($request, 'catalog.fields.updated', 'product', $product->id,
-                $before, $product->fields()->get()->toArray());
+                $before, [
+                    'fields' => $product->fields()->get()->toArray(),
+                    'customer_no_template' => $product->customer_no_template,
+                ]);
         });
 
         return back();
@@ -749,6 +752,27 @@ class AdminCatalogController
         }
 
         if ($provider->code === 'DIGIFLAZZ') {
+            if ($data['is_active']) {
+                $product = Product::query()
+                    ->join('product_packages', 'product_packages.product_id', '=', 'products.id')
+                    ->where('product_packages.id', $mapping->product_package_id)
+                    ->select('products.*')
+                    ->firstOrFail();
+                $template = trim((string) ($product->customer_no_template ?? ''));
+                $fieldKeys = $product->fields()->pluck('field_key')->all();
+                $requiredKeys = $product->fields()->where('is_required', true)->pluck('field_key')->all();
+                preg_match_all('/\{\{([^}]+)\}\}/', $template, $matches);
+                $references = $matches[1] ?? [];
+                if ($product->is_active && $product->fulfillment_mode === 'AUTO_PROVIDER'
+                    && (($template !== '' && $references === [])
+                        || (count($fieldKeys) > 1 && $template === '')
+                        || ($template !== '' && array_diff($references, $fieldKeys))
+                        || ($template !== '' && array_diff($requiredKeys, $references)))) {
+                    throw ValidationException::withMessages([
+                        'is_active' => 'Produk harus memiliki format Digiflazz yang mencantumkan semua kolom wajib sebelum mapping diaktifkan.',
+                    ]);
+                }
+            }
             $locking = (bool) ($data['is_manual_price'] ?? $mapping->is_manual_price);
             if ($locking && ! $mapping->is_manual_price && ! isset($data['manual_price_idr'])) {
                 throw ValidationException::withMessages([

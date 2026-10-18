@@ -508,6 +508,10 @@ class CatalogTest extends TestCase
             ],
         ])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertSame('{{user_id}}{{zone_id}}{{region_id}}', $product->fresh()->customer_no_template);
+        $auditAfter = json_decode((string) DB::table('audit_logs')->where('action', 'catalog.fields.updated')
+            ->where('target_id', (string) $product->id)->latest('id')->value('after'), true, 512, JSON_THROW_ON_ERROR);
+        $this->assertSame('{{user_id}}{{zone_id}}{{region_id}}', $auditAfter['customer_no_template']);
+        $this->assertCount(3, $auditAfter['fields']);
 
         $this->put('/admin/catalog/products/'.$product->id.'/fields', [
             'customer_no_template' => '{{user_id}}',
@@ -557,6 +561,36 @@ class CatalogTest extends TestCase
             ],
         ])->assertSessionHasErrors('customer_no_template');
         $this->assertSame('{{user_id}}', $product->fresh()->customer_no_template);
+    }
+
+    public function test_digiflazz_mapping_cannot_be_activated_without_valid_shared_template(): void
+    {
+        $this->actingAs($this->admin(), 'admin');
+        $category = Category::where('slug', 'game')->firstOrFail();
+        $providerId = DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
+        $product = Product::create([
+            'category_id' => $category->id, 'name' => 'Mapping Activation Game', 'slug' => 'mapping-activation-game',
+            'margin_percent' => 10, 'fulfillment_mode' => 'AUTO_PROVIDER', 'is_active' => true,
+        ]);
+        $product->fields()->createMany([
+            ['field_key' => 'user_id', 'label' => 'User ID', 'type' => 'text', 'is_required' => true, 'sort_order' => 0],
+            ['field_key' => 'zone_id', 'label' => 'Zone ID', 'type' => 'text', 'is_required' => true, 'sort_order' => 1],
+        ]);
+        $package = $product->packages()->create(['code' => 'ACTIVATE1', 'name' => 'Paket']);
+        $mappingId = DB::table('provider_mappings')->insertGetId([
+            'product_package_id' => $package->id, 'provider_id' => $providerId, 'external_sku' => 'ACTIVATE-SKU',
+            'cost_idr' => 10000, 'max_price_idr' => 12000, 'fulfillment_config' => json_encode([]),
+            'priority' => 1, 'is_active' => false, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $this->put('/admin/catalog/mappings/'.$mappingId, [
+            'priority' => 1, 'is_active' => true, 'is_manual_price' => false,
+        ])->assertSessionHasErrors('is_active');
+        $this->assertDatabaseHas('provider_mappings', ['id' => $mappingId, 'is_active' => false]);
+        $product->update(['customer_no_template' => '{{user_id}}{{zone_id}}']);
+        $this->put('/admin/catalog/mappings/'.$mappingId, [
+            'priority' => 1, 'is_active' => true, 'is_manual_price' => false,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('provider_mappings', ['id' => $mappingId, 'is_active' => true]);
     }
 
     public function test_shared_template_migration_rollback_restores_legacy_mapping_templates(): void
