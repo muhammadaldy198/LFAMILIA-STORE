@@ -249,12 +249,14 @@ const fieldsProductId = ref('');
 const fieldRows = ref([]);
 const fieldsError = ref('');
 const fieldsSaving = ref(false);
+const customerTemplateOriginal = ref('');
 watch(fieldsProductId, (id) => {
     const product = products.value.find(item => String(item.id) === String(id));
     fieldRows.value = (product?.fields || []).map(field => ({
         field_key: field.field_key, label: field.label, placeholder: field.placeholder || '',
         type: field.type, is_required: Boolean(field.is_required),
     }));
+    customerTemplateOriginal.value = product?.customer_no_template || '';
     fieldsError.value = '';
 });
 const addField = () => fieldRows.value.push({ field_key: '', label: '', placeholder: '', type: 'text', is_required: true });
@@ -268,12 +270,15 @@ const saveFields = () => {
     fieldsError.value = '';
     fieldsSaving.value = true;
     const product = products.value.find(item => String(item.id) === String(fieldsProductId.value));
+    const customerTemplate = product?.customer_no_template || '';
+    const customerTemplateChanged = customerTemplate !== customerTemplateOriginal.value;
     router.put('/admin/catalog/products/' + fieldsProductId.value + '/fields', {
-        ...(product?.customer_no_template ? { customer_no_template: product.customer_no_template } : {}),
+        ...(customerTemplateChanged ? { customer_no_template: customerTemplate || null } : {}),
         fields: fieldRows.value.map(field => ({ ...field, field_key: field.field_key.trim(), label: field.label.trim(), placeholder: field.placeholder.trim() || null })),
     }, {
         preserveScroll: true,
         onError: errors => { fieldsError.value = Object.values(errors).join(' · '); },
+        onSuccess: () => { customerTemplateOriginal.value = customerTemplate; },
         onFinish: () => { fieldsSaving.value = false; },
     });
 };
@@ -310,7 +315,7 @@ const saveProduct = (item) => router.put('/admin/catalog/products/' + item.id, {
     nickname_game_code: item.nickname_game_code || null,
     nickname_user_field_key: item.nickname_user_field_key || null,
     nickname_server_field_key: item.nickname_server_field_key || null,
-}, {preserveScroll:true,onStart:()=>{savingProduct.value=true;},onFinish:()=>{savingProduct.value=false;}});
+}, {preserveScroll:true,onStart:()=>{savingProduct.value=true;},onSuccess:()=>{if(String(fieldsProductId.value)===String(item.id))customerTemplateOriginal.value=item.customer_no_template||'';},onFinish:()=>{savingProduct.value=false;}});
 const savePackage = (pack) => router.put('/admin/catalog/packages/' + pack.id, {
     code: pack.code, name: pack.name, note: pack.note || null, group_name: pack.group_name || null, nominal_value: pack.nominal_value,
     sort_order: pack.sort_order, is_active: pack.is_active,
