@@ -492,6 +492,9 @@ class CatalogTest extends TestCase
         $this->put('/admin/catalog/products/'.$product->id, [...$payload, 'customer_no_template' => null])
             ->assertRedirect()->assertSessionHasNoErrors();
         $this->assertNull($product->fresh()->customer_no_template);
+        $legacyConfig = json_decode((string) DB::table('provider_mappings')
+            ->where('product_package_id', $package->id)->value('fulfillment_config'), true);
+        $this->assertArrayNotHasKey('customer_no_template', $legacyConfig);
 
         $product->update(['is_active' => true]);
         $payload['is_active'] = true;

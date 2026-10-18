@@ -354,10 +354,38 @@ class AdminCatalogController
         DB::transaction(function () use ($request, $product, $data, $audit): void {
             $before = $product->toArray();
             $product->update($data);
+            if (array_key_exists('customer_no_template', $data) && $data['customer_no_template'] === null) {
+                $this->clearLegacyCustomerNoTemplates($product->id);
+            }
             $audit->record($request, 'catalog.product.updated', 'product', $product->id, $before, $product->toArray());
         });
 
         return back();
+    }
+
+    private function clearLegacyCustomerNoTemplates(int $productId): void
+    {
+        $mappings = DB::table('provider_mappings as mappings')
+            ->join('providers', 'providers.id', '=', 'mappings.provider_id')
+            ->join('product_packages', 'product_packages.id', '=', 'mappings.product_package_id')
+            ->where('providers.code', 'DIGIFLAZZ')
+            ->where('product_packages.product_id', $productId)
+            ->get(['mappings.id', 'mappings.fulfillment_config']);
+
+        foreach ($mappings as $mapping) {
+            $config = is_string($mapping->fulfillment_config)
+                ? (json_decode($mapping->fulfillment_config, true) ?: [])
+                : (array) $mapping->fulfillment_config;
+            if (! array_key_exists('customer_no_template', $config)) {
+                continue;
+            }
+
+            unset($config['customer_no_template']);
+            DB::table('provider_mappings')->where('id', $mapping->id)->update([
+                'fulfillment_config' => json_encode($config, JSON_THROW_ON_ERROR),
+                'updated_at' => now(),
+            ]);
+        }
     }
 
     public function destroyProduct(Request $request, Product $product, CatalogAudit $audit): RedirectResponse

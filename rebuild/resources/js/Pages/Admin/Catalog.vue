@@ -269,7 +269,7 @@ const saveFields = () => {
     fieldsSaving.value = true;
     const product = products.value.find(item => String(item.id) === String(fieldsProductId.value));
     router.put('/admin/catalog/products/' + fieldsProductId.value + '/fields', {
-        customer_no_template: product?.customer_no_template || null,
+        ...(product?.customer_no_template ? { customer_no_template: product.customer_no_template } : {}),
         fields: fieldRows.value.map(field => ({ ...field, field_key: field.field_key.trim(), label: field.label.trim(), placeholder: field.placeholder.trim() || null })),
     }, {
         preserveScroll: true,
