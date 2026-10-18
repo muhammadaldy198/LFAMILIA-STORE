@@ -268,22 +268,13 @@ const saveFields = () => {
     fieldsError.value = '';
     fieldsSaving.value = true;
     const product = products.value.find(item => item.id === fieldsProductId.value);
-    const saveSharedFormat = (done) => {
-        if (!product || product.fulfillment_mode !== 'AUTO_PROVIDER') return done();
-        router.put('/admin/catalog/products/' + product.id, {
-            category_id: product.category_id, name: product.name, slug: product.slug, publisher: product.publisher || '', description: product.description,
-            fulfillment_mode: product.fulfillment_mode, manual_delivery_instructions: product.manual_delivery_instructions || '', manual_service_start_at: product.manual_service_start_at || null, manual_service_end_at: product.manual_service_end_at || null,
-            margin_percent: product.margin_percent, customer_no_template: product.customer_no_template || null,
-            sort_order: product.sort_order, is_active: product.is_active,
-        }, { preserveScroll: true, onFinish: done });
-    };
     router.put('/admin/catalog/products/' + fieldsProductId.value + '/fields', {
+        customer_no_template: product?.customer_no_template || null,
         fields: fieldRows.value.map(field => ({ ...field, field_key: field.field_key.trim(), label: field.label.trim(), placeholder: field.placeholder.trim() || null })),
     }, {
         preserveScroll: true,
         onError: errors => { fieldsError.value = Object.values(errors).join(' · '); },
-        onSuccess: () => saveSharedFormat(() => { fieldsSaving.value = false; }),
-        onFinish: () => { if (!product || product.fulfillment_mode !== 'AUTO_PROVIDER') fieldsSaving.value = false; },
+        onFinish: () => { fieldsSaving.value = false; },
     });
 };
 const saveCategory = (item) => router.put('/admin/catalog/categories/' + item.id, { name: item.name, slug: item.slug, icon: item.icon || 'grid', sort_order: item.sort_order, is_active: item.is_active });

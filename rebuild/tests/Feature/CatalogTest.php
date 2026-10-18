@@ -448,6 +448,7 @@ class CatalogTest extends TestCase
             $this->seedCheckoutDigiflazzCatalog($package->id);
         }
         $this->put('/admin/catalog/products/'.$product->id.'/fields', [
+            'customer_no_template' => '{{user_id}}{{zone_id}}',
             'fields' => [
                 ['field_key' => 'user_id', 'label' => 'User ID', 'type' => 'text', 'is_required' => true],
                 ['field_key' => 'zone_id', 'label' => 'Zone ID', 'type' => 'text', 'is_required' => false],
@@ -499,17 +500,24 @@ class CatalogTest extends TestCase
             ->assertSessionHasErrors('customer_no_template');
 
         $this->put('/admin/catalog/products/'.$product->id.'/fields', [
+            'customer_no_template' => '{{user_id}}{{zone_id}}{{region_id}}',
             'fields' => [
                 ['field_key' => 'user_id', 'label' => 'User ID', 'type' => 'text', 'is_required' => true],
                 ['field_key' => 'zone_id', 'label' => 'Zone ID', 'type' => 'text', 'is_required' => true],
                 ['field_key' => 'region_id', 'label' => 'Region ID', 'type' => 'text', 'is_required' => true],
             ],
-        ])->assertSessionHasErrors('fields');
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame('{{user_id}}{{zone_id}}{{region_id}}', $product->fresh()->customer_no_template);
 
-        $product->update(['customer_no_template' => '{{user_id}}']);
-        $product->fields()->create(['field_key' => 'region_id', 'label' => 'Region ID', 'type' => 'text', 'is_required' => true, 'sort_order' => 2]);
-        $this->put('/admin/catalog/products/'.$product->id, $payload)
-            ->assertSessionHasErrors('customer_no_template');
+        $this->put('/admin/catalog/products/'.$product->id.'/fields', [
+            'customer_no_template' => '{{user_id}}',
+            'fields' => [
+                ['field_key' => 'user_id', 'label' => 'User ID', 'type' => 'text', 'is_required' => true],
+                ['field_key' => 'zone_id', 'label' => 'Zone ID', 'type' => 'text', 'is_required' => true],
+                ['field_key' => 'region_id', 'label' => 'Region ID', 'type' => 'text', 'is_required' => true],
+            ],
+        ])->assertSessionHasErrors('customer_no_template');
+        $this->assertSame('{{user_id}}{{zone_id}}{{region_id}}', $product->fresh()->customer_no_template);
     }
 
     public function test_shared_template_migration_rollback_restores_legacy_mapping_templates(): void

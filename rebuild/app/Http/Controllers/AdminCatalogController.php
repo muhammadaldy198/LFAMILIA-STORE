@@ -246,7 +246,7 @@ class AdminCatalogController
             throw ValidationException::withMessages(['customer_no_template' => 'Format tujuan mengandung kurung kurawal yang tidak berpasangan.']);
         }
         if ($data['is_active'] && ($data['fulfillment_mode'] ?? $product->fulfillment_mode) === 'AUTO_PROVIDER'
-            && count($requiredFieldKeys) > 1
+            && $product->fields()->count() > 1
             && ($template === '' || array_diff($requiredFieldKeys, $referencedKeys))) {
             throw ValidationException::withMessages(['customer_no_template' => 'Format tujuan harus mencantumkan semua kolom wajib produk dengan placeholder {{field_key}}.']);
         }
@@ -581,6 +581,7 @@ class AdminCatalogController
     {
         $data = $request->validate([
             'fields' => ['present', 'array', 'max:20'],
+            'customer_no_template' => ['sometimes', 'nullable', 'string', 'max:500'],
             'fields.*.field_key' => ['required', 'string', 'max:80', 'regex:/^[a-z][a-z0-9_]*$/', 'distinct'],
             'fields.*.label' => ['required', 'string', 'max:255'],
             'fields.*.placeholder' => ['nullable', 'string', 'max:255'],
@@ -588,13 +589,23 @@ class AdminCatalogController
             'fields.*.is_required' => ['required', 'boolean'],
         ]);
         $keys = array_column($data['fields'], 'field_key');
-        $references = [];
+        $template = trim((string) (array_key_exists('customer_no_template', $data)
+            ? $data['customer_no_template']
+            : ($product->customer_no_template ?? '')));
+        preg_match_all('/\{\{([^}]+)\}\}/', $template, $matches);
+        $references = $matches[1] ?? [];
         if ($product->nickname_check_enabled) {
-            $references = array_filter([$product->nickname_user_field_key, $product->nickname_server_field_key]);
+            $references = array_merge($references, array_filter([$product->nickname_user_field_key, $product->nickname_server_field_key]));
         }
-        preg_match_all('/\{\{([^}]+)\}\}/', (string) $product->customer_no_template, $matches);
-        $references = array_merge($references, $matches[1] ?? []);
-        if (trim((string) $product->customer_no_template) === '') {
+        foreach ($matches[1] ?? [] as $fieldKey) {
+            if (! preg_match('/^[a-z][a-z0-9_]*$/', $fieldKey) || ! in_array($fieldKey, $keys, true)) {
+                throw ValidationException::withMessages(['customer_no_template' => 'Placeholder {{'.$fieldKey.'}} tidak cocok dengan field produk.']);
+            }
+        }
+        if (preg_match('/\{(?!\{)|(?<!\})\}/', preg_replace('/\{\{[a-z][a-z0-9_]*\}\}/', '', $template) ?? $template)) {
+            throw ValidationException::withMessages(['customer_no_template' => 'Format tujuan mengandung kurung kurawal yang tidak berpasangan.']);
+        }
+        if ($template === '') {
             $packageIds = $product->packages()->pluck('id');
             foreach (DB::table('provider_mappings as mappings')
                 ->join('providers', 'providers.id', '=', 'mappings.provider_id')
@@ -618,11 +629,20 @@ class AdminCatalogController
             ->where('product_packages.product_id', $product->id)
             ->exists();
         if ($product->is_active && $product->fulfillment_mode === 'AUTO_PROVIDER' && $hasDigiflazzMapping
-            && count($requiredKeys) > 1 && array_diff($requiredKeys, $references)) {
-            throw ValidationException::withMessages(['fields' => 'Semua kolom wajib harus tercakup dalam format customer Digiflazz sebelum menyimpan perubahan kolom.']);
+            && count($data['fields']) > 1 && $template === '') {
+            throw ValidationException::withMessages(['customer_no_template' => 'Format tujuan Digiflazz wajib diisi jika produk memiliki lebih dari satu kolom.']);
         }
-        DB::transaction(function () use ($request, $product, $data, $audit): void {
+        if ($product->is_active && $product->fulfillment_mode === 'AUTO_PROVIDER' && $hasDigiflazzMapping
+            && count($requiredKeys) > 1 && array_diff($requiredKeys, $references)) {
+            throw ValidationException::withMessages(['customer_no_template' => 'Format tujuan harus mencantumkan semua kolom wajib produk.']);
+        }
+        DB::transaction(function () use ($request, $product, $data, $audit, $template): void {
             $before = $product->fields()->get()->toArray();
+            $beforeTemplate = $product->customer_no_template;
+            $product->customer_no_template = $template !== '' ? $template : null;
+            $product->save();
+            $product->refresh();
+            $before = ['fields' => $before, 'customer_no_template' => $beforeTemplate];
             $product->fields()->delete();
             foreach ($data['fields'] as $index => $field) {
                 ProductInputField::create([
