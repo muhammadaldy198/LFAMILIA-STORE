@@ -58,10 +58,6 @@ return new class extends Migration
                 $config = is_string($mapping->fulfillment_config)
                     ? (json_decode($mapping->fulfillment_config, true) ?: [])
                     : (array) $mapping->fulfillment_config;
-                if (trim((string) ($config['customer_no_template'] ?? '')) !== '') {
-                    continue;
-                }
-
                 $config['customer_no_template'] = $product->customer_no_template;
                 DB::table('provider_mappings')->where('id', $mapping->id)->update([
                     'fulfillment_config' => json_encode($config, JSON_THROW_ON_ERROR),

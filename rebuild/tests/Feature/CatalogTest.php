@@ -520,6 +520,45 @@ class CatalogTest extends TestCase
         $this->assertSame('{{user_id}}{{zone_id}}{{region_id}}', $product->fresh()->customer_no_template);
     }
 
+    public function test_active_digiflazz_shared_template_rejects_missing_required_fields_and_literals(): void
+    {
+        $this->actingAs($this->admin(), 'admin');
+        $category = Category::where('slug', 'game')->firstOrFail();
+        $providerId = DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
+        $product = Product::create([
+            'category_id' => $category->id, 'name' => 'Template Validation Game', 'slug' => 'template-validation-game',
+            'margin_percent' => 10, 'fulfillment_mode' => 'AUTO_PROVIDER', 'is_active' => true,
+            'customer_no_template' => '{{user_id}}',
+        ]);
+        $product->fields()->createMany([
+            ['field_key' => 'user_id', 'label' => 'User ID', 'type' => 'text', 'is_required' => true, 'sort_order' => 0],
+            ['field_key' => 'zone_id', 'label' => 'Zone ID', 'type' => 'text', 'is_required' => false, 'sort_order' => 1],
+        ]);
+        $package = $product->packages()->create(['code' => 'VALIDATE1', 'name' => 'Paket']);
+        DB::table('provider_mappings')->insert([
+            'product_package_id' => $package->id, 'provider_id' => $providerId, 'external_sku' => 'VALIDATE-SKU',
+            'cost_idr' => 10000, 'max_price_idr' => 12000, 'fulfillment_config' => json_encode([]),
+            'priority' => 1, 'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        foreach (['fixed-account-id', '{{zone_id}}'] as $invalidTemplate) {
+            $this->put('/admin/catalog/products/'.$product->id.'/fields', [
+                'customer_no_template' => $invalidTemplate,
+                'fields' => [
+                    ['field_key' => 'user_id', 'label' => 'User ID', 'type' => 'text', 'is_required' => true],
+                    ['field_key' => 'zone_id', 'label' => 'Zone ID', 'type' => 'text', 'is_required' => false],
+                ],
+            ])->assertSessionHasErrors('customer_no_template');
+        }
+        $this->put('/admin/catalog/products/'.$product->id.'/fields', [
+            'customer_no_template' => '{{zone_id}}',
+            'fields' => [
+                ['field_key' => 'user_id', 'label' => 'User ID', 'type' => 'text', 'is_required' => true],
+                ['field_key' => 'zone_id', 'label' => 'Zone ID', 'type' => 'text', 'is_required' => false],
+            ],
+        ])->assertSessionHasErrors('customer_no_template');
+        $this->assertSame('{{user_id}}', $product->fresh()->customer_no_template);
+    }
+
     public function test_shared_template_migration_rollback_restores_legacy_mapping_templates(): void
     {
         $category = Category::where('slug', 'game')->firstOrFail();
@@ -531,12 +570,13 @@ class CatalogTest extends TestCase
         $package = $product->packages()->create(['code' => 'ROLLBACK1', 'name' => 'Paket']);
         $mappingId = DB::table('provider_mappings')->insertGetId([
             'product_package_id' => $package->id, 'provider_id' => $providerId, 'external_sku' => 'ROLLBACK-SKU',
-            'cost_idr' => 10000, 'max_price_idr' => 12000, 'fulfillment_config' => json_encode([]),
+            'cost_idr' => 10000, 'max_price_idr' => 12000, 'fulfillment_config' => json_encode(['customer_no_template' => '{{stale}}']),
             'priority' => 1, 'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
         ]);
+        $product->update(['customer_no_template' => '{{latest_user}}{{latest_zone}}']);
         (require database_path('migrations/2026_10_18_134621_backfill_product_customer_no_templates.php'))->down();
         $config = json_decode(DB::table('provider_mappings')->where('id', $mappingId)->value('fulfillment_config'), true);
-        $this->assertSame('{{user_id}}{{zone_id}}', $config['customer_no_template']);
+        $this->assertSame('{{latest_user}}{{latest_zone}}', $config['customer_no_template']);
     }
 
     public function test_digiflazz_sku_only_enters_through_trusted_import_service(): void

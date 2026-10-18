@@ -245,9 +245,17 @@ class AdminCatalogController
         if (preg_match('/\{(?!\{)|(?<!\})\}/', preg_replace('/\{\{[a-z][a-z0-9_]*\}\}/', '', $template) ?? $template)) {
             throw ValidationException::withMessages(['customer_no_template' => 'Format tujuan mengandung kurung kurawal yang tidak berpasangan.']);
         }
+        $hasDigiflazzMapping = DB::table('provider_mappings as mappings')
+            ->join('providers', 'providers.id', '=', 'mappings.provider_id')
+            ->join('product_packages', 'product_packages.id', '=', 'mappings.product_package_id')
+            ->where('providers.code', 'DIGIFLAZZ')
+            ->where('product_packages.product_id', $product->id)
+            ->exists();
         if ($data['is_active'] && ($data['fulfillment_mode'] ?? $product->fulfillment_mode) === 'AUTO_PROVIDER'
-            && $product->fields()->count() > 1
-            && ($template === '' || array_diff($requiredFieldKeys, $referencedKeys))) {
+            && $hasDigiflazzMapping
+            && (($template !== '' && $referencedKeys === [])
+                || ($product->fields()->count() > 1 && $template === '')
+                || ($template !== '' && array_diff($requiredFieldKeys, $referencedKeys)))) {
             throw ValidationException::withMessages(['customer_no_template' => 'Format tujuan harus mencantumkan semua kolom wajib produk dengan placeholder {{field_key}}.']);
         }
         $data['customer_no_template'] = $template !== '' ? $template : null;
@@ -629,12 +637,10 @@ class AdminCatalogController
             ->where('product_packages.product_id', $product->id)
             ->exists();
         if ($product->is_active && $product->fulfillment_mode === 'AUTO_PROVIDER' && $hasDigiflazzMapping
-            && count($data['fields']) > 1 && $template === '') {
-            throw ValidationException::withMessages(['customer_no_template' => 'Format tujuan Digiflazz wajib diisi jika produk memiliki lebih dari satu kolom.']);
-        }
-        if ($product->is_active && $product->fulfillment_mode === 'AUTO_PROVIDER' && $hasDigiflazzMapping
-            && count($requiredKeys) > 1 && array_diff($requiredKeys, $references)) {
-            throw ValidationException::withMessages(['customer_no_template' => 'Format tujuan harus mencantumkan semua kolom wajib produk.']);
+            && (($template !== '' && $references === [])
+                || (count($data['fields']) > 1 && $template === '')
+                || ($requiredKeys !== [] && array_diff($requiredKeys, $references)))) {
+            throw ValidationException::withMessages(['customer_no_template' => 'Format tujuan harus memakai placeholder kolom produk dan mencantumkan semua kolom wajib.']);
         }
         DB::transaction(function () use ($request, $product, $data, $audit, $template): void {
             $before = $product->fields()->get()->toArray();
