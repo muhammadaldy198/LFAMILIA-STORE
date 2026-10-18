@@ -463,6 +463,40 @@ class CatalogTest extends TestCase
         ])->assertSessionHasErrors('fields.1.field_key');
     }
 
+    public function test_product_template_is_saved_and_legacy_mapping_fields_cannot_be_removed(): void
+    {
+        $this->actingAs($this->admin(), 'admin');
+        $category = Category::where('slug', 'game')->firstOrFail();
+        $providerId = DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
+        $product = Product::create([
+            'category_id' => $category->id, 'name' => 'Shared Template Game', 'slug' => 'shared-template-game',
+            'margin_percent' => 10, 'fulfillment_mode' => 'AUTO_PROVIDER', 'is_active' => false,
+        ]);
+        $product->fields()->create(['field_key' => 'user_id', 'label' => 'User ID', 'type' => 'text', 'is_required' => true, 'sort_order' => 0]);
+        $product->fields()->create(['field_key' => 'zone_id', 'label' => 'Zone ID', 'type' => 'text', 'is_required' => true, 'sort_order' => 1]);
+        $package = $product->packages()->create(['code' => 'SHARED1', 'name' => 'Paket', 'is_active' => false]);
+        DB::table('provider_mappings')->insert([
+            'product_package_id' => $package->id, 'provider_id' => $providerId, 'external_sku' => 'SHARED-SKU',
+            'cost_idr' => 10000, 'max_price_idr' => 12000, 'fulfillment_config' => json_encode(['customer_no_template' => '{{user_id}}{{zone_id}}']),
+            'priority' => 1, 'is_active' => false, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $payload = [
+            'category_id' => $category->id, 'name' => $product->name, 'slug' => $product->slug,
+            'fulfillment_mode' => 'AUTO_PROVIDER', 'margin_percent' => 10, 'sort_order' => 0, 'is_active' => false,
+            'customer_no_template' => '{{user_id}}{{zone_id}}',
+        ];
+        $this->put('/admin/catalog/products/'.$product->id, $payload)->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame('{{user_id}}{{zone_id}}', $product->fresh()->customer_no_template);
+        $this->put('/admin/catalog/products/'.$product->id, [...$payload, 'customer_no_template' => null])
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertNull($product->fresh()->customer_no_template);
+
+        $this->put('/admin/catalog/products/'.$product->id.'/fields', [
+            'fields' => [['field_key' => 'user_id', 'label' => 'User ID', 'type' => 'text', 'is_required' => true]],
+        ])->assertSessionHasErrors('fields');
+    }
+
     public function test_digiflazz_sku_only_enters_through_trusted_import_service(): void
     {
         $category = Category::where('slug', 'game')->firstOrFail();

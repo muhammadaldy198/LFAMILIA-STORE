@@ -211,6 +211,7 @@ class AdminCatalogController
             'publisher' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:5000'],
             'fulfillment_mode' => ['sometimes', Rule::in(['AUTO_PROVIDER', 'MANUAL'])],
+            'customer_no_template' => ['sometimes', 'nullable', 'string', 'max:500'],
             'initials' => ['nullable', 'string', 'max:4'],
             'accent_color' => ['nullable', 'string', 'regex:/^#[0-9A-Fa-f]{6}$/'],
             'instant' => ['sometimes', 'boolean'],
@@ -229,7 +230,9 @@ class AdminCatalogController
             'nickname_user_field_key' => ['nullable', 'string', 'max:80', 'regex:/^[a-z][a-z0-9_]*$/'],
             'nickname_server_field_key' => ['nullable', 'string', 'max:80', 'regex:/^[a-z][a-z0-9_]*$/'],
         ]);
-        $template = trim((string) ($data['customer_no_template'] ?? $product->customer_no_template ?? ''));
+        $template = trim((string) (array_key_exists('customer_no_template', $data)
+            ? $data['customer_no_template']
+            : ($product->customer_no_template ?? '')));
         $fieldKeys = $product->fields()->pluck('field_key')->all();
         preg_match_all('/\{\{([^}]+)\}\}/', $template, $templateMatches);
         foreach ($templateMatches[1] ?? [] as $fieldKey) {
@@ -585,6 +588,18 @@ class AdminCatalogController
         }
         preg_match_all('/\{\{([^}]+)\}\}/', (string) $product->customer_no_template, $matches);
         $references = array_merge($references, $matches[1] ?? []);
+        if (trim((string) $product->customer_no_template) === '') {
+            $packageIds = $product->packages()->pluck('id');
+            foreach (DB::table('provider_mappings as mappings')
+                ->join('providers', 'providers.id', '=', 'mappings.provider_id')
+                ->where('providers.code', 'DIGIFLAZZ')
+                ->whereIn('mappings.product_package_id', $packageIds)
+                ->pluck('mappings.fulfillment_config') as $config) {
+                $config = is_string($config) ? (json_decode($config, true) ?: []) : (array) $config;
+                preg_match_all('/\{\{([^}]+)\}\}/', (string) data_get($config, 'customer_no_template'), $mappingMatches);
+                $references = array_merge($references, $mappingMatches[1] ?? []);
+            }
+        }
         if (array_diff($references, $keys)) {
             throw ValidationException::withMessages(['fields' => 'Kode kolom masih dipakai cek nickname atau template pengiriman. Ubah pengaturan tersebut dahulu.']);
         }
