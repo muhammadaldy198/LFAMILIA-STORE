@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Services\AdminAuditService;
+use App\Services\AdminPermissionService;
 use App\Services\CustomerAccountDeletion;
 use App\Services\CustomerCleanupService;
 use App\Services\MembershipService;
@@ -149,10 +150,27 @@ class AdminCustomerController
 
         return Inertia::render('Admin/Customers', [
             'isSuperAdmin' => $request->user('admin')?->role === 'SUPER_ADMIN',
+            'canManageMembershipRules' => app(AdminPermissionService::class)->allows($request->user('admin'), 'settings.manage'),
             'customers' => $customers,
             'filters' => $filters,
             'membershipTiers' => DB::table('membership_tiers')
                 ->where('is_active', true)->orderBy('rank')->get(['code', 'rank']),
+            'membershipRules' => DB::table('membership_tiers')->orderBy('rank')->get()
+                ->map(function (object $tier): array {
+                    $requirements = json_decode((string) $tier->requirements, true) ?: [];
+                    $benefits = json_decode((string) $tier->benefits, true) ?: [];
+
+                    return [
+                        'code' => (string) $tier->code,
+                        'rank' => (int) $tier->rank,
+                        'is_active' => (bool) $tier->is_active,
+                        'minimum_spend_idr' => max(0, (int) ($requirements['minimum_spend_idr'] ?? 0)),
+                        'discount_percent' => round(max(0, min(10000, (int) ($benefits['discount_bps'] ?? 0))) / 100, 2),
+                        'benefit_notes' => (string) ($benefits['benefit_notes'] ?? ''),
+                        'has_legacy_requirements' => count(array_diff_key($requirements, ['minimum_spend_idr' => true])) > 0,
+                        'has_legacy_benefits' => count(array_diff_key($benefits, ['discount_bps' => true, 'benefit_notes' => true])) > 0,
+                    ];
+                })->values(),
             'cleanupSettings' => app(CustomerCleanupService::class)->settings(),
             'summary' => [
                 'total' => (clone $activeUsers)->count(),

@@ -99,10 +99,10 @@ function deleteEmpty() {
 <Head :title="'Pelanggan · ' + customer.name" />
 <AdminShell>
     <div class="space-y-5">
-        <div class="flex flex-wrap items-start justify-between gap-3">
-            <div>
+        <header class="flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between">
+            <div class="min-w-0">
                 <Link href="/admin/customers" class="text-sm text-muted-foreground underline-offset-4 hover:underline">← Daftar pelanggan</Link>
-                <h1 class="mt-2 text-2xl font-semibold">{{ customer.name }}</h1>
+                <h1 class="mt-2 break-words text-2xl font-semibold tracking-tight">{{ customer.name }}</h1>
                 <p class="mt-1 text-sm text-muted-foreground">ID pelanggan #{{ customer.id }}</p>
             </div>
             <div class="flex flex-wrap gap-2">
@@ -110,7 +110,7 @@ function deleteEmpty() {
                 <Badge v-if="customer.google_linked" variant="outline">Google terhubung</Badge>
                 <Badge v-if="customer.has_password" variant="outline">Memiliki kata sandi</Badge>
             </div>
-        </div>
+        </header>
 
         <div class="lf-admin-summary ">
             <Card class="p-4"><p class="text-xs text-muted-foreground">Saldo</p><p class="mt-2 text-xl font-semibold">{{ money(balanceIdr) }}</p></Card>
@@ -121,13 +121,13 @@ function deleteEmpty() {
             <Card class="p-4"><p class="text-xs text-muted-foreground">Akun game</p><p class="mt-2 text-2xl font-semibold">{{ summary.saved_accounts || 0 }}</p></Card>
         </div>
 
-        <nav class="lf-admin-tabs">
-            <Button type="button" :variant="tab === 'overview' ? 'secondary' : 'ghost'" class="shrink-0" @click="tab = 'overview'">Profil</Button>
-            <Button type="button" :variant="tab === 'tier' ? 'secondary' : 'ghost'" class="shrink-0" @click="tab = 'tier'">Tier</Button>
-            <Button type="button" :variant="tab === 'orders' ? 'secondary' : 'ghost'" class="shrink-0" @click="tab = 'orders'">Pesanan</Button>
-            <Button type="button" :variant="tab === 'wallet' ? 'secondary' : 'ghost'" class="shrink-0" @click="tab = 'wallet'">Saldo & Top Up</Button>
-            <Button type="button" :variant="tab === 'support' ? 'secondary' : 'ghost'" class="shrink-0" @click="tab = 'support'">Tiket</Button>
-            <Button type="button" :variant="tab === 'accounts' ? 'secondary' : 'ghost'" class="shrink-0" @click="tab = 'accounts'">Akun Game</Button>
+        <nav class="lf-admin-tabs" aria-label="Bagian data pelanggan">
+            <Button type="button" :variant="tab === 'overview' ? 'secondary' : 'ghost'" :aria-current="tab === 'overview' ? 'page' : undefined" class="shrink-0" @click="tab = 'overview'">Profil</Button>
+            <Button type="button" :variant="tab === 'tier' ? 'secondary' : 'ghost'" :aria-current="tab === 'tier' ? 'page' : undefined" class="shrink-0" @click="tab = 'tier'">Tier</Button>
+            <Button type="button" :variant="tab === 'orders' ? 'secondary' : 'ghost'" :aria-current="tab === 'orders' ? 'page' : undefined" class="shrink-0" @click="tab = 'orders'">Pesanan</Button>
+            <Button type="button" :variant="tab === 'wallet' ? 'secondary' : 'ghost'" :aria-current="tab === 'wallet' ? 'page' : undefined" class="shrink-0" @click="tab = 'wallet'">Saldo & Top Up</Button>
+            <Button type="button" :variant="tab === 'support' ? 'secondary' : 'ghost'" :aria-current="tab === 'support' ? 'page' : undefined" class="shrink-0" @click="tab = 'support'">Tiket</Button>
+            <Button type="button" :variant="tab === 'accounts' ? 'secondary' : 'ghost'" :aria-current="tab === 'accounts' ? 'page' : undefined" class="shrink-0" @click="tab = 'accounts'">Akun Game</Button>
         </nav>
 
         <template v-if="tab === 'overview'"><Card class="p-4">
@@ -136,9 +136,9 @@ function deleteEmpty() {
                         <div><dt class="text-xs text-muted-foreground">Nama</dt><dd class="mt-1 font-medium">{{ customer.name }}</dd></div>
                         <div><dt class="text-xs text-muted-foreground">Email</dt><dd class="mt-1 break-all">{{ customer.email || 'Belum diisi' }}</dd></div>
                         <div><dt class="text-xs text-muted-foreground">Nomor telepon</dt><dd class="mt-1">{{ customer.phone || 'Belum diisi' }}</dd></div>
-                        <div><dt class="text-xs text-muted-foreground">Membership aktif</dt><dd class="mt-1"><Badge variant="secondary">{{ customer.membership_tier_code }}</Badge></dd></div>
-                        <div><dt class="text-xs text-muted-foreground">Mode membership</dt><dd class="mt-1">{{ customer.membership_mode === 'MANUAL' ? 'Manual' : 'Otomatis' }}</dd></div>
-                        <div><dt class="text-xs text-muted-foreground">Leaderboard</dt><dd class="mt-1">{{ customer.leaderboard_opt_in ? 'Ikut ditampilkan' : 'Tidak ikut' }}</dd></div>
+                        <div><dt class="text-xs text-muted-foreground">Tingkat member aktif</dt><dd class="mt-1"><Badge variant="secondary">{{ customer.membership_tier_code }}</Badge></dd></div>
+                        <div><dt class="text-xs text-muted-foreground">Penetapan tingkat</dt><dd class="mt-1">{{ customer.membership_mode === 'MANUAL' ? 'Ditetapkan admin' : 'Otomatis dari transaksi' }}</dd></div>
+                        <div><dt class="text-xs text-muted-foreground">Papan peringkat</dt><dd class="mt-1">{{ customer.leaderboard_opt_in ? 'Ikut ditampilkan' : 'Tidak ikut' }}</dd></div>
                         <div><dt class="text-xs text-muted-foreground">Terdaftar</dt><dd class="mt-1">{{ date(customer.created_at) }}</dd></div>
                         <div><dt class="text-xs text-muted-foreground">Aktivitas terakhir</dt><dd class="mt-1">{{ date(customer.last_active_at || customer.created_at) }}</dd></div>
                     </dl>
@@ -170,7 +170,7 @@ function deleteEmpty() {
         <template v-else-if="tab === 'orders'">
             <Card class="p-4">
                 <h2 class="text-lg font-semibold">Riwayat Pesanan</h2>
-                <div class="mt-4 overflow-x-auto">
+                <div class="mt-4 overflow-x-auto" role="region" aria-label="Pesanan pelanggan" tabindex="0">
                     <AdminResponsiveTable :mobile-columns="[0,1,3,4]">
                         <TableHeader><TableRow><TableHead>Invoice</TableHead><TableHead>Produk</TableHead><TableHead>Nominal</TableHead><TableHead>Status</TableHead><TableHead class="text-right">Total</TableHead><TableHead>Tanggal</TableHead></TableRow></TableHeader>
                         <TableBody>
@@ -192,7 +192,7 @@ function deleteEmpty() {
 
         <template v-else-if="tab === 'wallet'"><Card v-if="isSuperAdmin" class="p-4">
                     <h2 class="font-semibold">Penyesuaian Saldo</h2>
-                    <p class="mt-1 text-xs text-muted-foreground">Setiap perubahan saldo menggunakan ledger dan Audit Log. Saldo tidak dapat menjadi negatif.</p>
+                    <p class="mt-1 text-xs text-muted-foreground">Setiap perubahan saldo tercatat untuk pemeriksaan. Saldo tidak dapat menjadi negatif.</p>
                     <div class="mt-3 grid gap-3 sm:grid-cols-[160px_minmax(0,1fr)]">
                         <label class="space-y-1"><span class="text-xs font-medium">Nominal (+/-)</span><Input v-model.number="wallet.amount_idr" type="number" /></label>
                         <label class="space-y-1"><span class="text-xs font-medium">Alasan</span><Input v-model="wallet.reason" maxlength="500" placeholder="Alasan penyesuaian" /></label>
@@ -203,7 +203,7 @@ function deleteEmpty() {
             <div class="lf-admin-summary ">
                 <Card class="p-4">
                     <h2 class="text-lg font-semibold">Aktivitas Saldo Terakhir</h2>
-                    <div class="mt-4 overflow-x-auto">
+                    <div class="mt-4 overflow-x-auto" role="region" aria-label="Aktivitas saldo pelanggan" tabindex="0">
                         <AdminResponsiveTable :mobile-columns="[1,2,3]">
                             <TableHeader><TableRow><TableHead>Tanggal</TableHead><TableHead>Sumber</TableHead><TableHead class="text-right">Perubahan</TableHead><TableHead class="text-right">Saldo akhir</TableHead></TableRow></TableHeader>
                             <TableBody>
@@ -216,7 +216,7 @@ function deleteEmpty() {
 
                 <Card class="p-4">
                     <h2 class="text-lg font-semibold">Riwayat Top Up</h2>
-                    <div class="mt-4 overflow-x-auto">
+                    <div class="mt-4 overflow-x-auto" role="region" aria-label="Riwayat top up pelanggan" tabindex="0">
                         <AdminResponsiveTable :mobile-columns="[0,2,3]">
                             <TableHeader><TableRow><TableHead>Tanggal</TableHead><TableHead>Metode</TableHead><TableHead>Status</TableHead><TableHead class="text-right">Saldo masuk</TableHead><TableHead class="text-right">Total bayar</TableHead></TableRow></TableHeader>
                             <TableBody>
@@ -232,7 +232,7 @@ function deleteEmpty() {
         <template v-else-if="tab === 'support'">
             <Card class="p-4">
                 <div class="flex flex-wrap items-start justify-between gap-3"><div><h2 class="text-lg font-semibold">Tiket Pelanggan</h2><p class="mt-1 text-sm text-muted-foreground">Balasan dan perubahan status dilakukan dari menu Layanan Pelanggan agar tidak ada fitur ganda.</p></div><Button variant="outline" size="sm" as-child><Link href="/admin/support">Buka Layanan Pelanggan</Link></Button></div>
-                <div class="mt-4 overflow-x-auto">
+                <div class="mt-4 overflow-x-auto" role="region" aria-label="Tiket pelanggan" tabindex="0">
                     <AdminResponsiveTable :mobile-columns="[1,2,0]"><TableHeader><TableRow><TableHead>Tiket</TableHead><TableHead>Subjek</TableHead><TableHead>Status</TableHead><TableHead>Tanggal</TableHead></TableRow></TableHeader><TableBody>
                         <TableRow v-for="ticket in tickets" :key="ticket.id"><TableCell>#{{ ticket.id }}</TableCell><TableCell>{{ ticket.subject }}</TableCell><TableCell><Badge variant="outline">{{ statusLabel(ticket.status) }}</Badge></TableCell><TableCell>{{ date(ticket.created_at) }}</TableCell></TableRow>
                         <TableRow v-if="!tickets.length"><TableCell colspan="4" class="py-8 text-center text-muted-foreground">Belum ada tiket.</TableCell></TableRow>
@@ -245,7 +245,7 @@ function deleteEmpty() {
             <Card class="p-4">
                 <h2 class="text-lg font-semibold">Akun Game Tersimpan</h2>
                 <p class="mt-1 text-sm text-muted-foreground">Panel hanya menampilkan label, produk, dan nickname. Nilai input akun tersimpan tidak dibuka di halaman ini.</p>
-                <div class="mt-4 overflow-x-auto">
+                <div class="mt-4 overflow-x-auto" role="region" aria-label="Akun game tersimpan pelanggan" tabindex="0">
                     <AdminResponsiveTable :mobile-columns="[0,1,2]"><TableHeader><TableRow><TableHead>Label</TableHead><TableHead>Produk</TableHead><TableHead>Nickname</TableHead><TableHead>Disimpan</TableHead></TableRow></TableHeader><TableBody>
                         <TableRow v-for="account in savedAccounts" :key="account.id"><TableCell>{{ account.label }}</TableCell><TableCell>{{ account.product_name }}</TableCell><TableCell>{{ account.nickname || '—' }}</TableCell><TableCell>{{ date(account.created_at) }}</TableCell></TableRow>
                         <TableRow v-if="!savedAccounts.length"><TableCell colspan="4" class="py-8 text-center text-muted-foreground">Belum ada akun game tersimpan.</TableCell></TableRow>

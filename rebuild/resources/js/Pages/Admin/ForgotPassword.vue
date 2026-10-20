@@ -23,43 +23,39 @@ const submit = () => {
 
 <template>
     <Head title="Lupa Kata Sandi Admin" />
-    <main class="lf-admin-auth min-h-screen bg-[#07172d] p-4 text-slate-900">
-        <div class="mx-auto grid min-h-[calc(100vh-2rem)] max-w-[980px] place-items-center">
-            <form class="w-full max-w-[420px] rounded-xl border border-slate-200 bg-white p-6 shadow-lg" @submit.prevent="submit">
-                <h1 class="mb-2 text-xl font-bold text-[#0c1c3b]">Pulihkan kata sandi admin</h1>
-                <p class="mb-5 text-sm leading-6 text-slate-600">
-                    Masukkan email admin yang terdaftar. Jika akun aktif, kami akan mengirim tautan reset yang berlaku selama 30 menit.
-                </p>
+    <main class="lf-admin-auth lf-admin" style="min-height:100svh;display:grid;place-items:center;padding:16px;">
+        <div style="width:100%;max-width:400px;">
+            <form
+                style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:24px;display:grid;gap:16px;"
+                @submit.prevent="submit"
+            >
+                <div>
+                    <div style="font-size:17px;font-weight:700;margin-bottom:4px;">Pulihkan kata sandi</div>
+                    <div style="font-size:12px;color:var(--muted-foreground);">Masukkan email admin yang terdaftar. Jika akun aktif, kami kirimkan tautan reset yang berlaku 30 menit.</div>
+                </div>
 
-                <p v-if="page.props.status" role="status" class="mb-4 rounded-lg bg-blue-50 p-3 text-sm text-blue-800">
+                <p v-if="page.props.status" role="status" style="padding:10px 12px;background:var(--accent);border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--accent-foreground);margin:0;">
                     {{ page.props.status }}
                 </p>
 
-                <label class="text-sm font-semibold text-slate-700">
+                <label style="display:grid;gap:6px;font-size:12px;font-weight:600;">
                     Email admin
-                    <Input v-model="form.email" name="email" type="email" autocomplete="email" required
-                        class="mt-1 h-10 w-full rounded-md border border-slate-300 px-3 text-base focus:border-[#1769e8]" />
+                    <Input v-model="form.email" name="email" type="email" autocomplete="email" required placeholder="email@contoh.com" />
+                    <span v-if="form.errors.email" role="alert" style="color:var(--destructive);font-weight:400;font-size:11px;">{{ form.errors.email }}</span>
                 </label>
-                <p v-if="form.errors.email" role="alert" class="mt-2 text-sm text-red-600">{{ form.errors.email }}</p>
 
-                <div v-if="security.turnstile_required" class="mt-4">
-                    <p class="mb-2 text-xs text-slate-600">Verifikasi keamanan Cloudflare</p>
-                    <TurnstileWidget ref="turnstile" :site-key="security.turnstile_site_key"
-                        :action="security.turnstile_action" @token="form.turnstile_token = $event" />
+                <div v-if="security.turnstile_required" style="display:grid;gap:6px;">
+                    <span style="font-size:11px;color:var(--muted-foreground);">Verifikasi keamanan Cloudflare</span>
+                    <TurnstileWidget ref="turnstile" :site-key="security.turnstile_site_key" :action="security.turnstile_action" @token="form.turnstile_token = $event" />
+                    <span v-if="form.errors.turnstile_token" role="alert" style="color:var(--destructive);font-size:11px;font-weight:400;">{{ form.errors.turnstile_token }}</span>
                 </div>
-                <p v-if="form.errors.turnstile_token" role="alert" class="mt-2 text-sm text-red-600">
-                    {{ form.errors.turnstile_token }}
-                </p>
 
-                <Button type="submit" class="mt-5 h-10 w-full rounded-md bg-[#1769e8] text-base font-semibold text-white"
-                    :disabled="form.processing">
+                <Button type="submit" :disabled="form.processing" style="width:100%;font-weight:600;">
                     {{ form.processing ? 'Mengirim…' : 'Kirim tautan pemulihan' }}
                 </Button>
 
-                <div class="mt-4 text-center">
-                    <Link href="/admin/login" class="text-sm font-medium text-[#1769e8] hover:underline">
-                        Kembali ke login admin
-                    </Link>
+                <div style="text-align:center;">
+                    <Link href="/admin/login" style="font-size:12px;color:var(--ring);text-decoration:none;">Kembali ke login</Link>
                 </div>
             </form>
         </div>

@@ -7,8 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 class ProviderMapping extends Model
 {
     protected $fillable = [
-        'product_package_id', 'provider_id', 'external_sku', 'cost_idr',
-        'max_price_idr', 'is_manual_price', 'fulfillment_config', 'priority', 'is_active', 'disabled_by_sync',
+        'product_package_id', 'provider_id', 'external_sku', 'cost_idr', 'store_cost_idr',
+        'seller_reference_price_idr', 'max_price_idr', 'is_manual_price', 'fulfillment_config', 'priority', 'is_active', 'disabled_by_sync',
     ];
 
     protected function casts(): array

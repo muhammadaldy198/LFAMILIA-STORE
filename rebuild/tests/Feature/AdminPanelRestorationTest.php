@@ -10,10 +10,10 @@ use App\Models\Provider;
 use App\Models\ProviderMapping;
 use App\Models\User;
 use App\Services\CatalogNominalOrder;
+use App\Services\CatalogPricingSettings;
 use App\Services\CheckoutPricing;
 use App\Services\CustomerCleanupService;
 use App\Services\DigiflazzCatalogService;
-use App\Services\DigiflazzFixedPricePolicy;
 use App\Services\FulfillmentService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\Client\Factory;
@@ -65,6 +65,29 @@ class AdminPanelRestorationTest extends TestCase
         Http::fake(['https://digiflazz.test/v1/price-list' => Http::response(['data' => $rows])]);
     }
 
+    public function test_template_backfill_requires_all_active_mappings_to_agree_and_preserves_existing_product_value(): void
+    {
+        $product = $this->product();
+        $product->update(['customer_no_template' => null]);
+        $firstPackage = $product->packages()->create(['code' => 'BACKFILL-1', 'name' => 'Nominal 1', 'is_active' => true]);
+        $secondPackage = $product->packages()->create(['code' => 'BACKFILL-2', 'name' => 'Nominal 2', 'is_active' => true]);
+        $providerId = Provider::where('code', 'DIGIFLAZZ')->value('id');
+        foreach ([[$firstPackage->id, '{{destination}}'], [$secondPackage->id, '{{destination}}']] as [$packageId, $template]) {
+            DB::table('provider_mappings')->insert([
+                'provider_id' => $providerId, 'product_package_id' => $packageId,
+                'external_sku' => 'backfill-'.$packageId, 'cost_idr' => 100, 'max_price_idr' => 100,
+                'fulfillment_config' => json_encode(['customer_no_template' => $template]),
+                'priority' => 1, 'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+            ]);
+        }
+        (require database_path('migrations/2026_10_18_134621_backfill_product_customer_no_templates.php'))->up();
+        $this->assertSame('{{destination}}', $product->fresh()->customer_no_template);
+
+        $product->update(['customer_no_template' => '{{already_set}}']);
+        (require database_path('migrations/2026_10_18_134621_backfill_product_customer_no_templates.php'))->up();
+        $this->assertSame('{{already_set}}', $product->fresh()->customer_no_template);
+    }
+
     public function test_sync_import_and_resync_preserve_baseline_and_inactive_import(): void
     {
         $this->login();
@@ -77,13 +100,106 @@ class AdminPanelRestorationTest extends TestCase
         $mapping = $package->mappings()->firstOrFail();
         $this->assertFalse($package->is_active);
         $this->assertFalse($mapping->is_active);
-        $this->assertSame(10000, (int) $mapping->max_price_idr);
+        // Redesign: the per-source cap is the store cost (seller 10000 + 2% uplift).
+        $this->assertSame(10200, (int) $mapping->max_price_idr);
         $this->fakeCatalog([$this->row(['price' => 12000])]);
         $this->post('/admin/catalog/mappings/'.$mapping->id.'/sync')->assertRedirect()->assertSessionHasNoErrors();
         $this->assertSame(12000, (int) $mapping->fresh()->cost_idr);
         $this->assertSame(10000, (int) DB::table('digiflazz_catalog_items')->where('id', $item->id)->value('baseline_price_idr'));
         $this->post('/admin/catalog/products/'.$product->id.'/import', ['item_ids' => [$item->id], 'margin_percent' => 12])->assertSessionHasNoErrors();
         $this->assertSame(1, $product->packages()->count());
+    }
+
+    public function test_importing_another_nominal_preserves_existing_product_sell_markup(): void
+    {
+        $this->login();
+        $this->fakeCatalog([$this->row()]);
+        app(DigiflazzCatalogService::class)->sync();
+        $product = $this->product();
+        $product->category->update(['is_active' => true]);
+        $product->update(['sell_markup_percent' => 17]);
+        $provider = Provider::where('code', 'DIGIFLAZZ')->firstOrFail();
+        $provider->forceFill(['is_active' => true])->save();
+        $itemId = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'restore-sku')->value('id');
+
+        $this->post('/admin/catalog/products/'.$product->id.'/import', [
+            'item_ids' => [$itemId], 'margin_percent' => 12,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $package = $product->packages()->firstOrFail();
+        $package->update(['is_active' => true]);
+        $package->mappings()->update(['is_active' => true]);
+        $this->assertSame('17.0000', (string) $product->fresh()->sell_markup_percent);
+        $this->assertSame(11934, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
+    }
+
+    public function test_activating_automatic_product_validates_existing_destination_template(): void
+    {
+        $this->login();
+        $this->fakeCatalog([$this->row()]);
+        app(DigiflazzCatalogService::class)->sync();
+        Provider::where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
+        $product = $this->product();
+        $product->category->update(['is_active' => true]);
+        $product->update(['is_active' => false, 'customer_no_template' => null]);
+        foreach (['user_id', 'zone_id'] as $index => $key) {
+            $product->fields()->create(['field_key' => $key, 'label' => $key, 'type' => 'text', 'is_required' => true, 'sort_order' => $index]);
+        }
+        $package = $product->packages()->create(['code' => 'ACTIVATE-TEMPLATE', 'name' => 'Activate Template', 'is_active' => true]);
+        ProviderMapping::create([
+            'product_package_id' => $package->id, 'provider_id' => Provider::where('code', 'DIGIFLAZZ')->value('id'),
+            'external_sku' => 'activate-template-'.bin2hex(random_bytes(3)), 'cost_idr' => 10000,
+            'max_price_idr' => 10200, 'priority' => 0, 'is_active' => true,
+        ]);
+
+        $this->put('/admin/catalog/products/'.$product->id, [
+            'category_id' => $product->category_id, 'name' => $product->name, 'description' => $product->description,
+            'margin_percent' => 10, 'sort_order' => 0, 'is_active' => true,
+        ])->assertSessionHasErrors('customer_no_template');
+
+        $this->assertFalse($product->fresh()->is_active);
+    }
+
+    public function test_nickname_reference_does_not_satisfy_required_provider_template_field(): void
+    {
+        $this->login();
+        $this->fakeCatalog([$this->row()]);
+        app(DigiflazzCatalogService::class)->sync();
+        Provider::where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
+        $product = $this->product();
+        $product->category->update(['is_active' => true]);
+        $product->fields()->create(['field_key' => 'user_id', 'label' => 'ID pengguna', 'type' => 'text', 'is_required' => true, 'sort_order' => 0]);
+        $product->fields()->create(['field_key' => 'zone_id', 'label' => 'Zona', 'type' => 'text', 'is_required' => false, 'sort_order' => 1]);
+        $product->update([
+            'nickname_check_enabled' => true, 'nickname_game_code' => 'free-fire',
+            'nickname_user_field_key' => 'user_id', 'nickname_server_field_key' => 'zone_id',
+            'customer_no_template' => '{{user_id}}{{zone_id}}',
+        ]);
+        $itemId = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'restore-sku')->value('id');
+        $this->post('/admin/catalog/products/'.$product->id.'/import', [
+            'item_ids' => [$itemId], 'margin_percent' => 10, 'publish' => true,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->put('/admin/catalog/products/'.$product->id.'/fields', [
+            'customer_no_template' => '{{zone_id}}',
+            'fields' => [
+                ['field_key' => 'user_id', 'label' => 'ID pengguna', 'type' => 'text', 'is_required' => true],
+                ['field_key' => 'zone_id', 'label' => 'Zona', 'type' => 'text', 'is_required' => false],
+            ],
+        ])->assertSessionHasErrors('customer_no_template');
+    }
+
+    public function test_new_automatic_product_inherits_global_markup_until_explicit_override(): void
+    {
+        $this->login();
+        $category = Category::create(['name' => 'Global markup', 'slug' => 'global-markup', 'sort_order' => 0, 'is_active' => true]);
+
+        $this->post('/admin/catalog/products', [
+            'category_id' => $category->id, 'name' => 'Inherited markup', 'fulfillment_mode' => 'AUTO_PROVIDER',
+            'margin_percent' => 10, 'sort_order' => 0,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertNull(Product::where('slug', 'inherited-markup')->firstOrFail()->sell_markup_percent);
     }
 
     public function test_publish_import_activates_product_nominal_and_source_with_price_and_destination(): void
@@ -94,27 +210,29 @@ class AdminPanelRestorationTest extends TestCase
         Provider::where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
         $product = $this->product();
         $product->category->update(['is_active' => true]);
-        $product->update(['is_active' => false]);
+        $product->update(['is_active' => false, 'customer_no_template' => '{{user_id}}{{zone_id}}']);
         foreach (['user_id', 'zone_id'] as $index => $key) {
             $product->fields()->create(['field_key' => $key, 'label' => $key, 'type' => 'text', 'is_required' => true, 'sort_order' => $index]);
         }
         $id = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'restore-sku')->value('id');
         $this->post('/admin/catalog/products/'.$product->id.'/import', [
             'item_ids' => [$id], 'margin_percent' => 12, 'publish' => true,
-            'customer_no_template' => '{{user_id}}{{zone_id}}',
         ])->assertRedirect()->assertSessionHasNoErrors();
         $package = $product->packages()->firstOrFail();
         $mapping = $package->mappings()->firstOrFail();
         $this->assertTrue($product->fresh()->is_active);
         $this->assertTrue($package->is_active);
         $this->assertTrue($mapping->is_active);
-        $this->assertSame('{{user_id}}{{zone_id}}', data_get($mapping->fulfillment_config, 'customer_no_template'));
-        $this->assertSame(11200, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
+        $this->assertSame('{{user_id}}{{zone_id}}', $product->fresh()->customer_no_template);
+        // Redesign: the reviewed import margin becomes the game-level sell markup.
+        $this->assertEqualsWithDelta(12, (float) $product->fresh()->sell_markup_percent, 0.0001);
+        // Redesign: store cost (10000 + 2%) × import margin 12% = 11424.
+        $this->assertSame(11424, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
         $response = $this->get('/catalog/'.$product->slug);
         $response->assertOk();
         $response->assertInertia(function (AssertableInertia $page): void {
             $page->where('packages.0.is_available', true);
-            $page->where('packages.0.price_idr', 11200);
+            $page->where('packages.0.price_idr', 11424);
         });
         $this->assertDatabaseHas('audit_logs', ['action' => 'catalog.mapping.updated', 'target_id' => (string) $mapping->id]);
         Http::assertSentCount(1);
@@ -129,13 +247,15 @@ class AdminPanelRestorationTest extends TestCase
         $product = $this->product();
         $product->category->update(['is_active' => true]);
         $product->fields()->create(['field_key' => 'destination', 'label' => 'ID tujuan', 'type' => 'text', 'is_required' => true, 'sort_order' => 0]);
+        $product->update(['customer_no_template' => '{{destination}}']);
         $id = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'restore-sku')->value('id');
         $this->post('/admin/catalog/products/'.$product->id.'/import', [
             'item_ids' => [$id], 'margin_percent' => 5, 'publish' => true,
         ])->assertRedirect()->assertSessionHasNoErrors();
         $package = $product->packages()->firstOrFail();
-        $this->assertSame('{{destination}}', data_get($package->mappings()->firstOrFail()->fulfillment_config, 'customer_no_template'));
-        $this->assertSame(10500, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
+        $this->assertSame('{{destination}}', $product->fresh()->customer_no_template);
+        // Redesign: store cost (10000 + 2%) × import margin 5% = 10710.
+        $this->assertSame(10710, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
     }
 
     public function test_publish_import_rejects_invalid_destination_formats_without_partial_activation(): void
@@ -211,9 +331,12 @@ class AdminPanelRestorationTest extends TestCase
             $this->assertSame(1, $package->mappings()->count());
             $this->assertSame(1, $package->mappings()->where('is_active', true)->count());
             $this->assertSame([0], $package->mappings()->orderBy('priority')->pluck('priority')->map(fn ($value): int => (int) $value)->all());
-            $this->assertSame(app(DigiflazzFixedPricePolicy::class)
-                ->fixedPriceFromCost((int) $package->nominal_value * 1000, '10'),
-                app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
+            // Imported price is fixed once from effective store cost and markup.
+            $quote = app(CheckoutPricing::class)->forPackage($package->id);
+            $this->assertSame('SELL_PRICE', $package->pricing_mode);
+            $this->assertSame((int) $package->sell_price_idr, $quote['subtotal_idr']);
+            $this->assertSame(1, $package->mappings()->count());
+            $this->assertGreaterThan(0, (int) $package->sell_price_idr);
         }
         $response = $this->get('/catalog/'.$product->slug);
         $response->assertOk();
@@ -224,7 +347,7 @@ class AdminPanelRestorationTest extends TestCase
         });
     }
 
-    public function test_automatic_import_keeps_exactly_one_source_even_when_cheaper_peers_exist(): void
+    public function test_import_keeps_exactly_one_selected_source_even_when_cheaper_peers_exist(): void
     {
         $this->login();
         $this->fakeCatalog([
@@ -246,13 +369,12 @@ class AdminPanelRestorationTest extends TestCase
         ])->assertSessionHasNoErrors();
         $package = $product->packages()->sole();
         $this->assertSame(['rank-expensive'], $package->mappings()->pluck('external_sku')->all());
-        $this->post('/admin/catalog/products/'.$product->id.'/auto-sources')
-            ->assertRedirect()->assertSessionHasNoErrors();
+        $this->post('/admin/catalog/products/'.$product->id.'/auto-sources')->assertNotFound();
         $this->assertSame(1, $package->mappings()->count());
         $this->assertSame('rank-expensive', app(CheckoutPricing::class)->forPackage($package->id)['provider_sku']);
     }
 
-    public function test_automatic_sources_do_not_merge_regions_variants_or_other_product_ownership(): void
+    public function test_import_rejects_duplicate_nominals(): void
     {
         $this->login();
         $this->fakeCatalog([
@@ -265,13 +387,8 @@ class AdminPanelRestorationTest extends TestCase
         $ids = DB::table('digiflazz_catalog_items')->whereIn('buyer_sku_code', ['plain', 'region', 'bonus'])->pluck('id')->all();
         $this->post('/admin/catalog/products/'.$product->id.'/import', [
             'item_ids' => $ids, 'margin_percent' => 10,
-        ])->assertSessionHasNoErrors();
-        $this->assertSame(3, $product->packages()->count());
-        $other = $this->product();
-        $this->post('/admin/catalog/products/'.$other->id.'/import', [
-            'item_ids' => [$ids[0]], 'margin_percent' => 10,
         ])->assertSessionHasErrors('item_ids');
-        $this->assertSame(0, $other->packages()->count());
+        $this->assertSame(0, $product->packages()->count());
     }
 
     public function test_full_sync_does_not_attach_backups_and_preserves_active_orphaned_mapping(): void
@@ -308,32 +425,19 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertArrayNotHasKey($package->id, app(CheckoutPricing::class)->forPackages([$package->id]));
     }
 
-    public function test_bulk_auto_sources_does_not_add_mapping_to_existing_nominal(): void
+    public function test_import_rejects_legacy_auto_sources_payload_and_auto_source_route(): void
     {
         $this->login();
-        $this->fakeCatalog([$this->row(['buyer_sku_code' => 'bulk-A']), $this->row(['buyer_sku_code' => 'bulk-B', 'price' => 10100])]);
+        $this->fakeCatalog([$this->row(['buyer_sku_code' => 'bulk-A'])]);
         app(DigiflazzCatalogService::class)->sync();
         $product = $this->product();
-        $product->fields()->create(['field_key' => 'destination', 'label' => 'ID tujuan', 'type' => 'text', 'is_required' => true, 'sort_order' => 0]);
         $id = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'bulk-A')->value('id');
+
         $this->post('/admin/catalog/products/'.$product->id.'/import', [
-            'item_ids' => [$id], 'margin_percent' => 10, 'auto_sources' => false,
-        ])->assertSessionHasNoErrors();
-        $package = $product->packages()->firstOrFail();
-        $this->assertSame(1, $package->mappings()->count());
-        $this->post('/admin/catalog/products/'.$product->id.'/auto-sources')->assertRedirect()->assertSessionHasNoErrors();
-        $this->assertSame(1, $package->mappings()->count());
-        $this->post('/admin/catalog/products/'.$product->id.'/auto-sources')->assertSessionHasNoErrors();
-        $this->assertSame(1, $product->packages()->count());
-        $this->assertSame(1, $package->mappings()->count());
-        $mapping = $package->mappings()->firstOrFail();
-        $group = data_get($mapping->fulfillment_config, 'auto_source_group');
-        $this->put('/admin/catalog/mappings/'.$mapping->id, [
-            'priority' => 0, 'is_active' => false, 'customer_no_template' => '{{destination}}',
-        ])->assertSessionHasNoErrors();
-        $this->assertSame($group, data_get($mapping->fresh()->fulfillment_config, 'auto_source_group'));
-        $this->login(['orders.view'], 'ADMIN');
-        $this->post('/admin/catalog/products/'.$product->id.'/auto-sources')->assertForbidden();
+            'item_ids' => [$id], 'auto_sources' => false,
+        ])->assertSessionHasErrors('auto_sources');
+        $this->assertSame(0, $product->packages()->count());
+        $this->post('/admin/catalog/products/'.$product->id.'/auto-sources')->assertNotFound();
     }
 
     public function test_thousand_supplier_skus_import_as_five_hundred_nominals_without_auto_backups(): void
@@ -616,6 +720,48 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertFalse($product->fresh()->is_active);
     }
 
+    public function test_manual_mapping_cost_edit_updates_checkout_store_cost(): void
+    {
+        $this->login();
+        $product = $this->product('MANUAL');
+        $product->category->update(['is_active' => true]);
+        $product->update(['sell_markup_percent' => 10]);
+        $provider = Provider::where('code', 'MANUAL')->firstOrFail();
+        $provider->forceFill(['is_active' => true])->save();
+        $package = ProductPackage::create([
+            'product_id' => $product->id, 'code' => 'MANUAL-COST', 'name' => 'Manual Cost',
+            'pricing_mode' => 'PRODUCT_MARGIN', 'is_active' => true,
+        ]);
+        $mapping = ProviderMapping::create([
+            'product_package_id' => $package->id, 'provider_id' => $provider->id,
+            'cost_idr' => 10000, 'store_cost_idr' => 10000, 'priority' => 0, 'is_active' => true,
+        ]);
+
+        $this->put('/admin/catalog/mappings/'.$mapping->id, [
+            'priority' => 0, 'is_active' => true, 'cost_idr' => 12000,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertSame(12000, (int) $mapping->fresh()->store_cost_idr);
+        $this->assertSame(13200, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
+    }
+
+    public function test_added_manual_nominal_initializes_authoritative_store_cost(): void
+    {
+        $this->login();
+        $product = $this->product('MANUAL');
+        $product->category->update(['is_active' => true]);
+
+        $this->post('/admin/catalog/products/'.$product->id.'/packages', [
+            'code' => 'MANUAL-ADDED-COST', 'name' => 'Manual Added Cost', 'sort_order' => 0,
+            'cost_idr' => 12345,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $package = $product->packages()->where('code', 'MANUAL-ADDED-COST')->firstOrFail();
+        $mapping = $package->mappings()->firstOrFail();
+        $this->assertSame(12345, (int) $mapping->cost_idr);
+        $this->assertSame(12345, (int) $mapping->store_cost_idr);
+    }
+
     public function test_manual_nominal_can_be_duplicated_and_catalog_deletes_protect_order_history(): void
     {
         $this->login();
@@ -624,6 +770,7 @@ class AdminPanelRestorationTest extends TestCase
         $package = ProductPackage::create([
             'product_id' => $product->id, 'code' => 'MANUAL10', 'name' => 'Manual 10',
             'group_name' => 'Manual', 'sort_order' => 0, 'is_active' => false,
+            'sell_markup_percent' => 13, 'cost_uplift_percent' => 3,
         ]);
         ProviderMapping::create([
             'product_package_id' => $package->id, 'provider_id' => $provider->id,
@@ -635,6 +782,8 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertFalse($copy->is_active);
         $this->assertStringContainsString('Salinan', $copy->name);
         $this->assertSame(9000, (int) $copy->mappings()->firstOrFail()->cost_idr);
+        $this->assertSame('13.0000', (string) $copy->sell_markup_percent);
+        $this->assertSame('3.0000', (string) $copy->cost_uplift_percent);
         $this->assertFalse($copy->mappings()->firstOrFail()->is_active);
 
         $this->delete('/admin/catalog/packages/'.$copy->id)->assertRedirect()->assertSessionHasNoErrors();
@@ -891,8 +1040,9 @@ class AdminPanelRestorationTest extends TestCase
 
         $package = $product->packages()->firstOrFail();
         $this->assertSame('SELL_PRICE', $package->pricing_mode);
-        $this->assertSame(11000, (int) $package->sell_price_idr);
-        $this->assertSame(10100, app(CheckoutPricing::class)->forPackage($package->id)['max_price_idr']);
+        // Imported display price uses the effective markup on store cost.
+        $this->assertSame(11220, (int) $package->sell_price_idr);
+        $this->assertSame(10200, app(CheckoutPricing::class)->forPackage($package->id)['max_price_idr']);
 
         $this->fakeCatalog([
             $this->row(['buyer_sku_code' => 'fixed-price-A', 'price' => 12500]),
@@ -908,8 +1058,7 @@ class AdminPanelRestorationTest extends TestCase
         ]);
         app(DigiflazzCatalogService::class)->sync();
         $this->assertArrayNotHasKey($package->id, app(CheckoutPricing::class)->forPackages([$package->id]));
-        $this->assertSame(11000, (int) $package->fresh()->sell_price_idr);
-        $this->assertNotEmpty(app(DigiflazzFixedPricePolicy::class)->alerts());
+        $this->assertSame('SELL_PRICE', $package->fresh()->pricing_mode);
     }
 
     public function test_admin_can_lock_legacy_prices_without_replacing_existing_fixed_prices(): void
@@ -1059,5 +1208,106 @@ class AdminPanelRestorationTest extends TestCase
         $this->login([], 'ADMIN');
         $this->post('/admin/customers/cleanup/run')->assertForbidden();
         $this->delete('/admin/customers/'.$funded->id)->assertForbidden();
+    }
+
+    public function test_admin_controls_global_cost_uplift_and_sell_markup(): void
+    {
+        $this->login();
+
+        $this->put('/admin/catalog/pricing', ['cost_uplift_percent' => 1001, 'sell_markup_percent' => 10])
+            ->assertSessionHasErrors('cost_uplift_percent');
+        $this->put('/admin/catalog/pricing', ['cost_uplift_percent' => 2, 'sell_markup_percent' => -1])
+            ->assertSessionHasErrors('sell_markup_percent');
+
+        $this->put('/admin/catalog/pricing', ['cost_uplift_percent' => 3, 'sell_markup_percent' => 15.5])
+            ->assertRedirect()->assertSessionHasNoErrors();
+
+        $settings = app(CatalogPricingSettings::class);
+        $this->assertSame('3', $settings->costUpliftPercent());
+        $this->assertSame('15.5', $settings->sellMarkupPercent());
+        // Exact percent arithmetic: 10.200 + 15% = 11.730.
+        $this->assertSame(11730, $settings->applyPercent(10200, '15'));
+        // Rounded up, never down: 10.001 + 3% = 10.301,03 -> 10.302.
+        $this->assertSame(10302, $settings->applyPercent(10001, '3'));
+
+        $this->login([], 'ADMIN');
+        $this->put('/admin/catalog/pricing', ['cost_uplift_percent' => 4, 'sell_markup_percent' => 20])
+            ->assertForbidden();
+        $this->assertSame('3', app(CatalogPricingSettings::class)->costUpliftPercent());
+    }
+
+    public function test_admin_can_set_and_clear_markup_and_uplift_overrides_per_game_and_nominal(): void
+    {
+        $this->login();
+        $product = $this->product();
+
+        $this->put('/admin/catalog/products/'.$product->id, [
+            'category_id' => $product->category_id, 'name' => $product->name, 'slug' => $product->slug,
+            'fulfillment_mode' => 'AUTO_PROVIDER', 'margin_percent' => 10, 'sort_order' => 0, 'is_active' => false,
+            'sell_markup_percent' => 12.5, 'cost_uplift_percent' => 3,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame(12.5, (float) $product->fresh()->sell_markup_percent);
+        $this->assertSame(3.0, (float) $product->fresh()->cost_uplift_percent);
+
+        $this->put('/admin/catalog/products/'.$product->id, [
+            'category_id' => $product->category_id, 'name' => $product->name, 'slug' => $product->slug,
+            'fulfillment_mode' => 'AUTO_PROVIDER', 'margin_percent' => 10, 'sort_order' => 0, 'is_active' => false,
+            'sell_markup_percent' => null, 'cost_uplift_percent' => null,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertNull($product->fresh()->sell_markup_percent);
+        $this->assertNull($product->fresh()->cost_uplift_percent);
+
+        $package = ProductPackage::create([
+            'product_id' => $product->id, 'code' => 'OVR10', 'name' => 'Override 10',
+            'sort_order' => 0, 'is_active' => false, 'pricing_mode' => 'PRODUCT_MARGIN',
+        ]);
+        $this->put('/admin/catalog/packages/'.$package->id, [
+            'code' => 'OVR10', 'name' => 'Override 10', 'sort_order' => 0, 'is_active' => false,
+            'pricing_mode' => 'PRODUCT_MARGIN', 'sell_markup_percent' => 8, 'cost_uplift_percent' => 1.5,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame(8.0, (float) $package->fresh()->sell_markup_percent);
+        $this->assertSame(1.5, (float) $package->fresh()->cost_uplift_percent);
+
+        $this->put('/admin/catalog/packages/'.$package->id, [
+            'code' => 'OVR10', 'name' => 'Override 10', 'sort_order' => 0, 'is_active' => false,
+            'pricing_mode' => 'PRODUCT_MARGIN', 'sell_markup_percent' => null, 'cost_uplift_percent' => null,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertNull($package->fresh()->sell_markup_percent);
+        $this->assertNull($package->fresh()->cost_uplift_percent);
+    }
+
+    public function test_catalog_index_exposes_pricing_controls_and_store_cost_columns(): void
+    {
+        $this->login();
+        $product = $this->product();
+        $product->update(['sell_markup_percent' => 11, 'cost_uplift_percent' => 2]);
+        $package = ProductPackage::create([
+            'product_id' => $product->id, 'code' => 'VIEW10', 'name' => 'View 10',
+            'sort_order' => 0, 'is_active' => false, 'pricing_mode' => 'PRODUCT_MARGIN',
+            'sell_markup_percent' => 9,
+        ]);
+        ProviderMapping::create([
+            'product_package_id' => $package->id,
+            'provider_id' => Provider::where('code', 'DIGIFLAZZ')->value('id'),
+            'external_sku' => 'view-sku', 'cost_idr' => 10000,
+            'seller_reference_price_idr' => 10000, 'store_cost_idr' => 10200,
+            'max_price_idr' => 10200, 'priority' => 0, 'is_active' => false,
+        ]);
+
+        $this->get('/admin/catalog')->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('pricingSettings.cost_uplift_percent', '2')
+            ->where('pricingSettings.sell_markup_percent', '10')
+            ->where('products', function ($products) use ($product, $package) {
+                $row = collect($products)->firstWhere('id', $product->id);
+                $nominal = collect($row['packages'])->firstWhere('id', $package->id);
+                $mapping = $nominal['mappings'][0];
+
+                return (float) $row['sell_markup_percent'] === 11.0
+                    && (float) $row['cost_uplift_percent'] === 2.0
+                    && (float) $nominal['sell_markup_percent'] === 9.0
+                    && array_key_exists('cost_uplift_percent', $nominal)
+                    && (int) $mapping['store_cost_idr'] === 10200
+                    && (int) $mapping['seller_reference_price_idr'] === 10000;
+            }));
     }
 }

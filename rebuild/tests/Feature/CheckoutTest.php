@@ -8,6 +8,7 @@ use App\Models\IntegrationCredential;
 use App\Models\NicknameGameCode;
 use App\Models\Product;
 use App\Models\User;
+use App\Services\CheckoutPricing;
 use App\Services\CheckoutService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
@@ -102,9 +103,59 @@ class CheckoutTest extends TestCase
         ];
     }
 
+    public function test_invalid_global_sell_markup_keeps_legacy_digiflazz_pricing(): void
+    {
+        $catalog = $this->catalog();
+        DB::table('product_packages')->where('id', $catalog['package_id'])->update(['sell_markup_percent' => null]);
+        DB::table('products')->where('id', $catalog['product']->id)->update(['sell_markup_percent' => null]);
+        DB::table('system_settings')->where('key', 'pricing.sell_markup_percent')->delete();
+
+        $quote = app(CheckoutPricing::class)->forPackage($catalog['package_id']);
+
+        $this->assertSame(11000, $quote['subtotal_idr']);
+        $this->assertSame(10100, $quote['max_price_idr']);
+    }
+
+    public function test_digiflazz_markup_uses_nominal_then_game_then_global_precedence(): void
+    {
+        $catalog = $this->catalog(['margin_percent' => 12, 'sell_markup_percent' => 12]);
+        DB::table('products')->where('id', $catalog['product']->id)->update(['sell_markup_percent' => 12]);
+        DB::table('system_settings')->updateOrInsert(
+            ['key' => 'pricing.sell_markup_percent'],
+            ['value' => json_encode(8), 'updated_at' => now(), 'created_at' => now()]
+        );
+        DB::table('provider_mappings')->where('id', $catalog['mapping_id'])
+            ->update(['cost_idr' => 12000, 'store_cost_idr' => 12000, 'max_price_idr' => 12000]);
+        DB::table('product_packages')->where('id', $catalog['package_id'])
+            ->update(['pricing_mode' => 'PERCENT', 'margin_percent' => 10]);
+        DB::table('product_packages')->where('id', $catalog['package_id'])
+            ->update(['sell_markup_percent' => 10]);
+        $this->seedCheckoutDigiflazzCatalog($catalog['package_id']);
+
+        $quote = app(CheckoutPricing::class)->forPackage($catalog['package_id']);
+        $this->assertSame(1200, $quote['margin_idr']);
+        $this->assertSame(13200, $quote['subtotal_idr']);
+
+        DB::table('product_packages')->where('id', $catalog['package_id'])->update([
+            'margin_percent' => null,
+            'pricing_mode' => 'PRODUCT_MARGIN',
+            'sell_markup_percent' => null,
+        ]);
+        $quote = app(CheckoutPricing::class)->forPackage($catalog['package_id']);
+        $this->assertSame(1440, $quote['margin_idr']);
+
+        DB::table('products')->where('id', $catalog['product']->id)->update(['sell_markup_percent' => null]);
+        DB::table('product_packages')->where('id', $catalog['package_id'])
+            ->update(['sell_markup_percent' => null]);
+        $quote = app(CheckoutPricing::class)->forPackage($catalog['package_id']);
+        $this->assertSame(960, $quote['margin_idr']);
+        $this->assertSame(12960, $quote['subtotal_idr']);
+    }
+
     public function test_server_calculates_price_and_idempotent_guest_retry_returns_same_order_and_access_code(): void
     {
         $catalog = $this->catalog();
+        $catalog['product']->update(['customer_no_template' => '{{user_id}}{{zone_id}}']);
         $payload = $this->guestPayload($catalog['package_id'], 'checkout-idempotency-0001');
 
         $first = $this->postJson('/checkout/orders', $payload)->assertCreated();
@@ -123,6 +174,7 @@ class CheckoutTest extends TestCase
         $this->assertSame(1000, (int) $order->margin_idr);
         $this->assertSame(11000, (int) $order->total_idr);
         $this->assertSame($catalog['mapping_id'], $snapshot['provider']['mapping_id']);
+        $this->assertSame('{{user_id}}{{zone_id}}', $snapshot['provider']['customer_no_template']);
         $this->assertSame('123456', $snapshot['customer_input']['user_id']);
         $this->assertSame('PENDING_PAYMENT', $order->status);
         $this->assertSame(1, DB::table('order_events')
@@ -147,6 +199,78 @@ class CheckoutTest extends TestCase
         $this->assertSame(10100, $snapshot['provider']['max_price_idr']);
         $this->assertSame(10000, (int) $order->cost_idr);
         $this->assertSame(11000, (int) $order->total_idr);
+    }
+
+    public function test_digiflazz_store_cost_uplift_and_markup_are_exact_and_snapshotted(): void
+    {
+        $catalog = $this->catalog();
+        $this->seedCheckoutDigiflazzCatalog($catalog['package_id']);
+        DB::table('provider_mappings')->where('id', $catalog['mapping_id'])
+            ->update(['cost_idr' => 12240, 'max_price_idr' => 12240]);
+        DB::table('product_packages')->where('id', $catalog['package_id'])
+            ->update(['pricing_mode' => 'PERCENT', 'margin_percent' => 10, 'sell_markup_percent' => 10]);
+        DB::table('system_settings')->updateOrInsert(
+            ['key' => 'pricing.cost_uplift_percent'],
+            ['value' => json_encode(2), 'updated_at' => now(), 'created_at' => now()]
+        );
+        $key = 'checkout-uplift-markup-snapshot';
+
+        app(CheckoutService::class)->create($this->guestPayload($catalog['package_id'], $key), null);
+
+        $order = DB::table('orders')->where('idempotency_key', $key)->firstOrFail();
+        $snapshot = json_decode($order->snapshot, true, 512, JSON_THROW_ON_ERROR);
+        $this->assertSame(12240, (int) $order->cost_idr);
+        $this->assertSame(13464, (int) $order->total_idr);
+        $this->assertSame(12240, $snapshot['provider']['max_price_idr']);
+
+        DB::table('provider_mappings')->where('id', $catalog['mapping_id'])
+            ->update(['cost_idr' => 15000]);
+        $after = DB::table('orders')->where('id', $order->id)->firstOrFail();
+        $this->assertSame($snapshot, json_decode($after->snapshot, true, 512, JSON_THROW_ON_ERROR));
+    }
+
+    public function test_checkout_uses_store_cost_instead_of_provider_reference_price(): void
+    {
+        $catalog = $this->catalog();
+        DB::table('provider_mappings')->where('id', $catalog['mapping_id'])->update([
+            'cost_idr' => 10000,
+            'store_cost_idr' => 10200,
+            'seller_reference_price_idr' => 10000,
+        ]);
+        DB::table('product_packages')->where('id', $catalog['package_id'])
+            ->update(['sell_markup_percent' => 10]);
+        $this->seedCheckoutDigiflazzCatalog($catalog['package_id']);
+
+        $quote = app(CheckoutPricing::class)->forPackage($catalog['package_id']);
+
+        $this->assertSame(10200, $quote['cost_idr']);
+        $this->assertSame(11220, $quote['subtotal_idr']);
+        $this->assertSame(10200, $quote['max_price_idr']);
+    }
+
+    public function test_catalog_pricing_edits_do_not_change_existing_order_snapshots(): void
+    {
+        $catalog = $this->catalog();
+        $this->seedCheckoutDigiflazzCatalog($catalog['package_id']);
+        $key = 'checkout-catalog-edit-snapshot';
+
+        app(CheckoutService::class)->create($this->guestPayload($catalog['package_id'], $key), null);
+
+        $order = DB::table('orders')->where('idempotency_key', $key)->firstOrFail();
+        $snapshot = json_decode($order->snapshot, true, 512, JSON_THROW_ON_ERROR);
+
+        DB::table('provider_mappings')->where('id', $catalog['mapping_id'])
+            ->update(['cost_idr' => 15000, 'max_price_idr' => 15000]);
+        DB::table('product_packages')->where('id', $catalog['package_id'])
+            ->update(['sell_markup_percent' => 20]);
+
+        $unchanged = DB::table('orders')->where('id', $order->id)->firstOrFail();
+        $snapshotAfterEdit = json_decode($unchanged->snapshot, true, 512, JSON_THROW_ON_ERROR);
+
+        $this->assertSame((int) $order->cost_idr, (int) $unchanged->cost_idr);
+        $this->assertSame((int) $order->total_idr, (int) $unchanged->total_idr);
+        $this->assertSame($snapshot['provider']['max_price_idr'], $snapshotAfterEdit['provider']['max_price_idr']);
+        $this->assertSame($snapshot, $snapshotAfterEdit);
     }
 
     public function test_digiflazz_max_price_uses_highest_active_backup_plus_one_percent_even_above_sell_price(): void

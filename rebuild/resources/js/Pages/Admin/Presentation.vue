@@ -42,7 +42,7 @@ const restoreTypography = () => {
 <AdminShell>
  <div class="lf-admin-page-heading"><div><h1>Teks & Tampilan Customer</h1><p>Kelola tulisan, font, panel, input, dan bagian homepage. Mobile dan desktop memiliki pengaturan terpisah.</p></div><Link :href="base + '/content'" class="lf-admin-button">Banner & Konten</Link></div>
  <nav class="lf-admin-tabs" aria-label="Pengaturan customer">
-  <Button v-for="[key, label] in [['text','Teks halaman'],['typography','Font & Panel'],['sections','Bagian Homepage'],['theme','Warna Website']]" :key="key" type="button" :class="{active: tab === key}" @click="tab = key">{{ label }}</Button>
+  <Button v-for="[key, label] in [['text','Teks halaman'],['typography','Font & Panel'],['sections','Bagian Homepage'],['theme','Warna Website']]" :key="key" type="button" :aria-current="tab === key ? 'page' : undefined" :class="{active: tab === key}" @click="tab = key">{{ label }}</Button>
  </nav>
  <form @submit.prevent="save" class="lf-admin-editor">
   <p v-if="$page.props.status" role="status" class="lf-admin-success">{{ $page.props.status }}</p>

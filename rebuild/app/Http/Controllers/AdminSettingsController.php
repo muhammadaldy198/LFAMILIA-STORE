@@ -35,38 +35,12 @@ class AdminSettingsController
             ->pluck('value', 'key')
             ->map(fn ($value) => json_decode((string) $value, true));
 
-        $tiers = DB::table('membership_tiers')->orderBy('rank')->get()
-            ->map(function (object $tier): array {
-                $requirements = $this->jsonArray($tier->requirements);
-                $benefits = $this->jsonArray($tier->benefits);
-
-                return [
-                    'code' => (string) $tier->code,
-                    'rank' => (int) $tier->rank,
-                    'is_active' => (bool) $tier->is_active,
-                    'minimum_spend_idr' => max(0, (int) ($requirements['minimum_spend_idr'] ?? 0)),
-                    'discount_percent' => round(
-                        max(0, min(10000, (int) ($benefits['discount_bps'] ?? 0))) / 100,
-                        2
-                    ),
-                    'benefit_notes' => (string) ($benefits['benefit_notes'] ?? ''),
-                    'has_legacy_requirements' => count(array_diff_key($requirements, ['minimum_spend_idr' => true])) > 0,
-                    'has_legacy_benefits' => count(array_diff_key($benefits, [
-                        'discount_bps' => true,
-                        'benefit_notes' => true,
-                    ])) > 0,
-                ];
-            })->values();
-
         return Inertia::render('Admin/Settings', [
             'settings' => collect(self::STORE_KEYS)->mapWithKeys(fn (string $key): array => [
                 $key => $stored[$key] ?? '',
             ]),
-            'tiers' => $tiers,
             'canExport' => $request->user('admin')->role === 'SUPER_ADMIN',
             'summary' => [
-                'active_tiers' => $tiers->where('is_active', true)->count(),
-                'total_tiers' => $tiers->count(),
                 'contacts_configured' => collect([
                     $stored['store.support_whatsapp'] ?? '',
                     $stored['store.email'] ?? '',

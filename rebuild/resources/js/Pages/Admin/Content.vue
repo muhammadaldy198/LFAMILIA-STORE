@@ -21,8 +21,20 @@ const props = defineProps({
     reviews: Array,
     settings: Object,
 });
+const contentArea = ref('storefront'); // 'storefront' | 'legal' | 'news'
 const contentTab = ref('banners');
-const contentTabs = [['banners','Banner'],['popup','Pop-up'],['assets','Logo & Gambar'],['support','Bantuan & Footer'],['news','Berita'],['reviews','Ulasan'],['faq','Pertanyaan Umum'],['legal','Kebijakan']];
+
+const areas = [
+    { key: 'storefront', label: 'Tampilan Toko', tabs: [['banners','Banner Utama'],['popup','Pop-up Pengumuman'],['assets','Logo & Gambar Cadangan'],['support','Teks Footer & Bantuan']] },
+    { key: 'legal', label: 'Bantuan & Kebijakan', tabs: [['faq','Pertanyaan Umum (FAQ)'],['legal','Kebijakan Toko']] },
+    { key: 'news', label: 'Berita & Ulasan', tabs: [['news','Berita'],['reviews','Ulasan Pelanggan']] },
+];
+
+const setArea = (areaKey) => {
+    contentArea.value = areaKey;
+    const found = areas.find(a => a.key === areaKey);
+    if (found && found.tabs.length) contentTab.value = found.tabs[0][0];
+};
 const page = usePage();
 const base = page.props.adminPanel?.base_path || '/admin';
 
@@ -158,12 +170,43 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
     <Head title="Banner & Konten" />
     <AdminShell>
         <div class="space-y-6">
-            <div>
-                <h1 class="text-3xl font-semibold">Banner & Konten</h1>
-                <p class="mt-2 text-sm text-slate-500">Kelola konten halaman pelanggan tanpa mengubah kode aplikasi.</p>
+            <header class="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-end sm:justify-between">
+                <div class="min-w-0">
+                    <h1 class="text-3xl font-semibold tracking-tight">Banner & Konten</h1>
+                    <p class="mt-2 text-sm text-slate-500">Kelola konten halaman pelanggan tanpa mengubah kode aplikasi.</p>
+                </div>
+            </header>
+
+            <!-- Navigasi 3 Area Konten -->
+            <div class="flex flex-wrap items-center gap-2 border-b border-border pb-3">
+                <Button
+                    v-for="area in areas"
+                    :key="area.key"
+                    type="button"
+                    :variant="contentArea === area.key ? 'default' : 'outline'"
+                    size="sm"
+                    @click="setArea(area.key)"
+                >
+                    {{ area.label }}
+                </Button>
+                <Button variant="ghost" size="sm" as-child class="ml-auto text-xs">
+                    <Link :href="base + '/content/presentation'">Tema & Presentasi Toko →</Link>
+                </Button>
             </div>
 
-            <nav class="lf-admin-tabs" aria-label="Konten toko"><Button v-for="[key,label] in contentTabs" :key="key" type="button" :class="{active:contentTab===key}" @click="contentTab=key">{{label}}</Button><Link :href="base + '/content/presentation'">Teks & Tampilan</Link></nav>
+            <!-- Sub-tab di dalam area yang dipilih -->
+            <nav class="lf-admin-tabs" aria-label="Sub bagian konten">
+                <Button
+                    v-for="[key, label] in (areas.find(a => a.key === contentArea)?.tabs || [])"
+                    :key="key"
+                    type="button"
+                    :aria-current="contentTab === key ? 'page' : undefined"
+                    :class="{ active: contentTab === key }"
+                    @click="contentTab = key"
+                >
+                    {{ label }}
+                </Button>
+            </nav>
             <section v-show="contentTab === 'banners'" class="rounded-xl border border-slate-200 bg-white p-5">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div>
@@ -173,10 +216,10 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                 </div>
 
                 <form class="mt-4 grid gap-3 md:grid-cols-3" @submit.prevent="bannerForm.post(base + '/content/banners', { preserveScroll: true, onSuccess: () => bannerForm.reset() })">
-                    <label class="lf-admin-field "><span>Judul</span><Input v-model="bannerForm.title" required placeholder="Nama internal / alt banner" class="rounded border border-slate-200 p-2 text-sm" /><span v-if="bannerForm.errors.title" role="alert" class="text-sm font-normal text-destructive">{{ bannerForm.errors.title }}</span></label>
-                    <label class="lf-admin-field "><span>Tautan tujuan</span><Input v-model="bannerForm.cta_href" placeholder="Link klik, contoh /promo" class="rounded border border-slate-200 p-2 text-sm" /><span v-if="bannerForm.errors.cta_href" role="alert" class="text-sm font-normal text-destructive">{{ bannerForm.errors.cta_href }}</span></label>
-                    <label class="lf-admin-field "><span>Urutan</span><Input v-model.number="bannerForm.sort_order" type="number" min="0" placeholder="Urutan" class="rounded border border-slate-200 p-2 text-sm" /><span v-if="bannerForm.errors.sort_order" role="alert" class="text-sm font-normal text-destructive">{{ bannerForm.errors.sort_order }}</span></label>
-                    <label class="lf-admin-field md:col-span-3"><span>Subjudul</span><Input v-model="bannerForm.subtitle" placeholder="Catatan internal (opsional)" class="rounded border border-slate-200 p-2 text-sm" /><span v-if="bannerForm.errors.subtitle" role="alert" class="text-sm font-normal text-destructive">{{ bannerForm.errors.subtitle }}</span></label>
+                    <label class="lf-admin-field "><span>Nama banner (juga menjadi teks alternatif gambar)</span><Input v-model="bannerForm.title" required placeholder="Contoh: Promo akhir pekan" class="rounded border border-slate-200 p-2 text-sm" /><span v-if="bannerForm.errors.title" role="alert" class="text-sm font-normal text-destructive">{{ bannerForm.errors.title }}</span></label>
+                    <label class="lf-admin-field "><span>Alamat tujuan saat banner ditekan</span><Input v-model="bannerForm.cta_href" placeholder="Contoh: /promo atau https://..." class="rounded border border-slate-200 p-2 text-sm" /><span v-if="bannerForm.errors.cta_href" role="alert" class="text-sm font-normal text-destructive">{{ bannerForm.errors.cta_href }}</span></label>
+                    <label class="lf-admin-field "><span>Urutan tampil</span><Input v-model.number="bannerForm.sort_order" type="number" min="0" placeholder="Urutan" class="rounded border border-slate-200 p-2 text-sm" /><span class="text-xs text-slate-500">Angka lebih kecil tampil lebih dulu.</span><span v-if="bannerForm.errors.sort_order" role="alert" class="text-sm font-normal text-destructive">{{ bannerForm.errors.sort_order }}</span></label>
+                    <label class="lf-admin-field md:col-span-3"><span>Teks kecil pada banner (opsional)</span><Input v-model="bannerForm.subtitle" placeholder="Teks yang tampil di banner" class="rounded border border-slate-200 p-2 text-sm" /><span v-if="bannerForm.errors.subtitle" role="alert" class="text-sm font-normal text-destructive">{{ bannerForm.errors.subtitle }}</span></label>
                     <label class="flex items-center gap-2 text-xs"><AdminSwitch v-model="bannerForm.show_desktop" /> Desktop</label>
                     <label class="flex items-center gap-2 text-xs"><AdminSwitch v-model="bannerForm.show_mobile" /> Mobile</label>
                     <label class="flex items-center gap-2 text-xs"><AdminSwitch v-model="bannerForm.is_active" /> Aktif</label>
@@ -186,10 +229,10 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                 <div class="mt-5 space-y-4">
                     <article v-for="item in banners" :key="item.id" class="rounded-lg border border-slate-200 p-4">
                         <div class="grid gap-2 md:grid-cols-3">
-                            <label class="lf-admin-field "><span>Judul</span><Input v-model="item.title" class="rounded border border-slate-200 p-2 text-sm" placeholder="Nama banner" /></label>
-                            <label class="lf-admin-field "><span>Tautan tujuan</span><Input v-model="item.cta_href" class="rounded border border-slate-200 p-2 text-sm" placeholder="Link klik" /></label>
-                            <label class="lf-admin-field "><span>Urutan</span><Input v-model.number="item.sort_order" type="number" min="0" class="rounded border border-slate-200 p-2 text-sm" placeholder="Urutan" /></label>
-                            <label class="lf-admin-field md:col-span-3"><span>Subjudul</span><Input v-model="item.subtitle" class="rounded border border-slate-200 p-2 text-sm" placeholder="Catatan internal" /></label>
+                            <label class="lf-admin-field "><span>Nama banner (juga menjadi teks alternatif gambar)</span><Input v-model="item.title" class="rounded border border-slate-200 p-2 text-sm" placeholder="Nama banner" /></label>
+                            <label class="lf-admin-field "><span>Alamat tujuan saat banner ditekan</span><Input v-model="item.cta_href" class="rounded border border-slate-200 p-2 text-sm" placeholder="Contoh: /promo atau https://..." /></label>
+                            <label class="lf-admin-field "><span>Urutan tampil</span><Input v-model.number="item.sort_order" type="number" min="0" class="rounded border border-slate-200 p-2 text-sm" placeholder="Urutan" /><span class="text-xs text-slate-500">Angka lebih kecil tampil lebih dulu.</span></label>
+                            <label class="lf-admin-field md:col-span-3"><span>Teks kecil pada banner</span><Input v-model="item.subtitle" class="rounded border border-slate-200 p-2 text-sm" placeholder="Teks yang tampil pada banner" /></label>
                         </div>
                         <div class="mt-3 flex flex-wrap gap-4">
                             <label class="flex items-center gap-2 text-xs"><AdminSwitch v-model="item.show_desktop" /> Desktop</label>
@@ -290,11 +333,11 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                 <h2 class="text-lg font-bold">Berita</h2>
                 <form class="mt-4 grid gap-3 md:grid-cols-3" @submit.prevent="newsForm.post(base + '/content/news', { preserveScroll: true, onSuccess: () => newsForm.reset() })">
                     <label class="lf-admin-field "><span>Judul</span><Input v-model="newsForm.title" required placeholder="Judul berita" class="rounded border border-slate-200 p-2 text-sm" /><span v-if="newsForm.errors.title" role="alert" class="text-sm font-normal text-destructive">{{ newsForm.errors.title }}</span></label>
-                    <label class="lf-admin-field "><span>Alamat publik</span><Input v-model="newsForm.slug" placeholder="Slug (opsional)" class="rounded border border-slate-200 p-2 text-sm" /><span v-if="newsForm.errors.slug" role="alert" class="text-sm font-normal text-destructive">{{ newsForm.errors.slug }}</span></label>
+                    <details><summary class="cursor-pointer text-sm">Ubah tautan berita (lanjutan)</summary><label class="lf-admin-field mt-2"><span>Bagian alamat halaman</span><Input v-model="newsForm.slug" placeholder="Dibuat otomatis dari judul" class="rounded border border-slate-200 p-2 text-sm" /><span v-if="newsForm.errors.slug" role="alert" class="text-sm font-normal text-destructive">{{ newsForm.errors.slug }}</span></label></details>
                     <label class="lf-admin-field "><span>Sumber berita</span><Input v-model="newsForm.source_label" placeholder="Sumber/label" class="rounded border border-slate-200 p-2 text-sm" /><span v-if="newsForm.errors.source_label" role="alert" class="text-sm font-normal text-destructive">{{ newsForm.errors.source_label }}</span></label>
                     <label class="lf-admin-field md:col-span-3"><span>Ringkasan</span><Textarea v-model="newsForm.summary" rows="2" placeholder="Ringkasan" class="rounded border border-slate-200 p-2 text-sm"></Textarea><span v-if="newsForm.errors.summary" role="alert" class="text-sm font-normal text-destructive">{{ newsForm.errors.summary }}</span></label>
                     <label class="lf-admin-field md:col-span-3"><span>Isi</span><Textarea v-model="newsForm.body" rows="5" placeholder="Isi berita" class="rounded border border-slate-200 p-2 text-sm"></Textarea><span v-if="newsForm.errors.body" role="alert" class="text-sm font-normal text-destructive">{{ newsForm.errors.body }}</span></label>
-                    <label class="lf-admin-field "><span>Urutan</span><Input v-model.number="newsForm.sort_order" type="number" min="0" placeholder="Urutan" class="rounded border border-slate-200 p-2 text-sm" /><span v-if="newsForm.errors.sort_order" role="alert" class="text-sm font-normal text-destructive">{{ newsForm.errors.sort_order }}</span></label>
+                    <label class="lf-admin-field "><span>Urutan tampil</span><Input v-model.number="newsForm.sort_order" type="number" min="0" placeholder="Urutan" class="rounded border border-slate-200 p-2 text-sm" /><span v-if="newsForm.errors.sort_order" role="alert" class="text-sm font-normal text-destructive">{{ newsForm.errors.sort_order }}</span></label>
                     <label class="lf-admin-field "><span>Tanggal publikasi</span><Input v-model="newsForm.published_at" type="datetime-local" class="rounded border border-slate-200 p-2 text-sm" /><span v-if="newsForm.errors.published_at" role="alert" class="text-sm font-normal text-destructive">{{ newsForm.errors.published_at }}</span></label>
                     <label class="flex items-center gap-2 text-xs"><AdminSwitch v-model="newsForm.is_active" /> Aktif</label>
                     <div class="md:col-span-3"><Button class="rounded bg-[#1769e8] px-4 py-2 text-xs font-bold text-white">Tambah berita</Button></div>
@@ -304,11 +347,11 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                     <article v-for="item in news" :key="item.id" class="rounded-lg border border-slate-200 p-4">
                         <div class="grid gap-2 md:grid-cols-3">
                             <label class="lf-admin-field "><span>Judul</span><Input v-model="item.title" class="rounded border border-slate-200 p-2 text-sm" /></label>
-                            <label class="lf-admin-field "><span>Alamat publik</span><Input v-model="item.slug" class="rounded border border-slate-200 p-2 text-sm" /></label>
+                            <details><summary class="cursor-pointer text-sm">Ubah tautan berita (lanjutan)</summary><label class="lf-admin-field mt-2"><span>Bagian alamat halaman</span><Input v-model="item.slug" class="rounded border border-slate-200 p-2 text-sm" /></label></details>
                             <label class="lf-admin-field "><span>Sumber berita</span><Input v-model="item.source_label" class="rounded border border-slate-200 p-2 text-sm" /></label>
                             <label class="lf-admin-field md:col-span-3"><span>Ringkasan</span><Textarea v-model="item.summary" rows="2" class="rounded border border-slate-200 p-2 text-sm"></Textarea></label>
                             <label class="lf-admin-field md:col-span-3"><span>Isi</span><Textarea v-model="item.body" rows="4" class="rounded border border-slate-200 p-2 text-sm"></Textarea></label>
-                            <label class="lf-admin-field "><span>Urutan</span><Input v-model.number="item.sort_order" type="number" min="0" class="rounded border border-slate-200 p-2 text-sm" /></label>
+                            <label class="lf-admin-field "><span>Urutan tampil</span><Input v-model.number="item.sort_order" type="number" min="0" class="rounded border border-slate-200 p-2 text-sm" /></label>
                             <label class="lf-admin-field "><span>Tanggal publikasi</span><Input v-model="item.published_at" type="datetime-local" class="rounded border border-slate-200 p-2 text-sm" /></label>
                             <label class="flex items-center gap-2 text-xs"><AdminSwitch v-model="item.is_active" /> Aktif</label>
                         </div>
@@ -321,7 +364,7 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
 
             <section v-show="contentTab === 'reviews'" class="rounded-xl border border-slate-200 bg-white p-5">
                 <div class="flex items-center justify-between gap-3"><div><h2 class="text-lg font-bold">Ulasan Pelanggan</h2><p class="mt-1 text-xs text-slate-500">Moderasi ulasan terverifikasi dari order sukses. Isi ulasan tidak diedit oleh Admin.</p></div><span class="rounded bg-slate-100 px-2 py-1 text-xs font-bold">{{reviews.length}} ulasan</span></div>
-                <div class="mt-4 overflow-x-auto rounded-lg border border-slate-200">
+                <div class="mt-4 overflow-x-auto rounded-lg border border-slate-200" role="region" aria-label="Daftar ulasan pelanggan" tabindex="0">
                     <AdminResponsiveTable :mobile-columns="[0,1,2,4,5]" class="w-full min-w-[780px] text-left text-xs">
                         <TableHeader class="bg-slate-50 text-slate-500"><TableRow><TableHead class="p-3">Pelanggan</TableHead><TableHead class="p-3">Produk</TableHead><TableHead class="p-3">Rating</TableHead><TableHead class="p-3">Ulasan</TableHead><TableHead class="p-3">Status</TableHead><TableHead class="p-3">Aksi</TableHead></TableRow></TableHeader>
                         <TableBody>
@@ -348,7 +391,7 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                 <h2 class="text-lg font-bold">Pertanyaan umum</h2>
                 <form class="mt-4 grid gap-3 md:grid-cols-[1fr_120px_auto]" @submit.prevent="faqForm.post(base + '/content/faqs', { preserveScroll: true, onSuccess: () => faqForm.reset() })">
                     <label class="lf-admin-field "><span>Pertanyaan</span><Input v-model="faqForm.question" required placeholder="Pertanyaan" class="rounded border border-slate-200 p-2 text-sm" /><span v-if="faqForm.errors.question" role="alert" class="text-sm font-normal text-destructive">{{ faqForm.errors.question }}</span></label>
-                    <label class="lf-admin-field "><span>Urutan</span><Input v-model.number="faqForm.sort_order" type="number" min="0" class="rounded border border-slate-200 p-2 text-sm" /><span v-if="faqForm.errors.sort_order" role="alert" class="text-sm font-normal text-destructive">{{ faqForm.errors.sort_order }}</span></label>
+                    <label class="lf-admin-field "><span>Urutan tampil</span><Input v-model.number="faqForm.sort_order" type="number" min="0" class="rounded border border-slate-200 p-2 text-sm" /><span v-if="faqForm.errors.sort_order" role="alert" class="text-sm font-normal text-destructive">{{ faqForm.errors.sort_order }}</span></label>
                     <label class="flex items-center gap-2 text-xs"><AdminSwitch v-model="faqForm.is_active" /> Aktif</label>
                     <label class="lf-admin-field md:col-span-3"><span>Jawaban</span><Textarea v-model="faqForm.answer" required rows="3" placeholder="Jawaban" class="rounded border border-slate-200 p-2 text-sm"></Textarea><span v-if="faqForm.errors.answer" role="alert" class="text-sm font-normal text-destructive">{{ faqForm.errors.answer }}</span></label>
                     <div class="md:col-span-3"><Button class="rounded bg-[#1769e8] px-4 py-2 text-xs font-bold text-white">Tambah FAQ</Button></div>

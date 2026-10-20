@@ -14,8 +14,8 @@ Reviewing a PR/diff, auditing code, security review, QA feedback. Use for any "c
 ## Hard rules
 
 - Verify with evidence: read the actual code, not summaries. A claim without a file + line reference is not a finding.
-- Report ALL findings, not only critical ones. Minor bugs count.
-- Feedback must be detailed and programmer-level — explain like a programmer to a programmer. No vague comments ("perbaiki ini", "kurang bagus").
+- Report all verified defects and risks, not only critical ones. A historical decision, archived document, or disagreement with an explicit current owner-approved policy is not a finding. Before reporting a policy conflict, check the active rule in `../AGENTS.md` and current product docs; stale history must not override it.
+- Feedback must be detailed and programmer-level — explain like a programmer to a programmer. No vague comments ("perbaiki ini", "kurang bagus"). Tie every finding to behavior in the current diff/head; do not repeat already-fixed or stale-head comments as new findings.
 - Checklist for every review: secrets committed? Dummy text? Dead code? Transaction safety (locks, idempotency)? N+1 queries? Pint style? Tests present and passing? Scope creep / unrelated changes? Docs updated if behavior changed?
 - Never approve with failing CI. Never rubber-stamp.
 - Never claim a PR is merged when it is only open.

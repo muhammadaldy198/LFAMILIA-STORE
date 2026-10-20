@@ -1,6 +1,5 @@
 <script setup>
 import AdminSwitch from '../../Components/AdminSwitch.vue';
-import AdminResponsiveTable from '../../Components/AdminResponsiveTable.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { reactive, ref, watch } from 'vue';
 import AdminShell from '../../Components/AdminShell.vue';
@@ -8,7 +7,7 @@ import { Badge } from '../../Components/ui/badge';
 import { Button } from '../../Components/ui/button';
 import { Card } from '../../Components/ui/card';
 import { Input } from '../../Components/ui/input';
-import { TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../Components/ui/table';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../Components/ui/table';
 import { byOrder, displayPosition } from '../../lib/ordering.js';
 
 const props = defineProps({
@@ -94,14 +93,14 @@ function saveProvider(row) {
 <Head title="Provider" />
 <AdminShell>
     <div class="space-y-5">
-        <header class="flex flex-wrap items-start justify-between gap-3">
-            <div>
-                <h1 class="text-2xl font-semibold">Provider</h1>
+        <header class="flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between">
+            <div class="min-w-0">
+                <h1 class="text-2xl font-semibold tracking-tight">Penyedia layanan</h1>
                 <p class="mt-1 max-w-3xl text-sm text-muted-foreground">
-                    Aktifkan penyedia layanan, atur nama dan urutannya, lalu pantau nominal yang terhubung. Kredensial API tetap dikelola di menu Integrasi.
+                    Aktifkan penyedia layanan, atur nama dan urutannya, lalu pantau nominal yang terhubung. Data akses penyedia dikelola di menu Integrasi.
                 </p>
             </div>
-            <Button variant="outline" @click="router.reload({ preserveScroll: true })">Muat ulang</Button>
+            <Button class="w-full sm:w-auto" variant="outline" @click="router.reload({ preserveScroll: true })">Muat ulang</Button>
         </header>
 
         <div class="lf-admin-summary ">
@@ -111,19 +110,19 @@ function saveProvider(row) {
                 <p class="mt-1 text-xs text-muted-foreground">dari {{ summary.provider_total || 0 }}</p>
             </Card>
             <Card class="p-4">
-                <p class="text-xs text-muted-foreground">Mapping aktif</p>
+                <p class="text-xs text-muted-foreground">Sumber harga aktif</p>
                 <p class="mt-2 text-2xl font-semibold">{{ Number(summary.mapping_active || 0).toLocaleString('id-ID') }}</p>
                 <p class="mt-1 text-xs text-muted-foreground">siap dipilih sistem</p>
             </Card>
             <Card class="p-4">
-                <p class="text-xs text-muted-foreground">Total mapping</p>
+                <p class="text-xs text-muted-foreground">Semua nominal terhubung</p>
                 <p class="mt-2 text-2xl font-semibold">{{ Number(summary.mapping_total || 0).toLocaleString('id-ID') }}</p>
-                <p class="mt-1 text-xs text-muted-foreground">seluruh nominal</p>
+                <p class="mt-1 text-xs text-muted-foreground">terhubung ke penyedia</p>
             </Card>
             <Card class="p-4">
                 <p class="text-xs text-muted-foreground">Perlu diperiksa</p>
                 <p class="mt-2 text-2xl font-semibold">{{ Number(summary.needs_reconciliation || 0).toLocaleString('id-ID') }}</p>
-                <p class="mt-1 text-xs text-muted-foreground">pending / belum pasti</p>
+                <p class="mt-1 text-xs text-muted-foreground">status transaksi belum jelas</p>
             </Card>
             <Card class="p-4">
                 <p class="text-xs text-muted-foreground">Boleh dialihkan</p>
@@ -133,92 +132,90 @@ function saveProvider(row) {
             <Card class="p-4">
                 <p class="text-xs text-muted-foreground">Aturan pengalihan</p>
                 <p class="mt-2 font-semibold">Aman saja</p>
-                <p class="mt-1 text-xs text-muted-foreground">pending tidak pernah dialihkan otomatis</p>
+                <p class="mt-1 text-xs text-muted-foreground">pesanan yang masih diproses atau belum jelas tidak akan dialihkan otomatis.</p>
             </Card>
         </div>
 
-        <section>
-            <div class="mb-3 flex flex-wrap items-end justify-between gap-3">
+        <Card class="overflow-hidden">
+            <div class="border-b p-4 flex flex-wrap items-center justify-between gap-3">
                 <div>
-                    <h2 class="text-lg font-semibold">Daftar provider</h2>
-                    <p class="mt-1 text-sm text-muted-foreground">Nama tampilan, keterangan, urutan, dan status dapat diubah. Kode sistem tetap dikunci agar proses transaksi tidak rusak.</p>
+                    <h2 class="text-base font-semibold">Daftar Provider</h2>
+                    <p class="mt-0.5 text-xs text-muted-foreground">Konfigurasi nama tampilan, urutan pemrosesan, dan status aktif provider.</p>
                 </div>
                 <Button variant="outline" size="sm" as-child><Link href="/admin/integrations">Buka Integrasi</Link></Button>
             </div>
 
-            <div class="grid gap-3 xl:grid-cols-3">
-                <Card v-for="row in rows" :key="row.id" class="p-4">
-                    <div class="flex items-start justify-between gap-3">
-                        <div class="min-w-0">
-                            <div class="flex flex-wrap items-center gap-2">
-                                <strong class="truncate">{{ row.display_name }}</strong><Badge variant="outline">Posisi {{ providerPosition(row) }}</Badge>
-                                <Badge :variant="healthVariant(row.health?.status)">{{ healthLabel(row.health?.status) }}</Badge>
-                            </div>
-                            <p class="mt-1 text-xs text-muted-foreground">
-                                {{ modeLabel(row.fulfillment_mode) }} · Kode sistem {{ row.code }}
-                            </p>
-                        </div>
-                        <label class="flex shrink-0 items-center gap-2 text-sm">
-                            <AdminSwitch v-model="row.is_active" />
-                            Aktif
-                        </label>
-                    </div>
-
-                    <div class="mt-4 grid gap-3">
-                        <label class="space-y-1">
-                            <span class="text-sm font-medium">Nama tampilan</span>
-                            <Input v-model="row.display_name" maxlength="80" />
-                        </label>
-                        <label class="space-y-1">
-                            <span class="text-sm font-medium">Keterangan</span>
-                            <textarea
-                                v-model="row.description"
-                                maxlength="500"
-                                rows="3"
-                                class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                            />
-                        </label>
-                        <details><summary class="cursor-pointer text-sm font-medium">Skor urutan teknis (lanjutan)</summary><label class="mt-2 block space-y-1 text-sm"><span>Skor internal</span><Input v-model.number="row.sort_order" type="number" min="0" max="9999" /></label><p class="mt-1 text-xs text-muted-foreground">Yang terlihat di daftar adalah Posisi 1, 2, 3; skor teknis 0 atau 10 tidak berarti error.</p></details>
-                    </div>
-
-                    <div class="mt-4 grid grid-cols-2 gap-3 rounded-md border p-3 text-sm">
-                        <div>
-                            <p class="text-xs text-muted-foreground">Mapping</p>
-                            <p class="mt-1 font-medium">{{ row.active_mapping_count }}/{{ row.mapping_count }} aktif</p>
-                        </div>
-                        <div>
-                            <p class="text-xs text-muted-foreground">Berhasil 24 jam</p>
-                            <p class="mt-1 font-medium">{{ Number(row.success_24h || 0).toLocaleString('id-ID') }}</p>
-                        </div>
-                        <div>
-                            <p class="text-xs text-muted-foreground">Perlu diperiksa</p>
-                            <p class="mt-1 font-medium">{{ Number(row.attention_count || 0).toLocaleString('id-ID') }}</p>
-                        </div>
-                        <div>
-                            <p class="text-xs text-muted-foreground">Proses terakhir</p>
-                            <p class="mt-1 text-xs font-medium">{{ date(row.last_attempt_at) }}</p>
-                        </div>
-                    </div>
-
-                    <p class="mt-3 text-xs text-muted-foreground">{{ row.health?.message }}</p>
-                    <div class="mt-4 flex justify-end">
-                        <Button size="sm" :disabled="saving === row.id" @click="saveProvider(row)">
-                            {{ saving === row.id ? 'Menyimpan…' : 'Simpan provider' }}
-                        </Button>
-                    </div>
-                </Card>
+            <div class="overflow-x-auto overscroll-x-contain" role="region" aria-label="Daftar provider" tabindex="0">
+                <Table class="min-w-[950px] table-fixed">
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead class="w-[24%]">Provider / Keterangan</TableHead>
+                            <TableHead class="w-[12%]">Layanan</TableHead>
+                            <TableHead class="w-[16%]">Koneksi & Status</TableHead>
+                            <TableHead class="w-[14%]">Denominasi</TableHead>
+                            <TableHead class="w-[12%]">Performa 24j</TableHead>
+                            <TableHead class="w-[10%]">Urutan</TableHead>
+                            <TableHead class="w-[12%] text-right">Aksi</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        <TableRow v-for="row in rows" :key="row.id">
+                            <TableCell class="align-top">
+                                <div class="space-y-1">
+                                    <Input v-model="row.display_name" maxlength="80" class="h-8 text-xs font-semibold" placeholder="Nama provider" />
+                                    <input
+                                        v-model="row.description"
+                                        maxlength="500"
+                                        placeholder="Keterangan opsional"
+                                        class="h-7 w-full rounded border border-input bg-background/50 px-2 text-[11px] text-muted-foreground placeholder:text-muted-foreground/50"
+                                    />
+                                </div>
+                            </TableCell>
+                            <TableCell class="align-top">
+                                <Badge variant="secondary" class="text-[10px]">{{ modeLabel(row.fulfillment_mode) }}</Badge>
+                                <p class="mt-1 text-[10px] text-muted-foreground">Posisi {{ providerPosition(row) }}</p>
+                            </TableCell>
+                            <TableCell class="align-top">
+                                <Badge :variant="healthVariant(row.health?.status)" class="text-[10px]">{{ healthLabel(row.health?.status) }}</Badge>
+                                <p v-if="row.health?.message" class="mt-1 text-[10px] text-muted-foreground truncate" :title="row.health.message">{{ row.health.message }}</p>
+                            </TableCell>
+                            <TableCell class="align-top text-xs">
+                                <strong>{{ row.active_mapping_count }}</strong> <span class="text-muted-foreground">/ {{ row.mapping_count }} aktif</span>
+                                <p class="text-[10px] text-muted-foreground mt-0.5">Terakhir: {{ date(row.last_attempt_at) }}</p>
+                            </TableCell>
+                            <TableCell class="align-top text-xs">
+                                <span class="text-emerald-400 font-medium">{{ Number(row.success_24h || 0).toLocaleString('id-ID') }} sukses</span>
+                                <p v-if="row.attention_count" class="text-[10px] text-destructive font-medium mt-0.5">{{ row.attention_count }} perhatian</p>
+                            </TableCell>
+                            <TableCell class="align-top">
+                                <Input v-model.number="row.sort_order" type="number" min="0" max="9999" class="h-8 w-16 text-xs text-center font-mono" />
+                            </TableCell>
+                            <TableCell class="align-top text-right">
+                                <div class="flex items-center justify-end gap-2">
+                                    <label class="flex items-center gap-1.5 text-xs cursor-pointer">
+                                        <AdminSwitch v-model="row.is_active" />
+                                        <span class="text-[11px] text-muted-foreground">{{ row.is_active ? 'Aktif' : 'Off' }}</span>
+                                    </label>
+                                    <Button size="sm" class="h-7 px-2 text-xs" :disabled="saving === row.id" @click="saveProvider(row)">
+                                        {{ saving === row.id ? '...' : 'Simpan' }}
+                                    </Button>
+                                </div>
+                            </TableCell>
+                        </TableRow>
+                    </TableBody>
+                </Table>
             </div>
-        </section>
+        </Card>
 
         <Card class="p-4">
             <div class="mb-4">
-                <h2 class="text-lg font-semibold">Nominal terhubung</h2>
+                <h2 class="text-lg font-semibold">Nominal produk yang dilayani penyedia</h2>
                 <p class="mt-1 text-sm text-muted-foreground">
-                    Daftar ini untuk memantau hubungan nominal ke provider. Perubahan SKU, harga, margin, prioritas, dan pengaturan nominal tetap dilakukan dari menu Produk agar tidak ada pengaturan ganda.
+                    Daftar ini menunjukkan nominal yang terhubung ke penyedia layanan. Untuk mengubah kode produk dari penyedia, harga, sumber utama atau cadangan, dan pengaturan nominal, buka menu Produk.
                 </p>
             </div>
 
-            <form class="grid gap-3 md:grid-cols-2 xl:grid-cols-5" @submit.prevent="search">
+            <form class="grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-5" @submit.prevent="search">
                 <label class="space-y-1 md:col-span-2">
                     <span class="text-sm font-medium">Cari</span>
                     <Input v-model="filters.q" maxlength="100" placeholder="Produk, nominal, SKU, atau provider" />
@@ -231,7 +228,7 @@ function saveProvider(row) {
                     </select>
                 </label>
                 <label class="space-y-1">
-                    <span class="text-sm font-medium">Status mapping</span>
+                    <span class="text-sm font-medium">Status nominal</span>
                     <select v-model="filters.status" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
                         <option value="">Semua status</option>
                         <option value="active">Aktif</option>
@@ -239,7 +236,7 @@ function saveProvider(row) {
                     </select>
                 </label>
                 <label class="space-y-1">
-                    <span class="text-sm font-medium">Baris</span>
+                    <span class="text-sm font-medium">Nominal per halaman</span>
                     <select v-model.number="filters.per_page" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
                         <option :value="10">10</option>
                         <option :value="25">25</option>
@@ -247,58 +244,62 @@ function saveProvider(row) {
                         <option :value="100">100</option>
                     </select>
                 </label>
-                <div class="flex flex-wrap gap-2 md:col-span-2 xl:col-span-5">
-                    <Button type="submit" size="sm">Terapkan</Button>
-                    <Button type="button" size="sm" variant="outline" @click="reset">Reset</Button>
+                <div class="flex flex-col gap-2 sm:flex-row md:col-span-2 xl:col-span-5">
+                    <Button class="w-full sm:w-auto" type="submit">Terapkan filter</Button>
+                    <Button class="w-full sm:w-auto" type="button" variant="outline" @click="reset">Hapus filter</Button>
                     <Button type="button" size="sm" variant="outline" as-child><Link href="/admin/catalog">Kelola di Produk</Link></Button>
                 </div>
             </form>
 
-            <div class="mt-4 overflow-x-auto">
-                <AdminResponsiveTable :mobile-columns="[0,1,4,7]">
+            <div class="mt-4 overflow-x-auto overscroll-x-contain" role="region" aria-label="Nominal produk yang terhubung ke penyedia" tabindex="0">
+                <Table class="min-w-[950px] table-fixed">
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Produk</TableHead>
-                            <TableHead>Nominal</TableHead>
-                            <TableHead>Provider</TableHead>
-                            <TableHead>SKU</TableHead>
-                            <TableHead class="text-right">Harga modal</TableHead>
-                            <TableHead class="text-right">Batas harga</TableHead>
-                            <TableHead>Status harga</TableHead>
-                            <TableHead class="text-right">Posisi sumber</TableHead>
-                            <TableHead>Status</TableHead>
+                            <TableHead class="w-[20%]">Produk</TableHead>
+                            <TableHead class="w-[18%]">Nominal</TableHead>
+                            <TableHead class="w-[14%]">Provider & SKU</TableHead>
+                            <TableHead class="w-[14%] text-right">Modal / Batas</TableHead>
+                            <TableHead class="w-[14%]">Update Harga</TableHead>
+                            <TableHead class="w-[10%] text-right">Sumber</TableHead>
+                            <TableHead class="w-[10%] text-right">Status</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         <TableRow v-for="row in mappings.data" :key="row.id">
-                            <TableCell>
-                                <div class="font-medium">{{ row.product_name }}</div>
-                                <div class="text-xs text-muted-foreground">{{ row.category_name }}</div>
+                            <TableCell class="align-top">
+                                <div class="font-medium text-xs">{{ row.product_name }}</div>
+                                <div class="text-[11px] text-muted-foreground">{{ row.category_name }}</div>
                             </TableCell>
-                            <TableCell>
-                                <div>{{ row.package_name }}</div>
-                                <div class="text-xs text-muted-foreground">{{ row.package_code }}</div>
+                            <TableCell class="align-top">
+                                <div class="text-xs">{{ row.package_name }}</div>
+                                <div class="text-[11px] text-muted-foreground">{{ row.package_code }}</div>
                             </TableCell>
-                            <TableCell>
-                                <div>{{ row.provider_name || row.provider_code }}</div>
-                                <div v-if="!row.provider_active" class="text-xs text-amber-600">Provider nonaktif</div>
+                            <TableCell class="align-top">
+                                <div class="text-xs font-semibold">{{ row.provider_name || row.provider_code }}</div>
+                                <div class="font-mono text-[11px] text-primary">{{ row.external_sku || '—' }}</div>
+                                <div v-if="!row.provider_active" class="text-[10px] text-destructive">Nonaktif</div>
                             </TableCell>
-                            <TableCell class="font-mono text-xs">{{ row.external_sku || '—' }}</TableCell>
-                            <TableCell class="text-right">{{ money(row.cost_idr) }}</TableCell>
-                            <TableCell class="text-right">{{ money(row.max_price_idr) }}</TableCell>
-                            <TableCell>{{ row.provider_code === 'DIGIFLAZZ' && row.is_manual_price ? 'Manual terkunci' : 'Ikuti sinkronisasi' }}</TableCell>
-                            <TableCell class="text-right">{{ row.source_position ? 'Posisi ' + row.source_position : 'Nonaktif' }}</TableCell>
-                            <TableCell>
-                                <Badge :variant="row.is_active && row.product_active && row.package_active && row.provider_active ? 'secondary' : 'outline'">
-                                    {{ row.is_active ? 'Aktif' : 'Nonaktif' }}
+                            <TableCell class="align-top text-right">
+                                <strong class="text-xs">{{ money(row.cost_idr) }}</strong>
+                                <p class="text-[10px] text-muted-foreground">Maks: {{ money(row.max_price_idr) }}</p>
+                            </TableCell>
+                            <TableCell class="align-top text-xs">
+                                <span class="text-[11px]">{{ row.provider_code === 'DIGIFLAZZ' && row.is_manual_price ? 'Manual' : 'Otomatis' }}</span>
+                            </TableCell>
+                            <TableCell class="align-top text-right text-xs">
+                                <span>{{ row.source_position ? 'Posisi ' + row.source_position : '—' }}</span>
+                            </TableCell>
+                            <TableCell class="align-top text-right">
+                                <Badge :variant="row.is_active && row.product_active && row.package_active && row.provider_active ? 'secondary' : 'outline'" class="text-[10px]">
+                                    {{ row.is_active ? 'Aktif' : 'Off' }}
                                 </Badge>
                             </TableCell>
                         </TableRow>
                         <TableRow v-if="!mappings.data?.length">
-                            <TableCell colspan="9" class="py-10 text-center text-muted-foreground">Belum ada mapping yang sesuai filter.</TableCell>
+                            <TableCell colspan="7" class="py-10 text-center text-sm text-muted-foreground">Belum ada nominal produk yang sesuai dengan filter.</TableCell>
                         </TableRow>
                     </TableBody>
-                </AdminResponsiveTable>
+                </Table>
             </div>
 
             <div v-if="mappings.links?.length > 3" class="mt-4 flex flex-wrap gap-1">

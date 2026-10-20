@@ -1,19 +1,19 @@
 /* Global branding only. Never define checkout geometry in this file. */
 :root {
-  --lf-color-background: #0C111A;
-  --lf-color-background-alt: #090E19;
-  --lf-color-surface: #111A2A;
-  --lf-color-panel: #161D29;
-  --lf-color-card: #1A2638;
-  --lf-color-border: #34445B;
-  --lf-color-text: #EDF3FF;
-  --lf-color-muted: #9EAEC5;
-  --lf-color-primary: #609CFF;
-  --lf-color-secondary: #B398FF;
-  --lf-color-highlight: #C8F66B;
-  --lf-color-success: #76D6AB;
-  --lf-color-warning: #F5C76A;
-  --lf-color-error: #FF999B;
+  --lf-color-background: #050505;
+  --lf-color-background-alt: #0a0a0a;
+  --lf-color-surface: #0f0f0f;
+  --lf-color-panel: #121212;
+  --lf-color-card: #151515;
+  --lf-color-border: #ffffff10;
+  --lf-color-text: #ededed;
+  --lf-color-muted: #737373;
+  --lf-color-primary: #3b82f6;
+  --lf-color-secondary: #8b5cf6;
+  --lf-color-highlight: #a3e635;
+  --lf-color-success: #22c55e;
+  --lf-color-warning: #eab308;
+  --lf-color-error: #ef4444;
   --lf-color-action-start:#91C7FF;--lf-color-action-end:#729FEA;
   --lf-color-card-start:#253147;--lf-color-card-mid:#1A2436;--lf-color-card-end:#171F30;--lf-color-card-selected-start:#253E59;--lf-color-card-selected-mid:#21334C;--lf-color-card-selected-end:#253645;--lf-color-header-start:#2B3645;--lf-color-header-end:#293443;--lf-color-modal-start:#202D46;--lf-color-modal-end:#101929;--lf-color-modal-rows:#0B1627;--lf-color-border-light:#A8BEDC;
   --lf-color-voucher-modal-start:#202D47;--lf-color-voucher-modal-end:#111B2D;

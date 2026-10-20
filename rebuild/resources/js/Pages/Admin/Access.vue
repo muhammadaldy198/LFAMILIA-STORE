@@ -148,16 +148,16 @@ function togglePermission(key, checked) {
 <Head title="Admin & Akses" />
 <AdminShell>
     <div class="space-y-5">
-        <header class="flex flex-wrap items-start justify-between gap-3">
-            <div>
-                <h1 class="text-2xl font-semibold">Admin & Akses</h1>
+        <header class="flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between">
+            <div class="min-w-0">
+                <h1 class="text-2xl font-semibold tracking-tight">Admin & Akses</h1>
                 <p class="mt-1 max-w-3xl text-sm text-muted-foreground">
                     Kelola akun Super Admin dan Admin, status login, serta izin operasional tiap Admin.
                 </p>
             </div>
-            <div class="flex gap-2">
-                <Button variant="outline" @click="router.reload({ preserveScroll: true })">Muat ulang</Button>
-                <Button @click="openCreate">Tambah Admin</Button>
+            <div class="flex flex-col gap-2 sm:flex-row">
+                <Button class="w-full sm:w-auto" variant="outline" @click="router.reload({ preserveScroll: true })">Muat ulang</Button>
+                <Button class="w-full sm:w-auto" @click="openCreate">Tambah Admin</Button>
             </div>
         </header>
 
@@ -170,14 +170,14 @@ function togglePermission(key, checked) {
             <Card class="p-4"><p class="text-xs text-muted-foreground">Pemilik aktif</p><p class="mt-2 text-2xl font-semibold">{{ summary.active_super_admins || 0 }}</p></Card>
         </div>
 
-        <Card class="p-4">
-            <form class="grid gap-3 md:grid-cols-2 xl:grid-cols-5" @submit.prevent="submitFilters">
+        <Card class="min-w-0 p-4 sm:p-5">
+            <form class="grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-5" @submit.prevent="submitFilters">
                 <label class="space-y-1 md:col-span-2">
                     <span class="text-sm font-medium">Cari akun</span>
                     <Input v-model="filters.q" maxlength="100" placeholder="Nama atau email" />
                 </label>
                 <label class="space-y-1">
-                    <span class="text-sm font-medium">Role</span>
+                    <span class="text-sm font-medium">Peran akun</span>
                     <select v-model="filters.role" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
                         <option value="">Semua role</option>
                         <option value="SUPER_ADMIN">Super Admin</option>
@@ -193,21 +193,21 @@ function togglePermission(key, checked) {
                     </select>
                 </label>
                 <label class="space-y-1">
-                    <span class="text-sm font-medium">Baris</span>
+                    <span class="text-sm font-medium">Akun per halaman</span>
                     <select v-model.number="filters.per_page" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
                         <option :value="10">10</option><option :value="25">25</option><option :value="50">50</option><option :value="100">100</option>
                     </select>
                 </label>
-                <div class="flex gap-2 md:col-span-2 xl:col-span-5">
-                    <Button size="sm">Terapkan</Button>
-                    <Button type="button" size="sm" variant="outline" @click="resetFilters">Reset</Button>
+                <div class="flex flex-col gap-2 sm:flex-row md:col-span-2 xl:col-span-5">
+                    <Button class="w-full sm:w-auto">Terapkan filter</Button>
+                    <Button class="w-full sm:w-auto" type="button" variant="outline" @click="resetFilters">Hapus filter</Button>
                 </div>
             </form>
         </Card>
 
         <div class="grid gap-4 xl:grid-cols-[minmax(0,2fr)_360px]">
             <Card class="min-w-0 p-4">
-                <div class="overflow-x-auto">
+                <div class="overflow-x-auto" role="region" aria-label="Daftar akun Admin" tabindex="0">
                     <AdminResponsiveTable :mobile-columns="[0,1,2,6]">
                         <TableHeader>
                             <TableRow>
@@ -374,7 +374,7 @@ function togglePermission(key, checked) {
                 </div>
                 <Button variant="outline" size="sm" as-child><Link href="/admin/audit">Buka Audit Log</Link></Button>
             </div>
-            <div class="mt-4 overflow-x-auto">
+            <div class="mt-4 overflow-x-auto" role="region" aria-label="Aktivitas Admin terbaru" tabindex="0">
                 <AdminResponsiveTable :mobile-columns="[3,1,0]">
                     <TableHeader><TableRow><TableHead>Waktu</TableHead><TableHead>Pelaku</TableHead><TableHead>Role</TableHead><TableHead>Aktivitas</TableHead><TableHead>Target</TableHead></TableRow></TableHeader>
                     <TableBody>

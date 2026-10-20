@@ -256,14 +256,14 @@ async function sendResendTestEmail() {
     <Head title="Integrasi" />
     <AdminShell>
         <div class="space-y-5">
-            <header class="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                    <h1 class="text-2xl font-semibold">Integrasi</h1>
+            <header class="flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between">
+                <div class="min-w-0">
+                    <h1 class="text-2xl font-semibold tracking-tight">Integrasi</h1>
                     <p class="mt-1 max-w-3xl text-sm text-muted-foreground">
-                        Kelola provider, environment, dan credential dari satu tempat. Secret disimpan terenkripsi dan tidak pernah dikirim kembali ke browser.
+                        Kelola sambungan ke layanan luar di satu tempat. Kunci akses disimpan dengan aman dan tidak ditampilkan kembali setelah tersimpan.
                     </p>
                 </div>
-                <Button variant="outline" as-child>
+                <Button class="w-full sm:w-auto" variant="outline" as-child>
                     <Link href="/admin/nickname-tools">Buka Validasi Akun</Link>
                 </Button>
             </header>
@@ -272,8 +272,10 @@ async function sendResendTestEmail() {
                 <h2 class="font-semibold">Mulai jualan top up</h2>
                 <p class="text-sm">Hubungkan Digiflazz dan satu metode pembayaran, lalu impor nominal dan atur margin di menu Produk.</p>
                 <p class="text-sm text-muted-foreground">Telegram, Discord, login Google, dan validasi nama akun adalah fitur tambahan. Semua integrasi tidak harus aktif. Tes koneksi memeriksa akses layanan; hasil tes transaksi pelanggan dicatat terpisah.</p>
-                <Button variant="outline" as-child><Link href="/admin/catalog">Buka Produk</Link></Button>
-                <Button variant="outline" as-child><Link href="/admin/payments">Buka Pembayaran</Link></Button>
+                <div class="flex flex-col gap-2 sm:flex-row">
+                    <Button class="w-full sm:w-auto" variant="outline" as-child><Link href="/admin/catalog">Buka Produk</Link></Button>
+                    <Button class="w-full sm:w-auto" variant="outline" as-child><Link href="/admin/payments">Buka Pembayaran</Link></Button>
+                </div>
             </Card>
 
             <div class="lf-admin-summary ">
@@ -298,20 +300,20 @@ async function sendResendTestEmail() {
                     <p class="mt-2 text-2xl font-semibold">{{ awaitingCount }}</p>
                 </Card>
                 <Card class="col-span-2 p-4 md:col-span-1">
-                    <p class="text-xs text-muted-foreground">Credential wajib lengkap</p>
+                    <p class="text-xs text-muted-foreground">Data akses wajib lengkap</p>
                     <p class="mt-2 text-2xl font-semibold">{{ completeCount }}/{{ items.length }}</p>
                 </Card>
             </div>
             <p class="text-xs text-muted-foreground">
-                Butuh tindakan = kredensial/callback bermasalah atau tes koneksi gagal.
-                Belum terverifikasi = penyedia tidak bisa dipastikan melalui tes otomatis; bukan berarti koneksi rusak.
+                Butuh tindakan = data akses, alamat pemberitahuan, atau tes koneksi bermasalah.
+                Belum terverifikasi = sambungan layanan belum bisa dipastikan lewat pemeriksaan otomatis; belum tentu rusak.
                 Kamu tidak perlu mengulang Tes Koneksi terus-menerus.
             </p>
 
             <Card class="p-4"><details>
-                    <summary class="cursor-pointer font-semibold">Callback & Redirect</summary>
+                    <summary class="cursor-pointer font-semibold">Alamat notifikasi & masuk kembali</summary>
                     <p class="mt-1 text-sm text-muted-foreground">
-                        URL ini berasal dari alamat aplikasi canonical. Endpoint callback adalah bagian protocol aplikasi dan tidak dapat diedit dari panel.
+                        Salin alamat yang sesuai ke pengaturan layanan terkait. Alamat ini dipakai untuk menerima pemberitahuan transaksi atau proses masuk kembali, dan tidak dapat diubah dari panel.
                     </p>
                 <div class="mt-4 grid gap-3 md:grid-cols-2">
                     <div
@@ -320,10 +322,10 @@ async function sendResendTestEmail() {
                         class="p-3"
                     >
                         <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                            {{ key === 'midtrans' ? 'Midtrans Notification'
-                                : key === 'doku' ? 'DOKU Notification'
-                                : key === 'digiflazz' ? 'Digiflazz Webhook'
-                                : 'Google OAuth Callback' }}
+                            {{ key === 'midtrans' ? 'Pemberitahuan pembayaran Midtrans'
+                                : key === 'doku' ? 'Pemberitahuan pembayaran DOKU'
+                                : key === 'digiflazz' ? 'Pemberitahuan transaksi Digiflazz'
+                                : 'Alamat kembali masuk Google' }}
                         </p>
                         <div class="mt-2 flex items-center gap-2">
                             <code class="min-w-0 flex-1 break-all text-xs">{{ value }}</code>
@@ -343,6 +345,7 @@ async function sendResendTestEmail() {
                     :key="item.code"
                     type="button"
                     :variant="selectedCode === item.code ? 'secondary' : 'ghost'"
+                    :aria-current="selectedCode === item.code ? 'page' : undefined"
                     class="shrink-0"
                     @click="selectedCode = item.code"
                 >
@@ -379,7 +382,7 @@ async function sendResendTestEmail() {
                             {{ item.description }}
                         </p>
                         <p class="mt-1 text-xs text-muted-foreground">
-                            {{ item.configured_required }}/{{ item.required_total }} credential wajib tersimpan ·
+                            {{ item.configured_required }}/{{ item.required_total }} data akses wajib tersimpan ·
                             {{ testedAt(item.health?.tested_at) }}
                         </p>
                     </div>
@@ -392,9 +395,9 @@ async function sendResendTestEmail() {
 
                 <div class="lf-admin-readiness mt-5">
                     <div class="p-3">
-                        <p class="text-xs text-muted-foreground">Credential</p>
+                        <p class="text-xs text-muted-foreground">Data akses</p>
                         <p class="mt-1 text-sm font-medium">
-                            {{ item.required_complete ? 'Tersimpan lengkap' : 'Belum lengkap' }}
+                            {{ item.required_complete ? 'Lengkap' : 'Belum lengkap' }}
                         </p>
                     </div>
                     <div class="p-3">
@@ -404,7 +407,7 @@ async function sendResendTestEmail() {
                         </p>
                     </div>
                     <div class="p-3">
-                        <p class="text-xs text-muted-foreground">Callback</p>
+                        <p class="text-xs text-muted-foreground">Pemberitahuan layanan</p>
                         <p class="mt-1 text-sm font-medium">
                             {{ item.callback?.label || 'Belum diketahui' }}
                         </p>
@@ -416,7 +419,7 @@ async function sendResendTestEmail() {
                     class="mt-5 grid gap-3 rounded-md border p-4 md:grid-cols-[minmax(0,260px)_1fr]"
                 >
                     <label class="space-y-1.5">
-                        <span class="text-sm font-medium">Lingkungan</span>
+                        <span class="text-sm font-medium">Mode layanan</span>
                         <select
                             :value="item.environment"
                             class="h-9 w-full rounded-md border bg-background px-3 text-sm"
@@ -432,10 +435,10 @@ async function sendResendTestEmail() {
                         </select>
                     </label>
                     <div class="text-sm text-muted-foreground">
-                        <p v-if="selectedEnvironment(item)?.live" role="status" class="mb-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 font-medium text-destructive">Mode Production aktif. Pastikan kredensial yang disimpan ditujukan untuk layanan produksi.</p>
+                        <p v-if="selectedEnvironment(item)?.live" role="status" class="mb-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 font-medium text-destructive">Mode layanan sungguhan sedang aktif. Pastikan data akses yang disimpan memang untuk layanan ini.</p>
                         <p>{{ selectedEnvironment(item)?.description }}</p>
                         <p v-if="item.credential_scope === 'per_environment'" class="mt-1">
-                            Credential environment ini terisolasi. Backend tidak akan memakai credential environment lain sebagai fallback.
+                            Data akses untuk mode ini terpisah. Data akses mode lain tidak akan dipakai sebagai pengganti.
                         </p>
                         <p v-else class="mt-1">
                             Credential akun dipakai bersama; mode request mengikuti environment yang dipilih.
@@ -485,7 +488,7 @@ async function sendResendTestEmail() {
                                     variant="outline"
                                     @click="toggleClearSecret(item, field.key)"
                                 >
-                                    {{ item.clear_secrets.includes(field.key) ? 'Batalkan hapus' : 'Hapus credential' }}
+                                    {{ item.clear_secrets.includes(field.key) ? 'Batalkan hapus' : 'Hapus data akses' }}
                                 </Button>
                             </div>
 

@@ -71,7 +71,7 @@ Jangan menaruh password, API credential, private token, payment signature, raw s
 
 ## UI Admin dan workspace produk
 
-Design system Admin berada di `resources/css/admin.css` dan dibatasi pada shell Admin. Kontrol mobile 36 px, desktop 40 px; sidebar desktop 240 px, topbar 56 px. `AdminResponsiveTable` memakai slot/handler tabel yang sama, dengan kolom prioritas eksplisit di mobile dan informasi sekunder dalam Detail. Checkbox tetap untuk pilihan jamak/konfirmasi; boolean memakai `AdminSwitch`.
+Design system Admin berada di `resources/css/admin.css` dan dibatasi pada shell Admin. Kontrol mobile 36 px, desktop 40 px; sidebar desktop 240 px, topbar 56 px. `AdminResponsiveTable` memakai slot/handler tabel yang sama. Workspace lain memakai kolom prioritas eksplisit di mobile dengan informasi sekunder di Detail. Katalog produk, hasil impor, dan daftar nominal memakai prop `scroll`: tabel aslinya tetap dirender di semua lebar dengan `min-w` dan menggulir horizontal di dalam container tabel, bukan berubah menjadi kartu bertumpuk. Halaman bisa digulir horizontal ke kanan untuk kolom teknis (modal toko, harga seller, markup). Checkbox tetap untuk pilihan jamak/konfirmasi; boolean memakai `AdminSwitch`.
 
 Produk menggunakan workspace penuh dengan URL `/admin/catalog?edit=<id>`. Daftar ditutup selama editor aktif. Lima tab: Informasi, Nominal & Harga, Tampilan Produk, Data Pelanggan, Penanganan. Nominal dirender 25 per halaman dan form detail hanya untuk nominal terpilih. Reorder desktop dan tombol naik/turun tetap tersedia. Backend catalog masih mengirim seluruh catalog sebagaimana sebelumnya; pagination server catalog adalah pekerjaan terpisah.
 
@@ -91,18 +91,42 @@ Interval API diatur pada Pengaturan monitor & sinkron otomatis (minimal 5 menit)
 
 Filter Normal/Peringatan/Kritis memakai aritmetika desimal pada kolom harga unsigned agar harga turun tidak menyebabkan error MySQL.
 
+## Harga katalog: modal toko → harga jual
+
+Harga jual seluruh katalog mengikuti **dua tahap yang terpisah**:
+
+1. **Tambahan modal (uplift)** — persentase di atas harga seller provider. Berlaku **sekali** saat modal nominal pertama kali dibentuk (impor/provider bootstrap); nilai hasilnya disimpan sebagai **modal toko** (`provider_mappings.store_cost_idr`). Sync berikutnya **tidak** menerapkan ulang uplift dan tidak menimpa modal toko.
+2. **Markup jual** — persentase di atas **modal toko** untuk menghasilkan harga jual; diterapkan saat harga dihitung, bukan disimpan ulang.
+
+Bawaan: uplift 2%, markup jual 10%. Keduanya bisa diubah **global**, **per game/produk**, dan **per nominal**; yang lebih spesifik menang (nominal → game → global); kolom yang dikosongkan berarti mengikuti level di atasnya. Perubahan markup langsung berlaku karena harga jual dihitung dari modal toko × markup yang berlaku. Harga rupiah dibulatkan ke atas (integer ceiling), tanpa pembulatan "cantik". Nilai persen dibatasi 0–1000.
+
+Contoh: seller Rp12.000 → uplift 2% = modal toko Rp12.240 → markup 10% = harga jual Rp13.464 (markup 12% = Rp13.709).
+
+Di halaman Produk, harga seller provider disimpan terpisah sebagai referensi (`seller_reference_price_idr`) dan tetap diperbarui oleh sync, sehingga admin bisa membandingkan "modal toko" (milik toko, bisa diedit) dengan "harga seller" (laporan provider). Mengubah modal toko tidak mengubah harga seller, dan modal toko tidak boleh diisi di bawah harga referensi seller saat itu.
+
+**Ketersediaan sementara:** untuk nominal dengan modal toko, bila harga seller provider naik **di atas** modal toko yang ditetapkan, nominal tersebut sementara tidak bisa dibeli dan hilang dari halaman customer; otomatis tersedia kembali saat harga seller turun ke dalam batas modal toko. Ini berbeda dari penonaktifan manual admin yang tetap nonaktif sampai diubah. Halaman Digiflazz menandai baris seperti ini sebagai peringatan dengan batas kelayakan = modal toko.
+
 ## Impor nominal langsung untuk dijual
 
 Pemilih SKU menyediakan **Langsung jual setelah impor** (aktif secara default). Satu submit mengimpor SKU yang tersedia dan masih segar, menyimpan margin serta format ID tujuan, dan mengaktifkan nominal, sumber Digiflazz, serta produk. Kategori dan integrasi Digiflazz harus sudah aktif; pengaturan tersebut tidak diaktifkan diam-diam. Nonaktifkan pilihan ini untuk menyimpan draf.
 
+Saat review, kolom margin pada formulir impor adalah **markup harga jual game** (`products.sell_markup_percent`) — bukan lagi margin di atas harga seller. Panel menampilkan pratinjau dua tahap per SKU (harga seller → modal toko setelah uplift → harga jual setelah markup) beserta total pilihan. Nominal yang sudah nyaris sama di produk tujuan diberi peringatan **nominal kembar** dan memerlukan keputusan eksplisit dari admin sebelum disimpan, sehingga duplikat tidak terjadi diam-diam.
+
 Format tujuan diisi dari konfigurasi sumber existing, satu kolom pelanggan, atau format Mobile Legends yang dikenal (User ID diikuti Zone ID). Produk lain dengan beberapa kolom harus menetapkan format di pemilih SKU. Backend menolak placeholder asing, format kosong, dan kolom wajib yang terlewat. Tidak ada request pembayaran atau topup provider saat impor.
+
+## Produk manual dengan banyak nominal
+
+Tab **Produk Manual** menyediakan satu formulir yang bisa membuat produk sekaligus **banyak baris nominal**: tiap baris punya nama, nilai nominal (opsional), modal toko sendiri, dan markup baris opsional dengan pratinjau harga jual (modal toko × markup yang berlaku). Modal toko yang diketik admin dipakai apa adanya — uplift hanya berlaku pada impor provider, bukan pada input manual.
+
+Nominal hasil formulir dibuat **nonaktif** dulu bersama pencatatan modal pada provider `MANUAL` (tanpa external SKU), sehingga tidak menyentuh Digiflazz dan alur fulfillment manual tetap sama; admin mengaktifkan nominal dan sumbernya seperti biasa. Kode nominal dibuat otomatis dari nama bila tidak diisi dan dijamin unik dalam produk. Baris nominal satu formulir hanya untuk produk manual: produk otomatis mengambil nominal dari impor. Baris cacat (nama kosong, modal negatif) dan nominal kembar dalam satu formulir ditolak seluruhnya tanpa menyisakan produk setengah jadi.
+
+Field input pelanggan tetap ditetapkan sekali di tingkat game/produk dan dipakai bersama semua nominal.
 
 ## Urutan nominal dan kebijakan SKU Digiflazz
 
 Impor mengelompokkan SKU dengan identitas kategori, merek, jenis, dan nama produk yang sama. Nama dinormalisasi huruf besar/kecil dan spasi; SKU, harga, serta seller bukan identitas nominal. Varian, bonus, dan wilayah dengan nama/jenis berbeda tetap terpisah. Pilih satu nominal untuk mengimpor sumber yang tersedia dan segar dalam kelompoknya; nominal yang sudah ada digunakan kembali. SKU yang dimiliki produk lain tidak dipindahkan.
 
-**Kebijakan PRD v1.1 §47 (1 SKU per nominal & no auto-switch):**
-Toko LFAMILIA Store menerapkan kebijakan 1 SKU aktif per nominal Digiflazz (model `_A`), tanpa mengaktifkan SKU cadangan (`_B`). Meskipun UI admin memiliki kapabilitas pemetaan sumber, **alur fulfillment produksi tidak melakukan auto-switch atau failover otomatis** ke SKU lain saat pengiriman gagal. Setiap kegagalan pengiriman definitif masuk ke antrean penanganan manual admin/CS. Mapping lama yang dinonaktifkan atau SKU yang hilang tidak otomatis diaktifkan kembali oleh sinkron. Format ID tujuan tetap disimpan saat pengaturan mapping diedit.
+**Kebijakan produk (PRD v1.1 §5–6):** katalog Digiflazz yang dijual menggunakan satu SKU terpilih per nominal; seller selection dan perubahan SKU dikelola admin, bukan otomatis dipilih ulang dari sisi customer. Fulfillment tidak boleh mengirim ulang atau berpindah ke SKU lain ketika hasil transaksi provider masih `pending`, `processing`, `timeout`, atau `unknown`; tunggu rekonsiliasi untuk memastikan status transaksi pertama sebelum tindakan lanjutan. Kegagalan definitif ditangani melalui alur operasional Admin/CS yang tersedia. Sinkronisasi dapat mengaktifkan kembali mapping yang sebelumnya dinonaktifkan oleh sync bila SKU muncul lagi; ini berbeda dari penonaktifan manual Admin. Perubahan dan pengaktifan mapping tetap mengikuti kontrol Admin yang berlaku. Format ID tujuan tetap disimpan saat pengaturan mapping diedit.
 
 Nilai nominal angka diisi dari nama katalog pada impor. Urutan awal impor dan halaman customer memakai angka dari kecil ke besar (7, 10, 20, 100, 200, 2.000). Nama tanpa nilai angka memakai natural sort. Urutan manual editor tetap dapat disesuaikan, tetapi impor/pelengkapan ulang menyusun urutan awal menurut nominal. Halaman customer selalu memakai urutan nominal angka.
 
@@ -112,4 +136,4 @@ Hasil Tes Koneksi terakhir tidak kedaluwarsa setelah 15 menit. Waktu tes tetap d
 
 Integrasi tanpa probe aman (SAFE_PROBE_UNAVAILABLE) atau dengan izin baca terbatas (PERMISSION_LIMITED) ditampilkan sebagai tersimpan dan belum terverifikasi, bukan kegagalan koneksi. Kondisi ini tidak masuk hitungan masalah System Health. Tidak ada klaim tes transaksi sudah lulus; teks milestone E2E statis dihapus dari panel.
 
-Panduan mulai jualan: hubungkan Digiflazz dan satu metode pembayaran, impor nominal, atur margin. Telegram, Discord, Google OAuth dan validasi nama akun merupakan fitur tambahan. Status panel tidak mengubah eligibility checkout, callback, pembayaran, atau fulfillment.
+Panduan mulai jualan: hubungkan Digiflazz dan satu metode pembayaran, impor nominal, lalu atur **markup harga jual** (dan tambahan modal bila perlu) di tingkat global, game, atau nominal. Telegram, Discord, Google OAuth dan validasi nama akun merupakan fitur tambahan. Status panel tidak mengubah eligibility checkout, callback, pembayaran, atau fulfillment.

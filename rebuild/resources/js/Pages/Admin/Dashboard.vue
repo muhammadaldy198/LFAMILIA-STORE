@@ -18,7 +18,7 @@ const props = defineProps({
 const chart=computed(()=>Array.isArray(props.chart)?props.chart:[]);
 const notifications=computed(()=>Array.isArray(props.notifications)?props.notifications:[]);
 const recentOrders=computed(()=>Array.isArray(props.recentOrders)?props.recentOrders:[]);
-const topProducts=computed(()=>Array.isArray(props.topProducts)?props.topProducts:[]);
+const _topProducts=computed(()=>Array.isArray(props.topProducts)?props.topProducts:[]);
 const integrations=computed(()=>Array.isArray(props.integrations)?props.integrations:[]);
 const page=usePage();
 const owner=computed(()=>page.props.adminPanel?.admin?.role==='SUPER_ADMIN');
@@ -54,40 +54,172 @@ const clockTime=computed(()=>new Intl.DateTimeFormat('id-ID',{hour:'2-digit',min
 const maxRevenue=computed(()=>Math.max(1,...chart.value.map(p=>p.revenue_idr)));
 const maxOrders=computed(()=>Math.max(1,...chart.value.map(p=>p.orders)));
 const statusLabel=status=>({SUCCESS:'Berhasil',PENDING_PAYMENT:'Pending',PAID:'Dibayar',PROCESSING:'Diproses',FAILED:'Gagal',EXPIRED:'Kedaluwarsa',CANCELLED:'Dibatalkan',HEALTHY:'Tes terakhir berhasil',CONFIGURED:'Tersimpan — tes otomatis tidak tersedia',DOWN:'Bermasalah',DEGRADED:'Perlu diperiksa',NOT_CONFIGURED:'Belum dikonfigurasi',UNTESTED:'Belum dites',STALE:'Perlu tes ulang'}[status]||status);
-const integrationSummary=computed(()=>{const active=integrations.value.filter(i=>i.active);if(!active.length)return 'Belum ada integrasi aktif';if(active.some(i=>!['HEALTHY','CONFIGURED'].includes(i.status)))return 'Ada yang perlu diperiksa';return active.some(i=>i.status==='CONFIGURED')?'Sebagian belum terverifikasi':'Tes terakhir berhasil';});
+const _integrationSummary=computed(()=>{const active=integrations.value.filter(i=>i.active);if(!active.length)return 'Belum ada integrasi aktif';if(active.some(i=>!['HEALTHY','CONFIGURED'].includes(i.status)))return 'Ada yang perlu diperiksa';return active.some(i=>i.status==='CONFIGURED')?'Sebagian belum terverifikasi':'Tes terakhir berhasil';});
 const visibleActivities=computed(()=>props.activities?.length?props.activities:recentOrders.value.slice(0,5).map(o=>({id:o.id,action:'Pesanan '+statusLabel(o.status),target:o.order_number,created_at:o.created_at,href:'/admin/orders/'+o.id})));
 const markRead=n=>router.post('/admin/notifications/'+n.id+'/read',{}, {preserveScroll:true});
 </script>
 <template>
 <Head title="Dashboard Admin"/>
-<AdminShell><div class="space-y-4">
-    <header class="flex flex-wrap items-start justify-between gap-3">
-        <div><h1 class="text-xl font-bold md:text-2xl">{{title}}</h1><p class="mt-1 text-sm text-muted-foreground">{{owner?'Kelola seluruh sistem dan data finansial toko.':'Kelola operasional toko sesuai akses akun.'}}</p></div>
-        <div class="flex flex-wrap items-center gap-3"><div class="rounded-lg border border-border bg-card px-3 py-2 text-xs"><strong class="block">{{clockDate}}</strong><span>{{clockTime}}</span></div><Button variant="outline" :disabled="busy" @click="refresh"><AdminIcon name="providers" class="size-4"/>{{busy?'Memuat…':'Muat ulang'}}</Button></div>
+<AdminShell><div class="space-y-5">
+    <header class="flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between">
+        <div class="min-w-0"><h1 class="text-2xl font-semibold tracking-tight">{{title}}</h1><p class="mt-1 max-w-2xl text-sm text-muted-foreground">{{owner?'Kelola seluruh sistem dan data finansial toko.':'Kelola operasional toko sesuai akses akun.'}}</p></div>
+        <div class="flex flex-wrap items-center gap-3"><time class="min-w-36 rounded-md border border-border bg-card px-3 py-2 text-xs"><strong class="block">{{clockDate}}</strong><span class="text-muted-foreground">{{clockTime}} WIB</span></time><Button variant="outline" :disabled="busy" @click="refresh"><AdminIcon name="providers" class="size-4"/>{{busy?'Memuat…':'Muat ulang'}}</Button></div>
     </header>
-    <section class="lf-admin-summary " aria-label="Ringkasan dashboard">
-        <Card v-for="metric in metricCards" :key="metric.key" class="p-4"><div class="flex items-start gap-3"><span class="grid size-9 shrink-0 place-items-center rounded-md bg-primary/10 text-primary"><AdminIcon :name="metric.icon" class="size-5"/></span><div class="min-w-0"><p class="text-xs text-muted-foreground">{{metric.label}}</p><strong class="mt-1 block break-words text-xl font-bold">{{metric.finance?money(metric.value):Number(metric.value||0).toLocaleString('id-ID')}}</strong></div></div><p class="mt-3 text-xs text-muted-foreground">{{metric.key==='digiflazz_balance'&&metric.value==null?statusLabel(digiflazzBalance?.status):metric.note}}</p><p v-if="metric.key==='digiflazz_balance'&&digiflazzBalance?.checked_at" class="mt-1 text-xs text-muted-foreground">{{date(digiflazzBalance.checked_at)}}</p></Card>
+    <!-- 1. Metric Cards -->
+    <section class="lf-admin-summary" aria-label="Ringkasan dashboard">
+        <Card v-for="metric in metricCards" :key="metric.key" class="min-w-0 p-4"><div class="flex items-start gap-3"><span class="grid size-9 shrink-0 place-items-center rounded-md bg-primary/10 text-primary"><AdminIcon :name="metric.icon" class="size-5"/></span><div class="min-w-0"><p class="text-xs text-muted-foreground">{{metric.label}}</p><strong class="mt-1 block break-words text-xl font-bold tabular-nums">{{metric.finance?money(metric.value):Number(metric.value||0).toLocaleString('id-ID')}}</strong></div></div><p class="mt-3 text-xs text-muted-foreground">{{metric.key==='digiflazz_balance'&&metric.value==null?statusLabel(digiflazzBalance?.status):metric.note}}</p><p v-if="metric.key==='digiflazz_balance'&&digiflazzBalance?.checked_at" class="mt-1 text-xs text-muted-foreground">{{date(digiflazzBalance.checked_at)}}</p></Card>
     </section>
 
-    <div class="grid grid-cols-1 items-start gap-4 xl:grid-cols-3">
-        <Card v-if="canViewFinance" class="min-w-0">
-            <CardHeader class="flex flex-row flex-wrap items-center justify-between gap-3 p-4"><CardTitle class="text-base">Grafik Penjualan</CardTitle><DropdownMenu><DropdownMenuTrigger as-child><Button variant="outline" size="sm" :disabled="busy">{{ranges[range]}}</Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuRadioGroup :model-value="range" @update:model-value="changeRange"><DropdownMenuRadioItem v-for="(label,key) in ranges" :key="key" :value="key">{{label}}</DropdownMenuRadioItem></DropdownMenuRadioGroup></DropdownMenuContent></DropdownMenu></CardHeader>
-            <CardContent class="space-y-3 px-4 pb-4"><p class="text-xs text-muted-foreground">Tanggal pesanan dalam WIB. Omzet hanya transaksi yang sudah dibayar.</p><div class="flex gap-4 text-xs"><span class="flex items-center gap-1"><i class="size-2 bg-primary"/>Omzet</span><span class="flex items-center gap-1"><i class="size-2 bg-primary/35"/>Pesanan</span></div>
-                <div ref="chartScroll" class="overflow-x-auto" role="img" :aria-label="'Grafik omzet dan jumlah pesanan '+ranges[range]"><div class="flex h-52 items-end gap-2" :style="{minWidth:Math.max(240,chart.length*28)+'px'}"><div v-for="(point,index) in chart" :key="point.day" class="flex min-w-0 flex-1 flex-col items-center"><div class="flex h-40 w-full items-end justify-center gap-1" :title="shortDay(point.day)+': '+money(point.revenue_idr)+' · '+point.orders+' pesanan'"><span class="w-2 rounded-t bg-primary" :style="{height:point.revenue_idr/maxRevenue*100+'%'}"/><span class="w-2 rounded-t bg-primary/35" :style="{height:point.orders/maxOrders*100+'%'}"/></div><span class="mt-2 whitespace-nowrap text-[10px] text-muted-foreground">{{chart.length<=7||index%7===0?shortDay(point.day):'·'}}</span></div></div></div>
-                <p v-if="!chart.some(p=>p.orders>0)" class="text-center text-xs text-muted-foreground">Belum ada transaksi pada periode ini.</p>
-                <details><summary class="cursor-pointer text-xs font-medium">Lihat data grafik</summary><div class="max-h-60 overflow-y-auto"><AdminResponsiveTable :mobile-columns="[0,1,2]"><TableHeader><TableRow><TableHead>Tanggal WIB</TableHead><TableHead>Omzet</TableHead><TableHead>Pesanan</TableHead></TableRow></TableHeader><TableBody><TableRow v-for="point in chart" :key="point.day"><TableCell>{{shortDay(point.day)}}</TableCell><TableCell>{{money(point.revenue_idr)}}</TableCell><TableCell>{{point.orders}}</TableCell></TableRow></TableBody></AdminResponsiveTable></div></details>
-            </CardContent>
-        </Card>
+    <!-- 2. Grafik Penjualan & Pesanan (Full Width) -->
+    <Card v-if="canViewFinance" class="min-w-0">
+        <CardHeader class="flex flex-row flex-wrap items-center justify-between gap-3 p-4">
+            <div>
+                <CardTitle class="text-base">Grafik Penjualan & Pesanan</CardTitle>
+                <p class="mt-0.5 text-xs text-muted-foreground">Omzet (WIB) hanya transaksi berstatus dibayar.</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <DropdownMenu>
+                    <DropdownMenuTrigger as-child>
+                        <Button variant="outline" size="sm" :disabled="busy">{{ranges[range] || '7 Hari Terakhir'}}</Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                        <DropdownMenuRadioGroup :model-value="range" @update:model-value="changeRange">
+                            <DropdownMenuRadioItem v-for="(label,key) in ranges" :key="key" :value="key">{{label}}</DropdownMenuRadioItem>
+                        </DropdownMenuRadioGroup>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            </div>
+        </CardHeader>
+        <CardContent class="space-y-3 px-4 pb-4">
+            <div class="flex gap-4 text-xs">
+                <span class="flex items-center gap-1.5"><span class="size-2.5 rounded-sm bg-primary inline-block"/>Omzet</span>
+                <span class="flex items-center gap-1.5"><span class="size-2.5 rounded-sm bg-primary/35 inline-block"/>Jumlah Pesanan</span>
+            </div>
+            <div ref="chartScroll" class="overflow-x-auto" role="group" :aria-label="'Grafik omzet dan jumlah pesanan '+ranges[range]">
+                <div class="flex h-52 items-end gap-2" :style="{minWidth:Math.max(280,chart.length*28)+'px'}">
+                    <div v-for="(point,index) in chart" :key="point.day" class="flex min-w-0 flex-1 flex-col items-center">
+                        <div class="flex h-40 w-full items-end justify-center gap-1" :title="shortDay(point.day)+': '+money(point.revenue_idr)+' · '+point.orders+' pesanan'">
+                            <span class="w-2.5 rounded-t bg-primary transition-all" :style="{height:point.revenue_idr/maxRevenue*100+'%'}"/>
+                            <span class="w-2.5 rounded-t bg-primary/35 transition-all" :style="{height:point.orders/maxOrders*100+'%'}"/>
+                        </div>
+                        <span class="mt-2 whitespace-nowrap text-[10px] text-muted-foreground">{{chart.length<=7||index%7===0?shortDay(point.day):'·'}}</span>
+                    </div>
+                </div>
+            </div>
+            <p v-if="!chart.some(p=>p.orders>0)" class="text-center text-xs text-muted-foreground py-2">Belum ada transaksi pada periode ini.</p>
+        </CardContent>
+    </Card>
 
-        <Card class="min-w-0"><CardHeader class="flex flex-row items-center justify-between gap-3 p-4"><CardTitle class="text-base">Aktivitas Terbaru</CardTitle><Button v-if="owner||canOrders" variant="link" size="sm" as-child><Link :href="owner?'/admin/audit':'/admin/orders'">Lihat semua</Link></Button></CardHeader><CardContent class="px-4 pb-4"><p v-if="!visibleActivities.length" class="py-6 text-center text-sm text-muted-foreground">Belum ada aktivitas.</p><article v-for="activity in visibleActivities" :key="activity.id" class="border-b border-border py-3 last:border-0"><Link v-if="activity.href" :href="activity.href" class="text-sm font-medium text-primary">{{activity.action}}</Link><strong v-else class="block break-words text-sm">{{activity.action}}</strong><p class="mt-1 break-words text-xs text-muted-foreground">{{activity.target}}</p><time class="mt-1 block text-xs text-muted-foreground">{{date(activity.created_at)}}</time></article></CardContent></Card>
+    <!-- 3. Pesanan Terbaru (Maks 5) -->
+    <Card v-if="canOrders" class="min-w-0">
+        <CardHeader class="flex flex-row flex-wrap items-center justify-between gap-3 p-4">
+            <div>
+                <CardTitle class="text-base">Pesanan Terbaru</CardTitle>
+                <p class="mt-0.5 text-xs text-muted-foreground">Maksimal 5 pesanan terakhir</p>
+            </div>
+            <Button variant="link" size="sm" as-child><Link href="/admin/orders">Buka Semua Pesanan →</Link></Button>
+        </CardHeader>
+        <CardContent class="px-0 pb-2">
+            <AdminResponsiveTable :mobile-columns="canViewFinance?[1,3,4,5,6]:[1,3,4,5]" class="table-fixed min-w-[720px]">
+                <TableHeader>
+                    <TableRow>
+                        <TableHead class="w-[4%]">#</TableHead>
+                        <TableHead class="w-[19%]">Invoice</TableHead>
+                        <TableHead class="w-[14%]">Pelanggan</TableHead>
+                        <TableHead class="w-[22%] whitespace-normal">Produk / Nominal</TableHead>
+                        <TableHead class="w-[15%] whitespace-normal">Pembayaran</TableHead>
+                        <TableHead v-if="canViewFinance" class="w-[13%]">Total</TableHead>
+                        <TableHead class="w-[13%]">Status</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    <TableRow v-for="(order,index) in recentOrders.slice(0, 5)" :key="order.id">
+                        <TableCell>{{index+1}}</TableCell>
+                        <TableCell class="whitespace-normal break-words">
+                            <Link :href="'/admin/orders/'+order.id" class="font-medium text-primary hover:underline">{{order.order_number}}</Link>
+                            <time class="mt-1 block text-xs text-muted-foreground">{{date(order.created_at)}}</time>
+                        </TableCell>
+                        <TableCell class="whitespace-normal break-words">{{order.buyer_name}}</TableCell>
+                        <TableCell class="whitespace-normal break-words">
+                            <strong>{{order.product_name}}</strong>
+                            <p class="text-xs text-muted-foreground">{{order.package_name}}</p>
+                        </TableCell>
+                        <TableCell class="whitespace-normal break-words">
+                            {{order.payment_channel}}
+                            <p class="text-xs text-muted-foreground">{{order.payment_status}}</p>
+                        </TableCell>
+                        <TableCell v-if="canViewFinance">{{money(order.total_idr)}}</TableCell>
+                        <TableCell><Badge :variant="order.status==='FAILED'?'destructive':'secondary'">{{statusLabel(order.status)}}</Badge></TableCell>
+                    </TableRow>
+                    <TableRow v-if="!recentOrders.length">
+                        <TableCell :colspan="canViewFinance?7:6" class="py-8 text-center text-muted-foreground">Belum ada pesanan.</TableCell>
+                    </TableRow>
+                </TableBody>
+            </AdminResponsiveTable>
+        </CardContent>
+    </Card>
 
-        <Card v-if="integrations.length" class="min-w-0"><CardHeader class="flex flex-row items-center justify-between gap-3 p-4"><CardTitle class="text-base">Status Integrasi</CardTitle><Button v-if="owner" variant="link" size="sm" as-child><Link href="/admin/integrations">Lihat Integrasi</Link></Button></CardHeader><CardContent class="space-y-2 px-4 pb-4"><div class="max-h-80 space-y-2 overflow-y-auto"><div v-for="integration in integrations" :key="integration.code" class="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border p-2"><div class="min-w-0"><strong class="text-sm">{{integration.name}}</strong><p class="text-xs text-muted-foreground">{{integration.active?'Aktif':'Nonaktif'}} · {{date(integration.tested_at)}}</p></div><Badge :variant="integration.status==='DOWN'?'destructive':'secondary'">{{statusLabel(integration.status)}}</Badge></div></div><dl class="space-y-2 border-t border-border pt-3 text-xs"><div class="flex flex-wrap justify-between gap-2"><dt>Terakhir Sinkronisasi</dt><dd>{{date(lastSyncedAt)}}</dd></div><div class="flex justify-between gap-2"><dt>Webhook</dt><dd>{{webhookReady?'URL HTTPS siap':'Periksa URL aplikasi'}}</dd></div><div class="flex justify-between gap-2"><dt>Integrasi Aktif</dt><dd>{{integrationSummary}}</dd></div></dl><p class="text-xs text-muted-foreground">Status mengikuti tes koneksi terakhir; konfigurasi tersimpan belum berarti koneksi terverifikasi.</p></CardContent></Card>
+    <!-- 4. Ringkasan Aktivitas, Integrasi & Notifikasi (Ringkas, bukan kartu bertumpuk) -->
+    <div class="grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
+        <!-- Aktivitas -->
+        <div class="rounded-lg border border-border bg-card p-4">
+            <div class="flex items-center justify-between pb-3 border-b border-border">
+                <strong class="text-sm">Aktivitas Terbaru</strong>
+                <Link v-if="owner||canOrders" :href="owner?'/admin/audit':'/admin/orders'" class="text-xs text-primary hover:underline">Semua</Link>
+            </div>
+            <div class="divide-y divide-border">
+                <p v-if="!visibleActivities.length" class="py-4 text-center text-xs text-muted-foreground">Belum ada aktivitas.</p>
+                <article v-for="activity in visibleActivities.slice(0, 5)" :key="activity.id" class="py-2.5">
+                    <Link v-if="activity.href" :href="activity.href" class="text-xs font-medium text-primary hover:underline block">{{activity.action}}</Link>
+                    <strong v-else class="block text-xs">{{activity.action}}</strong>
+                    <p class="text-[11px] text-muted-foreground truncate">{{activity.target}}</p>
+                    <time class="block text-[10px] text-muted-foreground mt-0.5">{{date(activity.created_at)}}</time>
+                </article>
+            </div>
+        </div>
+
+        <!-- Status Integrasi -->
+        <div v-if="integrations.length" class="rounded-lg border border-border bg-card p-4">
+            <div class="flex items-center justify-between pb-3 border-b border-border">
+                <strong class="text-sm">Status Integrasi</strong>
+                <Link v-if="owner" href="/admin/integrations" class="text-xs text-primary hover:underline">Kelola</Link>
+            </div>
+            <div class="divide-y divide-border">
+                <div v-for="integration in integrations.slice(0, 5)" :key="integration.code" class="flex items-center justify-between py-2">
+                    <div class="min-w-0 pr-2">
+                        <span class="text-xs font-medium block truncate">{{integration.name}}</span>
+                        <span class="text-[10px] text-muted-foreground">{{integration.active?'Aktif':'Nonaktif'}}</span>
+                    </div>
+                    <Badge :variant="integration.status==='DOWN'?'destructive':'secondary'" class="text-[10px]">{{statusLabel(integration.status)}}</Badge>
+                </div>
+            </div>
+            <div class="mt-3 pt-2.5 border-t border-border flex justify-between text-[11px] text-muted-foreground">
+                <span>Sinkronisasi terakhir:</span>
+                <span class="font-medium text-foreground">{{date(lastSyncedAt)}}</span>
+            </div>
+        </div>
+
+        <!-- Notifikasi Belum Dibaca -->
+        <div v-if="canNotifications" class="rounded-lg border border-border bg-card p-4">
+            <div class="flex items-center justify-between pb-3 border-b border-border">
+                <strong class="text-sm">Notifikasi</strong>
+                <Link href="/admin/notifications" class="text-xs text-primary hover:underline">Semua</Link>
+            </div>
+            <div class="divide-y divide-border">
+                <p v-if="!notifications.length" class="py-4 text-center text-xs text-muted-foreground">Tidak ada notifikasi baru.</p>
+                <article v-for="n in notifications.slice(0, 4)" :key="n.id" class="py-2.5">
+                    <div class="flex items-start justify-between gap-1">
+                        <strong class="text-xs truncate block">{{n.title}}</strong>
+                        <Badge class="text-[9px] shrink-0" :variant="n.severity==='ERROR'?'destructive':'secondary'">{{n.severity}}</Badge>
+                    </div>
+                    <p class="text-[11px] text-muted-foreground truncate mt-0.5">{{n.message}}</p>
+                    <div class="flex items-center justify-between mt-1">
+                        <time class="text-[10px] text-muted-foreground">{{date(n.created_at)}}</time>
+                        <button v-if="!n.read_at" type="button" class="text-[10px] text-primary hover:underline" @click="markRead(n)">Tandai dibaca</button>
+                    </div>
+                </article>
+            </div>
+        </div>
     </div>
-
-    <div class="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,2.5fr)_minmax(0,1fr)]">
-        <Card v-if="canOrders" class="min-w-0"><CardHeader class="flex flex-row flex-wrap items-center justify-between gap-3 p-4"><CardTitle class="text-base">Pesanan Terbaru</CardTitle><Button variant="link" size="sm" as-child><Link href="/admin/orders">Lihat Semua Pesanan</Link></Button></CardHeader><CardContent class="px-0 pb-2"><AdminResponsiveTable :mobile-columns="canViewFinance?[1,3,4,5,6]:[1,3,4,5]" class="table-fixed min-w-[720px]"><TableHeader><TableRow><TableHead class="w-[4%]">#</TableHead><TableHead class="w-[19%]">Invoice</TableHead><TableHead class="w-[14%]">Pelanggan</TableHead><TableHead class="w-[22%] whitespace-normal">Produk / Nominal</TableHead><TableHead class="w-[15%] whitespace-normal">Pembayaran</TableHead><TableHead v-if="canViewFinance" class="w-[13%]">Total</TableHead><TableHead class="w-[13%]">Status</TableHead></TableRow></TableHeader><TableBody><TableRow v-for="(order,index) in recentOrders" :key="order.id"><TableCell>{{index+1}}</TableCell><TableCell class="whitespace-normal break-words"><Link :href="'/admin/orders/'+order.id" class="font-medium text-primary">{{order.order_number}}</Link><time class="mt-1 block text-xs text-muted-foreground">{{date(order.created_at)}}</time></TableCell><TableCell class="whitespace-normal break-words">{{order.buyer_name}}</TableCell><TableCell class="whitespace-normal break-words"><strong>{{order.product_name}}</strong><p class="text-xs text-muted-foreground">{{order.package_name}}</p></TableCell><TableCell class="whitespace-normal break-words">{{order.payment_channel}}<p class="text-xs text-muted-foreground">{{order.payment_status}}</p></TableCell><TableCell v-if="canViewFinance">{{money(order.total_idr)}}</TableCell><TableCell><Badge :variant="order.status==='FAILED'?'destructive':'secondary'">{{statusLabel(order.status)}}</Badge></TableCell></TableRow><TableRow v-if="!recentOrders.length"><TableCell :colspan="canViewFinance?7:6" class="py-8 text-center text-muted-foreground">Belum ada pesanan pada periode ini.</TableCell></TableRow></TableBody></AdminResponsiveTable></CardContent></Card>
-        <Card v-if="canCatalog&&canOrders" class="min-w-0"><CardHeader class="flex flex-row items-center justify-between gap-3 p-4"><CardTitle class="text-base">Produk Terlaris</CardTitle><Button variant="link" size="sm" as-child><Link href="/admin/catalog">Lihat semua</Link></Button></CardHeader><CardContent class="px-4 pb-4"><p v-if="!topProducts.length" class="py-6 text-center text-sm text-muted-foreground">Belum ada data produk pada periode ini.</p><Link v-for="(product,index) in topProducts" :key="product.id" :href="'/admin/catalog?q='+encodeURIComponent(product.name)" class="flex items-center gap-3 border-b border-border py-3 last:border-0"><span class="text-xs text-muted-foreground">{{index+1}}</span><span class="min-w-0 flex-1 break-words text-sm font-medium">{{product.name}}</span><strong class="text-sm">{{product.fulfilled_orders}}</strong></Link></CardContent></Card>
-    </div>
-    <Card v-if="canNotifications"><CardHeader class="flex flex-row flex-wrap items-center justify-between gap-3 p-4"><CardTitle class="text-base">Notifikasi Terbaru</CardTitle><Button variant="link" size="sm" as-child><Link href="/admin/notifications">Lihat semua</Link></Button></CardHeader><CardContent class="px-4 pb-4"><p v-if="!notifications.length" class="py-6 text-center text-sm text-muted-foreground">Belum ada notifikasi.</p><article v-for="notification in notifications" :key="notification.id" class="flex flex-wrap items-start justify-between gap-3 border-b border-border py-3 last:border-0"><div class="min-w-0 flex-1"><strong class="break-words text-sm">{{notification.title}}</strong><Badge class="ml-2" :variant="notification.severity==='ERROR'?'destructive':'secondary'">{{notification.severity}}</Badge><p class="mt-1 break-words text-xs text-muted-foreground">{{notification.message}}</p><p class="mt-1 text-xs text-muted-foreground">{{date(notification.created_at)}} · {{notification.read_at?'Sudah dibaca':'Belum dibaca'}}</p></div><Button v-if="!notification.read_at" variant="outline" size="sm" @click="markRead(notification)">Tandai dibaca</Button></article></CardContent></Card>
 </div></AdminShell>
 </template>

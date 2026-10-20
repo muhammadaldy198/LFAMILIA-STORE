@@ -1,7 +1,7 @@
 <script setup>
 import AdminSwitch from '../../Components/AdminSwitch.vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
-import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue';
 import AdminShell from '../../Components/AdminShell.vue';
 import { Button } from '../../Components/ui/button';
 import { Input } from '../../Components/ui/input';
@@ -51,11 +51,11 @@ const autoSyncForm = useForm({
     price_warning_percent: Number(props.monitorSettings?.price_warning_percent || 3),
 });
 const syncForm = useForm({});
-const maxSkuText = ref('');
-const maxPricePreview = ref(null);
-const maxPriceBusy = ref(false);
-const maxPriceError = ref('');
-watch(maxSkuText, () => { maxPricePreview.value = null; });
+const _maxSkuText = ref('');
+const _maxPricePreview = ref(null);
+const _maxPriceBusy = ref(false);
+const _maxPriceError = ref('');
+
 
 const money = value => value == null ? '—' : 'Rp' + Number(value).toLocaleString('id-ID');
 const date = value => value
@@ -114,10 +114,10 @@ function sync(id = null) {
         .post('/admin/digiflazz/sync', { preserveScroll: true });
 }
 
-async function previewMaxPrices() {
-    maxPriceError.value = '';
-    maxPricePreview.value = null;
-    maxPriceBusy.value = true;
+async function _previewMaxPrices() {
+    _maxPriceError.value = '';
+    _maxPricePreview.value = null;
+    _maxPriceBusy.value = true;
     try {
         const response = await fetch('/admin/digiflazz/max-prices/preview', {
             method: 'POST',
@@ -127,23 +127,23 @@ async function previewMaxPrices() {
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
             },
-            body: JSON.stringify({ sku_text: maxSkuText.value }),
+            body: JSON.stringify({ sku_text: _maxSkuText.value }),
         });
         const body = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(Object.values(body.errors || {})?.[0]?.[0] || body.message || 'Preview gagal.');
-        maxPricePreview.value = body;
+        _maxPricePreview.value = body;
     } catch (error) {
-        maxPriceError.value = error.message;
+        _maxPriceError.value = error.message;
     } finally {
-        maxPriceBusy.value = false;
+        _maxPriceBusy.value = false;
     }
 }
-function applyMaxPrices() {
-    if (!maxPricePreview.value || !confirm('Terapkan Harga Max dan modal sesuai daftar SKU pada preview ini?')) return;
-    router.post('/admin/digiflazz/max-prices/apply', { preview_token: maxPricePreview.value.token }, {
+function _applyMaxPrices() {
+    if (!_maxPricePreview.value || !confirm('Terapkan Harga Max dan modal sesuai daftar SKU pada preview ini?')) return;
+    router.post('/admin/digiflazz/max-prices/apply', { preview_token: _maxPricePreview.value.token }, {
         preserveScroll: true,
-        onSuccess: () => { maxPricePreview.value = null; },
-        onError: errors => { maxPriceError.value = errors.preview_token || 'Eksekusi ditolak. Buat preview baru.'; },
+        onSuccess: () => { _maxPricePreview.value = null; },
+        onError: errors => { _maxPriceError.value = errors.preview_token || 'Eksekusi ditolak. Buat preview baru.'; },
     });
 }
 function baseline(id) {
@@ -179,38 +179,19 @@ onUnmounted(() => {
 <Head title="Digiflazz" />
 <AdminShell>
     <div class="space-y-5">
-        <header class="flex flex-wrap items-start justify-between gap-3">
-            <div>
-                <h1 class="text-2xl font-semibold">Digiflazz</h1>
-                <p class="mt-1 text-sm text-muted-foreground">Monitor harga modal, seller, stok, cut-off, sinkronisasi, dan transaksi Digiflazz.</p>
+        <header class="flex flex-col gap-4 border-b border-border pb-4 xl:flex-row xl:items-end xl:justify-between">
+            <div class="min-w-0">
+                <h1 class="text-2xl font-semibold tracking-tight">Digiflazz</h1>
+                <p class="mt-1 text-sm text-muted-foreground">Pantau harga modal, penjual, stok, jam layanan, pembaruan daftar harga, dan transaksi Digiflazz.</p>
             </div>
-            <div class="flex flex-wrap gap-2">
-                <Link href="/admin/catalog?import=digiflazz" class="inline-flex items-center rounded-md border px-3 py-2 text-sm font-medium">Impor ke produk</Link>
-                <Button variant="outline" :disabled="syncForm.processing" @click="refresh">Muat ulang</Button>
-                <Button :disabled="syncForm.processing" @click="sync()">
+            <div class="flex flex-col gap-2 sm:flex-row">
+                <Link href="/admin/catalog?import=digiflazz" class="inline-flex min-h-10 items-center justify-center rounded-md border px-3 py-2 text-sm font-medium">Impor ke produk</Link>
+                <Button class="w-full sm:w-auto" variant="outline" :disabled="syncForm.processing" @click="refresh">Muat ulang</Button>
+                <Button class="w-full sm:w-auto" :disabled="syncForm.processing" @click="sync()">
                     {{ syncForm.processing ? 'Menyinkronkan…' : 'Sinkron daftar harga' }}
                 </Button>
             </div>
         </header>
-
-        <Card class="space-y-3 p-4">
-            <h2 class="font-semibold">Samakan Harga Max dari Buyer Area</h2>
-            <p class="text-sm text-muted-foreground">Tempel CSV atau TSV berisi SKU dan Harga Max dari Buyer Area Digiflazz. Data API sinkronisasi tidak menyediakan Harga Max. Hanya SKU yang ditempel yang dapat diubah, setelah preview dan konfirmasi.</p>
-            <textarea v-model="maxSkuText" class="w-full rounded-md border bg-transparent p-3 font-mono text-sm" rows="5" aria-label="Daftar SKU dan Harga Max" placeholder="SKU, Harga Max — satu SKU setiap baris"></textarea>
-            <Button type="button" :disabled="maxPriceBusy || !maxSkuText.trim()" @click="previewMaxPrices">{{maxPriceBusy ? 'Membuat preview…' : 'Pratinjau Harga Max'}}</Button>
-            <p v-if="maxPriceError" role="alert" class="text-sm text-destructive">{{maxPriceError}}</p>
-            <div v-if="maxPricePreview" class="space-y-3 rounded border p-3">
-                <strong>Preview: {{maxPricePreview.summary.skus}} SKU · {{maxPricePreview.summary.affected_mappings}} mapping · Selisih harga jual {{money(maxPricePreview.summary.total_sell_difference_idr)}}</strong>
-                <div class="max-h-72 space-y-2 overflow-auto text-xs">
-                    <div v-for="row in maxPricePreview.mappings" :key="row.mapping_id" class="border-b pb-2">
-                        <b>{{row.sku}} — {{row.product}} / {{row.package}}</b>
-                        <p>Harga Max {{money(row.old_max_price_idr)}} → {{money(row.new_max_price_idr)}} · Modal {{money(row.old_cost_idr)}} → {{money(row.new_cost_idr)}}</p>
-                        <p>Harga jual {{money(row.before_sell_idr)}} → {{money(row.after_sell_idr)}} · Selisih {{money(row.difference_idr)}} · {{row.is_manual_price ? 'Harga manual tetap terkunci' : 'Harga bukan manual: dapat berubah pada sync berikutnya'}}</p>
-                    </div>
-                </div>
-                <Button type="button" variant="outline" @click="applyMaxPrices">Konfirmasi &amp; samakan Harga Max</Button>
-            </div>
-        </Card>
 
         <div class="lf-admin-summary">
             <Card class="p-4">
@@ -285,7 +266,7 @@ onUnmounted(() => {
         </Card>
 
         <Card class="p-4">
-            <form class="grid grid-cols-2 gap-3 md:grid-cols-4" @submit.prevent="search">
+            <form class="grid min-w-0 grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4" @submit.prevent="search">
 <label class="space-y-1 col-span-2 md:col-span-1">
                     <span class="text-sm font-medium">Cari</span>
                     <Input v-model="filters.q" maxlength="100" placeholder="Produk, nominal, SKU, seller, atau brand" />
@@ -338,104 +319,45 @@ onUnmounted(() => {
         </Card>
 
         <Card class="overflow-hidden">
-            <div class="divide-y md:hidden">
-                <details v-for="item in items.data" :key="item.id" :data-digiflazz-health="item.health" class="group">
-                    <summary class="grid cursor-pointer list-none grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 py-3">
-                        <div class="min-w-0">
-                            <strong class="block truncate text-sm">{{ item.local_product_name || item.product_name }}</strong>
-                            <p class="mt-0.5 truncate text-xs text-muted-foreground">{{ item.local_package_name || item.product_name }} · {{ item.buyer_sku_code }}</p>
-                        </div>
-                        <div class="text-right">
-                            <strong class="block whitespace-nowrap text-sm">{{ money(item.price_idr) }}</strong>
-                            <span class="mt-1 inline-flex items-center gap-2">
-                                <Badge :variant="healthVariant(item.health)">{{ healthLabel(item.health) }}</Badge>
-                                <span class="text-xs text-muted-foreground group-open:hidden">Detail</span>
-                                <span class="hidden text-xs text-muted-foreground group-open:inline">Tutup</span>
-                            </span>
-                        </div>
-                    </summary>
-                    <div class="border-t bg-muted/10 px-4 py-3">
-                        <dl class="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
-                            <div class="min-w-0">
-                                <dt class="font-medium text-muted-foreground">Seller</dt>
-                                <dd class="mt-1 break-words text-sm">{{ item.seller_name || 'Seller tidak tersedia' }}</dd>
-                                <dd class="mt-0.5 text-muted-foreground">{{ item.multi ? 'Transaksi bersamaan' : 'Transaksi berurutan' }}</dd>
-                            </div>
-                            <div class="min-w-0">
-                                <dt class="font-medium text-muted-foreground">Stok / cut-off</dt>
-                                <dd class="mt-1 break-words text-sm">{{ item.unlimited_stock ? 'Tidak terbatas' : Number(item.stock).toLocaleString('id-ID') + ' tersisa' }}</dd>
-                                <dd class="mt-0.5 text-muted-foreground">{{ item.start_cut_off === item.end_cut_off ? 'Tanpa cut-off' : item.start_cut_off + '–' + item.end_cut_off + ' WIB' }}</dd>
-                            </div>
-                            <div class="min-w-0">
-                                <dt class="font-medium text-muted-foreground">Baseline</dt>
-                                <dd class="mt-1 text-sm">{{ money(item.baseline_price_idr) }}</dd>
-                                <dd v-if="Number(item.price_idr) > Number(item.baseline_price_idr)" class="mt-0.5 text-muted-foreground">Naik {{ money(Number(item.price_idr) - Number(item.baseline_price_idr)) }}</dd>
-                            </div>
-                            <div class="min-w-0">
-                                <dt class="font-medium text-muted-foreground">Status mapping</dt>
-                                <dd class="mt-1 text-sm">{{ item.mapped ? 'Terhubung' : 'Belum diimpor' }}</dd>
-                                <dd class="mt-0.5 text-muted-foreground">Produk {{ item.buyer_active ? 'aktif' : 'nonaktif' }} · Seller {{ item.seller_active ? 'aktif' : 'nonaktif' }}</dd>
-                                <dd v-if="item.mapped" class="mt-0.5 text-muted-foreground">Mapping {{ item.mapping_active ? 'aktif' : 'nonaktif' }}</dd>
-                            </div>
-                        </dl>
-                        <p v-if="item.alert_reason" class="mt-3 border-t pt-3 text-xs text-muted-foreground">{{ item.alert_reason }}</p>
-                        <div class="mt-3 flex gap-2 border-t pt-3">
-                            <Link v-if="!item.mapped && item.available" :href="'/admin/catalog?import_sku=' + item.id" class="inline-flex items-center rounded-md border px-3 py-2 text-sm font-medium">Impor ke produk</Link>
-                            <Button class="flex-1" size="sm" variant="outline" :disabled="syncForm.processing" @click="sync(item.id)">Sinkron SKU</Button>
-                            <Button class="flex-1" size="sm" variant="outline" @click="baseline(item.id)">Jadikan baseline</Button>
-                        </div>
-                    </div>
-                </details>
-                <div v-if="!items.data.length" class="px-4 py-10 text-center text-sm text-muted-foreground">Tidak ada SKU yang sesuai dengan filter.</div>
-            </div>
-
-            <div class="hidden overflow-x-auto md:block">
-                <Table class="min-w-[1100px] table-fixed">
+            <div class="overflow-x-auto overscroll-x-contain" role="region" aria-label="Daftar produk dan harga Digiflazz" tabindex="0">
+                <Table class="min-w-[900px] table-fixed">
                     <TableHeader>
                         <TableRow>
-                            <TableHead class="w-[23%]">Produk / nominal</TableHead>
-                            <TableHead class="w-[15%]">SKU / seller</TableHead>
-                            <TableHead class="w-[18%] text-right">Modal / baseline</TableHead>
-                            <TableHead class="w-[16%]">Stok / cut-off</TableHead>
-                            <TableHead class="w-[18%]">Status</TableHead>
-                            <TableHead class="w-[10%]">Aksi</TableHead>
+                            <TableHead class="w-[25%]">Produk / Nominal</TableHead>
+                            <TableHead class="w-[16%]">SKU / Seller</TableHead>
+                            <TableHead class="w-[16%] text-right">Harga Modal</TableHead>
+                            <TableHead class="w-[15%]">Stok & Cut-off</TableHead>
+                            <TableHead class="w-[16%]">Kesehatan</TableHead>
+                            <TableHead class="w-[12%] text-right">Aksi</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         <TableRow v-for="item in items.data" :key="item.id" :data-digiflazz-health="item.health">
                             <TableCell class="align-top">
-                                <strong class="break-words">{{ item.local_product_name || item.product_name }}</strong>
-                                <p class="mt-1 break-words text-sm">{{ item.local_package_name || item.product_name }}</p>
-                                <p class="mt-1 text-xs text-muted-foreground">{{ item.category || 'Tanpa kategori' }} · {{ item.brand || 'Tanpa brand' }}</p>
-                                <Badge class="mt-2" variant="outline">{{ item.mapped ? 'Terhubung' : 'Belum diimpor' }}</Badge>
+                                <strong class="break-words text-xs block">{{ item.local_product_name || item.product_name }}</strong>
+                                <p class="text-[11px] text-muted-foreground">{{ item.local_package_name || item.product_name }}</p>
+                                <span class="text-[10px] text-muted-foreground">{{ item.mapped ? 'Terhubung' : 'Belum diimpor' }}</span>
                             </TableCell>
                             <TableCell class="align-top">
-                                <p class="break-all font-mono text-xs">{{ item.buyer_sku_code }}</p>
-                                <p class="mt-2 text-sm">{{ item.seller_name || 'Seller tidak tersedia' }}</p>
-                                <p class="mt-1 text-xs text-muted-foreground">{{ item.multi ? 'Mendukung transaksi bersamaan' : 'Transaksi berurutan' }}</p>
+                                <code class="text-xs font-mono text-primary">{{ item.buyer_sku_code }}</code>
+                                <p class="text-[11px] text-muted-foreground truncate">{{ item.seller_name || '—' }}</p>
                             </TableCell>
                             <TableCell class="align-top text-right">
-                                <strong>{{ money(item.price_idr) }}</strong>
-                                <p class="mt-1 text-xs text-muted-foreground">Baseline {{ money(item.baseline_price_idr) }}</p>
-                                <p v-if="Number(item.price_idr) > Number(item.baseline_price_idr)" class="mt-2 text-xs">
-                                    Naik {{ money(Number(item.price_idr) - Number(item.baseline_price_idr)) }}
-                                </p>
+                                <strong class="text-xs">{{ money(item.price_idr) }}</strong>
+                                <p v-if="item.baseline_price_idr" class="text-[10px] text-muted-foreground">Base: {{ money(item.baseline_price_idr) }}</p>
+                            </TableCell>
+                            <TableCell class="align-top text-xs">
+                                <span>{{ item.unlimited_stock ? 'Tak terbatas' : Number(item.stock).toLocaleString('id-ID') }}</span>
+                                <p class="text-[10px] text-muted-foreground">{{ item.start_cut_off === item.end_cut_off ? 'Tanpa cut-off' : item.start_cut_off + '–' + item.end_cut_off }}</p>
                             </TableCell>
                             <TableCell class="align-top">
-                                <p>{{ item.unlimited_stock ? 'Tidak terbatas' : Number(item.stock).toLocaleString('id-ID') + ' tersisa' }}</p>
-                                <p class="mt-1 text-xs text-muted-foreground">{{ item.start_cut_off === item.end_cut_off ? 'Tanpa cut-off' : item.start_cut_off + '–' + item.end_cut_off + ' WIB' }}</p>
+                                <Badge :variant="healthVariant(item.health)" class="text-[10px]">{{ healthLabel(item.health) }}</Badge>
+                                <p v-if="item.alert_reason" class="text-[10px] text-destructive mt-0.5 truncate" :title="item.alert_reason">{{ item.alert_reason }}</p>
                             </TableCell>
-                            <TableCell class="align-top">
-                                <Badge :variant="healthVariant(item.health)">{{ healthLabel(item.health) }}</Badge>
-                                <p v-if="item.alert_reason" class="mt-2 text-xs text-muted-foreground">{{ item.alert_reason }}</p>
-                                <p class="mt-2 text-xs text-muted-foreground">Produk {{ item.buyer_active ? 'aktif' : 'nonaktif' }} · Seller {{ item.seller_active ? 'aktif' : 'nonaktif' }}</p>
-                                <p v-if="item.mapped" class="mt-1 text-xs text-muted-foreground">Mapping {{ item.mapping_active ? 'aktif' : 'nonaktif' }}</p>
-                            </TableCell>
-                            <TableCell class="align-top">
-                                <div class="flex flex-col gap-2">
-                                    <Link v-if="!item.mapped && item.available" :href="'/admin/catalog?import_sku=' + item.id" class="inline-flex items-center rounded-md border px-3 py-2 text-xs font-medium">Impor ke produk</Link>
-                                    <Button size="sm" variant="outline" :disabled="syncForm.processing" @click="sync(item.id)">Sinkron SKU</Button>
-                                    <Button size="sm" variant="outline" @click="baseline(item.id)">Jadikan baseline</Button>
+                            <TableCell class="align-top text-right">
+                                <div class="flex items-center justify-end gap-1">
+                                    <Button size="sm" variant="ghost" class="h-6 px-1.5 text-[10px]" :disabled="syncForm.processing" @click="sync(item.id)">Sync</Button>
+                                    <Button size="sm" variant="outline" class="h-6 px-1.5 text-[10px]" @click="baseline(item.id)">Baseline</Button>
                                 </div>
                             </TableCell>
                         </TableRow>
@@ -456,45 +378,28 @@ onUnmounted(() => {
 
         <Card class="overflow-hidden">
             <div class="border-b p-4">
-                <h2 class="font-semibold">Transaksi Digiflazz terbaru</h2>
-                <p class="mt-1 text-xs text-muted-foreground">Ringkasan operasional. Riwayat dan tindakan lengkap tetap berada di menu Pesanan dan Manual.</p>
+                <h2 class="font-semibold text-sm">Transaksi Digiflazz terbaru</h2>
+                <p class="mt-0.5 text-xs text-muted-foreground">Ringkasan operasional transaksi terakhir.</p>
             </div>
 
-            <div class="divide-y md:hidden">
-                <div v-for="row in recentTransactions" :key="row.id" class="px-4 py-3">
-                    <div class="flex min-w-0 items-start justify-between gap-3">
-                        <div class="min-w-0">
-                            <Link :href="'/admin/orders/' + row.order_id" class="block truncate font-medium underline-offset-4 hover:underline">{{ row.order_number }}</Link>
-                            <p class="mt-0.5 truncate text-sm">{{ row.product_name }} · {{ row.package_name }}</p>
-                            <p class="mt-1 text-xs text-muted-foreground">{{ date(row.created_at) }}</p>
-                        </div>
-                        <Badge class="shrink-0" variant="secondary">{{ row.status_label }}</Badge>
-                    </div>
-                    <p v-if="row.provider_status || row.message" class="mt-2 border-t pt-2 text-xs text-muted-foreground">
-                        {{ row.provider_status || 'Provider' }}<template v-if="row.message"> · {{ row.message }}</template>
-                    </p>
-                </div>
-                <div v-if="!recentTransactions.length" class="px-4 py-8 text-center text-sm text-muted-foreground">Belum ada transaksi Digiflazz.</div>
-            </div>
-
-            <div class="hidden overflow-x-auto md:block">
-                <Table class="min-w-[800px]">
+            <div class="overflow-x-auto overscroll-x-contain" role="region" aria-label="Transaksi Digiflazz" tabindex="0">
+                <Table class="min-w-[700px]">
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Pesanan</TableHead>
-                            <TableHead>Produk</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Waktu</TableHead>
-                            <TableHead>Catatan</TableHead>
+                            <TableHead class="w-[20%]">Pesanan</TableHead>
+                            <TableHead class="w-[25%]">Produk</TableHead>
+                            <TableHead class="w-[18%]">Status</TableHead>
+                            <TableHead class="w-[17%]">Waktu</TableHead>
+                            <TableHead class="w-[20%]">Catatan</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         <TableRow v-for="row in recentTransactions" :key="row.id">
-                            <TableCell><Link :href="'/admin/orders/' + row.order_id" class="font-medium underline-offset-4 hover:underline">{{ row.order_number }}</Link></TableCell>
-                            <TableCell>{{ row.product_name }}<p class="text-xs text-muted-foreground">{{ row.package_name }}</p></TableCell>
-                            <TableCell><Badge variant="secondary">{{ row.status_label }}</Badge><p v-if="row.provider_status" class="mt-1 text-xs text-muted-foreground">{{ row.provider_status }}</p></TableCell>
-                            <TableCell class="text-sm">{{ date(row.created_at) }}</TableCell>
-                            <TableCell class="max-w-[280px] text-sm">{{ row.message || '—' }}</TableCell>
+                            <TableCell><Link :href="'/admin/orders/' + row.order_id" class="font-medium text-xs text-primary underline-offset-4 hover:underline">{{ row.order_number }}</Link></TableCell>
+                            <TableCell class="text-xs">{{ row.product_name }}<p class="text-[11px] text-muted-foreground">{{ row.package_name }}</p></TableCell>
+                            <TableCell><Badge variant="secondary" class="text-[10px]">{{ row.status_label }}</Badge><p v-if="row.provider_status" class="mt-0.5 text-[10px] text-muted-foreground">{{ row.provider_status }}</p></TableCell>
+                            <TableCell class="text-xs text-muted-foreground">{{ date(row.created_at) }}</TableCell>
+                            <TableCell class="max-w-[240px] text-xs text-muted-foreground truncate">{{ row.message || '—' }}</TableCell>
                         </TableRow>
                         <TableRow v-if="!recentTransactions.length">
                             <TableCell colspan="5" class="py-8 text-center text-sm text-muted-foreground">Belum ada transaksi Digiflazz.</TableCell>

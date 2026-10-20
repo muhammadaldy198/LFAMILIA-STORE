@@ -42,6 +42,7 @@ class FulfillmentTest extends TestCase
             'margin_percent' => 10,
             'fulfillment_mode' => 'AUTO_PROVIDER',
             'is_active' => true,
+            'customer_no_template' => $template,
         ]);
         $product->fields()->create([
             'field_key' => 'user_id',
@@ -69,9 +70,7 @@ class FulfillmentTest extends TestCase
             'external_sku' => $sku,
             'cost_idr' => $cost,
             'max_price_idr' => $maxPrice,
-            'fulfillment_config' => $template === null ? null : json_encode([
-                'customer_no_template' => $template,
-            ], JSON_THROW_ON_ERROR),
+            'fulfillment_config' => json_encode(['provider_option' => 'preserve'], JSON_THROW_ON_ERROR),
             'priority' => 1,
             'is_active' => true,
             'created_at' => now(),
@@ -104,6 +103,13 @@ class FulfillmentTest extends TestCase
                 'synced_at' => now(), 'created_at' => now(), 'updated_at' => now(),
             ]);
         }
+        $customerNoTemplate = $catalog['product']->customer_no_template;
+        if ($customerNoTemplate === null) {
+            $mappingConfig = is_string($mapping->fulfillment_config)
+                ? (json_decode($mapping->fulfillment_config, true) ?: [])
+                : (array) $mapping->fulfillment_config;
+            $customerNoTemplate = $mappingConfig['customer_no_template'] ?? null;
+        }
         $snapshot = [
             'product' => [
                 'id' => $catalog['product']->id,
@@ -117,6 +123,7 @@ class FulfillmentTest extends TestCase
                 'sku' => $mapping->external_sku,
                 'cost_idr' => (int) $mapping->cost_idr,
                 'max_price_idr' => $snapshotMaxPrice ?? (int) $mapping->max_price_idr,
+                'customer_no_template' => $customerNoTemplate,
             ],
             'pricing' => ['cost_idr' => (int) $mapping->cost_idr, 'total_idr' => 11000],
             'customer_input' => ['user_id' => '123456', 'zone_id' => '7890'],
@@ -546,6 +553,53 @@ class FulfillmentTest extends TestCase
         $attempt = DB::table('fulfillment_attempts')->where('order_id', $orderId)->first();
         $this->assertSame('BLOCKED', $attempt->status);
         $this->assertSame('PAID', DB::table('orders')->where('id', $orderId)->value('status'));
+        Http::assertNothingSent();
+    }
+
+    public function test_product_customer_template_is_used_instead_of_mapping_template(): void
+    {
+        Queue::fake();
+        $this->credentials();
+        $catalog = $this->automaticCatalog(template: null);
+        $catalog['product']->update(['customer_no_template' => '{{user_id}}{{zone_id}}']);
+        $orderId = $this->paidOrder($catalog);
+        $catalog['product']->update(['customer_no_template' => '{{zone_id}}{{user_id}}']);
+
+        Http::fake(['*' => Http::response(['data' => [
+            'ref_id' => 'shared-template-ref', 'customer_no' => '1234567890',
+            'buyer_sku_code' => 'DF-PRIMARY', 'message' => 'Sukses', 'status' => 'Sukses',
+            'rc' => '00', 'sn' => 'TEST', 'price' => 10000,
+        ]])]);
+
+        $service = app(FulfillmentService::class);
+        $service->startOrder($orderId);
+        $attempt = DB::table('fulfillment_attempts')->where('order_id', $orderId)->first();
+        $service->sendAttempt((int) $attempt->id);
+
+        Http::assertSent(fn ($request): bool => ($request['customer_no'] ?? null) === '1234567890'
+            && ($request['buyer_sku_code'] ?? null) === 'DF-PRIMARY');
+    }
+
+    public function test_explicitly_cleared_template_snapshot_does_not_fall_back_to_mapping_template(): void
+    {
+        Queue::fake();
+        $this->credentials();
+        $catalog = $this->automaticCatalog(template: '{{user_id}}{{zone_id}}');
+        $orderId = $this->paidOrder($catalog);
+        $snapshot = json_decode((string) DB::table('orders')->where('id', $orderId)->value('snapshot'), true);
+        $snapshot['provider']['customer_no_template'] = null;
+        DB::table('orders')->where('id', $orderId)->update(['snapshot' => json_encode($snapshot, JSON_THROW_ON_ERROR)]);
+        DB::table('provider_mappings')->where('id', $catalog['mapping_id'])->update([
+            'fulfillment_config' => json_encode(['customer_no_template' => '{{zone_id}}{{user_id}}']),
+        ]);
+
+        Http::fake();
+        $service = app(FulfillmentService::class);
+        $service->startOrder($orderId);
+        $attempt = DB::table('fulfillment_attempts')->where('order_id', $orderId)->first();
+        $service->sendAttempt((int) $attempt->id);
+
+        $this->assertSame('BLOCKED', DB::table('fulfillment_attempts')->where('id', $attempt->id)->value('status'));
         Http::assertNothingSent();
     }
 

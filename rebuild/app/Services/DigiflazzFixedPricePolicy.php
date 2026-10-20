@@ -92,9 +92,13 @@ class DigiflazzFixedPricePolicy
             $cost = (int) ($row->is_manual_price ? $row->live_price_idr : $row->cost_idr);
             $alerts[$id]['lowest_cost_idr'] = $alerts[$id]['lowest_cost_idr'] === null
                 ? $cost : min($cost, $alerts[$id]['lowest_cost_idr']);
+            // Catalog redesign: the admin store cost is the affordability cap.
+            $ceiling = $row->store_cost_idr !== null
+                ? (int) $row->store_cost_idr
+                : (int) $row->sell_price_idr;
             if ($catalog->sellable($row)
                 && $cost > 0
-                && $cost <= (int) $row->sell_price_idr
+                && $cost <= $ceiling
                 && (! $row->is_manual_price || $cost <= (int) $row->max_price_idr)) {
                 $alerts[$id]['has_eligible_source'] = true;
             }
@@ -117,7 +121,10 @@ class DigiflazzFixedPricePolicy
             ->where('mappings.cost_idr', '>', 0)
             ->where(function ($query): void {
                 $query->whereNull('mappings.max_price_idr')
-                    ->orWhereColumn('mappings.cost_idr', '<=', 'mappings.max_price_idr');
+                    ->orWhereColumn('mappings.cost_idr', '<=', 'mappings.max_price_idr')
+                    // Catalog redesign: a mapping with an admin store cost is
+                    // evaluated against that cap by the alert logic below.
+                    ->orWhereNotNull('mappings.store_cost_idr');
             })
             ->where('packages.pricing_mode', $fixed ? '=' : '!=', 'SELL_PRICE')
             ->select(
@@ -131,6 +138,7 @@ class DigiflazzFixedPricePolicy
                 'products.name as product_name',
                 'mappings.external_sku',
                 'mappings.cost_idr',
+                'mappings.store_cost_idr',
                 'mappings.max_price_idr',
                 'mappings.is_manual_price',
                 'items.price_idr as live_price_idr',

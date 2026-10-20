@@ -28,12 +28,22 @@ const props = defineProps({
     callbackUrls: { type: Object, default: () => ({}) },
 });
 
+const area = ref('settings');
 const tab = ref('methods');
-const tabs = [
-    ['methods', 'Metode & Urutan'], ['routing', 'Biaya & Routing'], ['gateways', 'Gateway'],
-    ['wallet', 'Top Up Cash'], ['qris', 'QRIS Manual'],
-    ['transactions', 'Transaksi'], ['page', 'Tampilan'],
+const settingTabs = [
+    ['methods', 'Metode'], ['qris', 'QRIS Manual'], ['gateways', 'Gateway'],
+    ['routing', 'Biaya & Routing'], ['wallet', 'Top Up Saldo'], ['page', 'Tampilan Checkout'],
 ];
+const areas = [['settings', 'Pengaturan Pembayaran'], ['transactions', 'Transaksi Pembayaran']];
+const selectArea = (value) => {
+    area.value = value;
+    if (value === 'transactions') tab.value = 'transactions';
+    else if (tab.value === 'transactions') tab.value = 'methods';
+};
+const selectSetting = (value) => {
+    area.value = 'settings';
+    tab.value = value;
+};
 
 const filters = reactive({
     q: props.filters?.q || '',
@@ -174,7 +184,7 @@ function searchTransactions() {
     }, {
         preserveState: true,
         preserveScroll: true,
-        onSuccess: () => { tab.value = 'transactions'; },
+        onSuccess: () => { area.value = 'transactions'; tab.value = 'transactions'; },
     });
 }
 
@@ -381,6 +391,11 @@ async function copy(value) {
             <Button variant="outline" @click="router.reload({ preserveScroll: true })">Muat ulang</Button>
         </header>
 
+        <nav class="lf-admin-tabs" aria-label="Bagian pembayaran">
+            <Button v-for="[key, label] in areas" :key="key" type="button" :variant="area === key ? 'secondary' : 'ghost'" @click="selectArea(key)">{{ label }}</Button>
+        </nav>
+
+        <template v-if="area === 'settings'">
         <div class="lf-admin-summary ">
             <Card class="p-4"><p class="text-xs text-muted-foreground">Total pembayaran</p><p class="mt-2 text-2xl font-semibold">{{ Number(summary.total || 0).toLocaleString('id-ID') }}</p><p class="mt-1 text-xs text-muted-foreground">seluruh transaksi tersimpan</p></Card>
             <Card class="p-4"><p class="text-xs text-muted-foreground">Nilai berhasil</p><p class="mt-2 text-xl font-semibold">{{ money(summary.paid_amount_idr) }}</p><p class="mt-1 text-xs text-muted-foreground">{{ Number(summary.paid || 0).toLocaleString('id-ID') }} pembayaran</p></Card>
@@ -389,8 +404,8 @@ async function copy(value) {
             <Card class="p-4"><p class="text-xs text-muted-foreground">Gagal / kedaluwarsa</p><p class="mt-2 text-2xl font-semibold">{{ Number(summary.failed || 0).toLocaleString('id-ID') }}</p><p class="mt-1 text-xs text-muted-foreground">{{ Number(summary.refunded || 0).toLocaleString('id-ID') }} dikembalikan</p></Card>
         </div>
 
-        <nav class="lf-admin-tabs">
-            <Button v-for="[key, label] in tabs" :key="key" type="button" :variant="tab === key ? 'secondary' : 'ghost'" class="shrink-0" @click="tab = key">{{ label }}</Button>
+        <nav class="lf-admin-tabs" aria-label="Subbagian pengaturan pembayaran">
+            <Button v-for="[key, label] in settingTabs" :key="key" type="button" :variant="tab === key ? 'secondary' : 'ghost'" class="shrink-0" @click="selectSetting(key)">{{ label }}</Button>
         </nav>
 
         <template v-if="tab === 'methods'">                <Card class="min-w-0 p-4">
@@ -540,7 +555,8 @@ async function copy(value) {
             </div>
         </template>
 
-        <template v-else>
+        </template>
+        <template v-else-if="area === 'transactions'">
             <Card class="p-4">
                 <div class="flex flex-wrap items-start justify-between gap-3"><div><h2 class="text-lg font-semibold">Transaksi Pembayaran</h2><p class="mt-1 text-sm text-muted-foreground">Riwayat pembayaran pesanan dan top up saldo. Data payload rahasia tidak ditampilkan.</p></div></div>
                 <form class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5" @submit.prevent="searchTransactions">

@@ -138,16 +138,16 @@ function saveQuickReplies() {
 <Head title="Layanan Pelanggan" />
 <AdminShell>
     <div class="space-y-5">
-        <header class="flex flex-wrap items-start justify-between gap-3">
-            <div>
-                <h1 class="text-2xl font-semibold">Layanan Pelanggan</h1>
+        <header class="flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between">
+            <div class="min-w-0">
+                <h1 class="text-2xl font-semibold tracking-tight">Layanan Pelanggan</h1>
                 <p class="mt-1 max-w-3xl text-sm text-muted-foreground">
-                    Tangani tiket bantuan, komplain, pembayaran, pengembalian dana, pesanan, dan percakapan pelanggan dari satu tempat.
+                    Tangani tiket bantuan dan percakapan pelanggan dari satu tempat.
                 </p>
             </div>
-            <div class="flex gap-2">
-                <Button variant="outline" @click="router.reload({ preserveScroll: true })">Muat ulang</Button>
-                <Button variant="outline" @click="quickRepliesOpen = !quickRepliesOpen">
+            <div class="flex flex-col gap-2 sm:flex-row">
+                <Button class="w-full sm:w-auto" variant="outline" @click="router.reload({ preserveScroll: true })">Muat ulang</Button>
+                <Button class="w-full sm:w-auto" variant="outline" @click="quickRepliesOpen = !quickRepliesOpen">
                     {{ quickRepliesOpen ? 'Tutup balasan cepat' : 'Atur balasan cepat' }}
                 </Button>
             </div>
@@ -184,8 +184,8 @@ function saveQuickReplies() {
             </form>
         </Card>
 
-        <Card class="p-4">
-            <form class="grid gap-3 md:grid-cols-2 xl:grid-cols-6" @submit.prevent="submitFilters">
+        <Card class="min-w-0 p-4 sm:p-5">
+            <form class="grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-6" @submit.prevent="submitFilters">
                 <label class="space-y-1 md:col-span-2">
                     <span class="text-sm font-medium">Cari tiket</span>
                     <Input v-model="filters.q" maxlength="100" placeholder="Nomor tiket, pelanggan, email, subjek, atau invoice" />
@@ -216,14 +216,14 @@ function saveQuickReplies() {
                     </select>
                 </label>
                 <label class="space-y-1">
-                    <span class="text-sm font-medium">Baris</span>
+                    <span class="text-sm font-medium">Tiket per halaman</span>
                     <select v-model.number="filters.per_page" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
                         <option :value="10">10</option><option :value="25">25</option><option :value="50">50</option><option :value="100">100</option>
                     </select>
                 </label>
-                <div class="flex flex-wrap gap-2 md:col-span-2 xl:col-span-6">
-                    <Button size="sm">Terapkan</Button>
-                    <Button type="button" size="sm" variant="outline" @click="resetFilters">Reset</Button>
+                <div class="flex flex-col gap-2 sm:flex-row md:col-span-2 xl:col-span-6">
+                    <Button class="w-full sm:w-auto">Terapkan filter</Button>
+                    <Button class="w-full sm:w-auto" type="button" variant="outline" @click="resetFilters">Hapus filter</Button>
                 </div>
             </form>
         </Card>
@@ -324,7 +324,7 @@ function saveQuickReplies() {
         </Card>
 
         <Card class="min-w-0 p-4">
-            <div class="overflow-x-auto">
+            <div class="overflow-x-auto" role="region" aria-label="Daftar tiket" tabindex="0">
                 <AdminResponsiveTable :mobile-columns="[0,1,6,7]">
                     <TableHeader>
                         <TableRow>
@@ -371,15 +371,16 @@ function saveQuickReplies() {
                 </AdminResponsiveTable>
             </div>
 
-            <div v-if="tickets.links?.length > 3" class="mt-4 flex flex-wrap gap-1">
+            <nav v-if="tickets.links?.length > 3" class="mt-4 flex flex-wrap gap-1" aria-label="Halaman tiket">
                 <Link
                     v-for="link in tickets.links"
                     :key="link.label"
                     :href="link.url || '#'"
                     preserve-scroll
+                    :aria-current="link.active ? 'page' : undefined"
                     :class="['rounded-md border px-3 py-1.5 text-sm', link.active ? 'bg-primary text-primary-foreground' : 'bg-background', !link.url ? 'pointer-events-none opacity-40' : '']"
                 >{{ link.label }}</Link>
-            </div>
+            </nav>
         </Card>
     </div>
 </AdminShell>

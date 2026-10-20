@@ -26,12 +26,14 @@ class CheckoutPricing
                 'packages.name as package_name',
                 'packages.nominal_value',
                 'packages.pricing_mode', 'packages.margin_percent as package_margin_percent',
+                'packages.sell_markup_percent as package_sell_markup_percent',
                 'packages.margin_fixed_idr', 'packages.sell_price_idr',
                 'products.id as product_id',
                 'products.name as product_name',
                 'products.slug as product_slug',
                 'products.category_id',
                 'products.margin_percent',
+                'products.sell_markup_percent as product_sell_markup_percent',
                 'products.fulfillment_mode',
                 'categories.name as category_name'
             );
@@ -53,19 +55,19 @@ class CheckoutPricing
             ->where('mappings.is_active', true)
             ->where('providers.is_active', true)
             ->where('providers.fulfillment_mode', $context->fulfillment_mode)
-            ->whereNotNull('mappings.cost_idr')
-            ->where('mappings.cost_idr', '>', 0)
+            ->whereRaw('COALESCE(mappings.store_cost_idr, mappings.cost_idr) > 0')
             ->where(function ($query): void {
                 $query->whereNull('mappings.max_price_idr')
-                    ->orWhereColumn('mappings.cost_idr', '<=', 'mappings.max_price_idr');
+                    ->orWhereRaw('COALESCE(mappings.store_cost_idr, mappings.cost_idr) <= mappings.max_price_idr');
             })
             ->orderBy('mappings.priority')
-            ->orderBy('mappings.cost_idr')
+            ->orderByRaw('COALESCE(mappings.store_cost_idr, mappings.cost_idr)')
             ->orderBy('mappings.id')
             ->select(
                 'mappings.id as mapping_id',
                 'mappings.external_sku',
-                'mappings.cost_idr',
+                DB::raw('COALESCE(mappings.store_cost_idr, mappings.cost_idr) as cost_idr'),
+                'mappings.store_cost_idr',
                 'mappings.max_price_idr',
                 'mappings.is_manual_price',
                 'mappings.fulfillment_config',
@@ -96,7 +98,8 @@ class CheckoutPricing
             }
 
             return $item !== null && app(DigiflazzCatalogService::class)->sellable($item)
-                && app(DigiflazzCatalogService::class)->verifiedIdentityMatches($item, $candidate->fulfillment_config);
+                && app(DigiflazzCatalogService::class)->verifiedIdentityMatches($item, $candidate->fulfillment_config)
+                && ! $this->sellerPriceExceedsStoreCost($candidate, $item);
         })->values();
 
         return $this->quoteForContext($context, $eligibleMappings);
@@ -131,12 +134,14 @@ class CheckoutPricing
                 'packages.name as package_name',
                 'packages.nominal_value',
                 'packages.pricing_mode', 'packages.margin_percent as package_margin_percent',
+                'packages.sell_markup_percent as package_sell_markup_percent',
                 'packages.margin_fixed_idr', 'packages.sell_price_idr',
                 'products.id as product_id',
                 'products.name as product_name',
                 'products.slug as product_slug',
                 'products.category_id',
                 'products.margin_percent',
+                'products.sell_markup_percent as product_sell_markup_percent',
                 'products.fulfillment_mode',
                 'categories.name as category_name'
             );
@@ -153,20 +158,20 @@ class CheckoutPricing
             ->where('mappings.is_active', true)
             ->where('providers.is_active', true)
             ->whereColumn('providers.fulfillment_mode', 'products.fulfillment_mode')
-            ->whereNotNull('mappings.cost_idr')
-            ->where('mappings.cost_idr', '>', 0)
+            ->whereRaw('COALESCE(mappings.store_cost_idr, mappings.cost_idr) > 0')
             ->where(function ($query): void {
                 $query->whereNull('mappings.max_price_idr')
-                    ->orWhereColumn('mappings.cost_idr', '<=', 'mappings.max_price_idr');
+                    ->orWhereRaw('COALESCE(mappings.store_cost_idr, mappings.cost_idr) <= mappings.max_price_idr');
             })
             ->orderBy('mappings.priority')
-            ->orderBy('mappings.cost_idr')
+            ->orderByRaw('COALESCE(mappings.store_cost_idr, mappings.cost_idr)')
             ->orderBy('mappings.id')
             ->select(
                 'mappings.product_package_id as package_id',
                 'mappings.id as mapping_id',
                 'mappings.external_sku',
-                'mappings.cost_idr',
+                DB::raw('COALESCE(mappings.store_cost_idr, mappings.cost_idr) as cost_idr'),
+                'mappings.store_cost_idr',
                 'mappings.max_price_idr',
                 'mappings.is_manual_price',
                 'mappings.fulfillment_config',
@@ -198,7 +203,8 @@ class CheckoutPricing
                 }
 
                 return $item !== null && app(DigiflazzCatalogService::class)->sellable($item)
-                && app(DigiflazzCatalogService::class)->verifiedIdentityMatches($item, $candidate->fulfillment_config);
+                && app(DigiflazzCatalogService::class)->verifiedIdentityMatches($item, $candidate->fulfillment_config)
+                && ! $this->sellerPriceExceedsStoreCost($candidate, $item);
             })->values();
 
             try {
@@ -245,26 +251,42 @@ class CheckoutPricing
             ]);
         }
 
-        $cost = (int) $mapping->cost_idr;
+        $cost = (int) ($mapping->store_cost_idr ?? $mapping->cost_idr);
+        $legacyDigiflazzPricing = $mapping->provider_code === 'DIGIFLAZZ'
+            && $mapping->store_cost_idr === null
+            && $context->package_sell_markup_percent === null
+            && $context->product_sell_markup_percent === null;
+        // Baris katalog lama (belum punya modal toko baru dan tanpa override markup)
+        // tetap memakai margin lamanya. Semua baris lain — termasuk nominal manual
+        // yang modal tokonya diisi admin — memakai harga jual modal toko × markup.
+        $legacyPricing = $mapping->store_cost_idr === null
+            && $context->package_sell_markup_percent === null
+            && $context->product_sell_markup_percent === null;
+        $markupPercent = $context->pricing_mode === 'SELL_PRICE'
+            ? null
+            : ($legacyPricing
+                ? null
+                : ($context->package_sell_markup_percent ?? $context->product_sell_markup_percent ?? $this->globalSellMarkupPercent()));
         $percent = $context->pricing_mode === 'PERCENT' ? $context->package_margin_percent : $context->margin_percent;
-        $margin = match ($context->pricing_mode) {
-            'FIXED' => (int) $context->margin_fixed_idr,
-            'SELL_PRICE' => (int) $context->sell_price_idr - $cost,
-            default => $this->margin($cost, (string) $percent),
-        };
+        $margin = $markupPercent !== null
+            ? $this->margin($cost, (string) $markupPercent)
+            : match ($context->pricing_mode) {
+                'FIXED' => (int) $context->margin_fixed_idr,
+                'SELL_PRICE' => (int) $context->sell_price_idr - $cost,
+                default => $this->margin($cost, (string) $percent),
+            };
         if ($margin < 0) {
             throw ValidationException::withMessages(['package_id' => 'Harga jual nominal berada di bawah modal.']);
         }
 
         $maxPrice = $mapping->max_price_idr !== null ? (int) $mapping->max_price_idr : null;
         if ($mapping->provider_code === 'DIGIFLAZZ') {
-            // The admin's locked cost is the exact max_price sent to Digiflazz.
-            // Other sources keep their existing provider-price tolerance.
+            // Legacy catalog entries retain their provider-price tolerance.
             $maxPrice = $mapping->is_manual_price
                 ? (int) $mapping->max_price_idr
-                : $this->digiflazzMaxPrice(
-                    (int) $eligibleMappings->where('provider_code', 'DIGIFLAZZ')->max('cost_idr')
-                );
+                : ($legacyDigiflazzPricing
+                    ? $this->digiflazzMaxPrice((int) $eligibleMappings->where('provider_code', 'DIGIFLAZZ')->max('cost_idr'))
+                    : $cost);
         }
 
         return [
@@ -299,6 +321,33 @@ class CheckoutPricing
         }
 
         return intdiv(($highestEligibleCost * 101) + 99, 100);
+    }
+
+    private function globalSellMarkupPercent(): string
+    {
+        return $this->configuredGlobalSellMarkupPercent() ?? '10';
+    }
+
+    /**
+     * Catalog redesign: the admin store cost is the Digiflazz `max_price` cap.
+     * A live seller price above that cap makes the SKU temporarily unavailable
+     * until the provider price recovers. Legacy mappings are unaffected.
+     */
+    private function sellerPriceExceedsStoreCost(object $candidate, ?object $item): bool
+    {
+        return $candidate->store_cost_idr !== null
+            && $item !== null
+            && (int) $item->price_idr > (int) $candidate->store_cost_idr;
+    }
+
+    private function configuredGlobalSellMarkupPercent(): ?string
+    {
+        $stored = DB::table('system_settings')->where('key', 'pricing.sell_markup_percent')->value('value');
+        $decoded = $stored !== null ? json_decode((string) $stored, true) : null;
+
+        return is_numeric($decoded) && (float) $decoded >= 0 && (float) $decoded <= 1000
+            ? (string) $decoded
+            : null;
     }
 
     private function margin(int $cost, string $percent): int

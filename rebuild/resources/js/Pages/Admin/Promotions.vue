@@ -213,16 +213,16 @@ function discountLabel(row) {
 <Head title="Promo" />
 <AdminShell>
     <div class="space-y-5">
-        <header class="flex flex-wrap items-start justify-between gap-3">
-            <div>
-                <h1 class="text-2xl font-semibold">Promo</h1>
+        <header class="flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between">
+            <div class="min-w-0">
+                <h1 class="text-2xl font-semibold tracking-tight">Promo</h1>
                 <p class="mt-1 max-w-3xl text-sm text-muted-foreground">
-                    Kelola voucher diskon dan prioritas produk di bagian Populer Sekarang. Flash Sale tidak digunakan.
+                    Kelola voucher diskon dan urutan produk di bagian Populer Sekarang.
                 </p>
             </div>
-            <div class="flex gap-2">
-                <Button variant="outline" @click="router.reload({ preserveScroll: true })">Muat ulang</Button>
-                <Button @click="openCreate">Tambah voucher</Button>
+            <div class="flex flex-col gap-2 sm:flex-row">
+                <Button class="w-full sm:w-auto" variant="outline" @click="router.reload({ preserveScroll: true })">Muat ulang</Button>
+                <Button class="w-full sm:w-auto" @click="openCreate">Tambah voucher</Button>
             </div>
         </header>
 
@@ -235,14 +235,14 @@ function discountLabel(row) {
             <Card class="p-4"><p class="text-xs text-muted-foreground">Populer & aktif</p><p class="mt-2 text-2xl font-semibold">{{ summary.active_popular_products || 0 }}</p></Card>
         </div>
 
-        <nav class="lf-admin-tabs">
-            <Button type="button" :variant="section === 'vouchers' ? 'secondary' : 'ghost'" class="shrink-0" @click="section = 'vouchers'">Voucher Diskon</Button>
-            <Button type="button" :variant="section === 'popular' ? 'secondary' : 'ghost'" class="shrink-0" @click="section = 'popular'">Populer Sekarang</Button>
+        <nav class="lf-admin-tabs" aria-label="Bagian promosi">
+            <Button type="button" :variant="section === 'vouchers' ? 'secondary' : 'ghost'" :aria-current="section === 'vouchers' ? 'page' : undefined" class="shrink-0" @click="section = 'vouchers'">Voucher Diskon</Button>
+            <Button type="button" :variant="section === 'popular' ? 'secondary' : 'ghost'" :aria-current="section === 'popular' ? 'page' : undefined" class="shrink-0" @click="section = 'popular'">Populer Sekarang</Button>
         </nav>
 
         <template v-if="section === 'vouchers'">
-            <Card class="p-4">
-                <form class="grid gap-3 md:grid-cols-2 xl:grid-cols-5" @submit.prevent="submitVoucherFilters">
+            <Card class="min-w-0 p-4 sm:p-5">
+                <form class="grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-5" @submit.prevent="submitVoucherFilters">
                     <label class="space-y-1 md:col-span-2">
                         <span class="text-sm font-medium">Cari voucher</span>
                         <Input v-model="voucherFilters.q" maxlength="100" placeholder="Kode, nama, atau deskripsi" />
@@ -267,20 +267,20 @@ function discountLabel(row) {
                         </select>
                     </label>
                     <label class="space-y-1">
-                        <span class="text-sm font-medium">Baris</span>
+                        <span class="text-sm font-medium">Voucher per halaman</span>
                         <select v-model.number="voucherFilters.per_page" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
                             <option :value="10">10</option><option :value="25">25</option><option :value="50">50</option><option :value="100">100</option>
                         </select>
                     </label>
-                    <div class="flex flex-wrap gap-2 md:col-span-2 xl:col-span-5">
-                        <Button size="sm">Terapkan</Button>
-                        <Button type="button" size="sm" variant="outline" @click="resetVoucherFilters">Reset</Button>
+                    <div class="flex flex-col gap-2 sm:flex-row md:col-span-2 xl:col-span-5">
+                        <Button class="w-full sm:w-auto">Terapkan filter</Button>
+                        <Button class="w-full sm:w-auto" type="button" variant="outline" @click="resetVoucherFilters">Hapus filter</Button>
                     </div>
                 </form>
             </Card>
 
             <Card class="min-w-0 p-4">
-                <div class="overflow-x-auto">
+                <div class="overflow-x-auto" role="region" aria-label="Daftar voucher" tabindex="0">
                     <AdminResponsiveTable :mobile-columns="[0,1,6,7]">
                         <TableHeader>
                             <TableRow>
@@ -344,8 +344,8 @@ function discountLabel(row) {
         </template>
 
         <template v-else>
-            <Card class="p-4">
-                <form class="grid gap-3 md:grid-cols-2 xl:grid-cols-5" @submit.prevent="submitPopularFilters">
+            <Card class="min-w-0 p-4 sm:p-5">
+                <form class="grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-5" @submit.prevent="submitPopularFilters">
                     <label class="space-y-1 md:col-span-2">
                         <span class="text-sm font-medium">Cari produk</span>
                         <Input v-model="popularFilters.popular_q" maxlength="100" placeholder="Nama atau slug produk" />
@@ -368,14 +368,14 @@ function discountLabel(row) {
                         </select>
                     </label>
                     <label class="space-y-1">
-                        <span class="text-sm font-medium">Baris</span>
+                        <span class="text-sm font-medium">Produk per halaman</span>
                         <select v-model.number="popularFilters.product_per_page" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
                             <option :value="10">10</option><option :value="25">25</option><option :value="50">50</option><option :value="100">100</option>
                         </select>
                     </label>
-                    <div class="flex flex-wrap gap-2 md:col-span-2 xl:col-span-5">
-                        <Button size="sm">Terapkan</Button>
-                        <Button type="button" size="sm" variant="outline" @click="resetPopularFilters">Reset</Button>
+                    <div class="flex flex-col gap-2 sm:flex-row md:col-span-2 xl:col-span-5">
+                        <Button class="w-full sm:w-auto">Terapkan filter</Button>
+                        <Button class="w-full sm:w-auto" type="button" variant="outline" @click="resetPopularFilters">Hapus filter</Button>
                     </div>
                 </form>
             </Card>
@@ -384,7 +384,7 @@ function discountLabel(row) {
                 <div class="mb-4 rounded-md border p-3 text-sm text-muted-foreground">
                     Produk bertanda populer didahulukan di homepage. Jika slot belum penuh, storefront melanjutkan dengan produk aktif yang memiliki ulasan terbanyak. Status produk tetap dikelola dari menu Produk.
                 </div>
-                <div class="overflow-x-auto">
+                <div class="overflow-x-auto" role="region" aria-label="Daftar prioritas produk" tabindex="0">
                     <AdminResponsiveTable :mobile-columns="[0,2,3,4,5]">
                         <TableHeader><TableRow><TableHead>Produk</TableHead><TableHead>Kategori</TableHead><TableHead>Nominal</TableHead><TableHead>Status Produk</TableHead><TableHead>Prioritas</TableHead><TableHead class="text-right">Aksi</TableHead></TableRow></TableHeader>
                         <TableBody>
@@ -464,9 +464,9 @@ function discountLabel(row) {
                     </label>
                 </div>
 
-                <div class="flex justify-end gap-2">
-                    <Button type="button" variant="outline" @click="closeEditor">Batal</Button>
-                    <Button :disabled="voucherForm.processing">{{ voucherForm.processing ? 'Menyimpan…' : 'Simpan voucher' }}</Button>
+                <div class="flex flex-col-reverse gap-2 border-t border-border pt-4 sm:flex-row sm:justify-end">
+                    <Button class="w-full sm:w-auto" type="button" variant="outline" @click="closeEditor">Batal</Button>
+                    <Button class="w-full sm:w-auto" :disabled="voucherForm.processing">{{ voucherForm.processing ? 'Menyimpan…' : 'Simpan voucher' }}</Button>
                 </div>
             </form>
         </Card>
