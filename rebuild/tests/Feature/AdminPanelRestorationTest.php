@@ -785,7 +785,13 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertSame(9500, (int) $copy->mappings()->firstOrFail()->store_cost_idr);
         $this->assertSame('13.0000', (string) $copy->sell_markup_percent);
         $this->assertSame('3.0000', (string) $copy->cost_uplift_percent);
-        $this->assertFalse($copy->mappings()->firstOrFail()->is_active);
+        $copiedMapping = $copy->mappings()->firstOrFail();
+        $this->assertFalse($copiedMapping->is_active);
+
+        $this->put('/admin/catalog/mappings/'.$copiedMapping->id, [
+            'priority' => 0, 'is_active' => true, 'cost_idr' => 9000,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame(9500, (int) $copiedMapping->fresh()->store_cost_idr);
 
         $this->delete('/admin/catalog/packages/'.$copy->id)->assertRedirect()->assertSessionHasNoErrors();
         $this->assertNull(ProductPackage::find($copy->id));

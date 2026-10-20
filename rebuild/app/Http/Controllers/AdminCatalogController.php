@@ -899,7 +899,9 @@ class AdminCatalogController
             'store_cost_idr' => [$provider->code === 'DIGIFLAZZ' ? 'sometimes' : 'prohibited', 'integer', 'min:1', 'max:1000000000'],
         ]);
         if ($provider->code === 'MANUAL' && array_key_exists('cost_idr', $data)) {
-            $data['store_cost_idr'] = $data['cost_idr'];
+            if ($mapping->store_cost_idr === null || (int) $data['cost_idr'] !== (int) $mapping->cost_idr) {
+                $data['store_cost_idr'] = $data['cost_idr'];
+            }
         } elseif ($provider->code !== 'MANUAL') {
             unset($data['cost_idr']);
         }
