@@ -774,7 +774,7 @@ class AdminPanelRestorationTest extends TestCase
         ]);
         ProviderMapping::create([
             'product_package_id' => $package->id, 'provider_id' => $provider->id,
-            'cost_idr' => 9000, 'priority' => 0, 'is_active' => false,
+            'cost_idr' => 9000, 'store_cost_idr' => 9500, 'priority' => 0, 'is_active' => false,
         ]);
 
         $this->post('/admin/catalog/packages/'.$package->id.'/duplicate')->assertRedirect()->assertSessionHasNoErrors();
@@ -782,6 +782,7 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertFalse($copy->is_active);
         $this->assertStringContainsString('Salinan', $copy->name);
         $this->assertSame(9000, (int) $copy->mappings()->firstOrFail()->cost_idr);
+        $this->assertSame(9500, (int) $copy->mappings()->firstOrFail()->store_cost_idr);
         $this->assertSame('13.0000', (string) $copy->sell_markup_percent);
         $this->assertSame('3.0000', (string) $copy->cost_uplift_percent);
         $this->assertFalse($copy->mappings()->firstOrFail()->is_active);
@@ -873,12 +874,14 @@ class AdminPanelRestorationTest extends TestCase
             ->where('provider_id', $provider->id)
             ->firstOrFail();
         $this->assertSame('digital.kode-10', data_get($mapping->fulfillment_config, 'stock_key'));
+        $this->assertSame(5000, (int) $mapping->store_cost_idr);
         $this->assertSame(2, DB::table('voucher_stock_codes')->where('stock_key', 'digital.kode-10')->count());
         $this->assertSame(2, DB::table('voucher_stock_codes')->where('status', 'AVAILABLE')->count());
         $this->assertDatabaseMissing('voucher_stock_codes', ['code_ciphertext' => 'SECRET-CODE-001']);
 
         $quote = app(CheckoutPricing::class)->forPackage($package->id);
         $this->assertSame('VOUCHER_STOCK', $quote['provider_code']);
+        $this->assertSame(5500, $quote['subtotal_idr']);
 
         $snapshot = [
             'product' => [

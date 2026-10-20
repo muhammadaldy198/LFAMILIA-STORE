@@ -586,6 +586,7 @@ class AdminCatalogController
                 'provider_id' => $sourceMapping->provider_id,
                 'external_sku' => null,
                 'cost_idr' => $sourceMapping->cost_idr,
+                'store_cost_idr' => $sourceMapping->store_cost_idr,
                 'max_price_idr' => null,
                 'priority' => $sourceMapping->priority,
                 'is_active' => false,
@@ -855,6 +856,7 @@ class AdminCatalogController
             $mapping->fill([
                 'external_sku' => 'stock-package-'.$package->id,
                 'cost_idr' => $data['cost_idr'],
+                'store_cost_idr' => $data['cost_idr'],
                 'max_price_idr' => null,
                 'fulfillment_config' => ['stock_key' => $stockKey],
                 'priority' => $data['priority'],
