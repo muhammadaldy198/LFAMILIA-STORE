@@ -4,7 +4,7 @@ This is the canonical repository-level instruction file for AI coding agents and
 
 It defines project invariants, ownership boundaries, safety rules, and required working methods. It does not replace the PRD or the detailed runtime/operations documentation. When a task conflicts with this file, stop and verify the current repository, documentation, and explicit task requirement before changing high-risk behavior.
 
-Last verified against the current Laravel runtime and Tahap 4 documentation on 2026-10-04.
+Last verified against the current Laravel runtime and repository guidance on 2026-10-20.
 
 ## 1. Project identity
 
@@ -67,7 +67,9 @@ If PRD and code differ, do not arbitrarily choose one. Determine whether the dif
 - a bug;
 - an intentionally deferred capability.
 
-For payment, wallet, fulfillment, auth, permissions, pricing, security, database, or production behavior, report a material conflict before making a broad behavioral change.
+Explicit current owner-approved decisions in this file supersede older PRDs, plans, agent role files, prompts, and archived policy notes. Apply this hierarchy to every coding/review agent, including `.claude/agents/*`; update stale active instructions when found. Do not report historical policy as a current defect or re-litigate a settled decision. Historical files may remain for audit only when clearly marked as superseded and not operational guidance.
+
+For payment, wallet, fulfillment, auth, permissions, pricing, security, database, or production behavior, report a material conflict only when current code or a current source conflicts with an explicit active owner-approved decision. An older PRD, plan, role prompt, or archived policy that conflicts with the active decision is stale guidance to correct, not a reason to re-open the settled decision.
 
 ## 4. Must-read project references
 

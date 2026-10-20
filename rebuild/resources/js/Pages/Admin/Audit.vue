@@ -89,18 +89,18 @@ const toggleDetail = (id) => {
 
     <AdminShell>
         <div class="space-y-5">
-            <header class="flex flex-wrap items-start justify-between gap-3">
-                <div>
+            <header class="flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between">
+                <div class="min-w-0">
                     <div class="flex flex-wrap items-center gap-2">
-                        <h1 class="text-2xl font-semibold">Audit Log</h1>
+                        <h1 class="text-2xl font-semibold tracking-tight">Audit Log</h1>
                         <Badge variant="outline">Khusus Super Admin</Badge>
                     </div>
                     <p class="mt-1 max-w-3xl text-sm text-muted-foreground">
                         Riwayat perubahan penting di panel Admin. Data bersifat baca-saja dan nilai rahasia disanitasi kembali sebelum dikirim ke halaman ini.
                     </p>
                 </div>
-                <Button variant="outline" as-child>
-                    <Link href="/admin/health">System Health</Link>
+                <Button class="w-full sm:w-auto" variant="outline" as-child>
+                    <Link href="/admin/health">Kondisi Sistem</Link>
                 </Button>
             </header>
 
@@ -131,7 +131,7 @@ const toggleDetail = (id) => {
                     </p>
                 </div>
 
-                <form class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4" @submit.prevent="applyFilters">
+                <form class="mt-4 grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-4" @submit.prevent="applyFilters">
                     <label class="space-y-1.5 text-sm xl:col-span-2">
                         <span>Pencarian</span>
                         <Input v-model="form.q" maxlength="100" placeholder="Contoh: pembayaran, invoice, correlation ID..." />
@@ -184,17 +184,17 @@ const toggleDetail = (id) => {
                     </label>
 
                     <label class="space-y-1.5 text-sm">
-                        <span>Baris per halaman</span>
+                        <span>Log per halaman</span>
                         <select v-model="form.per_page" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
-                            <option value="25">25 baris</option>
-                            <option value="50">50 baris</option>
-                            <option value="100">100 baris</option>
+                            <option value="25">25 log</option>
+                            <option value="50">50 log</option>
+                            <option value="100">100 log</option>
                         </select>
                     </label>
 
-                    <div class="flex items-end gap-2 md:col-span-2 xl:col-span-3">
-                        <Button type="submit">Terapkan Filter</Button>
-                        <Button type="button" variant="outline" @click="resetFilters">Reset</Button>
+                    <div class="flex flex-col gap-2 sm:flex-row md:col-span-2 xl:col-span-3">
+                        <Button class="w-full sm:w-auto" type="submit">Terapkan filter</Button>
+                        <Button class="w-full sm:w-auto" type="button" variant="outline" @click="resetFilters">Hapus filter</Button>
                     </div>
                 </form>
             </Card>
@@ -210,7 +210,7 @@ const toggleDetail = (id) => {
                     <p class="text-xs text-muted-foreground">Urutan terbaru lebih dulu</p>
                 </div>
 
-                <div class="overflow-x-auto">
+                <div class="overflow-x-auto" role="region" aria-label="Riwayat aktivitas Admin" tabindex="0">
                     <AdminResponsiveTable :mobile-columns="[2,3,0,5]" class="min-w-[1040px]">
                         <TableHeader>
                             <TableRow>

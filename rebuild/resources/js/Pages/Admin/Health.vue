@@ -63,13 +63,13 @@ function refresh() {
 </script>
 
 <template>
-    <Head title="System Health" />
+    <Head title="Kondisi Sistem" />
     <AdminShell>
         <div class="space-y-5">
-            <header class="flex flex-wrap items-start justify-between gap-3">
-                <div>
+            <header class="flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between">
+                <div class="min-w-0">
                     <div class="flex flex-wrap items-center gap-2">
-                        <h1 class="text-2xl font-semibold">System Health</h1>
+                        <h1 class="text-2xl font-semibold tracking-tight">Kondisi Sistem</h1>
                         <Badge :variant="statusVariant(summary.overall)">{{ overallLabel }}</Badge>
                     </div>
                     <p class="mt-1 max-w-3xl text-sm text-muted-foreground">
@@ -145,7 +145,7 @@ function refresh() {
                     </Button>
                 </div>
 
-                <div class="mt-4 overflow-x-auto rounded-md border">
+                <div class="mt-4 overflow-x-auto rounded-md border" role="region" aria-label="Status integrasi" tabindex="0">
                     <AdminResponsiveTable :mobile-columns="[0,2,3]" class="min-w-[760px]">
                         <TableHeader>
                             <TableRow>
@@ -182,7 +182,7 @@ function refresh() {
                             Ringkasan status operasional gateway. Routing dan maintenance tetap dikelola dari menu Pembayaran.
                         </p>
                     </div>
-                    <div class="mt-4 overflow-x-auto rounded-md border">
+                    <div class="mt-4 overflow-x-auto rounded-md border" role="region" aria-label="Status gateway pembayaran" tabindex="0">
                         <AdminResponsiveTable :mobile-columns="[0,1,2]" class="min-w-[560px]">
                             <TableHeader>
                                 <TableRow>

@@ -15,7 +15,7 @@ use App\Services\AdminAuditService;
 use App\Services\AdminPricingPreviewService;
 use App\Services\CatalogAudit;
 use App\Services\CatalogNominalOrder;
-use App\Services\DigiflazzAutoSources;
+use App\Services\CatalogPricingSettings;
 use App\Services\DigiflazzCatalogService;
 use App\Services\DigiflazzFixedPricePolicy;
 use App\Services\VoucherStockService;
@@ -50,7 +50,8 @@ class AdminCatalogController
                 ->map(fn (Product $product): array => [
                     ...$product->only('id', 'category_id', 'name', 'publisher', 'slug', 'description', 'fulfillment_mode',
                         'initials', 'accent_color', 'instant', 'package_tabs_enabled', 'package_tabs',
-                        'manual_instructions', 'manual_open_time', 'manual_close_time', 'manual_timezone', 'margin_percent', 'sort_order', 'is_active',
+                        'customer_no_template', 'manual_instructions', 'manual_open_time', 'manual_close_time', 'manual_timezone', 'margin_percent', 'sort_order', 'is_active',
+                        'sell_markup_percent', 'cost_uplift_percent',
                         'nickname_check_enabled', 'nickname_game_code', 'nickname_user_field_key',
                         'nickname_server_field_key'),
                     'image_url' => $product->getFirstMediaUrl('image'),
@@ -62,11 +63,12 @@ class AdminCatalogController
                     'packages' => $product->packages->sortBy([
                         ['sort_order', 'asc'], ['nominal_value', 'asc'],
                     ])->values()->map(fn (ProductPackage $package): array => [
-                        ...$package->only('id', 'code', 'name', 'note', 'group_name', 'nominal_value', 'sort_order', 'is_active', 'pricing_mode', 'margin_percent', 'margin_fixed_idr', 'sell_price_idr'),
+                        ...$package->only('id', 'code', 'name', 'note', 'group_name', 'nominal_value', 'sort_order', 'is_active', 'pricing_mode', 'margin_percent', 'margin_fixed_idr', 'sell_price_idr', 'sell_markup_percent', 'cost_uplift_percent'),
                         'image_url' => $package->getFirstMediaUrl('image'),
                         'mappings' => $package->mappings->map(fn (ProviderMapping $mapping): array => [
                             ...$mapping->only('id', 'provider_id', 'external_sku', 'cost_idr',
-                                'max_price_idr', 'is_manual_price', 'priority', 'is_active', 'disabled_by_sync'),
+                                'max_price_idr', 'is_manual_price', 'priority', 'is_active', 'disabled_by_sync',
+                                'store_cost_idr', 'seller_reference_price_idr'),
                             'provider_code' => $providers->get($mapping->provider_id)?->code,
                             'provider_name' => $providers->get($mapping->provider_id)?->display_name ?: $providers->get($mapping->provider_id)?->code,
                             'customer_no_template' => data_get($mapping->fulfillment_config, 'customer_no_template'),
@@ -80,6 +82,10 @@ class AdminCatalogController
                     ])->all(),
                 ]),
             'defaultMargin' => json_decode((string) DB::table('system_settings')->where('key', 'catalog.default_margin_percent')->value('value'), true) ?? 0,
+            'pricingSettings' => [
+                'cost_uplift_percent' => app(CatalogPricingSettings::class)->costUpliftPercent(),
+                'sell_markup_percent' => app(CatalogPricingSettings::class)->sellMarkupPercent(),
+            ],
             'fixedPriceProposals' => app(DigiflazzFixedPricePolicy::class)->proposals(),
             'fixedPriceAlerts' => app(DigiflazzFixedPricePolicy::class)->alerts(),
             'digiflazzItems' => (function () {
@@ -90,7 +96,6 @@ class AdminCatalogController
                 return DB::table('digiflazz_catalog_items')->orderBy('category')->orderBy('brand')->orderBy('product_name')->get()
                     ->map(fn (object $item): array => [...((array) $item), 'available' => app(DigiflazzCatalogService::class)->available($item),
                         'mapped' => isset($mappedSkus[$item->buyer_sku_code]),
-                        'source_group' => app(DigiflazzAutoSources::class)->key($item),
                         'nominal_value' => app(CatalogNominalOrder::class)->value($item->product_name, $item->brand)]);
             })(),
         ]);
@@ -169,13 +174,27 @@ class AdminCatalogController
             'publisher' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:5000'],
             'fulfillment_mode' => ['required', Rule::in(['AUTO_PROVIDER', 'MANUAL'])],
+            'customer_no_template' => ['nullable', 'string', 'max:500'],
             'manual_instructions' => ['nullable', 'string', 'max:5000'],
             'manual_open_time' => ['nullable', 'regex:/^([01]\\d|2[0-3]):[0-5]\\d$/'],
             'manual_close_time' => ['nullable', 'regex:/^([01]\\d|2[0-3]):[0-5]\\d$/'],
             'manual_timezone' => ['nullable', Rule::in(['Asia/Jakarta', 'Asia/Makassar', 'Asia/Jayapura'])],
             'margin_percent' => ['required', 'numeric', 'min:0', 'max:1000'],
+            'sell_markup_percent' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:1000'],
             'sort_order' => ['required', 'integer', 'min:0'],
+            // Satu formulir boleh membawa banyak baris nominal untuk produk manual.
+            'packages' => ['sometimes', 'array', 'max:100'],
+            'packages.*.name' => ['required', 'string', 'max:255'],
+            'packages.*.code' => ['nullable', 'string', 'max:80', 'regex:/^[A-Za-z0-9_-]+$/'],
+            'packages.*.note' => ['nullable', 'string', 'max:80'],
+            'packages.*.group_name' => ['nullable', 'string', 'max:120'],
+            'packages.*.nominal_value' => ['nullable', 'integer', 'min:0'],
+            'packages.*.sort_order' => ['nullable', 'integer', 'min:0'],
+            'packages.*.cost_idr' => ['required', 'integer', 'min:0'],
+            'packages.*.sell_markup_percent' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:1000'],
         ]);
+        $rows = collect($data['packages'] ?? [])->values();
+        unset($data['packages']);
         $data['slug'] = ($data['slug'] ?? null) ?: Str::slug($data['name']);
         if (! $data['slug']) {
             throw ValidationException::withMessages(['name' => 'Nama produk tidak valid.']);
@@ -192,9 +211,69 @@ class AdminCatalogController
             $data['manual_timezone'] = ($data['manual_timezone'] ?? null) ?: 'Asia/Jakarta';
         }
 
-        DB::transaction(function () use ($request, $data, $audit): void {
+        if ($rows->isNotEmpty() && $data['fulfillment_mode'] !== 'MANUAL') {
+            throw ValidationException::withMessages([
+                'packages' => 'Baris nominal satu formulir hanya untuk produk manual. Produk otomatis mengambil nominal dari impor Digiflazz.',
+            ]);
+        }
+
+        $duplicateNominals = $rows->whereNotNull('nominal_value')
+            ->groupBy(fn (array $row): string => (string) $row['nominal_value'])
+            ->filter(fn ($group): bool => $group->count() > 1)
+            ->keys();
+        if ($duplicateNominals->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                'packages' => 'Nominal '.$duplicateNominals->implode(', ').' muncul lebih dari sekali di formulir ini. Gabungkan atau ubah nominalnya.',
+            ]);
+        }
+
+        DB::transaction(function () use ($request, $data, $rows, $audit): void {
             $product = Product::create([...$data, 'is_active' => false]);
             $audit->record($request, 'catalog.product.created', 'product', $product->id, null, $product->toArray());
+
+            if ($rows->isEmpty()) {
+                return;
+            }
+
+            // Produk manual: modal toko tiap nominal disimpan pada mapping provider
+            // MANUAL tanpa SKU provider asli, jadi Digiflazz tidak tersentuh.
+            $manualProvider = Provider::where('code', 'MANUAL')->firstOrFail();
+            $usedCodes = [];
+            foreach ($rows as $index => $row) {
+                $code = trim((string) ($row['code'] ?? '')) ?: Str::upper(Str::slug($row['name'], '_'));
+                $code = Str::limit($code !== '' ? $code : 'NOMINAL', 80, '');
+                $base = $code;
+                $suffix = 2;
+                while (in_array($code, $usedCodes, true)) {
+                    $code = Str::limit($base, 76, '').'_'.$suffix;
+                    $suffix++;
+                }
+                $usedCodes[] = $code;
+
+                $package = $product->packages()->create([
+                    'code' => $code,
+                    'name' => $row['name'],
+                    'note' => $row['note'] ?? null,
+                    'group_name' => $row['group_name'] ?? null,
+                    'nominal_value' => $row['nominal_value'] ?? null,
+                    'sort_order' => $row['sort_order'] ?? $index,
+                    'sell_markup_percent' => $row['sell_markup_percent'] ?? null,
+                    'is_active' => false,
+                ]);
+                // Modal toko tidak di-uplift: uplift hanya berlaku saat impor provider.
+                $mapping = ProviderMapping::create([
+                    'product_package_id' => $package->id,
+                    'provider_id' => $manualProvider->id,
+                    'external_sku' => null,
+                    'cost_idr' => $row['cost_idr'],
+                    'store_cost_idr' => $row['cost_idr'],
+                    'max_price_idr' => null,
+                    'priority' => 0,
+                    'is_active' => false,
+                ]);
+                $audit->record($request, 'catalog.mapping.created', 'provider_mapping', $mapping->id, null, $mapping->toArray());
+                $audit->record($request, 'catalog.package.created', 'product_package', $package->id, null, $package->toArray());
+            }
         });
 
         return back();
@@ -210,6 +289,7 @@ class AdminCatalogController
             'publisher' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:5000'],
             'fulfillment_mode' => ['sometimes', Rule::in(['AUTO_PROVIDER', 'MANUAL'])],
+            'customer_no_template' => ['sometimes', 'nullable', 'string', 'max:500'],
             'initials' => ['nullable', 'string', 'max:4'],
             'accent_color' => ['nullable', 'string', 'regex:/^#[0-9A-Fa-f]{6}$/'],
             'instant' => ['sometimes', 'boolean'],
@@ -223,11 +303,71 @@ class AdminCatalogController
             'margin_percent' => ['required', 'numeric', 'min:0', 'max:1000'],
             'sort_order' => ['required', 'integer', 'min:0'],
             'is_active' => ['required', 'boolean'],
+            'sell_markup_percent' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:1000'],
+            'cost_uplift_percent' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:1000'],
             'nickname_check_enabled' => ['sometimes', 'boolean'],
             'nickname_game_code' => ['nullable', 'string', 'max:80', 'regex:/^[a-z0-9][a-z0-9-]*$/'],
             'nickname_user_field_key' => ['nullable', 'string', 'max:80', 'regex:/^[a-z][a-z0-9_]*$/'],
             'nickname_server_field_key' => ['nullable', 'string', 'max:80', 'regex:/^[a-z][a-z0-9_]*$/'],
         ]);
+        $templateSubmitted = array_key_exists('customer_no_template', $data);
+        $template = trim((string) ($templateSubmitted
+            ? $data['customer_no_template']
+            : ($product->customer_no_template ?? '')));
+        $fieldKeys = $product->fields()->pluck('field_key')->all();
+        preg_match_all('/\{\{([^}]+)\}\}/', $template, $templateMatches);
+        foreach ($templateMatches[1] ?? [] as $fieldKey) {
+            if (! preg_match('/^[a-z][a-z0-9_]*$/', $fieldKey) || ! in_array($fieldKey, $fieldKeys, true)) {
+                throw ValidationException::withMessages(['customer_no_template' => 'Placeholder {{'.$fieldKey.'}} tidak cocok dengan field produk.']);
+            }
+        }
+        $requiredFieldKeys = $product->fields()->where('is_required', true)->pluck('field_key')->all();
+        $referencedKeys = $templateMatches[1] ?? [];
+        if (preg_match('/\{(?!\{)|(?<!\})\}/', preg_replace('/\{\{[a-z][a-z0-9_]*\}\}/', '', $template) ?? $template)) {
+            throw ValidationException::withMessages(['customer_no_template' => 'Format tujuan mengandung kurung kurawal yang tidak berpasangan.']);
+        }
+        $hasDigiflazzMapping = DB::table('provider_mappings as mappings')
+            ->join('providers', 'providers.id', '=', 'mappings.provider_id')
+            ->join('product_packages', 'product_packages.id', '=', 'mappings.product_package_id')
+            ->where('providers.code', 'DIGIFLAZZ')
+            ->where('product_packages.product_id', $product->id)
+            ->exists();
+        if ($templateSubmitted && $data['is_active']
+            && ($data['fulfillment_mode'] ?? $product->fulfillment_mode) === 'AUTO_PROVIDER'
+            && $hasDigiflazzMapping
+            && (($template !== '' && $referencedKeys === [])
+                || ($product->fields()->count() > 1 && $template === '')
+                || ($template !== '' && array_diff($requiredFieldKeys, $referencedKeys)))) {
+            throw ValidationException::withMessages(['customer_no_template' => 'Format tujuan harus mencantumkan semua kolom wajib produk dengan placeholder {{field_key}}.']);
+        }
+        if ($data['is_active'] && ! $product->is_active
+            && ($data['fulfillment_mode'] ?? $product->fulfillment_mode) === 'AUTO_PROVIDER'
+            && $hasDigiflazzMapping) {
+            $mappingConfigs = DB::table('provider_mappings as mappings')
+                ->join('providers', 'providers.id', '=', 'mappings.provider_id')
+                ->join('product_packages', 'product_packages.id', '=', 'mappings.product_package_id')
+                ->where('product_packages.product_id', $product->id)
+                ->where('providers.code', 'DIGIFLAZZ')
+                ->where('mappings.is_active', true)
+                ->pluck('mappings.fulfillment_config');
+            foreach ($mappingConfigs as $config) {
+                $config = is_string($config) ? (json_decode($config, true) ?: []) : (array) $config;
+                $effectiveTemplate = $templateSubmitted
+                    ? $template
+                    : ($template !== '' ? $template : trim((string) data_get($config, 'customer_no_template')));
+                preg_match_all('/\{\{([^}]+)\}\}/', $effectiveTemplate, $effectiveMatches);
+                $effectiveReferences = $effectiveMatches[1] ?? [];
+                if (($effectiveTemplate !== '' && array_diff($effectiveReferences, $fieldKeys))
+                    || ($effectiveTemplate !== '' && $effectiveReferences === [])
+                    || (count($fieldKeys) > 1 && $effectiveTemplate === '')
+                    || ($effectiveTemplate !== '' && array_diff($requiredFieldKeys, $effectiveReferences))) {
+                    throw ValidationException::withMessages(['customer_no_template' => 'Produk otomatis belum memiliki format tujuan yang valid untuk semua kolom wajib.']);
+                }
+            }
+        }
+        if ($templateSubmitted) {
+            $data['customer_no_template'] = $template !== '' ? $template : null;
+        }
         $data['slug'] ??= $product->slug;
         $data['fulfillment_mode'] ??= $product->fulfillment_mode;
         $data['package_tabs_enabled'] ??= $product->package_tabs_enabled;
@@ -323,10 +463,38 @@ class AdminCatalogController
         DB::transaction(function () use ($request, $product, $data, $audit): void {
             $before = $product->toArray();
             $product->update($data);
+            if (array_key_exists('customer_no_template', $data) && $data['customer_no_template'] === null) {
+                $this->clearLegacyCustomerNoTemplates($product->id);
+            }
             $audit->record($request, 'catalog.product.updated', 'product', $product->id, $before, $product->toArray());
         });
 
         return back();
+    }
+
+    private function clearLegacyCustomerNoTemplates(int $productId): void
+    {
+        $mappings = DB::table('provider_mappings as mappings')
+            ->join('providers', 'providers.id', '=', 'mappings.provider_id')
+            ->join('product_packages', 'product_packages.id', '=', 'mappings.product_package_id')
+            ->where('providers.code', 'DIGIFLAZZ')
+            ->where('product_packages.product_id', $productId)
+            ->get(['mappings.id', 'mappings.fulfillment_config']);
+
+        foreach ($mappings as $mapping) {
+            $config = is_string($mapping->fulfillment_config)
+                ? (json_decode($mapping->fulfillment_config, true) ?: [])
+                : (array) $mapping->fulfillment_config;
+            if (! array_key_exists('customer_no_template', $config)) {
+                continue;
+            }
+
+            unset($config['customer_no_template']);
+            DB::table('provider_mappings')->where('id', $mapping->id)->update([
+                'fulfillment_config' => json_encode($config, JSON_THROW_ON_ERROR),
+                'updated_at' => now(),
+            ]);
+        }
     }
 
     public function destroyProduct(Request $request, Product $product, CatalogAudit $audit): RedirectResponse
@@ -411,6 +579,8 @@ class AdminCatalogController
                 'margin_percent' => $package->margin_percent,
                 'margin_fixed_idr' => $package->margin_fixed_idr,
                 'sell_price_idr' => $package->sell_price_idr,
+                'sell_markup_percent' => $package->sell_markup_percent,
+                'cost_uplift_percent' => $package->cost_uplift_percent,
             ]);
             $mapping = $copy->mappings()->create([
                 'provider_id' => $sourceMapping->provider_id,
@@ -471,6 +641,7 @@ class AdminCatalogController
                     'provider_id' => $provider->id,
                     'external_sku' => null,
                     'cost_idr' => $data['cost_idr'],
+                    'store_cost_idr' => $data['cost_idr'],
                     'max_price_idr' => null,
                     'priority' => 0,
                     'is_active' => false,
@@ -499,6 +670,8 @@ class AdminCatalogController
             'margin_percent' => ['nullable', 'numeric', 'min:0', 'max:1000', 'required_if:pricing_mode,PERCENT'],
             'margin_fixed_idr' => ['nullable', 'integer', 'min:0', 'max:1000000000', 'required_if:pricing_mode,FIXED'],
             'sell_price_idr' => ['nullable', 'integer', 'min:1', 'max:1000000000', 'required_if:pricing_mode,SELL_PRICE'],
+            'sell_markup_percent' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:1000'],
+            'cost_uplift_percent' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:1000'],
         ]);
 
         $product = $package->product()->firstOrFail();
@@ -512,8 +685,10 @@ class AdminCatalogController
             }
         }
 
+        $highestActiveCost = $package->mappings()->where('is_active', true)
+            ->selectRaw('MAX(COALESCE(store_cost_idr, cost_idr)) as aggregate')->value('aggregate');
         if (($data['pricing_mode'] ?? $package->pricing_mode) === 'SELL_PRICE'
-            && (int) ($data['sell_price_idr'] ?? $package->sell_price_idr) < (int) $package->mappings()->where('is_active', true)->max('cost_idr')) {
+            && (int) ($data['sell_price_idr'] ?? $package->sell_price_idr) < (int) $highestActiveCost) {
             throw ValidationException::withMessages(['sell_price_idr' => 'Harga jual tidak boleh di bawah modal.']);
         }
         DB::transaction(function () use ($request, $package, $data, $audit): void {
@@ -558,6 +733,7 @@ class AdminCatalogController
     {
         $data = $request->validate([
             'fields' => ['present', 'array', 'max:20'],
+            'customer_no_template' => ['sometimes', 'nullable', 'string', 'max:500'],
             'fields.*.field_key' => ['required', 'string', 'max:80', 'regex:/^[a-z][a-z0-9_]*$/', 'distinct'],
             'fields.*.label' => ['required', 'string', 'max:255'],
             'fields.*.placeholder' => ['nullable', 'string', 'max:255'],
@@ -565,19 +741,62 @@ class AdminCatalogController
             'fields.*.is_required' => ['required', 'boolean'],
         ]);
         $keys = array_column($data['fields'], 'field_key');
-        $references = [];
+        $template = trim((string) (array_key_exists('customer_no_template', $data)
+            ? $data['customer_no_template']
+            : ($product->customer_no_template ?? '')));
+        preg_match_all('/\{\{([^}]+)\}\}/', $template, $matches);
+        $templateReferences = $matches[1] ?? [];
+        $references = $templateReferences;
         if ($product->nickname_check_enabled) {
-            $references = array_filter([$product->nickname_user_field_key, $product->nickname_server_field_key]);
+            $references = array_merge($references, array_filter([$product->nickname_user_field_key, $product->nickname_server_field_key]));
         }
-        foreach (ProviderMapping::whereIn('product_package_id', $product->packages()->pluck('id'))->get() as $mapping) {
-            preg_match_all('/\{\{([^}]+)\}\}/', (string) data_get($mapping->fulfillment_config, 'customer_no_template'), $matches);
-            $references = array_merge($references, $matches[1] ?? []);
+        foreach ($matches[1] ?? [] as $fieldKey) {
+            if (! preg_match('/^[a-z][a-z0-9_]*$/', $fieldKey) || ! in_array($fieldKey, $keys, true)) {
+                throw ValidationException::withMessages(['customer_no_template' => 'Placeholder {{'.$fieldKey.'}} tidak cocok dengan field produk.']);
+            }
+        }
+        if (preg_match('/\{(?!\{)|(?<!\})\}/', preg_replace('/\{\{[a-z][a-z0-9_]*\}\}/', '', $template) ?? $template)) {
+            throw ValidationException::withMessages(['customer_no_template' => 'Format tujuan mengandung kurung kurawal yang tidak berpasangan.']);
+        }
+        if ($template === '') {
+            $packageIds = $product->packages()->pluck('id');
+            foreach (DB::table('provider_mappings as mappings')
+                ->join('providers', 'providers.id', '=', 'mappings.provider_id')
+                ->where('providers.code', 'DIGIFLAZZ')
+                ->whereIn('mappings.product_package_id', $packageIds)
+                ->pluck('mappings.fulfillment_config') as $config) {
+                $config = is_string($config) ? (json_decode($config, true) ?: []) : (array) $config;
+                preg_match_all('/\{\{([^}]+)\}\}/', (string) data_get($config, 'customer_no_template'), $mappingMatches);
+                $references = array_merge($references, $mappingMatches[1] ?? []);
+            }
         }
         if (array_diff($references, $keys)) {
             throw ValidationException::withMessages(['fields' => 'Kode kolom masih dipakai cek nickname atau template pengiriman. Ubah pengaturan tersebut dahulu.']);
         }
-        DB::transaction(function () use ($request, $product, $data, $audit): void {
+        $requiredKeys = collect($data['fields'])->filter(fn (array $field): bool => (bool) $field['is_required'])
+            ->pluck('field_key')->all();
+        $hasDigiflazzMapping = DB::table('provider_mappings as mappings')
+            ->join('providers', 'providers.id', '=', 'mappings.provider_id')
+            ->join('product_packages', 'product_packages.id', '=', 'mappings.product_package_id')
+            ->where('providers.code', 'DIGIFLAZZ')
+            ->where('product_packages.product_id', $product->id)
+            ->exists();
+        if ($product->is_active && $product->fulfillment_mode === 'AUTO_PROVIDER' && $hasDigiflazzMapping
+            && (($template !== '' && $templateReferences === [])
+                || (count($data['fields']) > 1 && $template === '')
+                || ($requiredKeys !== [] && array_diff($requiredKeys, $templateReferences)))) {
+            throw ValidationException::withMessages(['customer_no_template' => 'Format tujuan harus memakai placeholder kolom produk dan mencantumkan semua kolom wajib.']);
+        }
+        DB::transaction(function () use ($request, $product, $data, $audit, $template): void {
             $before = $product->fields()->get()->toArray();
+            $beforeTemplate = $product->customer_no_template;
+            $product->customer_no_template = $template !== '' ? $template : null;
+            $product->save();
+            if (array_key_exists('customer_no_template', $data) && $data['customer_no_template'] === null) {
+                $this->clearLegacyCustomerNoTemplates($product->id);
+            }
+            $product->refresh();
+            $before = ['fields' => $before, 'customer_no_template' => $beforeTemplate];
             $product->fields()->delete();
             foreach ($data['fields'] as $index => $field) {
                 ProductInputField::create([
@@ -585,7 +804,10 @@ class AdminCatalogController
                 ]);
             }
             $audit->record($request, 'catalog.fields.updated', 'product', $product->id,
-                $before, $product->fields()->get()->toArray());
+                $before, [
+                    'fields' => $product->fields()->get()->toArray(),
+                    'customer_no_template' => $product->customer_no_template,
+                ]);
         });
 
         return back();
@@ -672,13 +894,46 @@ class AdminCatalogController
             'cost_idr' => [$provider->code === 'MANUAL' ? 'required' : 'prohibited', 'integer', 'min:0'],
             'is_manual_price' => [$provider->code === 'DIGIFLAZZ' ? 'sometimes' : 'prohibited', 'boolean'],
             'manual_price_idr' => [$provider->code === 'DIGIFLAZZ' ? 'sometimes' : 'prohibited', 'integer', 'min:1', 'max:1000000000'],
-            'customer_no_template' => [$provider->code === 'DIGIFLAZZ' ? 'nullable' : 'prohibited', 'string', 'max:500'],
+            'store_cost_idr' => [$provider->code === 'DIGIFLAZZ' ? 'sometimes' : 'prohibited', 'integer', 'min:1', 'max:1000000000'],
         ]);
-        if ($provider->code !== 'MANUAL') {
+        if ($provider->code === 'MANUAL' && array_key_exists('cost_idr', $data)) {
+            $data['store_cost_idr'] = $data['cost_idr'];
+        } elseif ($provider->code !== 'MANUAL') {
             unset($data['cost_idr']);
         }
 
         if ($provider->code === 'DIGIFLAZZ') {
+            if (isset($data['store_cost_idr'])) {
+                if ($mapping->seller_reference_price_idr !== null
+                    && (int) $data['store_cost_idr'] < (int) $mapping->seller_reference_price_idr) {
+                    throw ValidationException::withMessages([
+                        'store_cost_idr' => 'Store cost tidak boleh di bawah harga referensi seller saat ini.',
+                    ]);
+                }
+                $data['max_price_idr'] = (int) $data['store_cost_idr'];
+            }
+
+            if ($data['is_active']) {
+                $product = Product::query()
+                    ->join('product_packages', 'product_packages.product_id', '=', 'products.id')
+                    ->where('product_packages.id', $mapping->product_package_id)
+                    ->select('products.*')
+                    ->firstOrFail();
+                $template = trim((string) ($product->customer_no_template ?? ''));
+                $fieldKeys = $product->fields()->pluck('field_key')->all();
+                $requiredKeys = $product->fields()->where('is_required', true)->pluck('field_key')->all();
+                preg_match_all('/\{\{([^}]+)\}\}/', $template, $matches);
+                $references = $matches[1] ?? [];
+                if ($product->is_active && $product->fulfillment_mode === 'AUTO_PROVIDER'
+                    && (($template !== '' && $references === [])
+                        || (count($fieldKeys) > 1 && $template === '')
+                        || ($template !== '' && array_diff($references, $fieldKeys))
+                        || ($template !== '' && array_diff($requiredKeys, $references)))) {
+                    throw ValidationException::withMessages([
+                        'is_active' => 'Produk harus memiliki format Digiflazz yang mencantumkan semua kolom wajib sebelum mapping diaktifkan.',
+                    ]);
+                }
+            }
             $locking = (bool) ($data['is_manual_price'] ?? $mapping->is_manual_price);
             if ($locking && ! $mapping->is_manual_price && ! isset($data['manual_price_idr'])) {
                 throw ValidationException::withMessages([
@@ -694,42 +949,18 @@ class AdminCatalogController
                 // One admin-supplied amount is both the fixed accounting cost
                 // and per-source maximum. Never use an incoming seller price.
                 $data['cost_idr'] = $data['manual_price_idr'];
+                $data['store_cost_idr'] = $data['manual_price_idr'];
                 $data['max_price_idr'] = $data['manual_price_idr'];
+            } elseif ($mapping->is_manual_price && ! $locking) {
+                // Unlocking returns this mapping to supplier-controlled pricing;
+                // the next sync refreshes cost and ceiling from the live SKU.
+                $data['store_cost_idr'] = null;
+                $data['max_price_idr'] = null;
             }
             unset($data['manual_price_idr']);
 
-            $template = trim((string) ($data['customer_no_template'] ?? ''));
-            $productId = DB::table('product_packages')->where('id', $mapping->product_package_id)
-                ->value('product_id');
-            $fieldKeys = DB::table('product_input_fields')->where('product_id', $productId)
-                ->pluck('field_key')->all();
-
-            preg_match_all('/\{\{([^}]+)\}\}/', $template, $matches);
-            foreach ($matches[1] ?? [] as $fieldKey) {
-                if (! preg_match('/^[a-z][a-z0-9_]*$/', $fieldKey)
-                    || ! in_array($fieldKey, $fieldKeys, true)) {
-                    throw ValidationException::withMessages([
-                        'customer_no_template' => 'Placeholder {{'.$fieldKey.'}} tidak cocok dengan field produk.',
-                    ]);
-                }
-            }
-
-            if ($data['is_active'] && count($fieldKeys) > 1 && $template === '') {
-                throw ValidationException::withMessages([
-                    'customer_no_template' => 'Template customer_no wajib untuk produk dengan lebih dari satu field.',
-                ]);
-            }
-
-            $config = $mapping->fulfillment_config ?? [];
-            if ($template === '') {
-                unset($config['customer_no_template']);
-            } else {
-                $config['customer_no_template'] = $template;
-            }
-            $data['fulfillment_config'] = $config ?: null;
             // An explicit admin edit overrides any earlier sync-generated disable.
             $data['disabled_by_sync'] = false;
-            unset($data['customer_no_template']);
         }
 
         DB::transaction(function () use ($request, $mapping, $data, $audit): void {
@@ -833,6 +1064,33 @@ class AdminCatalogController
         $previews->executeGlobalMargin($request, $data['preview_token'], $audit);
 
         return back()->with('status', 'Margin global diterapkan sesuai preview yang telah dikonfirmasi.');
+    }
+
+    /**
+     * Global pricing controls of the catalog redesign: the one-time cost uplift
+     * that produces the admin store cost, and the sell markup applied to it.
+     * Both are percentages and both are overridable per game and per nominal.
+     */
+    public function pricing(Request $request, AdminAuditService $audit, CatalogPricingSettings $settings): RedirectResponse
+    {
+        $data = $request->validate([
+            'cost_uplift_percent' => ['required', 'numeric', 'min:0', 'max:1000'],
+            'sell_markup_percent' => ['required', 'numeric', 'min:0', 'max:1000'],
+        ]);
+
+        DB::transaction(function () use ($request, $data, $audit, $settings): void {
+            $before = [
+                'cost_uplift_percent' => $settings->costUpliftPercent(),
+                'sell_markup_percent' => $settings->sellMarkupPercent(),
+            ];
+            $settings->update($data['cost_uplift_percent'], $data['sell_markup_percent']);
+            $audit->record($request, 'catalog.pricing.updated', 'system_setting', 'pricing', $before, [
+                'cost_uplift_percent' => $settings->costUpliftPercent(),
+                'sell_markup_percent' => $settings->sellMarkupPercent(),
+            ]);
+        });
+
+        return back()->with('status', 'Pengaturan harga katalog disimpan.');
     }
 
     private function noticeData(Request $request): array

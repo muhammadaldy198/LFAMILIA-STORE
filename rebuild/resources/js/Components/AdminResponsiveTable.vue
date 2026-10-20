@@ -4,6 +4,9 @@ import { Table } from './ui/table';
 
 // Use the same slots and action handlers for either representation. Each workspace
 // chooses its priority columns; secondary data stays available in a disclosure.
+// `scroll` opts a workspace into the catalog-redesign mobile layout: the real
+// table stays intact inside a horizontal scroll container instead of being
+// restacked into one card per record.
 const flatten = nodes => (nodes || []).flatMap(node => node.type === Fragment
     ? flatten(node.children) : node.type === Comment ? [] : [node]);
 const children = node => flatten(Array.isArray(node.children) ? node.children : node.children?.default?.());
@@ -12,7 +15,10 @@ const text = node => node.type === Text || typeof node.children === 'string'
 
 export default defineComponent({
     inheritAttrs: false,
-    props: { mobileColumns: { type: Array, required: true } },
+    props: {
+        mobileColumns: { type: Array, required: true },
+        scroll: { type: Boolean, default: false },
+    },
     setup(props, { slots, attrs }) {
         const mobile = ref(false);
         let media;
@@ -24,6 +30,7 @@ export default defineComponent({
         });
         onUnmounted(() => media?.removeEventListener('change', update));
         return () => {
+            if (props.scroll) return h(Table, attrs, slots);
             if (!mobile.value) return h(Table, attrs, slots);
             const sections = flatten(slots.default?.());
             const headings = children(children(sections[0])[0] || { children: [] }).map(text);

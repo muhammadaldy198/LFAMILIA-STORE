@@ -151,15 +151,15 @@ onUnmounted(() => clearInterval(timer));
 </script>
 
 <template>
-<Head title="Manual" />
+<Head title="Antrean Pesanan" />
 <AdminShell>
-    <div class="flex flex-wrap items-start justify-between gap-3">
-        <div>
-            <h1 class="text-2xl font-semibold">Manual</h1>
-            <p class="mt-1 text-sm text-muted-foreground">Antrean penanganan pesanan yang membutuhkan tindakan atau pemeriksaan Admin.</p>
+    <header class="flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between">
+        <div class="min-w-0">
+            <h1 class="text-2xl font-semibold tracking-tight">Antrean Pesanan</h1>
+            <p class="mt-1 max-w-2xl text-sm text-muted-foreground">Pesanan yang menunggu tindakan atau pemeriksaan Admin.</p>
         </div>
-        <Button variant="outline" as-child><Link href="/admin/orders">Buka Pesanan</Link></Button>
-    </div>
+        <Button class="w-full sm:w-auto" variant="outline" as-child><Link href="/admin/orders">Buka Pesanan</Link></Button>
+    </header>
 
     <div class="lf-admin-summary mt-5">
         <Card v-for="metric in metrics" :key="metric.label" class="min-w-0 p-4">
@@ -168,8 +168,8 @@ onUnmounted(() => clearInterval(timer));
         </Card>
     </div>
 
-    <Card class="mt-5 p-4">
-        <form class="grid items-end gap-3 sm:grid-cols-2 xl:grid-cols-4" @submit.prevent="apply">
+    <Card class="mt-5 min-w-0 p-4 sm:p-5">
+        <form class="grid min-w-0 items-end gap-3 sm:grid-cols-2 xl:grid-cols-4" @submit.prevent="apply">
             <label class="space-y-1 sm:col-span-2">
                 <span class="text-sm font-medium">Cari antrean</span>
                 <Input v-model="filters.q" maxlength="150" placeholder="Nomor pesanan, pelanggan, produk, atau tujuan" />
@@ -190,12 +190,12 @@ onUnmounted(() => clearInterval(timer));
                 </select>
             </label>
             <label class="space-y-1">
-                <span class="text-sm font-medium">Baris per halaman</span>
+                <span class="text-sm font-medium">Pesanan per halaman</span>
                 <select v-model="filters.per_page" class="manual-select">
                     <option v-for="size in [10,25,50,100]" :key="size" :value="size">{{ size }} pesanan</option>
                 </select>
             </label>
-            <div class="flex flex-wrap gap-2 sm:col-span-2 xl:col-span-3">
+            <div class="flex flex-col gap-2 sm:flex-row sm:col-span-2 xl:col-span-3">
                 <Button type="submit" :disabled="busy">{{ busy ? 'Memuat…' : 'Terapkan filter' }}</Button>
                 <Button type="button" variant="outline" :disabled="busy" @click="reset">Hapus filter</Button>
             </div>
@@ -212,69 +212,56 @@ onUnmounted(() => clearInterval(timer));
     </div>
 
     <Card class="min-w-0 overflow-hidden">
-        <div class="hidden md:block">
-            <Table class="min-w-[980px] table-fixed">
+        <div class="overflow-x-auto overscroll-x-contain" tabindex="0" role="region" aria-label="Antrean pesanan, geser mendatar untuk melihat semua kolom">
+            <Table class="min-w-[850px] table-fixed">
                 <TableHeader>
                     <TableRow>
                         <TableHead class="w-[18%]">Pesanan</TableHead>
                         <TableHead class="w-[20%]">Pelanggan</TableHead>
-                        <TableHead class="w-[22%]">Produk dan tujuan</TableHead>
-                        <TableHead class="w-[14%]">Sumber</TableHead>
-                        <TableHead class="w-[16%]">Status</TableHead>
-                        <TableHead class="w-[10%]">Aksi</TableHead>
+                        <TableHead class="w-[22%]">Produk & Tujuan</TableHead>
+                        <TableHead class="w-[16%]">Penyedia / Sumber</TableHead>
+                        <TableHead class="w-[14%]">Status</TableHead>
+                        <TableHead class="w-[10%] text-right">Aksi</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    <TableRow v-for="attempt in attempts.data" :key="attempt.id">
+                    <TableRow v-for="attempt in attempts.data" :key="attempt.id" :class="{'bg-destructive/5': attempt.last_error}">
                         <TableCell class="align-top break-all">
-                            <strong class="font-medium">{{ attempt.order_number }}</strong>
-                            <p class="mt-1 text-xs text-muted-foreground">{{ date(attempt.created_at) }}</p>
-                            <p class="mt-1 text-xs text-muted-foreground">Proses ke-{{ attempt.attempt_no }}</p>
+                            <strong class="font-medium text-primary text-xs">{{ attempt.order_number }}</strong>
+                            <p class="mt-0.5 text-[11px] text-muted-foreground">{{ date(attempt.created_at) }}</p>
+                            <p class="text-[10px] text-muted-foreground">Ke-{{ attempt.attempt_no }}</p>
                         </TableCell>
                         <TableCell class="align-top break-words">
-                            <strong class="font-medium">{{ attempt.buyer_name }}</strong>
-                            <p v-if="attempt.buyer_phone" class="mt-1 text-xs">{{ attempt.buyer_phone }}</p>
-                            <p v-if="attempt.buyer_email" class="mt-1 break-all text-xs text-muted-foreground">{{ attempt.buyer_email }}</p>
+                            <strong class="font-medium text-xs">{{ attempt.buyer_name }}</strong>
+                            <p v-if="attempt.buyer_phone" class="text-[11px] text-muted-foreground">{{ attempt.buyer_phone }}</p>
+                            <p v-if="attempt.buyer_email" class="break-all text-[10px] text-muted-foreground">{{ attempt.buyer_email }}</p>
                         </TableCell>
                         <TableCell class="align-top break-words">
-                            <strong class="font-medium">{{ attempt.product_name }}</strong>
-                            <p class="text-sm">{{ attempt.package_name }}</p>
-                            <p v-for="(target,index) in attempt.destinations" :key="index" class="mt-1 break-all text-xs text-muted-foreground">{{ target.label }}: {{ target.value }}</p>
+                            <strong class="font-medium text-xs">{{ attempt.product_name }}</strong>
+                            <p class="text-[11px] text-muted-foreground">{{ attempt.package_name }}</p>
+                            <p v-for="(target,index) in attempt.destinations" :key="index" class="break-all text-[10px] text-muted-foreground">{{ target.label }}: {{ target.value }}</p>
                         </TableCell>
                         <TableCell class="align-top break-words">
-                            <p>{{ attempt.source }}</p>
-                            <p v-if="attempt.price_idr != null" class="mt-1 text-xs text-muted-foreground">Biaya sumber {{ money(attempt.price_idr) }}</p>
+                            <p class="text-xs">{{ attempt.source }}</p>
+                            <p v-if="attempt.price_idr != null" class="text-[10px] text-muted-foreground">Biaya {{ money(attempt.price_idr) }}</p>
                         </TableCell>
                         <TableCell class="align-top">
-                            <Badge variant="secondary" class="whitespace-normal">{{ attempt.status_label }}</Badge>
-                            <p class="mt-2 text-xs text-muted-foreground">Pesanan: {{ attempt.order_status_label }}</p>
-                            <p v-if="attempt.last_error" class="mt-2 text-xs text-amber-700">{{ attempt.last_error }}</p>
+                            <Badge variant="secondary" class="text-[10px]">{{ attempt.status_label }}</Badge>
+                            <p class="mt-1 text-[10px] text-muted-foreground">Order: {{ attempt.order_status_label }}</p>
+                            <p v-if="attempt.last_error" class="mt-1 text-[10px] font-medium text-destructive truncate" :title="attempt.last_error">{{ attempt.last_error }}</p>
                         </TableCell>
-                        <TableCell class="align-top">
-                            <Button size="sm" variant="outline" @click="openAttempt(attempt)">{{ attempt.can_complete || attempt.can_fail || attempt.can_reconcile || attempt.can_retry ? 'Tangani' : 'Lihat' }}</Button>
+                        <TableCell class="align-top text-right">
+                            <Button size="sm" variant="outline" class="h-7 text-xs" @click="openAttempt(attempt)">
+                                {{ attempt.can_complete || attempt.can_fail || attempt.can_reconcile || attempt.can_retry ? 'Tangani' : 'Lihat' }}
+                            </Button>
                         </TableCell>
+                    </TableRow>
+                    <TableRow v-if="!attempts.data.length">
+                        <TableCell colspan="6" class="p-8 text-center text-sm text-muted-foreground">Tidak ada antrean yang sesuai dengan filter.</TableCell>
                     </TableRow>
                 </TableBody>
             </Table>
         </div>
-
-        <div class="divide-y md:hidden">
-            <article v-for="attempt in attempts.data" :key="attempt.id" class="min-w-0 space-y-2 px-4 py-3">
-                <div class="flex items-start justify-between gap-3">
-                    <div class="min-w-0"><strong class="block break-all text-sm">{{ attempt.order_number }}</strong><p class="mt-1 text-xs text-muted-foreground">{{ date(attempt.created_at) }}</p></div>
-                    <Badge variant="secondary" class="max-w-[48%] shrink-0 whitespace-normal">{{ attempt.status_label }}</Badge>
-                </div>
-                <div><p class="font-medium">{{ attempt.product_name }}</p><p class="text-sm">{{ attempt.package_name }}</p></div>
-                <details class="lf-admin-record-details"><summary>Kontak & tujuan</summary><div class="space-y-2 py-2">                <p class="text-sm">{{ attempt.buyer_name }}<span v-if="attempt.buyer_phone" class="block">{{ attempt.buyer_phone }}</span></p>
-                <p v-for="(target,index) in attempt.destinations" :key="index" class="break-all text-sm">{{ target.label }}: {{ target.value }}</p></div></details>
-                <div class="flex flex-wrap items-end justify-between gap-3">
-                    <div><p class="text-sm">{{ attempt.source }}</p><p class="text-xs text-muted-foreground">Pesanan: {{ attempt.order_status_label }}</p><p v-if="attempt.last_error" class="mt-1 text-xs text-amber-700">{{ attempt.last_error }}</p></div>
-                    <Button size="sm" variant="outline" @click="openAttempt(attempt)">{{ attempt.can_complete || attempt.can_fail || attempt.can_reconcile || attempt.can_retry ? 'Tangani' : 'Lihat' }}</Button>
-                </div>
-            </article>
-        </div>
-
-        <p v-if="!attempts.data.length" class="p-8 text-center text-sm text-muted-foreground">Tidak ada antrean yang sesuai dengan filter.</p>
         <div class="flex flex-wrap items-center justify-between gap-3 border-t p-4">
             <p class="text-sm text-muted-foreground">{{ attempts.from || 0 }}–{{ attempts.to || 0 }} dari {{ attempts.total }} proses · Halaman {{ attempts.current_page }} dari {{ attempts.last_page }}</p>
             <div class="flex gap-2">
@@ -309,10 +296,8 @@ onUnmounted(() => clearInterval(timer));
                         <h3 class="font-semibold">Status proses</h3>
                         <p class="text-sm"><span class="text-muted-foreground">Status:</span> {{ selected.status_label }}</p>
                         <p class="text-sm"><span class="text-muted-foreground">Sumber:</span> {{ selected.source }}</p>
-                        <p class="break-all text-sm"><span class="text-muted-foreground">Referensi proses:</span> {{ selected.process_reference }}</p>
-                        <p v-if="selected.provider_status" class="text-sm"><span class="text-muted-foreground">Status sumber:</span> {{ selected.provider_status }}</p>
-                        <p v-if="selected.response_code" class="text-sm"><span class="text-muted-foreground">Kode respons:</span> {{ selected.response_code }}</p>
                         <p class="text-sm"><span class="text-muted-foreground">Terakhir diperiksa:</span> {{ date(selected.last_checked_at) }}</p>
+                        <details class="text-sm"><summary class="cursor-pointer">Rincian teknis (lanjutan)</summary><div class="mt-2 space-y-2"><p class="break-all"><span class="text-muted-foreground">Nomor referensi:</span> {{ selected.process_reference }}</p><p v-if="selected.provider_status"><span class="text-muted-foreground">Status dari penyedia:</span> {{ selected.provider_status }}</p><p v-if="selected.response_code"><span class="text-muted-foreground">Kode jawaban penyedia:</span> {{ selected.response_code }}</p></div></details>
                         <p v-if="selected.last_error" class="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{{ selected.last_error }}</p>
                     </Card>
 

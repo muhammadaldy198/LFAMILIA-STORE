@@ -67,16 +67,16 @@ onUnmounted(() => clearInterval(timer));
 <template>
 <Head title="Pesanan" />
 <AdminShell>
-    <div class="flex flex-wrap items-start justify-between gap-3">
-        <div><h1 class="text-2xl font-semibold">Pesanan</h1><p class="mt-1 text-sm text-muted-foreground">Pantau pembayaran, tujuan, dan penyelesaian pesanan.</p></div>
-        <Button v-if="canCreateManual" @click="openManual">Catat pesanan manual</Button>
-    </div>
+    <header class="flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between">
+        <div class="min-w-0"><h1 class="text-2xl font-semibold tracking-tight">Pesanan</h1><p class="mt-1 max-w-2xl text-sm text-muted-foreground">Pantau pembayaran, tujuan, dan status penyelesaian pesanan di satu tempat.</p></div>
+        <Button v-if="canCreateManual" class="w-full sm:w-auto" @click="openManual">Catat pesanan manual</Button>
+    </header>
     <p v-if="notice" role="status" class="mt-3 text-sm">{{ notice }}</p>
     <div class="lf-admin-summary mt-5">
         <Card v-for="metric in metrics" :key="metric.label" class="min-w-0 p-4"><p class="text-sm text-muted-foreground">{{ metric.label }}</p><p class="mt-2 text-2xl font-semibold">{{ Number(metric.value).toLocaleString('id-ID') }}</p></Card>
     </div>
-    <Card class="mt-5 p-4">
-        <form @submit.prevent="apply" class="grid items-end gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <Card class="mt-5 min-w-0 p-4 sm:p-5">
+        <form @submit.prevent="apply" class="grid min-w-0 items-end gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <label class="space-y-1 sm:col-span-2"><span class="text-sm font-medium">Cari pesanan</span><Input v-model="filters.q" placeholder="Nomor pesanan, pelanggan, produk, atau tujuan" maxlength="150" /></label>
             <label class="space-y-1"><span class="text-sm font-medium">Status pesanan</span><select v-model="filters.status" class="order-select"><option value="">Semua status</option><option v-for="(label, key) in statuses" :key="key" :value="key">{{ label }}</option><option value="attention">Perlu perhatian</option></select></label>
             <label class="space-y-1"><span class="text-sm font-medium">Penyedia</span><select v-model="filters.provider" class="order-select"><option value="">Semua penyedia</option><option v-for="provider in providers" :key="provider" :value="provider">{{ provider === 'MANUAL' ? 'Penanganan manual' : provider.charAt(0) + provider.slice(1).toLowerCase() }}</option></select></label>
@@ -95,29 +95,59 @@ onUnmounted(() => clearInterval(timer));
         <p class="w-full text-xs text-muted-foreground">Terakhir diperbarui: {{ date(updatedAt) }}. Pembaruan otomatis berhenti sementara saat formulir diisi atau pesanan dipilih.</p>
     </div>
     <Card class="min-w-0 overflow-hidden">
-        <div class="flex flex-wrap items-center justify-between gap-3 border-b p-4"><label class="flex items-center gap-2 text-sm"><input type="checkbox" :checked="allSelected" @change="toggleAll" :disabled="!orders.data.length" class="size-4" />Pilih pesanan di halaman ini</label><div class="flex items-center gap-2"><span class="text-sm">{{ selected.length }} dipilih</span><Button variant="outline" size="sm" @click="exportSelected" :disabled="!selected.length">Unduh yang dipilih</Button></div></div>
-        <div class="hidden md:block">
-            <Table class="min-w-[1000px] table-fixed">
-                <TableHeader><TableRow><TableHead class="w-[5%]">Pilih</TableHead><TableHead class="w-[17%]">Pesanan</TableHead><TableHead class="w-[16%]">Pelanggan</TableHead><TableHead class="w-[18%]">Produk dan tujuan</TableHead><TableHead class="w-[16%]">Pembayaran</TableHead><TableHead class="w-[18%]">Status</TableHead><TableHead class="w-[10%]">Detail</TableHead></TableRow></TableHeader>
-                <TableBody><TableRow v-for="row in orders.data" :key="row.id">
-                    <TableCell><input v-model="selected" :value="row.id" type="checkbox" :aria-label="'Pilih ' + row.order_number" class="size-4" /></TableCell>
-                    <TableCell class="break-all"><strong class="font-medium">{{ row.order_number }}</strong><p class="mt-1 text-xs text-muted-foreground">{{ date(row.created_at) }}</p><Button variant="ghost" size="sm" @click="copy(row.order_number)">Salin nomor</Button></TableCell>
-                    <TableCell class="break-words">{{ row.buyer_name }}<p class="mt-1 text-xs text-muted-foreground break-all">{{ row.buyer_phone || row.buyer_email || 'Kontak belum tersedia' }}</p></TableCell>
-                    <TableCell class="break-words"><strong class="font-medium">{{ row.product_name }}</strong><p class="text-sm">{{ row.package_name }}</p><p v-for="(target,index) in row.destinations" :key="index" class="mt-1 text-xs text-muted-foreground break-all">{{ target.label }}: {{ target.value }}</p><p v-if="row.nickname" class="text-xs">Nama akun: {{ row.nickname }}</p></TableCell>
-                    <TableCell class="break-words"><strong>{{ money(row.total_idr) }}</strong><p class="text-xs">{{ row.payment_method }}</p><p class="mt-1 text-xs text-muted-foreground">{{ row.provider }}</p></TableCell>
-                    <TableCell class="break-words"><Badge variant="outline" class="mb-1">{{row.paid_at?'Pembayaran diterima':'Pembayaran belum diterima'}}</Badge><Badge variant="secondary" class="whitespace-normal">{{ row.status_label }}</Badge><p v-if="row.needs_attention" class="mt-2 text-xs text-amber-700">Perlu perhatian</p></TableCell>
-                    <TableCell><Button variant="outline" size="sm" as-child><Link :href="'/admin/orders/'+row.id">Lihat</Link></Button></TableCell>
-                </TableRow></TableBody>
+        <div class="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between"><label class="flex items-center gap-2 text-sm"><input type="checkbox" :checked="allSelected" @change="toggleAll" :disabled="!orders.data.length" class="size-4" />Pilih pesanan di halaman ini</label><div class="flex flex-wrap items-center gap-3"><span class="text-sm text-muted-foreground" role="status">{{ selected.length }} pesanan dipilih</span><Button class="w-full sm:w-auto" variant="outline" size="sm" @click="exportSelected" :disabled="!selected.length">Unduh yang dipilih</Button></div></div>
+        <!-- Tabel Pesanan (Horizontally Scrollable di semua ukuran layar) -->
+        <div class="overflow-x-auto overscroll-x-contain" tabindex="0" role="region" aria-label="Daftar pesanan, geser mendatar untuk melihat semua kolom">
+            <Table class="min-w-[850px] table-fixed">
+                <TableHeader>
+                    <TableRow>
+                        <TableHead class="w-[5%]">Pilih</TableHead>
+                        <TableHead class="w-[18%]">Pesanan</TableHead>
+                        <TableHead class="w-[16%]">Pelanggan</TableHead>
+                        <TableHead class="w-[20%]">Produk & Tujuan</TableHead>
+                        <TableHead class="w-[16%]">Pembayaran</TableHead>
+                        <TableHead class="w-[15%]">Status</TableHead>
+                        <TableHead class="w-[10%] text-right">Aksi</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    <TableRow v-for="row in orders.data" :key="row.id" :class="{'bg-destructive/5': row.needs_attention}">
+                        <TableCell><input v-model="selected" :value="row.id" type="checkbox" :aria-label="'Pilih ' + row.order_number" class="size-4" /></TableCell>
+                        <TableCell class="break-all">
+                            <strong class="font-medium text-primary">{{ row.order_number }}</strong>
+                            <p class="mt-0.5 text-[11px] text-muted-foreground">{{ date(row.created_at) }}</p>
+                            <Button variant="ghost" size="sm" class="h-6 px-1.5 text-[10px]" @click="copy(row.order_number)">Salin</Button>
+                        </TableCell>
+                        <TableCell class="break-words">
+                            <span class="font-medium block text-xs">{{ row.buyer_name }}</span>
+                            <span class="text-[11px] text-muted-foreground break-all">{{ row.buyer_phone || row.buyer_email || '—' }}</span>
+                        </TableCell>
+                        <TableCell class="break-words">
+                            <strong class="font-medium text-xs">{{ row.product_name }}</strong>
+                            <p class="text-[11px] text-muted-foreground">{{ row.package_name }}</p>
+                            <p v-for="(target,index) in row.destinations" :key="index" class="text-[10px] text-muted-foreground break-all">{{ target.label }}: {{ target.value }}</p>
+                            <p v-if="row.nickname" class="text-[10px] text-foreground">Nama: {{ row.nickname }}</p>
+                        </TableCell>
+                        <TableCell class="break-words">
+                            <strong class="text-xs">{{ money(row.total_idr) }}</strong>
+                            <p class="text-[11px] text-muted-foreground">{{ row.payment_method }}</p>
+                            <p class="text-[10px] text-muted-foreground">{{ row.provider }}</p>
+                        </TableCell>
+                        <TableCell class="break-words">
+                            <Badge variant="outline" class="mb-1 text-[10px]">{{ row.paid_at ? 'Dibayar' : 'Belum dibayar' }}</Badge>
+                            <Badge variant="secondary" class="text-[10px] block w-fit">{{ row.status_label }}</Badge>
+                            <p v-if="row.needs_attention" class="mt-1 text-[10px] font-semibold text-amber-500">Perlu perhatian</p>
+                        </TableCell>
+                        <TableCell class="text-right">
+                            <Button variant="outline" size="sm" as-child class="h-7 text-xs"><Link :href="'/admin/orders/'+row.id">Detail</Link></Button>
+                        </TableCell>
+                    </TableRow>
+                    <TableRow v-if="!orders.data.length">
+                        <TableCell colspan="7" class="p-8 text-center text-sm text-muted-foreground">Tidak ada pesanan yang sesuai.</TableCell>
+                    </TableRow>
+                </TableBody>
             </Table>
         </div>
-        <div class="divide-y md:hidden"><article v-for="row in orders.data" :key="row.id" class="min-w-0 px-4 py-3">
-            <div class="flex items-start justify-between gap-3"><label class="flex min-w-0 items-start gap-2"><input v-model="selected" type="checkbox" :value="row.id" :aria-label="'Pilih '+row.order_number" class="size-4 shrink-0" /><span class="break-all text-sm font-semibold">{{row.order_number}}</span></label><Badge variant="secondary" class="max-w-[45%] shrink-0">{{row.status_label}}</Badge></div>
-            <div class="mt-2 grid grid-cols-[minmax(0,1fr)_auto] gap-2"><div class="min-w-0"><strong class="block break-words">{{row.product_name}}</strong><p class="text-xs text-muted-foreground">{{row.package_name}} · {{row.buyer_name}}</p></div><div class="text-right"><strong class="block">{{money(row.total_idr)}}</strong><span class="text-xs" :class="row.paid_at?'text-emerald-700':'text-amber-700'">{{row.paid_at?'Dibayar':'Belum diterima'}}</span></div></div>
-            <div class="mt-2 flex items-center justify-between gap-2"><time class="text-xs text-muted-foreground">{{date(row.created_at)}}</time><Button size="sm" variant="outline" as-child><Link :href="'/admin/orders/'+row.id">Detail pesanan</Link></Button></div>
-            <p v-if="row.needs_attention" class="mt-1 text-xs text-amber-700">Perlu perhatian</p>
-            <details class="lf-admin-record-details"><summary>Kontak & tujuan</summary><div class="space-y-2 py-2"><p class="break-all">{{row.buyer_phone||row.buyer_email||'Kontak belum tersedia'}}</p><p v-for="(target,index) in row.destinations" :key="index" class="break-all">{{target.label}}: {{target.value}}</p><p v-if="row.nickname">Nama akun: {{row.nickname}}</p><p class="text-xs text-muted-foreground">{{row.payment_method}} · {{row.provider}}</p><Button size="sm" variant="ghost" @click="copy(row.order_number)">Salin nomor pesanan</Button></div></details>
-        </article></div>
-        <p v-if="!orders.data.length" class="p-8 text-center text-sm text-muted-foreground">Tidak ada pesanan yang sesuai. Coba ubah atau hapus filter.</p>
         <div class="flex flex-wrap items-center justify-between gap-3 border-t p-4"><p class="text-sm text-muted-foreground">{{ orders.from || 0 }}–{{ orders.to || 0 }} dari {{ orders.total }} pesanan · Halaman {{ orders.current_page }} dari {{ orders.last_page }}</p><div class="flex gap-2"><Button variant="outline" size="sm" :disabled="!orders.prev_page_url || busy" @click="router.get(orders.prev_page_url, {}, { preserveState:true, preserveScroll:true, onSuccess:()=>selected=[] })">Sebelumnya</Button><Button variant="outline" size="sm" :disabled="!orders.next_page_url || busy" @click="router.get(orders.next_page_url, {}, { preserveState:true, preserveScroll:true, onSuccess:()=>selected=[] })">Berikutnya</Button></div></div>
     </Card>
     <Card class="mt-5 p-4"><h2 class="font-semibold">Aktivitas pesanan terbaru</h2><p v-if="!activities.length" class="mt-3 text-sm text-muted-foreground">Belum ada aktivitas pesanan.</p><ol class="mt-3 max-h-80 divide-y overflow-auto"><li v-for="activity in activities" :key="activity.id" class="py-3 text-sm"><Link :href="'/admin/orders/'+activity.order_id" class="break-all font-medium underline underline-offset-4">{{ activity.order_number }}</Link><p>{{ activity.label }}</p><p class="mt-1 text-xs text-muted-foreground">{{ date(activity.created_at) }}</p></li></ol></Card>

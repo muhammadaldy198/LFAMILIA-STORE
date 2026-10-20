@@ -20,6 +20,32 @@ const icon = href => {
  const path = href.split('?')[0].split('/')[2];
  return { panel:'dashboard', content:'content', 'nickname-tools':'nickname', payments:'payments', customers:'customers', vouchers:'vouchers', support:'support', reports:'reports', access:'access', settings:'settings', integrations:'integrations', health:'health', audit:'audit', fulfillment:'fulfillment', catalog:'catalog', orders:'orders', providers:'providers' }[path] || 'dashboard';
 };
+
+// Menu groups: setiap group punya label dan daftar path prefix yang cocok.
+const MENU_GROUPS = [
+ { label: null, paths: ['/admin/panel'] },
+ { label: 'Transaksi', paths: ['/admin/orders', '/admin/fulfillment', '/admin/vouchers'] },
+ { label: 'Katalog', paths: ['/admin/catalog'] },
+ { label: 'Konten', paths: ['/admin/content'] },
+ { label: 'Integrasi', paths: ['/admin/digiflazz', '/admin/providers', '/admin/nickname-tools'] },
+ { label: 'Keuangan', paths: ['/admin/payments', '/admin/reports'] },
+ { label: 'Pelanggan', paths: ['/admin/customers'] },
+ { label: 'Layanan', paths: ['/admin/support'] },
+ { label: 'Sistem', paths: ['/admin/integrations', '/admin/health', '/admin/audit', '/admin/notifications'] },
+ { label: 'Pengaturan', paths: ['/admin/settings', '/admin/access'] },
+];
+
+const groupedMenu = computed(() => {
+ const items = panel.value.menu || [];
+ const assigned = new Set();
+ return MENU_GROUPS.map(group => {
+  const groupItems = items.filter(item => {
+   const p = item.href.split('?')[0];
+   return group.paths.some(gp => p === gp || p.startsWith(gp + '/'));
+  }).filter(item => !assigned.has(item.href) && (assigned.add(item.href), true));
+  return { label: group.label, items: groupItems };
+ }).filter(g => g.items.length);
+});
 let controller;
 let outsideSearchTimer;
 let searchRequest = 0;
@@ -62,15 +88,23 @@ onUnmounted(() => { window.removeEventListener('keydown', shortcut);window.remov
  <Sheet v-model:open="open"><SheetContent side="left" class="lf-admin-mobile-navigation"><SheetTitle class="sr-only">Navigasi Admin</SheetTitle><SheetDescription class="sr-only">Pilih menu pengelolaan toko.</SheetDescription>
   <Link :href="base + '/panel'" class="lf-admin-brand"><span class="lf-admin-logo"><AdminIcon name="nickname" /></span><span><strong>{{ $page.props.storefront?.storeName || 'LFAMILIA' }} ADMIN</strong><small>{{ $page.props.storefront?.tagline || 'Top Up Game Solution' }}</small></span></Link>
   
-  <nav class="lf-admin-menu"><Link v-for="item in panel.menu" :key="item.href" :href="item.href" :class="{active:active(item.href)}" :aria-current="active(item.href) ? 'page' : undefined" @click="open=false"><AdminIcon :name="icon(item.href)" /><span>{{ item.label }}</span></Link></nav>
-  <div v-if="panel.menu.some(x => x.href === '/admin/support')" class="lf-admin-help"><strong>Butuh bantuan?</strong><p>Buka Layanan Pelanggan untuk melihat dan menangani tiket.</p><Link :href="base + '/support'">Pusat Bantuan</Link></div>
+  <nav class="lf-admin-menu">
+   <template v-for="group in groupedMenu" :key="group.label">
+    <span v-if="group.label" class="lf-admin-menu-group-label">{{ group.label }}</span>
+    <Link v-for="item in group.items" :key="item.href" :href="item.href" :class="{active:active(item.href)}" :aria-current="active(item.href) ? 'page' : undefined" @click="open=false"><AdminIcon :name="icon(item.href)" /><span>{{ item.label }}</span></Link>
+   </template>
+  </nav>
   <div class="lf-admin-sidebar-footer">© {{ new Date().getFullYear() }} {{ $page.props.storefront?.storeName || 'LFAMILIA' }}</div>
  </SheetContent></Sheet>
  <aside class="lf-admin-sidebar" aria-label="Navigasi Admin">
   <Link :href="base + '/panel'" class="lf-admin-brand"><span class="lf-admin-logo"><AdminIcon name="nickname" /></span><span><strong>{{ $page.props.storefront?.storeName || 'LFAMILIA' }} ADMIN</strong><small>{{ $page.props.storefront?.tagline || 'Top Up Game Solution' }}</small></span></Link>
   <button type="button" class="lf-admin-drawer-close" aria-label="Tutup menu" @click="open=false"><AdminIcon name="close" /></button>
-  <nav class="lf-admin-menu"><Link v-for="item in panel.menu" :key="item.href" :href="item.href" :class="{active:active(item.href)}" :aria-current="active(item.href) ? 'page' : undefined" @click="open=false"><AdminIcon :name="icon(item.href)" /><span>{{ item.label }}</span></Link></nav>
-  <div v-if="panel.menu.some(x => x.href === '/admin/support')" class="lf-admin-help"><strong>Butuh bantuan?</strong><p>Buka Layanan Pelanggan untuk melihat dan menangani tiket.</p><Link :href="base + '/support'">Pusat Bantuan</Link></div>
+  <nav class="lf-admin-menu">
+   <template v-for="group in groupedMenu" :key="group.label">
+    <span v-if="group.label" class="lf-admin-menu-group-label">{{ group.label }}</span>
+    <Link v-for="item in group.items" :key="item.href" :href="item.href" :class="{active:active(item.href)}" :aria-current="active(item.href) ? 'page' : undefined" @click="open=false"><AdminIcon :name="icon(item.href)" /><span>{{ item.label }}</span></Link>
+   </template>
+  </nav>
   <div class="lf-admin-sidebar-footer">© {{ new Date().getFullYear() }} {{ $page.props.storefront?.storeName || 'LFAMILIA' }}</div>
  </aside>
  <div class="lf-admin-body">

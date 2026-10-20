@@ -57,3 +57,26 @@ test('per-product sync button label admits it syncs the whole catalog', () => {
     assert.doesNotMatch(source, /Sinkron semua nominal produk/);
     assert.match(source, /router\.post\('\/admin\/catalog\/products\/'\+item\.id\+'\/sync'/);
 });
+
+test('catalog prices preserve markup for manual store-cost mappings and shared tables keep mobile cards by default', () => {
+    const source = read('Catalog.vue');
+    const table = readFileSync(new URL('../../resources/js/Components/AdminResponsiveTable.vue', import.meta.url), 'utf8');
+
+    assert.match(table, /scroll: \{ type: Boolean, default: false \}/);
+    assert.match(source, /<AdminResponsiveTable scroll class="min-w-\[1100px\]"/);
+    assert.match(source, /if\(mapping\.store_cost_idr!==null&&mapping\.store_cost_idr!==undefined\)/);
+    assert.match(source, /mapping\.provider_code === 'DIGIFLAZZ' \? \{/);
+    assert.match(source, /\{ store_cost_idr: Number\(mapping\.store_cost_idr\) \}/);
+    assert.match(source, /1000000\+Math\.round\(markup\*10000\)/);
+    assert.match(source, /Math\.round\(Number\(markup\) \* 10000\)/);
+    assert.doesNotMatch(source, /customer_no_template: item\.customer_no_template/);
+    assert.match(source, /const importRowPreview = \(sku, item\) => markupExample\(\s*sku\.price_idr,\s*effectiveUpliftPercent\(null, item\),\s*item\.sell_markup_percent !== null && item\.sell_markup_percent !== undefined\s*\? effectiveMarkupPercent\(null, item\)\s*: Number\(importForm\.margin_percent\),?\s*\)/);
+    assert.match(source, /:disabled="item\.sell_markup_percent !== null && item\.sell_markup_percent !== undefined"/);
+    assert.match(source, /@click="saveFields"/);
+    assert.match(source, /Modal toko \/ batas harga \(Rp\)<Input v-model\.number="mapping\.store_cost_idr"/);
+    assert.match(source, /\{ store_cost_idr: Number\(mapping\.store_cost_idr\) \}/);
+
+    const customers = read('Customers.vue');
+    assert.match(customers, /canManageMembershipRules: Boolean/);
+    assert.match(customers, /<Card v-if="canManageMembershipRules"/);
+});

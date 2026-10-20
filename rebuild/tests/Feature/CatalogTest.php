@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\ProductPackage;
 use App\Models\ProviderMapping;
 use App\Models\StoreAsset;
+use App\Services\CheckoutPricing;
 use App\Services\DigiflazzCatalogImport;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\UploadedFile;
@@ -448,6 +449,7 @@ class CatalogTest extends TestCase
             $this->seedCheckoutDigiflazzCatalog($package->id);
         }
         $this->put('/admin/catalog/products/'.$product->id.'/fields', [
+            'customer_no_template' => '{{user_id}}{{zone_id}}',
             'fields' => [
                 ['field_key' => 'user_id', 'label' => 'User ID', 'type' => 'text', 'is_required' => true],
                 ['field_key' => 'zone_id', 'label' => 'Zone ID', 'type' => 'text', 'is_required' => false],
@@ -461,6 +463,190 @@ class CatalogTest extends TestCase
                 ['field_key' => 'user_id', 'label' => 'Again', 'type' => 'text', 'is_required' => true],
             ],
         ])->assertSessionHasErrors('fields.1.field_key');
+    }
+
+    public function test_product_template_is_saved_and_legacy_mapping_fields_cannot_be_removed(): void
+    {
+        $this->actingAs($this->admin(), 'admin');
+        $category = Category::where('slug', 'game')->firstOrFail();
+        $providerId = DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
+        $product = Product::create([
+            'category_id' => $category->id, 'name' => 'Shared Template Game', 'slug' => 'shared-template-game',
+            'margin_percent' => 10, 'fulfillment_mode' => 'AUTO_PROVIDER', 'is_active' => false,
+        ]);
+        $product->fields()->create(['field_key' => 'user_id', 'label' => 'User ID', 'type' => 'text', 'is_required' => true, 'sort_order' => 0]);
+        $product->fields()->create(['field_key' => 'zone_id', 'label' => 'Zone ID', 'type' => 'text', 'is_required' => true, 'sort_order' => 1]);
+        $package = $product->packages()->create(['code' => 'SHARED1', 'name' => 'Paket', 'is_active' => false]);
+        DB::table('provider_mappings')->insert([
+            'product_package_id' => $package->id, 'provider_id' => $providerId, 'external_sku' => 'SHARED-SKU',
+            'cost_idr' => 10000, 'max_price_idr' => 12000, 'fulfillment_config' => json_encode(['customer_no_template' => '{{user_id}}{{zone_id}}']),
+            'priority' => 1, 'is_active' => false, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $payload = [
+            'category_id' => $category->id, 'name' => $product->name, 'slug' => $product->slug,
+            'fulfillment_mode' => 'AUTO_PROVIDER', 'margin_percent' => 10, 'sort_order' => 0, 'is_active' => false,
+            'customer_no_template' => '{{user_id}}{{zone_id}}',
+        ];
+        $legacyOnlyPayload = $payload;
+        unset($legacyOnlyPayload['customer_no_template']);
+        $this->put('/admin/catalog/products/'.$product->id, $legacyOnlyPayload)->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertNull($product->fresh()->customer_no_template);
+        $legacyConfig = json_decode((string) DB::table('provider_mappings')
+            ->where('product_package_id', $package->id)->value('fulfillment_config'), true);
+        $this->assertSame('{{user_id}}{{zone_id}}', $legacyConfig['customer_no_template']);
+
+        $this->put('/admin/catalog/products/'.$product->id, $payload)->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame('{{user_id}}{{zone_id}}', $product->fresh()->customer_no_template);
+        $this->put('/admin/catalog/products/'.$product->id, [...$payload, 'customer_no_template' => null])
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertNull($product->fresh()->customer_no_template);
+        $legacyConfig = json_decode((string) DB::table('provider_mappings')
+            ->where('product_package_id', $package->id)->value('fulfillment_config'), true);
+        $this->assertArrayNotHasKey('customer_no_template', $legacyConfig);
+
+        DB::table('provider_mappings')->where('product_package_id', $package->id)->update([
+            'fulfillment_config' => json_encode(['customer_no_template' => '{{user_id}}{{zone_id}}']),
+        ]);
+        $this->put('/admin/catalog/products/'.$product->id.'/fields', [
+            'fields' => [
+                ['field_key' => 'user_id', 'label' => 'User ID', 'type' => 'text', 'is_required' => true],
+                ['field_key' => 'zone_id', 'label' => 'Zone ID', 'type' => 'text', 'is_required' => true],
+            ],
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $preservedConfig = json_decode((string) DB::table('provider_mappings')
+            ->where('product_package_id', $package->id)->value('fulfillment_config'), true);
+        $this->assertSame('{{user_id}}{{zone_id}}', $preservedConfig['customer_no_template']);
+
+        $this->put('/admin/catalog/products/'.$product->id.'/fields', [
+            'customer_no_template' => null,
+            'fields' => [
+                ['field_key' => 'user_id', 'label' => 'User ID', 'type' => 'text', 'is_required' => true],
+                ['field_key' => 'zone_id', 'label' => 'Zone ID', 'type' => 'text', 'is_required' => true],
+            ],
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $clearedConfig = json_decode((string) DB::table('provider_mappings')
+            ->where('product_package_id', $package->id)->value('fulfillment_config'), true);
+        $this->assertArrayNotHasKey('customer_no_template', $clearedConfig);
+
+        $product->update(['is_active' => true]);
+        $payload['is_active'] = true;
+        $payload['customer_no_template'] = '{{user_id}}';
+        $this->put('/admin/catalog/products/'.$product->id, $payload)
+            ->assertSessionHasErrors('customer_no_template');
+
+        $this->put('/admin/catalog/products/'.$product->id.'/fields', [
+            'customer_no_template' => '{{user_id}}{{zone_id}}{{region_id}}',
+            'fields' => [
+                ['field_key' => 'user_id', 'label' => 'User ID', 'type' => 'text', 'is_required' => true],
+                ['field_key' => 'zone_id', 'label' => 'Zone ID', 'type' => 'text', 'is_required' => true],
+                ['field_key' => 'region_id', 'label' => 'Region ID', 'type' => 'text', 'is_required' => true],
+            ],
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame('{{user_id}}{{zone_id}}{{region_id}}', $product->fresh()->customer_no_template);
+        $auditAfter = json_decode((string) DB::table('audit_logs')->where('action', 'catalog.fields.updated')
+            ->where('target_id', (string) $product->id)->latest('id')->value('after'), true, 512, JSON_THROW_ON_ERROR);
+        $this->assertSame('{{user_id}}{{zone_id}}{{region_id}}', $auditAfter['customer_no_template']);
+        $this->assertCount(3, $auditAfter['fields']);
+
+        $this->put('/admin/catalog/products/'.$product->id.'/fields', [
+            'customer_no_template' => '{{user_id}}',
+            'fields' => [
+                ['field_key' => 'user_id', 'label' => 'User ID', 'type' => 'text', 'is_required' => true],
+                ['field_key' => 'zone_id', 'label' => 'Zone ID', 'type' => 'text', 'is_required' => true],
+                ['field_key' => 'region_id', 'label' => 'Region ID', 'type' => 'text', 'is_required' => true],
+            ],
+        ])->assertSessionHasErrors('customer_no_template');
+        $this->assertSame('{{user_id}}{{zone_id}}{{region_id}}', $product->fresh()->customer_no_template);
+    }
+
+    public function test_active_digiflazz_shared_template_rejects_missing_required_fields_and_literals(): void
+    {
+        $this->actingAs($this->admin(), 'admin');
+        $category = Category::where('slug', 'game')->firstOrFail();
+        $providerId = DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
+        $product = Product::create([
+            'category_id' => $category->id, 'name' => 'Template Validation Game', 'slug' => 'template-validation-game',
+            'margin_percent' => 10, 'fulfillment_mode' => 'AUTO_PROVIDER', 'is_active' => true,
+            'customer_no_template' => '{{user_id}}',
+        ]);
+        $product->fields()->createMany([
+            ['field_key' => 'user_id', 'label' => 'User ID', 'type' => 'text', 'is_required' => true, 'sort_order' => 0],
+            ['field_key' => 'zone_id', 'label' => 'Zone ID', 'type' => 'text', 'is_required' => false, 'sort_order' => 1],
+        ]);
+        $package = $product->packages()->create(['code' => 'VALIDATE1', 'name' => 'Paket']);
+        DB::table('provider_mappings')->insert([
+            'product_package_id' => $package->id, 'provider_id' => $providerId, 'external_sku' => 'VALIDATE-SKU',
+            'cost_idr' => 10000, 'max_price_idr' => 12000, 'fulfillment_config' => json_encode([]),
+            'priority' => 1, 'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        foreach (['fixed-account-id', '{{zone_id}}'] as $invalidTemplate) {
+            $this->put('/admin/catalog/products/'.$product->id.'/fields', [
+                'customer_no_template' => $invalidTemplate,
+                'fields' => [
+                    ['field_key' => 'user_id', 'label' => 'User ID', 'type' => 'text', 'is_required' => true],
+                    ['field_key' => 'zone_id', 'label' => 'Zone ID', 'type' => 'text', 'is_required' => false],
+                ],
+            ])->assertSessionHasErrors('customer_no_template');
+        }
+        $this->put('/admin/catalog/products/'.$product->id.'/fields', [
+            'customer_no_template' => '{{zone_id}}',
+            'fields' => [
+                ['field_key' => 'user_id', 'label' => 'User ID', 'type' => 'text', 'is_required' => true],
+                ['field_key' => 'zone_id', 'label' => 'Zone ID', 'type' => 'text', 'is_required' => false],
+            ],
+        ])->assertSessionHasErrors('customer_no_template');
+        $this->assertSame('{{user_id}}', $product->fresh()->customer_no_template);
+    }
+
+    public function test_digiflazz_mapping_cannot_be_activated_without_valid_shared_template(): void
+    {
+        $this->actingAs($this->admin(), 'admin');
+        $category = Category::where('slug', 'game')->firstOrFail();
+        $providerId = DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
+        $product = Product::create([
+            'category_id' => $category->id, 'name' => 'Mapping Activation Game', 'slug' => 'mapping-activation-game',
+            'margin_percent' => 10, 'fulfillment_mode' => 'AUTO_PROVIDER', 'is_active' => true,
+        ]);
+        $product->fields()->createMany([
+            ['field_key' => 'user_id', 'label' => 'User ID', 'type' => 'text', 'is_required' => true, 'sort_order' => 0],
+            ['field_key' => 'zone_id', 'label' => 'Zone ID', 'type' => 'text', 'is_required' => true, 'sort_order' => 1],
+        ]);
+        $package = $product->packages()->create(['code' => 'ACTIVATE1', 'name' => 'Paket']);
+        $mappingId = DB::table('provider_mappings')->insertGetId([
+            'product_package_id' => $package->id, 'provider_id' => $providerId, 'external_sku' => 'ACTIVATE-SKU',
+            'cost_idr' => 10000, 'max_price_idr' => 12000, 'fulfillment_config' => json_encode([]),
+            'priority' => 1, 'is_active' => false, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $this->put('/admin/catalog/mappings/'.$mappingId, [
+            'priority' => 1, 'is_active' => true, 'is_manual_price' => false,
+        ])->assertSessionHasErrors('is_active');
+        $this->assertDatabaseHas('provider_mappings', ['id' => $mappingId, 'is_active' => false]);
+        $product->update(['customer_no_template' => '{{user_id}}{{zone_id}}']);
+        $this->put('/admin/catalog/mappings/'.$mappingId, [
+            'priority' => 1, 'is_active' => true, 'is_manual_price' => false,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('provider_mappings', ['id' => $mappingId, 'is_active' => true]);
+    }
+
+    public function test_shared_template_migration_rollback_restores_legacy_mapping_templates(): void
+    {
+        $category = Category::where('slug', 'game')->firstOrFail();
+        $providerId = DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
+        $product = Product::create([
+            'category_id' => $category->id, 'name' => 'Rollback Template Game', 'slug' => 'rollback-template-game',
+            'margin_percent' => 10, 'fulfillment_mode' => 'AUTO_PROVIDER', 'customer_no_template' => '{{user_id}}{{zone_id}}',
+        ]);
+        $package = $product->packages()->create(['code' => 'ROLLBACK1', 'name' => 'Paket']);
+        $mappingId = DB::table('provider_mappings')->insertGetId([
+            'product_package_id' => $package->id, 'provider_id' => $providerId, 'external_sku' => 'ROLLBACK-SKU',
+            'cost_idr' => 10000, 'max_price_idr' => 12000, 'fulfillment_config' => json_encode(['customer_no_template' => '{{stale}}']),
+            'priority' => 1, 'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $product->update(['customer_no_template' => '{{latest_user}}{{latest_zone}}']);
+        (require database_path('migrations/2026_10_18_134621_backfill_product_customer_no_templates.php'))->down();
+        $config = json_decode(DB::table('provider_mappings')->where('id', $mappingId)->value('fulfillment_config'), true);
+        $this->assertSame('{{latest_user}}{{latest_zone}}', $config['customer_no_template']);
     }
 
     public function test_digiflazz_sku_only_enters_through_trusted_import_service(): void
@@ -654,5 +840,123 @@ class CatalogTest extends TestCase
                 ->where('initialPackageId', '')
                 ->has('packages', 0)
                 ->etc());
+    }
+
+    public function test_admin_creates_a_manual_product_with_many_nominal_rows_in_one_form(): void
+    {
+        $category = Category::where('slug', 'game')->firstOrFail();
+        DB::table('providers')->where('code', 'MANUAL')->update(['is_active' => true]);
+        $this->actingAs($this->admin(), 'admin');
+
+        $this->post('/admin/catalog/products', [
+            'category_id' => $category->id,
+            'name' => 'Manual Bundle',
+            'fulfillment_mode' => 'MANUAL',
+            'manual_instructions' => 'Cek pesanan di panel admin',
+            'margin_percent' => 10,
+            'sell_markup_percent' => 15,
+            'sort_order' => 3,
+            'packages' => [
+                ['name' => '100 Koin', 'nominal_value' => 100, 'cost_idr' => 10000, 'sell_markup_percent' => 12],
+                ['name' => '200 Koin', 'nominal_value' => 200, 'cost_idr' => 19000],
+                ['name' => 'Kartu Koleksi', 'nominal_value' => null, 'cost_idr' => 5000, 'note' => 'Bonus'],
+            ],
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $product = Product::where('slug', 'manual-bundle')->firstOrFail();
+        $this->assertFalse($product->is_active);
+        $packages = ProductPackage::where('product_id', $product->id)->orderBy('sort_order')->get();
+        $this->assertCount(3, $packages);
+        $this->assertSame(['100 Koin', '200 Koin', 'Kartu Koleksi'], $packages->pluck('name')->all());
+        $this->assertSame(3, $packages->pluck('code')->unique()->count(), 'Kode nominal dibuat otomatis dan unik.');
+        $this->assertSame(['100', '200', null], $packages->map(fn (ProductPackage $pack) => $pack->nominal_value === null ? null : (string) $pack->nominal_value)->all());
+        foreach ($packages as $package) {
+            $this->assertFalse((bool) $package->is_active, 'Nominal manual baru menunggu aktivasi admin.');
+        }
+
+        // Satu formulir membuat baris nominal manual; tidak ada SKU provider asli
+        // yang tertempel — pencatatan modal tetap lewat provider MANUAL.
+        $mappings = ProviderMapping::whereIn('product_package_id', $packages->pluck('id'))->get();
+        $this->assertCount(3, $mappings);
+        foreach ($mappings as $mapping) {
+            $this->assertNull($mapping->external_sku);
+            $this->assertSame('MANUAL', DB::table('providers')->where('id', $mapping->provider_id)->value('code'));
+            $this->assertFalse((bool) $mapping->is_active);
+            $this->assertNull($mapping->seller_reference_price_idr);
+        }
+
+        $first = $packages->firstWhere('name', '100 Koin');
+        $firstMapping = $mappings->firstWhere('product_package_id', $first->id);
+        // Modal toko yang diketik admin tidak di-uplift: uplift hanya berlaku saat impor.
+        $this->assertSame(10000, (int) $firstMapping->cost_idr);
+        $this->assertSame(10000, (int) $firstMapping->store_cost_idr);
+        $this->assertSame('12.0000', (string) $first->sell_markup_percent);
+
+        DB::table('products')->where('id', $product->id)->update(['is_active' => true]);
+        DB::table('product_packages')->whereIn('id', $packages->pluck('id'))->update(['is_active' => true]);
+        DB::table('provider_mappings')->whereIn('product_package_id', $packages->pluck('id'))->update(['is_active' => true]);
+        $quotes = app(CheckoutPricing::class)->forPackages($packages->pluck('id')->all());
+
+        // Baris dengan markup sendiri memakai markup baris (10.000 × 12% = 11.200).
+        $this->assertSame(11200, $quotes[$first->id]['subtotal_idr']);
+        // Baris tanpa markup memakai markup produk dari formulir yang sama (19.000 × 15% = 21.850).
+        $second = $packages->firstWhere('name', '200 Koin');
+        $this->assertSame(21850, $quotes[$second->id]['subtotal_idr']);
+        // Tanpa markup baris, berlaku markup produk dari formulir yang sama (5.000 × 15% = 5.750).
+        $third = $packages->firstWhere('name', 'Kartu Koleksi');
+        $this->assertSame(5750, $quotes[$third->id]['subtotal_idr']);
+    }
+
+    public function test_manual_nominal_rows_are_rejected_for_automatic_products(): void
+    {
+        $category = Category::where('slug', 'game')->firstOrFail();
+        $this->actingAs($this->admin(), 'admin');
+
+        $this->post('/admin/catalog/products', [
+            'category_id' => $category->id,
+            'name' => 'Otomatis Dengan Baris',
+            'fulfillment_mode' => 'AUTO_PROVIDER',
+            'margin_percent' => 10,
+            'sort_order' => 4,
+            'packages' => [
+                ['name' => '100 Koin', 'nominal_value' => 100, 'cost_idr' => 10000],
+            ],
+        ])->assertSessionHasErrors('packages');
+
+        $this->assertDatabaseMissing('products', ['name' => 'Otomatis Dengan Baris']);
+        $this->assertSame(0, ProductPackage::whereIn('name', ['100 Koin'])->whereHas('product', fn ($query) => $query->where('name', 'Otomatis Dengan Baris'))->count());
+    }
+
+    public function test_manual_nominal_rows_reject_duplicates_and_invalid_rows_without_partial_creation(): void
+    {
+        $category = Category::where('slug', 'game')->firstOrFail();
+        $this->actingAs($this->admin(), 'admin');
+        $base = [
+            'category_id' => $category->id,
+            'fulfillment_mode' => 'MANUAL',
+            'margin_percent' => 10,
+            'sort_order' => 5,
+        ];
+
+        // Nominal kembar dalam satu formulir tidak boleh dibuat diam-diam.
+        $this->post('/admin/catalog/products', $base + [
+            'name' => 'Manual Kembar',
+            'packages' => [
+                ['name' => '100 Koin', 'nominal_value' => 100, 'cost_idr' => 10000],
+                ['name' => '100 Koin Varian', 'nominal_value' => 100, 'cost_idr' => 11000],
+            ],
+        ])->assertSessionHasErrors('packages');
+        $this->assertDatabaseMissing('products', ['name' => 'Manual Kembar']);
+
+        // Baris cacat ditolak seluruhnya — tidak ada produk/nominal yang setengah jadi.
+        $this->post('/admin/catalog/products', $base + [
+            'name' => 'Manual Cacat',
+            'packages' => [
+                ['name' => '', 'nominal_value' => 50, 'cost_idr' => -1],
+                ['name' => '250 Koin', 'nominal_value' => 250, 'cost_idr' => 25000],
+            ],
+        ])->assertSessionHasErrors(['packages.0.name', 'packages.0.cost_idr']);
+        $this->assertDatabaseMissing('products', ['name' => 'Manual Cacat']);
+        $this->assertSame(0, ProductPackage::where('name', '250 Koin')->count());
     }
 }

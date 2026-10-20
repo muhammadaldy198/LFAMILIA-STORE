@@ -114,7 +114,10 @@ class DigiflazzCatalogService
                     // manually locked. Such mappings stay active but ineligible for
                     // checkout and fulfillment until an admin examines them.
                     $mappings = (clone $mappingQuery)->lockForUpdate()
-                        ->get(['id', 'is_manual_price', 'fulfillment_config']);
+                        ->get([
+                            'id', 'is_manual_price', 'fulfillment_config', 'cost_idr', 'store_cost_idr',
+                            'product_package_id',
+                        ]);
                     $matching = $mappings->filter(
                         fn (object $mapping): bool => $this->verifiedIdentityMatches((object) $row, $mapping->fulfillment_config)
                     );
@@ -126,10 +129,19 @@ class DigiflazzCatalogService
                     }
                     $matchingIds = $matching->pluck('id')->all();
                     if ($matchingIds !== []) {
-                        (clone $mappingQuery)->whereIn('id', $matchingIds)
-                            ->where('is_manual_price', false)->update([
-                                'cost_idr' => $row['price_idr'], 'max_price_idr' => $row['price_idr'], 'updated_at' => now(),
-                            ]);
+                        foreach ($matching->where('is_manual_price', false) as $mapping) {
+                            $updates = [
+                                'cost_idr' => $row['price_idr'],
+                                'seller_reference_price_idr' => $row['price_idr'],
+                                'updated_at' => now(),
+                            ];
+                            if ($mapping->store_cost_idr === null) {
+                                // Legacy mapping: the provider price is also the cap.
+                                // A redesigned mapping keeps its admin store cost as the cap.
+                                $updates['max_price_idr'] = $row['price_idr'];
+                            }
+                            DB::table('provider_mappings')->where('id', $mapping->id)->update($updates);
+                        }
                         // Restore only mappings previously disabled *by sync*, and
                         // only if their verified supplier identity still matches.
                         if ($row['buyer_active'] && $row['seller_active']
@@ -208,10 +220,6 @@ class DigiflazzCatalogService
                             'created_at' => now(), 'updated_at' => now(),
                         ]);
                     }
-                }
-
-                if ($sku === null) {
-                    app(DigiflazzAutoSources::class)->sync();
                 }
 
                 return count($clean);

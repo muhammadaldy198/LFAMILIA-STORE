@@ -93,6 +93,22 @@ class AdminPackagePriceGuardTest extends TestCase
         $this->assertSame(18000, (int) $package->fresh()->sell_price_idr);
     }
 
+    public function test_active_store_cost_is_used_to_guard_fixed_sell_price(): void
+    {
+        [$admin, $package] = $this->packageWithMappings();
+        $this->actingAs($admin, 'admin');
+        $package->mappings()->where('is_active', true)->update(['store_cost_idr' => 19000]);
+
+        $this->put('/admin/catalog/packages/'.$package->id, $this->updatePayload([
+            'sell_price_idr' => 18000,
+        ]))->assertSessionHasErrors('sell_price_idr');
+
+        $this->put('/admin/catalog/packages/'.$package->id, $this->updatePayload([
+            'sell_price_idr' => 19000,
+        ]))->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame(19000, (int) $package->fresh()->sell_price_idr);
+    }
+
     public function test_active_mapping_cost_still_blocks_price_below_cost(): void
     {
         [$admin, $package] = $this->packageWithMappings();

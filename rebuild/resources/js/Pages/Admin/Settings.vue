@@ -1,9 +1,6 @@
 <script setup>
-import AdminSwitch from '../../Components/AdminSwitch.vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
-import { reactive, ref, watch } from 'vue';
 import AdminShell from '../../Components/AdminShell.vue';
-import { Badge } from '../../Components/ui/badge';
 import { Button } from '../../Components/ui/button';
 import { Card } from '../../Components/ui/card';
 import { Input } from '../../Components/ui/input';
@@ -11,15 +8,8 @@ import { Textarea } from '../../Components/ui/textarea';
 
 const props = defineProps({
     settings: { type: Object, default: () => ({}) },
-    tiers: { type: Array, default: () => [] },
     canExport: Boolean,
     summary: { type: Object, default: () => ({}) },
-});
-
-const tab = ref('store');
-const tiers = reactive((props.tiers || []).map((tier) => ({ ...tier })));
-watch(() => props.tiers, (value) => {
-    tiers.splice(0, tiers.length, ...(value || []).map((tier) => ({ ...tier })));
 });
 
 const storeForm = useForm({
@@ -36,45 +26,27 @@ const storeForm = useForm({
     address: props.settings?.['store.address'] || '',
 });
 
-const money = (value) => 'Rp' + Number(value || 0).toLocaleString('id-ID');
-const percent = (value) => Number(value || 0).toLocaleString('id-ID', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-}) + '%';
-
 function saveStore() {
     storeForm.put('/admin/settings', { preserveScroll: true });
 }
 
-function saveTier(tier) {
-    router.put('/admin/settings/membership/' + encodeURIComponent(tier.code), {
-        is_active: Boolean(tier.is_active),
-        minimum_spend_idr: Number(tier.minimum_spend_idr || 0),
-        discount_percent: Number(tier.discount_percent || 0),
-        benefit_notes: tier.benefit_notes || '',
-    }, { preserveScroll: true });
-}
 </script>
 
 <template>
 <Head title="Pengaturan" />
 <AdminShell>
     <div class="space-y-5">
-        <header class="flex flex-wrap items-start justify-between gap-3">
-            <div>
-                <h1 class="text-2xl font-semibold">Pengaturan</h1>
+        <header class="flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between">
+            <div class="min-w-0">
+                <h1 class="text-2xl font-semibold tracking-tight">Pengaturan</h1>
                 <p class="mt-1 max-w-3xl text-sm text-muted-foreground">
-                    Kelola identitas toko, kanal bantuan, informasi merchant, membership pelanggan, dan ekspor konfigurasi aman.
+                    Kelola identitas toko, kanal bantuan, informasi merchant, dan ekspor konfigurasi aman.
                 </p>
             </div>
-            <Button variant="outline" @click="router.reload({ preserveScroll: true })">Muat ulang</Button>
+            <Button class="w-full sm:w-auto" variant="outline" @click="router.reload({ preserveScroll: true })">Muat ulang</Button>
         </header>
 
         <div class="lf-admin-summary ">
-            <Card class="p-4">
-                <p class="text-xs text-muted-foreground">Tier aktif</p>
-                <p class="mt-2 text-2xl font-semibold">{{ summary.active_tiers || 0 }}/{{ summary.total_tiers || 0 }}</p>
-            </Card>
             <Card class="p-4">
                 <p class="text-xs text-muted-foreground">Kanal kontak</p>
                 <p class="mt-2 text-2xl font-semibold">{{ summary.contacts_configured || 0 }}/4</p>
@@ -89,14 +61,7 @@ function saveTier(tier) {
             </Card>
         </div>
 
-        <nav class="lf-admin-tabs">
-            <Button type="button" :variant="tab === 'store' ? 'secondary' : 'ghost'" class="shrink-0" @click="tab = 'store'">Toko & Kontak</Button>
-            <Button type="button" :variant="tab === 'membership' ? 'secondary' : 'ghost'" class="shrink-0" @click="tab = 'membership'">Membership</Button>
-            <Button v-if="canExport" type="button" :variant="tab === 'export' ? 'secondary' : 'ghost'" class="shrink-0" @click="tab = 'export'">Ekspor</Button>
-        </nav>
-
-        <template v-if="tab === 'store'">
-            <form class="space-y-4" @submit.prevent="saveStore">
+        <form class="space-y-4" @submit.prevent="saveStore">
                 <Card class="p-4">
                     <div>
                         <h2 class="text-lg font-semibold">Identitas Toko</h2>
@@ -187,84 +152,24 @@ function saveTier(tier) {
                 <div class="flex justify-end">
                     <Button :disabled="storeForm.processing">{{ storeForm.processing ? 'Menyimpan…' : 'Simpan Pengaturan Toko' }}</Button>
                 </div>
-            </form>
-        </template>
+        </form>
 
-        <template v-else-if="tab === 'membership'">
-            <Card class="p-4">
-                <div>
-                    <h2 class="text-lg font-semibold">Tier Membership Pelanggan</h2>
-                    <p class="mt-1 text-sm text-muted-foreground">
-                        Urutan tier tetap BASIC → SILVER → GOLD → DIAMOND → PLATINUM → MAFIA. Syarat tier otomatis memakai total transaksi berhasil; diskon diterapkan server-side saat checkout.
-                    </p>
-                </div>
-            </Card>
-
-            <div class="lf-admin-summary ">
-                <Card v-for="tier in tiers" :key="tier.code" class="p-4">
-                    <div class="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                            <div class="flex items-center gap-2">
-                                <h3 class="text-lg font-semibold">{{ tier.rank }}. {{ tier.code }}</h3>
-                                <Badge :variant="tier.is_active ? 'secondary' : 'outline'">{{ tier.is_active ? 'Aktif' : 'Nonaktif' }}</Badge>
-                            </div>
-                            <p class="mt-1 text-xs text-muted-foreground">
-                                Syarat saat ini {{ money(tier.minimum_spend_idr) }} · diskon {{ percent(tier.discount_percent) }}
-                            </p>
-                        </div>
-                        <label class="flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
-                            <AdminSwitch v-model="tier.is_active" />
-                            Aktif
-                        </label>
-                    </div>
-
-                    <div class="mt-4 grid gap-3 md:grid-cols-2">
-                        <label class="space-y-1">
-                            <span class="text-sm font-medium">Minimum total transaksi berhasil</span>
-                            <Input v-model.number="tier.minimum_spend_idr" type="number" min="0" max="1000000000000" step="1" />
-                            <span class="text-xs text-muted-foreground">Rp0 berarti tier dapat dicapai tanpa minimum belanja.</span>
-                        </label>
-                        <label class="space-y-1">
-                            <span class="text-sm font-medium">Diskon member (%)</span>
-                            <Input v-model.number="tier.discount_percent" type="number" min="0" max="100" step="0.01" />
-                            <span class="text-xs text-muted-foreground">Maksimum 100%. Perhitungan tetap dilakukan backend.</span>
-                        </label>
-                        <label class="space-y-1 md:col-span-2">
-                            <span class="text-sm font-medium">Manfaat tambahan</span>
-                            <Textarea v-model="tier.benefit_notes" rows="3" maxlength="1000" placeholder="Contoh: Prioritas layanan&#10;Promo khusus member" />
-                            <span class="text-xs text-muted-foreground">Tulis dengan bahasa customer, satu manfaat per baris bila perlu.</span>
-                        </label>
-                    </div>
-
-                    <div v-if="tier.has_legacy_requirements || tier.has_legacy_benefits" class="mt-3 rounded-md border p-3 text-xs text-muted-foreground">
-                        Tier ini memiliki metadata lama tambahan. Data tersebut tetap dipertahankan saat menyimpan agar tidak hilang.
-                    </div>
-
-                    <div class="mt-4 flex justify-end">
-                        <Button size="sm" @click="saveTier(tier)">Simpan {{ tier.code }}</Button>
-                    </div>
-                </Card>
-            </div>
-        </template>
-
-        <template v-else>
-            <Card v-if="canExport" class="p-4">
+        <Card v-if="canExport" class="p-4">
                 <div class="flex flex-wrap items-start justify-between gap-4">
                     <div class="max-w-2xl">
-                        <h2 class="text-lg font-semibold">Ekspor Konfigurasi Aman</h2>
+                        <h2 class="text-lg font-semibold">Unduh pengaturan toko</h2>
                         <p class="mt-1 text-sm text-muted-foreground">
-                            Unduh snapshot konfigurasi aplikasi untuk dokumentasi atau pemulihan manual. Credential, password, API key, token, private key, signature, dan ciphertext tidak ikut diekspor.
+                            Unduh salinan pengaturan toko untuk dokumentasi atau panduan pemulihan. Kata sandi dan data akses layanan tidak disertakan.
                         </p>
                         <p class="mt-2 text-xs text-muted-foreground">
-                            Ini bukan backup database penuh dan tidak menggantikan backup server.
+                            File ini tidak mencakup data pesanan, pelanggan, atau seluruh isi toko; bukan pengganti cadangan sistem.
                         </p>
                     </div>
                     <Button as-child>
-                        <a href="/admin/configuration/export">Unduh JSON</a>
+                        <a href="/admin/configuration/export">Unduh pengaturan</a>
                     </Button>
                 </div>
             </Card>
-        </template>
     </div>
 </AdminShell>
 </template>

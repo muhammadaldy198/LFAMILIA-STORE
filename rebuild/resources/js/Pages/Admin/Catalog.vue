@@ -20,6 +20,7 @@ const props = defineProps({
     digiflazzItems: { type: Array, default: () => [] },
     nicknameGameCodes: { type: Array, default: () => [] },
     defaultMargin: Number,
+    pricingSettings: { type: Object, default: () => ({ cost_uplift_percent: '2', sell_markup_percent: '10' }) },
     fixedPriceProposals: { type: Array, default: () => [] },
     fixedPriceAlerts: { type: Array, default: () => [] },
 });
@@ -98,10 +99,74 @@ const visibleProducts = computed(() => {
 });
 watch([tab,catalogSearch,catalogCategory,catalogStatus,catalogSort,catalogPageSize], () => {catalogPage.value = 1;});
 const resetCatalogFilters=()=>{catalogSearch.value='';catalogCategory.value='';catalogStatus.value='';catalogSort.value='CUSTOM';catalogPageSize.value=25;catalogPage.value=1;};
-const categoryIconOptions=[['gamepad','Game'],['ticket','Voucher'],['play','Entertainment'],['smartphone','Pulsa / Data'],['zap','PLN / Listrik'],['grid','Umum']];
+const categoryIconOptions=[['gamepad','Game'],['ticket','Voucher'],['play','Hiburan'],['smartphone','Pulsa / Data'],['zap','PLN / Listrik'],['grid','Umum']];
 const categoryForm = useForm({ name: '', slug: '', icon: 'grid', sort_order: categories.value.length });
-const productForm = useForm({ category_id: '', name: '', slug: '', publisher: '', description: '', fulfillment_mode: 'AUTO_PROVIDER', manual_instructions: '', manual_open_time: '', manual_close_time: '', manual_timezone: 'Asia/Jakarta', margin_percent: props.defaultMargin||0, sort_order: Math.max(-1, ...products.value.map((item) => Number(item.sort_order ?? 0))) + 1 });
+const productForm = useForm({ category_id: '', name: '', slug: '', publisher: '', description: '', fulfillment_mode: 'AUTO_PROVIDER', manual_instructions: '', manual_open_time: '', manual_close_time: '', manual_timezone: 'Asia/Jakarta', margin_percent: props.defaultMargin||0, sell_markup_percent: null, sort_order: Math.max(-1, ...products.value.map((item) => Number(item.sort_order ?? 0))) + 1 });
+// Produk manual dibuat satu formulir untuk banyak nominal sekaligus: tiap baris
+// punya modal tokonya sendiri dan memakai markup baris → produk → global.
+const emptyManualRow = () => ({ name: '', nominal_value: '', cost_idr: '', sell_markup_percent: '' });
+const manualRows = ref([emptyManualRow()]);
+const addManualRow = () => manualRows.value.push(emptyManualRow());
+const removeManualRow = index => {
+    manualRows.value.splice(index, 1);
+    if (!manualRows.value.length) manualRows.value.push(emptyManualRow());
+};
+const createRowMarkup = row => {
+    for (const candidate of [row.sell_markup_percent, productForm.sell_markup_percent, props.pricingSettings?.sell_markup_percent]) {
+        if (candidate !== '' && candidate !== null && candidate !== undefined) return Number(candidate);
+    }
+    return 10;
+};
+const createRowPreview = row => markupExample(row.cost_idr || 0, 0, createRowMarkup(row));
+const filledManualRows = () => manualRows.value
+    .filter(row => String(row.name || '').trim() !== '')
+    .map((row, index) => ({
+        name: String(row.name).trim(),
+        nominal_value: row.nominal_value === '' || row.nominal_value === null || row.nominal_value === undefined ? null : Number(row.nominal_value),
+        sort_order: index,
+        cost_idr: Number(row.cost_idr || 0),
+        ...(row.sell_markup_percent === '' || row.sell_markup_percent === null || row.sell_markup_percent === undefined
+            ? {}
+            : { sell_markup_percent: Number(row.sell_markup_percent) }),
+    }));
+const submitProduct = () => {
+    productForm.fulfillment_mode = tab.value;
+    const rows = tab.value === 'MANUAL' ? filledManualRows() : [];
+    productForm
+        .transform(data => (rows.length ? { ...data, packages: rows } : data))
+        .post('/admin/catalog/products', {
+            onSuccess: () => {
+                productForm.reset();
+                manualRows.value = [emptyManualRow()];
+                productForm.sort_order = Math.max(-1, ...products.value.map((row) => Number(row.sort_order ?? 0))) + 1;
+            },
+        });
+};
 const globalMarginForm = useForm({margin_percent:props.defaultMargin||0,include_imported_percent:false});
+const pricingForm = useForm({
+    cost_uplift_percent: Number(props.pricingSettings?.cost_uplift_percent ?? 2),
+    sell_markup_percent: Number(props.pricingSettings?.sell_markup_percent ?? 10),
+});
+const savePricingSettings = () => pricingForm
+    .transform(data => ({ cost_uplift_percent: Number(data.cost_uplift_percent), sell_markup_percent: Number(data.sell_markup_percent) }))
+    .put('/admin/catalog/pricing', { preserveScroll: true });
+// Persentase disimpan sebagai teks desimal; null berarti "ikut tingkat di atasnya".
+const overrideValue = value => (value === null || value === undefined || value === '') ? null : Number(value);
+const effectiveMarkupPercent = (pack, item) => {
+    const nominal = overrideValue(pack?.sell_markup_percent);
+    const game = overrideValue(item?.sell_markup_percent);
+    return nominal ?? game ?? Number(props.pricingSettings?.sell_markup_percent ?? 10);
+};
+const effectiveUpliftPercent = (pack, item) => {
+    const nominal = overrideValue(pack?.cost_uplift_percent);
+    const game = overrideValue(item?.cost_uplift_percent);
+    return nominal ?? game ?? Number(props.pricingSettings?.cost_uplift_percent ?? 2);
+};
+const markupExample = (amount, uplift, markup) => {
+    const stored = Math.ceil((Number(amount) * (1000000 + Math.round(Number(uplift) * 10000))) / 1000000);
+    const sell = Math.ceil((stored * (1000000 + Math.round(Number(markup) * 10000))) / 1000000);
+    return { stored, sell };
+};
 const legacyDigiflazzPercent = computed(() => products.value
     .filter(item=>item.fulfillment_mode==='AUTO_PROVIDER')
     .flatMap(item=>item.packages)
@@ -145,7 +210,7 @@ watch(() => [globalMarginForm.margin_percent, globalMarginForm.include_imported_
 });
 const applyGlobalMargin = () => {
     if (!globalMarginPreview.value) return;
-    if (!confirm('Konfirmasi eksekusi perubahan yang ditampilkan pada preview Global Margin?')) return;
+    if (!confirm('Terapkan perubahan harga jual yang ditampilkan pada pratinjau?')) return;
     router.put('/admin/catalog/margin', { preview_token: globalMarginPreview.value.token }, {
         preserveScroll: true,
         onSuccess: () => { globalMarginPreview.value = null; },
@@ -158,21 +223,7 @@ const applyFixedDigiflazzPrices = () => {
     if (!confirm('Kunci harga jual ' + rows.length + ' nominal Digiflazz sesuai margin yang sudah diatur admin? Periksa pratinjau sebelum menyetujui. Harga tetap manual tidak ditimpa.')) return;
     router.post('/admin/catalog/digiflazz/lock-prices', { package_ids: rows.map(row => row.package_id) }, { preserveScroll: true });
 };
-const autoSourcesForm = useForm({});
-const importForm = useForm({item_ids:[],margin_percent:props.defaultMargin||0,publish:true,auto_sources:true,customer_no_template:''});
-const suggestedTemplate = item => {
-    const fields = item.fields || [];
-    const previous = item.packages.flatMap(pack => pack.mappings).find(mapping => mapping.provider_code === 'DIGIFLAZZ' && mapping.customer_no_template);
-    if (previous) return previous.customer_no_template;
-    if (fields.length === 1) return '{{' + fields[0].field_key + '}}';
-    if (item.slug === 'mobile-legends') {
-        const keys = fields.map(field => field.field_key);
-        const user = ['user_id', 'destination'].find(key => keys.includes(key));
-        const server = ['zone_id', 'server'].find(key => keys.includes(key));
-        if (user && server) return '{{' + user + '}}{{' + server + '}}';
-    }
-    return '';
-};
+const importForm = useForm({item_ids:[],margin_percent:props.defaultMargin||0,publish:true});
 const importSearch=ref(''),importBrand=ref(''),showImport=ref(false);
 const importPage=ref(1);
 const importUrl = new URLSearchParams(page.url.split('?')[1] || '');
@@ -187,8 +238,6 @@ function openProductImport() {
     showImport.value = true;
     importForm.clearErrors();
     importForm.publish = true;
-    importForm.auto_sources = true;
-    importForm.customer_no_template = suggestedTemplate(item);
     importSearch.value = '';
     importBrand.value = props.digiflazzItems.find(sku=>sku.brand.toLowerCase()===item.name.toLowerCase())?.brand || '';
     importPage.value = 1;
@@ -202,42 +251,39 @@ function toggleImport(item) {
     if (showImport.value) {
         importForm.clearErrors();
         importForm.publish = true;
-        importForm.auto_sources = true;
-        importForm.customer_no_template = suggestedTemplate(item);
-        importForm.margin_percent = Number(item.margin_percent || 0);
+        importForm.margin_percent = Number(effectiveMarkupPercent(null, item));
         importBrand.value = props.digiflazzItems.find(sku=>sku.brand.toLowerCase()===item.name.toLowerCase())?.brand || '';
     }
 }
 
 const importBrands=computed(()=>[...new Set(props.digiflazzItems.map(i=>i.brand))].sort());
-const importMatches=computed(()=>{
-    const matches=props.digiflazzItems.filter(i=>!i.mapped && i.available && (!importBrand.value||i.brand===importBrand.value) && (!importSearch.value||[i.product_name,i.buyer_sku_code].join(' ').toLowerCase().includes(importSearch.value.toLowerCase())));
-    const groups=new Map();
-    for(const item of matches){
-        const key=importForm.auto_sources ? item.source_group : item.buyer_sku_code;
-        const current=groups.get(key);
-        if(!current || Number(item.price_idr)<Number(current.price_idr))groups.set(key,item);
-    }
-    return [...groups.values()].map(item=>({...item,source_count:props.digiflazzItems.filter(source=>source.source_group===item.source_group && source.available).length}))
-        .sort((a,b)=>(a.nominal_value??Infinity)-(b.nominal_value??Infinity)||a.product_name.localeCompare(b.product_name,'id-ID',{numeric:true}));
-});
-watch(()=>importForm.auto_sources,()=>{importForm.item_ids=[];importPage.value=1;});
+const importMatches=computed(()=>props.digiflazzItems
+    .filter(item=>!item.mapped && item.available && (!importBrand.value||item.brand===importBrand.value) && (!importSearch.value||[item.product_name,item.buyer_sku_code].join(' ').toLowerCase().includes(importSearch.value.toLowerCase())))
+    .sort((a,b)=>(a.nominal_value??Infinity)-(b.nominal_value??Infinity)||a.product_name.localeCompare(b.product_name,'id-ID',{numeric:true})));
 const importItems=computed(()=>importMatches.value.slice((importPage.value-1)*25,importPage.value*25));
+// Review helpers: the importer turns the reviewed margin into the game markup,
+// so the same two-stage maths used by the pricing card can preview every row.
+const importRowPreview = (sku, item) => markupExample(
+    sku.price_idr,
+    effectiveUpliftPercent(null, item),
+    item.sell_markup_percent !== null && item.sell_markup_percent !== undefined
+        ? effectiveMarkupPercent(null, item)
+        : Number(importForm.margin_percent),
+);
+const selectedImportItems=()=>importMatches.value.filter(sku=>importForm.item_ids.includes(sku.id));
+const importTotals=()=>selectedImportItems().reduce((acc,sku)=>{
+    const row=importRowPreview(sku,selectedProductItems.value[0]);acc.count+=1;acc.seller+=Number(sku.price_idr||0);acc.stored+=row.stored;acc.sell+=row.sell;return acc;
+},{count:0,seller:0,stored:0,sell:0});
+const nominalAlreadyExists=(sku,item)=>sku.nominal_value!==null&&sku.nominal_value!==undefined
+    &&(item.packages||[]).some(pack=>pack.nominal_value!==null&&pack.nominal_value!==undefined&&Number(pack.nominal_value)===Number(sku.nominal_value));
+const duplicateImportRows=(item)=>selectedImportItems().filter(sku=>nominalAlreadyExists(sku,item));
+const importUnavailableCount=computed(()=>props.digiflazzItems.filter(sku=>!sku.mapped&&!sku.available&&(!importBrand.value||sku.brand===importBrand.value)).length);
+const submitImport=(item)=>{
+    const duplicates=duplicateImportRows(item);
+    if(duplicates.length&&!confirm(duplicates.length+' nominal yang dipilih sudah punya nominal serupa di produk ini ('+duplicates.slice(0,5).map(sku=>sku.product_name).join(', ')+'). Tetap impor sebagai nominal baru?'))return;
+    importForm.post('/admin/catalog/products/'+item.id+'/import',{preserveScroll:true,onSuccess:()=>{importForm.item_ids=[];showImport.value=false;}});
+};
 watch([importSearch,importBrand],()=>{importPage.value=1;});
-const sourceSearch=reactive({});
-const sourceCandidates=(pack)=>{
-    const term=String(sourceSearch[pack.id]||'').trim().toLowerCase();
-    if(!term)return [];
-    return props.digiflazzItems
-        .filter(item=>!item.mapped&&item.available&&[item.product_name,item.buyer_sku_code,item.brand,item.seller_name].filter(Boolean).join(' ').toLowerCase().includes(term))
-        .slice(0,12);
-};
-const attachSource=(pack,item)=>{
-    router.post('/admin/catalog/packages/'+pack.id+'/sources/digiflazz',{item_id:item.id},{
-        preserveScroll:true,
-        onSuccess:()=>{sourceSearch[pack.id]='';},
-    });
-};
 const draggedPackageId=ref(null);
 const reorderPackage=(item,index,direction)=>{
  const target=index+direction;if(target<0||target>=item.packages.length)return;
@@ -250,10 +296,19 @@ const dropPackage=(item,index)=>{
  const moved=item.packages.splice(from,1)[0];item.packages.splice(index,0,moved);
  router.put('/admin/catalog/products/'+item.id+'/packages/reorder',{ids:item.packages.map(p=>p.id)},{preserveScroll:true});
 };
+const mappingCost = (mapping) => Number(mapping?.store_cost_idr ?? mapping?.cost_idr ?? 0);
 const previewPrice=(pack,item)=>{
- const mapping=[...pack.mappings].filter(m=>m.is_active).sort((a,b)=>a.priority-b.priority||a.cost_idr-b.cost_idr)[0]||pack.mappings[0];
- if(!mapping?.cost_idr)return 'Belum ada modal';
- const cost=Number(mapping.cost_idr);
+ const active=[...pack.mappings].filter(m=>m.is_active);
+ const mapping=(active.length?active:[...pack.mappings]).sort((a,b)=>a.priority-b.priority||mappingCost(a)-mappingCost(b))[0];
+ if(!mapping)return 'Belum ada modal';
+ const cost=mappingCost(mapping);
+ if(!cost)return 'Belum ada modal';
+ // Checkout applies the configured markup to any mapping with store cost.
+ if(mapping.store_cost_idr!==null&&mapping.store_cost_idr!==undefined){
+  const markup=effectiveMarkupPercent(pack,item);
+  const price=Math.ceil((cost*(1000000+Math.round(markup*10000)))/1000000);
+  return 'Rp'+price.toLocaleString('id-ID')+(price<cost?' · di bawah modal':'');
+ }
  const price=pack.pricing_mode==='SELL_PRICE'?Number(pack.sell_price_idr):cost+(pack.pricing_mode==='FIXED'?Number(pack.margin_fixed_idr||0):Math.ceil(cost*Number(pack.pricing_mode==='PERCENT'?pack.margin_percent:item.margin_percent)/100));
  return 'Rp'+price.toLocaleString('id-ID')+(price<cost?' · di bawah modal':'');
 };
@@ -264,12 +319,14 @@ const fieldsProductId = ref('');
 const fieldRows = ref([]);
 const fieldsError = ref('');
 const fieldsSaving = ref(false);
+const customerTemplateOriginal = ref('');
 watch(fieldsProductId, (id) => {
     const product = products.value.find(item => String(item.id) === String(id));
     fieldRows.value = (product?.fields || []).map(field => ({
         field_key: field.field_key, label: field.label, placeholder: field.placeholder || '',
         type: field.type, is_required: Boolean(field.is_required),
     }));
+    customerTemplateOriginal.value = product?.customer_no_template || '';
     fieldsError.value = '';
 });
 const addField = () => fieldRows.value.push({ field_key: '', label: '', placeholder: '', type: 'text', is_required: true });
@@ -282,11 +339,16 @@ const moveField = (index, direction) => {
 const saveFields = () => {
     fieldsError.value = '';
     fieldsSaving.value = true;
+    const product = products.value.find(item => String(item.id) === String(fieldsProductId.value));
+    const customerTemplate = product?.customer_no_template || '';
+    const customerTemplateChanged = customerTemplate !== customerTemplateOriginal.value;
     router.put('/admin/catalog/products/' + fieldsProductId.value + '/fields', {
+        ...(customerTemplateChanged ? { customer_no_template: customerTemplate || null } : {}),
         fields: fieldRows.value.map(field => ({ ...field, field_key: field.field_key.trim(), label: field.label.trim(), placeholder: field.placeholder.trim() || null })),
     }, {
         preserveScroll: true,
         onError: errors => { fieldsError.value = Object.values(errors).join(' · '); },
+        onSuccess: () => { customerTemplateOriginal.value = customerTemplate; },
         onFinish: () => { fieldsSaving.value = false; },
     });
 };
@@ -317,22 +379,26 @@ const saveProduct = (item) => router.put('/admin/catalog/products/' + item.id, {
     manual_instructions: item.manual_instructions, manual_open_time: item.manual_open_time || null,
     manual_close_time: item.manual_close_time || null, manual_timezone: item.manual_timezone || 'Asia/Jakarta',
     margin_percent: item.margin_percent,
+    sell_markup_percent: overrideValue(item.sell_markup_percent),
+    cost_uplift_percent: overrideValue(item.cost_uplift_percent),
     sort_order: item.sort_order, is_active: item.is_active,
     nickname_check_enabled: item.nickname_check_enabled,
     nickname_game_code: item.nickname_game_code || null,
     nickname_user_field_key: item.nickname_user_field_key || null,
     nickname_server_field_key: item.nickname_server_field_key || null,
-}, {preserveScroll:true,onStart:()=>{savingProduct.value=true;},onFinish:()=>{savingProduct.value=false;}});
+}, {preserveScroll:true,onStart:()=>{savingProduct.value=true;},onSuccess:()=>{if(String(fieldsProductId.value)===String(item.id))customerTemplateOriginal.value=item.customer_no_template||'';},onFinish:()=>{savingProduct.value=false;}});
 const savePackage = (pack) => router.put('/admin/catalog/packages/' + pack.id, {
     code: pack.code, name: pack.name, note: pack.note || null, group_name: pack.group_name || null, nominal_value: pack.nominal_value,
     sort_order: pack.sort_order, is_active: pack.is_active,
     pricing_mode:pack.pricing_mode||'PRODUCT_MARGIN',margin_percent:pack.margin_percent??null,margin_fixed_idr:pack.margin_fixed_idr??null,sell_price_idr:pack.sell_price_idr??null,
+    sell_markup_percent:overrideValue(pack.sell_markup_percent),cost_uplift_percent:overrideValue(pack.cost_uplift_percent),
 });
 const saveMapping = (mapping) => router.put('/admin/catalog/mappings/' + mapping.id, {
     priority: mapping.priority, is_active: mapping.is_active,
     ...(mapping.provider_code === 'MANUAL' ? { cost_idr: mapping.cost_idr } : {}),
     ...(mapping.provider_code === 'DIGIFLAZZ' ? {
-        customer_no_template: mapping.customer_no_template || null,
+        ...(mapping.store_cost_idr !== null && mapping.store_cost_idr !== undefined
+            ? { store_cost_idr: Number(mapping.store_cost_idr) } : {}),
         is_manual_price: Boolean(mapping.is_manual_price),
         ...(mapping.is_manual_price ? { manual_price_idr: Number(mapping.manual_price_idr) } : {}),
     } : {}),
@@ -379,18 +445,18 @@ const deleteNotice = (notice) => {
     <AdminShell>
         <div class="mx-auto max-w-7xl space-y-8">
             <template v-if="selectedProductId === null">
-            <div class="flex flex-wrap items-center justify-between gap-3"><div><Link href="/admin/panel" class="text-sm text-cyan-300">← Panel Admin</Link><h1 class="mt-2 text-3xl font-bold">Produk</h1></div><Link href="/" class="text-sm text-cyan-300">Lihat katalog pelanggan</Link></div>
+            <header class="flex flex-col gap-3 border-b border-slate-800 pb-4 sm:flex-row sm:items-end sm:justify-between"><div class="min-w-0"><Link href="/admin/panel" class="text-sm text-cyan-300">← Panel Admin</Link><h1 class="mt-2 text-3xl font-bold tracking-tight">Produk</h1></div><Link href="/" class="text-sm text-cyan-300">Lihat katalog pelanggan</Link></header>
             
 
-            <nav class="lf-admin-tabs"><Button v-for="[key,label] in catalogTabs" :key="key" type="button" :class="{active:catalogTab===key}" @click="catalogTab=key">{{label}}</Button></nav>
+            <nav class="lf-admin-tabs" aria-label="Bagian katalog"><Button v-for="[key,label] in catalogTabs" :key="key" type="button" :aria-current="catalogTab===key ? 'page' : undefined" :class="{active:catalogTab===key}" @click="catalogTab=key">{{label}}</Button></nav>
             <section v-show="catalogTab === 'categories'" class="space-y-4 rounded-xl border border-slate-800 bg-slate-900 p-5">
                 <h2 class="text-xl font-semibold">Kategori</h2>
-                <p class="text-xs text-muted-foreground">Posisi ditampilkan mulai 1. Angka urutan teknis lama tetap disimpan agar tampilan toko tidak berubah tiba-tiba.</p>
+                <p class="text-xs text-muted-foreground">Urutan ini menentukan posisi kategori di toko. Kategori dengan posisi lebih kecil tampil lebih dulu.</p>
                 <form class="flex flex-wrap items-end gap-3" @submit.prevent="categoryForm.post('/admin/catalog/categories', { onSuccess: () => { categoryForm.reset(); categoryForm.sort_order = categories.value.length; } })">
                     <label class="text-sm">Nama kategori<Input v-model="categoryForm.name" required class="mt-1 block rounded-md bg-slate-800 p-2" /><span v-if="categoryForm.errors.name" role="alert" class="text-sm font-normal text-destructive">{{ categoryForm.errors.name }}</span></label>
-                    <label class="text-sm">Alamat kategori<Input v-model="categoryForm.slug" placeholder="Otomatis dari nama jika kosong" class="mt-1 block rounded-md bg-slate-800 p-2" /><span v-if="categoryForm.errors.slug" role="alert" class="text-sm font-normal text-destructive">{{ categoryForm.errors.slug }}</span></label>
-                    <label class="text-sm">Ikon cadangan<select v-model="categoryForm.icon" class="mt-1 block rounded-md bg-slate-800 p-2"><option v-for="[value,label] in categoryIconOptions" :key="value" :value="value">{{label}}</option></select><span v-if="categoryForm.errors.icon" role="alert" class="text-sm font-normal text-destructive">{{ categoryForm.errors.icon }}</span></label>
-                    <details class="text-sm"><summary class="cursor-pointer">Urutan lanjutan</summary><label class="block mt-2">Skor urutan teknis<Input v-model.number="categoryForm.sort_order" type="number" min="0" required class="mt-1 block w-24 rounded-md bg-slate-800 p-2" /><span v-if="categoryForm.errors.sort_order" role="alert" class="text-sm font-normal text-destructive">{{ categoryForm.errors.sort_order }}</span></label></details>
+                    <details class="text-sm"><summary class="cursor-pointer">Ubah tautan halaman kategori (lanjutan)</summary><label class="mt-2 block">Bagian alamat halaman<Input v-model="categoryForm.slug" placeholder="Dibuat otomatis dari nama" class="mt-1 block rounded-md bg-slate-800 p-2" /><span v-if="categoryForm.errors.slug" role="alert" class="text-sm font-normal text-destructive">{{ categoryForm.errors.slug }}</span></label></details>
+                    <label class="text-sm">Ikon jika belum ada gambar<select v-model="categoryForm.icon" class="mt-1 block rounded-md bg-slate-800 p-2"><option v-for="[value,label] in categoryIconOptions" :key="value" :value="value">{{label}}</option></select><span v-if="categoryForm.errors.icon" role="alert" class="text-sm font-normal text-destructive">{{ categoryForm.errors.icon }}</span></label>
+                    <details class="text-sm"><summary class="cursor-pointer">Atur posisi kategori (lanjutan)</summary><label class="mt-2 block">Posisi di toko<Input v-model.number="categoryForm.sort_order" type="number" min="0" required class="mt-1 block w-24 rounded-md bg-slate-800 p-2" /><span class="mt-1 block text-xs text-muted-foreground">Angka lebih kecil tampil lebih dulu.</span><span v-if="categoryForm.errors.sort_order" role="alert" class="text-sm font-normal text-destructive">{{ categoryForm.errors.sort_order }}</span></label></details>
                     <Button :disabled="categoryForm.processing" class="rounded-md bg-cyan-400 px-4 py-2 font-semibold text-slate-950">Tambah</Button>
                     <span v-if="categoryForm.errors.name" class="text-sm text-red-300">{{ categoryForm.errors.name }}</span>
                 </form>
@@ -398,13 +464,13 @@ const deleteNotice = (notice) => {
                     <div class="flex flex-wrap items-end gap-3">
                         <span class="text-xs font-semibold text-slate-300">Posisi {{ categoryPosition(item) }}</span>
                         <label class="text-sm">Nama<Input v-model="item.name" class="mt-1 block rounded-md bg-slate-800 p-2" /></label>
-                        <label class="text-sm">Alamat kategori<Input v-model="item.slug" class="mt-1 block rounded-md bg-slate-800 p-2" /></label>
-                        <label class="text-sm">Ikon cadangan<select v-model="item.icon" class="mt-1 block rounded-md bg-slate-800 p-2"><option v-for="[value,label] in categoryIconOptions" :key="value" :value="value">{{label}}</option></select></label>
-                        <details class="text-sm"><summary class="cursor-pointer">Ubah skor urutan (lanjutan)</summary><label class="mt-2 block">Skor teknis<Input v-model.number="item.sort_order" type="number" min="0" class="mt-1 block w-24 rounded-md bg-slate-800 p-2" /></label></details>
+                        <details class="text-sm"><summary class="cursor-pointer">Ubah tautan halaman kategori (lanjutan)</summary><label class="mt-2 block">Bagian alamat halaman<Input v-model="item.slug" class="mt-1 block rounded-md bg-slate-800 p-2" /></label></details>
+                        <label class="text-sm">Ikon jika belum ada gambar<select v-model="item.icon" class="mt-1 block rounded-md bg-slate-800 p-2"><option v-for="[value,label] in categoryIconOptions" :key="value" :value="value">{{label}}</option></select></label>
+                        <details class="text-sm"><summary class="cursor-pointer">Atur posisi kategori (lanjutan)</summary><label class="mt-2 block">Posisi di toko<Input v-model.number="item.sort_order" type="number" min="0" class="mt-1 block w-24 rounded-md bg-slate-800 p-2" /><span class="mt-1 block text-xs text-muted-foreground">Angka lebih kecil tampil lebih dulu.</span></label></details>
                         <label class="flex gap-2 text-sm"><AdminSwitch v-model="item.is_active" />Aktif</label>
                         <Button type="button" class="rounded-md bg-slate-700 px-3 py-2 text-sm" @click="saveCategory(item)">Simpan</Button>
                         <Button type="button" class="rounded-md bg-red-50 px-3 py-2 text-sm font-semibold text-red-700" @click="deleteCategory(item)">Hapus</Button>
-                        <span class="text-xs text-slate-500">Alamat publik: /{{ item.slug }} · ikon dipakai jika gambar kategori kosong.</span>
+                        <span class="text-xs text-slate-500">Ikon pilihan di atas tampil bila kategori belum memiliki gambar.</span>
                     </div>
                     <div class="rounded-md border border-slate-200 p-3">
                         <strong class="text-xs">Gambar kategori</strong>
@@ -416,7 +482,7 @@ const deleteNotice = (notice) => {
 
             <Card class="space-y-3 p-4" data-testid="digiflazz-fixed-price-policy">
                 <h2 class="font-semibold">Harga tetap Digiflazz · mengikuti pengaturan admin</h2>
-                <p class="text-sm text-muted-foreground">Harga supplier tetap sinkron. Harga jual tetap dan modal manual tidak ditimpa. Batas transaksi Digiflazz mengikuti modal manual yang admin tetapkan.</p>
+                <p class="text-sm text-muted-foreground">Perbarui harga dari Digiflazz tanpa mengubah harga jual tetap atau modal yang kamu atur sendiri. Nominal yang melewati batas harga atau sedang tidak tersedia akan ditandai untuk diperiksa.</p>
                 <p class="text-sm">Harga dinamis siap dikunci: <b>{{fixedPriceProposals.length}}</b> · Nominal tanpa sumber yang memenuhi batas admin/tersedia: <b>{{fixedPriceAlerts.length}}</b></p>
                 <div v-if="fixedPriceProposals.length" class="max-h-56 overflow-auto rounded border p-2 text-xs">
                     <div v-for="row in fixedPriceProposals" :key="row.package_id" class="flex flex-wrap justify-between gap-2 border-b py-1">
@@ -432,17 +498,17 @@ const deleteNotice = (notice) => {
             </Card>
             <Card class="p-4">
                 <form class="flex flex-wrap items-end gap-3" @submit.prevent="previewGlobalMargin">
-                    <label class="text-sm">Margin global produk otomatis (%)
+                    <label class="text-sm">Markup harga jual otomatis (%)
                         <Input v-model.number="globalMarginForm.margin_percent" type="number" min="0" max="1000" step="0.0001" class="mt-1"/>
                     </label>
-                    <Button :disabled="globalMarginBusy">{{globalMarginBusy ? 'Membuat preview…' : 'Pratinjau Global Margin'}}</Button>
-                    <label class="flex w-full items-start gap-2 text-xs"><input v-model="globalMarginForm.include_imported_percent" type="checkbox" class="mt-0.5"/><span>Alihkan {{legacyDigiflazzPercent}} nominal impor Digiflazz lama dengan margin % tersendiri agar mengikuti Global Margin. Ini termasuk margin % khusus yang pernah diedit; centang hanya bila ingin menggantinya secara massal.</span></label>
-                    <p class="w-full text-xs text-muted-foreground">Preview tidak menyimpan perubahan. Produk manual, harga tetap, dan margin rupiah tidak diubah.</p>
+                    <Button :disabled="globalMarginBusy">{{globalMarginBusy ? 'Menghitung…' : 'Pratinjau perubahan harga'}}</Button>
+                    <label class="flex w-full items-start gap-2 text-xs"><input v-model="globalMarginForm.include_imported_percent" type="checkbox" class="mt-0.5"/><span>Jadikan {{legacyDigiflazzPercent}} nominal Digiflazz lama yang memiliki markup sendiri mengikuti pengaturan otomatis ini. Termasuk markup khusus yang pernah diedit; centang hanya jika kamu memang ingin menggantinya sekaligus.</span></label>
+                    <p class="w-full text-xs text-muted-foreground">Pratinjau belum menyimpan perubahan. Produk manual, harga jual tetap, dan tambahan harga dalam rupiah tidak diubah.</p>
                     <p v-if="globalMarginError" class="w-full text-sm text-destructive" role="alert">{{globalMarginError}}</p>
                 </form>
                 <div v-if="globalMarginPreview" class="mt-4 space-y-3 rounded border p-3">
-                    <strong>Preview wajib — {{globalMarginPreview.summary.affected_mappings}} mapping berubah dari {{globalMarginPreview.summary.previewed_mappings}} yang diperiksa</strong>
-                    <p class="text-sm">Produk: {{globalMarginPreview.summary.products}} · Nominal yang beralih mode: {{globalMarginPreview.summary.converted_packages}} · Total selisih harga jual per mapping: {{formatAdminMoney(globalMarginPreview.summary.total_sell_difference_idr)}}</p>
+                    <strong>Pratinjau perubahan — {{globalMarginPreview.summary.affected_mappings}} sumber harga akan berubah dari {{globalMarginPreview.summary.previewed_mappings}} yang diperiksa</strong>
+                    <p class="text-sm">Produk terdampak: {{globalMarginPreview.summary.products}} · Nominal yang ikut pengaturan baru: {{globalMarginPreview.summary.converted_packages}} · Total selisih harga jual: {{formatAdminMoney(globalMarginPreview.summary.total_sell_difference_idr)}}</p>
                     <div class="max-h-72 space-y-1 overflow-auto text-xs">
                         <div v-for="row in globalMarginPreview.mappings" :key="row.mapping_id" class="border-b py-2">
                             <b>{{row.product}} / {{row.package}} · {{row.sku}}</b>
@@ -451,6 +517,28 @@ const deleteNotice = (notice) => {
                     </div>
                     <Button type="button" variant="outline" @click="applyGlobalMargin">Konfirmasi &amp; terapkan sesuai preview</Button>
                 </div>
+            </Card>
+            <Card class="space-y-3 p-4" data-testid="catalog-pricing-settings">
+                <div>
+                    <h3 class="font-semibold">Harga katalog otomatis: tambahan modal &amp; markup jual</h3>
+                    <p class="mt-1 text-xs text-muted-foreground">Dua tahap terpisah. Tahap 1 menambah sekian persen dari harga seller Digiflazz menjadi <strong>modal toko</strong> dan hanya dipakai sekali saat nominal dibuat. Tahap 2 menambah sekian persen dari modal toko menjadi <strong>harga jual</strong> dan langsung dipakai saat pelanggan membeli. Angka ini dipakai bila game atau nominal belum punya nilainya sendiri.</p>
+                </div>
+                <form class="grid gap-3 md:grid-cols-3" @submit.prevent="savePricingSettings">
+                    <label class="text-sm">Tahap 1 — tambahan modal dari harga seller (%)
+                        <Input v-model.number="pricingForm.cost_uplift_percent" type="number" min="0" max="1000" step="0.0001" class="mt-1" />
+                        <span v-if="pricingForm.errors.cost_uplift_percent" role="alert" class="mt-1 block text-xs text-destructive">{{ pricingForm.errors.cost_uplift_percent }}</span>
+                    </label>
+                    <label class="text-sm">Tahap 2 — markup harga jual dari modal toko (%)
+                        <Input v-model.number="pricingForm.sell_markup_percent" type="number" min="0" max="1000" step="0.0001" class="mt-1" />
+                        <span v-if="pricingForm.errors.sell_markup_percent" role="alert" class="mt-1 block text-xs text-destructive">{{ pricingForm.errors.sell_markup_percent }}</span>
+                    </label>
+                    <div class="flex items-end">
+                        <Button :disabled="pricingForm.processing">{{ pricingForm.processing ? 'Menyimpan…' : 'Simpan pengaturan harga' }}</Button>
+                    </div>
+                </form>
+                <p class="text-xs text-slate-400">Contoh harga seller Rp10.000 → modal toko {{ formatAdminMoney(markupExample(10000, pricingForm.cost_uplift_percent, 0).stored) }} → harga jual {{ formatAdminMoney(markupExample(10000, pricingForm.cost_uplift_percent, pricingForm.sell_markup_percent).sell) }}. Modal toko yang sudah ada tidak diubah oleh perubahan tahap 1.</p>
+                <p v-if="pricingForm.recentlySuccessful" class="text-xs text-emerald-400">Pengaturan harga katalog tersimpan.</p>
+                <p v-if="Object.keys(pricingForm.errors).length" role="alert" class="text-xs text-destructive">{{ Object.values(pricingForm.errors).join(' · ') }}</p>
             </Card>
             <section v-show="catalogTab === 'products'" class="lf-admin-catalog-section space-y-5 rounded-xl border border-slate-800 bg-slate-900 p-5">
                 <div class="flex flex-wrap items-start justify-between gap-3"><div><h2 class="text-xl font-semibold">Produk</h2><p class="mt-1 text-sm text-muted-foreground">Kelola produk otomatis dan manual. Kode SKU penyedia hanya dikelola dari panel admin dan tidak ditampilkan kepada pelanggan.</p></div><div class="flex gap-2"><Button v-for="mode in ['AUTO_PROVIDER', 'MANUAL']" :key="mode" type="button" :variant="tab===mode?'default':'outline'" @click="tab = mode">{{ mode === 'MANUAL' ? 'Produk Manual' : 'Produk Otomatis' }}</Button></div></div>
@@ -470,7 +558,7 @@ const deleteNotice = (notice) => {
                 </div>
                 <Card v-if="showCatalogImport && tab === 'AUTO_PROVIDER'" class="space-y-3 p-4" data-testid="catalog-import-target">
                     <h3 class="font-semibold">Impor nominal Digiflazz</h3>
-                    <p class="text-sm text-muted-foreground">Pilih produk tujuan, lalu pilih SKU yang ingin diimpor. Jika produknya belum ada, buat lewat Tambah produk terlebih dahulu.</p>
+                    <p class="text-sm text-muted-foreground">Pilih produk tujuan, lalu pilih kode produk dari Digiflazz yang ingin ditambahkan. Jika produknya belum ada, buat lewat Tambah produk terlebih dahulu.</p>
                     <label class="block text-sm">Produk tujuan
                         <select v-model="importProductId" class="mt-1 block w-full rounded-md border p-2">
                             <option value="">Pilih produk tujuan</option>
@@ -479,36 +567,42 @@ const deleteNotice = (notice) => {
                     </label>
                     <Button type="button" :disabled="!importProductId" @click="openProductImport">Lanjut pilih SKU</Button>
                 </Card>
-                <form v-if="showCreateProduct" class="grid gap-3 md:grid-cols-3" @submit.prevent="productForm.fulfillment_mode = tab; productForm.post('/admin/catalog/products', { onSuccess: () => { productForm.reset(); productForm.sort_order = Math.max(-1, ...products.value.map((row) => Number(row.sort_order ?? 0))) + 1; } })">
+                <form v-if="showCreateProduct" class="grid gap-3 md:grid-cols-3" @submit.prevent="submitProduct">
                     <label class="text-sm">Kategori<select v-model="productForm.category_id" required class="mt-1 block w-full rounded-md bg-slate-800 p-2"><option value="">Pilih kategori</option><option v-for="item in categories" :key="item.id" :value="item.id">{{ item.name }}</option></select><span v-if="productForm.errors.category_id" role="alert" class="text-sm font-normal text-destructive">{{ productForm.errors.category_id }}</span></label>
                     <label class="text-sm">Nama produk<Input v-model="productForm.name" required class="mt-1 block w-full rounded-md bg-slate-800 p-2" /><span v-if="productForm.errors.name" role="alert" class="text-sm font-normal text-destructive">{{ productForm.errors.name }}</span></label>
-                    <label class="text-sm">Alamat produk<Input v-model="productForm.slug" placeholder="Otomatis dari nama jika kosong" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /><span v-if="productForm.errors.slug" role="alert" class="text-sm font-normal text-destructive">{{ productForm.errors.slug }}</span></label>
-                    <label class="text-sm">Publisher / merek<Input v-model="productForm.publisher" placeholder="Contoh: Moonton" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /><span v-if="productForm.errors.publisher" role="alert" class="text-sm font-normal text-destructive">{{ productForm.errors.publisher }}</span></label>
-                    <label class="text-sm">Margin persen<Input v-model.number="productForm.margin_percent" type="number" step="0.0001" min="0" required class="mt-1 block w-full rounded-md bg-slate-800 p-2" /><span v-if="productForm.errors.margin_percent" role="alert" class="text-sm font-normal text-destructive">{{ productForm.errors.margin_percent }}</span></label>
+                    <details class="text-sm"><summary class="cursor-pointer">Ubah tautan halaman produk (lanjutan)</summary><label class="mt-2 block">Bagian alamat halaman<Input v-model="productForm.slug" placeholder="Dibuat otomatis dari nama" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /><span v-if="productForm.errors.slug" role="alert" class="text-sm font-normal text-destructive">{{ productForm.errors.slug }}</span></label></details>
+                    <label class="text-sm">Merek game (opsional)<Input v-model="productForm.publisher" placeholder="Contoh: Moonton" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /><span v-if="productForm.errors.publisher" role="alert" class="text-sm font-normal text-destructive">{{ productForm.errors.publisher }}</span></label>
+                    <label v-if="tab !== 'MANUAL'" class="text-sm">Margin persen<Input v-model.number="productForm.margin_percent" type="number" step="0.0001" min="0" required class="mt-1 block w-full rounded-md bg-slate-800 p-2" /><span v-if="productForm.errors.margin_percent" role="alert" class="text-sm font-normal text-destructive">{{ productForm.errors.margin_percent }}</span></label>
+                    <label v-else class="text-sm">Markup harga jual (%)<Input v-model.number="productForm.sell_markup_percent" type="number" step="0.0001" min="0" max="1000" required class="mt-1 block w-full rounded-md bg-slate-800 p-2" /><span class="mt-1 block text-xs text-slate-500">Harga jual nominal = modal toko × markup. Markup global sekarang {{ pricingSettings?.sell_markup_percent ?? 10 }}%; tiap baris di bawah boleh punya markup sendiri.</span><span v-if="productForm.errors.sell_markup_percent" role="alert" class="text-sm font-normal text-destructive">{{ productForm.errors.sell_markup_percent }}</span></label>
                     <label class="text-sm md:col-span-2">Deskripsi<Textarea v-model="productForm.description" rows="2" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /><span v-if="productForm.errors.description" role="alert" class="text-sm font-normal text-destructive">{{ productForm.errors.description }}</span></label>
-                    <details class="text-sm"><summary class="cursor-pointer">Urutan produk (lanjutan)</summary><label class="mt-2 block">Skor teknis<Input v-model.number="productForm.sort_order" type="number" min="0" required class="mt-1 block w-full rounded-md bg-slate-800 p-2" /><span v-if="productForm.errors.sort_order" role="alert" class="text-sm font-normal text-destructive">{{ productForm.errors.sort_order }}</span></label></details>
+                    <details class="text-sm"><summary class="cursor-pointer">Atur posisi produk (lanjutan)</summary><label class="mt-2 block">Posisi di toko<Input v-model.number="productForm.sort_order" type="number" min="0" required class="mt-1 block w-full rounded-md bg-slate-800 p-2" /><span class="mt-1 block text-xs text-muted-foreground">Angka lebih kecil tampil lebih dulu.</span><span v-if="productForm.errors.sort_order" role="alert" class="text-sm font-normal text-destructive">{{ productForm.errors.sort_order }}</span></label></details>
                     <label v-if="tab === 'MANUAL'" class="text-sm md:col-span-3">Instruksi penanganan internal<Textarea v-model="productForm.manual_instructions" rows="2" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /><span v-if="productForm.errors.manual_instructions" role="alert" class="text-sm font-normal text-destructive">{{ productForm.errors.manual_instructions }}</span></label>
                     <template v-if="tab === 'MANUAL'">
                         <label class="text-sm">Jam buka<Input v-model="productForm.manual_open_time" type="time" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /><span v-if="productForm.errors.manual_open_time" role="alert" class="text-sm font-normal text-destructive">{{ productForm.errors.manual_open_time }}</span></label>
                         <label class="text-sm">Jam tutup<Input v-model="productForm.manual_close_time" type="time" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /><span v-if="productForm.errors.manual_close_time" role="alert" class="text-sm font-normal text-destructive">{{ productForm.errors.manual_close_time }}</span></label>
                         <label class="text-sm">Zona waktu<select v-model="productForm.manual_timezone" class="mt-1 block w-full rounded-md bg-slate-800 p-2"><option value="Asia/Jakarta">WIB — Asia/Jakarta</option><option value="Asia/Makassar">WITA — Asia/Makassar</option><option value="Asia/Jayapura">WIT — Asia/Jayapura</option></select><span v-if="productForm.errors.manual_timezone" role="alert" class="text-sm font-normal text-destructive">{{ productForm.errors.manual_timezone }}</span></label>
+                        <div class="space-y-2 rounded-md border border-slate-700 p-3 md:col-span-3" data-testid="manual-nominal-rows">
+                            <div class="flex flex-wrap items-start justify-between gap-2">
+                                <div>
+                                    <p class="text-sm font-semibold">Nominal manual — bisa banyak baris sekaligus</p>
+                                    <p class="text-xs text-slate-400">Modal toko yang Anda ketik dipakai apa adanya (tanpa tambahan modal impor). Harga jual = modal toko × markup yang berlaku. Nominal dibuat nonaktif dulu sampai Anda mengaktifkannya.</p>
+                                </div>
+                                <Button type="button" variant="outline" size="sm" @click="addManualRow">Tambah baris</Button>
+                            </div>
+                            <div v-for="(row, index) in manualRows" :key="index" data-testid="manual-nominal-row" class="grid items-end gap-2 border-t border-slate-800 pt-2 md:grid-cols-12">
+                                <label class="text-xs md:col-span-3">Nama nominal<Input v-model="row.name" data-field="name" placeholder="Contoh: 100 Diamonds" class="mt-1" /><span v-if="productForm.errors['packages.'+index+'.name']" role="alert" class="mt-1 block text-[11px] text-red-300">{{ productForm.errors['packages.'+index+'.name'] }}</span></label>
+                                <label class="text-xs md:col-span-2">Nilai nominal<Input v-model="row.nominal_value" data-field="nominal_value" type="number" min="0" placeholder="Opsional" class="mt-1" /></label>
+                                <label class="text-xs md:col-span-2">Modal toko (Rp)<Input v-model="row.cost_idr" data-field="cost_idr" type="number" min="0" required class="mt-1" /><span v-if="productForm.errors['packages.'+index+'.cost_idr']" role="alert" class="mt-1 block text-[11px] text-red-300">{{ productForm.errors['packages.'+index+'.cost_idr'] }}</span></label>
+                                <label class="text-xs md:col-span-2">Markup baris (%)<Input v-model="row.sell_markup_percent" data-field="sell_markup_percent" type="number" min="0" max="1000" step="0.0001" placeholder="Ikut produk" class="mt-1" /><span class="mt-1 block text-[11px] text-slate-500">Kosongkan untuk mengikuti markup produk.</span></label>
+                                <p class="text-xs md:col-span-2" data-testid="manual-row-price">Harga jual <strong>{{ formatAdminMoney(createRowPreview(row).sell) }}</strong><span class="block text-slate-500">modal toko × {{ createRowMarkup(row) }}%</span></p>
+                                <div class="md:col-span-1"><Button type="button" variant="outline" size="sm" @click="removeManualRow(index)">Hapus</Button></div>
+                            </div>
+                            <p v-if="productForm.errors.packages" role="alert" class="text-sm text-red-300">{{ productForm.errors.packages }}</p>
+                        </div>
                     </template>
                     <div class="md:col-span-3"><Button :disabled="productForm.processing" class="rounded-md bg-cyan-400 px-4 py-2 font-semibold text-slate-950">Tambah {{ tab === 'MANUAL' ? 'produk manual' : 'produk otomatis' }}</Button><p v-if="Object.keys(productForm.errors).length" class="mt-2 text-sm text-red-300">{{ Object.values(productForm.errors).join(' · ') }}</p></div>
                 </form>
-                <div class="divide-y border-y border-slate-200 md:hidden">
-                    <button v-for="item in visibleProducts" :key="item.id" type="button" class="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-1 py-3 text-left" @click="editProduct(item)">
-                        <span class="min-w-0">
-                            <strong class="block truncate text-sm">{{ item.name }}</strong>
-                            <small class="mt-0.5 block truncate text-muted-foreground">{{ categories.find(c=>String(c.id)===String(item.category_id))?.name||'Tanpa kategori' }}<template v-if="item.publisher"> · {{ item.publisher }}</template></small>
-                            <small class="mt-1 block text-muted-foreground">Posisi {{ productPosition(item) }} · {{ item.packages.length }} nominal · {{ item.fulfillment_mode==='MANUAL'?'Manual':'Otomatis' }}</small>
-                        </span>
-                        <span class="text-right">
-                            <span class="block text-xs font-semibold" :class="item.is_active ? 'text-emerald-700' : 'text-slate-500'">{{ item.is_active ? 'Aktif' : 'Nonaktif' }}</span>
-                            <span class="mt-1 block text-xs font-medium text-primary">Edit →</span>
-                        </span>
-                    </button>
-                </div>
-                <div class="hidden overflow-x-auto md:block"><Table class="min-w-[880px]"><TableHeader><TableRow><TableHead>Produk</TableHead><TableHead>Kategori</TableHead><TableHead>Jenis</TableHead><TableHead>Nominal</TableHead><TableHead>Urutan</TableHead><TableHead>Status</TableHead><TableHead>Aksi</TableHead></TableRow></TableHeader><TableBody><TableRow v-for="item in visibleProducts" :key="item.id"><TableCell><strong>{{item.name}}</strong><small class="block text-muted-foreground">/{{item.slug}}<template v-if="item.publisher"> · {{item.publisher}}</template></small></TableCell><TableCell>{{categories.find(c=>String(c.id)===String(item.category_id))?.name||'Tanpa kategori'}}</TableCell><TableCell>{{item.fulfillment_mode==='MANUAL'?'Manual':'Otomatis'}}</TableCell><TableCell>{{item.packages.length}}</TableCell><TableCell>Posisi {{ productPosition(item) }}</TableCell><TableCell>{{item.is_active ? 'Aktif' : 'Nonaktif'}}</TableCell><TableCell><Button type="button" variant="outline" size="sm" @click="editProduct(item)">Edit</Button></TableCell></TableRow></TableBody></Table></div><p v-if="!visibleProducts.length" class="lf-admin-note">Tidak ada produk yang sesuai dengan filter.</p>
+                <div class="overflow-x-auto rounded-md border" role="region" aria-label="Daftar produk dalam katalog" tabindex="0"><Table class="min-w-[880px]"><TableHeader><TableRow><TableHead>Produk</TableHead><TableHead>Kategori</TableHead><TableHead>Jenis</TableHead><TableHead>Nominal</TableHead><TableHead>Urutan</TableHead><TableHead>Status</TableHead><TableHead>Aksi</TableHead></TableRow></TableHeader><TableBody><TableRow v-for="item in visibleProducts" :key="item.id"><TableCell><strong>{{item.name}}</strong><small v-if="item.publisher" class="block text-muted-foreground">{{item.publisher}}</small></TableCell><TableCell>{{categories.find(c=>String(c.id)===String(item.category_id))?.name||'Tanpa kategori'}}</TableCell><TableCell>{{item.fulfillment_mode==='MANUAL'?'Manual':'Otomatis'}}</TableCell><TableCell>{{item.packages.length}}</TableCell><TableCell>Posisi {{ productPosition(item) }}</TableCell><TableCell>{{item.is_active ? 'Aktif' : 'Nonaktif'}}</TableCell><TableCell><Button type="button" variant="outline" size="sm" @click="editProduct(item)">Edit</Button></TableCell></TableRow></TableBody></Table></div><p v-if="!visibleProducts.length" class="lf-admin-note">Tidak ada produk yang sesuai dengan filter.</p>
                 <nav class="flex flex-wrap items-center justify-between gap-3"><span class="text-sm text-muted-foreground">{{matchingProducts.length}} produk · Halaman {{catalogPage}} dari {{totalCatalogPages}}</span><div class="flex gap-2"><Button type="button" variant="outline" :disabled="catalogPage <= 1" @click="catalogPage--">Sebelumnya</Button><Button type="button" variant="outline" :disabled="catalogPage >= totalCatalogPages" @click="catalogPage++">Berikutnya</Button></div></nav>
 
             </section>
@@ -525,8 +619,8 @@ const deleteNotice = (notice) => {
             </template>
             <section v-else class="lf-admin-workspace" aria-label="Editor produk">
                         <div v-for="item in selectedProductItems" :key="item.id" class="space-y-4">
-                    <header class="flex flex-wrap items-center justify-between gap-3 border-b pb-4 pr-8"><div><p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Editor Produk</p><h1 class="mt-1 text-xl font-semibold">{{item.name}}</h1></div><div class="flex flex-wrap gap-2"><Button type="button" variant="destructive" size="sm" @click="deleteProduct(item)">Hapus</Button><Button type="button" variant="outline" size="sm" @click="closeProduct">Kembali ke produk</Button></div></header>
-                    <nav class="lf-admin-tabs"><Button type="button" variant="ghost" :class="{active:editorTab==='info'}" @click="editorTab='info'">Informasi</Button><Button type="button" variant="ghost" :class="{active:editorTab==='nominal'}" @click="editorTab='nominal'">Nominal & Harga</Button><Button type="button" variant="ghost" :class="{active:editorTab==='display'}" @click="editorTab='display'">Tampilan Produk</Button><Button type="button" variant="ghost" :class="{active:editorTab==='fields'}" @click="fieldsProductId=String(item.id);editorTab='fields'">Data Pelanggan</Button><Button type="button" variant="ghost" :class="{active:editorTab==='fulfillment'}" @click="editorTab='fulfillment'">Penanganan</Button></nav>
+                    <header class="flex flex-col gap-3 border-b pb-4 pr-8 sm:flex-row sm:items-center sm:justify-between"><div class="min-w-0"><p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Editor Produk</p><h1 class="mt-1 break-words text-xl font-semibold">{{item.name}}</h1></div><div class="flex flex-col gap-2 sm:flex-row"><Button class="w-full sm:w-auto" type="button" variant="destructive" size="sm" @click="deleteProduct(item)">Hapus</Button><Button class="w-full sm:w-auto" type="button" variant="outline" size="sm" @click="closeProduct">Kembali ke produk</Button></div></header>
+                    <nav class="lf-admin-tabs" aria-label="Bagian editor produk"><Button type="button" variant="ghost" :aria-current="editorTab==='info' ? 'page' : undefined" :class="{active:editorTab==='info'}" @click="editorTab='info'">Informasi</Button><Button type="button" variant="ghost" :aria-current="editorTab==='nominal' ? 'page' : undefined" :class="{active:editorTab==='nominal'}" @click="editorTab='nominal'">Nominal & Harga</Button><Button type="button" variant="ghost" :aria-current="editorTab==='display' ? 'page' : undefined" :class="{active:editorTab==='display'}" @click="editorTab='display'">Tampilan Produk</Button><Button type="button" variant="ghost" :aria-current="editorTab==='fields' ? 'page' : undefined" :class="{active:editorTab==='fields'}" @click="fieldsProductId=String(item.id);editorTab='fields'">Data Pelanggan</Button><Button type="button" variant="ghost" :aria-current="editorTab==='fulfillment' ? 'page' : undefined" :class="{active:editorTab==='fulfillment'}" @click="editorTab='fulfillment'">Penanganan</Button></nav>
                     <div v-show="editorTab==='info'" class="space-y-4">
                     <div class="grid gap-3 md:grid-cols-4">
                         <label class="text-sm">Nama<Input v-model="item.name" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /></label>
@@ -535,7 +629,9 @@ const deleteNotice = (notice) => {
                         <label class="text-sm">Kategori<select v-model="item.category_id" class="mt-1 block w-full rounded-md bg-slate-800 p-2"><option v-for="category in categories" :key="category.id" :value="category.id">{{ category.name }}</option></select></label>
                         <label class="text-sm">Jenis penanganan<select v-model="item.fulfillment_mode" :disabled="item.packages.length>0" class="mt-1 block w-full rounded-md bg-slate-800 p-2"><option value="AUTO_PROVIDER">Otomatis</option><option value="MANUAL">Manual</option></select><span v-if="item.packages.length>0" class="mt-1 block text-xs text-slate-500">Kosongkan nominal terlebih dahulu jika jenis penanganan memang perlu diubah.</span></label>
                         <label class="text-sm">Margin produk (%)<Input v-model.number="item.margin_percent" type="number" step="0.0001" min="0" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /></label>
-                        <details class="text-sm"><summary class="cursor-pointer">Posisi {{ productPosition(item) }} · ubah skor teknis</summary><label class="mt-2 block">Skor urutan internal<Input v-model.number="item.sort_order" type="number" min="0" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /></label></details>
+                        <label class="text-sm">Markup jual game (%)<Input v-model.number="item.sell_markup_percent" type="number" step="0.0001" min="0" max="1000" placeholder="Ikut pengaturan global" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /><span class="mt-1 block text-xs text-slate-500">Dihitung dari modal toko. Kosongkan untuk mengikuti pengaturan global.</span></label>
+                        <label class="text-sm">Tambahan modal game (%)<Input v-model.number="item.cost_uplift_percent" type="number" step="0.0001" min="0" max="1000" placeholder="Ikut pengaturan global" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /><span class="mt-1 block text-xs text-slate-500">Dipakai hanya saat modal nominal pertama kali dibuat; modal yang sudah ada tidak diubah. Kosongkan untuk ikut global.</span></label>
+                        <details class="text-sm"><summary class="cursor-pointer">Atur posisi produk (lanjutan)</summary><label class="mt-2 block">Posisi di toko<Input v-model.number="item.sort_order" type="number" min="0" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /><span class="mt-1 block text-xs text-muted-foreground">Angka lebih kecil tampil lebih dulu.</span></label></details>
                         <label class="text-sm md:col-span-3">Deskripsi<Textarea v-model="item.description" rows="2" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /></label>
                         <label class="flex items-center gap-2 text-sm"><AdminSwitch v-model="item.is_active" /> Produk aktif</label>
                         <label v-if="item.fulfillment_mode === 'MANUAL'" class="text-sm md:col-span-4">Instruksi internal<Textarea v-model="item.manual_instructions" rows="2" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /></label>
@@ -564,8 +660,8 @@ const deleteNotice = (notice) => {
                     </div>
 
                     </div>
-                    <div v-if="editorTab==='fields'" class="space-y-3"><h3>Data Pelanggan</h3><p class="text-muted-foreground">Atur data yang diminta saat pelanggan membeli produk ini.</p><AdminCustomerFields :rows="fieldRows" :error="fieldsError" :saving="fieldsSaving" @move="moveField" @remove="index=>fieldRows.splice(index,1)" @add="addField" @save="saveFields" /></div>
-                    <div v-show="editorTab==='fulfillment'" class="space-y-4"><h3 class="font-semibold">Penanganan {{item.fulfillment_mode==='MANUAL'?'manual':'otomatis'}}</h3><p class="text-sm text-slate-500">Instruksi dan jam layanan dikelola pada Informasi. Sumber pemenuhan, prioritas, modal, dan format tujuan dikelola per nominal.</p><Button v-if="item.fulfillment_mode==='AUTO_PROVIDER'" type="button" variant="outline" title="Menyinkronkan seluruh katalog Digiflazz, bukan hanya produk ini." @click="router.post('/admin/catalog/products/'+item.id+'/sync',{}, {preserveScroll:true})">Sinkron seluruh katalog</Button><AdminResponsiveTable :mobile-columns="[0,2,3]"><TableHeader><TableRow><TableHead>Nominal</TableHead><TableHead>Sumber / kode</TableHead><TableHead>Status koneksi</TableHead><TableHead>Aksi</TableHead></TableRow></TableHeader><TableBody><TableRow v-for="pack in visiblePackages(item)" :key="pack.id"><TableCell>{{pack.name}}</TableCell><TableCell><p v-for="mapping in pack.mappings" :key="mapping.id">{{providerLabel(mapping)}} · {{mapping.provider_code==='VOUCHER_STOCK' ? (mapping.stock_key||'-') : (mapping.external_sku||'Manual')}}</p></TableCell><TableCell><p v-for="mapping in pack.mappings" :key="mapping.id">{{ fulfillmentRole(pack,mapping) }}<span v-if="mapping.is_active"> · Posisi {{ sourcePosition(pack,mapping) }}</span></p></TableCell><TableCell><Button type="button" variant="outline" @click="selectedPackageId=pack.id;editorTab='nominal'">Kelola sumber</Button></TableCell></TableRow></TableBody></AdminResponsiveTable></div>
+                    <div v-if="editorTab==='fields'" class="space-y-3"><h3>Data Pelanggan</h3><p class="text-muted-foreground">Atur data akun yang diminta saat pelanggan membeli produk ini. Urutan data yang kamu tambahkan berlaku untuk semua nominal produk ini.</p><div v-if="item.fulfillment_mode==='AUTO_PROVIDER'" class="space-y-2"><p class="text-sm">Pilih data top up sesuai urutan yang diminta penyedia. Bila perlu dua data, tambahkan keduanya berurutan:</p><div class="flex flex-wrap gap-2"><Button v-for="field in item.fields" :key="field.field_key" type="button" variant="outline" size="sm" @click="item.customer_no_template=(item.customer_no_template||'')+'{{'+field.field_key+'}}'">Tambah {{field.label}}</Button></div><details class="text-sm"><summary class="cursor-pointer">Lihat format teknis penyedia (lanjutan)</summary><label class="mt-2 block max-w-xl">Urutan data yang dikirim ke penyedia<Input v-model="item.customer_no_template" data-testid="product-customer-template" class="mt-1" placeholder="Pilih data di atas sesuai urutan"/><span class="mt-1 block text-xs text-muted-foreground">Format ini menggabungkan data yang dipilih tanpa pemisah. Ubah hanya bila diminta oleh penyedia.</span></label></details><Button type="button" :disabled="fieldsSaving" @click="saveFields">Simpan urutan data</Button></div><AdminCustomerFields :rows="fieldRows" :error="fieldsError" :saving="fieldsSaving" @move="moveField" @remove="index=>fieldRows.splice(index,1)" @add="addField" @save="saveFields" /></div>
+                    <div v-show="editorTab==='fulfillment'" class="space-y-4"><h3 class="font-semibold">Penanganan {{item.fulfillment_mode==='MANUAL'?'manual':'otomatis'}}</h3><p class="text-sm text-slate-500">Instruksi dan jam layanan dikelola pada Informasi. Format tujuan bersama diatur pada Data Pelanggan; sumber, prioritas, dan modal tetap dikelola per nominal.</p><Button v-if="item.fulfillment_mode==='AUTO_PROVIDER'" type="button" variant="outline" title="Menyinkronkan seluruh katalog Digiflazz, bukan hanya produk ini." @click="router.post('/admin/catalog/products/'+item.id+'/sync',{}, {preserveScroll:true})">Sinkron seluruh katalog</Button><AdminResponsiveTable scroll class="min-w-[900px]" :mobile-columns="[0,2,3]"><TableHeader><TableRow><TableHead>Nominal</TableHead><TableHead>Sumber / kode</TableHead><TableHead>Status koneksi</TableHead><TableHead>Aksi</TableHead></TableRow></TableHeader><TableBody><TableRow v-for="pack in visiblePackages(item)" :key="pack.id"><TableCell>{{pack.name}}</TableCell><TableCell><p v-for="mapping in pack.mappings" :key="mapping.id">{{providerLabel(mapping)}} · {{mapping.provider_code==='VOUCHER_STOCK' ? (mapping.stock_key||'-') : (mapping.external_sku||'Manual')}}</p></TableCell><TableCell><p v-for="mapping in pack.mappings" :key="mapping.id">{{ fulfillmentRole(pack,mapping) }}<span v-if="mapping.is_active"> · Posisi {{ sourcePosition(pack,mapping) }}</span></p></TableCell><TableCell><Button type="button" variant="outline" @click="selectedPackageId=pack.id;editorTab='nominal'">Kelola sumber</Button></TableCell></TableRow></TableBody></AdminResponsiveTable></div>
                     <div v-show="editorTab==='display'" class="space-y-4">
                     <div class="grid gap-3 md:grid-cols-2">
                         <div class="rounded-md border border-slate-200 p-3"><strong class="text-xs">Gambar produk / card</strong><div class="mt-2"><AdminMediaControl type="product" :id="item.id" :url="item.image_url" /></div></div>
@@ -602,32 +698,31 @@ const deleteNotice = (notice) => {
 
                     </div>
                     <div v-show="editorTab==='nominal'" class="lf-admin-nominals space-y-3 rounded-md bg-slate-950 p-4">
-                        <div class="flex flex-wrap items-center justify-between gap-3"><h3 class="font-semibold">Nominal / paket</h3><Button v-if="item.fulfillment_mode==='AUTO_PROVIDER'" type="button" variant="outline" :disabled="autoSourcesForm.processing" @click="autoSourcesForm.post('/admin/catalog/products/'+item.id+'/auto-sources',{preserveScroll:true})">Lengkapi cadangan otomatis</Button><Button v-if="item.fulfillment_mode==='AUTO_PROVIDER'" type="button" variant="outline" @click="toggleImport(item)">Impor nominal Digiflazz</Button></div>
-                        <p v-if="Object.keys(autoSourcesForm.errors).length" role="alert" class="text-sm text-destructive">{{ Object.values(autoSourcesForm.errors).join(' · ') }}</p>
+                        <div class="flex flex-wrap items-center justify-between gap-3"><h3 class="font-semibold">Nominal / paket</h3><Button v-if="item.fulfillment_mode==='AUTO_PROVIDER'" type="button" variant="outline" @click="toggleImport(item)">Impor nominal Digiflazz</Button></div>
                         <Card v-if="showImport && item.fulfillment_mode==='AUTO_PROVIDER'" class="space-y-3 p-4" data-testid="digiflazz-import">
-                            <h4 class="font-semibold">Pilih SKU untuk {{item.name}}</h4>
-                            <div class="grid gap-3 md:grid-cols-3"><label class="text-sm">Cari SKU<Input v-model="importSearch" class="mt-1"/></label><label class="text-sm">Merek<select v-model="importBrand" class="mt-1 block w-full rounded border p-2"><option value="">Semua brand</option><option v-for="brand in importBrands" :key="brand">{{brand}}</option></select></label><p class="self-end text-sm font-semibold text-emerald-700">Harga jual tetap · margin admin</p></div>
-                            <p class="text-xs text-slate-500">Pilih SKU yang tersedia, lalu impor. Harga jual awal memakai margin yang admin isi, lalu bisa diedit manual.</p>
-                            <label class="block text-sm">Margin awal harga jual impor (%)<Input v-model.number="importForm.margin_percent" type="number" min="0" max="1000" step="0.0001" class="mt-1" /></label>
-                            <label class="flex items-center gap-2 text-sm"><AdminSwitch v-model="importForm.auto_sources" /> Cadangan otomatis untuk nominal yang sama</label>
-                            <p class="text-sm text-muted-foreground">SKU dengan nama, merek, jenis, dan kategori yang sama menjadi satu nominal. Sumber termurah yang tersedia dipilih lebih dahulu; cadangan baru ditambahkan saat sinkron.</p>
+                            <h4 class="font-semibold">Pilih kode produk Digiflazz untuk {{item.name}}</h4>
+                            <div class="grid gap-3 md:grid-cols-3"><label class="text-sm">Cari kode produk<Input v-model="importSearch" class="mt-1"/></label><label class="text-sm">Merek<select v-model="importBrand" class="mt-1 block w-full rounded border p-2"><option value="">Semua brand</option><option v-for="brand in importBrands" :key="brand">{{brand}}</option></select></label><p class="self-end text-sm font-semibold text-emerald-700">Modal toko × markup</p></div>
+                            <p class="text-xs text-slate-500">Pilih SKU yang tersedia, lalu impor. Harga jual dihitung dari modal toko × markup; keduanya bisa diubah setelah impor.</p>
+                            <label class="block text-sm">Markup harga jual game (%)<Input v-model.number="importForm.margin_percent" type="number" min="0" max="1000" step="0.0001" :disabled="item.sell_markup_percent !== null && item.sell_markup_percent !== undefined" class="mt-1" /><span class="mt-1 block text-xs text-slate-500">{{ item.sell_markup_percent !== null && item.sell_markup_percent !== undefined ? 'Memakai markup game yang sudah tersimpan. Ubah di Informasi jika ingin mengganti harga jual seluruh nominal.' : 'Menjadi markup jual game ini, dihitung dari modal toko. Tahap tambahan modal tetap memakai pengaturan game/global.' }}</span></label>
+                            <p class="text-sm text-muted-foreground">Pilih satu SKU Digiflazz untuk setiap nominal. Katalog tidak akan menambahkan SKU alternatif otomatis.</p>
                             <div class="flex flex-wrap gap-2"><Button type="button" variant="outline" @click="importForm.item_ids=importMatches.map(sku=>sku.id)">Pilih semua hasil filter ({{ importMatches.length }})</Button><Button type="button" variant="outline" @click="importForm.item_ids=[]">Hapus pilihan</Button></div>
                             <label class="flex items-center gap-2 text-sm"><AdminSwitch v-model="importForm.publish" /> Langsung jual setelah impor</label>
-                            <label class="block text-sm">Format ID tujuan<Input v-model="importForm.customer_no_template" data-testid="import-customer-template" class="mt-1" placeholder="Pilih kolom pelanggan di bawah" /></label>
-                            <div class="flex flex-wrap gap-2"><Button v-for="field in item.fields" :key="field.field_key" type="button" size="sm" variant="outline" @click="importForm.customer_no_template += '{{' + field.field_key + '}}'">{{ field.label }}</Button></div>
-                            <p class="text-sm text-muted-foreground">{{ importForm.publish ? 'Produk, nominal dan cadangan Digiflazz diaktifkan bersama. Harga jual tetap; batas transaksi supplier mengikuti modal manual yang admin isi.' : 'Nominal disimpan sebagai draf dan belum dijual.' }}</p>
-                            <label v-for="sku in importItems" :key="sku.id" :data-sku="sku.buyer_sku_code" class="flex items-start gap-3 rounded border p-2 text-sm"><input v-model="importForm.item_ids" type="checkbox" :value="sku.id"><span>{{sku.product_name}}<small class="block">{{sku.buyer_sku_code}} · Rp{{Number(sku.price_idr).toLocaleString('id-ID')}}<span v-if="importForm.auto_sources"> · {{sku.source_count}} sumber otomatis</span></small></span></label>
+                            <p class="text-sm text-muted-foreground">{{ importForm.publish ? 'Produk dan SKU nominal yang dipilih diaktifkan. Harga jual = modal toko × markup; batas harga supplier mengikuti modal toko saat impor.' : 'Nominal disimpan sebagai draf dan belum dijual.' }}</p>
+                            <label v-for="sku in importItems" :key="sku.id" :data-sku="sku.buyer_sku_code" class="flex items-start gap-3 rounded border p-2 text-sm"><input v-model="importForm.item_ids" type="checkbox" :value="sku.id" class="mt-1"><span class="min-w-0">{{sku.product_name}}<small class="block">{{sku.buyer_sku_code}} · seller Rp{{Number(sku.price_idr).toLocaleString('id-ID')}}</small><small class="block text-slate-400">Modal toko {{formatAdminMoney(importRowPreview(sku,item).stored)}} → harga jual {{formatAdminMoney(importRowPreview(sku,item).sell)}}</small><small v-if="nominalAlreadyExists(sku,item)" class="mt-1 block font-semibold text-amber-400">Nominal serupa sudah ada di produk ini</small></span></label>
+                            <p v-if="importForm.item_ids.length" class="text-sm"><strong>{{importForm.item_ids.length}} dipilih</strong> dari {{importMatches.length}} hasil filter · Total seller {{formatAdminMoney(importTotals().seller)}} · Modal toko {{formatAdminMoney(importTotals().stored)}} · Harga jual {{formatAdminMoney(importTotals().sell)}}</p>
+                            <p v-if="duplicateImportRows(item).length" role="status" class="text-sm text-amber-400">{{duplicateImportRows(item).length}} pilihan bertabrakan dengan nominal yang sudah ada. Kamu akan diminta konfirmasi sebelum menyimpan.</p>
+                            <p v-if="importUnavailableCount" class="text-xs text-slate-500">{{importUnavailableCount}} SKU pada merek ini sedang tidak tersedia (stok habis, cutoff, atau harga di atas batas) sehingga tidak bisa dipilih.</p>
                             <p v-if="!importMatches.length" class="text-sm">Tidak ada SKU tersedia yang sesuai dengan filter dan belum diimpor. Hapus filter atau sinkronkan daftar harga di menu Digiflazz.</p>
                             <div class="flex flex-wrap items-center gap-2"><Button type="button" variant="outline" :disabled="importPage===1" @click="importPage--">Sebelumnya</Button><span class="text-sm">Halaman {{importPage}} / {{Math.max(1,Math.ceil(importMatches.length/25))}}</span><Button type="button" variant="outline" :disabled="importPage*25>=importMatches.length" @click="importPage++">Berikutnya</Button></div>
                             <p v-if="Object.keys(importForm.errors).length" role="alert" class="text-sm text-destructive">{{ Object.values(importForm.errors).join(' · ') }}</p>
                             <p v-if="!importForm.item_ids.length" class="text-sm text-muted-foreground">Centang minimal satu SKU untuk mengaktifkan tombol impor.</p>
-                            <Button type="button" :disabled="importForm.processing||!importForm.item_ids.length" @click="importForm.post('/admin/catalog/products/'+item.id+'/import',{preserveScroll:true,onSuccess:()=>{importForm.item_ids=[];showImport=false;}})">Impor {{importForm.item_ids.length}} nominal</Button>
+                            <Button type="button" :disabled="importForm.processing||!importForm.item_ids.length" @click="submitImport(item)">Impor {{importForm.item_ids.length}} nominal</Button>
                         </Card>
-                        <AdminResponsiveTable :mobile-columns="[0,2,5,6]"><TableHeader><TableRow><TableHead>Nominal</TableHead><TableHead>Sumber / Modal</TableHead><TableHead class="text-right">Harga jual</TableHead><TableHead>Margin</TableHead><TableHead class="text-right">Urutan</TableHead><TableHead>Status</TableHead><TableHead>Aksi</TableHead></TableRow></TableHeader><TableBody>
+                <AdminResponsiveTable scroll class="min-w-[1100px]" :mobile-columns="[0,2,5,6]"><TableHeader><TableRow><TableHead>Nominal</TableHead><TableHead>Sumber / Modal</TableHead><TableHead class="text-right">Harga jual</TableHead><TableHead>Margin</TableHead><TableHead class="text-right">Urutan</TableHead><TableHead>Status</TableHead><TableHead>Aksi</TableHead></TableRow></TableHeader><TableBody>
                             <TableRow v-for="(pack,index) in visiblePackages(item)" :key="pack.id" draggable="true" @dragstart="draggedPackageId=pack.id" @dragover.prevent @drop.prevent="dropPackage(item,(nominalPage-1)*25+index)">
                                 <TableCell><div class="flex items-center gap-2"><img v-if="pack.image_url" :src="pack.image_url" alt="" class="size-8 shrink-0 object-contain"><strong>{{pack.name}}</strong></div><p class="text-xs text-slate-500">{{pack.group_name||'-'}}</p></TableCell>
-                                <TableCell><p v-for="mapping in pack.mappings" :key="mapping.id" class="text-xs">{{ providerLabel(mapping) }}<span v-if="mapping.provider_code==='VOUCHER_STOCK'"> · {{ mapping.stock_key || '-' }}</span><span v-else-if="mapping.external_sku"> · {{ mapping.external_sku }}</span> · Rp{{Number(mapping.cost_idr||0).toLocaleString('id-ID')}}</p></TableCell>
-                                <TableCell class="text-right">{{previewPrice(pack,item)}}</TableCell><TableCell>{{pack.pricing_mode==='SELL_PRICE'?'Harga tetap':pack.pricing_mode==='FIXED'?'Rp'+Number(pack.margin_fixed_idr||0).toLocaleString('id-ID'):(pack.pricing_mode==='PERCENT'?pack.margin_percent:item.margin_percent)+'%'}}</TableCell><TableCell class="text-right">Posisi {{ packagePosition(item, pack) }}</TableCell><TableCell>{{pack.is_active?'Aktif':'Nonaktif'}}</TableCell>
+                                <TableCell><p v-for="mapping in pack.mappings" :key="mapping.id" class="text-xs">{{ providerLabel(mapping) }}<span v-if="mapping.provider_code==='VOUCHER_STOCK'"> · {{ mapping.stock_key || '-' }}</span><span v-else-if="mapping.external_sku"> · {{ mapping.external_sku }}</span> · Rp{{mappingCost(mapping).toLocaleString('id-ID')}}</p></TableCell>
+                                <TableCell class="text-right">{{previewPrice(pack,item)}}</TableCell><TableCell><template v-if="pack.mappings.some(mapping=>mapping.provider_code==='DIGIFLAZZ'&&mapping.store_cost_idr!==null&&mapping.store_cost_idr!==undefined)">Markup {{effectiveMarkupPercent(pack,item)}}%</template><template v-else>{{pack.pricing_mode==='SELL_PRICE'?'Harga tetap':pack.pricing_mode==='FIXED'?'Rp'+Number(pack.margin_fixed_idr||0).toLocaleString('id-ID'):(pack.pricing_mode==='PERCENT'?pack.margin_percent:item.margin_percent)+'%'}}</template></TableCell><TableCell class="text-right">Posisi {{ packagePosition(item, pack) }}</TableCell><TableCell>{{pack.is_active?'Aktif':'Nonaktif'}}</TableCell>
                                 <TableCell><div class="flex flex-wrap gap-2"><Button type="button" variant="outline" @click="editPackage(pack.id)">Edit nominal</Button></div></TableCell>
                             </TableRow>
                         </TableBody></AdminResponsiveTable>
@@ -642,7 +737,7 @@ const deleteNotice = (notice) => {
                                 <label class="text-xs">Badge<Input v-model="pack.note" maxlength="80" placeholder="Contoh: Populer" class="mt-1 block w-28 rounded bg-slate-800 p-2" /></label>
                                 <label class="text-xs">Grup / Tabel<select v-if="item.package_tabs_enabled" v-model="pack.group_name" class="mt-1 block w-full rounded bg-slate-800 p-2"><option value="">Pilih tab</option><option v-for="tabName in item.package_tabs||[]" :key="tabName" :value="tabName">{{tabName}}</option></select><Input v-else v-model="pack.group_name" placeholder="Contoh: Diamonds" class="mt-1 block rounded bg-slate-800 p-2" /></label>
                                 <label class="text-xs">Nilai nominal<Input v-model.number="pack.nominal_value" type="number" min="0" class="mt-1 block w-28 rounded bg-slate-800 p-2" /></label>
-                                <details class="text-xs"><summary class="cursor-pointer">Posisi {{ packagePosition(item,pack) }} · skor lanjutan</summary><label class="block mt-2">Skor teknis<Input v-model.number="pack.sort_order" type="number" min="0" class="mt-1 block w-20 rounded bg-slate-800 p-2" /></label></details>
+                                <details class="text-xs"><summary class="cursor-pointer">Atur posisi nominal (lanjutan)</summary><label class="block mt-2">Posisi di toko<Input v-model.number="pack.sort_order" type="number" min="0" class="mt-1 block w-20 rounded bg-slate-800 p-2" /></label><p class="mt-1 text-slate-500">Angka lebih kecil tampil lebih dulu.</p></details>
                                 <label class="flex gap-2 text-xs"><AdminSwitch v-model="pack.is_active" />Aktif</label>
                                 <Button type="button" class="rounded bg-slate-700 px-3 py-2 text-xs" @click="savePackage(pack)">Simpan</Button>
                             </div>
@@ -653,35 +748,28 @@ const deleteNotice = (notice) => {
                                 <label v-if="pack.pricing_mode==='SELL_PRICE'" class="text-xs">Harga jual Rp<Input v-model.number="pack.sell_price_idr" type="number" min="1" class="mt-1"/></label>
                                 <p class="self-center text-sm">Pratinjau harga: <strong>{{previewPrice(pack,item)}}</strong></p>
                             </div>
+                            <div class="grid gap-3 md:grid-cols-3">
+                                <label class="text-xs">Markup jual nominal (%)<Input v-model.number="pack.sell_markup_percent" type="number" min="0" max="1000" step="0.0001" placeholder="Ikut game" class="mt-1" /><span class="mt-1 block text-[11px] text-slate-500">Yang berlaku sekarang: {{ effectiveMarkupPercent(pack,item) }}% dari modal toko.</span></label>
+                                <label class="text-xs">Tambahan modal nominal (%)<Input v-model.number="pack.cost_uplift_percent" type="number" min="0" max="1000" step="0.0001" placeholder="Ikut game" class="mt-1" /><span class="mt-1 block text-[11px] text-slate-500">Yang berlaku sekarang: {{ effectiveUpliftPercent(pack,item) }}% · hanya saat modal nominal dibuat.</span></label>
+                            </div>
                             <div class="rounded border border-slate-700 p-2">
                                 <p class="mb-2 text-[11px] text-slate-400">Gambar nominal: rekomendasi 512×512 (1:1), PNG/WebP transparan bila memungkinkan.</p>
                                 <AdminMediaControl type="package" :id="pack.id" :url="pack.image_url" />
                             </div>
                             <div class="space-y-2 rounded-md border border-slate-800 p-3">
-                                <div><h4 class="text-sm font-semibold">Sumber Top Up: Utama dan Cadangan</h4><p class="mt-1 text-[11px] text-slate-500">Posisi dimulai dari 1. Sumber utama digunakan pertama, cadangan hanya untuk kegagalan definitif. Pending, proses, timeout, atau status tidak pasti wajib direkonsiliasi, bukan langsung dikirim ulang.</p></div>
+                                <div><h4 class="text-sm font-semibold">Mapping fulfillment</h4><p class="mt-1 text-[11px] text-slate-500">Setiap nominal Digiflazz memakai satu SKU. Jika transaksi gagal, sistem tidak berpindah otomatis ke SKU lain.</p></div>
                                 <div v-for="mapping in [...pack.mappings.filter((entry) => entry.provider_code !== 'VOUCHER_STOCK')].sort(bySourcePriority)" :key="mapping.id" class="flex flex-wrap items-end gap-2 rounded border border-slate-800 p-2 text-xs text-slate-300">
-                                    <span class="min-w-40"><strong>{{ fulfillmentRole(pack, mapping) }}<template v-if="mapping.is_active"> · Posisi {{ sourcePosition(pack,mapping) }}</template></strong><br>{{ providerLabel(mapping) }}<span v-if="mapping.external_sku"> · {{ mapping.external_sku }}</span><br><span class="text-slate-500">Modal Rp{{Number(mapping.cost_idr||0).toLocaleString('id-ID')}}<template v-if="mapping.is_manual_price"> · Terkunci</template></span></span>
+                                    <span class="min-w-40"><strong>{{ fulfillmentRole(pack, mapping) }}<template v-if="mapping.is_active"> · Posisi {{ sourcePosition(pack,mapping) }}</template></strong><br>{{ providerLabel(mapping) }}<span v-if="mapping.external_sku"> · {{ mapping.external_sku }}</span><br><span class="text-slate-500"><template v-if="mapping.store_cost_idr!==null&&mapping.store_cost_idr!==undefined">Modal toko Rp{{Number(mapping.store_cost_idr||0).toLocaleString('id-ID')}} · Harga seller Rp{{Number(mapping.seller_reference_price_idr??mapping.cost_idr??0).toLocaleString('id-ID')}}</template><template v-else>Modal Rp{{Number(mapping.cost_idr||0).toLocaleString('id-ID')}}</template><template v-if="mapping.is_manual_price"> · Terkunci</template></span></span>
                                     <Button v-if="mapping.provider_code==='DIGIFLAZZ'" type="button" variant="outline" @click="router.post('/admin/catalog/mappings/'+mapping.id+'/sync',{}, {preserveScroll:true})">Sinkron harga</Button>
                                     <label v-if="mapping.provider_code === 'MANUAL'">Modal Rp<Input v-model.number="mapping.cost_idr" type="number" min="0" class="mt-1 block w-28 rounded bg-slate-800 p-2" /></label>
+                                    <label v-if="mapping.provider_code === 'DIGIFLAZZ' && !mapping.is_manual_price && mapping.store_cost_idr!==null && mapping.store_cost_idr!==undefined">Modal toko / batas harga (Rp)<Input v-model.number="mapping.store_cost_idr" type="number" min="1" max="1000000000" class="mt-1 block w-36 rounded bg-slate-800 p-2" /></label>
                                     <div v-if="mapping.provider_code === 'DIGIFLAZZ'" class="space-y-1">
                                         <label class="flex items-center gap-2"><AdminSwitch v-model="mapping.is_manual_price" /> Kunci modal & batas harga manual</label>
                                         <label v-if="mapping.is_manual_price" class="block">Harga Modal = Max Price Digiflazz (Rp)<Input v-model.number="mapping.manual_price_idr" type="number" min="1" max="1000000000" required class="mt-1 block w-36 rounded bg-slate-800 p-2" /></label>
                                         <p class="max-w-64 text-[11px] text-slate-500">Modal yang lu isi akan sama persis dengan max_price Digiflazz dan tidak ditimpa sinkronisasi. Matikan kunci jika mau mengikuti harga supplier.</p>
                                     </div>
-                                    <label v-if="mapping.provider_code === 'DIGIFLAZZ'" class="min-w-72">Format ID tujuan<Input v-model="mapping.customer_no_template" placeholder="{{user_id}}{{zone_id}}" class="mt-1 block w-full rounded bg-slate-800 p-2" /><span class="mt-1 block text-[11px] text-slate-500">Gunakan kode kolom di dalam {{ }}.</span></label>
-                                    <details class="text-xs"><summary class="cursor-pointer">Prioritas teknis (lanjutan)</summary><label class="mt-2 block">Skor internal<Input v-model.number="mapping.priority" type="number" min="0" max="1000" class="mt-1 block w-20 rounded bg-slate-800 p-2" /></label><p>Angka kecil dipilih lebih dulu. Pada sumber otomatis, skor dapat disusun ulang saat sinkronisasi.</p></details>
                                     <label class="flex gap-2"><AdminSwitch v-model="mapping.is_active" />Aktif</label>
                                     <Button type="button" class="rounded bg-slate-700 px-3 py-2" @click="saveMapping(mapping)">Simpan sumber</Button>
-                                </div>
-                                <div v-if="item.fulfillment_mode==='AUTO_PROVIDER'" class="space-y-2 border-t border-slate-800 pt-3">
-                                    <label class="text-xs">Tambah sumber Digiflazz alternatif<Input v-model="sourceSearch[pack.id]" placeholder="Cari nama, SKU, merek, atau seller" class="mt-1" /></label>
-                                    <div v-if="sourceCandidates(pack).length" class="max-h-56 overflow-y-auto rounded border border-slate-800">
-                                        <button v-for="candidate in sourceCandidates(pack)" :key="candidate.id" type="button" class="flex w-full items-center justify-between gap-3 border-b border-slate-800 px-3 py-2 text-left text-xs last:border-b-0 hover:bg-slate-900" @click="attachSource(pack,candidate)">
-                                            <span><strong>{{candidate.product_name}}</strong><small class="block text-slate-500">{{candidate.buyer_sku_code}} · {{candidate.brand||'-'}} · {{candidate.seller_name||'Seller Digiflazz'}}</small></span>
-                                            <span class="whitespace-nowrap">Rp{{Number(candidate.price_idr||0).toLocaleString('id-ID')}}</span>
-                                        </button>
-                                    </div>
-                                    <p class="text-[11px] text-slate-500">Sumber baru selalu ditambahkan nonaktif dan di prioritas paling belakang. Periksa kesetaraan nominal, format tujuan, harga, lalu aktifkan secara manual.</p>
                                 </div>
                             </div>
                             <div v-if="item.fulfillment_mode==='AUTO_PROVIDER'" class="space-y-3 rounded-md border border-slate-700 p-3">

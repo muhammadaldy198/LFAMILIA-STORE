@@ -52,11 +52,19 @@ class DigiflazzAutoSources
             throw ValidationException::withMessages(['item_ids' => 'Tidak ada SKU Digiflazz yang aktif dan tersedia.']);
         }
         $nominal = app(CatalogNominalOrder::class)->value($first->product_name, $first->brand);
+        // Importing another nominal must not change the product-level markup.
+        // New products still initialize their fixed selling price from the
+        // reviewed import markup and the one-time-uplifted store cost.
         if (! $package) {
-            // The initial fixed selling price uses the margin configured by
-            // the admin. Supplier sync must not rewrite this selling price.
+            if ($product->sell_markup_percent === null) {
+                $product->update(['sell_markup_percent' => $margin]);
+            }
+            $storeCost = app(DigiflazzCatalogImport::class)->initialStoreCost(null, $product, (int) $first->price_idr);
+            // The initial selling price uses the effective markup on the store
+            // cost. Supplier sync must not rewrite this selling price.
+            $effectiveMarkup = $product->sell_markup_percent ?? $margin;
             $fixedPrice = app(DigiflazzFixedPricePolicy::class)->fixedPriceFromCost(
-                (int) $first->price_idr, $margin
+                $storeCost, $effectiveMarkup
             );
             $package = $product->packages()->create([
                 'code' => 'DF_'.substr(hash('sha256', $first->buyer_sku_code), 0, 20),
@@ -83,9 +91,6 @@ class DigiflazzAutoSources
             $mapping = app(DigiflazzCatalogImport::class)->upsert($package, $item->buyer_sku_code, (int) $item->price_idr, (int) $item->price_idr);
             $before = $mapping->toArray();
             $config = $mapping->fulfillment_config ?? [];
-            if ($template !== null) {
-                $config['customer_no_template'] = $template;
-            }
             if ($automatic) {
                 $config['auto_source_group'] = $this->key($item);
             }
@@ -290,7 +295,6 @@ class DigiflazzAutoSources
                 $config['auto_source_group'] = $this->key($freshItem);
                 $mapping->update([
                     'is_active' => true, 'priority' => 0, 'is_manual_price' => false,
-                    'cost_idr' => (int) $freshItem->price_idr, 'max_price_idr' => (int) $freshItem->price_idr,
                     'fulfillment_config' => $config,
                 ]);
                 app(AdminAuditService::class)->record(

@@ -25,12 +25,14 @@ Unique constraint MySQL menjadi proteksi tambahan terhadap race.
 
 Di dalam transaction, backend mengunci/revalidasi package/provider mapping, customer input, membership, voucher, dan payment route lalu menghitung:
 
-- provider cost;
-- margin;
+- modal toko (mapping terpilih);
+- markup jual yang berlaku (nominal → game → global; harga rupiah dibulatkan ke atas);
 - membership discount;
 - voucher discount;
 - payment fee;
 - final total.
+
+Harga jual = modal toko × markup; tidak ada pembulatan "cantik". Nominal dengan modal toko yang harga seller provider-nya sedang naik di atas modal toko dianggap tidak eligible, sehingga tidak tampil di halaman produk dan tidak bisa dibeli sampai harganya kembali ke dalam batas.
 
 Snapshot order menyimpan product/package/provider/payment/pricing/membership/voucher/customer input yang dipakai saat order dibuat. Harga order tidak berubah hanya karena setting katalog/provider berubah kemudian.
 

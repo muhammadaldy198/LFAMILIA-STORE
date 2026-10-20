@@ -66,6 +66,7 @@ DB::transaction(function (): void {
             'description' => 'Fixture khusus browser regression checkout.',
             'margin_percent' => 10,
             'fulfillment_mode' => 'AUTO_PROVIDER',
+            'customer_no_template' => '{{user_id}}{{zone_id}}',
             'nickname_check_enabled' => false,
             'is_active' => true,
         ]
@@ -129,6 +130,17 @@ DB::transaction(function (): void {
             'synced_at' => now(), 'created_at' => now(), 'updated_at' => now(),
         ]
     );
+
+    // The admin browser smoke imports these SKUs into the fixture product. Drop
+    // whatever a previous run imported so the import picker still lists them as
+    // unmapped and the duplicate-nominal guard starts from a clean product —
+    // CI runs on a fresh database, local reruns must behave the same way.
+    $previousImportIds = DB::table('product_packages')
+        ->whereIn('name', ['Browser Import 200 Diamonds', 'Browser Import 300 Diamonds'])
+        ->pluck('id');
+    DB::table('provider_mappings')->whereIn('product_package_id', $previousImportIds)->delete();
+    DB::table('product_packages')->whereIn('id', $previousImportIds)->delete();
+    DB::table('provider_mappings')->where('external_sku', 'like', 'BROWSER-IMPORT-%')->delete();
 
     foreach (['BROWSER-IMPORT-200', 'BROWSER-IMPORT-300'] as $sku) {
         DB::table('digiflazz_catalog_items')->updateOrInsert(
@@ -195,6 +207,23 @@ DB::transaction(function (): void {
         'payment_received' => true, 'idempotency_key' => 'browser-ui-fixture-v1',
     ], (int) $admin->id);
     DB::table('orders')->where('id', $orderId)->update(['user_id' => $customer->id]);
+
+    // Provide one actionable manual attempt so the browser smoke can verify that
+    // cancelling its confirmation never posts a mutation.
+    $fulfillmentOrderId = app(AdminManualOrderService::class)->create([
+        'customer_name' => 'Pelanggan fixture fulfillment',
+        'phone' => '081234567890',
+        'email' => 'browser-account@example.test',
+        'product_name' => 'Produk manual fixture',
+        'package_name' => 'Paket manual fixture',
+        'destination' => 'BROWSER-FULFILLMENT-DESTINATION',
+        'total_idr' => 25000,
+        'note' => 'Data sintetis lokal untuk smoke test.',
+        'payment_received' => true,
+        'idempotency_key' => 'browser-fulfillment-fixture-v1',
+    ], (int) $admin->id);
+    DB::table('orders')->where('id', $fulfillmentOrderId)->update(['user_id' => $customer->id]);
+
     SupportTicket::updateOrCreate(
         ['user_id' => $customer->id, 'subject' => 'Tiket fixture dengan judul panjang untuk audit Admin mobile'],
         ['order_id' => $orderId, 'message' => 'Pesan sintetis khusus regression browser.', 'kind' => 'GENERAL']

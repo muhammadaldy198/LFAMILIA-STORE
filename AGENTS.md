@@ -35,7 +35,7 @@ Skills live in `.claude/skills/`. Read the `SKILL.md`, not just the skill name.
 
 **Mandatory report:** at the end of every coding/audit task, state which skills were used + which were skipped and why. If a mandatory skill wasn't used, the reason must be written — no silent skipping.
 
-**Conflict rule:** owner instructions (this file, `CLAUDE.md`, explicit task) always win over skills. Example: the Midtrans skill teaches automatic refund implementation → rejected, the store's refund is manual via CS (DE-2026-10-17-05), never automatic.
+**Conflict rule:** explicit current owner-approved decisions in this file and `CLAUDE.md` override skills, role files, PRDs, old prompts, and historical plans. Explicit user instructions for the current task override repository defaults. Example: the Midtrans skill teaches automatic refund implementation → rejected, the store's refund is manual via CS (DE-2026-10-17-05), never automatic. When an active role/prompt conflicts with a settled decision, update that active instruction file; do not re-litigate the decision or report archived history as a current defect.
 
 **Override:** the user can force a skill by naming it ("pake skill X") — that overrides the table.
 
@@ -55,7 +55,7 @@ Never claim success without tool output / evidence. A failed, unavailable, timed
 
 Never report a PR as merged when it is only open. Never report production as deployed when only repository changes were merged.
 
-Bugs (even minor) must be audited and discussed with the user BEFORE being fixed. Bring the full findings list, not only critical ones.
+Bugs (even minor) must be audited and discussed with the user BEFORE being fixed, unless the user has already explicitly authorized the specific correction. When asked to align agent instructions with a settled owner decision, update the conflicting active instruction files directly; do not pause to re-ask about the already-approved business rule. Bring the full findings list for unrelated defects.
 
 ## 3. Hard rules from the owner (non-negotiable)
 
@@ -67,7 +67,7 @@ Bugs (even minor) must be audited and discussed with the user BEFORE being fixed
 - **Payment tests ONLY simulation/sandbox.** No real production payment transactions without user approval.
 - **REFUND = manual via CS (DE-2026-10-17-05).** Refund DILAYANI untuk kondisi tertentu (Kebijakan Pengembalian Dana: gagal tak diproses ulang, pembayaran ganda, produk tak tersedia, nominal kurang, transaksi tak sah; ajukan ≤7 hari kalender via Hubungi Kami; review 1–7 hari kerja; dana 1–14 hari kerja). **Jangan pernah bangun/trigger refund OTOMATIS di sistem** — sistem nggak mengotomatiskan refund. Failed/expired payments handled via retry, bukan refund. Masalah order berbayar: settlement manual via Super Admin wallet adjustment (member) atau kontak langsung (guest). Jangan pernah initiate gateway refund otomatis.
 - **Digiflazz rules.** Cheapest seller with rating ≥ 4.8. Harga Max = seller price × 1.02, rounded to nearest rupiah. Save one-by-one (not bulk). Navigate Buyer Area → Produk. Single browser session. All products ON. No seller ≥ 4.8 → delete the product. The `_A`/`_B` backup-SKU concept is DEAD — 1 SKU per nominal (model `_A`).
-- **Pricing.** Cost (`cost_idr`) = Harga Max Digiflazz (fixed, not the fluctuating seller price). ML sell price = cost × 1.06, NOT rounded (owner decision 2026-10-12). Other games' sell prices are NOT decided — do not invent them.
+- **Pricing (active catalog redesign decision).** The effective store cost is the admin-editable `store_cost_idr` (fallback to provider `cost_idr` for legacy mappings). Initial Digiflazz store cost uses the configured cost uplift (default 2%), and sale markup is configurable globally, per game, and per nominal (default 10%; nominal overrides game, game overrides global) for every game. Checkout applies the effective markup to store cost without rounding the sale percentage result. These rules supersede the archived 2026-10-12 ML-only `cost × 1.06` decision; never reintroduce an ML-only rate or fixed 1.06 pricing assumption.
 - **Real customer data:** never use as fixtures, screenshots, or public issue content.
 - **Text the user must copy on their phone:** plain text, not code blocks. Commands to copy go alone on their own line/message, without other words.
 - **No estimates.** Do not say "sabar" (be patient).

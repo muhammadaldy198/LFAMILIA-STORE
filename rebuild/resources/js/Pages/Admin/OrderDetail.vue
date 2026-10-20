@@ -56,8 +56,38 @@ async function copy(value) {
 <template>
 <Head :title="'Pesanan '+order.order_number" />
 <AdminShell>
-    <div class="flex flex-wrap items-start justify-between gap-3"><div class="min-w-0"><h1 class="break-all text-xl font-semibold sm:text-2xl">{{ order.order_number }}</h1><p class="mt-1 text-sm text-muted-foreground">Detail pesanan dan riwayat penanganan.</p></div><Button variant="outline" as-child><Link href="/admin/orders">Daftar pesanan</Link></Button></div>
-    <div class="my-4 flex flex-wrap gap-2"><Button variant="outline" size="sm" @click="copy(order.order_number)">Salin nomor pesanan</Button><Button v-if="whatsappUrl" variant="outline" size="sm" as-child><a :href="whatsappUrl" target="_blank" rel="noopener noreferrer">Hubungi WhatsApp</a></Button><Button variant="outline" size="sm" @click="refresh" :disabled="busy">{{ busy?'Memuat…':'Muat ulang detail' }}</Button><Button v-if="canCheckFulfillment" size="sm" @click="check('process')" :disabled="busy">Periksa proses pesanan</Button><Button v-if="canCancel" variant="destructive" size="sm" @click="open('cancel',order.id)">Batalkan pesanan</Button></div>
+    <!-- Header -->
+    <header class="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between">
+        <div class="min-w-0">
+            <div class="flex items-center gap-2">
+                <h1 class="break-all text-xl font-semibold tracking-tight sm:text-2xl">{{ order.order_number }}</h1>
+                <Badge :variant="order.status==='FAILED'?'destructive':'secondary'">{{ order.status_label }}</Badge>
+            </div>
+            <p class="mt-1 text-xs text-muted-foreground">Dibuat {{ date(order.created_at) }} · {{ order.paid_at ? 'Pembayaran terverifikasi' : 'Belum dibayar' }}</p>
+        </div>
+        <div class="flex items-center gap-2">
+            <Button variant="outline" size="sm" as-child><Link href="/admin/orders">← Semua Pesanan</Link></Button>
+        </div>
+    </header>
+
+    <!-- Status & Next Action Banner -->
+    <div class="my-4 rounded-lg border border-border bg-card p-4">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+                <strong class="text-sm block">Status Saat Ini: {{ order.status_label }}</strong>
+                <p class="text-xs text-muted-foreground mt-0.5">
+                    {{ order.needs_attention ? '⚠️ Pesanan ini membutuhkan perhatian admin.' : order.paid_at ? 'Pembayaran diterima, proses pengiriman berjalan.' : 'Menunggu pembayaran dari pelanggan.' }}
+                </p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+                <Button variant="outline" size="sm" @click="copy(order.order_number)">Salin Nomor</Button>
+                <Button v-if="whatsappUrl" variant="outline" size="sm" as-child><a :href="whatsappUrl" target="_blank" rel="noopener noreferrer">WhatsApp</a></Button>
+                <Button variant="outline" size="sm" @click="refresh" :disabled="busy">{{ busy?'Memuat…':'Muat Ulang' }}</Button>
+                <Button v-if="canCheckFulfillment" size="sm" @click="check('process')" :disabled="busy">Periksa Proses</Button>
+                <Button v-if="canCancel" variant="destructive" size="sm" @click="open('cancel',order.id)">Batalkan Pesanan</Button>
+            </div>
+        </div>
+    </div>
     <p v-if="notice" role="status" class="mb-4 text-sm">{{ notice }}</p>
     <p v-for="(error,key) in $page.props.errors" :key="key" role="alert" class="mb-3 text-sm text-destructive">{{ error }}</p>
     <div class="grid items-start gap-4 lg:grid-cols-2">
@@ -78,7 +108,7 @@ async function copy(value) {
         <p v-if="action?.type==='cancel'" class="text-sm font-medium">Tidak ada refund otomatis. Pengembalian dana jika disetujui dilakukan oleh admin secara terpisah.</p><p v-if="action?.type==='payment'" class="font-semibold">Total pesanan: {{ money(order.total_idr) }}</p><p v-if="action?.type==='resend'" class="text-sm">Email tujuan: <strong class="break-all">{{ order.buyer_email }}</strong></p>
         <label class="flex items-start gap-2 text-sm"><input v-model="form.confirmed" type="checkbox" required class="mt-1 size-4 shrink-0" :disabled="form.processing" /><span>Saya sudah memeriksa pesanan dan memastikan tindakan ini benar.</span></label>
         <p v-for="(error,key) in form.errors" :key="key" role="alert" class="text-sm text-destructive">{{ error }}</p>
-        <div class="flex gap-2"><Button type="submit" :disabled="form.processing || !form.confirmed">{{ form.processing?'Menyimpan…':'Konfirmasi tindakan' }}</Button><Button type="button" variant="outline" :disabled="form.processing" @click="actionOpen=false">Batal</Button></div>
+        <div class="flex flex-col gap-2 sm:flex-row"><Button class="w-full sm:w-auto" type="submit" :disabled="form.processing || !form.confirmed">{{ form.processing?'Menyimpan…':'Konfirmasi tindakan' }}</Button><Button class="w-full sm:w-auto" type="button" variant="outline" :disabled="form.processing" @click="actionOpen=false">Batal</Button></div>
     </form></SheetContent></Sheet>
 </AdminShell>
 </template>

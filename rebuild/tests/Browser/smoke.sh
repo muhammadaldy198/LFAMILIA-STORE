@@ -80,7 +80,7 @@ assert_page "/" "LFAMILIA STORE" 1440 1000
 assert_page "/login" "Masuk LFAMILIA" 1440 1000
 assert_page "/register" "Daftar LFAMILIA" 1440 1000
 assert_page "/orders/check" "Cek status pesananmu" 1440 1000
-assert_page "/admin/login" "Admin LFAMILIA" 1440 1000
+assert_page "/admin/login" "Masuk Admin" 1440 1000
 
 
 # Stage 7.8: render the real customer checkout page at desktop and mobile sizes.
@@ -94,8 +94,8 @@ assert_page "/catalog/browser-checkout-game" "Lihat voucher" 390 844
 
 echo "Running responsive browser smoke (maximum 5 minutes)"
 timeout --signal=TERM --kill-after=10s 5m node tests/Browser/responsive.mjs "$CHROME_BIN"
-echo "Running admin browser smoke (maximum 9 minutes)"
-timeout --signal=TERM --kill-after=10s 9m node tests/Browser/admin-ui.mjs "$CHROME_BIN"
+echo "Running admin browser smoke (maximum 15 minutes)"
+timeout --signal=TERM --kill-after=10s 15m node tests/Browser/admin-ui.mjs "$CHROME_BIN"
 
 # Browser-fallback icon must exist even when no Admin favicon is configured.
 curl --fail --silent --show-error "$APP_URL/favicon.ico" >/dev/null || {

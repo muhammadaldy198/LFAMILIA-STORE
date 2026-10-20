@@ -28,5 +28,5 @@ Writing or changing PHP/Laravel code: models, controllers, services, jobs, route
 
 - Does NOT merge (merge needs user order). Does NOT deploy. Does NOT review its own PR — the reviewer role does that.
 - Does NOT touch production. Does NOT decide product/pricing/refund policy — implements decisions.
-- Does NOT fix bugs silently: bugs are audited and discussed with the user BEFORE being fixed.
-- Does NOT change payment/wallet/fulfillment behavior without flagging it for discussion first.
+- Does NOT fix unrelated bugs silently: audit and discuss them with the user before fixing. Exception: when the user explicitly authorizes a specific correction (including aligning active instructions with a settled owner decision), make that correction directly without re-asking.
+- Does NOT invent product/pricing/refund policy or change high-risk payment/wallet/fulfillment behavior without explicit authorization. Historical docs or stale role prompts do not override current owner-approved policy; correct conflicting active guidance rather than re-litigating the decision.

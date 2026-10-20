@@ -2,7 +2,7 @@
 import AdminSwitch from '../../Components/AdminSwitch.vue';
 import AdminResponsiveTable from '../../Components/AdminResponsiveTable.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
-import { nextTick, reactive, ref } from 'vue';
+import { nextTick, reactive, ref, watch } from 'vue';
 import AdminShell from '../../Components/AdminShell.vue';
 import { Badge } from '../../Components/ui/badge';
 import { Button } from '../../Components/ui/button';
@@ -13,9 +13,11 @@ import { walletAdjustmentError } from '../../lib/adminWalletAdjustment';
 
 const props = defineProps({
     isSuperAdmin: Boolean,
+    canManageMembershipRules: Boolean,
     customers: { type: Object, default: () => ({ data: [], links: [] }) },
     filters: { type: Object, default: () => ({}) },
     membershipTiers: { type: Array, default: () => [] },
+    membershipRules: { type: Array, default: () => [] },
     cleanupSettings: { type: Object, default: () => ({}) },
     summary: { type: Object, default: () => ({}) },
 });
@@ -34,6 +36,18 @@ const cleanup = reactive({
     enabled: props.cleanupSettings?.enabled ?? true,
     inactivity_days: Number(props.cleanupSettings?.inactivity_days || 30),
 });
+
+const membershipRules = reactive((props.membershipRules || []).map(tier => ({ ...tier })));
+watch(() => props.membershipRules, value => membershipRules.splice(0, membershipRules.length, ...(value || []).map(tier => ({ ...tier }))));
+const percent = value => Number(value || 0).toLocaleString('id-ID', { maximumFractionDigits: 2 }) + '%';
+function saveTier(tier) {
+    router.put('/admin/settings/membership/' + encodeURIComponent(tier.code), {
+        is_active: Boolean(tier.is_active),
+        minimum_spend_idr: Number(tier.minimum_spend_idr || 0),
+        discount_percent: Number(tier.discount_percent || 0),
+        benefit_notes: tier.benefit_notes || '',
+    }, { preserveScroll: true });
+}
 
 const editor = ref(null);
 const saving = ref('');
@@ -143,15 +157,37 @@ function runCleanup() {
 <Head title="Pelanggan" />
 <AdminShell>
     <div class="space-y-5">
-        <header class="flex flex-wrap items-start justify-between gap-3">
-            <div>
-                <h1 class="text-2xl font-semibold">Pelanggan</h1>
+        <header class="flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between">
+            <div class="min-w-0">
+                <h1 class="text-2xl font-semibold tracking-tight">Pelanggan</h1>
                 <p class="mt-1 max-w-3xl text-sm text-muted-foreground">
-                    Cari pelanggan, lihat saldo dan aktivitas, kelola membership, serta buka riwayat pesanan, top up, tiket, dan akun game tersimpan.
+                    Cari pelanggan, periksa saldo dan aktivitas, atau buka riwayat pesanan, top up, tiket, dan akun game.
                 </p>
             </div>
-            <Button variant="outline" @click="router.reload({ preserveScroll: true })">Muat ulang</Button>
+            <Button class="w-full sm:w-auto" variant="outline" @click="router.reload({ preserveScroll: true })">Muat ulang</Button>
         </header>
+
+        <Card v-if="canManageMembershipRules" class="p-4">
+            <div class="mb-4">
+                <h2 class="text-lg font-semibold">Aturan tier membership</h2>
+                <p class="mt-1 text-sm text-muted-foreground">Atur minimum total transaksi berhasil dan diskon global tiap tier. Perhitungan diskon tetap dilakukan server saat checkout.</p>
+            </div>
+            <div class="grid gap-3 xl:grid-cols-2">
+                <section v-for="tier in membershipRules" :key="tier.code" class="rounded-md border p-4">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div><h3 class="font-semibold">{{ tier.rank }}. {{ tier.code }}</h3><p class="text-xs text-muted-foreground">{{ money(tier.minimum_spend_idr) }} · diskon {{ percent(tier.discount_percent) }}</p></div>
+                        <label class="flex items-center gap-2 text-sm"><AdminSwitch v-model="tier.is_active" />Aktif</label>
+                    </div>
+                    <div class="mt-3 grid gap-3 sm:grid-cols-2">
+                        <label class="space-y-1 text-sm">Minimum transaksi berhasil<Input v-model.number="tier.minimum_spend_idr" type="number" min="0" max="1000000000000" step="1" /><span class="text-xs text-muted-foreground">Rp0 berarti tanpa minimum.</span></label>
+                        <label class="space-y-1 text-sm">Diskon member (%)<Input v-model.number="tier.discount_percent" type="number" min="0" max="100" step="0.01" /><span class="text-xs text-muted-foreground">Maksimum 100%.</span></label>
+                        <label class="space-y-1 text-sm sm:col-span-2">Manfaat tambahan<Input v-model="tier.benefit_notes" maxlength="1000" placeholder="Manfaat tambahan untuk pelanggan" /></label>
+                    </div>
+                    <p v-if="tier.has_legacy_requirements || tier.has_legacy_benefits" class="mt-3 rounded-md border p-2 text-xs text-muted-foreground">Informasi tambahan versi sebelumnya tetap dijaga saat disimpan.</p>
+                    <div class="mt-3 flex justify-end"><Button size="sm" @click="saveTier(tier)">Simpan {{ tier.code }}</Button></div>
+                </section>
+            </div>
+        </Card>
 
         <div class="lf-admin-summary ">
             <Card class="p-4"><p class="text-xs text-muted-foreground">Total pelanggan</p><p class="mt-2 text-2xl font-semibold">{{ Number(summary.total || 0).toLocaleString('id-ID') }}</p></Card>
@@ -162,13 +198,13 @@ function runCleanup() {
             <Card class="p-4"><p class="text-xs text-muted-foreground">Tiket aktif</p><p class="mt-2 text-2xl font-semibold">{{ Number(summary.open_tickets || 0).toLocaleString('id-ID') }}</p></Card>
         </div>
 
-        <Card class="p-4">
-            <form class="grid grid-cols-2 gap-3 md:grid-cols-4" @submit.prevent="search"><label class="space-y-1 col-span-2">
+        <Card class="min-w-0 p-4 sm:p-5">
+            <form class="grid min-w-0 grid-cols-2 gap-3 md:grid-cols-4" @submit.prevent="search"><label class="col-span-2 min-w-0 space-y-1">
                     <span class="text-sm font-medium">Cari pelanggan</span>
                     <Input v-model="filters.q" maxlength="100" placeholder="Nama, email, atau nomor telepon" />
                 </label>
 <label class="space-y-1">
-                    <span class="text-sm font-medium">Membership</span>
+                    <span class="text-sm font-medium">Tingkat member</span>
                     <select v-model="filters.tier" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
                         <option value="">Semua tier</option>
                         <option v-for="tier in membershipTiers" :key="tier.code" :value="tier.code">{{ tier.code }}</option>
@@ -213,16 +249,16 @@ function runCleanup() {
                         <option :value="50">50</option>
                         <option :value="100">100</option>
                     </select>
-                </label></div></details><div class="col-span-2 flex gap-2 md:col-span-4"><Button type="submit" size="sm">Terapkan</Button><Button type="button" size="sm" variant="outline" @click="reset">Hapus filter</Button></div></form>
+                </label></div></details><div class="col-span-2 flex flex-col gap-2 sm:flex-row md:col-span-4"><Button class="w-full sm:w-auto" type="submit">Terapkan filter</Button><Button class="w-full sm:w-auto" type="button" variant="outline" @click="reset">Hapus filter</Button></div></form>
         </Card>
 
         <Card class="min-w-0 p-4">
-            <div class="overflow-x-auto">
+            <div class="overflow-x-auto" role="region" aria-label="Daftar pelanggan" tabindex="0">
                 <AdminResponsiveTable :mobile-columns="[0,1,2,4,6,7]">
                     <TableHeader>
                         <TableRow>
                             <TableHead>Pelanggan</TableHead>
-                            <TableHead>Membership</TableHead>
+                            <TableHead>Tingkat member</TableHead>
                             <TableHead class="text-right">Saldo</TableHead>
                             <TableHead class="text-right">Belanja</TableHead>
                             <TableHead class="text-right">Pesanan</TableHead>
@@ -242,7 +278,7 @@ function runCleanup() {
                             </TableCell>
                             <TableCell>
                                 <Badge variant="secondary">{{ row.membership_tier_code }}</Badge>
-                                <p class="mt-1 text-xs text-muted-foreground">{{ row.membership_mode === 'MANUAL' ? 'Manual' : 'Otomatis' }}</p>
+                                <p class="mt-1 text-xs text-muted-foreground">{{ row.membership_mode === 'MANUAL' ? 'Ditetapkan admin' : 'Otomatis dari transaksi' }}</p>
                             </TableCell>
                             <TableCell class="text-right font-medium">{{ money(row.balance_idr) }}</TableCell>
                             <TableCell class="text-right">{{ money(row.lifetime_spend_idr) }}</TableCell>
@@ -256,9 +292,9 @@ function runCleanup() {
                             </TableCell>
                             <TableCell>
                                 <div class="flex min-w-[150px] flex-wrap gap-1">
-                                    <Badge :variant="row.email_verified ? 'secondary' : 'outline'">{{ row.email_verified ? 'Email valid' : 'Email belum valid' }}</Badge>
+                                    <Badge :variant="row.email_verified ? 'secondary' : 'outline'">{{ row.email_verified ? 'Email terverifikasi' : 'Email belum terverifikasi' }}</Badge>
                                     <Badge v-if="row.google_linked" variant="outline">Google</Badge>
-                                    <Badge v-if="row.open_ticket_count" variant="outline">{{ row.open_ticket_count }} tiket aktif</Badge>
+                                    <Badge v-if="row.open_ticket_count" variant="outline">{{ row.open_ticket_count }} tiket belum selesai</Badge>
                                 </div>
                             </TableCell>
                             <TableCell class="text-right">
@@ -281,6 +317,7 @@ function runCleanup() {
                     :key="link.label"
                     :href="link.url || '#'"
                     preserve-scroll
+                    :aria-current="link.active ? 'page' : undefined"
                     :class="[
                         'rounded-md border px-3 py-1.5 text-sm',
                         link.active ? 'bg-primary text-primary-foreground' : 'bg-background',
@@ -294,7 +331,7 @@ function runCleanup() {
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <div>
                     <h2 class="text-lg font-semibold">Atur pelanggan · {{ editor.name }}</h2>
-                    <p class="mt-1 text-sm text-muted-foreground">Membership dan penyesuaian saldo hanya dapat dilakukan Super Admin dan selalu dicatat di Audit Log.</p>
+                    <p class="mt-1 text-sm text-muted-foreground">Tingkat member dan perubahan saldo hanya dapat dilakukan Super Admin. Setiap perubahan dicatat untuk pemeriksaan.</p>
                 </div>
                 <Button size="sm" variant="ghost" @click="closeEditor">Tutup</Button>
             </div>
@@ -302,7 +339,7 @@ function runCleanup() {
             <div class="mt-4 grid gap-4 lg:grid-cols-2">
                 <div class="rounded-md border p-4">
                     <h3 class="font-medium">Membership pelanggan</h3>
-                    <p class="mt-1 text-xs text-muted-foreground">Mode otomatis mengikuti total transaksi. Mode manual mengunci tier pilihan.</p>
+                    <p class="mt-1 text-xs text-muted-foreground">Secara otomatis, tingkat member mengikuti aktivitas transaksi. Pilihan manual menetapkan tingkat yang kamu pilih.</p>
                     <select v-model="editor.membership_assignment" class="mt-3 h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
                         <option value="AUTO">Otomatis berdasarkan transaksi</option>
                         <option v-for="tier in membershipTiers" :key="tier.code" :value="tier.code">{{ tier.code }} · manual</option>
@@ -324,7 +361,7 @@ function runCleanup() {
 
             <div v-if="editor.deletable" class="mt-4 rounded-md border border-destructive/40 p-4">
                 <h3 class="font-medium">Akun kosong</h3>
-                <p class="mt-1 text-xs text-muted-foreground">Akun ini tidak memiliki saldo, ledger, pesanan, top up, atau tiket yang harus dipertahankan.</p>
+                <p class="mt-1 text-xs text-muted-foreground">Akun ini tidak memiliki saldo, catatan perubahan saldo, pesanan, top up, atau tiket yang harus dipertahankan.</p>
                 <Button class="mt-3" size="sm" variant="destructive" @click="deleteEmpty(editor)">Hapus akun kosong</Button>
             </div>
         </Card>
@@ -332,8 +369,8 @@ function runCleanup() {
         <Card v-if="isSuperAdmin" class="p-4">
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                    <h2 class="text-lg font-semibold">Pembersihan Akun Kosong</h2>
-                    <p class="mt-1 text-sm text-muted-foreground">Hanya akun lama yang benar-benar kosong yang dapat dibersihkan. Saldo, ledger, pesanan, top up, dan tiket selalu dilindungi.</p>
+                    <h2 class="text-lg font-semibold">Pembersihan akun lama yang kosong</h2>
+                    <p class="mt-1 text-sm text-muted-foreground">Hanya akun lama yang benar-benar kosong yang dapat dibersihkan. Saldo, catatan perubahan saldo, pesanan, top up, dan tiket selalu dilindungi.</p>
                 </div>
                 <Badge variant="outline">Super Admin</Badge>
             </div>

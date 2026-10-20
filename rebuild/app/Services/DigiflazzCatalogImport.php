@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Product;
 use App\Models\ProductPackage;
 use App\Models\Provider;
 use App\Models\ProviderMapping;
@@ -11,6 +12,38 @@ use InvalidArgumentException;
 
 class DigiflazzCatalogImport
 {
+    /**
+     * One-time store cost: seller reference plus the effective cost uplift
+     * (nominal → game → global). Applied only when a mapping has no store
+     * cost yet, so repeated sync/import never compounds the uplift.
+     */
+    public function initialStoreCost(?ProductPackage $package, Product $product, int $sellerPrice): int
+    {
+        $markup = $package?->cost_uplift_percent
+            ?? $product->cost_uplift_percent
+            ?? $this->globalCostUpliftPercent();
+        if (! preg_match('/^(\d+)(?:\.(\d{1,4}))?$/', (string) $markup, $matches)) {
+            throw new InvalidArgumentException('Persentase tambahan modal tidak valid.');
+        }
+
+        $units = ((int) $matches[1] * 10000) + (int) str_pad($matches[2] ?? '', 4, '0');
+        if ($units > 100000000 || $sellerPrice > intdiv(PHP_INT_MAX - 1000000, 1000000 + $units)) {
+            throw new InvalidArgumentException('Modal awal berada di luar batas aman.');
+        }
+
+        return intdiv(($sellerPrice * (1000000 + $units)) + 999999, 1000000);
+    }
+
+    private function globalCostUpliftPercent(): string
+    {
+        $stored = DB::table('system_settings')->where('key', 'pricing.cost_uplift_percent')->value('value');
+        $decoded = $stored !== null ? json_decode((string) $stored, true) : null;
+
+        return is_numeric($decoded) && (float) $decoded >= 0 && (float) $decoded <= 1000
+            ? (string) $decoded
+            : '2';
+    }
+
     /**
      * Called only by a trusted provider sync in M8/M9; no customer or admin text field supplies the SKU.
      */
@@ -23,7 +56,7 @@ class DigiflazzCatalogImport
             throw new InvalidArgumentException('Mapping Digiflazz tidak valid.');
         }
 
-        return DB::transaction(function () use ($package, $buyerSkuCode, $costIdr, $maxPriceIdr): ProviderMapping {
+        return DB::transaction(function () use ($package, $buyerSkuCode, $costIdr): ProviderMapping {
             $provider = Provider::where('code', 'DIGIFLAZZ')->firstOrFail();
             $mapping = ProviderMapping::where('provider_id', $provider->id)
                 ->where('external_sku', $buyerSkuCode)->lockForUpdate()->first();
@@ -47,7 +80,11 @@ class DigiflazzCatalogImport
             // manual price lock from another synchronization path.
             if (! $mapping->is_manual_price) {
                 $mapping->cost_idr = $costIdr;
-                $mapping->max_price_idr = $maxPriceIdr;
+                $mapping->seller_reference_price_idr = $costIdr;
+                if ($mapping->store_cost_idr === null) {
+                    $mapping->store_cost_idr = $this->initialStoreCost($package, $package->product, $costIdr);
+                }
+                $mapping->max_price_idr = $mapping->store_cost_idr;
             }
             $mapping->save();
             DB::table('audit_logs')->insert([

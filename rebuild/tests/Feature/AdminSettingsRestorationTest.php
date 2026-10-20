@@ -46,21 +46,9 @@ class AdminSettingsRestorationTest extends TestCase
         ], $overrides);
     }
 
-    public function test_settings_workspace_is_dedicated_and_uses_friendly_membership_fields(): void
+    public function test_settings_no_longer_owns_membership_rules(): void
     {
         $this->login();
-
-        DB::table('membership_tiers')->where('code', 'SILVER')->update([
-            'requirements' => json_encode([
-                'minimum_spend_idr' => 100000,
-                'legacy_flag' => true,
-            ], JSON_THROW_ON_ERROR),
-            'benefits' => json_encode([
-                'discount_bps' => 150,
-                'benefit_notes' => "Prioritas layanan\nPromo khusus",
-                'legacy_benefit' => 'dipertahankan',
-            ], JSON_THROW_ON_ERROR),
-        ]);
 
         $this->get('/admin/settings')
             ->assertOk()
@@ -68,14 +56,52 @@ class AdminSettingsRestorationTest extends TestCase
                 ->component('Admin/Settings')
                 ->where('canExport', true)
                 ->has('settings')
-                ->has('tiers', 6)
-                ->where('tiers.1.code', 'SILVER')
-                ->where('tiers.1.minimum_spend_idr', 100000)
-                ->where('tiers.1.discount_percent', 1.5)
-                ->where('tiers.1.benefit_notes', "Prioritas layanan\nPromo khusus")
-                ->where('tiers.1.has_legacy_requirements', true)
-                ->where('tiers.1.has_legacy_benefits', true)
+                ->missing('tiers')
                 ->has('summary'));
+    }
+
+    public function test_membership_rules_are_managed_from_customers_and_saved_with_existing_guard(): void
+    {
+        $this->login();
+        DB::table('membership_tiers')->where('code', 'SILVER')->update([
+            'requirements' => json_encode(['minimum_spend_idr' => 100000, 'legacy_flag' => true], JSON_THROW_ON_ERROR),
+            'benefits' => json_encode(['discount_bps' => 150, 'benefit_notes' => 'Prioritas layanan', 'legacy_benefit' => 'keep'], JSON_THROW_ON_ERROR),
+        ]);
+
+        $this->get('/admin/customers')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/Customers')
+            ->has('membershipRules', 6)
+            ->where('membershipRules.1.code', 'SILVER')
+            ->where('membershipRules.1.minimum_spend_idr', 100000)
+            ->where('membershipRules.1.discount_percent', 1.5)
+            ->where('membershipRules.1.benefit_notes', 'Prioritas layanan')
+            ->where('membershipRules.1.has_legacy_requirements', true)
+            ->where('membershipRules.1.has_legacy_benefits', true));
+
+        $this->put('/admin/settings/membership/SILVER', [
+            'is_active' => true, 'minimum_spend_idr' => 150000, 'discount_percent' => 2, 'benefit_notes' => 'Dukungan prioritas',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertEqualsCanonicalizing(['minimum_spend_idr' => 150000, 'legacy_flag' => true], json_decode((string) DB::table('membership_tiers')->where('code', 'SILVER')->value('requirements'), true));
+        $this->assertEqualsCanonicalizing(['discount_bps' => 200, 'benefit_notes' => 'Dukungan prioritas', 'legacy_benefit' => 'keep'], json_decode((string) DB::table('membership_tiers')->where('code', 'SILVER')->value('benefits'), true));
+    }
+
+    public function test_regular_admin_with_settings_permission_can_edit_membership_rules(): void
+    {
+        $this->login('ADMIN', ['settings.manage', 'customers.view']);
+
+        $this->get('/admin/customers')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/Customers')
+            ->where('canManageMembershipRules', true));
+    }
+
+    public function test_regular_admin_without_settings_permission_cannot_edit_membership_rules(): void
+    {
+        $this->login('ADMIN', ['customers.view']);
+
+        $this->get('/admin/customers')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/Customers')
+            ->where('canManageMembershipRules', false));
     }
 
     public function test_regular_admin_with_permission_can_manage_settings_but_cannot_export(): void

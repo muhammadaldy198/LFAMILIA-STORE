@@ -10,6 +10,7 @@ use App\Services\AdminAuditService;
 use App\Services\AdminDigiflazzMonitorService;
 use App\Services\AdminPermissionService;
 use App\Services\AdminPricingPreviewService;
+use App\Services\CatalogNominalOrder;
 use App\Services\DigiflazzAutoSources;
 use App\Services\DigiflazzCatalogImport;
 use App\Services\DigiflazzCatalogService;
@@ -354,8 +355,14 @@ class AdminDigiflazzController
             if ($existing) {
                 throw ValidationException::withMessages([
                     'item_id' => $existing->product_package_id === $package->id
-                        ? 'SKU ini sudah menjadi sumber fulfillment nominal tersebut.'
+                        ? 'SKU ini sudah menjadi mapping nominal tersebut.'
                         : 'SKU ini sudah digunakan oleh nominal lain.',
+                ]);
+            }
+            if (ProviderMapping::where('product_package_id', $package->id)
+                ->where('provider_id', $provider->id)->exists()) {
+                throw ValidationException::withMessages([
+                    'item_id' => 'Nominal ini sudah memiliki satu SKU Digiflazz. Lepas mapping lama sebelum menggantinya.',
                 ]);
             }
 
@@ -414,18 +421,25 @@ class AdminDigiflazzController
             // Kept for old admin forms, but fixed Digiflazz import no longer needs this field.
             'margin_percent' => ['sometimes', 'numeric', 'min:0', 'max:1000'],
             'publish' => ['sometimes', 'boolean'],
-            'auto_sources' => ['sometimes', 'boolean'],
-            'customer_no_template' => ['nullable', 'string', 'max:500'],
+            'auto_sources' => ['prohibited'],
         ]);
         DB::transaction(function () use ($request, $product, $service, $audit, $data): void {
             $product = $product->lockForUpdate()->findOrFail($product->id);
             $publish = (bool) ($data['publish'] ?? false);
-            $template = $this->importCustomerTemplate($product, $data['customer_no_template'] ?? null, $publish);
+            $template = $this->importCustomerTemplate($product, $product->customer_no_template, $publish);
             if ($publish && (! $product->category->is_active || ! Provider::where('code', 'DIGIFLAZZ')->where('is_active', true)->exists())) {
                 throw ValidationException::withMessages(['publish' => 'Aktifkan kategori produk dan integrasi Digiflazz sebelum menjual.']);
             }
-            $automatic = (bool) ($data['auto_sources'] ?? true);
             $selected = DB::table('digiflazz_catalog_items')->whereIn('id', $data['item_ids'])->lockForUpdate()->get();
+            $nominals = $selected->groupBy(fn (object $item): string => app(CatalogNominalOrder::class)
+                ->value((string) $item->product_name, (string) $item->brand) === null
+                ? 'sku:'.$item->buyer_sku_code
+                : 'value:'.app(CatalogNominalOrder::class)->value((string) $item->product_name, (string) $item->brand));
+            if ($nominals->contains(fn ($items): bool => $items->count() > 1)) {
+                throw ValidationException::withMessages([
+                    'item_ids' => 'Beberapa SKU yang dipilih mengarah ke nominal sama. Pilih satu SKU untuk setiap nominal.',
+                ]);
+            }
             foreach ($selected as $item) {
                 if (! $service->sellable($item)) {
                     throw ValidationException::withMessages(['item_ids' => 'SKU tidak tersedia atau data lebih dari 24 jam. Sinkronkan dahulu.']);
@@ -435,12 +449,8 @@ class AdminDigiflazzController
                 }
             }
             $sources = app(DigiflazzAutoSources::class);
-            $groups = $automatic
-                ? $selected->groupBy(fn (object $item): string => $sources->key($item))
-                : $selected->groupBy('buyer_sku_code');
-            $catalog = $automatic ? $sources->catalog() : collect();
-            foreach ($groups as $key => $items) {
-                $sources->importGroup($product, $automatic ? $catalog->get($key) : $items, $template, $publish, (string) ($data['margin_percent'] ?? $product->margin_percent), $automatic, $request);
+            foreach ($selected as $item) {
+                $sources->importGroup($product, collect([$item]), $template, $publish, (string) ($data['margin_percent'] ?? $product->margin_percent), false, $request);
             }
             $sources->orderProduct($product);
             if ($publish && ! $product->is_active) {

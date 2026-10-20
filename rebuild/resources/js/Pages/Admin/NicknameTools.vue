@@ -324,8 +324,8 @@ if (nicknameCodes.value.length > 0) gameCode.value = nicknameCodes.value[0].code
 <Head title="Validasi Akun" />
 <AdminShell>
 <div class="mx-auto max-w-[1540px]">
-    <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <div>
+    <header class="mb-4 flex flex-col gap-3 border-b border-[#e1e6ed] pb-4 sm:flex-row sm:items-end sm:justify-between">
+        <div class="min-w-0">
             <h1 class="text-2xl font-semibold tracking-[-0.025em] text-[#20324c]">Validasi Akun</h1>
             <p class="mt-1 text-xs text-[#7a899e]">Uji data akun dan kelola aturan validasi game. Credential tetap tersimpan di backend.</p>
         </div>
@@ -333,7 +333,7 @@ if (nicknameCodes.value.length > 0) gameCode.value = nicknameCodes.value[0].code
             <span class="rounded-full border px-3 py-1.5 text-xs font-bold" :class="integrationStatus.className">{{ integrationStatus.text }}</span>
             <a href="/admin/integrations" class="rounded-md border border-[#dfe5ed] bg-white px-3 py-2 text-xs font-bold text-[#52627a] hover:bg-[#f8fafc]">Pengaturan Integrasi</a>
         </div>
-    </div>
+    </header>
 
     <section class="overflow-hidden rounded-lg border border-[#e1e6ed] bg-white">
         <header class="border-b border-[#edf0f4] px-4 pt-3">
@@ -343,6 +343,7 @@ if (nicknameCodes.value.length > 0) gameCode.value = nicknameCodes.value[0].code
                     :key="item[0]"
                     type="button"
                     class="shrink-0"
+                    :aria-current="tab===item[0] ? 'page' : undefined"
                     :variant="tab===item[0] ? 'secondary' : 'ghost'"
                     @click="selectTab(item[0])"
                 >
@@ -491,7 +492,7 @@ if (nicknameCodes.value.length > 0) gameCode.value = nicknameCodes.value[0].code
                 </div>
             </div>
 
-            <div class="overflow-x-auto rounded-md border border-[#e1e6ed]">
+            <div class="overflow-x-auto rounded-md border border-[#e1e6ed]" role="region" aria-label="Daftar aturan validasi game" tabindex="0">
                 <AdminResponsiveTable :mobile-columns="[1,3,6,8]" class="min-w-[980px] w-full text-left text-xs">
                     <TableHeader class="bg-[#f8fafc] text-[#607089]">
                         <TableRow>
