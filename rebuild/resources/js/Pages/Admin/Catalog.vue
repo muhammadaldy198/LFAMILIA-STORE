@@ -29,6 +29,8 @@ const cloneProducts = (items) => items.map((item) => ({
     packages: item.packages.map((pack) => {
         const mappings = pack.mappings.map((mapping) => ({
             ...mapping,
+            store_cost_idr: mapping.store_cost_idr ?? mapping.cost_idr,
+            original_store_cost_idr: mapping.store_cost_idr ?? mapping.cost_idr,
             manual_price_idr: mapping.is_manual_price ? mapping.max_price_idr : mapping.cost_idr,
         }));
         const stock = mappings.find((mapping) => mapping.provider_code === 'VOUCHER_STOCK');
@@ -177,6 +179,8 @@ const globalMarginError = ref('');
 const globalMarginBusy = ref(false);
 const csrfToken = () => document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 const formatAdminMoney = value => 'Rp' + Number(value || 0).toLocaleString('id-ID');
+const hasNumericValue = value => value !== null && value !== undefined
+    && !(typeof value === 'string' && value.trim() === '') && Number.isFinite(Number(value));
 const requestAdminPreview = async (url, payload) => {
     const response = await fetch(url, {
         method: 'POST',
@@ -395,9 +399,13 @@ const savePackage = (pack) => router.put('/admin/catalog/packages/' + pack.id, {
 });
 const saveMapping = (mapping) => router.put('/admin/catalog/mappings/' + mapping.id, {
     priority: mapping.priority, is_active: mapping.is_active,
-    ...(mapping.provider_code === 'MANUAL' ? { cost_idr: mapping.cost_idr } : {}),
+    ...(mapping.provider_code === 'MANUAL' ? {
+        cost_idr: mapping.cost_idr,
+        ...(mapping.store_cost_idr !== mapping.original_store_cost_idr && hasNumericValue(mapping.store_cost_idr)
+            ? { store_cost_idr: Number(mapping.store_cost_idr) } : {}),
+    } : {}),
     ...(mapping.provider_code === 'DIGIFLAZZ' ? {
-        ...(mapping.store_cost_idr !== null && mapping.store_cost_idr !== undefined
+        ...(hasNumericValue(mapping.store_cost_idr)
             ? { store_cost_idr: Number(mapping.store_cost_idr) } : {}),
         is_manual_price: Boolean(mapping.is_manual_price),
         ...(mapping.is_manual_price ? { manual_price_idr: Number(mapping.manual_price_idr) } : {}),
@@ -761,7 +769,7 @@ const deleteNotice = (notice) => {
                                 <div v-for="mapping in [...pack.mappings.filter((entry) => entry.provider_code !== 'VOUCHER_STOCK')].sort(bySourcePriority)" :key="mapping.id" class="flex flex-wrap items-end gap-2 rounded border border-slate-800 p-2 text-xs text-slate-300">
                                     <span class="min-w-40"><strong>{{ fulfillmentRole(pack, mapping) }}<template v-if="mapping.is_active"> · Posisi {{ sourcePosition(pack,mapping) }}</template></strong><br>{{ providerLabel(mapping) }}<span v-if="mapping.external_sku"> · {{ mapping.external_sku }}</span><br><span class="text-slate-500"><template v-if="mapping.store_cost_idr!==null&&mapping.store_cost_idr!==undefined">Modal toko Rp{{Number(mapping.store_cost_idr||0).toLocaleString('id-ID')}} · Harga seller Rp{{Number(mapping.seller_reference_price_idr??mapping.cost_idr??0).toLocaleString('id-ID')}}</template><template v-else>Modal Rp{{Number(mapping.cost_idr||0).toLocaleString('id-ID')}}</template><template v-if="mapping.is_manual_price"> · Terkunci</template></span></span>
                                     <Button v-if="mapping.provider_code==='DIGIFLAZZ'" type="button" variant="outline" @click="router.post('/admin/catalog/mappings/'+mapping.id+'/sync',{}, {preserveScroll:true})">Sinkron harga</Button>
-                                    <label v-if="mapping.provider_code === 'MANUAL'">Modal Rp<Input v-model.number="mapping.cost_idr" type="number" min="0" class="mt-1 block w-28 rounded bg-slate-800 p-2" /></label>
+                                    <template v-if="mapping.provider_code === 'MANUAL'"><label>Harga manual Rp<Input v-model.number="mapping.cost_idr" type="number" min="0" class="mt-1 block w-28 rounded bg-slate-800 p-2" /></label><label>Modal toko Rp<Input v-model.number="mapping.store_cost_idr" type="number" min="0" max="1000000000" class="mt-1 block w-28 rounded bg-slate-800 p-2" /></label></template>
                                     <label v-if="mapping.provider_code === 'DIGIFLAZZ' && !mapping.is_manual_price && mapping.store_cost_idr!==null && mapping.store_cost_idr!==undefined">Modal toko / batas harga (Rp)<Input v-model.number="mapping.store_cost_idr" type="number" min="1" max="1000000000" class="mt-1 block w-36 rounded bg-slate-800 p-2" /></label>
                                     <div v-if="mapping.provider_code === 'DIGIFLAZZ'" class="space-y-1">
                                         <label class="flex items-center gap-2"><AdminSwitch v-model="mapping.is_manual_price" /> Kunci modal & batas harga manual</label>

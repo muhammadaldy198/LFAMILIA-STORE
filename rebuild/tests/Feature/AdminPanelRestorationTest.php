@@ -762,6 +762,37 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertSame(12345, (int) $mapping->store_cost_idr);
     }
 
+    public function test_zero_cost_manual_mapping_can_be_saved_without_changing_checkout_availability(): void
+    {
+        $this->login();
+        $product = $this->product('MANUAL');
+        $product->category->update(['is_active' => true]);
+        $provider = Provider::where('code', 'MANUAL')->firstOrFail();
+        $provider->forceFill(['is_active' => true])->save();
+        $package = ProductPackage::create([
+            'product_id' => $product->id, 'code' => 'ZERO-COST', 'name' => 'Zero Cost',
+            'pricing_mode' => 'PRODUCT_MARGIN', 'is_active' => true,
+        ]);
+        $mapping = ProviderMapping::create([
+            'product_package_id' => $package->id, 'provider_id' => $provider->id,
+            'cost_idr' => 0, 'store_cost_idr' => 0, 'priority' => 0, 'is_active' => false,
+        ]);
+
+        $this->put('/admin/catalog/mappings/'.$mapping->id, [
+            'priority' => 1, 'is_active' => true, 'cost_idr' => 0,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertSame(0, (int) $mapping->fresh()->cost_idr);
+        $this->assertSame(0, (int) $mapping->fresh()->store_cost_idr);
+        $this->assertSame(1, (int) $mapping->fresh()->priority);
+        try {
+            app(CheckoutPricing::class)->forPackage($package->id);
+            $this->fail('A zero-cost mapping must not become an eligible checkout price.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('package_id', $exception->errors());
+        }
+    }
+
     public function test_manual_nominal_can_be_duplicated_and_catalog_deletes_protect_order_history(): void
     {
         $this->login();
@@ -774,7 +805,7 @@ class AdminPanelRestorationTest extends TestCase
         ]);
         ProviderMapping::create([
             'product_package_id' => $package->id, 'provider_id' => $provider->id,
-            'cost_idr' => 9000, 'priority' => 0, 'is_active' => false,
+            'cost_idr' => 9000, 'store_cost_idr' => 9500, 'priority' => 0, 'is_active' => false,
         ]);
 
         $this->post('/admin/catalog/packages/'.$package->id.'/duplicate')->assertRedirect()->assertSessionHasNoErrors();
@@ -782,9 +813,38 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertFalse($copy->is_active);
         $this->assertStringContainsString('Salinan', $copy->name);
         $this->assertSame(9000, (int) $copy->mappings()->firstOrFail()->cost_idr);
+        $this->assertSame(9500, (int) $copy->mappings()->firstOrFail()->store_cost_idr);
         $this->assertSame('13.0000', (string) $copy->sell_markup_percent);
         $this->assertSame('3.0000', (string) $copy->cost_uplift_percent);
-        $this->assertFalse($copy->mappings()->firstOrFail()->is_active);
+        $copiedMapping = $copy->mappings()->firstOrFail();
+        $this->assertFalse($copiedMapping->is_active);
+
+        $this->put('/admin/catalog/mappings/'.$copiedMapping->id, [
+            'priority' => 0, 'is_active' => true, 'cost_idr' => 9000,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame(9500, (int) $copiedMapping->fresh()->store_cost_idr); // Vue omits store_cost_idr until intentionally edited.
+
+        $this->put('/admin/catalog/mappings/'.$copiedMapping->id, [
+            'priority' => 0, 'is_active' => true, 'cost_idr' => 10000, 'store_cost_idr' => 11000,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame(10000, (int) $copiedMapping->fresh()->cost_idr);
+        $this->assertSame(11000, (int) $copiedMapping->fresh()->store_cost_idr);
+
+        $this->put('/admin/catalog/mappings/'.$copiedMapping->id, [
+            'priority' => 0, 'is_active' => true, 'cost_idr' => 12000,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame(12000, (int) $copiedMapping->fresh()->store_cost_idr);
+
+        $this->put('/admin/catalog/mappings/'.$copiedMapping->id, [
+            'priority' => 0, 'is_active' => true, 'cost_idr' => 12000, 'store_cost_idr' => 9000,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame(9000, (int) $copiedMapping->fresh()->store_cost_idr);
+        $product->update(['is_active' => true]);
+        $provider->forceFill(['is_active' => true])->save();
+        $copy->update(['is_active' => true]);
+        $quote = app(CheckoutPricing::class)->forPackage($copy->id);
+        $this->assertSame(9000, $quote['cost_idr']);
+        $this->assertSame(10170, $quote['subtotal_idr']);
 
         $this->delete('/admin/catalog/packages/'.$copy->id)->assertRedirect()->assertSessionHasNoErrors();
         $this->assertNull(ProductPackage::find($copy->id));
@@ -873,12 +933,14 @@ class AdminPanelRestorationTest extends TestCase
             ->where('provider_id', $provider->id)
             ->firstOrFail();
         $this->assertSame('digital.kode-10', data_get($mapping->fulfillment_config, 'stock_key'));
+        $this->assertSame(5000, (int) $mapping->store_cost_idr);
         $this->assertSame(2, DB::table('voucher_stock_codes')->where('stock_key', 'digital.kode-10')->count());
         $this->assertSame(2, DB::table('voucher_stock_codes')->where('status', 'AVAILABLE')->count());
         $this->assertDatabaseMissing('voucher_stock_codes', ['code_ciphertext' => 'SECRET-CODE-001']);
 
         $quote = app(CheckoutPricing::class)->forPackage($package->id);
         $this->assertSame('VOUCHER_STOCK', $quote['provider_code']);
+        $this->assertSame(5500, $quote['subtotal_idr']);
 
         $snapshot = [
             'product' => [

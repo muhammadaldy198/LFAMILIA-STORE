@@ -190,7 +190,7 @@ class AdminCatalogController
             'packages.*.group_name' => ['nullable', 'string', 'max:120'],
             'packages.*.nominal_value' => ['nullable', 'integer', 'min:0'],
             'packages.*.sort_order' => ['nullable', 'integer', 'min:0'],
-            'packages.*.cost_idr' => ['required', 'integer', 'min:0'],
+            'packages.*.cost_idr' => ['required', 'integer', 'min:0', 'max:1000000000'],
             'packages.*.sell_markup_percent' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:1000'],
         ]);
         $rows = collect($data['packages'] ?? [])->values();
@@ -586,6 +586,7 @@ class AdminCatalogController
                 'provider_id' => $sourceMapping->provider_id,
                 'external_sku' => null,
                 'cost_idr' => $sourceMapping->cost_idr,
+                'store_cost_idr' => $sourceMapping->store_cost_idr,
                 'max_price_idr' => null,
                 'priority' => $sourceMapping->priority,
                 'is_active' => false,
@@ -611,7 +612,7 @@ class AdminCatalogController
             'nominal_value' => ['nullable', 'integer', 'min:0'],
             'sort_order' => ['required', 'integer', 'min:0'],
             'cost_idr' => [$product->fulfillment_mode === 'MANUAL' ? 'required' : 'nullable',
-                'integer', 'min:0'],
+                'integer', 'min:0', 'max:1000000000'],
         ]);
 
         if ($product->package_tabs_enabled) {
@@ -855,6 +856,7 @@ class AdminCatalogController
             $mapping->fill([
                 'external_sku' => 'stock-package-'.$package->id,
                 'cost_idr' => $data['cost_idr'],
+                'store_cost_idr' => $data['cost_idr'],
                 'max_price_idr' => null,
                 'fulfillment_config' => ['stock_key' => $stockKey],
                 'priority' => $data['priority'],
@@ -891,13 +893,16 @@ class AdminCatalogController
         $data = $request->validate([
             'priority' => ['required', 'integer', 'min:0', 'max:1000'],
             'is_active' => ['required', 'boolean'],
-            'cost_idr' => [$provider->code === 'MANUAL' ? 'required' : 'prohibited', 'integer', 'min:0'],
+            'cost_idr' => [$provider->code === 'MANUAL' ? 'required' : 'prohibited', 'integer', 'min:0', 'max:1000000000'],
             'is_manual_price' => [$provider->code === 'DIGIFLAZZ' ? 'sometimes' : 'prohibited', 'boolean'],
             'manual_price_idr' => [$provider->code === 'DIGIFLAZZ' ? 'sometimes' : 'prohibited', 'integer', 'min:1', 'max:1000000000'],
-            'store_cost_idr' => [$provider->code === 'DIGIFLAZZ' ? 'sometimes' : 'prohibited', 'integer', 'min:1', 'max:1000000000'],
+            'store_cost_idr' => [$provider->code === 'MANUAL' || $provider->code === 'DIGIFLAZZ' ? 'sometimes' : 'prohibited', 'integer', $provider->code === 'MANUAL' ? 'min:0' : 'min:1', 'max:1000000000'],
         ]);
         if ($provider->code === 'MANUAL' && array_key_exists('cost_idr', $data)) {
-            $data['store_cost_idr'] = $data['cost_idr'];
+            if (! array_key_exists('store_cost_idr', $data)
+                && ($mapping->store_cost_idr === null || (int) $data['cost_idr'] !== (int) $mapping->cost_idr)) {
+                $data['store_cost_idr'] = $data['cost_idr'];
+            }
         } elseif ($provider->code !== 'MANUAL') {
             unset($data['cost_idr']);
         }
