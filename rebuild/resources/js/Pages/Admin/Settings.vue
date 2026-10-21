@@ -2,7 +2,6 @@
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import AdminShell from '../../Components/AdminShell.vue';
 import { Button } from '../../Components/ui/button';
-import { Card } from '../../Components/ui/card';
 import { Input } from '../../Components/ui/input';
 import { Textarea } from '../../Components/ui/textarea';
 
@@ -40,25 +39,23 @@ function saveStore() {
             <div class="min-w-0">
                 <h1 class="text-2xl font-semibold tracking-tight">Pengaturan</h1>
                 <p class="mt-1 max-w-3xl text-sm text-muted-foreground">
-                    Kelola identitas toko, kanal bantuan, informasi merchant, dan ekspor konfigurasi aman.
+                    Identitas dan kontak toko yang tampil di halaman pelanggan, serta salinan pengaturan untuk dokumentasi. Tingkat member diatur di menu Pelanggan.
                 </p>
             </div>
             <Button class="w-full sm:w-auto" variant="outline" @click="router.reload({ preserveScroll: true })">Muat ulang</Button>
         </header>
 
-        <p class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-            <span><strong class="text-foreground">{{ summary.contacts_configured || 0 }}/4</strong> kanal kontak terisi</span>
-            <span>Identitas merchant <strong class="text-foreground">{{ summary.merchant_identity_complete ? 'lengkap' : 'belum lengkap' }}</strong></span>
-            <span>Ekspor konfigurasi <strong class="text-foreground">{{ canExport ? 'tersedia' : 'tidak tersedia' }}</strong></span>
-        </p>
-
-        <form class="space-y-4" @submit.prevent="saveStore">
-                <Card class="p-4">
-                    <div>
-                        <h2 class="text-lg font-semibold">Identitas Toko</h2>
-                        <p class="mt-1 text-sm text-muted-foreground">Nama dan tagline digunakan langsung oleh frontend customer pada area yang terhubung ke konfigurasi toko.</p>
+        <form class="space-y-6" @submit.prevent="saveStore">
+                <section aria-labelledby="settings-store-heading">
+                    <div class="flex flex-wrap items-end justify-between gap-2 border-b border-border pb-3">
+                        <div>
+                            <h2 id="settings-store-heading" class="text-lg font-semibold">Toko &amp; kontak</h2>
+                            <p class="mt-1 text-sm text-muted-foreground">Nama, tagline, kanal bantuan, dan identitas usaha yang tampil di halaman pelanggan.</p>
+                        </div>
+                        <p class="text-xs text-muted-foreground">{{ summary.contacts_configured || 0 }} dari 4 kanal kontak terisi · identitas usaha {{ summary.merchant_identity_complete ? 'lengkap' : 'belum lengkap' }}</p>
                     </div>
-                    <div class="mt-4 grid gap-3 md:grid-cols-2">
+                    <h3 class="mt-4 text-sm font-semibold text-muted-foreground">Identitas toko</h3>
+                    <div class="mt-2 grid gap-3 md:grid-cols-2">
                         <label class="space-y-1">
                             <span class="text-sm font-medium">Nama toko</span>
                             <Input v-model="storeForm.store_name" required minlength="2" maxlength="80" />
@@ -70,19 +67,13 @@ function saveStore() {
                             <span v-if="storeForm.errors.tagline" class="text-xs text-destructive">{{ storeForm.errors.tagline }}</span>
                         </label>
                     </div>
-                    <div class="mt-4 rounded-md border p-3 text-sm text-muted-foreground">
-                        Logo, favicon, banner homepage, gambar footer, widget bantuan, dan teks presentasi tetap dikelola di
-                        <Link href="/admin/content" class="font-medium text-foreground underline underline-offset-2">Banner & Konten</Link>
-                        agar tidak ada pengaturan ganda.
-                    </div>
-                </Card>
+                    <p class="mt-3 text-xs text-muted-foreground">
+                        Logo, favicon, banner beranda, gambar footer, widget bantuan, dan teks tampilan diatur di
+                        <Link href="/admin/content" class="font-medium text-foreground underline underline-offset-2">Banner &amp; Konten</Link>.
+                    </p>
 
-                <Card class="p-4">
-                    <div>
-                        <h2 class="text-lg font-semibold">Kontak & Jam Layanan</h2>
-                        <p class="mt-1 text-sm text-muted-foreground">Data ini terhubung ke footer, tombol bantuan, halaman kontak, dan kanal customer yang relevan.</p>
-                    </div>
-                    <div class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    <h3 class="mt-5 text-sm font-semibold text-muted-foreground">Kontak &amp; jam layanan</h3>
+                    <div class="mt-2 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                         <label class="space-y-1">
                             <span class="text-sm font-medium">WhatsApp bantuan</span>
                             <Input v-model="storeForm.support_whatsapp" maxlength="32" placeholder="+6281234567890" />
@@ -114,14 +105,10 @@ function saveStore() {
                             <span v-if="storeForm.errors.support_url" class="text-xs text-destructive">{{ storeForm.errors.support_url }}</span>
                         </label>
                     </div>
-                </Card>
 
-                <Card class="p-4">
-                    <div>
-                        <h2 class="text-lg font-semibold">Identitas Merchant</h2>
-                        <p class="mt-1 text-sm text-muted-foreground">Digunakan pada halaman status publik untuk informasi identitas bisnis. Kosongkan field yang memang belum tersedia.</p>
-                    </div>
-                    <div class="mt-4 grid gap-3 md:grid-cols-2">
+                    <h3 class="mt-5 text-sm font-semibold text-muted-foreground">Identitas usaha</h3>
+                    <p class="mt-1 text-xs text-muted-foreground">Dipakai pada halaman status publik. Kosongkan bagian yang memang belum ada.</p>
+                    <div class="mt-2 grid gap-3 md:grid-cols-2">
                         <label class="space-y-1">
                             <span class="text-sm font-medium">Nama legal / badan usaha</span>
                             <Input v-model="storeForm.legal_name" maxlength="255" placeholder="Nama legal toko atau badan usaha" />
@@ -138,29 +125,26 @@ function saveStore() {
                             <span v-if="storeForm.errors.address" class="text-xs text-destructive">{{ storeForm.errors.address }}</span>
                         </label>
                     </div>
-                </Card>
 
-                <div class="flex justify-end">
-                    <Button :disabled="storeForm.processing">{{ storeForm.processing ? 'Menyimpan…' : 'Simpan Pengaturan Toko' }}</Button>
-                </div>
+                    <div class="mt-4 flex justify-end">
+                        <Button :disabled="storeForm.processing">{{ storeForm.processing ? 'Menyimpan…' : 'Simpan pengaturan toko' }}</Button>
+                    </div>
+                </section>
         </form>
 
-        <Card v-if="canExport" class="p-4">
+        <section v-if="canExport" class="border-t border-border pt-5" aria-labelledby="settings-export-heading">
                 <div class="flex flex-wrap items-start justify-between gap-4">
                     <div class="max-w-2xl">
-                        <h2 class="text-lg font-semibold">Unduh pengaturan toko</h2>
+                        <h2 id="settings-export-heading" class="text-lg font-semibold">Ekspor pengaturan</h2>
                         <p class="mt-1 text-sm text-muted-foreground">
-                            Unduh salinan pengaturan toko untuk dokumentasi atau panduan pemulihan. Kata sandi dan data akses layanan tidak disertakan.
-                        </p>
-                        <p class="mt-2 text-xs text-muted-foreground">
-                            File ini tidak mencakup data pesanan, pelanggan, atau seluruh isi toko; bukan pengganti cadangan sistem.
+                            Salinan pengaturan toko untuk dokumentasi atau panduan pemulihan. Kata sandi dan data akses layanan tidak disertakan, dan berkas ini bukan cadangan sistem.
                         </p>
                     </div>
                     <Button as-child>
                         <a href="/admin/configuration/export">Unduh pengaturan</a>
                     </Button>
                 </div>
-            </Card>
+            </section>
     </div>
 </AdminShell>
 </template>
