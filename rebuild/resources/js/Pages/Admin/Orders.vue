@@ -21,6 +21,13 @@ const notice = ref('');
 const manual = useForm({ customer_name: '', phone: '', email: '', product_name: '', package_name: '', destination: '', total_idr: '', note: '', payment_received: false, idempotency_key: '' });
 const money = value => 'Rp' + Number(value).toLocaleString('id-ID');
 const date = value => value ? new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Jakarta' }).format(new Date(value)) + ' WIB' : 'Belum tersedia';
+const sortedOrders = computed(() => [...props.orders.data].sort((a, b) => {
+    // Backend sudah mengurutkan prioritas di SQL sebelum pagination; ini hanya
+    // menjaga urutan yang sama setelah data sampai di klien. Tiga tingkat,
+    // supaya pesanan bermasalah tidak pernah tenggelam di bawah yang belum bayar.
+    const priority = row => row.needs_attention ? 0 : row.status === 'PENDING_PAYMENT' ? 1 : 2;
+    return priority(a) - priority(b) || new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+}));
 const allSelected = computed(() => props.orders.data.length > 0 && props.orders.data.every(row => selected.value.includes(row.id)));
 function toggleAll(event) { selected.value = event.target.checked ? props.orders.data.map(row => row.id) : []; }
 function apply() {
@@ -106,12 +113,13 @@ onUnmounted(() => clearInterval(timer));
                         <TableHead class="w-[16%]">Pelanggan</TableHead>
                         <TableHead class="w-[20%]">Produk & Tujuan</TableHead>
                         <TableHead class="w-[16%]">Pembayaran</TableHead>
-                        <TableHead class="w-[15%]">Status</TableHead>
+                        <TableHead class="w-[15%]">Status Pembayaran</TableHead>
+                        <TableHead class="w-[15%]">Status Proses</TableHead>
                         <TableHead class="w-[10%] text-right">Aksi</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    <TableRow v-for="row in orders.data" :key="row.id" :class="{'bg-destructive/5': row.needs_attention}">
+                    <TableRow v-for="row in sortedOrders" :key="row.id" :class="{'bg-destructive/5': row.needs_attention}">
                         <TableCell><input v-model="selected" :value="row.id" type="checkbox" :aria-label="'Pilih ' + row.order_number" class="size-4" /></TableCell>
                         <TableCell class="break-all">
                             <strong class="font-medium text-primary">{{ row.order_number }}</strong>
@@ -134,8 +142,10 @@ onUnmounted(() => clearInterval(timer));
                             <p class="text-[10px] text-muted-foreground">{{ row.provider }}</p>
                         </TableCell>
                         <TableCell class="break-words">
-                            <Badge variant="outline" class="mb-1 text-[10px]">{{ row.paid_at ? 'Dibayar' : 'Belum dibayar' }}</Badge>
-                            <Badge variant="secondary" class="text-[10px] block w-fit">{{ row.status_label }}</Badge>
+                            <Badge variant="outline" class="text-[10px]">{{ row.paid_at ? 'Dibayar' : 'Belum dibayar' }}</Badge>
+                        </TableCell>
+                        <TableCell class="break-words">
+                            <Badge variant="secondary" class="text-[10px]">{{ row.status_label }}</Badge>
                             <p v-if="row.needs_attention" class="mt-1 text-[10px] font-semibold text-amber-500">Perlu perhatian</p>
                         </TableCell>
                         <TableCell class="text-right">

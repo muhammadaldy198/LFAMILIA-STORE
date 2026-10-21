@@ -355,4 +355,23 @@ class AdminOrdersRestorationTest extends TestCase
         $this->post('/admin/orders/'.$id.'/check-payment')->assertSessionHasErrors('payment');
         Queue::assertPushed(StartFulfillmentJob::class, 1);
     }
+
+    public function test_attention_orders_are_prioritised_across_pages_not_only_within_one_page(): void
+    {
+        $admin = $this->login();
+        Queue::fake();
+        $attentionId = $this->order($admin);
+        DB::table('fulfillment_attempts')->where('order_id', $attentionId)->update([
+            'status' => 'MANUAL_FAILED', 'updated_at' => now(),
+        ]);
+        // Pesanan baru setelahnya, cukup banyak agar pesanan bermasalah terdorong ke halaman berikutnya.
+        $newer = [];
+        for ($i = 0; $i < 3; $i++) {
+            $newer[] = $this->order($admin, array_merge($this->data(), ['idempotency_key' => (string) Str::uuid()]));
+        }
+
+        $this->get('/admin/orders?per_page=10')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('orders.data.0.id', $attentionId)
+            ->where('orders.data.0.needs_attention', true));
+    }
 }

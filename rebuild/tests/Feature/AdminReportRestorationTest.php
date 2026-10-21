@@ -256,5 +256,37 @@ class AdminReportRestorationTest extends TestCase
 
         $this->get('/admin/reports')->assertForbidden();
         $this->get('/admin/reports/export?range=30d')->assertForbidden();
+        $this->postJson('/admin/reports/export-audit', ['section' => 'sales', 'range' => '30d'])
+            ->assertForbidden();
+    }
+
+    public function test_client_side_export_records_its_own_audit_trail(): void
+    {
+        $admin = $this->login('ADMIN', ['reports.view']);
+
+        $this->postJson('/admin/reports/export-audit', [
+            'section' => 'operations',
+            'range' => 'custom',
+            'from' => '2026-01-01',
+            'to' => '2026-01-31',
+        ])->assertOk()->assertJson(['recorded' => true]);
+
+        $this->assertDatabaseHas('audit_logs', [
+            'actor_type' => 'admin_user',
+            'actor_id' => (string) $admin->id,
+            'action' => 'report.exported',
+            'target_type' => 'report',
+            'target_id' => 'operations',
+        ]);
+    }
+
+    public function test_export_audit_rejects_unknown_sections_and_ranges(): void
+    {
+        $this->login('ADMIN', ['reports.view']);
+
+        $this->postJson('/admin/reports/export-audit', ['section' => 'anything', 'range' => '30d'])
+            ->assertJsonValidationErrors('section');
+        $this->postJson('/admin/reports/export-audit', ['section' => 'sales', 'range' => 'forever'])
+            ->assertJsonValidationErrors('range');
     }
 }

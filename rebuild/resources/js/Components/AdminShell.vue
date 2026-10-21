@@ -30,7 +30,7 @@ const MENU_GROUPS = [
  { label: 'Integrasi', paths: ['/admin/digiflazz', '/admin/providers', '/admin/nickname-tools'] },
  { label: 'Keuangan', paths: ['/admin/payments', '/admin/reports'] },
  { label: 'Pelanggan', paths: ['/admin/customers'] },
- { label: 'Layanan', paths: ['/admin/support'] },
+ { label: 'Layanan Pelanggan', paths: ['/admin/support'] },
  { label: 'Sistem', paths: ['/admin/integrations', '/admin/health', '/admin/audit', '/admin/notifications'] },
  { label: 'Pengaturan', paths: ['/admin/settings', '/admin/access'] },
 ];
@@ -38,13 +38,16 @@ const MENU_GROUPS = [
 const groupedMenu = computed(() => {
  const items = panel.value.menu || [];
  const assigned = new Set();
- return MENU_GROUPS.map(group => {
+ const groups = MENU_GROUPS.map(group => {
   const groupItems = items.filter(item => {
    const p = item.href.split('?')[0];
    return group.paths.some(gp => p === gp || p.startsWith(gp + '/'));
   }).filter(item => !assigned.has(item.href) && (assigned.add(item.href), true));
   return { label: group.label, items: groupItems };
  }).filter(g => g.items.length);
+ // Jangan pernah menyembunyikan menu yang diberikan backend: taruh sisanya di grup terakhir.
+ const rest = items.filter(item => !assigned.has(item.href));
+ return rest.length ? [...groups, { label: 'Lainnya', items: rest }] : groups;
 });
 let controller;
 let outsideSearchTimer;

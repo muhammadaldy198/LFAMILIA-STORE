@@ -161,12 +161,9 @@ onUnmounted(() => clearInterval(timer));
         <Button class="w-full sm:w-auto" variant="outline" as-child><Link href="/admin/orders">Buka Pesanan</Link></Button>
     </header>
 
-    <div class="lf-admin-summary mt-5">
-        <Card v-for="metric in metrics" :key="metric.label" class="min-w-0 p-4">
-            <p class="text-sm text-muted-foreground">{{ metric.label }}</p>
-            <p class="mt-2 text-2xl font-semibold">{{ Number(metric.value).toLocaleString('id-ID') }}</p>
-        </Card>
-    </div>
+    <p class="mt-5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+        <span v-for="metric in metrics" :key="metric.label"><strong class="text-foreground">{{ Number(metric.value).toLocaleString('id-ID') }}</strong> {{ metric.label.toLowerCase() }}</span>
+    </p>
 
     <Card class="mt-5 min-w-0 p-4 sm:p-5">
         <form class="grid min-w-0 items-end gap-3 sm:grid-cols-2 xl:grid-cols-4" @submit.prevent="apply">

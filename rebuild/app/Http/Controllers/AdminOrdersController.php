@@ -84,7 +84,10 @@ class AdminOrdersController
         $query = $this->query($request);
         $counts = (clone $query)->reorder()->select('orders.status')->selectRaw('COUNT(*) as total')->groupBy('orders.status')->pluck('total', 'orders.status');
         $attention = (clone $query)->whereRaw("EXISTS(SELECT 1 FROM fulfillment_attempts fa WHERE fa.order_id = orders.id AND fa.id = (SELECT MAX(fb.id) FROM fulfillment_attempts fb WHERE fb.order_id = orders.id) AND fa.status IN ('UNKNOWN','BLOCKED','MANUAL_FAILED'))")->count();
-        $rows = $query->orderByDesc('orders.id')->paginate((int) $request->query('per_page', 25))->withQueryString();
+        $rows = $query
+            ->orderByRaw("CASE WHEN EXISTS(SELECT 1 FROM fulfillment_attempts fa WHERE fa.order_id = orders.id AND fa.id = (SELECT MAX(fb.id) FROM fulfillment_attempts fb WHERE fb.order_id = orders.id) AND fa.status IN ('UNKNOWN','BLOCKED','MANUAL_FAILED')) THEN 0 WHEN orders.status = 'PENDING_PAYMENT' THEN 1 ELSE 2 END")
+            ->orderByDesc('orders.id')
+            ->paginate((int) $request->query('per_page', 25))->withQueryString();
         $presentation->preloadFieldLabels($rows->items());
         $rows->through(fn (object $row): array => $presentation->row($row));
         $permissions = app(AdminPermissionService::class);
@@ -96,7 +99,7 @@ class AdminOrdersController
             'metrics' => [
                 ['label' => 'Total pesanan', 'value' => (int) $counts->sum()],
                 ['label' => 'Menunggu pembayaran', 'value' => (int) ($counts['PENDING_PAYMENT'] ?? 0)],
-                ['label' => 'Sedang diproses', 'value' => (int) ($counts['PROCESSING'] ?? 0) + (int) ($counts['PAID'] ?? 0)],
+                ['label' => 'Perlu diproses', 'value' => (int) ($counts['PROCESSING'] ?? 0) + (int) ($counts['PAID'] ?? 0)],
                 ['label' => 'Berhasil', 'value' => (int) ($counts['SUCCESS'] ?? 0)],
                 ['label' => 'Gagal', 'value' => (int) ($counts['FAILED'] ?? 0)],
                 ['label' => 'Perlu perhatian', 'value' => $attention],

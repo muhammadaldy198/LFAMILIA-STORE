@@ -153,15 +153,13 @@ function saveQuickReplies() {
             </div>
         </header>
 
-        <div class="lf-admin-summary ">
-            <Card class="p-4"><p class="text-xs text-muted-foreground">Total tiket</p><p class="mt-2 text-2xl font-semibold">{{ summary.total || 0 }}</p></Card>
-            <Card class="p-4"><p class="text-xs text-muted-foreground">Menunggu</p><p class="mt-2 text-2xl font-semibold">{{ summary.open || 0 }}</p></Card>
-            <Card class="p-4"><p class="text-xs text-muted-foreground">Diproses</p><p class="mt-2 text-2xl font-semibold">{{ summary.in_progress || 0 }}</p></Card>
-            <Card class="p-4"><p class="text-xs text-muted-foreground">Selesai</p><p class="mt-2 text-2xl font-semibold">{{ summary.resolved || 0 }}</p></Card>
-            <Card class="p-4"><p class="text-xs text-muted-foreground">Ditutup</p><p class="mt-2 text-2xl font-semibold">{{ summary.closed || 0 }}</p></Card>
-            <Card class="p-4"><p class="text-xs text-muted-foreground">Dari akun</p><p class="mt-2 text-2xl font-semibold">{{ summary.account || 0 }}</p></Card>
-            <Card class="p-4"><p class="text-xs text-muted-foreground">Guest</p><p class="mt-2 text-2xl font-semibold">{{ summary.guest || 0 }}</p></Card>
-        </div>
+        <p class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+            <span><strong class="text-foreground">{{ summary.open || 0 }}</strong> menunggu</span>
+            <span><strong class="text-foreground">{{ summary.in_progress || 0 }}</strong> diproses</span>
+            <span><strong class="text-foreground">{{ summary.resolved || 0 }}</strong> selesai</span>
+            <span><strong class="text-foreground">{{ summary.closed || 0 }}</strong> ditutup</span>
+            <span>{{ summary.total || 0 }} total · {{ summary.account || 0 }} dari akun · {{ summary.guest || 0 }} guest</span>
+        </p>
 
         <Card v-if="quickRepliesOpen" class="p-4">
             <div class="flex flex-wrap items-start justify-between gap-3">

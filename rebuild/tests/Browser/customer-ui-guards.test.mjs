@@ -177,3 +177,27 @@ test('payment page shows a separate fee row between subtotal and total', () => {
     assert.ok(subtotal > -1 && fee > subtotal && total > fee);
     assert.doesNotMatch(source, /order\.total_idr\s*=\s*order\.product_total_idr/);
 });
+
+test('guest access code is optional on the ticket form and never blocks first contact', () => {
+    const support = read('Pages/Guest/Support.vue');
+    // Kode akses hanya untuk membuka riwayat dari perangkat lain.
+    assert.match(support, /<details v-if="!order" class="lf-guest-support-access">/);
+    assert.match(support, /v-model="form\.access_code" minlength="64" maxlength="64"/);
+    assert.doesNotMatch(support, /v-model="form\.access_code" required/);
+    assert.match(support, /dari perangkat yang sama riwayat tiket langsung terbuka/);
+});
+
+test('guest ticket status is translated instead of showing raw enum values', () => {
+    const support = read('Pages/Guest/Support.vue');
+    assert.match(support, /const statusLabel = status => \(\{ OPEN:/);
+    assert.match(support, /Status: \{\{ statusLabel\(ticket\.status\) \}\}/);
+    assert.doesNotMatch(support, /Status: \{\{ ticket\.status \}\}/);
+    // Status yang benar-benar bisa disetel admin harus punya terjemahan;
+    // PENDING/ANSWERED bukan status tiket yang sah.
+    const controller = readFileSync(new URL('../../app/Http/Controllers/AdminSupportController.php', import.meta.url), 'utf8');
+    const statuses = controller.match(/private const STATUSES = \[([^\]]+)\]/)[1].match(/'([A-Z_]+)'/g).map(s => s.replaceAll("'", ''));
+    for (const status of statuses) {
+        assert.ok(support.includes(status + ':'), `status ${status} belum diterjemahkan`);
+    }
+    assert.doesNotMatch(support, /PENDING: |ANSWERED: /);
+});

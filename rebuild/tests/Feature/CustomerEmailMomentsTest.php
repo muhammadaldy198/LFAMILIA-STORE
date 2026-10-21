@@ -125,7 +125,7 @@ class CustomerEmailMomentsTest extends TestCase
         $invoice = (string) $order->json('order_number');
         $channelName = json_decode((string) DB::table('orders')->where('order_number', $invoice)->value('snapshot'), true)['payment']['channel_name'] ?? '';
 
-        Queue::assertPushed(SendTransactionalEmailJob::class, function (SendTransactionalEmailJob $job) use ($invoice, $channelName): bool {
+        Queue::assertPushed(SendTransactionalEmailJob::class, function (SendTransactionalEmailJob $job) use ($invoice, $channelName, $order): bool {
             return $job->recipient === 'moments-created@example.test'
                 && str_contains($job->subject, $invoice)
                 && str_contains($job->subject, 'dibuat')
@@ -141,7 +141,9 @@ class CustomerEmailMomentsTest extends TestCase
                 && str_contains($job->text, 'WIB')
                 && str_contains($job->text, 'invoice='.$invoice)
                 && str_contains($job->text, '/orders/check')
-                && str_contains($job->text, 'support@lfamiliastore.my.id');
+                && str_contains($job->text, 'support@lfamiliastore.my.id')
+                && str_contains($job->text, 'Kode akses pesanan: '.(string) $order->json('access_code'))
+                && str_contains($job->text, 'Jangan bagikan ke siapa pun');
         });
     }
 

@@ -205,7 +205,7 @@ function togglePermission(key, checked) {
             </form>
         </Card>
 
-        <div class="grid gap-4 xl:grid-cols-[minmax(0,2fr)_360px]">
+        <div class="grid items-start gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(360px,1fr)]">
             <Card class="min-w-0 p-4">
                 <div class="overflow-x-auto" role="region" aria-label="Daftar akun Admin" tabindex="0">
                     <AdminResponsiveTable :mobile-columns="[0,1,2,6]">
@@ -223,7 +223,7 @@ function togglePermission(key, checked) {
                         <TableBody>
                             <TableRow v-for="admin in admins.data" :key="admin.id">
                                 <TableCell>
-                                    <strong class="block">{{ admin.name }}</strong>
+                                    <button type="button" class="block text-left font-semibold underline-offset-4 hover:underline" @click="openEdit(admin)">{{ admin.name }}</button>
                                     <span class="text-xs text-muted-foreground">{{ admin.email }}</span>
                                     <Badge v-if="Number(admin.id) === Number(currentAdminId)" variant="outline" class="mt-1">Sedang digunakan</Badge>
                                 </TableCell>
@@ -263,25 +263,6 @@ function togglePermission(key, checked) {
                             >{{ link.label }}</Link>
                 </div>
             </Card>
-
-            <Card class="p-4">
-                <h2 class="text-lg font-semibold">Aturan Akses</h2>
-                <div class="mt-4 space-y-3">
-                    <div class="rounded-md border p-3">
-                        <strong class="text-sm">Super Admin</strong>
-                        <p class="mt-1 text-xs text-muted-foreground">Akses penuh termasuk Integrasi, Admin & Akses, System Health, Audit Log, routing pembayaran, serta operasi sensitif lainnya.</p>
-                    </div>
-                    <div class="rounded-md border p-3">
-                        <strong class="text-sm">Admin</strong>
-                        <p class="mt-1 text-xs text-muted-foreground">Akses hanya ke menu yang dicentang. Dashboard selalu wajib agar akun memiliki halaman masuk yang aman.</p>
-                    </div>
-                    <div class="rounded-md border p-3">
-                        <strong class="text-sm">Role pelanggan terpisah</strong>
-                        <p class="mt-1 text-xs text-muted-foreground">Membership BASIC sampai MAFIA bukan role panel Admin.</p>
-                    </div>
-                </div>
-            </Card>
-        </div>
 
         <Card v-if="editorOpen" id="access-editor" class="p-4">
             <div class="flex flex-wrap items-start justify-between gap-3">
@@ -365,6 +346,26 @@ function togglePermission(key, checked) {
                 </div>
             </form>
         </Card>
+
+            <Card class="p-4">
+                <h2 class="text-lg font-semibold">Aturan Akses</h2>
+                <div class="mt-4 space-y-3">
+                    <div class="rounded-md border p-3">
+                        <strong class="text-sm">Super Admin</strong>
+                        <p class="mt-1 text-xs text-muted-foreground">Akses penuh termasuk Integrasi, Admin & Akses, System Health, Audit Log, routing pembayaran, serta operasi sensitif lainnya.</p>
+                    </div>
+                    <div class="rounded-md border p-3">
+                        <strong class="text-sm">Admin</strong>
+                        <p class="mt-1 text-xs text-muted-foreground">Akses hanya ke menu yang dicentang. Dashboard selalu wajib agar akun memiliki halaman masuk yang aman.</p>
+                    </div>
+                    <div class="rounded-md border p-3">
+                        <strong class="text-sm">Role pelanggan terpisah</strong>
+                        <p class="mt-1 text-xs text-muted-foreground">Membership BASIC sampai MAFIA bukan role panel Admin.</p>
+                    </div>
+                </div>
+            </Card>
+        </div>
+
 
         <Card class="p-4">
             <div class="flex flex-wrap items-start justify-between gap-3">

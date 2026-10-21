@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Services\AdminAuditService;
 use App\Services\AdminPermissionService;
 use Illuminate\Database\Query\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -99,6 +100,31 @@ class AdminReportController
                     'total' => (int) $row->total,
                 ])->values(),
         ]);
+    }
+
+    /**
+     * Ekspor CSV dibuat di browser agar bisa memuat tab Produk/Operasional
+     * tanpa endpoint baru per jenis laporan. Endpoint ini hanya mencatat
+     * jejak auditnya, karena ekspor klien tidak melewati export().
+     */
+    public function auditExport(Request $request, AdminAuditService $audit): JsonResponse
+    {
+        $data = $request->validate([
+            'section' => ['required', Rule::in(['sales', 'products', 'operations'])],
+            'range' => ['required', Rule::in(self::RANGE_OPTIONS)],
+            'from' => ['nullable', 'date_format:Y-m-d'],
+            'to' => ['nullable', 'date_format:Y-m-d'],
+        ]);
+
+        $audit->record($request, 'report.exported', 'report', $data['section'], null, [
+            'range' => $data['range'],
+            'from' => $data['from'] ?? null,
+            'to' => $data['to'] ?? null,
+            'finance' => app(AdminPermissionService::class)
+                ->allows($request->user('admin'), 'reports.finance'),
+        ]);
+
+        return response()->json(['recorded' => true]);
     }
 
     public function export(Request $request, AdminAuditService $audit): StreamedResponse

@@ -422,3 +422,5 @@
 .lfx .lfx-country-option>span:last-child{margin-left:auto;color:var(--lf-color-muted)}
 .lfx .lfx-country-empty{margin:0;padding:9px;font-size:10px;color:var(--lf-color-muted)}
 @media(max-width:420px){.lfx .lfx-country-trigger{padding:0 8px;font-size:11px}}
+
+@media(max-width:767px){.lfx #lfx-contact .lfx-field-grid{grid-template-columns:1fr}}

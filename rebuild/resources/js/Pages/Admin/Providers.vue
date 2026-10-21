@@ -31,6 +31,8 @@ const filters = reactive({
 });
 
 const saving = ref(null);
+const selectedProviderId = ref(null);
+const selectedProvider = () => rows.value.find((row) => row.id === selectedProviderId.value) || null;
 
 const money = value => value == null ? '—' : 'Rp' + Number(value).toLocaleString('id-ID');
 const date = value => value
@@ -103,39 +105,6 @@ function saveProvider(row) {
             <Button class="w-full sm:w-auto" variant="outline" @click="router.reload({ preserveScroll: true })">Muat ulang</Button>
         </header>
 
-        <div class="lf-admin-summary ">
-            <Card class="p-4">
-                <p class="text-xs text-muted-foreground">Provider aktif</p>
-                <p class="mt-2 text-2xl font-semibold">{{ summary.provider_active || 0 }}</p>
-                <p class="mt-1 text-xs text-muted-foreground">dari {{ summary.provider_total || 0 }}</p>
-            </Card>
-            <Card class="p-4">
-                <p class="text-xs text-muted-foreground">Sumber harga aktif</p>
-                <p class="mt-2 text-2xl font-semibold">{{ Number(summary.mapping_active || 0).toLocaleString('id-ID') }}</p>
-                <p class="mt-1 text-xs text-muted-foreground">siap dipilih sistem</p>
-            </Card>
-            <Card class="p-4">
-                <p class="text-xs text-muted-foreground">Semua nominal terhubung</p>
-                <p class="mt-2 text-2xl font-semibold">{{ Number(summary.mapping_total || 0).toLocaleString('id-ID') }}</p>
-                <p class="mt-1 text-xs text-muted-foreground">terhubung ke penyedia</p>
-            </Card>
-            <Card class="p-4">
-                <p class="text-xs text-muted-foreground">Perlu diperiksa</p>
-                <p class="mt-2 text-2xl font-semibold">{{ Number(summary.needs_reconciliation || 0).toLocaleString('id-ID') }}</p>
-                <p class="mt-1 text-xs text-muted-foreground">status transaksi belum jelas</p>
-            </Card>
-            <Card class="p-4">
-                <p class="text-xs text-muted-foreground">Boleh dialihkan</p>
-                <p class="mt-2 text-2xl font-semibold">{{ Number(summary.safe_to_failover || 0).toLocaleString('id-ID') }}</p>
-                <p class="mt-1 text-xs text-muted-foreground">gagal sudah terkonfirmasi</p>
-            </Card>
-            <Card class="p-4">
-                <p class="text-xs text-muted-foreground">Aturan pengalihan</p>
-                <p class="mt-2 font-semibold">Aman saja</p>
-                <p class="mt-1 text-xs text-muted-foreground">pesanan yang masih diproses atau belum jelas tidak akan dialihkan otomatis.</p>
-            </Card>
-        </div>
-
         <Card class="overflow-hidden">
             <div class="border-b p-4 flex flex-wrap items-center justify-between gap-3">
                 <div>
@@ -162,13 +131,8 @@ function saveProvider(row) {
                         <TableRow v-for="row in rows" :key="row.id">
                             <TableCell class="align-top">
                                 <div class="space-y-1">
-                                    <Input v-model="row.display_name" maxlength="80" class="h-8 text-xs font-semibold" placeholder="Nama provider" />
-                                    <input
-                                        v-model="row.description"
-                                        maxlength="500"
-                                        placeholder="Keterangan opsional"
-                                        class="h-7 w-full rounded border border-input bg-background/50 px-2 text-[11px] text-muted-foreground placeholder:text-muted-foreground/50"
-                                    />
+                                    <div class="text-xs font-semibold">{{ row.display_name }}</div>
+                                    <p class="text-[11px] text-muted-foreground">{{ row.description || 'Tanpa keterangan' }}</p>
                                 </div>
                             </TableCell>
                             <TableCell class="align-top">
@@ -188,23 +152,35 @@ function saveProvider(row) {
                                 <p v-if="row.attention_count" class="text-[10px] text-destructive font-medium mt-0.5">{{ row.attention_count }} perhatian</p>
                             </TableCell>
                             <TableCell class="align-top">
-                                <Input v-model.number="row.sort_order" type="number" min="0" max="9999" class="h-8 w-16 text-xs text-center font-mono" />
+                                <span class="text-xs font-mono">{{ providerPosition(row) }}</span>
                             </TableCell>
                             <TableCell class="align-top text-right">
                                 <div class="flex items-center justify-end gap-2">
-                                    <label class="flex items-center gap-1.5 text-xs cursor-pointer">
-                                        <AdminSwitch v-model="row.is_active" />
-                                        <span class="text-[11px] text-muted-foreground">{{ row.is_active ? 'Aktif' : 'Off' }}</span>
-                                    </label>
-                                    <Button size="sm" class="h-7 px-2 text-xs" :disabled="saving === row.id" @click="saveProvider(row)">
-                                        {{ saving === row.id ? '...' : 'Simpan' }}
-                                    </Button>
+                                    <Badge :variant="row.is_active ? 'secondary' : 'outline'" class="text-[10px]">{{ row.is_active ? 'Aktif' : 'Off' }}</Badge>
+                                    <Button size="sm" variant="outline" class="h-7 px-2 text-xs" @click="selectedProviderId = row.id">Atur</Button>
                                 </div>
                             </TableCell>
                         </TableRow>
                     </TableBody>
                 </Table>
             </div>
+        </Card>
+
+        <Card v-if="selectedProvider()" class="p-4 space-y-4">
+            <div class="flex items-start justify-between gap-3">
+                <div>
+                    <h2 class="text-lg font-semibold">Atur {{ selectedProvider().display_name }}</h2>
+                    <p class="text-sm text-muted-foreground">Ubah pengaturan provider yang dipilih.</p>
+                </div>
+                <Button variant="outline" size="sm" @click="selectedProviderId = null">Tutup</Button>
+            </div>
+            <div class="grid gap-3 sm:grid-cols-2">
+                <label class="space-y-1"><span class="text-sm font-medium">Nama tampilan</span><Input v-model="selectedProvider().display_name" maxlength="80" /></label>
+                <label class="space-y-1"><span class="text-sm font-medium">Urutan</span><Input v-model.number="selectedProvider().sort_order" type="number" min="0" max="9999" /></label>
+                <label class="space-y-1 sm:col-span-2"><span class="text-sm font-medium">Keterangan</span><Input v-model="selectedProvider().description" maxlength="500" /></label>
+                <label class="flex items-center gap-2 text-sm"><AdminSwitch v-model="selectedProvider().is_active" /> Aktif</label>
+            </div>
+            <div class="flex justify-end"><Button :disabled="saving === selectedProvider().id" @click="saveProvider(selectedProvider())">{{ saving === selectedProvider().id ? 'Menyimpan...' : 'Simpan provider' }}</Button></div>
         </Card>
 
         <Card class="p-4">

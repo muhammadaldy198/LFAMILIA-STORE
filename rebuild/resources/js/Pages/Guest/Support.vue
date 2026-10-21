@@ -12,18 +12,22 @@ const replyForm = id => replies[id] ||= useForm({ message: '' });
 const submit = () => { if (!form.processing) form.post('/support', { onSuccess: () => form.reset('subject', 'message', 'access_code') }); };
 const verify = () => { if (!form.processing) form.post('/support/verify', { onSuccess: () => form.reset('access_code') }); };
 const reply = id => { const f = replyForm(id); if (!f.processing) f.post('/support/' + id + '/messages', { onSuccess: () => f.reset() }); };
+const statusLabel = status => ({ OPEN: 'Menunggu balasan', IN_PROGRESS: 'Sedang ditangani', RESOLVED: 'Selesai', CLOSED: 'Ditutup' })[status] || status;
 </script>
 <template>
 <Head :title="customerText('pages.guest.support.attribute.title.f4fe7922', 'Bantuan Guest')" />
 <CustomerShell>
 <main class="lf-container lf-content-page">
  <p class="lf-eyebrow">{{ customerText("pages.guest.support.b30960ff", "PUSAT BANTUAN") }}</p><h1>{{ customerText("pages.guest.support.b0d8eb35", "Bantuan tanpa akun") }}</h1>
- <p class="lf-copy">{{ customerText("pages.guest.support.d1eb5268", "Buat tiket atau baca balasan untuk pesanan guest. Gunakan nomor invoice dan kode akses yang diberikan saat checkout.") }}</p>
+ <p class="lf-copy">{{ customerText("pages.guest.support.d1eb5268", "Buat tiket atau baca balasan untuk pesanan tanpa akun. Cukup masukkan nomor invoice; dari perangkat yang sama riwayat tiket langsung terbuka.") }}</p>
  <form class="lf-guest-support-form" @submit.prevent="submit">
   <h2>{{ customerText("pages.guest.support.e85cc33c", "Formulir bantuan") }}</h2>
-  <label>{{ customerText("pages.guest.support.d031d757", "Nomor invoice") }}<input v-model="form.order_number" required maxlength="80" autocomplete="off"></label>
-  <label v-if="!order">{{ customerText("pages.guest.support.edc129b1", "Kode akses pesanan") }}<input v-model="form.access_code" required minlength="64" maxlength="64" autocomplete="off" type="password"></label>
-  <p v-if="!order" class="lf-copy">{{ customerText("pages.guest.support.88f08ced", "Kode akses menjaga percakapan tetap pribadi. Jika kode hilang, hubungi tim melalui kanal resmi di halaman Hubungi Kami.") }}</p>
+  <label>{{ customerText("pages.guest.support.d031d757", "Nomor invoice") }}<input v-model="form.order_number" required maxlength="80" autocomplete="off" placeholder="Contoh: LF-2026-000123"></label>
+  <details v-if="!order" class="lf-guest-support-access">
+    <summary>{{ customerText("pages.guest.support.access_toggle", "Punya kode akses dari email?") }}</summary>
+    <label>{{ customerText("pages.guest.support.edc129b1", "Kode akses pesanan") }}<input v-model="form.access_code" minlength="64" maxlength="64" autocomplete="off" type="password" placeholder="Tempel 64 karakter dari email pesanan"></label>
+    <p class="lf-copy">{{ customerText("pages.guest.support.88f08ced", "Kode akses menjaga percakapan tetap pribadi. Kode ini dikirim ke email saat checkout. Jika kode hilang, buka tiket dengan nomor invoice dari perangkat yang sama atau hubungi tim melalui halaman Hubungi Kami.") }}</p>
+  </details>
   <p v-for="(error, field) in form.errors" :key="field" role="alert" class="text-red-300">{{ error }}</p>
   <button class="lf-secondary" type="button" :disabled="form.processing" @click="verify">{{ customerText("pages.guest.support.35ad1ca1", "Lihat tiket dan balasan") }}</button>
   <label>{{ customerText("pages.guest.support.4bcccc29", "Subjek") }}<input v-model="form.subject" required maxlength="150"></label>
@@ -35,7 +39,7 @@ const reply = id => { const f = replyForm(id); if (!f.processing) f.post('/suppo
   <h2>{{ customerText('pages.guest.support.ticket_for', 'Tiket untuk') }} {{ order.order_number }}</h2>
   <p v-if="!tickets.length">{{ customerText("pages.guest.support.e066336", "Belum ada tiket untuk pesanan ini.") }}</p>
   <article v-for="ticket in tickets" :key="ticket.id" class="lf-guest-support-form">
-   <h3>#{{ ticket.id }} · {{ ticket.subject }}</h3><p>Status: {{ ticket.status }}</p>
+   <h3>#{{ ticket.id }} · {{ ticket.subject }}</h3><p>Status: {{ statusLabel(ticket.status) }}</p>
    <p class="whitespace-pre-wrap">{{ ticket.message }}</p>
    <div v-for="message in ticket.messages" :key="message.id" class="lf-guest-support-message">
     <strong>{{ message.sender_type === 'ADMIN' ? 'Tim LFAMILIA' : 'Kamu' }}</strong>

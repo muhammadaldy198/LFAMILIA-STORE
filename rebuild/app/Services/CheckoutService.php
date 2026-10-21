@@ -367,7 +367,7 @@ class CheckoutService
             $result['order']->id,
             ['order_number' => $result['order']->order_number]
         );
-        $this->emails->queueOrderCreated((int) $result['order']->id);
+        $this->emails->queueOrderCreated((int) $result['order']->id, $accessCode);
 
         return [
             'order' => $result['order'],

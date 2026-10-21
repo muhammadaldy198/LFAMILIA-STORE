@@ -14,13 +14,11 @@ import { TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../Co
 const props = defineProps({
     filters: { type: Object, default: () => ({}) },
     vouchers: { type: Object, default: () => ({ data: [], links: [] }) },
-    popularProducts: { type: Object, default: () => ({ data: [], links: [] }) },
     categories: { type: Array, default: () => [] },
     scopeProducts: { type: Array, default: () => [] },
     summary: { type: Object, default: () => ({}) },
 });
 
-const section = ref('vouchers');
 const editorOpen = ref(false);
 const editingId = ref(null);
 
@@ -29,13 +27,6 @@ const voucherFilters = reactive({
     status: props.filters?.status || '',
     discount_type: props.filters?.discount_type || '',
     per_page: Number(props.filters?.per_page || 25),
-});
-
-const popularFilters = reactive({
-    popular_q: props.filters?.popular_q || '',
-    popular_category: props.filters?.popular_category || '',
-    popular_status: props.filters?.popular_status || '',
-    product_per_page: Number(props.filters?.product_per_page || 25),
 });
 
 const voucherForm = useForm({
@@ -73,38 +64,12 @@ const statusLabel = (value) => ({
 const statusVariant = (value) => value === 'active' ? 'secondary' : 'outline';
 
 function submitVoucherFilters() {
-    router.get('/admin/vouchers', {
-        ...voucherFilters,
-        popular_q: props.filters?.popular_q || undefined,
-        popular_category: props.filters?.popular_category || undefined,
-        popular_status: props.filters?.popular_status || undefined,
-        product_per_page: props.filters?.product_per_page || undefined,
-    }, { preserveState: true, preserveScroll: true });
+    router.get('/admin/vouchers', voucherFilters, { preserveState: true, preserveScroll: true });
 }
 
 function resetVoucherFilters() {
     Object.assign(voucherFilters, { q: '', status: '', discount_type: '', per_page: 25 });
     submitVoucherFilters();
-}
-
-function submitPopularFilters() {
-    router.get('/admin/vouchers', {
-        q: props.filters?.q || undefined,
-        status: props.filters?.status || undefined,
-        discount_type: props.filters?.discount_type || undefined,
-        per_page: props.filters?.per_page || undefined,
-        ...popularFilters,
-    }, { preserveState: true, preserveScroll: true });
-}
-
-function resetPopularFilters() {
-    Object.assign(popularFilters, {
-        popular_q: '',
-        popular_category: '',
-        popular_status: '',
-        product_per_page: 25,
-    });
-    submitPopularFilters();
 }
 
 function openCreate() {
@@ -196,12 +161,6 @@ function deleteVoucher(row) {
     router.delete('/admin/vouchers/' + row.id, { preserveScroll: true });
 }
 
-function togglePopular(product) {
-    router.put('/admin/vouchers/popular/' + product.id, {
-        popular: !product.popular,
-    }, { preserveScroll: true });
-}
-
 function discountLabel(row) {
     return row.discount_type === 'PERCENT'
         ? Number(row.discount_value).toLocaleString('id-ID') + '%'
@@ -217,7 +176,7 @@ function discountLabel(row) {
             <div class="min-w-0">
                 <h1 class="text-2xl font-semibold tracking-tight">Promo</h1>
                 <p class="mt-1 max-w-3xl text-sm text-muted-foreground">
-                    Kelola voucher diskon dan urutan produk di bagian Populer Sekarang.
+                    Kelola voucher diskon.
                 </p>
             </div>
             <div class="flex flex-col gap-2 sm:flex-row">
@@ -231,16 +190,9 @@ function discountLabel(row) {
             <Card class="p-4"><p class="text-xs text-muted-foreground">Voucher aktif</p><p class="mt-2 text-2xl font-semibold">{{ summary.active_vouchers || 0 }}</p></Card>
             <Card class="p-4"><p class="text-xs text-muted-foreground">Terpakai</p><p class="mt-2 text-2xl font-semibold">{{ summary.used_count || 0 }}</p></Card>
             <Card class="p-4"><p class="text-xs text-muted-foreground">Reservasi aktif</p><p class="mt-2 text-2xl font-semibold">{{ summary.reserved_count || 0 }}</p></Card>
-            <Card class="p-4"><p class="text-xs text-muted-foreground">Produk populer</p><p class="mt-2 text-2xl font-semibold">{{ summary.popular_products || 0 }}</p></Card>
-            <Card class="p-4"><p class="text-xs text-muted-foreground">Populer & aktif</p><p class="mt-2 text-2xl font-semibold">{{ summary.active_popular_products || 0 }}</p></Card>
         </div>
 
-        <nav class="lf-admin-tabs" aria-label="Bagian promosi">
-            <Button type="button" :variant="section === 'vouchers' ? 'secondary' : 'ghost'" :aria-current="section === 'vouchers' ? 'page' : undefined" class="shrink-0" @click="section = 'vouchers'">Voucher Diskon</Button>
-            <Button type="button" :variant="section === 'popular' ? 'secondary' : 'ghost'" :aria-current="section === 'popular' ? 'page' : undefined" class="shrink-0" @click="section = 'popular'">Populer Sekarang</Button>
-        </nav>
-
-        <template v-if="section === 'vouchers'">
+        <template>
             <Card class="min-w-0 p-4 sm:p-5">
                 <form class="grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-5" @submit.prevent="submitVoucherFilters">
                     <label class="space-y-1 md:col-span-2">
@@ -334,81 +286,6 @@ function discountLabel(row) {
                 <div v-if="vouchers.links?.length > 3" class="mt-4 flex flex-wrap gap-1">
                     <Link
                         v-for="link in vouchers.links"
-                        :key="link.label"
-                        :href="link.url || '#'"
-                        preserve-scroll
-                        :class="['rounded-md border px-3 py-1.5 text-sm', link.active ? 'bg-primary text-primary-foreground' : 'bg-background', !link.url ? 'pointer-events-none opacity-40' : '']"
-                        >{{ link.label }}</Link>
-                </div>
-            </Card>
-        </template>
-
-        <template v-else>
-            <Card class="min-w-0 p-4 sm:p-5">
-                <form class="grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-5" @submit.prevent="submitPopularFilters">
-                    <label class="space-y-1 md:col-span-2">
-                        <span class="text-sm font-medium">Cari produk</span>
-                        <Input v-model="popularFilters.popular_q" maxlength="100" placeholder="Nama atau slug produk" />
-                    </label>
-                    <label class="space-y-1">
-                        <span class="text-sm font-medium">Kategori</span>
-                        <select v-model="popularFilters.popular_category" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
-                            <option value="">Semua kategori</option>
-                            <option v-for="category in categories" :key="category.id" :value="category.id">{{ category.name }}</option>
-                        </select>
-                    </label>
-                    <label class="space-y-1">
-                        <span class="text-sm font-medium">Status</span>
-                        <select v-model="popularFilters.popular_status" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
-                            <option value="">Semua</option>
-                            <option value="popular">Diprioritaskan</option>
-                            <option value="not_popular">Tidak diprioritaskan</option>
-                            <option value="active">Produk aktif</option>
-                            <option value="inactive">Produk nonaktif</option>
-                        </select>
-                    </label>
-                    <label class="space-y-1">
-                        <span class="text-sm font-medium">Produk per halaman</span>
-                        <select v-model.number="popularFilters.product_per_page" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
-                            <option :value="10">10</option><option :value="25">25</option><option :value="50">50</option><option :value="100">100</option>
-                        </select>
-                    </label>
-                    <div class="flex flex-col gap-2 sm:flex-row md:col-span-2 xl:col-span-5">
-                        <Button class="w-full sm:w-auto">Terapkan filter</Button>
-                        <Button class="w-full sm:w-auto" type="button" variant="outline" @click="resetPopularFilters">Hapus filter</Button>
-                    </div>
-                </form>
-            </Card>
-
-            <Card class="min-w-0 p-4">
-                <div class="mb-4 rounded-md border p-3 text-sm text-muted-foreground">
-                    Produk bertanda populer didahulukan di homepage. Jika slot belum penuh, storefront melanjutkan dengan produk aktif yang memiliki ulasan terbanyak. Status produk tetap dikelola dari menu Produk.
-                </div>
-                <div class="overflow-x-auto" role="region" aria-label="Daftar prioritas produk" tabindex="0">
-                    <AdminResponsiveTable :mobile-columns="[0,2,3,4,5]">
-                        <TableHeader><TableRow><TableHead>Produk</TableHead><TableHead>Kategori</TableHead><TableHead>Nominal</TableHead><TableHead>Status Produk</TableHead><TableHead>Prioritas</TableHead><TableHead class="text-right">Aksi</TableHead></TableRow></TableHeader>
-                        <TableBody>
-                            <TableRow v-for="product in popularProducts.data" :key="product.id">
-                                <TableCell>
-                                    <div class="flex min-w-[220px] items-center gap-3">
-                                        <img v-if="product.image_url" :src="product.image_url" :alt="product.name" class="size-10 rounded-md border object-cover">
-                                        <div><strong class="block">{{ product.name }}</strong><span class="text-xs text-muted-foreground">{{ product.slug }}</span></div>
-                                    </div>
-                                </TableCell>
-                                <TableCell>{{ product.category_name }}</TableCell>
-                                <TableCell>{{ product.packages_count }}</TableCell>
-                                <TableCell><Badge variant="outline">{{ product.is_active ? 'Aktif' : 'Nonaktif' }}</Badge></TableCell>
-                                <TableCell><Badge :variant="product.popular ? 'secondary' : 'outline'">{{ product.popular ? 'Diprioritaskan' : 'Normal' }}</Badge></TableCell>
-                                <TableCell class="text-right"><Button size="sm" :variant="product.popular ? 'outline' : 'default'" @click="togglePopular(product)">{{ product.popular ? 'Lepas prioritas' : 'Jadikan populer' }}</Button></TableCell>
-                            </TableRow>
-                            <TableRow v-if="!popularProducts.data?.length"><TableCell colspan="6" class="py-10 text-center text-muted-foreground">Tidak ada produk sesuai filter.</TableCell></TableRow>
-                        </TableBody>
-                    </AdminResponsiveTable>
-                </div>
-
-                <div v-if="popularProducts.links?.length > 3" class="mt-4 flex flex-wrap gap-1">
-                    <Link
-                        v-for="link in popularProducts.links"
                         :key="link.label"
                         :href="link.url || '#'"
                         preserve-scroll

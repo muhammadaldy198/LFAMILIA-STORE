@@ -25,7 +25,6 @@ const props = defineProps({
     deletable: Boolean,
 });
 
-const tab = ref('overview');
 const membership = ref(props.customer?.membership_assignment || 'AUTO');
 const wallet = reactive({ amount_idr: '', reason: '' });
 const saving = ref('');
@@ -69,6 +68,8 @@ function adjustWallet() {
     const reason = String(wallet.reason || '').trim();
     adjustError.value = walletAdjustmentError(wallet.amount_idr, reason);
     if (adjustError.value) return;
+    const direction = amount > 0 ? 'menambah' : 'mengurangi';
+    if (!window.confirm(`Konfirmasi ${direction} saldo pelanggan sebesar ${money(Math.abs(amount))}? Alasan: ${reason}`)) return;
 
     saving.value = 'wallet';
     router.post('/admin/customers/' + props.customer.id + '/wallet', {
@@ -112,26 +113,7 @@ function deleteEmpty() {
             </div>
         </header>
 
-        <div class="lf-admin-summary ">
-            <Card class="p-4"><p class="text-xs text-muted-foreground">Saldo</p><p class="mt-2 text-xl font-semibold">{{ money(balanceIdr) }}</p></Card>
-            <Card class="p-4"><p class="text-xs text-muted-foreground">Total belanja</p><p class="mt-2 text-xl font-semibold">{{ money(summary.lifetime_spend_idr) }}</p></Card>
-            <Card class="p-4"><p class="text-xs text-muted-foreground">Pesanan</p><p class="mt-2 text-2xl font-semibold">{{ summary.orders || 0 }}</p><p class="mt-1 text-xs text-muted-foreground">{{ summary.successful_orders || 0 }} selesai</p></Card>
-            <Card class="p-4"><p class="text-xs text-muted-foreground">Top up saldo</p><p class="mt-2 text-2xl font-semibold">{{ summary.topups || 0 }}</p></Card>
-            <Card class="p-4"><p class="text-xs text-muted-foreground">Tiket</p><p class="mt-2 text-2xl font-semibold">{{ summary.tickets || 0 }}</p></Card>
-            <Card class="p-4"><p class="text-xs text-muted-foreground">Akun game</p><p class="mt-2 text-2xl font-semibold">{{ summary.saved_accounts || 0 }}</p></Card>
-        </div>
-
-        <nav class="lf-admin-tabs" aria-label="Bagian data pelanggan">
-            <Button type="button" :variant="tab === 'overview' ? 'secondary' : 'ghost'" :aria-current="tab === 'overview' ? 'page' : undefined" class="shrink-0" @click="tab = 'overview'">Profil</Button>
-            <Button type="button" :variant="tab === 'tier' ? 'secondary' : 'ghost'" :aria-current="tab === 'tier' ? 'page' : undefined" class="shrink-0" @click="tab = 'tier'">Tier</Button>
-            <Button type="button" :variant="tab === 'orders' ? 'secondary' : 'ghost'" :aria-current="tab === 'orders' ? 'page' : undefined" class="shrink-0" @click="tab = 'orders'">Pesanan</Button>
-            <Button type="button" :variant="tab === 'wallet' ? 'secondary' : 'ghost'" :aria-current="tab === 'wallet' ? 'page' : undefined" class="shrink-0" @click="tab = 'wallet'">Saldo & Top Up</Button>
-            <Button type="button" :variant="tab === 'support' ? 'secondary' : 'ghost'" :aria-current="tab === 'support' ? 'page' : undefined" class="shrink-0" @click="tab = 'support'">Tiket</Button>
-            <Button type="button" :variant="tab === 'accounts' ? 'secondary' : 'ghost'" :aria-current="tab === 'accounts' ? 'page' : undefined" class="shrink-0" @click="tab = 'accounts'">Akun Game</Button>
-        </nav>
-
-        <template v-if="tab === 'overview'"><Card class="p-4">
-                    <h2 class="text-lg font-semibold">Profil Pelanggan</h2>
+        <section aria-labelledby="customer-profile-heading" class="space-y-3"><h2 id="customer-profile-heading" class="text-lg font-semibold">Profil Pelanggan</h2><Card class="p-4">
                     <dl class="mt-4 grid gap-4 sm:grid-cols-2">
                         <div><dt class="text-xs text-muted-foreground">Nama</dt><dd class="mt-1 font-medium">{{ customer.name }}</dd></div>
                         <div><dt class="text-xs text-muted-foreground">Email</dt><dd class="mt-1 break-all">{{ customer.email || 'Belum diisi' }}</dd></div>
@@ -146,8 +128,8 @@ function deleteEmpty() {
                 <h2 class="font-semibold">Akun Kosong</h2>
                 <p class="mt-1 text-sm text-muted-foreground">Akun tidak memiliki saldo, ledger, pesanan, top up, atau tiket yang harus dipertahankan.</p>
                 <Button class="mt-3" size="sm" variant="destructive" @click="deleteEmpty">Hapus akun kosong</Button>
-            </Card></template>
-        <template v-else-if="tab === 'tier'"><Card v-if="membershipProfile" class="p-4">
+            </Card></section>
+        <section aria-labelledby="customer-tier-heading" class="space-y-3"><h2 id="customer-tier-heading" class="text-lg font-semibold">Membership</h2><Card v-if="membershipProfile" class="p-4">
                     <h2 class="text-lg font-semibold">Progress Membership</h2>
                     <div class="mt-4 grid gap-3 sm:grid-cols-2">
                         <div class="rounded-md border p-3"><p class="text-xs text-muted-foreground">Tier aktif</p><p class="mt-1 text-xl font-semibold">{{ membershipProfile.code }}</p></div>
@@ -165,9 +147,9 @@ function deleteEmpty() {
                         <option v-for="tier in membershipTiers" :key="tier.code" :value="tier.code">{{ tier.code }} · manual</option>
                     </select>
                     <Button class="mt-3" size="sm" :disabled="Boolean(saving)" @click="saveMembership">{{ saving === 'membership' ? 'Menyimpan…' : 'Simpan membership' }}</Button>
-                </Card></template>
+                </Card></section>
 
-        <template v-else-if="tab === 'orders'">
+        <section aria-labelledby="customer-orders-heading" class="space-y-3"><h2 id="customer-orders-heading" class="text-lg font-semibold">Riwayat Pesanan</h2>
             <Card class="p-4">
                 <h2 class="text-lg font-semibold">Riwayat Pesanan</h2>
                 <div class="mt-4 overflow-x-auto" role="region" aria-label="Pesanan pelanggan" tabindex="0">
@@ -188,9 +170,9 @@ function deleteEmpty() {
                 </div>
                 <div v-if="orders.links?.length > 3" class="mt-4 flex flex-wrap gap-1"><Link v-for="link in orders.links" :key="link.label" :href="link.url || '#'" preserve-scroll :class="['rounded-md border px-3 py-1.5 text-sm', link.active ? 'bg-primary text-primary-foreground' : 'bg-background', !link.url ? 'pointer-events-none opacity-40' : '']">{{ link.label }}</Link></div>
             </Card>
-        </template>
+        </section>
 
-        <template v-else-if="tab === 'wallet'"><Card v-if="isSuperAdmin" class="p-4">
+        <section aria-labelledby="customer-wallet-heading" class="space-y-3"><h2 id="customer-wallet-heading" class="text-lg font-semibold">Saldo & Top Up</h2><Card v-if="isSuperAdmin" class="p-4">
                     <h2 class="font-semibold">Penyesuaian Saldo</h2>
                     <p class="mt-1 text-xs text-muted-foreground">Setiap perubahan saldo tercatat untuk pemeriksaan. Saldo tidak dapat menjadi negatif.</p>
                     <div class="mt-3 grid gap-3 sm:grid-cols-[160px_minmax(0,1fr)]">
@@ -227,9 +209,9 @@ function deleteEmpty() {
                     </div>
                 </Card>
             </div>
-        </template>
+        </section>
 
-        <template v-else-if="tab === 'support'">
+        <section aria-labelledby="customer-support-heading" class="space-y-3"><h2 id="customer-support-heading" class="text-lg font-semibold">Tiket</h2>
             <Card class="p-4">
                 <div class="flex flex-wrap items-start justify-between gap-3"><div><h2 class="text-lg font-semibold">Tiket Pelanggan</h2><p class="mt-1 text-sm text-muted-foreground">Balasan dan perubahan status dilakukan dari menu Layanan Pelanggan agar tidak ada fitur ganda.</p></div><Button variant="outline" size="sm" as-child><Link href="/admin/support">Buka Layanan Pelanggan</Link></Button></div>
                 <div class="mt-4 overflow-x-auto" role="region" aria-label="Tiket pelanggan" tabindex="0">
@@ -239,9 +221,9 @@ function deleteEmpty() {
                     </TableBody></AdminResponsiveTable>
                 </div>
             </Card>
-        </template>
+        </section>
 
-        <template v-else>
+        <section aria-labelledby="customer-accounts-heading" class="space-y-3"><h2 id="customer-accounts-heading" class="text-lg font-semibold">Akun Game Tersimpan</h2>
             <Card class="p-4">
                 <h2 class="text-lg font-semibold">Akun Game Tersimpan</h2>
                 <p class="mt-1 text-sm text-muted-foreground">Panel hanya menampilkan label, produk, dan nickname. Nilai input akun tersimpan tidak dibuka di halaman ini.</p>
@@ -252,7 +234,7 @@ function deleteEmpty() {
                     </TableBody></AdminResponsiveTable>
                 </div>
             </Card>
-        </template>
+        </section>
     </div>
 </AdminShell>
 </template>
