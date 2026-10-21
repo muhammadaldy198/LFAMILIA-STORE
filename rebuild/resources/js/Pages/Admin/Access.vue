@@ -1,5 +1,6 @@
 <script setup>
 import AdminSwitch from '../../Components/AdminSwitch.vue';
+import AdminConfirmDialog from '../../Components/AdminConfirmDialog.vue';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../../Components/ui/sheet';
 import AdminResponsiveTable from '../../Components/AdminResponsiveTable.vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
@@ -29,6 +30,7 @@ const filters = reactive({
 
 const editorOpen = ref(false);
 const editingId = ref(null);
+const deleting = ref(null);
 const form = useForm({
     name: '',
     email: '',
@@ -39,6 +41,8 @@ const form = useForm({
 });
 
 const permissionEntries = computed(() => Object.entries(props.permissions || {}));
+// Kelompokkan izin per menu: satu kontrol per menu, bukan satu centang per izin.
+
 const isEditingSelf = computed(() => Number(editingId.value) === Number(props.currentAdminId));
 
 const date = (value) => value ? new Intl.DateTimeFormat('id-ID', {
@@ -48,11 +52,11 @@ const date = (value) => value ? new Intl.DateTimeFormat('id-ID', {
 }).format(new Date(value)) + ' WIB' : 'Belum pernah';
 
 const roleLabel = (role) => role === 'SUPER_ADMIN' ? 'Super Admin' : 'Admin';
-const actionLabel = (action) => ({
+const actionLabel = (activity) => activity.action_label || ({
     'admin.created': 'Menambah akun Admin',
     'admin.updated': 'Mengubah akun / hak akses',
     'admin.deleted': 'Menghapus akun Admin',
-}[action] || action);
+}[activity.action] || 'Aktivitas akun Admin');
 
 function submitFilters() {
     router.get('/admin/access', {
@@ -123,10 +127,15 @@ function save() {
     form.post('/admin/access', options);
 }
 
-function remove(admin) {
+function askRemove(admin) {
     if (Number(admin.id) === Number(props.currentAdminId)) return;
-    if (!window.confirm('Hapus akun ' + admin.name + '? Tindakan ini tidak dapat dibatalkan.')) return;
-    router.delete('/admin/access/' + admin.id, { preserveScroll: true });
+    deleting.value = admin;
+}
+
+function confirmRemove() {
+    const admin = deleting.value;
+    deleting.value = null;
+    if (admin) router.delete('/admin/access/' + admin.id, { preserveScroll: true });
 }
 
 function permissionChecked(key) {
@@ -204,7 +213,7 @@ function togglePermission(key, checked) {
             </form>
         </Card>
 
-        <div class="grid items-start gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(360px,1fr)]">
+        <div class="grid items-start gap-4">
             <Card class="min-w-0 p-4">
                 <div class="overflow-x-auto" role="region" aria-label="Daftar akun Admin" tabindex="0">
                     <AdminResponsiveTable :mobile-columns="[0,1,2,6]">
@@ -237,7 +246,7 @@ function togglePermission(key, checked) {
                                 <TableCell class="text-right">
                                     <div class="flex justify-end gap-1">
                                         <Button size="sm" variant="outline" @click="openEdit(admin)">Edit</Button>
-                                        <Button size="sm" variant="destructive" :disabled="Number(admin.id) === Number(currentAdminId)" @click="remove(admin)">Hapus</Button>
+                                        <Button size="sm" variant="destructive" :disabled="Number(admin.id) === Number(currentAdminId)" @click="askRemove(admin)">Hapus</Button>
                                     </div>
                                 </TableCell>
                             </TableRow>
@@ -264,12 +273,12 @@ function togglePermission(key, checked) {
             </Card>
 
         <Sheet :open="editorOpen" @update:open="(value) => { if (!value) closeEditor(); }">
-        <SheetContent side="right" class="w-full overflow-y-auto sm:max-w-3xl">
+        <SheetContent side="right" class="w-full overflow-y-auto sm:max-w-xl">
             <SheetHeader><SheetTitle>{{ editingId ? 'Edit Akun Admin' : 'Tambah Akun Admin' }}</SheetTitle><SheetDescription>{{ isEditingSelf ? 'Akun yang sedang digunakan tidak dapat dinonaktifkan atau diturunkan.' : 'Perubahan role, status, password, dan permission dicatat ke Audit Log.' }}</SheetDescription></SheetHeader>
 
 
             <form class="mt-4 space-y-4" @submit.prevent="save">
-                <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <div class="grid gap-3 sm:grid-cols-2">
                     <label class="space-y-1">
                         <span class="text-sm font-medium">Nama</span>
                         <Input v-model="form.name" required minlength="2" maxlength="120" />
@@ -308,7 +317,7 @@ function togglePermission(key, checked) {
                         </div>
                         <Badge variant="outline">{{ form.permissions.length }} izin dipilih</Badge>
                     </div>
-                    <div class="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                    <div class="mt-4 grid gap-2 sm:grid-cols-2">
                         <label
                             v-for="[key, label] in permissionEntries"
                             :key="key"
@@ -341,23 +350,6 @@ function togglePermission(key, checked) {
         </SheetContent>
         </Sheet>
 
-            <Card class="p-4">
-                <h2 class="text-lg font-semibold">Aturan Akses</h2>
-                <div class="mt-4 space-y-3">
-                    <div class="rounded-md border p-3">
-                        <strong class="text-sm">Super Admin</strong>
-                        <p class="mt-1 text-xs text-muted-foreground">Akses penuh termasuk Integrasi, Admin & Akses, System Health, Audit Log, routing pembayaran, serta operasi sensitif lainnya.</p>
-                    </div>
-                    <div class="rounded-md border p-3">
-                        <strong class="text-sm">Admin</strong>
-                        <p class="mt-1 text-xs text-muted-foreground">Akses hanya ke menu yang dicentang. Dashboard selalu wajib agar akun memiliki halaman masuk yang aman.</p>
-                    </div>
-                    <div class="rounded-md border p-3">
-                        <strong class="text-sm">Role pelanggan terpisah</strong>
-                        <p class="mt-1 text-xs text-muted-foreground">Membership BASIC sampai MAFIA bukan role panel Admin.</p>
-                    </div>
-                </div>
-            </Card>
         </div>
 
 
@@ -377,7 +369,7 @@ function togglePermission(key, checked) {
                             <TableCell>{{ date(activity.created_at) }}</TableCell>
                             <TableCell>{{ activity.actor_name }}</TableCell>
                             <TableCell><Badge variant="outline">{{ roleLabel(activity.actor_role) }}</Badge></TableCell>
-                            <TableCell>{{ actionLabel(activity.action) }}</TableCell>
+                            <TableCell>{{ actionLabel(activity) }}</TableCell>
                             <TableCell>{{ activity.target_id ? 'Admin #' + activity.target_id : '—' }}</TableCell>
                         </TableRow>
                         <TableRow v-if="!recentActivities.length"><TableCell colspan="5" class="py-10 text-center text-muted-foreground">Belum ada aktivitas pengelolaan Admin.</TableCell></TableRow>
@@ -386,5 +378,15 @@ function togglePermission(key, checked) {
             </div>
         </Card>
     </div>
+
+    <AdminConfirmDialog
+        :open="Boolean(deleting)"
+        title="Hapus akun Admin"
+        :message="deleting ? 'Akun ' + deleting.name + ' (' + deleting.email + ') akan dihapus permanen. Riwayat audit tetap tersimpan.' : ''"
+        confirm-label="Hapus akun"
+        destructive
+        @update:open="value => { if (!value) deleting = null; }"
+        @confirm="confirmRemove"
+    />
 </AdminShell>
 </template>

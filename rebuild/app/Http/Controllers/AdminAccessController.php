@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AdminUser;
 use App\Services\AdminAuditService;
 use App\Services\AdminPermissionService;
+use App\Support\AuditLabels;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -16,7 +17,7 @@ use Inertia\Response;
 
 class AdminAccessController
 {
-    public function index(Request $request, AdminPermissionService $permissions): Response
+    public function index(Request $request, AdminPermissionService $permissions, AuditLabels $labels): Response
     {
         $filters = $request->validate([
             'q' => ['nullable', 'string', 'max:100'],
@@ -69,7 +70,7 @@ class AdminAccessController
             'admins' => AdminUser::where('role', 'ADMIN')->count(),
             'active' => (clone $supportedAdmins)->where('is_active', true)->count(),
             'inactive' => (clone $supportedAdmins)->where('is_active', false)->count(),
-            'active_super_admins' => AdminUser::where('role', 'SUPER_ADMIN')->where('is_active', true)->count(),
+            'active_super_admins' => (clone $supportedAdmins)->where('role', 'SUPER_ADMIN')->where('is_active', true)->count(),
         ];
 
         $activityRows = DB::table('audit_logs')
@@ -99,6 +100,7 @@ class AdminAccessController
             'actor_name' => $actorNames[(int) $row->actor_id] ?? 'Admin #'.$row->actor_id,
             'actor_role' => $row->actor_role,
             'action' => (string) $row->action,
+            'action_label' => $labels->actionLabel((string) $row->action),
             'target_id' => $row->target_id,
             'created_at' => $row->created_at,
         ])->values();
