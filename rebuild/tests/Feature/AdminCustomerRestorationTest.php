@@ -48,7 +48,8 @@ class AdminCustomerRestorationTest extends TestCase
             'name' => 'Customer Test',
             'email' => bin2hex(random_bytes(8)).'@example.test',
             'email_verified_at' => now(),
-            'phone' => '081234567890',
+            // Nomor unik per test: fixture browser menyimpan nomor tetap di DB lokal.
+            'phone' => '08'.str_pad((string) random_int(0, 9999999999), 10, '0', STR_PAD_LEFT),
             'password' => Hash::make('VeryStrongCustomer123!'),
         ], $overrides));
 

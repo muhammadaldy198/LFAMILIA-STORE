@@ -200,10 +200,10 @@ test('payment settings keep one page and edit each method in a sheet', () => {
 
 test('customer detail starts at profile and confirms wallet changes', () => {
     const source = read('CustomerDetail.vue');
-    const profile = source.indexOf('customer-profile-heading');
-    assert.ok(profile > -1);
-    assert.ok(source.indexOf('lf-admin-summary') > source.indexOf('customer-profile-heading'));
-    assert.ok(source.indexOf('customer-profile-heading') < source.indexOf('customer-tier-heading'));
+    // Urutan rancangan 4.12: ringkasan -> profil -> tingkat -> pesanan -> saldo -> tiket -> akun.
+    const order = ['lf-admin-summary', 'customer-profile-heading', 'customer-tier-heading', 'customer-orders-heading', 'customer-wallet-heading', 'customer-support-heading', 'customer-accounts-heading'];
+    let previous = -1;
+    for (const marker of order) { const position = source.indexOf(marker); assert.ok(position > previous, marker); previous = position; }
     assert.match(source, /withSensitive\(`Konfirmasi \$\{direction\} saldo pelanggan/);
     assert.match(source, /function saveWallet\(amount, reason\)/);
 });
