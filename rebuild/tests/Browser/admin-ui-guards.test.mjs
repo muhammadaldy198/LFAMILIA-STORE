@@ -110,8 +110,8 @@ test('reports separates sections and keeps operations grouped', () => {
     assert.match(source, /visible\('sales'\)/);
     assert.match(source, /visible\('products'\)/);
     assert.match(source, /visible\('operations'\)/);
-    assert.match(source, /Produk Terlaris/);
-    assert.match(source, /Kategori Teratas/);
+    assert.match(source, /Produk terlaris/);
+    assert.match(source, /Kategori teratas/);
     assert.match(source, /Kinerja penyedia layanan/);
     assert.match(source, /v-if="canViewFinance"/);
     assert.match(source, /v-show="visible\('operations'\)"/);

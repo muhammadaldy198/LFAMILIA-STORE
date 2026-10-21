@@ -151,17 +151,17 @@ function statusLabel(status) {
             <div class="min-w-0">
                 <h1 class="text-2xl font-semibold tracking-tight">Laporan</h1>
                 <p class="mt-1 max-w-3xl text-sm text-muted-foreground">
-                    Analisis pesanan, pembayaran, produk, kategori, dan performa provider berdasarkan periode yang dipilih.
+                    Analisis penjualan, produk, dan operasional toko pada periode yang dipilih. Nilai uang hanya terlihat oleh Super Admin.
                 </p>
             </div>
             <div class="flex flex-col gap-2 sm:flex-row">
                 <Button class="w-full sm:w-auto" variant="outline" @click="router.reload({ preserveScroll: true })">Muat ulang</Button>
-                <Button class="w-full sm:w-auto" type="button" @click="exportReport">Unduh CSV</Button>
+                <Button class="w-full sm:w-auto" type="button" @click="exportReport">Unduh laporan</Button>
             </div>
         </header>
 
-        <Card class="min-w-0 p-4 sm:p-5">
-            <form class="grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-5" @submit.prevent="submit">
+        <div class="min-w-0">
+            <form class="grid min-w-0 items-end gap-3 border-y border-border py-4 sm:grid-cols-2 xl:grid-cols-5" @submit.prevent="submit">
                 <label class="space-y-1">
                     <span class="text-sm font-medium">Periode</span>
                     <select v-model="form.range" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
@@ -181,15 +181,16 @@ function statusLabel(status) {
                     <span class="text-sm font-medium">Sampai</span>
                     <Input v-model="form.to" type="date" :disabled="form.range !== 'custom'" :required="form.range === 'custom'" />
                 </label>
-                <div class="self-end">
-                    <Button class="w-full sm:w-auto" type="submit">Tampilkan laporan</Button>
+                <div>
+                    <Button class="w-full sm:w-auto" type="submit">Tampilkan</Button>
                 </div>
-                <div class="self-end text-sm text-muted-foreground">
-                    {{ filters.from }} s.d. {{ filters.to }}
+                <div class="text-sm text-muted-foreground">
+                    Data {{ filters.from }} sampai {{ filters.to }} (WIB)
                 </div>
             </form>
-        </Card>
+        </div>
 
+        <p class="-mt-2 text-xs text-muted-foreground">Unduhan mengikuti bagian yang sedang dibuka: {{ rangeLabel.toLowerCase() }}.</p>
         <nav class="lf-admin-tabs" aria-label="Bagian laporan">
             <Button v-for="item in sections" :key="item.id" type="button" :variant="section === item.id ? 'secondary' : 'ghost'" :aria-current="section === item.id ? 'page' : undefined" @click="section = item.id">{{ item.label }}</Button>
         </nav>
@@ -200,7 +201,7 @@ function statusLabel(status) {
             <Card class="p-4"><p class="text-xs text-muted-foreground">Menunggu bayar</p><p class="mt-2 text-2xl font-semibold">{{ number(metrics.pending_payment_total) }}</p></Card>
             <Card class="p-4"><p class="text-xs text-muted-foreground">Dalam proses</p><p class="mt-2 text-2xl font-semibold">{{ number(metrics.pending_fulfillment_total) }}</p></Card>
             <Card class="p-4"><p class="text-xs text-muted-foreground">Gagal</p><p class="mt-2 text-2xl font-semibold">{{ number(metrics.failed_total) }}</p></Card>
-            <Card class="p-4"><p class="text-xs text-muted-foreground">Error provider</p><p class="mt-2 text-2xl font-semibold">{{ number(metrics.provider_errors) }}</p></Card>
+            <Card class="p-4"><p class="text-xs text-muted-foreground">Galat penyedia</p><p class="mt-2 text-2xl font-semibold">{{ number(metrics.provider_errors) }}</p></Card>
             <Card v-if="canViewFinance" class="p-4"><p class="text-xs text-muted-foreground">Omzet dibayar</p><p class="mt-2 text-xl font-semibold">{{ money(metrics.paid_revenue_idr) }}</p></Card>
             <Card v-if="canViewFinance" class="p-4"><p class="text-xs text-muted-foreground">Laba kotor</p><p class="mt-2 text-xl font-semibold">{{ money(metrics.gross_profit_idr) }}</p></Card>
         </div>
@@ -209,14 +210,14 @@ function statusLabel(status) {
             <Card class="p-4"><p class="text-xs text-muted-foreground">Diskon terpakai</p><p class="mt-2 text-lg font-semibold">{{ money(metrics.discount_idr) }}</p></Card>
             <Card class="p-4"><p class="text-xs text-muted-foreground">Biaya pembayaran</p><p class="mt-2 text-lg font-semibold">{{ money(metrics.payment_fee_idr) }}</p></Card>
             <Card class="p-4"><p class="text-xs text-muted-foreground">Top up saldo dibayar</p><p class="mt-2 text-lg font-semibold">{{ money(metrics.paid_topup_idr) }}</p></Card>
-            <Card class="p-4"><p class="text-xs text-muted-foreground">Saldo pelanggan saat ini</p><p class="mt-2 text-lg font-semibold">{{ money(metrics.wallet_liability_idr) }}</p><p class="mt-1 text-xs text-muted-foreground">Snapshot saat halaman dibuka</p></Card>
+            <Card class="p-4"><p class="text-xs text-muted-foreground">Saldo pelanggan saat ini</p><p class="mt-2 text-lg font-semibold">{{ money(metrics.wallet_liability_idr) }}</p><p class="mt-1 text-xs text-muted-foreground">Posisi saldo saat halaman dibuka</p></Card>
         </div>
 
         <div class="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
-            <Card v-show="visible('sales')" class="min-w-0 p-4">
+            <section v-show="visible('sales')" class="min-w-0" aria-labelledby="report-chart-heading">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                        <h2 class="text-lg font-semibold">Grafik Penjualan</h2>
+                        <h2 id="report-chart-heading" class="text-lg font-semibold">Grafik penjualan</h2>
                         <p class="mt-1 text-sm text-muted-foreground">
                             {{ canViewFinance ? 'Omzet dibayar' : 'Jumlah pesanan' }} · {{ rangeLabel }}
                         </p>
@@ -237,10 +238,10 @@ function statusLabel(status) {
                     </div>
                 </div>
                 <p v-else class="py-12 text-center text-sm text-muted-foreground">Belum ada transaksi dalam periode ini.</p>
-            </Card>
+            </section>
 
-            <Card v-show="visible('operations')" class="p-4">
-                <h2 class="text-lg font-semibold">Status Operasional</h2>
+            <section v-show="visible('operations')" class="min-w-0" aria-labelledby="report-status-heading">
+                <h2 id="report-status-heading" class="text-lg font-semibold">Status operasional</h2>
                 <div class="mt-4 space-y-4">
                     <div>
                         <p class="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Pesanan</p>
@@ -264,12 +265,12 @@ function statusLabel(status) {
                         </div>
                     </div>
                 </div>
-            </Card>
+            </section>
         </div>
 
-        <Card v-show="visible('products')" class="min-w-0 p-4">
+        <section v-show="visible('products')" class="min-w-0 border-t border-border pt-4" aria-labelledby="report-products-heading">
             <div>
-                <h2 class="text-lg font-semibold">Produk Terlaris</h2>
+                <h2 id="report-products-heading" class="text-lg font-semibold">Produk terlaris</h2>
                 <p class="mt-1 text-sm text-muted-foreground">Urutan berdasarkan pesanan berhasil, lalu jumlah pesanan.</p>
             </div>
             <div class="mt-4 overflow-x-auto" role="region" aria-label="Laporan produk terlaris" tabindex="0">
@@ -299,11 +300,11 @@ function statusLabel(status) {
                     </TableBody>
                 </AdminResponsiveTable>
             </div>
-        </Card>
+        </section>
 
-        <div v-show="visible('products')" class="lf-admin-summary">
-            <Card class="min-w-0 p-4">
-                <h2 class="text-lg font-semibold">Kategori Teratas</h2>
+        <section v-show="visible('products')" class="min-w-0 border-t border-border pt-4" aria-labelledby="report-categories-heading">
+            <div>
+                <h2 id="report-categories-heading" class="text-lg font-semibold">Kategori teratas</h2>
                 <div class="mt-4 overflow-x-auto" role="region" aria-label="Laporan kategori teratas" tabindex="0">
                     <AdminResponsiveTable :mobile-columns="canViewFinance?[0,1,3]:[0,1,2]">
                         <TableHeader><TableRow><TableHead>Kategori</TableHead><TableHead class="text-right">Pesanan</TableHead><TableHead class="text-right">Berhasil</TableHead><TableHead v-if="canViewFinance" class="text-right">Omzet</TableHead></TableRow></TableHeader>
@@ -318,11 +319,11 @@ function statusLabel(status) {
                         </TableBody>
                     </AdminResponsiveTable>
                 </div>
-            </Card>
-        </div>
+            </div>
+        </section>
 
-        <Card v-show="visible('operations')" class="min-w-0 p-4">
-            <h2 class="text-lg font-semibold">Kinerja penyedia layanan</h2>
+        <section v-show="visible('operations')" class="min-w-0 border-t border-border pt-4" aria-labelledby="report-providers-heading">
+            <h2 id="report-providers-heading" class="text-lg font-semibold">Kinerja penyedia layanan</h2>
             <p class="mt-1 text-sm text-muted-foreground">Persentase masalah membandingkan proses yang statusnya belum pasti, gagal, atau terblokir dengan seluruh proses pada periode ini.</p>
             <div class="mt-4 overflow-x-auto" role="region" aria-label="Kinerja penyedia layanan" tabindex="0">
                 <AdminResponsiveTable :mobile-columns="[0,1,2,5]">
@@ -340,14 +341,14 @@ function statusLabel(status) {
                     </TableBody>
                 </AdminResponsiveTable>
             </div>
-        </Card>
+        </section>
 
-        <Card v-show="visible('sales')" class="p-4">
-            <h2 class="text-lg font-semibold">Catatan Perhitungan</h2>
-            <p class="mt-2 text-sm text-muted-foreground">
-                Omzet dihitung dari pesanan yang sudah dibayar. Laba kotor memperhitungkan modal produk dan biaya pembayaran yang dibebankan kepada pelanggan, sebelum biaya operasional lain. Nilai keuangan hanya dapat dilihat oleh Super Admin.
+        <details v-show="visible('sales')" class="lf-admin-advanced rounded-md border border-border">
+            <summary class="cursor-pointer px-4 py-3 text-sm font-medium">Cara angka ini dihitung</summary>
+            <p class="border-t border-border p-4 text-sm text-muted-foreground">
+                Omzet dihitung dari pesanan yang sudah dibayar. Laba kotor memperhitungkan modal produk dan biaya pembayaran yang dibebankan kepada pelanggan, sebelum biaya operasional lain. Nilai uang hanya dapat dilihat oleh Super Admin.
             </p>
-        </Card>
+        </details>
     </div>
 </AdminShell>
 </template>
