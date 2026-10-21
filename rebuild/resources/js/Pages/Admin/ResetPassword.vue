@@ -24,7 +24,7 @@ const submit = () => {
 </script>
 
 <template>
-    <Head title="Reset Kata Sandi Admin" />
+    <Head title="Kata sandi baru admin" />
     <main class="lf-admin-auth lf-admin" style="min-height:100svh;display:grid;place-items:center;padding:16px;">
         <div style="width:100%;max-width:400px;">
             <form
@@ -33,7 +33,7 @@ const submit = () => {
             >
                 <div>
                     <div style="font-size:17px;font-weight:700;margin-bottom:4px;">Buat kata sandi baru</div>
-                    <div style="font-size:12px;color:var(--muted-foreground);">Gunakan minimal 12 karakter untuk melindungi akun admin.</div>
+                    <div style="font-size:12px;color:var(--muted-foreground);">Gunakan minimal 12 karakter. Sandi yang panjang dan tidak dipakai di tempat lain paling aman.</div>
                 </div>
 
                 <label style="display:grid;gap:6px;font-size:12px;font-weight:600;">
@@ -62,7 +62,7 @@ const submit = () => {
 
                 <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;">
                     <Link href="/admin/forgot-password" style="font-size:12px;color:var(--ring);text-decoration:none;">Minta tautan baru</Link>
-                    <Link href="/admin/login" style="font-size:12px;color:var(--ring);text-decoration:none;">Kembali ke login</Link>
+                    <Link href="/admin/login" style="font-size:12px;color:var(--ring);text-decoration:none;">Kembali ke halaman masuk</Link>
                 </div>
             </form>
         </div>
