@@ -1,16 +1,15 @@
 <script setup>
 import AdminSwitch from '../../Components/AdminSwitch.vue';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../../Components/ui/sheet';
-import AdminResponsiveTable from '../../Components/AdminResponsiveTable.vue';
 import { Button } from '../../Components/ui/button';
 import { Input } from '../../Components/ui/input';
 import { Textarea } from '../../Components/ui/textarea';
-import { TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../Components/ui/table';
 
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { ref, watch } from 'vue';
 import AdminShell from '../../Components/AdminShell.vue';
 import AdminMediaControl from '../../Components/AdminMediaControl.vue';
+import AdminConfirmDialog from '../../Components/AdminConfirmDialog.vue';
 
 const props = defineProps({
     assets: Array,
@@ -24,6 +23,14 @@ const props = defineProps({
 });
 const contentArea = ref('storefront'); // 'storefront' | 'legal' | 'news'
 const contentTab = ref('banners');
+const selectedPopupId = ref(null);
+const selectedAssetId = ref(null);
+const selectedReviewId = ref(null);
+
+// Satu dialog konfirmasi bertema untuk semua tindakan hapus.
+const pendingAction = ref(null);
+const ask = (title, message, confirmLabel, run) => { pendingAction.value = { title, message, confirmLabel, run }; };
+const runPending = () => { const action = pendingAction.value; pendingAction.value = null; action?.run(); };
 const selectedBannerId = ref(null);
 const selectedFaqId = ref(null);
 const selectedPageKey = ref(null);
@@ -107,9 +114,9 @@ const saveBanner = (item) => router.put(base + '/content/banners/' + item.id, {
     sort_order: Number(item.sort_order || 0),
     is_active: Boolean(item.is_active),
 }, { preserveScroll: true });
-const deleteBanner = (item) => {
-    if (confirm('Hapus banner ini?')) router.delete(base + '/content/banners/' + item.id, { preserveScroll: true });
-};
+const deleteBanner = (item) => ask('Hapus banner', 'Banner "' + (item.title || 'tanpa nama') + '" akan dihapus dari halaman utama.', 'Hapus banner', () => {
+    router.delete(base + '/content/banners/' + item.id, { preserveScroll: true });
+});
 
 const savePopup = (item) => router.put(base + '/content/popups/' + item.id, {
     title: item.title,
@@ -117,9 +124,9 @@ const savePopup = (item) => router.put(base + '/content/popups/' + item.id, {
     dismiss_days: Number(item.dismiss_days || 0),
     is_active: Boolean(item.is_active),
 }, { preserveScroll: true });
-const deletePopup = (item) => {
-    if (confirm('Hapus pop-up ini?')) router.delete(base + '/content/popups/' + item.id, { preserveScroll: true });
-};
+const deletePopup = (item) => ask('Hapus pop-up', 'Pop-up "' + (item.title || 'tanpa judul') + '" tidak akan muncul lagi di halaman utama.', 'Hapus pop-up', () => {
+    router.delete(base + '/content/popups/' + item.id, { preserveScroll: true, onSuccess: () => { selectedPopupId.value = null; } });
+});
 const assetHasTarget = (key) => ['banner_desktop', 'banner_mobile'].includes(key);
 const assetLabel = (key) => ({
     logo: 'Logo toko',
@@ -143,9 +150,9 @@ const saveNews = (item) => router.put(base + '/content/news/' + item.id, {
     published_at: item.published_at || null,
 }, { preserveScroll: true });
 
-const deleteNews = (item) => {
-    if (confirm('Hapus berita "' + item.title + '"?')) router.delete(base + '/content/news/' + item.id, { preserveScroll: true });
-};
+const deleteNews = (item) => ask('Hapus berita', 'Berita "' + item.title + '" akan dihapus permanen.', 'Hapus berita', () => {
+    router.delete(base + '/content/news/' + item.id, { preserveScroll: true, onSuccess: () => { selectedNewsId.value = null; } });
+});
 
 const saveFaq = (item) => router.put(base + '/content/faqs/' + item.id, {
     question: item.question,
@@ -154,18 +161,16 @@ const saveFaq = (item) => router.put(base + '/content/faqs/' + item.id, {
     is_active: Boolean(item.is_active),
 }, { preserveScroll: true });
 
-const deleteFaq = (item) => {
-    if (confirm('Hapus FAQ ini?')) router.delete(base + '/content/faqs/' + item.id, { preserveScroll: true });
-};
+const deleteFaq = (item) => ask('Hapus FAQ', 'Pertanyaan "' + item.question + '" akan dihapus dari halaman bantuan.', 'Hapus FAQ', () => {
+    router.delete(base + '/content/faqs/' + item.id, { preserveScroll: true, onSuccess: () => { selectedFaqId.value = null; } });
+});
 const saveReview = (item) => router.put(base + '/content/reviews/' + item.id, {
     is_active: Boolean(item.is_active),
 }, { preserveScroll: true });
 
-const deleteReview = (item) => {
-    if (confirm('Hapus ulasan ini secara permanen?')) {
-        router.delete(base + '/content/reviews/' + item.id, { preserveScroll: true });
-    }
-};
+const deleteReview = (item) => ask('Hapus ulasan', 'Ulasan dari ' + item.display_name + ' akan dihapus permanen. Untuk sekadar menyembunyikan, matikan tombol Tampil.', 'Hapus ulasan', () => {
+    router.delete(base + '/content/reviews/' + item.id, { preserveScroll: true });
+});
 
 const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
     title: item.title,
@@ -181,8 +186,8 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
         <div class="space-y-6">
             <header class="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between">
                 <div class="min-w-0">
-                    <h1 class="text-3xl font-semibold tracking-tight">Banner & Konten</h1>
-                    <p class="mt-2 text-sm text-muted-foreground">Kelola konten halaman pelanggan tanpa mengubah kode aplikasi.</p>
+                    <h1 class="text-2xl font-semibold tracking-tight">Banner & Konten</h1>
+                    <p class="mt-1 max-w-3xl text-sm text-muted-foreground">Kelola isi halaman toko yang dibaca pelanggan: banner, pop-up, logo, bantuan, kebijakan, berita, dan moderasi ulasan. Pilih satu baris untuk membukanya di panel samping.</p>
                 </div>
             </header>
 
@@ -216,7 +221,7 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                     {{ label }}
                 </Button>
             </nav>
-            <section v-show="contentTab === 'banners'" class="rounded-xl border border-border bg-card p-5">
+            <section v-show="contentTab === 'banners'" class="space-y-4">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div>
                         <h2 class="text-lg font-bold">Banner halaman utama</h2>
@@ -281,75 +286,107 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                 </div>
             </section>
 
-            <section v-show="contentTab === 'popup'" class="rounded-xl border border-border bg-card p-5">
-                <div>
-                    <h2 class="text-lg font-bold">Pop-up halaman utama</h2>
-                    <p class="mt-1 text-xs text-muted-foreground">Hanya satu pop-up pengumuman. Muncul saat pelanggan membuka halaman utama dan dapat disembunyikan sesuai masa yang ditentukan.</p>
+            <section v-show="contentTab === 'popup'" class="space-y-4">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <h2 class="text-lg font-semibold">Pop-up halaman utama</h2>
+                        <p class="mt-1 text-sm text-muted-foreground">Hanya satu pop-up pengumuman. Muncul saat pelanggan membuka halaman utama dan bisa disembunyikan sesuai masa yang ditentukan.</p>
+                    </div>
+                    <Button v-if="!popups.length" type="button" @click="popupFormOpen = true">Tambah pop-up</Button>
                 </div>
 
-                <div v-if="!popups.length" class="mt-4"><Button type="button" class="rounded bg-[#1769e8] px-4 py-2 text-xs font-bold text-white" @click="popupFormOpen = true">Tambah Pop-up</Button></div>
                 <Sheet :open="popupFormOpen" @update:open="(value) => { popupFormOpen = value; }">
-                <SheetContent side="right" class="w-full overflow-y-auto sm:max-w-xl">
-                <SheetHeader><SheetTitle>Tambah pop-up</SheetTitle><SheetDescription>Pop-up tampil sekali saat pelanggan membuka halaman utama.</SheetDescription></SheetHeader>
-                <form class="grid gap-3" @submit.prevent="popupForm.post(base + '/content/popups', { preserveScroll: true, onSuccess: () => { popupFormOpen = false; } })">
-                    <label class="lf-admin-field "><span>Judul</span><Input v-model="popupForm.title" required placeholder="Judul pop-up" class="rounded border border-border p-2 text-sm" /><span v-if="popupForm.errors.title" role="alert" class="text-sm font-normal text-destructive">{{ popupForm.errors.title }}</span></label>
-                    <label class="lf-admin-field "><span>Isi</span><Textarea v-model="popupForm.body" required rows="5" placeholder="Isi pengumuman" class="rounded border border-border p-2 text-sm"></Textarea><span v-if="popupForm.errors.body" role="alert" class="text-sm font-normal text-destructive">{{ popupForm.errors.body }}</span></label>
-                    <div class="grid gap-3 sm:grid-cols-2">
-                        <label class="text-xs">Jangan tampil lagi selama (hari)<Input v-model.number="popupForm.dismiss_days" type="number" min="0" max="365" class="mt-1 w-full rounded border border-border p-2 text-sm" /><span v-if="popupForm.errors.dismiss_days" role="alert" class="text-sm font-normal text-destructive">{{ popupForm.errors.dismiss_days }}</span></label>
-                        <label class="flex items-center gap-2 self-end pb-2 text-xs"><AdminSwitch v-model="popupForm.is_active" /> Aktif</label>
-                    </div>
-                    <div class="flex gap-2"><Button class="rounded bg-[#1769e8] px-4 py-2 text-xs font-bold text-white">Simpan Pop-up</Button><Button type="button" variant="outline" class="px-4 py-2 text-xs" @click="popupFormOpen = false">Batal</Button></div>
-                </form>
-                </SheetContent>
+                    <SheetContent side="right" class="w-full overflow-y-auto sm:max-w-xl">
+                        <SheetHeader><SheetTitle>Tambah pop-up</SheetTitle><SheetDescription>Pop-up tampil sekali saat pelanggan membuka halaman utama.</SheetDescription></SheetHeader>
+                        <form class="mt-4 grid gap-3" @submit.prevent="popupForm.post(base + '/content/popups', { preserveScroll: true, onSuccess: () => { popupFormOpen = false; } })">
+                            <label class="lf-admin-field"><span>Judul</span><Input v-model="popupForm.title" required placeholder="Judul pop-up" /><span v-if="popupForm.errors.title" role="alert" class="text-xs font-normal text-destructive">{{ popupForm.errors.title }}</span></label>
+                            <label class="lf-admin-field"><span>Isi</span><Textarea v-model="popupForm.body" required rows="5" placeholder="Isi pengumuman"></Textarea><span v-if="popupForm.errors.body" role="alert" class="text-xs font-normal text-destructive">{{ popupForm.errors.body }}</span></label>
+                            <label class="lf-admin-field"><span>Jangan tampil lagi selama (hari)</span><Input v-model.number="popupForm.dismiss_days" type="number" min="0" max="365" /><span v-if="popupForm.errors.dismiss_days" role="alert" class="text-xs font-normal text-destructive">{{ popupForm.errors.dismiss_days }}</span></label>
+                            <label class="flex items-center gap-2 text-sm"><AdminSwitch v-model="popupForm.is_active" /> Aktif</label>
+                            <div class="flex justify-end gap-2 border-t border-border pt-4"><Button type="button" variant="outline" @click="popupFormOpen = false">Batal</Button><Button :disabled="popupForm.processing">Simpan pop-up</Button></div>
+                        </form>
+                    </SheetContent>
                 </Sheet>
 
-                <div v-if="popups.length" class="mt-4 grid gap-4 lg:grid-cols-2">
-                    <div class="space-y-3 border-t border-border py-3">
-                        <label class="lf-admin-field "><span>Judul</span><Input v-model="popups[0].title" class="w-full rounded border border-border p-2 text-sm" placeholder="Judul pop-up" /></label>
-                        <label class="lf-admin-field "><span>Isi</span><Textarea v-model="popups[0].body" rows="5" class="mt-3 w-full rounded border border-border p-2 text-sm" placeholder="Isi pengumuman"></Textarea></label>
-                        <div class="grid gap-3 sm:grid-cols-2">
-                            <label class="text-xs">Jangan tampil lagi selama (hari)<Input v-model.number="popups[0].dismiss_days" type="number" min="0" max="365" class="mt-1 w-full rounded border border-border p-2 text-sm" /></label>
-                            <label class="flex items-center gap-2 self-end pb-2 text-xs"><AdminSwitch v-model="popups[0].is_active" /> Aktif</label>
-                        </div>
-                        <div class="flex flex-wrap gap-2">
-                            <Button type="button" class="rounded bg-primary px-3 py-2 text-xs font-bold text-white" @click="savePopup(popups[0])">Simpan</Button>
-                            <Button type="button" variant="destructive" @click="deletePopup(popups[0])">Hapus pop-up</Button>
-                        </div>
-                        <p class="text-[11px] text-muted-foreground">Gambar pop-up bersifat opsional.</p>
-                        <AdminMediaControl type="popup" :id="popups[0].id" :url="popups[0].image_url" />
-                    </div>
-                    <aside class="min-h-48 rounded-lg border border-border bg-muted p-5" aria-label="Pratinjau pop-up">
-                        <h3 class="font-semibold">Pratinjau pop-up</h3>
-                        <div class="mx-auto mt-4 max-w-sm rounded-xl bg-card p-5 shadow-sm">
-                            <img v-if="popups[0].image_url" :src="popups[0].image_url" :alt="popups[0].title" class="mb-3 max-h-40 w-full object-contain" />
-                            <h4 class="text-lg font-bold">{{ popups[0].title }}</h4>
-                            <p class="mt-2 whitespace-pre-wrap text-sm">{{ popups[0].body }}</p>
-                        </div>
-                    </aside>
-                </div>
+                <ul v-if="popups.length" class="divide-y divide-border rounded-md border border-border">
+                    <li v-for="item in popups" :key="item.id">
+                        <button type="button" class="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-muted/40" @click="selectedPopupId = item.id">
+                            <span class="min-w-0 flex-1">
+                                <strong class="block truncate">{{ item.title || 'Pop-up' }}</strong>
+                                <small class="mt-0.5 block truncate text-muted-foreground">{{ item.body }}</small>
+                            </span>
+                            <span :class="['shrink-0 rounded border px-2 py-0.5 text-xs', item.is_active ? 'border-emerald-500/40 text-emerald-400' : 'border-border text-muted-foreground']">{{ item.is_active ? 'Aktif' : 'Nonaktif' }}</span>
+                            <span class="shrink-0 text-xs text-muted-foreground">Ubah</span>
+                        </button>
+                    </li>
+                </ul>
+
+                <Sheet :open="selectedPopupId !== null" @update:open="(value) => { if (!value) selectedPopupId = null; }">
+                    <SheetContent side="right" class="w-full overflow-y-auto sm:max-w-2xl">
+                        <SheetHeader><SheetTitle>Ubah pop-up</SheetTitle><SheetDescription>Ubah teks, gambar, dan masa tampil pop-up.</SheetDescription></SheetHeader>
+                        <template v-for="item in popups" :key="'popup-'+item.id">
+                            <div v-if="selectedPopupId === item.id" class="mt-4 grid gap-4">
+                                <div class="space-y-3">
+                                    <label class="lf-admin-field"><span>Judul</span><Input v-model="item.title" /></label>
+                                    <label class="lf-admin-field"><span>Isi</span><Textarea v-model="item.body" rows="5"></Textarea></label>
+                                    <label class="lf-admin-field"><span>Jangan tampil lagi selama (hari)</span><Input v-model.number="item.dismiss_days" type="number" min="0" max="365" /></label>
+                                    <label class="flex items-center gap-2 text-sm"><AdminSwitch v-model="item.is_active" /> Aktif</label>
+                                    <p class="text-xs text-muted-foreground">Gambar pop-up bersifat opsional.</p>
+                                    <AdminMediaControl type="popup" :id="item.id" :url="item.image_url" />
+                                    <div class="flex gap-2 border-t border-border pt-4"><Button type="button" @click="savePopup(item)">Simpan</Button><Button type="button" variant="destructive" @click="deletePopup(item)">Hapus pop-up</Button></div>
+                                </div>
+                                <aside class="rounded-lg border border-border bg-muted p-4" aria-label="Pratinjau pop-up">
+                                    <h3 class="font-semibold">Pratinjau pop-up</h3>
+                                    <div class="mx-auto mt-4 max-w-sm rounded-xl bg-card p-5 shadow-sm">
+                                        <img v-if="item.image_url" :src="item.image_url" :alt="item.title" class="mb-3 max-h-40 w-full object-contain" />
+                                        <h4 class="text-lg font-bold">{{ item.title }}</h4>
+                                        <p class="mt-2 whitespace-pre-wrap text-sm">{{ item.body }}</p>
+                                    </div>
+                                </aside>
+                            </div>
+                        </template>
+                    </SheetContent>
+                </Sheet>
             </section>
 
-            <section v-show="contentTab === 'assets'" class="rounded-xl border border-border bg-card p-5">
-                <h2 class="text-lg font-bold">Logo & gambar cadangan</h2>
-                <p class="mt-1 text-xs text-muted-foreground">Kelola logo, favicon, banner cadangan, gambar footer, dan aset tampilan lain yang digunakan toko.</p>
-                <div class="mt-4 grid gap-4 lg:grid-cols-2">
-                    <article v-for="asset in assets" :key="asset.id" class="rounded-lg border border-border p-4">
-                        <div class="flex flex-wrap items-center gap-3">
-                            <strong class="text-sm">{{ assetLabel(asset.key) }}</strong>
-                            <label class="flex items-center gap-2 text-xs"><AdminSwitch v-model="asset.is_active" /> Aktif</label>
-                        </div>
-                        <label v-if="assetHasTarget(asset.key)" class="mt-3 block text-xs">
-                            Link ketika banner ditekan
-                            <Input v-model="asset.target_url" type="url" class="mt-1 block w-full rounded border border-border p-2" placeholder="https://..." />
-                        </label>
-                        
-                        <div class="mt-3"><AdminMediaControl type="asset" :asset-key="asset.key" :id="asset.id" :url="asset.image_url" /></div>
-                        <Button type="button" class="mt-3 rounded bg-primary px-3 py-2 text-xs font-bold text-white" @click="saveAsset(asset)">Simpan</Button>
-                    </article>
+            <section v-show="contentTab === 'assets'" class="space-y-4">
+                <div>
+                    <h2 class="text-lg font-semibold">Logo & gambar cadangan</h2>
+                    <p class="mt-1 text-sm text-muted-foreground">Logo, favicon, banner cadangan, gambar footer, dan aset tampilan lain yang dipakai toko. Pilih satu untuk mengganti gambar atau mengatur tautannya.</p>
                 </div>
+                <ul v-if="assets.length" class="divide-y divide-border rounded-md border border-border">
+                    <li v-for="asset in assets" :key="asset.id">
+                        <button type="button" class="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-muted/40" @click="selectedAssetId = asset.id">
+                            <span class="min-w-0 flex-1">
+                                <strong class="block truncate">{{ assetLabel(asset.key) }}</strong>
+                                <small class="mt-0.5 block truncate text-muted-foreground">{{ asset.image_url ? 'Gambar terpasang' : 'Belum ada gambar' }}<template v-if="asset.target_url"> · {{ asset.target_url }}</template></small>
+                            </span>
+                            <span :class="['shrink-0 rounded border px-2 py-0.5 text-xs', asset.is_active ? 'border-emerald-500/40 text-emerald-400' : 'border-border text-muted-foreground']">{{ asset.is_active ? 'Aktif' : 'Nonaktif' }}</span>
+                            <span class="shrink-0 text-xs text-muted-foreground">Ubah</span>
+                        </button>
+                    </li>
+                </ul>
+                <p v-else class="rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground">Belum ada aset toko yang bisa diatur.</p>
+
+                <Sheet :open="selectedAssetId !== null" @update:open="(value) => { if (!value) selectedAssetId = null; }">
+                    <SheetContent side="right" class="w-full overflow-y-auto sm:max-w-xl">
+                        <SheetHeader><SheetTitle>Ubah aset toko</SheetTitle><SheetDescription>Gambar dan tautan aset yang tampil di halaman pelanggan.</SheetDescription></SheetHeader>
+                        <template v-for="asset in assets" :key="'asset-'+asset.id">
+                            <form v-if="selectedAssetId === asset.id" class="mt-4 space-y-4" @submit.prevent="saveAsset(asset)">
+                                <p class="text-sm font-semibold">{{ assetLabel(asset.key) }}</p>
+                                <label v-if="assetHasTarget(asset.key)" class="lf-admin-field"><span>Tautan saat gambar ditekan</span>
+                                    <Input v-model="asset.target_url" type="url" placeholder="https://..." />
+                                </label>
+                                <AdminMediaControl type="asset" :asset-key="asset.key" :id="asset.id" :url="asset.image_url" />
+                                <label class="flex items-center gap-2 text-sm"><AdminSwitch v-model="asset.is_active" /> Aktif dipakai toko</label>
+                                <div class="flex justify-end gap-2 border-t border-border pt-4"><Button type="button" variant="outline" @click="selectedAssetId = null">Tutup</Button><Button>Simpan</Button></div>
+                            </form>
+                        </template>
+                    </SheetContent>
+                </Sheet>
             </section>
 
-            <section v-show="contentTab === 'support'" class="rounded-xl border border-border bg-card p-5">
+            <section v-show="contentTab === 'support'" class="space-y-4">
                 <h2 class="text-lg font-bold">Bantuan, berita & footer</h2>
                 <p class="mt-1 text-xs text-muted-foreground">Nomor kontak, akun sosial, tautan bantuan, dan jam layanan dikelola satu kali di menu Pengaturan.</p>
                 <form class="mt-4 grid gap-3 md:grid-cols-2" @submit.prevent="settingsForm.put(base + '/content/settings')">
@@ -366,7 +403,7 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                 </form>
             </section>
 
-            <section v-show="contentTab === 'news'" class="rounded-xl border border-border bg-card p-5">
+            <section v-show="contentTab === 'news'" class="space-y-4">
                 <h2 class="text-lg font-bold">Berita</h2>
                 <div class="mt-4"><Button type="button" class="rounded bg-[#1769e8] px-4 py-2 text-xs font-bold text-white" @click="newsFormOpen = true">Tambah berita</Button></div>
                 <Sheet :open="newsFormOpen" @update:open="(value) => { newsFormOpen = value; }">
@@ -428,32 +465,53 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                 </Sheet>
             </section>
 
-            <section v-show="contentTab === 'reviews'" class="rounded-xl border border-border bg-card p-5">
-                <div class="flex items-center justify-between gap-3"><div><h2 class="text-lg font-bold">Ulasan Pelanggan</h2><p class="mt-1 text-xs text-muted-foreground">Moderasi ulasan terverifikasi dari order sukses. Isi ulasan tidak diedit oleh Admin.</p></div><span class="rounded bg-muted px-2 py-1 text-xs font-bold">{{reviews.length}} ulasan</span></div>
-                <div class="mt-4 overflow-x-auto rounded-lg border border-border" role="region" aria-label="Daftar ulasan pelanggan" tabindex="0">
-                    <AdminResponsiveTable :mobile-columns="[0,1,2,4,5]" class="w-full min-w-[780px] text-left text-xs">
-                        <TableHeader class="bg-muted text-muted-foreground"><TableRow><TableHead class="p-3">Pelanggan</TableHead><TableHead class="p-3">Produk</TableHead><TableHead class="p-3">Rating</TableHead><TableHead class="p-3">Ulasan</TableHead><TableHead class="p-3">Status</TableHead><TableHead class="p-3">Aksi</TableHead></TableRow></TableHeader>
-                        <TableBody>
-                            <TableRow v-for="item in reviews" :key="item.id" class="border-t border-border">
-                                <TableCell class="p-3 font-semibold">{{item.display_name}}</TableCell>
-                                <TableCell class="p-3">{{item.product_name}}</TableCell>
-                                <TableCell class="p-3 text-amber-500">{{'★'.repeat(item.rating)}}{{'☆'.repeat(5-item.rating)}}</TableCell>
-                                <TableCell class="max-w-[360px] p-3 text-muted-foreground">{{item.body}}</TableCell>
-                                <TableCell class="p-3"><label class="flex items-center gap-2"><AdminSwitch v-model="item.is_active" /> Tampil</label></TableCell>
-                                <TableCell class="p-3">
-                                    <div class="flex items-center gap-2">
-                                        <Button type="button" class="rounded bg-primary px-3 py-2 text-xs font-bold text-white" @click="saveReview(item)">Simpan</Button>
-                                        <Button type="button" class="rounded bg-destructive/10 px-3 py-2 text-xs font-bold text-destructive" @click="deleteReview(item)">Hapus</Button>
-                                    </div>
-                                </TableCell>
-                            </TableRow>
-                            <TableRow v-if="!reviews.length"><TableCell colspan="6" class="p-6 text-center text-muted-foreground">Belum ada ulasan.</TableCell></TableRow>
-                        </TableBody>
-                    </AdminResponsiveTable>
+            <section v-show="contentTab === 'reviews'" class="space-y-4">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <h2 class="text-lg font-semibold">Ulasan pelanggan</h2>
+                        <p class="mt-1 text-sm text-muted-foreground">Moderasi ulasan terverifikasi dari pesanan sukses. Isi ulasan tidak diedit Admin — hanya ditampilkan atau disembunyikan.</p>
+                    </div>
+                    <p class="text-sm text-muted-foreground">{{ reviews.length }} ulasan</p>
                 </div>
+
+                <ul v-if="reviews.length" class="divide-y divide-border rounded-md border border-border">
+                    <li v-for="item in reviews" :key="item.id">
+                        <button type="button" class="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-muted/40" @click="selectedReviewId = item.id">
+                            <span class="min-w-0 flex-1">
+                                <strong class="block truncate">{{ item.display_name }} · {{ item.product_name }}</strong>
+                                <small class="mt-0.5 block truncate text-muted-foreground">{{ '★'.repeat(item.rating) }}{{ '☆'.repeat(5 - item.rating) }} · {{ item.body }}</small>
+                            </span>
+                            <span :class="['shrink-0 rounded border px-2 py-0.5 text-xs', item.is_active ? 'border-emerald-500/40 text-emerald-400' : 'border-border text-muted-foreground']">{{ item.is_active ? 'Tampil' : 'Disembunyikan' }}</span>
+                            <span class="shrink-0 text-xs text-muted-foreground">Tinjau</span>
+                        </button>
+                    </li>
+                </ul>
+                <p v-else class="rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground">Belum ada ulasan masuk.</p>
+
+                <Sheet :open="selectedReviewId !== null" @update:open="(value) => { if (!value) selectedReviewId = null; }">
+                    <SheetContent side="right" class="w-full overflow-y-auto sm:max-w-xl">
+                        <SheetHeader><SheetTitle>Tinjau ulasan</SheetTitle><SheetDescription>Putuskan apakah ulasan ini tampil di halaman produk.</SheetDescription></SheetHeader>
+                        <template v-for="item in reviews" :key="'review-'+item.id">
+                            <div v-if="selectedReviewId === item.id" class="mt-4 space-y-4">
+                                <div class="rounded-md border border-border p-4">
+                                    <p class="text-sm font-semibold">{{ item.display_name }}</p>
+                                    <p class="text-xs text-muted-foreground">{{ item.product_name }}</p>
+                                    <p class="mt-2 text-amber-500">{{ '★'.repeat(item.rating) }}{{ '☆'.repeat(5 - item.rating) }}</p>
+                                    <p class="mt-2 whitespace-pre-wrap text-sm">{{ item.body }}</p>
+                                </div>
+                                <label class="flex items-center gap-2 text-sm"><AdminSwitch v-model="item.is_active" /> Tampilkan di halaman produk</label>
+                                <div class="flex justify-end gap-2 border-t border-border pt-4">
+                                    <Button type="button" variant="destructive" @click="deleteReview(item)">Hapus permanen</Button>
+                                    <Button type="button" variant="outline" @click="selectedReviewId = null">Tutup</Button>
+                                    <Button type="button" @click="saveReview(item)">Simpan</Button>
+                                </div>
+                            </div>
+                        </template>
+                    </SheetContent>
+                </Sheet>
             </section>
 
-            <section v-show="contentTab === 'faq'" class="rounded-xl border border-border bg-card p-5">
+            <section v-show="contentTab === 'faq'" class="space-y-4">
                 <h2 class="text-lg font-bold">Pertanyaan umum</h2>
                 <div class="mt-4"><Button type="button" class="rounded bg-[#1769e8] px-4 py-2 text-xs font-bold text-white" @click="faqFormOpen = true">Tambah FAQ</Button></div>
                 <Sheet :open="faqFormOpen" @update:open="(value) => { faqFormOpen = value; }">
@@ -483,7 +541,7 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                 </div>
             </section>
 
-            <section v-show="contentTab === 'legal'" class="rounded-xl border border-border bg-card p-5">
+            <section v-show="contentTab === 'legal'" class="space-y-4">
                 <h2 class="text-lg font-bold">Kebijakan toko</h2><p class="lf-admin-note">Gunakan ## di awal paragraf untuk judul bagian, dan - di awal paragraf untuk item daftar.</p>
                 <div class="mt-4 space-y-4">
                     <article v-for="item in pages" :key="item.key" class="border-t border-border py-3"><button type="button" class="text-left font-semibold" @click="selectedPageKey = selectedPageKey === item.key ? null : item.key">{{ item.title || item.key }}</button><Sheet :open="selectedPageKey === item.key" @update:open="(value) => { if (!value) selectedPageKey = null; }">
@@ -500,5 +558,15 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                 </div>
             </section>
         </div>
+
+        <AdminConfirmDialog
+            :open="Boolean(pendingAction)"
+            :title="pendingAction?.title || ''"
+            :message="pendingAction?.message || ''"
+            :confirm-label="pendingAction?.confirmLabel || 'Hapus'"
+            destructive
+            @update:open="value => { if (!value) pendingAction = null; }"
+            @confirm="runPending"
+        />
     </AdminShell>
 </template>
