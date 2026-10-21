@@ -179,6 +179,8 @@ const globalMarginError = ref('');
 const globalMarginBusy = ref(false);
 const csrfToken = () => document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 const formatAdminMoney = value => 'Rp' + Number(value || 0).toLocaleString('id-ID');
+const hasNumericValue = value => value !== null && value !== undefined
+    && !(typeof value === 'string' && value.trim() === '') && Number.isFinite(Number(value));
 const requestAdminPreview = async (url, payload) => {
     const response = await fetch(url, {
         method: 'POST',
@@ -399,11 +401,11 @@ const saveMapping = (mapping) => router.put('/admin/catalog/mappings/' + mapping
     priority: mapping.priority, is_active: mapping.is_active,
     ...(mapping.provider_code === 'MANUAL' ? {
         cost_idr: mapping.cost_idr,
-        ...(mapping.store_cost_idr !== mapping.original_store_cost_idr
+        ...(mapping.store_cost_idr !== mapping.original_store_cost_idr && hasNumericValue(mapping.store_cost_idr)
             ? { store_cost_idr: Number(mapping.store_cost_idr) } : {}),
     } : {}),
     ...(mapping.provider_code === 'DIGIFLAZZ' ? {
-        ...(mapping.store_cost_idr !== null && mapping.store_cost_idr !== undefined
+        ...(hasNumericValue(mapping.store_cost_idr)
             ? { store_cost_idr: Number(mapping.store_cost_idr) } : {}),
         is_manual_price: Boolean(mapping.is_manual_price),
         ...(mapping.is_manual_price ? { manual_price_idr: Number(mapping.manual_price_idr) } : {}),
