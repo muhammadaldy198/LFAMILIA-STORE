@@ -5,6 +5,7 @@ import { Sheet, SheetContent, SheetTitle, SheetDescription } from "./ui/sheet";
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import AdminIcon from './AdminIcon.vue';
+import AdminSensitivePrompt from './AdminSensitivePrompt.vue';
 const page = usePage(), open = ref(false), query = ref(''), results = ref([]), searching = ref(false), searchError = ref(''), searchInput = ref(null), accountOpen = ref(false), notificationOpen = ref(false);
 const panel = computed(() => page.props.adminPanel || { menu: [] });
 const base = computed(() => panel.value.base_path || '/admin');
@@ -130,4 +131,5 @@ onUnmounted(() => { window.removeEventListener('keydown', shortcut);window.remov
   <main id="admin-main" tabindex="-1" class="lf-admin-content"><div v-if="Object.keys($page.props.errors || {}).length" role="alert" class="lf-admin-error"><p v-for="(error,key) in $page.props.errors" :key="key">{{error}}</p></div><p v-if="$page.props.status" role="status" class="lf-admin-success">{{$page.props.status}}</p><slot/></main>
  </div>
 </div>
+<AdminSensitivePrompt/>
 </template>

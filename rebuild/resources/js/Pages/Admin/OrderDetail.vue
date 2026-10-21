@@ -7,6 +7,7 @@ import { Button } from '../../Components/ui/button';
 import { Badge } from '../../Components/ui/badge';
 import { Textarea } from '../../Components/ui/textarea';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../../Components/ui/sheet';
+import { confirmSensitive } from '../../lib/sensitivePrompt';
 const props = defineProps({ order: Object, events: Array, payments: Array, attempts: Array, canViewCustomer: Boolean, canCheckFulfillment: Boolean, canResendDelivery: Boolean, canCancel: Boolean });
 const notice = ref('');
 const busy = ref(false);
@@ -32,8 +33,10 @@ const whatsappUrl = computed(() => {
     return 'https://wa.me/' + normalized + '?text=' + encodeURIComponent(text);
 });
 function open(type,id) { form.reset(); form.clearErrors(); action.value={type,id}; actionOpen.value=true; }
-function submit() {
+async function submit() {
     if (!form.confirmed || !action.value) return;
+    const needsPassword = ['cancel','payment'].includes(action.value.type);
+    if (needsPassword && !(await confirmSensitive('Tindakan ini mengubah status pesanan. Masukkan kata sandi admin untuk melanjutkan.'))) return;
     const url = action.value.type==='cancel' ? '/admin/orders/'+props.order.id+'/cancel' : action.value.type==='payment' ? '/admin/payments/manual/'+action.value.id+'/confirm' : action.value.type==='resend' ? '/admin/orders/'+props.order.id+'/resend-delivery' : '/admin/fulfillment/'+action.value.id+'/'+heading.value.suffix;
     form.post(url, { preserveScroll:true, onSuccess:()=>{ actionOpen.value=false; notice.value='Tindakan berhasil disimpan.'; } });
 }

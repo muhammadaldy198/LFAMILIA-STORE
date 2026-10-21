@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
 import { phoneCountries, LEADING_ZERO_PRESERVED_DIALS } from '../Data/phoneCountries';
+import { flagUrl } from '../lib/flags';
 
 const props = defineProps({
     modelValue: { type: String, default: '' },
@@ -17,7 +18,7 @@ const open = ref(false);
 const search = ref('');
 let lastEmitted = null;
 
-const flag = (item) => String.fromCodePoint(...item.iso.toUpperCase().split('').map((char) => 127397 + char.charCodeAt(0)));
+const flag = (item) => flagUrl(item.iso);
 const filtered = computed(() => phoneCountries.filter((item) => `${item.name} +${item.dial}`.toLowerCase().includes(search.value.trim().toLowerCase())));
 
 /**
@@ -137,7 +138,7 @@ watch(() => props.modelValue, (value) => {
 <template>
     <div class="lf-country-picker flex flex-wrap items-start gap-2">
         <button type="button" class="flex h-9 shrink-0 items-center gap-1 rounded border border-white/10 bg-white/5 px-2 text-xs font-semibold text-slate-100 hover:border-white/25 disabled:opacity-50" :disabled="disabled" :aria-expanded="open" aria-label="Pilih kode negara" @click="toggle">
-            <span aria-hidden="true">{{ flag(country) }}</span>
+            <img :src="flag(country)" :alt="country.iso" class="lf-flag" width="20" height="14">
             <span>+{{ country.dial }}</span>
             <span aria-hidden="true" class="text-[9px] text-slate-400">⌄</span>
         </button>
@@ -146,7 +147,7 @@ watch(() => props.modelValue, (value) => {
             <input v-model="search" type="search" placeholder="Cari negara..." aria-label="Cari negara" class="h-9 w-full" />
             <div class="mt-1 max-h-52 overflow-y-auto">
                 <button v-for="item in filtered" :key="item.iso" type="button" class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs text-slate-200 hover:bg-white/10" @click="select(item)">
-                    <span aria-hidden="true">{{ flag(item) }}</span>
+                    <img :src="flag(item)" :alt="item.iso" class="lf-flag" width="20" height="14">
                     <span>{{ item.name }}</span>
                     <span class="ml-auto text-slate-400">+{{ item.dial }}</span>
                 </button>

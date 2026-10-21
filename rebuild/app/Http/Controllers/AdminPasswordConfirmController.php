@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -24,7 +25,7 @@ class AdminPasswordConfirmController
         return Inertia::render('Admin/PasswordConfirm');
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request): RedirectResponse|JsonResponse
     {
         $request->validate([
             'password' => ['required', 'string'],
@@ -33,12 +34,21 @@ class AdminPasswordConfirmController
         $admin = Auth::guard('admin')->user();
 
         if (! $admin || ! Hash::check($request->input('password'), $admin->password)) {
+            if ($request->wantsJson()) {
+                return response()->json(['message' => 'Kata sandi tidak cocok.', 'errors' => ['password' => ['Kata sandi tidak cocok.']]], 422);
+            }
+
             throw ValidationException::withMessages([
                 'password' => 'Kata sandi tidak cocok.',
             ]);
         }
 
         $request->session()->put(self::SESSION_KEY, time());
+
+        // Pop-up admin memakai fetch: cukup balas JSON agar tidak berpindah halaman.
+        if ($request->wantsJson()) {
+            return response()->json(['ok' => true]);
+        }
 
         // P1: kembali ke halaman GET yang aman, bukan replay POST
         // P2: hanya izinkan URL internal

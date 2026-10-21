@@ -1,5 +1,6 @@
 <script setup>
 import AdminSwitch from '../../Components/AdminSwitch.vue';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../../Components/ui/sheet';
 import { Card } from '../../Components/ui/card';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../Components/ui/table';
 import { Button } from '../../Components/ui/button';
@@ -443,7 +444,7 @@ const deleteNotice = (notice) => {
     <Head title="Kelola katalog" />
     <AdminShell>
         <div class="mx-auto max-w-7xl space-y-8">
-            <template v-if="selectedProductId === null">
+            <template>
             <header class="flex flex-col gap-3 border-b border-slate-800 pb-4 sm:flex-row sm:items-end sm:justify-between"><div class="min-w-0"><Link href="/admin/panel" class="text-sm text-cyan-300">← Panel Admin</Link><h1 class="mt-2 text-3xl font-bold tracking-tight">Produk</h1></div><Link href="/" class="text-sm text-cyan-300">Lihat katalog pelanggan</Link></header>
             
 
@@ -567,7 +568,10 @@ const deleteNotice = (notice) => {
                     </label>
                     <Button type="button" :disabled="!importProductId" @click="openProductImport">Lanjut pilih SKU</Button>
                 </Card>
-                <form v-if="showCreateProduct" class="grid gap-3 md:grid-cols-3" @submit.prevent="submitProduct">
+                <Sheet :open="showCreateProduct" @update:open="(value) => { showCreateProduct = value; }">
+                <SheetContent side="right" class="w-full overflow-y-auto sm:max-w-3xl">
+                <SheetHeader><SheetTitle>Tambah produk</SheetTitle><SheetDescription>Isi data produk baru. Nominal bisa ditambahkan setelah produk dibuat.</SheetDescription></SheetHeader>
+                <form class="grid gap-3 md:grid-cols-3" @submit.prevent="submitProduct">
                     <label class="text-sm">Kategori<select v-model="productForm.category_id" required class="mt-1 block w-full rounded-md bg-slate-800 p-2"><option value="">Pilih kategori</option><option v-for="item in categories" :key="item.id" :value="item.id">{{ item.name }}</option></select><span v-if="productForm.errors.category_id" role="alert" class="text-sm font-normal text-destructive">{{ productForm.errors.category_id }}</span></label>
                     <label class="text-sm">Nama produk<Input v-model="productForm.name" required class="mt-1 block w-full rounded-md bg-slate-800 p-2" /><span v-if="productForm.errors.name" role="alert" class="text-sm font-normal text-destructive">{{ productForm.errors.name }}</span></label>
                     <details class="text-sm"><summary class="cursor-pointer">Ubah tautan halaman produk (lanjutan)</summary><label class="mt-2 block">Bagian alamat halaman<Input v-model="productForm.slug" placeholder="Dibuat otomatis dari nama" class="mt-1 block w-full rounded-md bg-slate-800 p-2" /><span v-if="productForm.errors.slug" role="alert" class="text-sm font-normal text-destructive">{{ productForm.errors.slug }}</span></label></details>
@@ -602,6 +606,8 @@ const deleteNotice = (notice) => {
                     </template>
                     <div class="md:col-span-3"><Button :disabled="productForm.processing" class="rounded-md bg-cyan-400 px-4 py-2 font-semibold text-slate-950">Tambah {{ tab === 'MANUAL' ? 'produk manual' : 'produk otomatis' }}</Button><p v-if="Object.keys(productForm.errors).length" class="mt-2 text-sm text-red-300">{{ Object.values(productForm.errors).join(' · ') }}</p></div>
                 </form>
+                </SheetContent>
+                </Sheet>
                 <div class="overflow-x-auto rounded-md border" role="region" aria-label="Daftar produk dalam katalog" tabindex="0"><Table class="min-w-[880px]"><TableHeader><TableRow><TableHead>Produk</TableHead><TableHead>Kategori</TableHead><TableHead>Jenis</TableHead><TableHead>Nominal</TableHead><TableHead>Urutan</TableHead><TableHead>Status</TableHead><TableHead>Aksi</TableHead></TableRow></TableHeader><TableBody><TableRow v-for="item in visibleProducts" :key="item.id" class="cursor-pointer" @click="editProduct(item)" @keydown.enter="editProduct(item)"><TableCell><strong>{{item.name}}</strong><small v-if="item.publisher" class="block text-muted-foreground">{{item.publisher}}</small></TableCell><TableCell>{{categories.find(c=>String(c.id)===String(item.category_id))?.name||'Tanpa kategori'}}</TableCell><TableCell>{{item.fulfillment_mode==='MANUAL'?'Manual':'Otomatis'}}</TableCell><TableCell>{{item.packages.length}}</TableCell><TableCell>Posisi {{ productPosition(item) }}</TableCell><TableCell>{{item.is_active ? 'Aktif' : 'Nonaktif'}}</TableCell><TableCell><Button type="button" variant="outline" size="sm" @click.stop="editProduct(item)">Edit</Button></TableCell></TableRow></TableBody></Table></div><p v-if="!visibleProducts.length" class="lf-admin-note">Tidak ada produk yang sesuai dengan filter.</p>
                 <nav class="flex flex-wrap items-center justify-between gap-3"><span class="text-sm text-muted-foreground">{{matchingProducts.length}} produk · Halaman {{catalogPage}} dari {{totalCatalogPages}}</span><div class="flex gap-2"><Button type="button" variant="outline" :disabled="catalogPage <= 1" @click="catalogPage--">Sebelumnya</Button><Button type="button" variant="outline" :disabled="catalogPage >= totalCatalogPages" @click="catalogPage++">Berikutnya</Button></div></nav>
 
@@ -617,7 +623,10 @@ const deleteNotice = (notice) => {
             </section>
 
             </template>
-            <section v-else class="lf-admin-workspace" aria-label="Editor produk">
+            <Sheet :open="selectedProductId !== null" @update:open="(value) => { if (!value) closeProduct(); }">
+            <SheetContent side="right" class="w-full overflow-y-auto sm:max-w-5xl">
+            <SheetHeader><SheetTitle>Editor produk</SheetTitle><SheetDescription>Ubah informasi, nominal, tampilan, dan data pelanggan tanpa meninggalkan daftar produk.</SheetDescription></SheetHeader>
+            <section class="lf-admin-workspace" aria-label="Editor produk">
                         <div v-for="item in selectedProductItems" :key="item.id" class="space-y-4">
                     <header class="flex flex-col gap-3 border-b pb-4 pr-8 sm:flex-row sm:items-center sm:justify-between"><div class="min-w-0"><p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Editor Produk</p><h1 class="mt-1 break-words text-xl font-semibold">{{item.name}}</h1></div><div class="flex flex-col gap-2 sm:flex-row"><Button class="w-full sm:w-auto" type="button" variant="destructive" size="sm" @click="deleteProduct(item)">Hapus</Button><Button class="w-full sm:w-auto" type="button" variant="outline" size="sm" @click="closeProduct">Kembali ke produk</Button></div></header>
                     <nav class="lf-admin-tabs" aria-label="Bagian editor produk"><Button type="button" variant="ghost" :aria-current="editorTab==='info' ? 'page' : undefined" :class="{active:editorTab==='info'}" @click="editorTab='info'">Informasi</Button><Button type="button" variant="ghost" :aria-current="editorTab==='nominal' ? 'page' : undefined" :class="{active:editorTab==='nominal'}" @click="editorTab='nominal'">Nominal & Harga</Button><Button type="button" variant="ghost" :aria-current="editorTab==='display' ? 'page' : undefined" :class="{active:editorTab==='display'}" @click="editorTab='display'">Tampilan Produk</Button><Button type="button" variant="ghost" :aria-current="editorTab==='fields' ? 'page' : undefined" :class="{active:editorTab==='fields'}" @click="fieldsProductId=String(item.id);editorTab='fields'">Data Pelanggan</Button><Button type="button" variant="ghost" :aria-current="editorTab==='fulfillment' ? 'page' : undefined" :class="{active:editorTab==='fulfillment'}" @click="editorTab='fulfillment'">Penanganan</Button></nav>
@@ -817,6 +826,8 @@ const deleteNotice = (notice) => {
                     <div class="lf-admin-workspace-actions"><Button type="button" variant="outline" @click="closeProduct">Kembali</Button><Button v-if="editorTab==='info'||editorTab==='display'" type="button" :disabled="savingProduct" @click="saveProduct(item)">{{savingProduct?'Menyimpan…':'Simpan produk'}}</Button><Button v-if="editorTab==='fields'" type="button" :disabled="fieldsSaving" @click="saveFields">{{fieldsSaving?'Menyimpan…':'Simpan data pelanggan'}}</Button></div>
                         </div>
             </section>
+            </SheetContent>
+            </Sheet>
 
         </div>
     </AdminShell>

@@ -25,6 +25,15 @@ class RequireAdminPasswordConfirm
             $path = parse_url($fallback, PHP_URL_PATH) ?: '/admin';
             $request->session()->put('url.intended', $path);
 
+            // Permintaan fetch dari pop-up dibalas JSON; kunjungan Inertia biasa
+            // tetap dialihkan ke halaman konfirmasi.
+            if ($request->wantsJson() && ! $request->header('X-Inertia')) {
+                return response()->json([
+                    'message' => 'Konfirmasi kata sandi diperlukan.',
+                    'requires_password' => true,
+                ], 423);
+            }
+
             return redirect()->route('admin.password.confirm');
         }
 
