@@ -232,8 +232,10 @@ function togglePermission(key, checked) {
                             <TableRow v-for="admin in admins.data" :key="admin.id">
                                 <TableCell>
                                     <button type="button" class="block text-left font-semibold underline-offset-4 hover:underline" @click="openEdit(admin)">{{ admin.name }}</button>
-                                    <span class="text-xs text-muted-foreground">{{ admin.email }}</span>
-                                    <Badge v-if="Number(admin.id) === Number(currentAdminId)" variant="outline" class="mt-1">Sedang digunakan</Badge>
+                                    <div class="flex flex-col items-start gap-1">
+                                        <span class="text-xs text-muted-foreground">{{ admin.email }}</span>
+                                        <Badge v-if="Number(admin.id) === Number(currentAdminId)" variant="outline">Sedang digunakan</Badge>
+                                    </div>
                                 </TableCell>
                                 <TableCell><Badge :variant="admin.role === 'SUPER_ADMIN' ? 'secondary' : 'outline'">{{ roleLabel(admin.role) }}</Badge></TableCell>
                                 <TableCell><Badge :variant="admin.is_active ? 'secondary' : 'outline'">{{ admin.is_active ? 'Aktif' : 'Nonaktif' }}</Badge></TableCell>
@@ -342,7 +344,7 @@ function togglePermission(key, checked) {
 
                 <p v-if="form.errors.admin" class="text-sm text-destructive">{{ form.errors.admin }}</p>
 
-                <div class="flex justify-end gap-2">
+                <div class="sticky bottom-0 -mx-6 flex justify-end gap-2 border-t bg-background px-6 py-3">
                     <Button type="button" variant="outline" @click="closeEditor">Batal</Button>
                     <Button :disabled="form.processing">{{ form.processing ? 'Menyimpan…' : 'Simpan akun' }}</Button>
                 </div>
