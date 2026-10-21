@@ -191,7 +191,6 @@ function discountLabel(row) {
             <Card class="p-4"><p class="text-xs text-muted-foreground">Reservasi aktif</p><p class="mt-2 text-2xl font-semibold">{{ summary.reserved_count || 0 }}</p></Card>
         </div>
 
-        <template>
             <Card class="min-w-0 p-4 sm:p-5">
                 <form class="grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-5" @submit.prevent="submitVoucherFilters">
                     <label class="space-y-1 md:col-span-2">
@@ -292,7 +291,6 @@ function discountLabel(row) {
                         >{{ link.label }}</Link>
                 </div>
             </Card>
-        </template>
 
         <Sheet :open="editorOpen" @update:open="(value) => { if (!value) closeEditor(); }">
         <SheetContent side="right" class="w-full overflow-y-auto sm:max-w-3xl">

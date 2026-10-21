@@ -444,7 +444,6 @@ const deleteNotice = (notice) => {
     <Head title="Kelola katalog" />
     <AdminShell>
         <div class="mx-auto max-w-7xl space-y-8">
-            <template>
             <header class="flex flex-col gap-3 border-b border-slate-800 pb-4 sm:flex-row sm:items-end sm:justify-between"><div class="min-w-0"><Link href="/admin/panel" class="text-sm text-cyan-300">← Panel Admin</Link><h1 class="mt-2 text-3xl font-bold tracking-tight">Produk</h1></div><Link href="/" class="text-sm text-cyan-300">Lihat katalog pelanggan</Link></header>
             
 
@@ -622,7 +621,6 @@ const deleteNotice = (notice) => {
                 </template>
             </section>
 
-            </template>
             <Sheet :open="selectedProductId !== null" @update:open="(value) => { if (!value) closeProduct(); }">
             <SheetContent side="right" class="w-full overflow-y-auto sm:max-w-5xl">
             <SheetHeader><SheetTitle>Editor produk</SheetTitle><SheetDescription>Ubah informasi, nominal, tampilan, dan data pelanggan tanpa meninggalkan daftar produk.</SheetDescription></SheetHeader>

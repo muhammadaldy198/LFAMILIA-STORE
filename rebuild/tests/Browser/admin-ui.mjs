@@ -78,7 +78,8 @@ try {
                 await pointerClick(`[...document.querySelectorAll('button')].find(b=>b.getBoundingClientRect().height>0&&b.textContent.trim()==='Lanjut pilih SKU')`);
                 if(!await evaluate(`Boolean(document.querySelector('[data-testid="digiflazz-import"]'))`))throw Error('Catalog import action did not open SKU picker');
                 await navigate('/admin/catalog?edit='+editor);
-                if(!await evaluate(`!document.querySelector('input[placeholder="Nama, alamat produk, merek, atau nominal"]')&&!document.querySelector('[role=dialog]')`))throw Error('Product list visible behind editor');
+                // Editor produk sekarang pop-up: daftar tetap di belakang, sheet harus terbuka.
+                if(!await evaluate(`Boolean(document.querySelector('[role=dialog]'))`))throw Error('Product editor sheet did not open');
                 for(const tab of ['Informasi','Nominal & Harga','Tampilan Produk','Data Pelanggan','Penanganan']){
                     await click(tab);await inspect(width+'-product-'+tab);
                     if(tab==='Nominal & Harga'){
