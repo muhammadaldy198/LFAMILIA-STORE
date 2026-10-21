@@ -91,7 +91,8 @@
 @media(min-width:768px){
  .lf-admin.lf-admin{--lf-admin-page:28px;--lf-admin-heading:18px;--lf-admin-body:14px;--lf-admin-control:40px}
  .lf-admin .lf-admin-content{padding:24px}
- .lf-admin-summary{grid-template-columns:repeat(4,minmax(0,1fr))}
+ .lf-admin-summary{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+ .lf-admin-summary.lf-admin-summary-4{grid-template-columns:repeat(4,minmax(0,1fr))}
  .lf-admin-content.lf-admin-content .lf-admin-summary>[data-slot=card]{border-bottom:0}
 }
 @media(max-width:767px){

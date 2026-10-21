@@ -66,7 +66,7 @@ const markRead=n=>router.post('/admin/notifications/'+n.id+'/read',{}, {preserve
         <div class="flex flex-wrap items-center gap-3"><time class="min-w-36 rounded-md border border-border bg-card px-3 py-2 text-xs"><strong class="block">{{clockDate}}</strong><span class="text-muted-foreground">{{clockTime}} WIB</span></time><Button variant="outline" :disabled="busy" @click="refresh"><AdminIcon name="providers" class="size-4"/>{{busy?'Memuat…':'Muat ulang'}}</Button></div>
     </header>
     <!-- 1. Metric Cards -->
-    <section class="lf-admin-summary" aria-label="Ringkasan dashboard">
+    <section class="lf-admin-summary lf-admin-summary-4" aria-label="Ringkasan dashboard">
         <Card v-for="metric in metricCards" :key="metric.key" class="min-w-0 p-4"><div class="flex items-start gap-3"><span class="grid size-9 shrink-0 place-items-center rounded-md bg-primary/10 text-primary"><AdminIcon :name="metric.icon" class="size-5"/></span><div class="min-w-0"><p class="text-xs text-muted-foreground">{{metric.label}}</p><strong class="mt-1 block break-words text-xl font-bold tabular-nums">{{metric.finance?money(metric.value):Number(metric.value||0).toLocaleString('id-ID')}}</strong></div></div><p class="mt-3 text-xs text-muted-foreground">{{metric.key==='digiflazz_balance'&&metric.value==null?statusLabel(digiflazzBalance?.status):metric.note}}</p><p v-if="metric.key==='digiflazz_balance'&&digiflazzBalance?.checked_at" class="mt-1 text-xs text-muted-foreground">{{date(digiflazzBalance.checked_at)}}</p></Card>
     </section>
 
