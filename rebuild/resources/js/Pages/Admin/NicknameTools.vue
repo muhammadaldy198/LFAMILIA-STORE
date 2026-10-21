@@ -1,10 +1,12 @@
 <script setup>
+import AdminConfirmDialog from '../../Components/AdminConfirmDialog.vue';
 import AdminSwitch from '../../Components/AdminSwitch.vue';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../../Components/ui/sheet';
 import AdminResponsiveTable from '../../Components/AdminResponsiveTable.vue';
 import { Head } from '@inertiajs/vue3';
 import { computed, reactive, ref, watch } from 'vue';
 import AdminShell from '../../Components/AdminShell.vue';
+import { Badge } from '../../Components/ui/badge';
 import { Button } from '../../Components/ui/button';
 import { Input } from '../../Components/ui/input';
 import { TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../Components/ui/table';
@@ -36,6 +38,15 @@ const editorBusy = ref(false);
 const editorError = ref('');
 const editorNotice = ref('');
 const reorderBusy = ref(false);
+const pendingAction = ref(null);
+const ask = (title, message, confirmLabel, run, destructive = false) => {
+    pendingAction.value = { title, message, confirmLabel, run, destructive };
+};
+const runPending = () => {
+    const action = pendingAction.value;
+    pendingAction.value = null;
+    action?.run();
+};
 const form = reactive({
     name: '',
     code: '',
@@ -248,8 +259,10 @@ async function saveCode() {
 
 async function deleteCode(item) {
     if (editorBusy.value || item.product_count > 0) return;
-    if (!window.confirm(`Hapus kode game “${item.name}”? Tindakan ini tidak dapat dibatalkan.`)) return;
+    ask('Hapus kode game', 'Kode “' + item.name + '” akan dihapus dan tidak bisa dikembalikan.', 'Hapus kode', () => removeCode(item), true);
+}
 
+async function removeCode(item) {
     editorBusy.value = true;
     editorError.value = '';
     try {
@@ -322,25 +335,25 @@ if (nicknameCodes.value.length > 0) gameCode.value = nicknameCodes.value[0].code
 </script>
 
 <template>
-<Head title="Validasi Akun" />
+<Head title="Alat cek nama game" />
 <AdminShell>
 <div class="mx-auto max-w-[1540px]">
     <header class="mb-4 flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between">
         <div class="min-w-0">
-            <h1 class="text-2xl font-semibold tracking-[-0.025em] text-foreground">Validasi Akun</h1>
-            <p class="mt-1 text-xs text-muted-foreground">Uji data akun dan kelola aturan validasi game. Credential tetap tersimpan di backend.</p>
+            <h1 class="text-2xl font-semibold tracking-tight">Alat cek nama game</h1>
+            <p class="mt-1 max-w-3xl text-sm text-muted-foreground">Cek nama panggilan pemain, server/region, atau nomor pelanggan PLN sebelum pelanggan membeli. Data akses layanan tetap tersimpan di server.</p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
             <span class="rounded-full border px-3 py-1.5 text-xs font-bold" :class="integrationStatus.className">{{ integrationStatus.text }}</span>
-            <a href="/admin/integrations" class="rounded-md border border-border bg-card px-3 py-2 text-xs font-bold text-muted-foreground hover:bg-muted">Pengaturan Integrasi</a>
+            <a href="/admin/integrations" class="rounded-md border border-border bg-card px-3 py-2 text-xs font-bold text-muted-foreground hover:bg-muted">Pengaturan integrasi</a>
         </div>
     </header>
 
-    <section class="overflow-hidden rounded-lg border border-border bg-card">
-        <header class="border-b border-border px-4 pt-3">
+    <section>
+        <header>
             <nav class="lf-admin-tabs" aria-label="Validasi akun">
                 <Button
-                    v-for="item in [['game','Cek Game'],['region','Cek Region'],['pln','PLN'],['codes','Kode Game']]"
+                    v-for="item in [['game','Cek nama game'],['region','Cek server'],['pln','Cek PLN'],['codes','Daftar kode game']]"
                     :key="item[0]"
                     type="button"
                     class="shrink-0"
@@ -356,7 +369,7 @@ if (nicknameCodes.value.length > 0) gameCode.value = nicknameCodes.value[0].code
         <div v-if="tab!=='codes'" class="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_360px]">
             <div class="grid content-start gap-4 sm:grid-cols-2">
                 <label v-if="tab==='game' || tab==='region'" class="text-sm font-bold text-muted-foreground">
-                    Game
+                    Pilih game
                     <select v-model="gameCode" class="mt-1 block h-10 w-full rounded-md border border-border bg-muted px-3 text-xs text-foreground outline-none focus:border-primary">
                         <option value="" disabled>Pilih game</option>
                         <option v-for="item in (tab==='region' ? regionCodes : nicknameCodes)" :key="item.id" :value="item.code">
@@ -366,25 +379,25 @@ if (nicknameCodes.value.length > 0) gameCode.value = nicknameCodes.value[0].code
                 </label>
 
                 <label v-if="tab!=='pln'" class="text-sm font-bold text-muted-foreground">
-                    User ID
-                    <Input v-model="userId" maxlength="80" placeholder="Masukkan User ID" class="mt-1 h-10 text-xs" />
+                    ID pemain
+                    <Input v-model="userId" maxlength="80" placeholder="Masukkan ID pemain" class="mt-1 h-10 text-xs" />
                 </label>
 
                 <label v-if="tab!=='pln'" class="text-sm font-bold text-muted-foreground">
-                    Server / Zone
+                    Server / zona
                     <Input
                         v-model="server"
                         maxlength="40"
-                        :placeholder="requiresServer || tab==='region' ? 'Wajib diisi' : 'Opsional'"
+                        :placeholder="requiresServer || tab==='region' ? 'Wajib diisi' : 'Boleh dikosongkan'"
                         class="mt-1 h-10 text-xs"
                     />
                     <small class="mt-1 block font-normal text-muted-foreground">
-                        {{ requiresServer || tab==='region' ? 'Wajib untuk pemeriksaan ini.' : 'Isi jika akun game menggunakan Server / Zone.' }}
+                        {{ requiresServer || tab==='region' ? 'Wajib untuk pemeriksaan ini.' : 'Isi bila akun game memakai server atau zona.' }}
                     </small>
                 </label>
 
                 <label v-if="tab==='pln'" class="text-sm font-bold text-muted-foreground sm:col-span-2">
-                    Nomor Meter / ID Pelanggan PLN
+                    Nomor meter / ID pelanggan PLN
                     <Input
                         :value="customerNumber"
                         inputmode="numeric"
@@ -395,13 +408,11 @@ if (nicknameCodes.value.length > 0) gameCode.value = nicknameCodes.value[0].code
                     />
                 </label>
 
-                <div v-if="tab==='region'" class="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs leading-4 text-blue-800 sm:col-span-2">
-                    Hanya game aktif yang ditandai “Perlu cek region” yang tersedia pada pemeriksaan ini.
-                </div>
+                <p v-if="tab==='region'" class="rounded-md border border-border bg-muted px-3 py-2 text-sm text-muted-foreground sm:col-span-2">Hanya game aktif yang ditandai perlu cek server yang bisa diperiksa di sini.</p>
 
                 <div class="flex flex-wrap gap-2 border-t border-border pt-4 sm:col-span-2">
                     <Button type="button" :disabled="busy" class="h-9 bg-primary px-4 text-sm font-bold text-white disabled:opacity-50" @click="runCheck">
-                        {{ busy ? 'Memeriksa...' : 'Cek Data' }}
+                        {{ busy ? 'Memeriksa…' : 'Cek data' }}
                     </Button>
                     <Button type="button" :disabled="busy" variant="outline" class="h-9 px-4 text-sm font-bold" @click="clearForm">
                         Bersihkan
@@ -412,43 +423,41 @@ if (nicknameCodes.value.length > 0) gameCode.value = nicknameCodes.value[0].code
             <aside class="space-y-3">
                 <div class="rounded-md border border-border bg-muted p-3">
                     <div class="flex items-center justify-between gap-2">
-                        <strong class="text-sm text-foreground">Alamat layanan aktif</strong>
-                        <span class="rounded-full border border-border bg-card px-2 py-1 text-xs font-bold text-muted-foreground">Hanya di server</span>
+                        <strong class="text-sm">Alamat layanan yang dipakai</strong>
+                        <span class="rounded-full border border-border bg-card px-2 py-1 text-xs font-bold text-muted-foreground">Disimpan di server</span>
                     </div>
                     <code class="mt-2 block break-all rounded border border-border bg-card px-2.5 py-2 text-xs text-primary">{{ endpointText }}</code>
                     <p v-if="validationConfig?.base_url" class="mt-2 break-all text-xs text-muted-foreground">{{ validationConfig.base_url }}</p>
                 </div>
-                <div v-if="error" class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2.5 text-xs font-semibold leading-4 text-rose-700">{{ error }}</div>
-                <div v-if="result" class="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-xs font-semibold leading-4 text-emerald-700">
-                    <template v-if="tab==='pln'">Nama pelanggan: {{ result.customer_name || '-' }}</template>
-                    <template v-else>Nickname: {{ result.nickname || '-' }}<span v-if="result.region"> · Region: {{ result.region }}</span></template>
+                <p v-if="error" role="alert" class="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-sm font-medium">{{ error }}</p>
+                <div v-if="result" role="status" class="rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-2.5 text-sm font-medium">
+                    <template v-if="tab==='pln'">Nama pelanggan: {{ result.customer_name || 'Tidak ditemukan' }}</template>
+                    <template v-else>Nama panggilan: {{ result.nickname || 'Tidak ditemukan' }}<span v-if="result.region"> · Server: {{ result.region }}</span></template>
                 </div>
-                <div class="rounded-md border border-border bg-card p-3 text-xs leading-4 text-muted-foreground">
-                    API key tidak pernah dikirim ke browser. Alamat utama dan jalur layanan dapat diubah melalui menu Integrasi.
-                </div>
+                <p class="rounded-md border border-border p-3 text-sm text-muted-foreground">Kunci akses tidak pernah dikirim ke peramban. Alamat layanan diatur di menu Integrasi.</p>
             </aside>
         </div>
 
         <div v-else class="p-4">
             <div class="mb-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                 <div>
-                    <h2 class="text-sm font-extrabold text-foreground">Daftar Kode Game</h2>
-                    <p class="mt-1 text-xs text-muted-foreground">Game aktif tidak otomatis mendukung cek nickname. Dukungan nickname, Server / Zone, region, status, dan urutan diatur terpisah.</p>
+                    <h2 class="text-lg font-semibold">Daftar kode game</h2>
+                    <p class="mt-1 text-sm text-muted-foreground">Game yang aktif belum tentu bisa dicek nama panggilannya. Dukungan cek nama, kebutuhan server, cek region, status, dan urutan diatur per game.</p>
                 </div>
                 <div class="flex w-full flex-col gap-2 sm:flex-row lg:w-auto">
-                    <Input aria-label="Cari game atau kode" v-model="query" placeholder="Cari game atau kode..." class="h-9 w-full text-sm sm:w-[280px]" />
-                    <Button type="button" class="h-9 bg-primary px-4 text-sm font-bold text-white" @click="createCode">Tambah Kode Game</Button>
+                    <Input aria-label="Cari game atau kode" v-model="query" placeholder="Cari nama game atau kode" class="h-10 w-full text-sm sm:w-[280px]" />
+                    <Button type="button" class="h-9 bg-primary px-4 text-sm font-bold text-white" @click="createCode">Tambah kode game</Button>
                 </div>
             </div>
 
         <Sheet :open="editorOpen" @update:open="(value) => { if (!value) { editorOpen = false; resetEditor(); } }">
             <SheetContent side="right" class="w-full overflow-y-auto sm:max-w-xl">
-                <SheetHeader><SheetTitle>{{ editingId ? 'Edit Kode Game' : 'Tambah Kode Game' }}</SheetTitle><SheetDescription>Perubahan langsung menjadi sumber aturan validasi backend.</SheetDescription></SheetHeader>
-                <div v-if="editorError" class="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">{{ editorError }}</div>
+                <SheetHeader><SheetTitle>{{ editingId ? 'Ubah kode game' : 'Tambah kode game' }}</SheetTitle><SheetDescription>Perubahan di sini langsung dipakai sistem saat memeriksa akun.</SheetDescription></SheetHeader>
+                <p v-if="editorError" role="alert" class="mt-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm font-medium">{{ editorError }}</p>
 
 
 
-                <div v-if="editorNotice" class="mb-3 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">{{ editorNotice }}</div>
+                <p v-if="editorNotice" class="mb-3 rounded-md border border-border bg-muted px-3 py-2 text-sm text-muted-foreground">{{ editorNotice }}</p>
 
                 <div class="grid gap-3 md:grid-cols-2">
                     <label class="text-xs font-bold text-muted-foreground">
@@ -465,11 +474,11 @@ if (nicknameCodes.value.length > 0) gameCode.value = nicknameCodes.value[0].code
                 <div class="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                     <label class="flex min-h-12 items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-xs font-semibold text-muted-foreground">
                         <AdminSwitch v-model="form.supports_nickname_check" @update:model-value="syncNicknameSupportRules" />
-                        Mendukung cek nickname
+                        Bisa dicek nama panggilannya
                     </label>
                     <label class="flex min-h-12 items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-xs font-semibold text-muted-foreground">
                         <AdminSwitch v-model="form.requires_server" :disabled="!form.supports_nickname_check || form.requires_region_check" />
-                        Wajib Server / Zone
+                        Wajib server / zona
                     </label>
                     <label class="flex min-h-12 items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-xs font-semibold text-muted-foreground">
                         <AdminSwitch v-model="form.requires_region_check" :disabled="!form.supports_nickname_check" @update:model-value="form.requires_server = form.requires_server || form.requires_region_check" />
@@ -483,7 +492,7 @@ if (nicknameCodes.value.length > 0) gameCode.value = nicknameCodes.value[0].code
 
                 <div class="mt-4 flex flex-wrap gap-2">
                     <Button type="button" :disabled="editorBusy" class="h-9 bg-primary px-4 text-sm font-bold text-white disabled:opacity-50" @click="saveCode">
-                        {{ editorBusy ? 'Menyimpan...' : 'Simpan' }}
+                        {{ editorBusy ? 'Menyimpan…' : 'Simpan' }}
                     </Button>
                     <Button type="button" :disabled="editorBusy" variant="outline" class="h-9 px-4 text-sm font-bold" @click="editorOpen=false;resetEditor()">Batal</Button>
                 </div>
@@ -496,16 +505,16 @@ if (nicknameCodes.value.length > 0) gameCode.value = nicknameCodes.value[0].code
                         <TableRow>
                             <TableHead class="w-[92px] px-3 py-2.5">Urutan</TableHead>
                             <TableHead class="px-3 py-2.5">Game</TableHead>
-                            <TableHead class="px-3 py-2.5">Kode Game</TableHead>
-                            <TableHead class="px-3 py-2.5">Cek Nickname</TableHead>
-                            <TableHead class="px-3 py-2.5">Server / Zone</TableHead>
+                            <TableHead class="px-3 py-2.5">Kode game</TableHead>
+                            <TableHead class="px-3 py-2.5">Cek nama</TableHead>
+                            <TableHead class="px-3 py-2.5">Server / zona</TableHead>
                             <TableHead class="px-3 py-2.5">Region</TableHead>
                             <TableHead class="px-3 py-2.5">Status</TableHead>
                             <TableHead class="px-3 py-2.5">Produk</TableHead>
-                            <TableHead class="px-3 py-2.5 text-right">Aksi</TableHead>
+                            <TableHead class="px-3 py-2.5 text-right">Tindakan</TableHead>
                         </TableRow>
                     </TableHeader>
-                    <TableBody class="divide-y divide-[#edf0f4] bg-card">
+                    <TableBody class="divide-y divide-border">
                         <TableRow v-for="item in filteredCodes" :key="item.id" :class="{ 'opacity-60': !item.is_active }">
                             <TableCell class="px-3 py-2.5">
                                 <div class="flex gap-1">
@@ -516,32 +525,24 @@ if (nicknameCodes.value.length > 0) gameCode.value = nicknameCodes.value[0].code
                             <TableCell class="px-3 py-2.5 font-semibold text-foreground">{{ item.name }}</TableCell>
                             <TableCell class="px-3 py-2.5 font-mono text-primary">{{ item.code }}</TableCell>
                             <TableCell class="px-3 py-2.5">
-                                <span class="rounded-full px-2 py-1 text-xs font-bold" :class="item.supports_nickname_check ? 'bg-emerald-50 text-emerald-700' : 'bg-muted text-muted-foreground'">
-                                    {{ item.supports_nickname_check ? 'Didukung' : 'Tidak didukung' }}
-                                </span>
+                                <Badge :variant="item.supports_nickname_check ? 'secondary' : 'outline'">{{ item.supports_nickname_check ? 'Didukung' : 'Tidak didukung' }}</Badge>
                             </TableCell>
                             <TableCell class="px-3 py-2.5">
-                                <span class="rounded-full px-2 py-1 text-xs font-bold" :class="item.requires_server ? 'bg-amber-50 text-amber-700' : 'bg-muted text-muted-foreground'">
-                                    {{ item.requires_server ? 'Wajib' : 'Tidak' }}
-                                </span>
+                                <Badge :variant="item.requires_server ? 'outline' : 'secondary'">{{ item.requires_server ? 'Wajib' : 'Tidak' }}</Badge>
                             </TableCell>
                             <TableCell class="px-3 py-2.5">
-                                <span class="rounded-full px-2 py-1 text-xs font-bold" :class="item.requires_region_check ? 'bg-blue-50 text-blue-700' : 'bg-muted text-muted-foreground'">
-                                    {{ item.requires_region_check ? 'Dicek' : 'Tidak' }}
-                                </span>
+                                <Badge :variant="item.requires_region_check ? 'outline' : 'secondary'">{{ item.requires_region_check ? 'Dicek' : 'Tidak' }}</Badge>
                             </TableCell>
                             <TableCell class="px-3 py-2.5">
-                                <span class="rounded-full px-2 py-1 text-xs font-bold" :class="item.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-muted text-muted-foreground'">
-                                    {{ item.is_active ? 'Aktif' : 'Nonaktif' }}
-                                </span>
+                                <Badge :variant="item.is_active ? 'secondary' : 'outline'">{{ item.is_active ? 'Aktif' : 'Nonaktif' }}</Badge>
                             </TableCell>
                             <TableCell class="px-3 py-2.5 text-muted-foreground">{{ item.product_count }}</TableCell>
                             <TableCell class="px-3 py-2.5">
                                 <div class="flex justify-end gap-1.5">
                                     <Button type="button" variant="outline" class="h-8 px-2.5 text-xs font-bold" @click="copyCode(item.code)">{{ copied===item.code ? 'Tersalin' : 'Salin' }}</Button>
-                                    <Button type="button" variant="outline" class="h-8 px-2.5 text-xs font-bold" @click="editCode(item)">Edit</Button>
-                                    <Button type="button" variant="outline" class="h-8 px-2.5 text-xs font-bold" :disabled="editorBusy || (item.is_active && item.product_count>0)" :title="item.is_active && item.product_count>0 ? 'Masih digunakan produk' : ''" @click="toggleCode(item)">{{ item.is_active ? 'Nonaktifkan' : 'Aktifkan' }}</Button>
-                                    <Button type="button" variant="outline" class="h-8 px-2.5 text-xs font-bold text-rose-600" :disabled="editorBusy || item.product_count>0" :title="item.product_count>0 ? 'Masih digunakan produk' : 'Hapus kode game'" @click="deleteCode(item)">Hapus</Button>
+                                    <Button type="button" variant="outline" class="h-8 px-2.5 text-xs font-bold" @click="editCode(item)">Ubah</Button>
+                                    <Button type="button" variant="outline" class="h-8 px-2.5 text-xs font-bold" :disabled="editorBusy || (item.is_active && item.product_count>0)" :title="item.is_active && item.product_count>0 ? 'Masih dipakai produk' : ''" @click="toggleCode(item)">{{ item.is_active ? 'Nonaktifkan' : 'Aktifkan' }}</Button>
+                                    <Button type="button" variant="outline" class="h-8 px-2.5 text-xs font-bold text-destructive" :disabled="editorBusy || item.product_count>0" :title="item.product_count>0 ? 'Masih dipakai produk' : 'Hapus kode game'" @click="deleteCode(item)">Hapus</Button>
                                 </div>
                             </TableCell>
                         </TableRow>
@@ -554,6 +555,16 @@ if (nicknameCodes.value.length > 0) gameCode.value = nicknameCodes.value[0].code
             <p v-if="query.trim()" class="mt-2 text-xs text-muted-foreground">Kosongkan pencarian untuk mengubah urutan.</p>
         </div>
     </section>
+
+    <AdminConfirmDialog
+        :open="Boolean(pendingAction)"
+        :title="pendingAction?.title || ''"
+        :message="pendingAction?.message || ''"
+        :confirm-label="pendingAction?.confirmLabel || 'Lanjutkan'"
+        :destructive="Boolean(pendingAction?.destructive)"
+        @update:open="value => { if (!value) pendingAction = null; }"
+        @confirm="runPending"
+    />
 </div>
 </AdminShell>
 </template>
