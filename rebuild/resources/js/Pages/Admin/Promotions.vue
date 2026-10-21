@@ -1,5 +1,6 @@
 <script setup>
 import AdminSwitch from '../../Components/AdminSwitch.vue';
+import AdminConfirmDialog from '../../Components/AdminConfirmDialog.vue';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../../Components/ui/sheet';
 import AdminResponsiveTable from '../../Components/AdminResponsiveTable.vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
@@ -22,6 +23,7 @@ const props = defineProps({
 
 const editorOpen = ref(false);
 const editingId = ref(null);
+const pendingVoucher = ref(null);
 
 const voucherFilters = reactive({
     q: props.filters?.q || '',
@@ -156,7 +158,12 @@ function quickToggle(row) {
 }
 
 function deleteVoucher(row) {
-    if (!window.confirm('Hapus voucher ' + row.code + '? Voucher yang sudah memiliki riwayat transaksi tidak dapat dihapus.')) return;
+    pendingVoucher.value = row;
+}
+function runDeleteVoucher() {
+    const row = pendingVoucher.value;
+    if (!row) return;
+    pendingVoucher.value = null;
     router.delete('/admin/vouchers/' + row.id, { preserveScroll: true });
 }
 
@@ -168,14 +175,14 @@ function discountLabel(row) {
 </script>
 
 <template>
-<Head title="Promo" />
+<Head title="Voucher &amp; promo" />
 <AdminShell>
     <div class="space-y-5">
         <header class="flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between">
             <div class="min-w-0">
-                <h1 class="text-2xl font-semibold tracking-tight">Promo</h1>
+                <h1 class="text-2xl font-semibold tracking-tight">Voucher &amp; promo</h1>
                 <p class="mt-1 max-w-3xl text-sm text-muted-foreground">
-                    Kelola voucher diskon.
+                    Buat dan pantau kode voucher yang dipakai pelanggan saat membayar. Produk populer diatur di menu Produk, bagian Tampilan Toko.
                 </p>
             </div>
             <div class="flex flex-col gap-2 sm:flex-row">
@@ -188,12 +195,12 @@ function discountLabel(row) {
             <Card class="p-4"><p class="text-xs text-muted-foreground">Total voucher</p><p class="mt-2 text-2xl font-semibold">{{ summary.total_vouchers || 0 }}</p></Card>
             <Card class="p-4"><p class="text-xs text-muted-foreground">Voucher aktif</p><p class="mt-2 text-2xl font-semibold">{{ summary.active_vouchers || 0 }}</p></Card>
             <Card class="p-4"><p class="text-xs text-muted-foreground">Terpakai</p><p class="mt-2 text-2xl font-semibold">{{ summary.used_count || 0 }}</p></Card>
-            <Card class="p-4"><p class="text-xs text-muted-foreground">Reservasi aktif</p><p class="mt-2 text-2xl font-semibold">{{ summary.reserved_count || 0 }}</p></Card>
+            <Card class="p-4"><p class="text-xs text-muted-foreground">Sedang dipakai</p><p class="mt-2 text-2xl font-semibold">{{ summary.reserved_count || 0 }}</p></Card>
         </div>
 
-            <Card class="min-w-0 p-4 sm:p-5">
-                <form class="grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-5" @submit.prevent="submitVoucherFilters">
-                    <label class="space-y-1 md:col-span-2">
+            <form class="border-y border-border py-4" @submit.prevent="submitVoucherFilters">
+                <div class="grid min-w-0 items-end gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <label class="space-y-1 sm:col-span-2">
                         <span class="text-sm font-medium">Cari voucher</span>
                         <Input v-model="voucherFilters.q" maxlength="100" placeholder="Kode, nama, atau deskripsi" />
                     </label>
@@ -208,29 +215,34 @@ function discountLabel(row) {
                             <option value="exhausted">Kuota habis</option>
                         </select>
                     </label>
-                    <label class="space-y-1">
-                        <span class="text-sm font-medium">Jenis diskon</span>
-                        <select v-model="voucherFilters.discount_type" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
-                            <option value="">Semua jenis</option>
-                            <option value="PERCENT">Persentase</option>
-                            <option value="FIXED">Nominal tetap</option>
-                        </select>
-                    </label>
-                    <label class="space-y-1">
-                        <span class="text-sm font-medium">Voucher per halaman</span>
-                        <select v-model.number="voucherFilters.per_page" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
-                            <option :value="10">10</option><option :value="25">25</option><option :value="50">50</option><option :value="100">100</option>
-                        </select>
-                    </label>
-                    <div class="flex flex-col gap-2 sm:flex-row md:col-span-2 xl:col-span-5">
-                        <Button class="w-full sm:w-auto">Terapkan filter</Button>
+                    <div class="flex flex-col gap-2 sm:flex-row">
+                        <Button class="w-full sm:w-auto">Terapkan</Button>
                         <Button class="w-full sm:w-auto" type="button" variant="outline" @click="resetVoucherFilters">Hapus filter</Button>
                     </div>
-                </form>
-            </Card>
+                </div>
+                <details class="lf-admin-advanced mt-3 rounded-md border border-border">
+                    <summary class="cursor-pointer px-4 py-3 text-sm font-medium">Filter lanjutan</summary>
+                    <div class="grid gap-3 border-t border-border p-4 sm:grid-cols-2">
+                        <label class="space-y-1">
+                            <span class="text-sm font-medium">Jenis diskon</span>
+                            <select v-model="voucherFilters.discount_type" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+                                <option value="">Semua jenis</option>
+                                <option value="PERCENT">Persentase</option>
+                                <option value="FIXED">Nominal tetap</option>
+                            </select>
+                        </label>
+                        <label class="space-y-1">
+                            <span class="text-sm font-medium">Voucher per halaman</span>
+                            <select v-model.number="voucherFilters.per_page" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+                                <option :value="10">10 voucher</option><option :value="25">25 voucher</option><option :value="50">50 voucher</option><option :value="100">100 voucher</option>
+                            </select>
+                        </label>
+                    </div>
+                </details>
+            </form>
 
-            <Card class="min-w-0 p-4">
-                <div class="overflow-x-auto" role="region" aria-label="Daftar voucher" tabindex="0">
+            <div class="min-w-0">
+                <div class="overflow-x-auto rounded-md border border-border" role="region" aria-label="Daftar voucher" tabindex="0">
                     <AdminResponsiveTable :mobile-columns="[0,1,6,7]">
                         <TableHeader>
                             <TableRow>
@@ -241,7 +253,7 @@ function discountLabel(row) {
                                 <TableHead>Periode</TableHead>
                                 <TableHead>Cakupan</TableHead>
                                 <TableHead>Status</TableHead>
-                                <TableHead class="text-right">Aksi</TableHead>
+                                <TableHead class="text-right">Tindakan</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -259,7 +271,7 @@ function discountLabel(row) {
                                     <span>{{ row.used_count }} terpakai · {{ row.reserved_count }} dipesan</span>
                                     <p class="text-xs text-muted-foreground">
                                         {{ row.total_quota === null ? 'Kuota tanpa batas' : (row.remaining_quota + ' dari ' + row.total_quota + ' tersisa') }}
-                                        · {{ row.per_customer_limit === null ? 'tanpa limit/customer' : ('maks. ' + row.per_customer_limit + '/customer') }}
+                                        · {{ row.per_customer_limit === null ? 'tanpa batas per pelanggan' : ('maks. ' + row.per_customer_limit + ' per pelanggan') }}
                                     </p>
                                 </TableCell>
                                 <TableCell>
@@ -270,7 +282,7 @@ function discountLabel(row) {
                                 <TableCell><Badge :variant="statusVariant(row.status)">{{ statusLabel(row.status) }}</Badge></TableCell>
                                 <TableCell class="text-right">
                                     <div class="flex justify-end gap-1">
-                                        <Button size="sm" variant="outline" @click="openEdit(row)">Edit</Button>
+                                        <Button size="sm" variant="outline" @click="openEdit(row)">Ubah</Button>
                                         <Button size="sm" variant="outline" @click="quickToggle(row)">{{ row.is_active ? 'Nonaktifkan' : 'Aktifkan' }}</Button>
                                         <Button size="sm" variant="destructive" @click="deleteVoucher(row)">Hapus</Button>
                                     </div>
@@ -290,11 +302,11 @@ function discountLabel(row) {
                         :class="['rounded-md border px-3 py-1.5 text-sm', link.active ? 'bg-primary text-primary-foreground' : 'bg-background', !link.url ? 'pointer-events-none opacity-40' : '']"
                         >{{ link.label }}</Link>
                 </div>
-            </Card>
+            </div>
 
         <Sheet :open="editorOpen" @update:open="(value) => { if (!value) closeEditor(); }">
         <SheetContent side="right" class="w-full overflow-y-auto sm:max-w-3xl">
-            <SheetHeader><SheetTitle>{{ editingId ? 'Edit Voucher' : 'Tambah Voucher' }}</SheetTitle><SheetDescription>Atur kode, nilai diskon, batas, jadwal, dan cakupan. Perubahan tidak menulis ulang harga pesanan yang sudah dibuat.</SheetDescription></SheetHeader>
+            <SheetHeader><SheetTitle>{{ editingId ? 'Ubah voucher' : 'Tambah voucher' }}</SheetTitle><SheetDescription>Atur kode, nilai diskon, batas, jadwal, dan cakupan. Perubahan tidak menulis ulang harga pesanan yang sudah dibuat.</SheetDescription></SheetHeader>
 
 
             <form class="mt-4 space-y-4" @submit.prevent="saveVoucher">
@@ -341,6 +353,7 @@ function discountLabel(row) {
             </form>
                 </SheetContent>
         </Sheet>
+        <AdminConfirmDialog :open="Boolean(pendingVoucher)" title="Hapus voucher" :message="'Voucher ' + (pendingVoucher?.code || '') + ' akan dihapus. Voucher yang sudah dipakai pada transaksi tidak dapat dihapus.'" confirm-label="Hapus voucher" destructive @update:open="value => { if (!value) pendingVoucher = null; }" @confirm="runDeleteVoucher" />
     </div>
 </AdminShell>
 </template>
