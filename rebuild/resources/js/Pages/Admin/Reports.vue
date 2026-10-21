@@ -37,7 +37,9 @@ const sections = [
 
 function csvCell(value) {
     const text = String(value ?? '');
-    const safe = /^[=+@-]/.test(text) ? "'" + text : text;
+    // Spasi/tab di depan tetap bisa memicu formula di Excel, jadi periksa
+    // setelah whitespace — sama seperti ekspor pesanan di sisi server.
+    const safe = /^\s*[=+@-]/.test(text) ? "'" + text : text;
     return '"' + safe.replaceAll('"', '""') + '"';
 }
 
@@ -60,7 +62,8 @@ function exportReport() {
             ...props.daily.map(row => [row.day, row.orders_count, row.success_count, row.failed_count, ...(props.canViewFinance ? [row.revenue_idr, row.profit_idr, row.discount_idr, row.fee_idr] : [])]),
         ];
     }
-    const range = form.range === 'custom' ? `${form.from}-${form.to}` : form.range;
+    const applied = props.filters || {};
+    const range = applied.range === 'custom' ? `${applied.from}-${applied.to}` : (applied.range || '30d');
     const csv = String.fromCharCode(0xFEFF) + rows.map(row => row.map(csvCell).join(',')).join('\r\n');
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
     const link = document.createElement('a');
@@ -68,6 +71,8 @@ function exportReport() {
     link.download = `laporan-${section.value}-${range}.csv`;
     link.click();
     URL.revokeObjectURL(url);
+    // Ekspor di klien tidak melewati endpoint, jadi audit dicatat terpisah.
+    router.post('/admin/reports/export-audit', { section: section.value, range: applied.range || '30d', from: applied.from, to: applied.to }, { preserveState: true, preserveScroll: true });
 }
 
 const money = (value) => 'Rp' + Number(value || 0).toLocaleString('id-ID');

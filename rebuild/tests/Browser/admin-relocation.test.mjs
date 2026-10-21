@@ -20,6 +20,12 @@ assert.match(catalog, /admin\/vouchers\/popular\/["'] \+ item\.id/);
 assert.doesNotMatch(catalog, /canManagePopular/);
 assert.match(catalog, /<Button type="button" :variant="item\.popular \? 'outline' : 'default'" @click="togglePopular\(item\)"/);
 assert.doesNotMatch(promotions, /Populer Sekarang|popularProducts|Produk populer/);
+// Editor voucher masih memakai daftar kategori/produk untuk cakupan, jadi
+// keduanya wajib tetap dideklarasikan sebagai props.
+assert.match(promotions, /categories: \{ type: Array, default: \(\) => \[\] \}/);
+assert.match(promotions, /scopeProducts: \{ type: Array, default: \(\) => \[\] \}/);
+assert.match(promotions, /v-for="category in categories"/);
+assert.match(promotions, /v-for="product in scopeProducts"/);
 assert.match(reports.split('<template>')[1] || reports, /Produk Terlaris/);
 assert.match(reports, /Kategori Teratas/);
 assert.match(reports, /Kinerja penyedia layanan/);

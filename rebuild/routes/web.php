@@ -430,6 +430,8 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
         Route::get('/admin/reports', [AdminReportController::class, 'index'])->name('admin.reports');
         Route::get('/admin/reports/export', [AdminReportController::class, 'export'])
             ->name('admin.reports.export');
+        Route::post('/admin/reports/export-audit', [AdminReportController::class, 'auditExport'])
+            ->middleware('throttle:admin-mutation')->name('admin.reports.export-audit');
     });
 
     Route::middleware('admin.permission:settings.manage')->group(function (): void {

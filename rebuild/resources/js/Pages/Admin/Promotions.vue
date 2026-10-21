@@ -14,6 +14,8 @@ import { TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../Co
 const props = defineProps({
     filters: { type: Object, default: () => ({}) },
     vouchers: { type: Object, default: () => ({ data: [], links: [] }) },
+    categories: { type: Array, default: () => [] },
+    scopeProducts: { type: Array, default: () => [] },
     summary: { type: Object, default: () => ({}) },
 });
 

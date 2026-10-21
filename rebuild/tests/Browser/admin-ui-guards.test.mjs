@@ -206,3 +206,15 @@ test('contact cards stack vertically on mobile so WhatsApp and email are not sid
     assert.match(mobile, /\.lf-contact-grid>a>div[^{]*\{min-width:0;width:100%\}/);
     assert.match(mobile, /\.lf-contact-grid small[^{]*\{overflow-wrap:anywhere\}/);
 });
+
+test('report export audits itself and never labels a period it did not load', () => {
+    const source = read('Reports.vue');
+    // Nama file dan data memakai filter yang benar-benar diterapkan, bukan form yang belum disubmit.
+    assert.match(source, /const applied = props\.filters \|\| \{\}/);
+    assert.match(source, /applied\.range === 'custom' \? `\$\{applied\.from\}-\$\{applied\.to\}`/);
+    assert.doesNotMatch(source, /const range = form\.range === 'custom'/);
+    // Ekspor klien tetap meninggalkan jejak audit.
+    assert.match(source, /router\.post\('\/admin\/reports\/export-audit'/);
+    // Formula setelah whitespace juga dinetralkan.
+    assert.match(source, /const safe = \/\^\\s\*\[=\+@-\]\/\.test\(text\)/);
+});

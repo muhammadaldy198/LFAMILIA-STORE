@@ -184,7 +184,10 @@ for (const file of files) {
         }
 
         const assignment = line.match(/(?:^|[\s,{[(])['"]?(password|api_key|server_key|client_key|client_secret|secret_key|merchant_key|merchant_secret|access_token|bot_token|webhook_secret|private_key)['"]?\s*(?:=>|:|=)\s*['"\x60]([^'"\x60\r\n]{8,})['"\x60]/i);
-        if (assignment && !isTranslationCatalog && !placeholderValue(assignment[2])) {
+        // Katalog terjemahan memang memetakan kunci `password` ke kalimat.
+        // Hanya kunci itu yang dikecualikan; api_key/token/private_key tetap dicek.
+        const translationPasswordLabel = isTranslationCatalog && assignment?.[1].toLowerCase() === 'password';
+        if (assignment && !translationPasswordLabel && !placeholderValue(assignment[2])) {
             addFinding(file, 'possible hardcoded ' + assignment[1].toLowerCase());
             break;
         }
