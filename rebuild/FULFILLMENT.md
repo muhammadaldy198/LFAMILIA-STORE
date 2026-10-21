@@ -62,7 +62,7 @@ Sesuai keputusan PRD v1.1 §47, **automatic failover / auto-switch dinonaktifkan
 
 Ketika fulfillment attempt mencapai kegagalan pasti (`FAILED_CONFIRMED`), pesanan tidak otomatis dialihkan ke sumber lain, melainkan ditandai `BLOCKED` untuk penanganan manual oleh Admin/CS.
 
-**Catatan teknis (F-04):** Pada implementasi `rebuild/app/Services/FulfillmentService.php`, failover otomatis dinonaktifkan (`if (false && $failover)`). Namun untuk baris attempt lama yang masih memiliki flag `safe_to_failover=true`, jalur retry Admin (`retrySafeAttempt()`) masih memanggil `failoverIfSafe()`. Dokumen ini mencatat hal tersebut sebagai celah teknis data lama yang menunggu migrasi/guard pembersihan.
+**Catatan teknis (F-04):** Failover otomatis dinonaktifkan. `retrySafeAttempt()` menolak attempt legacy dengan status `FAILED_CONFIRMED` dan `safe_to_failover=true` melalui `return null`, sehingga tidak dikirim ulang. Metode yatim `failoverIfSafe()` dihapus pada PR ini; kabel pemanggilnya telah dicabut pada PR #286.
 
 ## Double fulfillment prevention
 

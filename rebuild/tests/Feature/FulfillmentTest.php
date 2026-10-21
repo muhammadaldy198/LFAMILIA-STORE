@@ -450,6 +450,31 @@ class FulfillmentTest extends TestCase
         $this->assertSame('PROCESSING', DB::table('orders')->where('id', $orderId)->value('status'));
     }
 
+    public function test_legacy_safe_to_failover_attempt_is_not_retried(): void
+    {
+        Queue::fake();
+        $catalog = $this->automaticCatalog();
+        $orderId = $this->paidOrder($catalog);
+        $attemptId = DB::table('fulfillment_attempts')->insertGetId([
+            'order_id' => $orderId,
+            'provider_mapping_id' => $catalog['mapping_id'],
+            'provider_id' => DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id'),
+            'attempt_no' => 1,
+            'external_reference' => 'FUL-LEGACY-'.bin2hex(random_bytes(4)),
+            'status' => 'FAILED_CONFIRMED',
+            'safe_to_failover' => true,
+            'correlation_id' => 'legacy-failover-test',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        app(FulfillmentService::class)->retrySafeAttempt($attemptId);
+
+        $this->assertSame('FAILED_CONFIRMED', DB::table('fulfillment_attempts')->where('id', $attemptId)->value('status'));
+        $this->assertSame('PAID', DB::table('orders')->where('id', $orderId)->value('status'));
+        Queue::assertNotPushed(SendFulfillmentJob::class);
+    }
+
     public function test_confirmed_failure_marks_blocked_without_automatic_failover(): void
     {
         Queue::fake();
