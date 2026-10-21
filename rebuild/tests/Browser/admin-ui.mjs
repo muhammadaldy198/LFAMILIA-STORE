@@ -184,7 +184,8 @@ try {
                 }
                 if(path==='/admin/nickname-tools'){
                     await click('Kode Game');await click('Tambah Kode Game');await inspect(width+'-game-code-editor');
-                    const switchState=await evaluate(`(()=>{const s=[...document.querySelectorAll('main [role=switch]')].find(s=>s.textContent===''&&!s.disabled);if(!s)return null;s.click();return true;})()`);
+                    // Editor kode game sekarang pop-up (di luar <main>), jadi cari switch di dialog dulu.
+                    const switchState=await evaluate(`(()=>{const root=document.querySelector('[role=dialog]')||document.querySelector('main');const s=[...root.querySelectorAll('[role=switch]')].find(s=>s.textContent===''&&!s.disabled);if(!s)return null;s.click();return true;})()`);
                     if(!switchState)throw Error('Boolean switch editor missing');await pause(100);await inspect(width+'-game-code-switch');
                 }
             }
