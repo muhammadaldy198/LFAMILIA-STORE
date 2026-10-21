@@ -192,4 +192,12 @@ test('guest ticket status is translated instead of showing raw enum values', () 
     assert.match(support, /const statusLabel = status => \(\{ OPEN:/);
     assert.match(support, /Status: \{\{ statusLabel\(ticket\.status\) \}\}/);
     assert.doesNotMatch(support, /Status: \{\{ ticket\.status \}\}/);
+    // Status yang benar-benar bisa disetel admin harus punya terjemahan;
+    // PENDING/ANSWERED bukan status tiket yang sah.
+    const controller = readFileSync(new URL('../../app/Http/Controllers/AdminSupportController.php', import.meta.url), 'utf8');
+    const statuses = controller.match(/private const STATUSES = \[([^\]]+)\]/)[1].match(/'([A-Z_]+)'/g).map(s => s.replaceAll("'", ''));
+    for (const status of statuses) {
+        assert.ok(support.includes(status + ':'), `status ${status} belum diterjemahkan`);
+    }
+    assert.doesNotMatch(support, /PENDING: |ANSWERED: /);
 });

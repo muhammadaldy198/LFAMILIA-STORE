@@ -12,7 +12,7 @@ const replyForm = id => replies[id] ||= useForm({ message: '' });
 const submit = () => { if (!form.processing) form.post('/support', { onSuccess: () => form.reset('subject', 'message', 'access_code') }); };
 const verify = () => { if (!form.processing) form.post('/support/verify', { onSuccess: () => form.reset('access_code') }); };
 const reply = id => { const f = replyForm(id); if (!f.processing) f.post('/support/' + id + '/messages', { onSuccess: () => f.reset() }); };
-const statusLabel = status => ({ OPEN: 'Menunggu balasan', PENDING: 'Sedang ditangani', ANSWERED: 'Sudah dijawab', RESOLVED: 'Selesai', CLOSED: 'Ditutup' })[status] || status;
+const statusLabel = status => ({ OPEN: 'Menunggu balasan', IN_PROGRESS: 'Sedang ditangani', RESOLVED: 'Selesai', CLOSED: 'Ditutup' })[status] || status;
 </script>
 <template>
 <Head :title="customerText('pages.guest.support.attribute.title.f4fe7922', 'Bantuan Guest')" />

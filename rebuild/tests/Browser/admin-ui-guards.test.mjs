@@ -213,8 +213,19 @@ test('report export audits itself and never labels a period it did not load', ()
     assert.match(source, /const applied = props\.filters \|\| \{\}/);
     assert.match(source, /applied\.range === 'custom' \? `\$\{applied\.from\}-\$\{applied\.to\}`/);
     assert.doesNotMatch(source, /const range = form\.range === 'custom'/);
-    // Ekspor klien tetap meninggalkan jejak audit.
-    assert.match(source, /router\.post\('\/admin\/reports\/export-audit'/);
+    // Ekspor klien tetap meninggalkan jejak audit, lewat fetch karena endpoint membalas JSON.
+    assert.match(source, /void fetch\('\/admin\/reports\/export-audit'/);
     // Formula setelah whitespace juga dinetralkan.
     assert.match(source, /const safe = \/\^\\s\*\[=\+@-\]\/\.test\(text\)/);
+});
+
+test('notification open waits for mark-read and report export posts JSON by fetch', () => {
+    const notifications = read('Notifications.vue');
+    // Kunjungan Inertia kedua membatalkan POST pertama, jadi navigasi menunggu markRead.
+    assert.match(notifications, /void markRead\(item\)\.finally\(\(\) => router\.visit\(href\)\)/);
+    assert.doesNotMatch(notifications, /markRead\(item\);\s*\n\s*const href = notificationHref\(item\);\s*\n\s*if \(href\) router\.visit\(href\);/);
+    const reports = read('Reports.vue');
+    // Endpoint audit membalas JSON, bukan halaman Inertia.
+    assert.match(reports, /void fetch\('\/admin\/reports\/export-audit'/);
+    assert.doesNotMatch(reports, /router\.post\('\/admin\/reports\/export-audit'/);
 });

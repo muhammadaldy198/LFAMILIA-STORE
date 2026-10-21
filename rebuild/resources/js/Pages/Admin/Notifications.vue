@@ -41,12 +41,23 @@ const notificationHref = item => {
     return null;
 };
 const markRead = item => {
-    if (!item.read_at) router.post(base + '/notifications/' + item.id + '/read', {}, { preserveScroll: true });
+    if (item.read_at) return Promise.resolve();
+    return fetch(base + '/notifications/' + item.id + '/read', {
+        method: 'POST',
+        keepalive: true,
+        headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+        },
+        body: '{}',
+    }).catch(() => {});
 };
 const openNotification = item => {
-    markRead(item);
     const href = notificationHref(item);
-    if (href) router.visit(href);
+    if (!href) { void markRead(item); return; }
+    // Tunggu POST selesai; kunjungan Inertia kedua akan membatalkan yang pertama.
+    void markRead(item).finally(() => router.visit(href));
 };
 const notificationKeydown = (event, item) => {
     if (event.key === 'Enter' || event.key === ' ') {

@@ -72,7 +72,17 @@ function exportReport() {
     link.click();
     URL.revokeObjectURL(url);
     // Ekspor di klien tidak melewati endpoint, jadi audit dicatat terpisah.
-    router.post('/admin/reports/export-audit', { section: section.value, range: applied.range || '30d', from: applied.from, to: applied.to }, { preserveState: true, preserveScroll: true });
+    // Pakai fetch, bukan router.post: endpoint ini membalas JSON, bukan halaman Inertia.
+    void fetch('/admin/reports/export-audit', {
+        method: 'POST',
+        keepalive: true,
+        headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+        },
+        body: JSON.stringify({ section: section.value, range: applied.range || '30d', from: applied.from, to: applied.to }),
+    });
 }
 
 const money = (value) => 'Rp' + Number(value || 0).toLocaleString('id-ID');
