@@ -423,4 +423,4 @@
 .lfx .lfx-country-empty{margin:0;padding:9px;font-size:10px;color:var(--lf-color-muted)}
 @media(max-width:420px){.lfx .lfx-country-trigger{padding:0 8px;font-size:11px}}
 
-@media(max-width:767px){.lfx #lfx-contact .lfx-field-grid{grid-template-columns:1fr}}
+@media(max-width:767px){.lfx #lfx-contact .lfx-field-grid{grid-template-columns:1fr}.lfx #lfx-contact .lfx-phone-entry{flex-direction:column;align-items:stretch;gap:8px}.lfx #lfx-contact .lfx-country-control,.lfx #lfx-contact .lfx-phone-entry>input{flex:0 0 auto;width:100%}.lfx #lfx-contact .lfx-country-trigger{justify-content:space-between;width:100%;padding:0 13px;font-size:14px}}
