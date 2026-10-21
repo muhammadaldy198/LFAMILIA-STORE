@@ -5,8 +5,8 @@ import { reactive, ref, watch } from 'vue';
 import AdminShell from '../../Components/AdminShell.vue';
 import { Badge } from '../../Components/ui/badge';
 import { Button } from '../../Components/ui/button';
-import { Card } from '../../Components/ui/card';
 import { Input } from '../../Components/ui/input';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../../Components/ui/sheet';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../Components/ui/table';
 import { byOrder, displayPosition } from '../../lib/ordering.js';
 
@@ -92,7 +92,7 @@ function saveProvider(row) {
 </script>
 
 <template>
-<Head title="Provider" />
+<Head title="Penyedia layanan" />
 <AdminShell>
     <div class="space-y-5">
         <header class="flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between">
@@ -105,26 +105,26 @@ function saveProvider(row) {
             <Button class="w-full sm:w-auto" variant="outline" @click="router.reload({ preserveScroll: true })">Muat ulang</Button>
         </header>
 
-        <Card class="overflow-hidden">
-            <div class="border-b p-4 flex flex-wrap items-center justify-between gap-3">
+        <section aria-labelledby="provider-list-heading">
+            <div class="flex flex-wrap items-end justify-between gap-3 border-b border-border pb-3">
                 <div>
-                    <h2 class="text-base font-semibold">Daftar Provider</h2>
-                    <p class="mt-0.5 text-xs text-muted-foreground">Konfigurasi nama tampilan, urutan pemrosesan, dan status aktif provider.</p>
+                    <h2 id="provider-list-heading" class="text-base font-semibold">Daftar penyedia</h2>
+                    <p class="mt-0.5 text-xs text-muted-foreground">Nama tampilan, urutan pemrosesan, dan status aktif. Kredensial penyedia diatur di menu Integrasi.</p>
                 </div>
                 <Button variant="outline" size="sm" as-child><Link href="/admin/integrations">Buka Integrasi</Link></Button>
             </div>
 
-            <div class="overflow-x-auto overscroll-x-contain" role="region" aria-label="Daftar provider" tabindex="0">
+            <div class="overflow-x-auto overscroll-x-contain rounded-md border border-border" role="region" aria-label="Daftar penyedia" tabindex="0">
                 <Table class="min-w-[950px] table-fixed">
                     <TableHeader>
                         <TableRow>
-                            <TableHead class="w-[24%]">Provider / Keterangan</TableHead>
-                            <TableHead class="w-[12%]">Layanan</TableHead>
-                            <TableHead class="w-[16%]">Koneksi & Status</TableHead>
-                            <TableHead class="w-[14%]">Denominasi</TableHead>
-                            <TableHead class="w-[12%]">Performa 24j</TableHead>
+                            <TableHead class="w-[24%]">Penyedia / keterangan</TableHead>
+                            <TableHead class="w-[12%]">Jenis layanan</TableHead>
+                            <TableHead class="w-[16%]">Koneksi &amp; status</TableHead>
+                            <TableHead class="w-[14%]">Nominal tertaut</TableHead>
+                            <TableHead class="w-[12%]">Performa 24 jam</TableHead>
                             <TableHead class="w-[10%]">Urutan</TableHead>
-                            <TableHead class="w-[12%] text-right">Aksi</TableHead>
+                            <TableHead class="w-[12%] text-right">Tindakan</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -156,86 +156,87 @@ function saveProvider(row) {
                             </TableCell>
                             <TableCell class="align-top text-right">
                                 <div class="flex items-center justify-end gap-2">
-                                    <Badge :variant="row.is_active ? 'secondary' : 'outline'" class="text-[10px]">{{ row.is_active ? 'Aktif' : 'Off' }}</Badge>
-                                    <Button size="sm" variant="outline" class="h-7 px-2 text-xs" @click="selectedProviderId = row.id">Atur</Button>
+                                    <Badge :variant="row.is_active ? 'secondary' : 'outline'" class="text-[10px]">{{ row.is_active ? 'Aktif' : 'Nonaktif' }}</Badge>
+                                    <Button size="sm" variant="outline" class="h-7 px-2 text-xs" @click="selectedProviderId = row.id">Ubah</Button>
                                 </div>
                             </TableCell>
                         </TableRow>
                     </TableBody>
                 </Table>
             </div>
-        </Card>
+        </section>
 
-        <Card v-if="selectedProvider()" class="p-4 space-y-4">
-            <div class="flex items-start justify-between gap-3">
-                <div>
-                    <h2 class="text-lg font-semibold">Atur {{ selectedProvider().display_name }}</h2>
-                    <p class="text-sm text-muted-foreground">Ubah pengaturan provider yang dipilih.</p>
-                </div>
-                <Button variant="outline" size="sm" @click="selectedProviderId = null">Tutup</Button>
-            </div>
-            <div class="grid gap-3 sm:grid-cols-2">
+        <Sheet :open="Boolean(selectedProvider())" @update:open="value => { if (!value) selectedProviderId = null; }">
+        <SheetContent side="right" class="w-full overflow-y-auto sm:max-w-md">
+            <SheetHeader><SheetTitle>Ubah {{ selectedProvider()?.display_name }}</SheetTitle><SheetDescription>Nama tampilan dan urutan pemrosesan penyedia. Perubahan berlaku untuk pesanan baru.</SheetDescription></SheetHeader>
+            <div v-if="selectedProvider()" class="mt-4 grid gap-3 sm:grid-cols-2">
                 <label class="space-y-1"><span class="text-sm font-medium">Nama tampilan</span><Input v-model="selectedProvider().display_name" maxlength="80" /></label>
                 <label class="space-y-1"><span class="text-sm font-medium">Urutan</span><Input v-model.number="selectedProvider().sort_order" type="number" min="0" max="9999" /></label>
                 <label class="space-y-1 sm:col-span-2"><span class="text-sm font-medium">Keterangan</span><Input v-model="selectedProvider().description" maxlength="500" /></label>
                 <label class="flex items-center gap-2 text-sm"><AdminSwitch v-model="selectedProvider().is_active" /> Aktif</label>
             </div>
-            <div class="flex justify-end"><Button :disabled="saving === selectedProvider().id" @click="saveProvider(selectedProvider())">{{ saving === selectedProvider().id ? 'Menyimpan...' : 'Simpan provider' }}</Button></div>
-        </Card>
+            <div class="mt-4 flex justify-end gap-2 border-t border-border pt-3"><Button variant="outline" @click="selectedProviderId = null">Batal</Button><Button :disabled="saving === selectedProvider().id" @click="saveProvider(selectedProvider())">{{ saving === selectedProvider().id ? 'Menyimpan…' : 'Simpan penyedia' }}</Button></div>
+        </SheetContent>
+        </Sheet>
 
-        <Card class="p-4">
+        <section class="border-t border-border pt-4" aria-labelledby="provider-mappings-heading">
             <div class="mb-4">
-                <h2 class="text-lg font-semibold">Nominal produk yang dilayani penyedia</h2>
+                <h2 id="provider-mappings-heading" class="text-lg font-semibold">Nominal produk yang dilayani penyedia</h2>
                 <p class="mt-1 text-sm text-muted-foreground">
                     Daftar ini menunjukkan nominal yang terhubung ke penyedia layanan. Untuk mengubah kode produk dari penyedia, harga, sumber utama atau cadangan, dan pengaturan nominal, buka menu Produk.
                 </p>
             </div>
 
-            <form class="grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-5" @submit.prevent="search">
-                <label class="space-y-1 md:col-span-2">
-                    <span class="text-sm font-medium">Cari</span>
-                    <Input v-model="filters.q" maxlength="100" placeholder="Produk, nominal, SKU, atau provider" />
+            <form class="grid min-w-0 items-end gap-3 border-y border-border py-4 sm:grid-cols-2 xl:grid-cols-4" @submit.prevent="search">
+                <label class="space-y-1 sm:col-span-2">
+                    <span class="text-sm font-medium">Cari nominal</span>
+                    <Input v-model="filters.q" maxlength="100" placeholder="Produk, nominal, kode penyedia, atau penyedia" />
                 </label>
                 <label class="space-y-1">
-                    <span class="text-sm font-medium">Provider</span>
+                    <span class="text-sm font-medium">Penyedia</span>
                     <select v-model.number="filters.provider" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
-                        <option :value="0">Semua provider</option>
+                        <option :value="0">Semua penyedia</option>
                         <option v-for="row in providers" :key="row.id" :value="row.id">{{ row.display_name }}</option>
                     </select>
                 </label>
-                <label class="space-y-1">
-                    <span class="text-sm font-medium">Status nominal</span>
-                    <select v-model="filters.status" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
-                        <option value="">Semua status</option>
-                        <option value="active">Aktif</option>
-                        <option value="inactive">Nonaktif</option>
-                    </select>
-                </label>
-                <label class="space-y-1">
-                    <span class="text-sm font-medium">Nominal per halaman</span>
-                    <select v-model.number="filters.per_page" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
-                        <option :value="10">10</option>
-                        <option :value="25">25</option>
-                        <option :value="50">50</option>
-                        <option :value="100">100</option>
-                    </select>
-                </label>
-                <div class="flex flex-col gap-2 sm:flex-row md:col-span-2 xl:col-span-5">
-                    <Button class="w-full sm:w-auto" type="submit">Terapkan filter</Button>
+                <div class="flex flex-col gap-2 sm:flex-row">
+                    <Button class="w-full sm:w-auto" type="submit">Terapkan</Button>
                     <Button class="w-full sm:w-auto" type="button" variant="outline" @click="reset">Hapus filter</Button>
-                    <Button type="button" size="sm" variant="outline" as-child><Link href="/admin/catalog">Kelola di Produk</Link></Button>
                 </div>
+                <details class="lf-admin-advanced rounded-md border border-border sm:col-span-2 xl:col-span-4">
+                    <summary class="cursor-pointer px-4 py-3 text-sm font-medium">Filter lanjutan</summary>
+                    <div class="grid gap-3 border-t border-border p-4 sm:grid-cols-2">
+                        <label class="space-y-1">
+                            <span class="text-sm font-medium">Status nominal</span>
+                            <select v-model="filters.status" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+                                <option value="">Semua status</option>
+                                <option value="active">Aktif</option>
+                                <option value="inactive">Nonaktif</option>
+                            </select>
+                        </label>
+                        <label class="space-y-1">
+                            <span class="text-sm font-medium">Nominal per halaman</span>
+                            <select v-model.number="filters.per_page" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+                                <option :value="10">10 nominal</option>
+                                <option :value="25">25 nominal</option>
+                                <option :value="50">50 nominal</option>
+                                <option :value="100">100 nominal</option>
+                            </select>
+                        </label>
+                    </div>
+                </details>
             </form>
+            <div class="mt-3 flex flex-wrap items-center gap-2"><Button type="button" size="sm" variant="outline" as-child><Link href="/admin/catalog">Kelola di Produk</Link></Button><p class="text-xs text-muted-foreground">Kode produk penyedia, modal, dan sumber diubah dari ruang kerja produk.</p></div>
 
-            <div class="mt-4 overflow-x-auto overscroll-x-contain" role="region" aria-label="Nominal produk yang terhubung ke penyedia" tabindex="0">
+            <div class="mt-4 overflow-x-auto overscroll-x-contain rounded-md border border-border" role="region" aria-label="Nominal produk yang terhubung ke penyedia" tabindex="0">
                 <Table class="min-w-[950px] table-fixed">
                     <TableHeader>
                         <TableRow>
                             <TableHead class="w-[20%]">Produk</TableHead>
                             <TableHead class="w-[18%]">Nominal</TableHead>
-                            <TableHead class="w-[14%]">Provider & SKU</TableHead>
+                            <TableHead class="w-[14%]">Penyedia &amp; kode</TableHead>
                             <TableHead class="w-[14%] text-right">Modal / Batas</TableHead>
-                            <TableHead class="w-[14%]">Update Harga</TableHead>
+                            <TableHead class="w-[14%]">Pembaruan harga</TableHead>
                             <TableHead class="w-[10%] text-right">Sumber</TableHead>
                             <TableHead class="w-[10%] text-right">Status</TableHead>
                         </TableRow>
@@ -267,7 +268,7 @@ function saveProvider(row) {
                             </TableCell>
                             <TableCell class="align-top text-right">
                                 <Badge :variant="row.is_active && row.product_active && row.package_active && row.provider_active ? 'secondary' : 'outline'" class="text-[10px]">
-                                    {{ row.is_active ? 'Aktif' : 'Off' }}
+                                    {{ row.is_active ? 'Aktif' : 'Nonaktif' }}
                                 </Badge>
                             </TableCell>
                         </TableRow>
@@ -291,7 +292,7 @@ function saveProvider(row) {
                     ]"
                 >{{ link.label }}</Link>
             </div>
-        </Card>
+        </section>
     </div>
 </AdminShell>
 </template>
