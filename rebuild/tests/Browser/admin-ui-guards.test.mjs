@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { walletAdjustmentError } from '../../resources/js/lib/adminWalletAdjustment.js';
 const path = filename => new URL('../../resources/js/Pages/Admin/' + filename, import.meta.url);
 const read = filename => readFileSync(path(filename), 'utf8');
@@ -228,4 +228,27 @@ test('notification open waits for mark-read and report export posts JSON by fetc
     // Endpoint audit membalas JSON, bukan halaman Inertia.
     assert.match(reports, /void fetch\('\/admin\/reports\/export-audit'/);
     assert.doesNotMatch(reports, /router\.post\('\/admin\/reports\/export-audit'/);
+});
+
+test('no template expression unwraps a ref that Vue already unwraps', () => {
+    const pages = new URL('../../resources/js/Pages/', import.meta.url);
+    const walk = dir => readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
+        const full = new URL(entry.name + (entry.isDirectory() ? '/' : ''), dir);
+        if (entry.isDirectory()) return walk(full);
+        return entry.name.endsWith('.vue') ? [full] : [];
+    });
+    const offenders = [];
+    for (const file of walk(pages)) {
+        const source = readFileSync(file, 'utf8');
+        if (!source.includes('<template>')) continue;
+        const [script, template] = source.split('<template>', 2);
+        const refs = [...script.matchAll(/const\s+(\w+)\s*=\s*ref\(/g)].map(match => match[1]);
+        for (const name of refs) {
+            // Di template ref sudah di-unwrap; `.value` akan mengakses properti dari nilai aslinya.
+            if (new RegExp('\\b' + name + '\\.value\\b').test(template)) {
+                offenders.push(file.pathname.split('/Pages/')[1] + ' -> ' + name);
+            }
+        }
+    }
+    assert.deepEqual(offenders, []);
 });
