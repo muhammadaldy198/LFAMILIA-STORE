@@ -12,44 +12,44 @@ class IntegrationRegistry
         return [
             'digiflazz' => [
                 'name' => 'Digiflazz',
-                'group' => 'Provider',
+                'group' => 'Pemasok produk',
                 'description' => 'Kredensial transaksi dan sinkronisasi produk Digiflazz.',
                 'default_environment' => 'test',
                 'credential_scope' => 'per_environment',
                 'environments' => [
                     'test' => [
-                        'label' => 'DEVELOPMENT / TEST',
+                        'label' => 'Masa uji',
                         'live' => false,
                         'description' => 'Menggunakan parameter testing resmi Digiflazz pada endpoint API yang sama.',
                     ],
                     'production' => [
-                        'label' => 'PRODUCTION — TRANSAKSI/DATA NYATA',
+                        'label' => 'Sungguhan — transaksi nyata',
                         'live' => true,
                         'description' => 'Request tanpa parameter testing; transaksi dapat diproses nyata oleh provider.',
                     ],
                 ],
                 'fields' => [
                     'username' => [
-                        'label' => 'Username Digiflazz',
+                        'label' => 'Nama pengguna Digiflazz',
                         'secret' => false,
                         'required' => true,
-                        'help' => 'Username akun buyer Digiflazz yang dipakai backend.',
+                        'help' => 'Nama pengguna akun pembeli Digiflazz yang dipakai sistem.',
                     ],
                     'api_key' => [
-                        'label' => 'API Key',
+                        'label' => 'Kunci akses',
                         'secret' => true,
                         'required' => true,
-                        'help' => 'Kunci API buyer untuk environment yang sedang dipilih. Development dan Production disimpan terpisah.',
+                        'help' => 'Kunci akses untuk mode layanan yang sedang dipilih. Mode uji dan mode sungguhan disimpan terpisah.',
                     ],
                     'webhook_secret' => [
                         'label' => 'Rahasia webhook',
                         'secret' => true,
                         'required' => false,
-                        'help' => 'Diperlukan agar callback Digiflazz dapat diverifikasi oleh backend.',
+                        'help' => 'Dipakai agar pemberitahuan dari Digiflazz dapat dipastikan asli.',
                     ],
                 ],
                 'callback' => [
-                    'label' => 'Digiflazz Webhook',
+                    'label' => 'Pemberitahuan Digiflazz',
                     'route' => 'api.fulfillment.digiflazz.webhook',
                     'required_fields' => ['webhook_secret'],
                 ],
@@ -57,36 +57,36 @@ class IntegrationRegistry
             ],
             'kokinpay' => [
                 'name' => 'Validasi Akun',
-                'group' => 'Validasi',
+                'group' => 'Pengecekan akun',
                 'description' => 'API pengecekan nickname, region MLBB, dan pelanggan PLN.',
                 'environment_note' => 'Environment terpisah tidak diaktifkan karena capability sandbox/test resmi untuk API yang digunakan belum terverifikasi.',
                 'fields' => [
                     'api_key' => [
-                        'label' => 'API Key',
+                        'label' => 'Kunci akses',
                         'secret' => true,
                         'required' => true,
                         'help' => 'Kunci akses layanan validasi akun.',
                     ],
                     'base_url' => [
-                        'label' => 'Alamat API',
+                        'label' => 'Alamat layanan',
                         'secret' => false,
                         'required' => true,
                         'help' => 'Alamat dasar API validasi. Wajib HTTPS.',
                     ],
                     'nickname_path' => [
-                        'label' => 'Path cek nickname',
+                        'label' => 'Alamat cek nama panggilan',
                         'secret' => false,
                         'required' => true,
                         'help' => 'Path endpoint cek nickname, misalnya /api/check-nickname.',
                     ],
                     'region_path' => [
-                        'label' => 'Path cek region MLBB',
+                        'label' => 'Alamat cek server MLBB',
                         'secret' => false,
                         'required' => true,
                         'help' => 'Path endpoint cek region MLBB.',
                     ],
                     'pln_path' => [
-                        'label' => 'Path cek pelanggan PLN',
+                        'label' => 'Alamat cek pelanggan PLN',
                         'secret' => false,
                         'required' => true,
                         'help' => 'Path endpoint cek nama pelanggan PLN.',
@@ -102,32 +102,32 @@ class IntegrationRegistry
                 'credential_scope' => 'per_environment',
                 'environments' => [
                     'sandbox' => [
-                        'label' => 'SANDBOX / TEST',
+                        'label' => 'Masa uji',
                         'live' => false,
                         'description' => 'Menggunakan endpoint dan credential Sandbox Midtrans.',
                     ],
                     'production' => [
-                        'label' => 'PRODUCTION — TRANSAKSI/DATA NYATA',
+                        'label' => 'Sungguhan — transaksi nyata',
                         'live' => true,
                         'description' => 'Menggunakan endpoint dan credential Production Midtrans.',
                     ],
                 ],
                 'fields' => [
                     'server_key' => [
-                        'label' => 'Server Key',
+                        'label' => 'Kunci server',
                         'secret' => true,
                         'required' => true,
                         'help' => 'Kunci server untuk environment yang sedang dipilih. Hanya digunakan backend.',
                     ],
                     'client_key' => [
-                        'label' => 'Client Key',
+                        'label' => 'Kunci aplikasi',
                         'secret' => true,
                         'required' => false,
                         'help' => 'Kunci client untuk environment yang sedang dipilih bila dibutuhkan oleh flow Snap.',
                     ],
                 ],
                 'callback' => [
-                    'label' => 'Midtrans Notification',
+                    'label' => 'Pemberitahuan Midtrans',
                     'route' => 'api.payments.midtrans.notification',
                     'required_fields' => ['server_key'],
                 ],
@@ -140,32 +140,32 @@ class IntegrationRegistry
                 'credential_scope' => 'per_environment',
                 'environments' => [
                     'sandbox' => [
-                        'label' => 'SANDBOX / TEST',
+                        'label' => 'Masa uji',
                         'live' => false,
                         'description' => 'Menggunakan endpoint dan credential Sandbox DOKU.',
                     ],
                     'production' => [
-                        'label' => 'PRODUCTION — TRANSAKSI/DATA NYATA',
+                        'label' => 'Sungguhan — transaksi nyata',
                         'live' => true,
                         'description' => 'Menggunakan endpoint dan credential Production DOKU.',
                     ],
                 ],
                 'fields' => [
                     'client_id' => [
-                        'label' => 'Client ID',
+                        'label' => 'ID aplikasi',
                         'secret' => true,
                         'required' => true,
                         'help' => 'Identitas merchant untuk environment yang sedang dipilih.',
                     ],
                     'secret_key' => [
-                        'label' => 'Secret Key',
+                        'label' => 'Kunci rahasia',
                         'secret' => true,
                         'required' => true,
                         'help' => 'Kunci penandatanganan request untuk environment yang sedang dipilih.',
                     ],
                 ],
                 'callback' => [
-                    'label' => 'DOKU Notification',
+                    'label' => 'Pemberitahuan DOKU',
                     'route' => 'api.payments.doku.notification',
                     'required_fields' => ['client_id', 'secret_key'],
                 ],
@@ -177,7 +177,7 @@ class IntegrationRegistry
                 'environment_note' => 'Resend tidak memakai endpoint Sandbox/Production terpisah pada integrasi ini. Pisahkan domain/team atau credential bila diperlukan secara operasional.',
                 'fields' => [
                     'api_key' => [
-                        'label' => 'API Key',
+                        'label' => 'Kunci akses',
                         'secret' => true,
                         'required' => true,
                         'help' => 'Kunci API Resend.',
@@ -204,51 +204,51 @@ class IntegrationRegistry
                 'environment_note' => 'Status Testing/Production OAuth dikelola di Google Cloud, bukan dengan endpoint backend terpisah. Karena itu panel tidak membuat selector environment palsu.',
                 'fields' => [
                     'client_id' => [
-                        'label' => 'Client ID',
+                        'label' => 'ID aplikasi',
                         'secret' => true,
                         'required' => true,
                         'help' => 'Client ID aplikasi OAuth Google.',
                     ],
                     'client_secret' => [
-                        'label' => 'Client Secret',
+                        'label' => 'Sandi aplikasi',
                         'secret' => true,
                         'required' => true,
                         'help' => 'Client Secret OAuth Google. Hanya digunakan backend.',
                     ],
                 ],
                 'callback' => [
-                    'label' => 'Google OAuth Callback',
+                    'label' => 'Alamat kembali Google',
                     'route' => 'google.callback',
                     'required_fields' => ['client_id', 'client_secret'],
                 ],
             ],
             'telegram' => [
                 'name' => 'Notifikasi Telegram',
-                'group' => 'Notifikasi',
+                'group' => 'Pemberitahuan',
                 'description' => 'Pengiriman notifikasi operasional Admin melalui bot Telegram.',
                 'default_environment' => 'test',
                 'credential_scope' => 'per_environment',
                 'environments' => [
                     'test' => [
-                        'label' => 'TEST',
+                        'label' => 'Masa uji',
                         'live' => false,
                         'description' => 'Menggunakan bot/token Telegram Test Environment dan path Bot API /test/.',
                     ],
                     'production' => [
-                        'label' => 'PRODUCTION — DATA NYATA',
+                        'label' => 'Sungguhan — data nyata',
                         'live' => true,
                         'description' => 'Menggunakan bot/token Telegram Production untuk notifikasi nyata.',
                     ],
                 ],
                 'fields' => [
                     'bot_token' => [
-                        'label' => 'Token bot',
+                        'label' => 'Token bot Telegram',
                         'secret' => true,
                         'required' => true,
                         'help' => 'Token bot untuk environment yang sedang dipilih.',
                     ],
                     'chat_id' => [
-                        'label' => 'ID chat',
+                        'label' => 'ID ruang obrolan',
                         'secret' => true,
                         'required' => true,
                         'help' => 'ID chat tujuan pada environment yang sedang dipilih.',
@@ -258,72 +258,72 @@ class IntegrationRegistry
             ],
             'discord' => [
                 'name' => 'Notifikasi Discord',
-                'group' => 'Notifikasi',
+                'group' => 'Pemberitahuan',
                 'description' => 'Pengiriman notifikasi operasional Admin melalui webhook Discord.',
                 'environment_note' => 'Webhook Discord yang digunakan tidak mempunyai selector Sandbox/Production terpisah.',
                 'fields' => [
                     'webhook_url' => [
-                        'label' => 'Alamat webhook (default)',
+                        'label' => 'Alamat pemberitahuan utama',
                         'secret' => true,
                         'required' => true,
                         'help' => 'URL webhook Discord. Dipakai untuk semua channel yang webhook per-channel-nya kosong. Nilai disimpan terenkripsi.',
                     ],
                     'webhook_url_order' => [
-                        'label' => 'Webhook channel ORDER',
+                        'label' => 'Alamat pemberitahuan ORDER',
                         'secret' => true,
                         'required' => false,
                         'help' => 'Order baru, bayar terlambat, laporan refund. Kosong = pakai webhook default.',
                     ],
                     'webhook_url_qris' => [
-                        'label' => 'Webhook channel QRIS',
+                        'label' => 'Alamat pemberitahuan QRIS',
                         'secret' => true,
                         'required' => false,
                         'help' => 'QRIS manual menunggu verifikasi. Kosong = pakai webhook default.',
                     ],
                     'webhook_url_fulfillment' => [
-                        'label' => 'Webhook channel FULFILMENT',
+                        'label' => 'Alamat pemberitahuan FULFILMENT',
                         'secret' => true,
                         'required' => false,
                         'help' => 'Update fulfillment rutin. Kosong = pakai webhook default.',
                     ],
                     'webhook_url_tiket' => [
-                        'label' => 'Webhook channel TIKET',
+                        'label' => 'Alamat pemberitahuan TIKET',
                         'secret' => true,
                         'required' => false,
                         'help' => 'Tiket support. Kosong = pakai webhook default.',
                     ],
                     'webhook_url_blocked' => [
-                        'label' => 'Webhook channel BLOCKED',
+                        'label' => 'Alamat pemberitahuan BLOCKED',
                         'secret' => true,
                         'required' => false,
                         'help' => 'Pengiriman tertahan / habis / reconcile mentok. Kosong = pakai webhook default.',
                     ],
                     'webhook_url_login' => [
-                        'label' => 'Webhook channel LOGIN MENCURIGAKAN',
+                        'label' => 'Alamat pemberitahuan LOGIN MENCURIGAKAN',
                         'secret' => true,
                         'required' => false,
                         'help' => 'Login admin mencurigakan. Kosong = pakai webhook default.',
                     ],
                     'webhook_url_urgent' => [
-                        'label' => 'Webhook channel URGENT+MAPPING',
+                        'label' => 'Alamat pemberitahuan URGENT+MAPPING',
                         'secret' => true,
                         'required' => false,
                         'help' => 'Harga penyedia jebol + mapping aktif ganda. Kosong = pakai webhook default.',
                     ],
                     'webhook_url_vps' => [
-                        'label' => 'Webhook channel VPS',
+                        'label' => 'Alamat pemberitahuan VPS',
                         'secret' => true,
                         'required' => false,
                         'help' => 'Website mati / healthcheck. Kosong = pakai webhook default.',
                     ],
                     'webhook_url_integrasi' => [
-                        'label' => 'Webhook channel INTEGRASI',
+                        'label' => 'Alamat pemberitahuan INTEGRASI',
                         'secret' => true,
                         'required' => false,
                         'help' => 'Integrasi bermasalah. Kosong = pakai webhook default.',
                     ],
                     'webhook_url_sync' => [
-                        'label' => 'Webhook channel SYNC',
+                        'label' => 'Alamat pemberitahuan SYNC',
                         'secret' => true,
                         'required' => false,
                         'help' => 'Sync Digiflazz gagal. Kosong = pakai webhook default.',
@@ -338,12 +338,12 @@ class IntegrationRegistry
                 'credential_scope' => 'per_environment',
                 'environments' => [
                     'test' => [
-                        'label' => 'TEST',
+                        'label' => 'Masa uji',
                         'live' => false,
                         'description' => 'Gunakan site key dan secret key pengujian Turnstile.',
                     ],
                     'production' => [
-                        'label' => 'PRODUCTION — DATA NYATA',
+                        'label' => 'Sungguhan — data nyata',
                         'live' => true,
                         'description' => 'Gunakan widget dan credential Turnstile milik hostname produksi.',
                     ],
@@ -356,7 +356,7 @@ class IntegrationRegistry
                         'help' => 'Kunci publik widget Turnstile untuk environment yang sedang dipilih.',
                     ],
                     'secret_key' => [
-                        'label' => 'Secret Key',
+                        'label' => 'Kunci rahasia',
                         'secret' => true,
                         'required' => true,
                         'help' => 'Kunci verifikasi server Turnstile untuk environment yang sedang dipilih.',

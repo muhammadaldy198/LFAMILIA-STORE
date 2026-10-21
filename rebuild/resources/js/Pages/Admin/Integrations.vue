@@ -101,7 +101,11 @@ const testedAt = (value) => {
     if (!value) return 'Belum pernah dites';
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return 'Waktu tes tidak tersedia';
-    return 'Terakhir dites ' + date.toLocaleString('id-ID');
+    return 'Terakhir dites ' + new Intl.DateTimeFormat('id-ID', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+        timeZone: 'Asia/Jakarta',
+    }).format(date) + ' WIB';
 };
 
 const selectedEnvironment = (item) => item.environment_options?.find(
@@ -264,19 +268,19 @@ async function sendResendTestEmail() {
                     </p>
                 </div>
                 <Button class="w-full sm:w-auto" variant="outline" as-child>
-                    <Link href="/admin/nickname-tools">Buka Validasi Akun</Link>
+                    <Link href="/admin/nickname-tools">Buka Alat Cek Nama Game</Link>
                 </Button>
             </header>
 
-            <Card class="space-y-2 p-4">
-                <h2 class="font-semibold">Mulai jualan top up</h2>
-                <p class="text-sm">Hubungkan Digiflazz dan satu metode pembayaran, lalu impor nominal dan atur margin di menu Produk.</p>
-                <p class="text-sm text-muted-foreground">Telegram, Discord, login Google, dan validasi nama akun adalah fitur tambahan. Semua integrasi tidak harus aktif. Tes koneksi memeriksa akses layanan; hasil tes transaksi pelanggan dicatat terpisah.</p>
+            <section class="space-y-2 border-b border-border pb-4" aria-labelledby="integrations-start-heading">
+                <h2 id="integrations-start-heading" class="font-semibold">Mulai jualan top up</h2>
+                <p class="text-sm">Hubungkan Digiflazz dan satu cara pembayaran, lalu impor nominal dan atur margin di menu Produk.</p>
+                <p class="text-sm text-muted-foreground">Telegram, Discord, masuk dengan Google, dan pengecekan nama akun bersifat tambahan dan tidak wajib aktif. Tes koneksi hanya memeriksa akses layanan; hasil transaksi pelanggan dicatat terpisah.</p>
                 <div class="flex flex-col gap-2 sm:flex-row">
                     <Button class="w-full sm:w-auto" variant="outline" as-child><Link href="/admin/catalog">Buka Produk</Link></Button>
                     <Button class="w-full sm:w-auto" variant="outline" as-child><Link href="/admin/payments">Buka Pembayaran</Link></Button>
                 </div>
-            </Card>
+            </section>
 
             <div class="lf-admin-summary ">
                 <Card class="p-4">
@@ -288,7 +292,7 @@ async function sendResendTestEmail() {
                     <p class="mt-2 text-2xl font-semibold">{{ activeCount }}</p>
                 </Card>
                 <Card class="p-4">
-                    <p class="text-xs text-muted-foreground">Terverifikasi</p>
+                    <p class="text-xs text-muted-foreground">Sudah terhubung</p>
                     <p class="mt-2 text-2xl font-semibold">{{ healthyCount }}</p>
                 </Card>
                 <Card class="p-4">
@@ -296,7 +300,7 @@ async function sendResendTestEmail() {
                     <p class="mt-2 text-2xl font-semibold">{{ attentionCount }}</p>
                 </Card>
                 <Card class="p-4">
-                    <p class="text-xs text-muted-foreground">Belum terverifikasi</p>
+                    <p class="text-xs text-muted-foreground">Belum dipastikan</p>
                     <p class="mt-2 text-2xl font-semibold">{{ awaitingCount }}</p>
                 </Card>
                 <Card class="col-span-2 p-4 md:col-span-1">
@@ -305,17 +309,15 @@ async function sendResendTestEmail() {
                 </Card>
             </div>
             <p class="text-xs text-muted-foreground">
-                Butuh tindakan = data akses, alamat pemberitahuan, atau tes koneksi bermasalah.
-                Belum terverifikasi = sambungan layanan belum bisa dipastikan lewat pemeriksaan otomatis; belum tentu rusak.
-                Kamu tidak perlu mengulang Tes Koneksi terus-menerus.
+                Butuh tindakan berarti data akses, alamat pemberitahuan, atau tes koneksi bermasalah. Belum dipastikan berarti sambungan belum bisa dicek otomatis dan belum tentu rusak; tidak perlu mengulang tes terus-menerus.
             </p>
 
-            <Card class="p-4"><details>
-                    <summary class="cursor-pointer font-semibold">Alamat notifikasi & masuk kembali</summary>
-                    <p class="mt-1 text-sm text-muted-foreground">
+            <details class="lf-admin-advanced rounded-md border border-border">
+                    <summary class="cursor-pointer px-4 py-3 text-sm font-medium">Alamat pemberitahuan &amp; masuk kembali</summary>
+                    <p class="border-t border-border px-4 pt-3 text-sm text-muted-foreground">
                         Salin alamat yang sesuai ke pengaturan layanan terkait. Alamat ini dipakai untuk menerima pemberitahuan transaksi atau proses masuk kembali, dan tidak dapat diubah dari panel.
                     </p>
-                <div class="mt-4 grid gap-3 md:grid-cols-2">
+                <div class="grid gap-3 p-4 md:grid-cols-2">
                     <div
                         v-for="(value, key) in callbackUrls"
                         :key="key"
@@ -335,7 +337,7 @@ async function sendResendTestEmail() {
                         </div>
                     </div>
                 </div>
-            </details></Card>
+            </details>
 
             <p v-if="!items.length" role="status" class="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">Belum ada integrasi yang tersedia. Periksa konfigurasi integrasi toko.</p>
 
@@ -353,11 +355,11 @@ async function sendResendTestEmail() {
                 </Button>
             </nav>
 
-            <Card
+            <section
                 v-for="item in items"
                 v-show="selectedCode === item.code"
                 :key="item.code"
-                class="p-4 md:p-5"
+                class="space-y-5 rounded-md border border-border p-4 md:p-5"
             >
                 <div class="flex flex-wrap items-start justify-between gap-4">
                     <div class="max-w-3xl">
@@ -438,10 +440,10 @@ async function sendResendTestEmail() {
                         <p v-if="selectedEnvironment(item)?.live" role="status" class="mb-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 font-medium text-destructive">Mode layanan sungguhan sedang aktif. Pastikan data akses yang disimpan memang untuk layanan ini.</p>
                         <p>{{ selectedEnvironment(item)?.description }}</p>
                         <p v-if="item.credential_scope === 'per_environment'" class="mt-1">
-                            Data akses untuk mode ini terpisah. Data akses mode lain tidak akan dipakai sebagai pengganti.
+                            Data akses untuk mode ini disimpan terpisah dan tidak memakai data akses mode lain.
                         </p>
                         <p v-else class="mt-1">
-                            Credential akun dipakai bersama; mode request mengikuti environment yang dipilih.
+                            Data akses dipakai bersama; permintaan mengikuti mode yang dipilih.
                         </p>
                     </div>
                 </div>
@@ -513,15 +515,15 @@ async function sendResendTestEmail() {
                 </div>
 
                 <div v-if="item.code === 'resend'" class="mt-5 rounded-md border p-4">
-                    <h3 class="font-semibold">Kirim Email Uji</h3>
-                    <p class="mt-1 text-sm text-muted-foreground">Uji pengiriman langsung menggunakan credential Resend yang tersimpan. Simpan perubahan integrasi terlebih dahulu. Pengiriman ini bukan simulasi dan akan mengirim email sungguhan.</p>
+                    <h3 class="font-semibold">Kirim email uji</h3>
+                    <p class="mt-1 text-sm text-muted-foreground">Uji pengiriman memakai data akses Resend yang tersimpan. Simpan perubahan dulu. Pengiriman ini bukan simulasi dan benar-benar mengirim email.</p>
                     <div class="mt-3 flex flex-wrap items-end gap-2">
                         <label class="min-w-0 flex-1 space-y-1.5">
                             <span class="text-sm font-medium">Email penerima</span>
                             <Input v-model="testRecipient" type="email" autocomplete="email" placeholder="admin@example.com" />
                         </label>
                         <Button type="button" variant="outline" :disabled="testEmailBusy || !testRecipient.trim() || !item.is_active" @click="sendResendTestEmail">
-                            {{ testEmailBusy ? 'Mengirim…' : 'Kirim Email Uji' }}
+                            {{ testEmailBusy ? 'Mengirim…' : 'Kirim email uji' }}
                         </Button>
                     </div>
                     <p v-if="testEmailResult" role="status" class="mt-3 text-sm" :class="testEmailResult.ok ? 'text-foreground' : 'text-destructive'">{{ testEmailResult.message }}</p>
@@ -529,10 +531,10 @@ async function sendResendTestEmail() {
 
                 <div class="mt-5 flex flex-wrap gap-2">
                     <Button :disabled="item.busy" @click="save(item)">
-                        Simpan Integrasi
+                        Simpan integrasi
                     </Button>
                     <Button variant="outline" :disabled="item.busy" @click="testConnection(item)">
-                        {{ item.busy ? 'Memeriksa…' : 'Tes Koneksi' }}
+                        {{ item.busy ? 'Memeriksa…' : 'Tes koneksi' }}
                     </Button>
                 </div>
 
@@ -547,11 +549,11 @@ async function sendResendTestEmail() {
                     <span> · {{ item.result.message }}</span>
                 </div>
 
-                <div v-else-if="item.health?.message" class="mt-4 rounded-md border p-3 text-sm text-muted-foreground">
+                <div v-else-if="item.health?.message" class="mt-4 rounded-md border border-border p-3 text-sm text-muted-foreground">
                     <strong>{{ statusLabel(item.health.status) }}</strong>
                     <span> · {{ item.health.message }}</span>
                 </div>
-            </Card>
+            </section>
         </div>
     </AdminShell>
 </template>
