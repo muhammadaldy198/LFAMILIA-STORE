@@ -58,7 +58,7 @@ const filteredCodes = computed(() => {
     );
 });
 const integrationStatus = computed(() => {
-    if (!props.validationConfig?.is_active) return { text: 'Nonaktif', className: 'border-slate-200 bg-slate-50 text-slate-600' };
+    if (!props.validationConfig?.is_active) return { text: 'Nonaktif', className: 'border-border bg-muted text-muted-foreground' };
     if (!props.validationConfig?.is_configured) return { text: 'Belum lengkap', className: 'border-amber-200 bg-amber-50 text-amber-700' };
     return { text: 'Siap digunakan', className: 'border-emerald-200 bg-emerald-50 text-emerald-700' };
 });
@@ -324,19 +324,19 @@ if (nicknameCodes.value.length > 0) gameCode.value = nicknameCodes.value[0].code
 <Head title="Validasi Akun" />
 <AdminShell>
 <div class="mx-auto max-w-[1540px]">
-    <header class="mb-4 flex flex-col gap-3 border-b border-[#e1e6ed] pb-4 sm:flex-row sm:items-end sm:justify-between">
+    <header class="mb-4 flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between">
         <div class="min-w-0">
-            <h1 class="text-2xl font-semibold tracking-[-0.025em] text-[#20324c]">Validasi Akun</h1>
-            <p class="mt-1 text-xs text-[#7a899e]">Uji data akun dan kelola aturan validasi game. Credential tetap tersimpan di backend.</p>
+            <h1 class="text-2xl font-semibold tracking-[-0.025em] text-foreground">Validasi Akun</h1>
+            <p class="mt-1 text-xs text-muted-foreground">Uji data akun dan kelola aturan validasi game. Credential tetap tersimpan di backend.</p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
             <span class="rounded-full border px-3 py-1.5 text-xs font-bold" :class="integrationStatus.className">{{ integrationStatus.text }}</span>
-            <a href="/admin/integrations" class="rounded-md border border-[#dfe5ed] bg-white px-3 py-2 text-xs font-bold text-[#52627a] hover:bg-[#f8fafc]">Pengaturan Integrasi</a>
+            <a href="/admin/integrations" class="rounded-md border border-border bg-card px-3 py-2 text-xs font-bold text-muted-foreground hover:bg-muted">Pengaturan Integrasi</a>
         </div>
     </header>
 
-    <section class="overflow-hidden rounded-lg border border-[#e1e6ed] bg-white">
-        <header class="border-b border-[#edf0f4] px-4 pt-3">
+    <section class="overflow-hidden rounded-lg border border-border bg-card">
+        <header class="border-b border-border px-4 pt-3">
             <nav class="lf-admin-tabs" aria-label="Validasi akun">
                 <Button
                     v-for="item in [['game','Cek Game'],['region','Cek Region'],['pln','PLN'],['codes','Kode Game']]"
@@ -354,9 +354,9 @@ if (nicknameCodes.value.length > 0) gameCode.value = nicknameCodes.value[0].code
 
         <div v-if="tab!=='codes'" class="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_360px]">
             <div class="grid content-start gap-4 sm:grid-cols-2">
-                <label v-if="tab==='game' || tab==='region'" class="text-sm font-bold text-[#52627a]">
+                <label v-if="tab==='game' || tab==='region'" class="text-sm font-bold text-muted-foreground">
                     Game
-                    <select v-model="gameCode" class="mt-1 block h-10 w-full rounded-md border border-[#dfe5ed] bg-[#f8fafc] px-3 text-xs text-[#243653] outline-none focus:border-[#8cb6ef]">
+                    <select v-model="gameCode" class="mt-1 block h-10 w-full rounded-md border border-border bg-muted px-3 text-xs text-foreground outline-none focus:border-primary">
                         <option value="" disabled>Pilih game</option>
                         <option v-for="item in (tab==='region' ? regionCodes : nicknameCodes)" :key="item.id" :value="item.code">
                             {{ item.name }} · {{ item.code }}
@@ -364,12 +364,12 @@ if (nicknameCodes.value.length > 0) gameCode.value = nicknameCodes.value[0].code
                     </select>
                 </label>
 
-                <label v-if="tab!=='pln'" class="text-sm font-bold text-[#52627a]">
+                <label v-if="tab!=='pln'" class="text-sm font-bold text-muted-foreground">
                     User ID
                     <Input v-model="userId" maxlength="80" placeholder="Masukkan User ID" class="mt-1 h-10 text-xs" />
                 </label>
 
-                <label v-if="tab!=='pln'" class="text-sm font-bold text-[#52627a]">
+                <label v-if="tab!=='pln'" class="text-sm font-bold text-muted-foreground">
                     Server / Zone
                     <Input
                         v-model="server"
@@ -377,12 +377,12 @@ if (nicknameCodes.value.length > 0) gameCode.value = nicknameCodes.value[0].code
                         :placeholder="requiresServer || tab==='region' ? 'Wajib diisi' : 'Opsional'"
                         class="mt-1 h-10 text-xs"
                     />
-                    <small class="mt-1 block font-normal text-[#8b98aa]">
+                    <small class="mt-1 block font-normal text-muted-foreground">
                         {{ requiresServer || tab==='region' ? 'Wajib untuk pemeriksaan ini.' : 'Isi jika akun game menggunakan Server / Zone.' }}
                     </small>
                 </label>
 
-                <label v-if="tab==='pln'" class="text-sm font-bold text-[#52627a] sm:col-span-2">
+                <label v-if="tab==='pln'" class="text-sm font-bold text-muted-foreground sm:col-span-2">
                     Nomor Meter / ID Pelanggan PLN
                     <Input
                         :value="customerNumber"
@@ -398,8 +398,8 @@ if (nicknameCodes.value.length > 0) gameCode.value = nicknameCodes.value[0].code
                     Hanya game aktif yang ditandai “Perlu cek region” yang tersedia pada pemeriksaan ini.
                 </div>
 
-                <div class="flex flex-wrap gap-2 border-t border-[#edf0f4] pt-4 sm:col-span-2">
-                    <Button type="button" :disabled="busy" class="h-9 bg-[#1769e8] px-4 text-sm font-bold text-white disabled:opacity-50" @click="runCheck">
+                <div class="flex flex-wrap gap-2 border-t border-border pt-4 sm:col-span-2">
+                    <Button type="button" :disabled="busy" class="h-9 bg-primary px-4 text-sm font-bold text-white disabled:opacity-50" @click="runCheck">
                         {{ busy ? 'Memeriksa...' : 'Cek Data' }}
                     </Button>
                     <Button type="button" :disabled="busy" variant="outline" class="h-9 px-4 text-sm font-bold" @click="clearForm">
@@ -409,20 +409,20 @@ if (nicknameCodes.value.length > 0) gameCode.value = nicknameCodes.value[0].code
             </div>
 
             <aside class="space-y-3">
-                <div class="rounded-md border border-[#e1e6ed] bg-[#f8fafc] p-3">
+                <div class="rounded-md border border-border bg-muted p-3">
                     <div class="flex items-center justify-between gap-2">
-                        <strong class="text-sm text-[#34445f]">Alamat layanan aktif</strong>
-                        <span class="rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-bold text-slate-500">Hanya di server</span>
+                        <strong class="text-sm text-foreground">Alamat layanan aktif</strong>
+                        <span class="rounded-full border border-border bg-card px-2 py-1 text-xs font-bold text-muted-foreground">Hanya di server</span>
                     </div>
-                    <code class="mt-2 block break-all rounded border border-[#e5eaf1] bg-white px-2.5 py-2 text-xs text-[#1769e8]">{{ endpointText }}</code>
-                    <p v-if="validationConfig?.base_url" class="mt-2 break-all text-xs text-[#8190a5]">{{ validationConfig.base_url }}</p>
+                    <code class="mt-2 block break-all rounded border border-border bg-card px-2.5 py-2 text-xs text-primary">{{ endpointText }}</code>
+                    <p v-if="validationConfig?.base_url" class="mt-2 break-all text-xs text-muted-foreground">{{ validationConfig.base_url }}</p>
                 </div>
                 <div v-if="error" class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2.5 text-xs font-semibold leading-4 text-rose-700">{{ error }}</div>
                 <div v-if="result" class="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-xs font-semibold leading-4 text-emerald-700">
                     <template v-if="tab==='pln'">Nama pelanggan: {{ result.customer_name || '-' }}</template>
                     <template v-else>Nickname: {{ result.nickname || '-' }}<span v-if="result.region"> · Region: {{ result.region }}</span></template>
                 </div>
-                <div class="rounded-md border border-[#e1e6ed] bg-white p-3 text-xs leading-4 text-[#52627a]">
+                <div class="rounded-md border border-border bg-card p-3 text-xs leading-4 text-muted-foreground">
                     API key tidak pernah dikirim ke browser. Alamat utama dan jalur layanan dapat diubah melalui menu Integrasi.
                 </div>
             </aside>
@@ -431,22 +431,22 @@ if (nicknameCodes.value.length > 0) gameCode.value = nicknameCodes.value[0].code
         <div v-else class="p-4">
             <div class="mb-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                 <div>
-                    <h2 class="text-sm font-extrabold text-[#243653]">Daftar Kode Game</h2>
-                    <p class="mt-1 text-xs text-[#8190a5]">Game aktif tidak otomatis mendukung cek nickname. Dukungan nickname, Server / Zone, region, status, dan urutan diatur terpisah.</p>
+                    <h2 class="text-sm font-extrabold text-foreground">Daftar Kode Game</h2>
+                    <p class="mt-1 text-xs text-muted-foreground">Game aktif tidak otomatis mendukung cek nickname. Dukungan nickname, Server / Zone, region, status, dan urutan diatur terpisah.</p>
                 </div>
                 <div class="flex w-full flex-col gap-2 sm:flex-row lg:w-auto">
                     <Input aria-label="Cari game atau kode" v-model="query" placeholder="Cari game atau kode..." class="h-9 w-full text-sm sm:w-[280px]" />
-                    <Button type="button" class="h-9 bg-[#1769e8] px-4 text-sm font-bold text-white" @click="createCode">Tambah Kode Game</Button>
+                    <Button type="button" class="h-9 bg-primary px-4 text-sm font-bold text-white" @click="createCode">Tambah Kode Game</Button>
                 </div>
             </div>
 
             <div v-if="editorError" class="mb-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">{{ editorError }}</div>
 
-            <div v-if="editorOpen" class="mb-4 rounded-lg border border-[#dfe5ed] bg-[#f8fafc] p-4">
+            <div v-if="editorOpen" class="mb-4 rounded-lg border border-border bg-muted p-4">
                 <div class="mb-3 flex items-center justify-between gap-3">
                     <div>
-                        <h3 class="text-xs font-extrabold text-[#243653]">{{ editingId ? 'Edit Kode Game' : 'Tambah Kode Game' }}</h3>
-                        <p class="mt-0.5 text-xs text-[#8190a5]">Perubahan langsung menjadi sumber aturan validasi backend.</p>
+                        <h3 class="text-xs font-extrabold text-foreground">{{ editingId ? 'Edit Kode Game' : 'Tambah Kode Game' }}</h3>
+                        <p class="mt-0.5 text-xs text-muted-foreground">Perubahan langsung menjadi sumber aturan validasi backend.</p>
                     </div>
                     <Button type="button" variant="ghost" class="h-8 px-2 text-xs" @click="editorOpen=false;resetEditor()">Tutup</Button>
                 </div>
@@ -454,47 +454,47 @@ if (nicknameCodes.value.length > 0) gameCode.value = nicknameCodes.value[0].code
                 <div v-if="editorNotice" class="mb-3 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">{{ editorNotice }}</div>
 
                 <div class="grid gap-3 md:grid-cols-2">
-                    <label class="text-xs font-bold text-[#52627a]">
+                    <label class="text-xs font-bold text-muted-foreground">
                         Nama game
                         <Input v-model="form.name" maxlength="120" placeholder="Contoh: Mobile Legends" class="mt-1 h-10 text-xs" />
                     </label>
-                    <label class="text-xs font-bold text-[#52627a]">
+                    <label class="text-xs font-bold text-muted-foreground">
                         Kode game
                         <Input v-model="form.code" maxlength="100" placeholder="contoh-kode-game" class="mt-1 h-10 font-mono text-xs" @blur="normalizeCodeInput" />
-                        <small class="mt-1 block font-normal text-[#8b98aa]">Huruf kecil, angka, dan tanda hubung. Jika kode yang sudah dipakai produk diubah, relasi produk ikut diperbarui.</small>
+                        <small class="mt-1 block font-normal text-muted-foreground">Huruf kecil, angka, dan tanda hubung. Jika kode yang sudah dipakai produk diubah, relasi produk ikut diperbarui.</small>
                     </label>
                 </div>
 
                 <div class="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-                    <label class="flex min-h-12 items-center gap-2 rounded-md border border-[#dfe5ed] bg-white px-3 py-2 text-xs font-semibold text-[#52627a]">
+                    <label class="flex min-h-12 items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-xs font-semibold text-muted-foreground">
                         <AdminSwitch v-model="form.supports_nickname_check" @update:model-value="syncNicknameSupportRules" />
                         Mendukung cek nickname
                     </label>
-                    <label class="flex min-h-12 items-center gap-2 rounded-md border border-[#dfe5ed] bg-white px-3 py-2 text-xs font-semibold text-[#52627a]">
+                    <label class="flex min-h-12 items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-xs font-semibold text-muted-foreground">
                         <AdminSwitch v-model="form.requires_server" :disabled="!form.supports_nickname_check || form.requires_region_check" />
                         Wajib Server / Zone
                     </label>
-                    <label class="flex min-h-12 items-center gap-2 rounded-md border border-[#dfe5ed] bg-white px-3 py-2 text-xs font-semibold text-[#52627a]">
+                    <label class="flex min-h-12 items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-xs font-semibold text-muted-foreground">
                         <AdminSwitch v-model="form.requires_region_check" :disabled="!form.supports_nickname_check" @update:model-value="form.requires_server = form.requires_server || form.requires_region_check" />
                         Perlu cek region
                     </label>
-                    <label class="flex min-h-12 items-center gap-2 rounded-md border border-[#dfe5ed] bg-white px-3 py-2 text-xs font-semibold text-[#52627a]">
+                    <label class="flex min-h-12 items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-xs font-semibold text-muted-foreground">
                         <AdminSwitch v-model="form.is_active" />
                         Aktif
                     </label>
                 </div>
 
                 <div class="mt-4 flex flex-wrap gap-2">
-                    <Button type="button" :disabled="editorBusy" class="h-9 bg-[#1769e8] px-4 text-sm font-bold text-white disabled:opacity-50" @click="saveCode">
+                    <Button type="button" :disabled="editorBusy" class="h-9 bg-primary px-4 text-sm font-bold text-white disabled:opacity-50" @click="saveCode">
                         {{ editorBusy ? 'Menyimpan...' : 'Simpan' }}
                     </Button>
                     <Button type="button" :disabled="editorBusy" variant="outline" class="h-9 px-4 text-sm font-bold" @click="editorOpen=false;resetEditor()">Batal</Button>
                 </div>
             </div>
 
-            <div class="overflow-x-auto rounded-md border border-[#e1e6ed]" role="region" aria-label="Daftar aturan validasi game" tabindex="0">
+            <div class="overflow-x-auto rounded-md border border-border" role="region" aria-label="Daftar aturan validasi game" tabindex="0">
                 <AdminResponsiveTable :mobile-columns="[1,3,6,8]" class="min-w-[980px] w-full text-left text-xs">
-                    <TableHeader class="bg-[#f8fafc] text-[#607089]">
+                    <TableHeader class="bg-muted text-muted-foreground">
                         <TableRow>
                             <TableHead class="w-[92px] px-3 py-2.5">Urutan</TableHead>
                             <TableHead class="px-3 py-2.5">Game</TableHead>
@@ -507,7 +507,7 @@ if (nicknameCodes.value.length > 0) gameCode.value = nicknameCodes.value[0].code
                             <TableHead class="px-3 py-2.5 text-right">Aksi</TableHead>
                         </TableRow>
                     </TableHeader>
-                    <TableBody class="divide-y divide-[#edf0f4] bg-white">
+                    <TableBody class="divide-y divide-[#edf0f4] bg-card">
                         <TableRow v-for="item in filteredCodes" :key="item.id" :class="{ 'opacity-60': !item.is_active }">
                             <TableCell class="px-3 py-2.5">
                                 <div class="flex gap-1">
@@ -515,29 +515,29 @@ if (nicknameCodes.value.length > 0) gameCode.value = nicknameCodes.value[0].code
                                     <Button type="button" variant="outline" class="h-9 w-9 p-0 text-xs" :disabled="reorderBusy || codes[codes.length-1]?.id===item.id || query.trim()!==''" aria-label="Pindahkan game ke bawah" @click="moveCode(item,1)">↓</Button>
                                 </div>
                             </TableCell>
-                            <TableCell class="px-3 py-2.5 font-semibold text-[#34445f]">{{ item.name }}</TableCell>
-                            <TableCell class="px-3 py-2.5 font-mono text-[#1769e8]">{{ item.code }}</TableCell>
+                            <TableCell class="px-3 py-2.5 font-semibold text-foreground">{{ item.name }}</TableCell>
+                            <TableCell class="px-3 py-2.5 font-mono text-primary">{{ item.code }}</TableCell>
                             <TableCell class="px-3 py-2.5">
-                                <span class="rounded-full px-2 py-1 text-xs font-bold" :class="item.supports_nickname_check ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'">
+                                <span class="rounded-full px-2 py-1 text-xs font-bold" :class="item.supports_nickname_check ? 'bg-emerald-50 text-emerald-700' : 'bg-muted text-muted-foreground'">
                                     {{ item.supports_nickname_check ? 'Didukung' : 'Tidak didukung' }}
                                 </span>
                             </TableCell>
                             <TableCell class="px-3 py-2.5">
-                                <span class="rounded-full px-2 py-1 text-xs font-bold" :class="item.requires_server ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-500'">
+                                <span class="rounded-full px-2 py-1 text-xs font-bold" :class="item.requires_server ? 'bg-amber-50 text-amber-700' : 'bg-muted text-muted-foreground'">
                                     {{ item.requires_server ? 'Wajib' : 'Tidak' }}
                                 </span>
                             </TableCell>
                             <TableCell class="px-3 py-2.5">
-                                <span class="rounded-full px-2 py-1 text-xs font-bold" :class="item.requires_region_check ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-500'">
+                                <span class="rounded-full px-2 py-1 text-xs font-bold" :class="item.requires_region_check ? 'bg-blue-50 text-blue-700' : 'bg-muted text-muted-foreground'">
                                     {{ item.requires_region_check ? 'Dicek' : 'Tidak' }}
                                 </span>
                             </TableCell>
                             <TableCell class="px-3 py-2.5">
-                                <span class="rounded-full px-2 py-1 text-xs font-bold" :class="item.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'">
+                                <span class="rounded-full px-2 py-1 text-xs font-bold" :class="item.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-muted text-muted-foreground'">
                                     {{ item.is_active ? 'Aktif' : 'Nonaktif' }}
                                 </span>
                             </TableCell>
-                            <TableCell class="px-3 py-2.5 text-[#52627a]">{{ item.product_count }}</TableCell>
+                            <TableCell class="px-3 py-2.5 text-muted-foreground">{{ item.product_count }}</TableCell>
                             <TableCell class="px-3 py-2.5">
                                 <div class="flex justify-end gap-1.5">
                                     <Button type="button" variant="outline" class="h-8 px-2.5 text-xs font-bold" @click="copyCode(item.code)">{{ copied===item.code ? 'Tersalin' : 'Salin' }}</Button>
@@ -548,12 +548,12 @@ if (nicknameCodes.value.length > 0) gameCode.value = nicknameCodes.value[0].code
                             </TableCell>
                         </TableRow>
                         <TableRow v-if="filteredCodes.length===0">
-                            <TableCell colspan="9" class="px-4 py-10 text-center text-sm text-[#8190a5]">Tidak ada kode game yang cocok.</TableCell>
+                            <TableCell colspan="9" class="px-4 py-10 text-center text-sm text-muted-foreground">Tidak ada kode game yang cocok.</TableCell>
                         </TableRow>
                     </TableBody>
                 </AdminResponsiveTable>
             </div>
-            <p v-if="query.trim()" class="mt-2 text-xs text-[#8b98aa]">Kosongkan pencarian untuk mengubah urutan.</p>
+            <p v-if="query.trim()" class="mt-2 text-xs text-muted-foreground">Kosongkan pencarian untuk mengubah urutan.</p>
         </div>
     </section>
 </div>

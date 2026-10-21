@@ -44,6 +44,14 @@ const gatewayKindLabel = (kind) => ({
 }[kind] || kind || '—');
 
 const overallLabel = computed(() => statusLabel(props.summary?.overall));
+const attentionChecks = computed(() => props.checks.filter(check => ['DOWN', 'DEGRADED', 'UNKNOWN', 'STALE'].includes(check.status)));
+const orderedChecks = computed(() => [...props.checks].sort((a, b) => Number(attentionChecks.value.includes(b)) - Number(attentionChecks.value.includes(a))));
+
+const attentionLabel = computed(() => attentionChecks.value.length
+    ? 'Komponen bermasalah ditampilkan lebih dahulu.'
+    : 'Tidak ada komponen yang memerlukan perhatian.');
+
+const checkStatusDescription = check => check.status === 'HEALTHY' ? 'Normal' : statusLabel(check.status);
 
 const formatDate = (value) => {
     if (!value) return 'Belum tersedia';
@@ -113,6 +121,19 @@ function refresh() {
                 </Card>
             </div>
 
+            <section class="border-b border-border pb-4" aria-labelledby="health-attention-heading">
+                <div class="flex flex-wrap items-baseline justify-between gap-2">
+                    <h2 id="health-attention-heading" class="text-lg font-semibold">Perlu perhatian</h2>
+                    <p class="text-sm text-muted-foreground" role="status">{{ attentionLabel }}</p>
+                </div>
+                <ul v-if="attentionChecks.length" class="mt-3 divide-y divide-border">
+                    <li v-for="check in attentionChecks" :key="check.key" class="flex flex-wrap items-start justify-between gap-2 py-3">
+                        <div><strong class="text-sm">{{ check.name }}</strong><p class="mt-1 text-sm text-muted-foreground">{{ check.message }}</p></div>
+                        <Badge :variant="statusVariant(check.status)">{{ checkStatusDescription(check) }}</Badge>
+                    </li>
+                </ul>
+            </section>
+
             <Card class="p-4 md:p-5">
                 <div>
                     <h2 class="text-lg font-semibold">Komponen Inti</h2>
@@ -121,7 +142,7 @@ function refresh() {
                     </p>
                 </div>
                 <div class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                    <article v-for="check in checks" :key="check.key" class="rounded-md border p-3">
+                    <article v-for="check in orderedChecks" :key="check.key" class="rounded-md border p-3">
                         <div class="flex items-start justify-between gap-3">
                             <strong class="text-sm">{{ check.name }}</strong>
                             <Badge :variant="statusVariant(check.status)">{{ statusLabel(check.status) }}</Badge>

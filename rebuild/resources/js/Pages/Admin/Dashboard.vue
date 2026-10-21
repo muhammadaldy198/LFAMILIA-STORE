@@ -51,8 +51,8 @@ onMounted(()=>{clockTimer=setInterval(()=>clock.value=new Date(),60000);});
 onUnmounted(()=>clearInterval(clockTimer));
 const clockDate=computed(()=>new Intl.DateTimeFormat('id-ID',{weekday:'long',day:'2-digit',month:'short',year:'numeric',timeZone:'Asia/Jakarta'}).format(clock.value));
 const clockTime=computed(()=>new Intl.DateTimeFormat('id-ID',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'Asia/Jakarta'}).format(clock.value)+' WIB');
-const maxRevenue=computed(()=>Math.max(1,...chart.value.map(p=>p.revenue_idr)));
-const maxOrders=computed(()=>Math.max(1,...chart.value.map(p=>p.orders)));
+const chartMetric=ref('revenue');
+const chartMaximum=computed(()=>Math.max(1,...chart.value.map(p=>chartMetric.value==='revenue'?p.revenue_idr:p.orders)));
 const statusLabel=status=>({SUCCESS:'Berhasil',PENDING_PAYMENT:'Pending',PAID:'Dibayar',PROCESSING:'Diproses',FAILED:'Gagal',EXPIRED:'Kedaluwarsa',CANCELLED:'Dibatalkan',HEALTHY:'Tes terakhir berhasil',CONFIGURED:'Tersimpan — tes otomatis tidak tersedia',DOWN:'Bermasalah',DEGRADED:'Perlu diperiksa',NOT_CONFIGURED:'Belum dikonfigurasi',UNTESTED:'Belum dites',STALE:'Perlu tes ulang'}[status]||status);
 const _integrationSummary=computed(()=>{const active=integrations.value.filter(i=>i.active);if(!active.length)return 'Belum ada integrasi aktif';if(active.some(i=>!['HEALTHY','CONFIGURED'].includes(i.status)))return 'Ada yang perlu diperiksa';return active.some(i=>i.status==='CONFIGURED')?'Sebagian belum terverifikasi':'Tes terakhir berhasil';});
 const visibleActivities=computed(()=>props.activities?.length?props.activities:recentOrders.value.slice(0,5).map(o=>({id:o.id,action:'Pesanan '+statusLabel(o.status),target:o.order_number,created_at:o.created_at,href:'/admin/orders/'+o.id})));
@@ -92,15 +92,14 @@ const markRead=n=>router.post('/admin/notifications/'+n.id+'/read',{}, {preserve
         </CardHeader>
         <CardContent class="space-y-3 px-4 pb-4">
             <div class="flex gap-4 text-xs">
-                <span class="flex items-center gap-1.5"><span class="size-2.5 rounded-sm bg-primary inline-block"/>Omzet</span>
-                <span class="flex items-center gap-1.5"><span class="size-2.5 rounded-sm bg-primary/35 inline-block"/>Jumlah Pesanan</span>
+                <button type="button" class="flex items-center gap-1.5 rounded px-1 py-0.5" :aria-pressed="chartMetric==='revenue'" @click="chartMetric='revenue'"><span class="size-2.5 rounded-sm bg-primary inline-block"/>Omzet</button>
+                <button type="button" class="flex items-center gap-1.5 rounded px-1 py-0.5" :aria-pressed="chartMetric==='orders'" @click="chartMetric='orders'"><span class="size-2.5 rounded-sm bg-primary/35 inline-block"/>Jumlah Pesanan</button>
             </div>
             <div ref="chartScroll" class="overflow-x-auto" role="group" :aria-label="'Grafik omzet dan jumlah pesanan '+ranges[range]">
                 <div class="flex h-52 items-end gap-2" :style="{minWidth:Math.max(280,chart.length*28)+'px'}">
                     <div v-for="(point,index) in chart" :key="point.day" class="flex min-w-0 flex-1 flex-col items-center">
                         <div class="flex h-40 w-full items-end justify-center gap-1" :title="shortDay(point.day)+': '+money(point.revenue_idr)+' · '+point.orders+' pesanan'">
-                            <span class="w-2.5 rounded-t bg-primary transition-all" :style="{height:point.revenue_idr/maxRevenue*100+'%'}"/>
-                            <span class="w-2.5 rounded-t bg-primary/35 transition-all" :style="{height:point.orders/maxOrders*100+'%'}"/>
+                            <span class="w-2.5 rounded-t bg-primary transition-all" :style="{height:(chartMetric==='revenue'?point.revenue_idr:point.orders)/chartMaximum*100+'%'}"/>
                         </div>
                         <span class="mt-2 whitespace-nowrap text-[10px] text-muted-foreground">{{chart.length<=7||index%7===0?shortDay(point.day):'·'}}</span>
                     </div>

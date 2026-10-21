@@ -104,23 +104,23 @@ const toggleDetail = (id) => {
                 </Button>
             </header>
 
-            <div class="lf-admin-summary ">
-                <Card class="p-4">
+            <div class="mb-4 flex flex-wrap gap-x-6 gap-y-2 border-b pb-3 text-sm">
+                <div class="flex items-baseline gap-2">
                     <p class="text-xs text-muted-foreground">Total log</p>
                     <p class="mt-2 text-2xl font-semibold">{{ Number(summary.total || 0).toLocaleString('id-ID') }}</p>
-                </Card>
-                <Card class="p-4">
+                </div>
+                <div class="flex items-baseline gap-2">
                     <p class="text-xs text-muted-foreground">Hari ini</p>
                     <p class="mt-2 text-2xl font-semibold">{{ Number(summary.today || 0).toLocaleString('id-ID') }}</p>
-                </Card>
-                <Card class="p-4">
+                </div>
+                <div class="flex items-baseline gap-2">
                     <p class="text-xs text-muted-foreground">7 hari terakhir</p>
                     <p class="mt-2 text-2xl font-semibold">{{ Number(summary.last_7_days || 0).toLocaleString('id-ID') }}</p>
-                </Card>
-                <Card class="p-4">
+                </div>
+                <div class="flex items-baseline gap-2">
                     <p class="text-xs text-muted-foreground">Admin tercatat</p>
                     <p class="mt-2 text-2xl font-semibold">{{ Number(summary.actors || 0).toLocaleString('id-ID') }}</p>
-                </Card>
+                </div>
             </div>
 
             <Card class="p-4 md:p-5">

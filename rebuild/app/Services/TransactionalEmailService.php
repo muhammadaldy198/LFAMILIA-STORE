@@ -48,7 +48,7 @@ class TransactionalEmailService
      * setelah order terbentuk. Isi ikut mockup "Mockup Email Notifikasi"
      * yang sudah disetujui user.
      */
-    public function queueOrderCreated(int $orderId): void
+    public function queueOrderCreated(int $orderId, ?string $accessCode = null): void
     {
         $details = $this->orderDetails($orderId);
         if (! $details) {
@@ -89,6 +89,15 @@ class TransactionalEmailService
             'Bayar sekarang: '.$this->payUrl($details['invoice'], $details['expires_at']),
             'Lacak pesanan: '.$this->trackingUrl(),
             '',
+        ];
+        if ($accessCode !== null) {
+            $lines = [...$lines,
+                'Kode akses pesanan: '.$accessCode,
+                'Simpan kode ini. Kode dipakai untuk membuka tiket bantuan dan memeriksa pesanan dari perangkat lain tanpa akun. Jangan bagikan ke siapa pun.',
+                '',
+            ];
+        }
+        $lines = [...$lines,
             'Sudah bayar? Abaikan email ini — kamu akan menerima email konfirmasi begitu pembayaranmu terverifikasi.',
             '',
             $this->csLine(),

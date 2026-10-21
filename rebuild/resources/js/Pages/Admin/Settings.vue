@@ -46,20 +46,11 @@ function saveStore() {
             <Button class="w-full sm:w-auto" variant="outline" @click="router.reload({ preserveScroll: true })">Muat ulang</Button>
         </header>
 
-        <div class="lf-admin-summary ">
-            <Card class="p-4">
-                <p class="text-xs text-muted-foreground">Kanal kontak</p>
-                <p class="mt-2 text-2xl font-semibold">{{ summary.contacts_configured || 0 }}/4</p>
-            </Card>
-            <Card class="p-4">
-                <p class="text-xs text-muted-foreground">Identitas merchant</p>
-                <p class="mt-2 text-lg font-semibold">{{ summary.merchant_identity_complete ? 'Lengkap' : 'Belum lengkap' }}</p>
-            </Card>
-            <Card class="p-4">
-                <p class="text-xs text-muted-foreground">Ekspor konfigurasi</p>
-                <p class="mt-2 text-lg font-semibold">{{ canExport ? 'Super Admin' : 'Tidak tersedia' }}</p>
-            </Card>
-        </div>
+        <p class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+            <span><strong class="text-foreground">{{ summary.contacts_configured || 0 }}/4</strong> kanal kontak terisi</span>
+            <span>Identitas merchant <strong class="text-foreground">{{ summary.merchant_identity_complete ? 'lengkap' : 'belum lengkap' }}</strong></span>
+            <span>Ekspor konfigurasi <strong class="text-foreground">{{ canExport ? 'tersedia' : 'tidak tersedia' }}</strong></span>
+        </p>
 
         <form class="space-y-4" @submit.prevent="saveStore">
                 <Card class="p-4">

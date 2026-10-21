@@ -152,6 +152,9 @@ for (const file of files) {
     const lines = addedLines(file);
     const isPhpRuntime = /^rebuild\/(?:app|bootstrap|config|public|routes)\/.*\.php$/i.test(file);
     const isFrontendRuntime = /^rebuild\/resources\/js\/.*\.(?:js|vue)$/i.test(file);
+    // Translation catalogs legitimately map the key 'password' to a human
+    // sentence; the assignment heuristic below would flag every locale.
+    const isTranslationCatalog = /^rebuild\/lang\/[^/]+\/[^/]+\.php$/i.test(file);
 
     for (const line of lines) {
         if (/^(?:<{7}|>{7})(?:\s|$)/.test(line)) {
@@ -181,7 +184,7 @@ for (const file of files) {
         }
 
         const assignment = line.match(/(?:^|[\s,{[(])['"]?(password|api_key|server_key|client_key|client_secret|secret_key|merchant_key|merchant_secret|access_token|bot_token|webhook_secret|private_key)['"]?\s*(?:=>|:|=)\s*['"\x60]([^'"\x60\r\n]{8,})['"\x60]/i);
-        if (assignment && !placeholderValue(assignment[2])) {
+        if (assignment && !isTranslationCatalog && !placeholderValue(assignment[2])) {
             addFinding(file, 'possible hardcoded ' + assignment[1].toLowerCase());
             break;
         }

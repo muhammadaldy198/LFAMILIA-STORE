@@ -21,6 +21,34 @@ const date = (value) => {
 };
 const page = usePage();
 const base = page.props.adminPanel?.base_path || '/admin';
+const menu = computed(() => page.props.adminPanel?.menu || []);
+const canOrders = computed(() => menu.value.some(item => item.href === '/admin/orders'));
+const canSupport = computed(() => menu.value.some(item => item.href === '/admin/support'));
+const notificationHref = item => {
+    const id = Number(item.target_id);
+    if (!Number.isSafeInteger(id) || id < 1) return null;
+    if (item.target_type === 'order' && canOrders.value) return `${base}/orders/${id}`;
+    if (item.target_type === 'support_ticket' && canSupport.value) return `${base}/support?ticket=${id}`;
+    if (item.target_type === 'fulfillment_attempt') {
+        const relatedOrderId = Number(item.metadata?.order_id);
+        if (Number.isSafeInteger(relatedOrderId) && relatedOrderId > 0 && canOrders.value) return `${base}/orders/${relatedOrderId}`;
+    }
+    return null;
+};
+const markRead = item => {
+    if (!item.read_at) router.post(base + '/notifications/' + item.id + '/read', {}, { preserveScroll: true });
+};
+const openNotification = item => {
+    markRead(item);
+    const href = notificationHref(item);
+    if (href) router.visit(href);
+};
+const notificationKeydown = (event, item) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        openNotification(item);
+    }
+};
 </script>
 
 <template>
@@ -40,7 +68,8 @@ const base = page.props.adminPanel?.base_path || '/admin';
                     <span class="mt-1 flex size-5 shrink-0 items-center justify-center rounded-full border text-[10px] font-semibold" :class="item.read_at ? 'border-border text-muted-foreground' : 'border-primary bg-primary text-primary-foreground'" :aria-label="item.read_at ? 'Sudah dibaca' : 'Belum dibaca'">{{ item.read_at ? '✓' : '!' }}</span>
                     <div class="min-w-0 flex-1">
                         <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
-                            <strong class="min-w-0 break-words text-sm">{{ item.title }}</strong>
+                            <strong v-if="notificationHref(item)" class="min-w-0 break-words text-sm"><button type="button" class="text-left underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" @click="openNotification(item)" @keydown="notificationKeydown($event, item)">{{ item.title }}</button></strong>
+                            <strong v-else class="min-w-0 break-words text-sm">{{ item.title }}</strong>
                             <time class="shrink-0 text-xs text-muted-foreground">{{ date(item.created_at) }}</time>
                         </div>
                         <p class="mt-1 break-words text-sm leading-6 text-muted-foreground">{{ item.message }}</p>

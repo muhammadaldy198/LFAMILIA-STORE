@@ -1,7 +1,7 @@
 <script setup>
 import AdminResponsiveTable from '../../Components/AdminResponsiveTable.vue';
 import { Head, router } from '@inertiajs/vue3';
-import { computed, reactive } from 'vue';
+import { computed, reactive, ref } from 'vue';
 import AdminShell from '../../Components/AdminShell.vue';
 import { Badge } from '../../Components/ui/badge';
 import { Button } from '../../Components/ui/button';
@@ -27,6 +27,48 @@ const form = reactive({
     from: props.filters?.from || '',
     to: props.filters?.to || '',
 });
+const section = ref('sales');
+const visible = (name) => section.value === name;
+const sections = [
+    { id: 'sales', label: 'Penjualan' },
+    { id: 'products', label: 'Produk' },
+    { id: 'operations', label: 'Operasional' },
+];
+
+function csvCell(value) {
+    const text = String(value ?? '');
+    const safe = /^[=+@-]/.test(text) ? "'" + text : text;
+    return '"' + safe.replaceAll('"', '""') + '"';
+}
+
+function exportReport() {
+    let rows;
+    if (section.value === 'products') {
+        rows = [
+            ['Jenis', 'Nama', 'Pesanan', 'Berhasil', ...(props.canViewFinance ? ['Omzet', 'Laba kotor'] : [])],
+            ...props.topProducts.map(row => ['Produk', row.name, row.total_orders, row.success_orders, ...(props.canViewFinance ? [row.revenue_idr, row.profit_idr] : [])]),
+            ...props.topCategories.map(row => ['Kategori', row.name, row.total_orders, row.success_orders, ...(props.canViewFinance ? [row.revenue_idr, ''] : [])]),
+        ];
+    } else if (section.value === 'operations') {
+        rows = [
+            ['Penyedia layanan', 'Kode', 'Proses', 'Berhasil', 'Perlu diperiksa', 'Masalah', 'Persentase masalah'],
+            ...props.providerReport.map(row => [row.name, row.code, row.attempts_count, row.success_count, row.pending_count, row.errors_count, row.error_rate]),
+        ];
+    } else {
+        rows = [
+            props.canViewFinance ? ['Tanggal', 'Pesanan', 'Berhasil', 'Gagal', 'Omzet', 'Laba kotor', 'Diskon', 'Biaya pembayaran'] : ['Tanggal', 'Pesanan', 'Berhasil', 'Gagal'],
+            ...props.daily.map(row => [row.day, row.orders_count, row.success_count, row.failed_count, ...(props.canViewFinance ? [row.revenue_idr, row.profit_idr, row.discount_idr, row.fee_idr] : [])]),
+        ];
+    }
+    const range = form.range === 'custom' ? `${form.from}-${form.to}` : form.range;
+    const csv = String.fromCharCode(0xFEFF) + rows.map(row => row.map(csvCell).join(',')).join('\r\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `laporan-${section.value}-${range}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+}
 
 const money = (value) => 'Rp' + Number(value || 0).toLocaleString('id-ID');
 const number = (value) => Number(value || 0).toLocaleString('id-ID');
@@ -55,15 +97,6 @@ function submit() {
         data.to = form.to;
     }
     router.get('/admin/reports', data, { preserveState: true, preserveScroll: true });
-}
-
-function exportHref() {
-    const params = new URLSearchParams({ range: form.range });
-    if (form.range === 'custom') {
-        params.set('from', form.from);
-        params.set('to', form.to);
-    }
-    return '/admin/reports/export?' + params.toString();
 }
 
 function barHeight(row) {
@@ -108,7 +141,7 @@ function statusLabel(status) {
             </div>
             <div class="flex flex-col gap-2 sm:flex-row">
                 <Button class="w-full sm:w-auto" variant="outline" @click="router.reload({ preserveScroll: true })">Muat ulang</Button>
-                <Button class="w-full sm:w-auto" as-child><a :href="exportHref()">Unduh CSV</a></Button>
+                <Button class="w-full sm:w-auto" type="button" @click="exportReport">Unduh CSV</Button>
             </div>
         </header>
 
@@ -142,7 +175,11 @@ function statusLabel(status) {
             </form>
         </Card>
 
-        <div class="lf-admin-summary ">
+        <nav class="lf-admin-tabs" aria-label="Bagian laporan">
+            <Button v-for="item in sections" :key="item.id" type="button" :variant="section === item.id ? 'secondary' : 'ghost'" :aria-current="section === item.id ? 'page' : undefined" @click="section = item.id">{{ item.label }}</Button>
+        </nav>
+
+        <div v-show="visible('sales')" class="lf-admin-summary">
             <Card class="p-4"><p class="text-xs text-muted-foreground">Total pesanan</p><p class="mt-2 text-2xl font-semibold">{{ number(metrics.orders_total) }}</p></Card>
             <Card class="p-4"><p class="text-xs text-muted-foreground">Berhasil</p><p class="mt-2 text-2xl font-semibold">{{ number(metrics.success_total) }}</p></Card>
             <Card class="p-4"><p class="text-xs text-muted-foreground">Menunggu bayar</p><p class="mt-2 text-2xl font-semibold">{{ number(metrics.pending_payment_total) }}</p></Card>
@@ -153,7 +190,7 @@ function statusLabel(status) {
             <Card v-if="canViewFinance" class="p-4"><p class="text-xs text-muted-foreground">Laba kotor</p><p class="mt-2 text-xl font-semibold">{{ money(metrics.gross_profit_idr) }}</p></Card>
         </div>
 
-        <div v-if="canViewFinance" class="lf-admin-summary ">
+        <div v-if="canViewFinance" v-show="visible('sales')" class="lf-admin-summary">
             <Card class="p-4"><p class="text-xs text-muted-foreground">Diskon terpakai</p><p class="mt-2 text-lg font-semibold">{{ money(metrics.discount_idr) }}</p></Card>
             <Card class="p-4"><p class="text-xs text-muted-foreground">Biaya pembayaran</p><p class="mt-2 text-lg font-semibold">{{ money(metrics.payment_fee_idr) }}</p></Card>
             <Card class="p-4"><p class="text-xs text-muted-foreground">Top up saldo dibayar</p><p class="mt-2 text-lg font-semibold">{{ money(metrics.paid_topup_idr) }}</p></Card>
@@ -161,7 +198,7 @@ function statusLabel(status) {
         </div>
 
         <div class="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
-            <Card class="min-w-0 p-4">
+            <Card v-show="visible('sales')" class="min-w-0 p-4">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div>
                         <h2 class="text-lg font-semibold">Grafik Penjualan</h2>
@@ -187,7 +224,7 @@ function statusLabel(status) {
                 <p v-else class="py-12 text-center text-sm text-muted-foreground">Belum ada transaksi dalam periode ini.</p>
             </Card>
 
-            <Card class="p-4">
+            <Card v-show="visible('operations')" class="p-4">
                 <h2 class="text-lg font-semibold">Status Operasional</h2>
                 <div class="mt-4 space-y-4">
                     <div>
@@ -215,7 +252,7 @@ function statusLabel(status) {
             </Card>
         </div>
 
-        <Card class="min-w-0 p-4">
+        <Card v-show="visible('products')" class="min-w-0 p-4">
             <div>
                 <h2 class="text-lg font-semibold">Produk Terlaris</h2>
                 <p class="mt-1 text-sm text-muted-foreground">Urutan berdasarkan pesanan berhasil, lalu jumlah pesanan.</p>
@@ -249,7 +286,7 @@ function statusLabel(status) {
             </div>
         </Card>
 
-        <div class="lf-admin-summary ">
+        <div v-show="visible('products')" class="lf-admin-summary">
             <Card class="min-w-0 p-4">
                 <h2 class="text-lg font-semibold">Kategori Teratas</h2>
                 <div class="mt-4 overflow-x-auto" role="region" aria-label="Laporan kategori teratas" tabindex="0">
@@ -268,7 +305,7 @@ function statusLabel(status) {
                 </div>
             </Card>
 
-            <Card class="min-w-0 p-4">
+            <Card v-show="visible('operations')" class="min-w-0 p-4">
                 <h2 class="text-lg font-semibold">Kinerja penyedia layanan</h2>
                 <p class="mt-1 text-sm text-muted-foreground">Persentase masalah membandingkan proses yang statusnya belum pasti, gagal, atau terblokir dengan seluruh proses pada periode ini.</p>
                 <div class="mt-4 overflow-x-auto" role="region" aria-label="Kinerja penyedia layanan" tabindex="0">
@@ -290,7 +327,7 @@ function statusLabel(status) {
             </Card>
         </div>
 
-        <Card class="p-4">
+        <Card v-show="visible('sales')" class="p-4">
             <h2 class="text-lg font-semibold">Catatan Perhitungan</h2>
             <p class="mt-2 text-sm text-muted-foreground">
                 Omzet dihitung dari pesanan yang sudah dibayar. Laba kotor memperhitungkan modal produk dan biaya pembayaran yang dibebankan kepada pelanggan, sebelum biaya operasional lain. Nilai keuangan hanya dapat dilihat oleh Super Admin.

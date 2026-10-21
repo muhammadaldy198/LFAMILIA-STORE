@@ -119,6 +119,8 @@ function adjustWallet() {
     const reason = String(editor.value.adjust_reason || '').trim();
     adjustError.value = walletAdjustmentError(editor.value.adjust_amount, reason);
     if (adjustError.value) return;
+    const direction = amount > 0 ? 'menambah' : 'mengurangi';
+    if (!window.confirm(`Konfirmasi ${direction} saldo ${editor.value.name} sebesar ${money(Math.abs(amount))}? Alasan: ${reason}`)) return;
 
     saving.value = 'wallet';
     router.post('/admin/customers/' + editor.value.id + '/wallet', {

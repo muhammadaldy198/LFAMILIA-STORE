@@ -1,7 +1,7 @@
 <script setup>
 import AdminSwitch from '../../Components/AdminSwitch.vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
-import { computed, onMounted, onUnmounted, reactive, ref } from 'vue';
+import { computed, onMounted, onUnmounted, reactive } from 'vue';
 import AdminShell from '../../Components/AdminShell.vue';
 import { Button } from '../../Components/ui/button';
 import { Input } from '../../Components/ui/input';
@@ -51,11 +51,6 @@ const autoSyncForm = useForm({
     price_warning_percent: Number(props.monitorSettings?.price_warning_percent || 3),
 });
 const syncForm = useForm({});
-const _maxSkuText = ref('');
-const _maxPricePreview = ref(null);
-const _maxPriceBusy = ref(false);
-const _maxPriceError = ref('');
-
 
 const money = value => value == null ? '—' : 'Rp' + Number(value).toLocaleString('id-ID');
 const date = value => value
@@ -114,38 +109,6 @@ function sync(id = null) {
         .post('/admin/digiflazz/sync', { preserveScroll: true });
 }
 
-async function _previewMaxPrices() {
-    _maxPriceError.value = '';
-    _maxPricePreview.value = null;
-    _maxPriceBusy.value = true;
-    try {
-        const response = await fetch('/admin/digiflazz/max-prices/preview', {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: {
-                Accept: 'application/json',
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-            },
-            body: JSON.stringify({ sku_text: _maxSkuText.value }),
-        });
-        const body = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(Object.values(body.errors || {})?.[0]?.[0] || body.message || 'Preview gagal.');
-        _maxPricePreview.value = body;
-    } catch (error) {
-        _maxPriceError.value = error.message;
-    } finally {
-        _maxPriceBusy.value = false;
-    }
-}
-function _applyMaxPrices() {
-    if (!_maxPricePreview.value || !confirm('Terapkan Harga Max dan modal sesuai daftar SKU pada preview ini?')) return;
-    router.post('/admin/digiflazz/max-prices/apply', { preview_token: _maxPricePreview.value.token }, {
-        preserveScroll: true,
-        onSuccess: () => { _maxPricePreview.value = null; },
-        onError: errors => { _maxPriceError.value = errors.preview_token || 'Eksekusi ditolak. Buat preview baru.'; },
-    });
-}
 function baseline(id) {
     router.put('/admin/digiflazz/baseline/' + id, {}, { preserveScroll: true });
 }
@@ -261,7 +224,7 @@ onUnmounted(() => {
                     </div>
                 </div>
             </form>
-            <p class="mt-3 text-xs text-muted-foreground">Harga jual, margin, prioritas sumber, dan max price tetap dikelola di menu Produk. Credential tetap dikelola di Integrasi.</p>
+            <p class="mt-3 text-xs text-muted-foreground">Harga jual, margin, dan prioritas sumber dikelola di menu Produk. Credential tetap dikelola di Integrasi.</p>
             </details>
         </Card>
 

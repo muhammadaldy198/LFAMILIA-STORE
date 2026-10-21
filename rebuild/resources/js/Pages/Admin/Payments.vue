@@ -29,20 +29,9 @@ const props = defineProps({
 });
 
 const area = ref('settings');
-const tab = ref('methods');
-const settingTabs = [
-    ['methods', 'Metode'], ['qris', 'QRIS Manual'], ['gateways', 'Gateway'],
-    ['routing', 'Biaya & Routing'], ['wallet', 'Top Up Saldo'], ['page', 'Tampilan Checkout'],
-];
 const areas = [['settings', 'Pengaturan Pembayaran'], ['transactions', 'Transaksi Pembayaran']];
 const selectArea = (value) => {
     area.value = value;
-    if (value === 'transactions') tab.value = 'transactions';
-    else if (tab.value === 'transactions') tab.value = 'methods';
-};
-const selectSetting = (value) => {
-    area.value = 'settings';
-    tab.value = value;
 };
 
 const filters = reactive({
@@ -184,7 +173,7 @@ function searchTransactions() {
     }, {
         preserveState: true,
         preserveScroll: true,
-        onSuccess: () => { area.value = 'transactions'; tab.value = 'transactions'; },
+        onSuccess: () => { area.value = 'transactions'; },
     });
 }
 
@@ -403,14 +392,9 @@ async function copy(value) {
             <Card class="p-4"><p class="text-xs text-muted-foreground">Berhasil</p><p class="mt-2 text-2xl font-semibold">{{ successRate() }}%</p><p class="mt-1 text-xs text-muted-foreground">rasio transaksi dibayar</p></Card>
             <Card class="p-4"><p class="text-xs text-muted-foreground">Gagal / kedaluwarsa</p><p class="mt-2 text-2xl font-semibold">{{ Number(summary.failed || 0).toLocaleString('id-ID') }}</p><p class="mt-1 text-xs text-muted-foreground">{{ Number(summary.refunded || 0).toLocaleString('id-ID') }} dikembalikan</p></Card>
         </div>
-
-        <nav class="lf-admin-tabs" aria-label="Subbagian pengaturan pembayaran">
-            <Button v-for="[key, label] in settingTabs" :key="key" type="button" :variant="tab === key ? 'secondary' : 'ghost'" class="shrink-0" @click="selectSetting(key)">{{ label }}</Button>
-        </nav>
-
-        <template v-if="tab === 'methods'">                <Card class="min-w-0 p-4">
+<section id="payment-methods" aria-labelledby="payment-methods-heading" class="space-y-3"><h2 id="payment-methods-heading" class="text-lg font-semibold">Metode Pembayaran</h2>                <Card class="min-w-0 p-4">
                     <div class="flex flex-wrap items-start justify-between gap-3">
-                        <div><h2 class="text-lg font-semibold">Metode Pembayaran & Urutan</h2><p class="mt-1 text-sm text-muted-foreground">Urutan pada tabel mengikuti urutan pilihan pelanggan. Nama dan posisi bisa diubah lewat Edit; tarif khusus Midtrans/DOKU di tab Biaya & Routing.</p></div>
+                        <div><h2 class="text-lg font-semibold">Metode Pembayaran & Urutan</h2><p class="mt-1 text-sm text-muted-foreground">Urutan pada tabel mengikuti urutan pilihan pelanggan. Nama dan posisi bisa diubah lewat Edit; tarif khusus Midtrans/DOKU di bagian Biaya & Routing.</p></div>
                         <div v-if="isSuperAdmin" class="flex flex-wrap gap-2"><Button size="sm" variant="outline" @click="syncChannels">Pulihkan metode bawaan</Button><Button size="sm" @click="openCreateChannel">Tambah metode</Button></div>
                     </div>
 
@@ -431,7 +415,7 @@ async function copy(value) {
                         </AdminResponsiveTable>
                     </div>
                 </Card>            <Card v-if="channelEditor" class="p-4">
-                <div class="flex flex-wrap items-start justify-between gap-3"><div><h2 class="text-lg font-semibold">{{ channelEditor.id ? 'Edit Metode Pembayaran' : 'Tambah Metode Pembayaran' }}</h2><p class="mt-1 text-sm text-muted-foreground">Tarif dasar berlaku untuk pesanan dan top up saldo; tarif khusus Midtrans termasuk QRIS otomatis dapat diatur di tab Biaya & Routing. Bayar dengan LFAMILIA Cash dan QRIS manual gratis.</p></div><Button size="sm" variant="ghost" @click="closeChannelEditor">Tutup</Button></div>
+                <div class="flex flex-wrap items-start justify-between gap-3"><div><h2 class="text-lg font-semibold">{{ channelEditor.id ? 'Edit Metode Pembayaran' : 'Tambah Metode Pembayaran' }}</h2><p class="mt-1 text-sm text-muted-foreground">Tarif dasar berlaku untuk pesanan dan top up saldo; tarif khusus Midtrans termasuk QRIS otomatis dapat diatur di bagian Biaya & Routing. Bayar dengan LFAMILIA Cash dan QRIS manual gratis.</p></div><Button size="sm" variant="ghost" @click="closeChannelEditor">Tutup</Button></div>
                 <div class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                     <label class="space-y-1"><span class="text-sm font-medium">Nama tampilan</span><Input v-model="channelEditor.name" maxlength="100" /></label>
                     <label class="space-y-1"><span class="text-sm font-medium">Kode metode</span><Input v-model="channelEditor.code" maxlength="60" placeholder="contoh: qris" /></label>
@@ -445,8 +429,13 @@ async function copy(value) {
                     <div class="space-y-2 rounded-md border p-3 md:col-span-2"><span class="text-sm font-medium">Logo metode</span><div class="flex items-center gap-3"><div class="grid size-14 place-items-center overflow-hidden rounded-md border bg-muted"><img v-if="channelLogoPreview" :src="channelLogoPreview" alt="" class="size-full object-contain"><span v-else class="text-xs text-muted-foreground">Logo</span></div><input type="file" accept="image/png,image/jpeg,image/webp" class="min-w-0 text-xs" @change="chooseChannelLogo"></div></div>
                 </div>
                 <div class="mt-4 flex justify-end gap-2"><Button variant="outline" @click="closeChannelEditor">Batal</Button><Button :disabled="saving === 'channel'" @click="saveChannel">{{ saving === 'channel' ? 'Menyimpan…' : 'Simpan metode' }}</Button></div>
-            </Card></template>
-        <template v-else-if="tab === 'gateways'">            <Card class="p-4">
+            </Card><div class="max-w-xl"><Card class="p-4">
+                        <h2 class="font-semibold">QRIS Manual</h2><p class="mt-1 text-xs text-muted-foreground">QRIS manual membutuhkan gambar aktif dan konfirmasi Admin sebelum pesanan diproses.</p>
+                        <div class="mt-3 overflow-hidden rounded-md border bg-white p-2"><img v-if="manualQrisAsset?.image_url" :src="manualQrisAsset.image_url" alt="QRIS manual" class="mx-auto max-h-48 object-contain"><div v-else class="grid h-32 place-items-center text-sm text-slate-500">Gambar belum diunggah</div></div>
+                        <label class="mt-3 block text-sm"><span class="mb-1 block font-medium">Ganti gambar</span><input type="file" accept="image/png,image/jpeg,image/webp" class="block w-full text-xs" @change="uploadManualQris"></label>
+                        <Button class="mt-3 w-full" size="sm" :variant="manualQrisAsset?.is_active ? 'outline' : 'default'" @click="toggleManualQris">{{ manualQrisAsset?.is_active ? 'Nonaktifkan QRIS manual' : 'Aktifkan QRIS manual' }}</Button>
+                    </Card></div></section>
+<section id="payment-gateways" aria-labelledby="payment-gateways-heading" class="space-y-3"><h2 id="payment-gateways-heading" class="text-lg font-semibold">Gateway dan Biaya</h2>            <Card class="p-4">
                 <div class="flex flex-wrap items-start justify-between gap-3"><div><h2 class="text-lg font-semibold">Gateway Pembayaran</h2><p class="mt-1 text-sm text-muted-foreground">Urutan tampilan gateway dimulai dari Posisi 1. Urutan pemilihan gateway untuk transaksi berbeda dan dikelola di Routing. Secret tetap hanya di Integrasi.</p></div><Button v-if="isSuperAdmin" size="sm" variant="outline" as-child><Link href="/admin/integrations">Buka Integrasi</Link></Button></div>
                 <div class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                     <div v-for="gateway in gateways" :key="gateway.id" class="rounded-md border p-3">
@@ -465,8 +454,8 @@ async function copy(value) {
                             <button type="button" class="w-full rounded-md border p-3 text-left" @click="copy(callbackUrls.midtrans)"><span class="block text-xs font-medium">Midtrans</span><span class="mt-1 block break-all text-[11px] text-muted-foreground">{{ callbackUrls.midtrans }}</span></button>
                             <button type="button" class="w-full rounded-md border p-3 text-left" @click="copy(callbackUrls.doku)"><span class="block text-xs font-medium">DOKU</span><span class="mt-1 block break-all text-[11px] text-muted-foreground">{{ callbackUrls.doku }}</span></button>
                         </div>
-                    </Card></template>
-        <template v-else-if="tab === 'routing'">            <Card class="p-4">
+                    </Card></section>
+<section id="payment-routing" aria-labelledby="payment-routing-heading" class="space-y-3"><h2 id="payment-routing-heading" class="text-lg font-semibold">Biaya & Routing</h2>            <Card class="p-4">
                 <div class="flex flex-wrap items-start justify-between gap-3"><div><h2 class="text-lg font-semibold">Biaya Admin & Routing Gateway</h2><p class="mt-1 text-sm text-muted-foreground">Atur biaya per kombinasi metode dan gateway untuk pembayaran pesanan serta top up saldo, termasuk QRIS otomatis Midtrans. Prioritas gateway kecil didahulukan; perubahan hanya berlaku pada pesanan baru.</p></div><Button v-if="isSuperAdmin" size="sm" variant="outline" @click="showAdvancedRouting = !showAdvancedRouting">{{ showAdvancedRouting ? 'Tutup pengaturan' : 'Atur routing' }}</Button></div>
                 <div class="mt-4 overflow-x-auto">
                     <AdminResponsiveTable :mobile-columns="[0,1,4,6]"><TableHeader><TableRow><TableHead>Metode</TableHead><TableHead>Gateway</TableHead><TableHead>Pesanan</TableHead><TableHead>Top up</TableHead><TableHead>Biaya admin</TableHead><TableHead>Prioritas</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
@@ -491,20 +480,13 @@ async function copy(value) {
                         <p v-if="!routes.length" class="rounded-md border p-3 text-sm text-muted-foreground">Belum ada routing yang didukung source code.</p>
                     </div>
                 </div>
-            </Card></template>
-        <template v-else-if="tab === 'qris'"><div class="max-w-xl"><Card class="p-4">
-                        <h2 class="font-semibold">QRIS Manual</h2><p class="mt-1 text-xs text-muted-foreground">QRIS manual membutuhkan gambar aktif dan konfirmasi Admin sebelum pesanan diproses.</p>
-                        <div class="mt-3 overflow-hidden rounded-md border bg-white p-2"><img v-if="manualQrisAsset?.image_url" :src="manualQrisAsset.image_url" alt="QRIS manual" class="mx-auto max-h-48 object-contain"><div v-else class="grid h-32 place-items-center text-sm text-slate-500">Gambar belum diunggah</div></div>
-                        <label class="mt-3 block text-sm"><span class="mb-1 block font-medium">Ganti gambar</span><input type="file" accept="image/png,image/jpeg,image/webp" class="block w-full text-xs" @change="uploadManualQris"></label>
-                        <Button class="mt-3 w-full" size="sm" :variant="manualQrisAsset?.is_active ? 'outline' : 'default'" @click="toggleManualQris">{{ manualQrisAsset?.is_active ? 'Nonaktifkan QRIS manual' : 'Aktifkan QRIS manual' }}</Button>
-                    </Card></div></template>
-        <template v-else-if="tab === 'wallet'"><div class="max-w-xl"><Card class="p-4">
+            </Card></section>
+<section id="payment-wallet" aria-labelledby="payment-wallet-heading" class="space-y-3"><h2 id="payment-wallet-heading" class="text-lg font-semibold">Pengaturan Top Up</h2><div class="max-w-xl"><Card class="p-4">
                         <div class="flex items-start justify-between gap-3"><div><h2 class="font-semibold">Top Up Saldo</h2><p class="mt-1 text-xs text-muted-foreground">Customer hanya melihat metode yang routing top up-nya aktif.</p></div><label class="flex items-center gap-2 text-sm"><AdminSwitch v-model="walletSettings.topup_enabled" :disabled="!isSuperAdmin" />Aktif</label></div>
                         <label class="mt-4 block space-y-1"><span class="text-sm font-medium">Minimum top up</span><Input v-model.number="walletSettings.minimum_topup_idr" type="number" min="1" max="100000000" :disabled="!isSuperAdmin" /></label>
                         <Button v-if="isSuperAdmin" class="mt-3 w-full" size="sm" @click="saveWalletSettings">Simpan top up saldo</Button><p v-else class="mt-3 text-xs text-muted-foreground">Pengaturan top up hanya dapat diubah Super Admin.</p>
-                    </Card></div></template>
-
-        <template v-else-if="tab === 'page'">
+                    </Card></div></section>
+<section id="payment-page" aria-labelledby="payment-page-heading" class="space-y-3"><h2 id="payment-page-heading" class="text-lg font-semibold">Tampilan Checkout</h2>
             <div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
                 <Card class="p-4">
                     <h2 class="text-lg font-semibold">Editor Halaman Pembayaran</h2><p class="mt-1 text-sm text-muted-foreground">Teks, warna, banner, instruksi, dan elemen customer dapat diedit tanpa mengubah kode.</p>
@@ -553,7 +535,7 @@ async function copy(value) {
                     </div>
                 </Card>
             </div>
-        </template>
+        </section>
 
         </template>
         <template v-else-if="area === 'transactions'">

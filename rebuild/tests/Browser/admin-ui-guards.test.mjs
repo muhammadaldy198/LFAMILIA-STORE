@@ -78,3 +78,131 @@ test('catalog prices preserve markup for manual store-cost mappings and shared t
     assert.match(customers, /canManageMembershipRules: Boolean/);
     assert.match(customers, /<Card v-if="canManageMembershipRules"/);
 });
+
+
+test('dashboard exposes selectable revenue/orders chart and split order statuses', () => {
+    const source = read('Dashboard.vue');
+    assert.match(source, /chartMetric/);
+    assert.match(source, /payment_status/);
+    assert.match(source, /order\.status/);
+});
+
+test('Digiflazz UI omits Harga Max controls and client requests while keeping SKU health tools', () => {
+    const source = read('Digiflazz.vue');
+    assert.doesNotMatch(source, /Harga Max|max-prices|_previewMaxPrices|_applyMaxPrices/);
+    assert.match(source, /healthLabel/);
+    assert.match(source, /Sinkron daftar harga/);
+});
+
+test('password confirmation uses the admin dark theme', () => {
+    const source = read('PasswordConfirm.vue');
+    assert.match(source, /lf-admin lf-admin-auth/);
+    assert.match(source, /bg-slate-900/);
+    assert.match(source, /focus-visible:ring/);
+});
+
+test('reports separates sections and keeps operations grouped', () => {
+    const source = read('Reports.vue');
+    for (const section of ['Penjualan', 'Produk', 'Operasional']) assert.match(source, new RegExp(section));
+    assert.match(source, /aria-label="Bagian laporan"/);
+    assert.match(source, /visible\('sales'\)/);
+    assert.match(source, /visible\('products'\)/);
+    assert.match(source, /visible\('operations'\)/);
+    assert.match(source, /Produk Terlaris/);
+    assert.match(source, /Kategori Teratas/);
+    assert.match(source, /Kinerja penyedia layanan/);
+    assert.match(source, /v-if="canViewFinance"/);
+    assert.match(source, /v-show="visible\('operations'\)"/);
+    assert.match(source, /function exportReport\(\)/);
+    assert.match(source, /props\.providerReport\.map/);
+    assert.match(source, /props\.daily\.map/);
+    assert.match(source, /props\.topProducts\.map/);
+    assert.match(source, /link\.download = `laporan-\$\{section\.value\}-\$\{range\}\.csv`/);
+});
+
+test('notifications link only to authorized in-app order and ticket targets', () => {
+    const source = read('Notifications.vue');
+    assert.match(source, /item\.target_type === 'order' && canOrders\.value/);
+    assert.match(source, /item\.target_type === 'support_ticket' && canSupport\.value/);
+    assert.match(source, /item\.target_type === 'fulfillment_attempt'/);
+    assert.match(source, /Number\.isSafeInteger\(relatedOrderId\)/);
+    assert.match(source, /@click="openNotification\(item\)"/);
+});
+
+test('health puts attention checks first and describes all-clear state', () => {
+    const source = read('Health.vue');
+    assert.match(source, /const attentionChecks = computed\(\(\) => props\.checks\.filter/);
+    assert.match(source, /const orderedChecks = computed/);
+    assert.match(source, /v-for="check in orderedChecks"/);
+    assert.match(source, /Perlu perhatian/);
+    assert.match(source, /Tidak ada komponen yang memerlukan perhatian/);
+});
+
+test('orders prioritize attention and pending then newest with split status columns', () => {
+    const source = read('Orders.vue');
+    assert.match(source, /sortedOrders/);
+    assert.match(source, /needs_attention/);
+    assert.match(source, /PENDING_PAYMENT/);
+    assert.match(source, /Status Pembayaran/);
+    assert.match(source, /Status Proses/);
+});
+
+
+test('customer detail is a sequential profile-to-accounts page', () => { const source = read('CustomerDetail.vue'); assert.doesNotMatch(source, /<nav class="lf-admin-tabs"/); for (const id of ['customer-profile-heading','customer-orders-heading','customer-wallet-heading','customer-support-heading','customer-accounts-heading']) assert.match(source, new RegExp('id="'+id+'"')); assert.match(source, /v-if="isSuperAdmin"/); });
+
+test('admin access editor is beside selectable account list', () => { const source = read('Access.vue'); assert.ok(source.includes('xl:grid-cols-[minmax(0,1.5fr)_minmax(360px,1fr)]')); assert.match(source, /id="access-editor"/); assert.match(source, /@click="openEdit\(admin\)"/); });
+
+test('news entries use a compact list and selected editor preview', () => { const source = read('Content.vue'); assert.match(source, /selectedNewsId === item.id/); assert.match(source, /aria-label="Pratinjau berita"/); assert.match(source, /Tutup editor/); });
+
+
+test('payment settings are one ordered page with manual QRIS grouped under methods', () => {
+    const source = read('Payments.vue');
+    assert.doesNotMatch(source, /Subbagian pengaturan pembayaran|settingTabs|selectSetting/);
+    const order = ['Metode Pembayaran', 'QRIS Manual', 'Gateway dan Biaya', 'Biaya & Routing', 'Pengaturan Top Up', 'Tampilan Checkout'];
+    let previous = -1;
+    for (const heading of order) { const position = source.indexOf('>'+heading+'</h2>'); assert.ok(position > previous, heading); previous = position; }
+    assert.ok(source.indexOf('QRIS Manual') > source.indexOf('payment-methods-heading'));
+    assert.ok(source.indexOf('QRIS Manual') < source.indexOf('payment-gateways-heading'));
+    assert.match(source, /area === 'transactions'/);
+});
+
+test('customer detail starts at profile and confirms wallet changes', () => {
+    const source = read('CustomerDetail.vue');
+    const profile = source.indexOf('customer-profile-heading');
+    assert.ok(profile > -1);
+    assert.ok(source.indexOf('lf-admin-summary') > source.indexOf('customer-profile-heading'));
+    assert.ok(source.indexOf('customer-profile-heading') < source.indexOf('customer-tier-heading'));
+    assert.match(source, /window\.confirm\(`Konfirmasi \$\{direction\} saldo pelanggan/);
+});
+
+test('shell never drops backend menu entries and names the support group', () => {
+    const source = readFileSync(new URL('../../resources/js/Components/AdminShell.vue', import.meta.url), 'utf8');
+    assert.match(source, /Layanan Pelanggan/);
+    assert.match(source, /const rest = items\.filter/);
+    assert.match(source, /label: 'Lainnya'/);
+});
+
+test('support and fulfillment lead with the work list instead of metric cards', () => {
+    for (const file of ['Support.vue', 'Fulfillment.vue', 'Settings.vue']) {
+        assert.ok(!read(file).includes('lf-admin-summary'), file);
+    }
+});
+
+test('list-page wallet adjustment confirms before posting', () => {
+    const source = read('Customers.vue');
+    assert.match(source, /window\.confirm\(`Konfirmasi \$\{direction\} saldo \$\{editor\.value\.name\}/);
+});
+
+test('product notices use dark theme tokens and render a preview', () => {
+    const source = read('Catalog.vue');
+    assert.doesNotMatch(source, /border-slate-200 bg-white/);
+    assert.match(source, /aria-label="Pratinjau pemberitahuan"/);
+});
+
+test('contact cards stack vertically on mobile so WhatsApp and email are not side by side', () => {
+    const css = readFileSync(new URL('../../resources/css/app.css', import.meta.url), 'utf8');
+    const mobile = css.slice(css.indexOf('@media(max-width:640px)'));
+    assert.match(mobile, /\.lf-contact-grid>a[^{]*\{flex-direction:column/);
+    assert.match(mobile, /\.lf-contact-grid>a>div[^{]*\{min-width:0;width:100%\}/);
+    assert.match(mobile, /\.lf-contact-grid small[^{]*\{overflow-wrap:anywhere\}/);
+});
