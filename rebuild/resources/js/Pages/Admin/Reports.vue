@@ -304,28 +304,28 @@ function statusLabel(status) {
                     </AdminResponsiveTable>
                 </div>
             </Card>
-
-            <Card v-show="visible('operations')" class="min-w-0 p-4">
-                <h2 class="text-lg font-semibold">Kinerja penyedia layanan</h2>
-                <p class="mt-1 text-sm text-muted-foreground">Persentase masalah membandingkan proses yang statusnya belum pasti, gagal, atau terblokir dengan seluruh proses pada periode ini.</p>
-                <div class="mt-4 overflow-x-auto" role="region" aria-label="Kinerja penyedia layanan" tabindex="0">
-                    <AdminResponsiveTable :mobile-columns="[0,1,2,5]">
-                        <TableHeader><TableRow><TableHead>Penyedia layanan</TableHead><TableHead class="text-right">Proses</TableHead><TableHead class="text-right">Berhasil</TableHead><TableHead class="text-right">Perlu diperiksa</TableHead><TableHead class="text-right">Gagal, belum pasti, atau terblokir</TableHead><TableHead class="text-right">Persentase masalah</TableHead></TableRow></TableHeader>
-                        <TableBody>
-                            <TableRow v-for="row in providerReport" :key="row.id + '-' + row.code">
-                                <TableCell><strong>{{ row.name }}</strong><p class="text-xs text-muted-foreground">{{ row.code }}</p></TableCell>
-                                <TableCell class="text-right">{{ number(row.attempts_count) }}</TableCell>
-                                <TableCell class="text-right">{{ number(row.success_count) }}</TableCell>
-                                <TableCell class="text-right">{{ number(row.pending_count) }}</TableCell>
-                                <TableCell class="text-right">{{ number(row.errors_count) }}</TableCell>
-                                <TableCell class="text-right">{{ percent(row.error_rate) }}</TableCell>
-                            </TableRow>
-                            <TableRow v-if="!providerReport.length"><TableCell colspan="6" class="py-10 text-center text-muted-foreground">Belum ada aktivitas provider.</TableCell></TableRow>
-                        </TableBody>
-                    </AdminResponsiveTable>
-                </div>
-            </Card>
         </div>
+
+        <Card v-show="visible('operations')" class="min-w-0 p-4">
+            <h2 class="text-lg font-semibold">Kinerja penyedia layanan</h2>
+            <p class="mt-1 text-sm text-muted-foreground">Persentase masalah membandingkan proses yang statusnya belum pasti, gagal, atau terblokir dengan seluruh proses pada periode ini.</p>
+            <div class="mt-4 overflow-x-auto" role="region" aria-label="Kinerja penyedia layanan" tabindex="0">
+                <AdminResponsiveTable :mobile-columns="[0,1,2,5]">
+                    <TableHeader><TableRow><TableHead>Penyedia layanan</TableHead><TableHead class="text-right">Proses</TableHead><TableHead class="text-right">Berhasil</TableHead><TableHead class="text-right">Perlu diperiksa</TableHead><TableHead class="text-right">Gagal, belum pasti, atau terblokir</TableHead><TableHead class="text-right">Persentase masalah</TableHead></TableRow></TableHeader>
+                    <TableBody>
+                        <TableRow v-for="row in providerReport" :key="row.id + '-' + row.code">
+                            <TableCell><strong>{{ row.name }}</strong><p class="text-xs text-muted-foreground">{{ row.code }}</p></TableCell>
+                            <TableCell class="text-right">{{ number(row.attempts_count) }}</TableCell>
+                            <TableCell class="text-right">{{ number(row.success_count) }}</TableCell>
+                            <TableCell class="text-right">{{ number(row.pending_count) }}</TableCell>
+                            <TableCell class="text-right">{{ number(row.errors_count) }}</TableCell>
+                            <TableCell class="text-right">{{ percent(row.error_rate) }}</TableCell>
+                        </TableRow>
+                        <TableRow v-if="!providerReport.length"><TableCell colspan="6" class="py-10 text-center text-muted-foreground">Belum ada aktivitas provider.</TableCell></TableRow>
+                    </TableBody>
+                </AdminResponsiveTable>
+            </div>
+        </Card>
 
         <Card v-show="visible('sales')" class="p-4">
             <h2 class="text-lg font-semibold">Catatan Perhitungan</h2>

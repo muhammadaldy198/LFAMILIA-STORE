@@ -17,8 +17,8 @@ assert.match(customers, /Saldo/);
 
 assert.match(catalog, /Tampilan Produk/);
 assert.match(catalog, /admin\/vouchers\/popular\/["'] \+ item\.id/);
-assert.match(catalog, /canManagePopular = computed\(\(\) => page\.props\.adminPanel\?\.menu\?\.some\(item => item\.href === '\/admin\/vouchers'\)/);
-assert.match(catalog, /<Button v-if="canManagePopular"[^>]*@click="togglePopular\(item\)"/);
+assert.doesNotMatch(catalog, /canManagePopular/);
+assert.match(catalog, /<Button type="button" :variant="item\.popular \? 'outline' : 'default'" @click="togglePopular\(item\)"/);
 assert.doesNotMatch(promotions, /Populer Sekarang|popularProducts|Produk populer/);
 assert.match(reports.split('<template>')[1] || reports, /Produk Terlaris/);
 assert.match(reports, /Kategori Teratas/);

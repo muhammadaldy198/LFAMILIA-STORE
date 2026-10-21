@@ -343,9 +343,11 @@ class AdminPromotionRestorationTest extends TestCase
         $this->assertSame(2000, $snapshot['voucher']['max_discount_idr']);
     }
 
-    public function test_popular_priority_is_managed_here_without_changing_product_active_state(): void
+    public function test_popular_priority_is_managed_from_the_catalog_workspace_permission(): void
     {
-        $this->login();
+        // Desain final menempatkan produk populer di ruang kerja Produk,
+        // jadi otorisasinya ikut izin katalog.
+        $this->login(['catalog.manage']);
         $catalog = $this->catalog();
         $this->assertFalse((bool) $catalog['product']->popular);
 
@@ -361,6 +363,18 @@ class AdminPromotionRestorationTest extends TestCase
             'target_type' => 'product',
             'target_id' => (string) $catalog['product']->id,
         ]);
+    }
+
+    public function test_voucher_only_admin_cannot_toggle_popular_products(): void
+    {
+        $this->login(['vouchers.manage']);
+        $catalog = $this->catalog();
+
+        $this->put('/admin/vouchers/popular/'.$catalog['product']->id, [
+            'popular' => true,
+        ])->assertForbidden();
+
+        $this->assertFalse((bool) $catalog['product']->refresh()->popular);
     }
 
     public function test_promo_routes_remain_permission_gated(): void

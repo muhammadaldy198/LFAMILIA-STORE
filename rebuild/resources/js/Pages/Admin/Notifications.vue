@@ -30,7 +30,12 @@ const notificationHref = item => {
     if (item.target_type === 'order' && canOrders.value) return `${base}/orders/${id}`;
     if (item.target_type === 'support_ticket' && canSupport.value) return `${base}/support?ticket=${id}`;
     if (item.target_type === 'fulfillment_attempt') {
-        const relatedOrderId = Number(item.metadata?.order_id);
+        // Controller mengirim kolom `data` (JSON), bukan `metadata`.
+        let payload = item.data;
+        if (typeof payload === 'string') {
+            try { payload = JSON.parse(payload); } catch { payload = null; }
+        }
+        const relatedOrderId = Number(payload?.order_id);
         if (Number.isSafeInteger(relatedOrderId) && relatedOrderId > 0 && canOrders.value) return `${base}/orders/${relatedOrderId}`;
     }
     return null;

@@ -399,12 +399,20 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
             ->middleware('throttle:admin-sensitive')->name('admin.customers.membership');
     });
 
-    Route::middleware('admin.permission:vouchers.manage')->prefix('admin/vouchers')
-        ->name('admin.vouchers.')->group(function (): void {
-            Route::get('/', [AdminPromotionController::class, 'index'])->name('index');
-            Route::post('/', [AdminPromotionController::class, 'store'])->middleware('throttle:admin-mutation')->name('store');
+    Route::middleware('admin.permission:catalog.manage')->prefix('admin/vouchers')
+        ->name('admin.vouchers.')
+        ->group(function (): void {
+            // Produk populer dikelola dari ruang kerja Produk (desain final),
+            // jadi otorisasinya mengikuti izin katalog, bukan izin voucher.
             Route::put('/popular/{productId}', [AdminPromotionController::class, 'updatePopular'])
                 ->middleware('throttle:admin-mutation')->name('popular.update');
+        });
+
+    Route::middleware('admin.permission:vouchers.manage')->prefix('admin/vouchers')
+        ->name('admin.vouchers.')
+        ->group(function (): void {
+            Route::get('/', [AdminPromotionController::class, 'index'])->name('index');
+            Route::post('/', [AdminPromotionController::class, 'store'])->middleware('throttle:admin-mutation')->name('store');
             Route::put('/{id}', [AdminPromotionController::class, 'update'])->middleware('throttle:admin-mutation')->name('update');
             Route::delete('/{id}', [AdminPromotionController::class, 'destroy'])->middleware('throttle:admin-mutation')->name('destroy');
         });

@@ -22,7 +22,10 @@ const manual = useForm({ customer_name: '', phone: '', email: '', product_name: 
 const money = value => 'Rp' + Number(value).toLocaleString('id-ID');
 const date = value => value ? new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Jakarta' }).format(new Date(value)) + ' WIB' : 'Belum tersedia';
 const sortedOrders = computed(() => [...props.orders.data].sort((a, b) => {
-    const priority = row => row.needs_attention || row.status === 'PENDING_PAYMENT' ? 0 : 1;
+    // Backend sudah mengurutkan prioritas di SQL sebelum pagination; ini hanya
+    // menjaga urutan yang sama setelah data sampai di klien. Tiga tingkat,
+    // supaya pesanan bermasalah tidak pernah tenggelam di bawah yang belum bayar.
+    const priority = row => row.needs_attention ? 0 : row.status === 'PENDING_PAYMENT' ? 1 : 2;
     return priority(a) - priority(b) || new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
 }));
 const allSelected = computed(() => props.orders.data.length > 0 && props.orders.data.every(row => selected.value.includes(row.id)));

@@ -150,7 +150,6 @@ const pricingForm = useForm({
     cost_uplift_percent: Number(props.pricingSettings?.cost_uplift_percent ?? 2),
     sell_markup_percent: Number(props.pricingSettings?.sell_markup_percent ?? 10),
 });
-const canManagePopular = computed(() => page.props.adminPanel?.menu?.some(item => item.href === '/admin/vouchers') ?? false);
 const togglePopular = item => router.put('/admin/vouchers/popular/' + item.id, { popular: !item.popular }, { preserveScroll: true });
 const savePricingSettings = () => pricingForm
     .transform(data => ({ cost_uplift_percent: Number(data.cost_uplift_percent), sell_markup_percent: Number(data.sell_markup_percent) }))
@@ -666,7 +665,7 @@ const deleteNotice = (notice) => {
                     <div v-show="editorTab==='display'" class="space-y-4">
                     <div class="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
                         <div><h3 class="font-semibold">Produk populer</h3><p class="text-sm text-muted-foreground">Produk bertanda populer didahulukan di homepage; pengaturan status produk tetap di Informasi.</p></div>
-                        <Button v-if="canManagePopular" type="button" :variant="item.popular ? 'outline' : 'default'" @click="togglePopular(item)">{{ item.popular ? 'Lepas prioritas' : 'Jadikan populer' }}</Button>
+                        <Button type="button" :variant="item.popular ? 'outline' : 'default'" @click="togglePopular(item)">{{ item.popular ? 'Lepas prioritas' : 'Jadikan populer' }}</Button>
                     </div>
                     <div class="grid gap-3 md:grid-cols-2">
                         <div class="rounded-md border border-slate-200 p-3"><strong class="text-xs">Gambar produk / card</strong><div class="mt-2"><AdminMediaControl type="product" :id="item.id" :url="item.image_url" /></div></div>
