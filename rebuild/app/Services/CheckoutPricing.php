@@ -19,7 +19,8 @@ class CheckoutPricing
     /** @return array<string, mixed> */
     public function previewForPackage(int $packageId): array
     {
-        return $this->quoteForPackage($packageId, false, true);
+        return $this->forPackages([$packageId], true)[$packageId]
+            ?? throw ValidationException::withMessages(['package_id' => 'Produk atau nominal tidak tersedia.']);
     }
 
     /** @return array<string, mixed> */
@@ -125,7 +126,7 @@ class CheckoutPricing
      * @param  array<int, int>  $packageIds
      * @return array<int, array<string, mixed>>
      */
-    public function forPackages(array $packageIds): array
+    public function forPackages(array $packageIds, bool $includeInactivePackages = false): array
     {
         $packageIds = array_values(array_unique(array_filter(
             array_map('intval', $packageIds),
@@ -139,9 +140,10 @@ class CheckoutPricing
             ->join('products', 'products.id', '=', 'packages.product_id')
             ->join('categories', 'categories.id', '=', 'products.category_id')
             ->whereIn('packages.id', $packageIds)
-            ->where('packages.is_active', true)
-            ->where('products.is_active', true)
-            ->where('categories.is_active', true)
+            ->when(! $includeInactivePackages, fn ($query) => $query
+                ->where('packages.is_active', true)
+                ->where('products.is_active', true)
+                ->where('categories.is_active', true))
             ->select(
                 'packages.id as package_id',
                 'packages.code as package_code',

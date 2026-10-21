@@ -1190,6 +1190,10 @@ class AdminPanelRestorationTest extends TestCase
             ->has('products', 1)
             ->where('products.0.packages.0.id', $package->id)
             ->where('products.0.packages.0.mappings.0.store_cost_idr', 10200));
+
+        $package->mappings()->update(['is_active' => false]);
+        $this->assertArrayNotHasKey($package->id, app(CheckoutPricing::class)->forPackages([$package->id], true));
+        $this->assertArrayNotHasKey($package->id, app(CheckoutPricing::class)->forPackages([$package->id]));
     }
 
     public function test_fixed_sell_price_below_cost_is_rejected(): void

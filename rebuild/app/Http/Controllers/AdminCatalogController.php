@@ -36,14 +36,10 @@ class AdminCatalogController
     {
         $providers = Provider::all(['id', 'code', 'display_name', 'is_active'])->keyBy('id');
         $stockCounts = app(VoucherStockService::class)->counts();
-        $checkoutPreviews = [];
-        foreach (ProductPackage::query()->pluck('id') as $packageId) {
-            try {
-                $checkoutPreviews[$packageId] = app(CheckoutPricing::class)->previewForPackage((int) $packageId)['subtotal_idr'];
-            } catch (ValidationException) {
-                $checkoutPreviews[$packageId] = null;
-            }
-        }
+        $checkoutPreviews = collect(app(CheckoutPricing::class)
+            ->forPackages(ProductPackage::query()->pluck('id')->map(fn ($id): int => (int) $id)->all(), true))
+            ->map(fn (array $quote): int => (int) $quote['subtotal_idr'])
+            ->all();
 
         return Inertia::render('Admin/Catalog', [
             'checkoutPreviews' => $checkoutPreviews,
