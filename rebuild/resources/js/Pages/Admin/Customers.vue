@@ -1,8 +1,9 @@
 <script setup>
 import AdminSwitch from '../../Components/AdminSwitch.vue';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../../Components/ui/sheet';
 import AdminResponsiveTable from '../../Components/AdminResponsiveTable.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
-import { nextTick, reactive, ref, watch } from 'vue';
+import { reactive, ref, watch } from 'vue';
 import AdminShell from '../../Components/AdminShell.vue';
 import { Badge } from '../../Components/ui/badge';
 import { Button } from '../../Components/ui/button';
@@ -10,6 +11,7 @@ import { Card } from '../../Components/ui/card';
 import { Input } from '../../Components/ui/input';
 import { TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../Components/ui/table';
 import { walletAdjustmentError } from '../../lib/adminWalletAdjustment';
+import { withSensitive } from '../../lib/sensitivePrompt';
 
 const props = defineProps({
     isSuperAdmin: Boolean,
@@ -87,7 +89,6 @@ function reset() {
 
 function openEditor(row) {
     adjustError.value = '';
-    nextTick(()=>document.getElementById('customer-editor')?.scrollIntoView({block:'start'}));
     editor.value = {
         ...row,
         membership_assignment: row.membership_assignment || 'AUTO',
@@ -120,8 +121,10 @@ function adjustWallet() {
     adjustError.value = walletAdjustmentError(editor.value.adjust_amount, reason);
     if (adjustError.value) return;
     const direction = amount > 0 ? 'menambah' : 'mengurangi';
-    if (!window.confirm(`Konfirmasi ${direction} saldo ${editor.value.name} sebesar ${money(Math.abs(amount))}? Alasan: ${reason}`)) return;
+    void withSensitive(`Konfirmasi ${direction} saldo ${editor.value.name} sebesar ${money(Math.abs(amount))}? Alasan: ${reason}`, () => saveWallet(amount, reason));
+}
 
+function saveWallet(amount, reason) {
     saving.value = 'wallet';
     router.post('/admin/customers/' + editor.value.id + '/wallet', {
         amount_idr: amount,
@@ -329,14 +332,10 @@ function runCleanup() {
             </div>
         </Card>
 
-        <Card v-if="editor && isSuperAdmin" id="customer-editor" class="p-4">
-            <div class="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                    <h2 class="text-lg font-semibold">Atur pelanggan · {{ editor.name }}</h2>
-                    <p class="mt-1 text-sm text-muted-foreground">Tingkat member dan perubahan saldo hanya dapat dilakukan Super Admin. Setiap perubahan dicatat untuk pemeriksaan.</p>
-                </div>
-                <Button size="sm" variant="ghost" @click="closeEditor">Tutup</Button>
-            </div>
+        <Sheet :open="Boolean(editor)" @update:open="(value) => { if (!value) closeEditor(); }">
+        <SheetContent side="right" class="w-full overflow-y-auto sm:max-w-2xl">
+            <SheetHeader><SheetTitle>Atur pelanggan · {{ editor?.name }}</SheetTitle><SheetDescription>Tingkat member dan perubahan saldo hanya dapat dilakukan Super Admin. Setiap perubahan dicatat untuk pemeriksaan.</SheetDescription></SheetHeader>
+
 
             <div class="mt-4 grid gap-4 lg:grid-cols-2">
                 <div class="rounded-md border p-4">
@@ -366,7 +365,8 @@ function runCleanup() {
                 <p class="mt-1 text-xs text-muted-foreground">Akun ini tidak memiliki saldo, catatan perubahan saldo, pesanan, top up, atau tiket yang harus dipertahankan.</p>
                 <Button class="mt-3" size="sm" variant="destructive" @click="deleteEmpty(editor)">Hapus akun kosong</Button>
             </div>
-        </Card>
+        </SheetContent>
+        </Sheet>
 
         <Card v-if="isSuperAdmin" class="p-4">
             <div class="flex flex-wrap items-start justify-between gap-3">

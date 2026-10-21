@@ -150,19 +150,49 @@ test('orders prioritize attention and pending then newest with split status colu
 
 test('customer detail is a sequential profile-to-accounts page', () => { const source = read('CustomerDetail.vue'); assert.doesNotMatch(source, /<nav class="lf-admin-tabs"/); for (const id of ['customer-profile-heading','customer-orders-heading','customer-wallet-heading','customer-support-heading','customer-accounts-heading']) assert.match(source, new RegExp('id="'+id+'"')); assert.match(source, /v-if="isSuperAdmin"/); });
 
-test('admin access editor is beside selectable account list', () => { const source = read('Access.vue'); assert.ok(source.includes('xl:grid-cols-[minmax(0,1.5fr)_minmax(360px,1fr)]')); assert.match(source, /id="access-editor"/); assert.match(source, /@click="openEdit\(admin\)"/); });
+test('admin access editor opens in a sheet over the account list', () => {
+    const source = read('Access.vue');
+    assert.match(source, /<Sheet :open="editorOpen"/);
+    assert.match(source, /@click="openEdit\(admin\)"/);
+    assert.doesNotMatch(source, /id="access-editor"/);
+});
 
-test('news entries use a compact list and selected editor preview', () => { const source = read('Content.vue'); assert.match(source, /selectedNewsId === item.id/); assert.match(source, /aria-label="Pratinjau berita"/); assert.match(source, /Tutup editor/); });
+test('news entries use a compact list and open the editor in a sheet', () => {
+    const source = read('Content.vue');
+    assert.match(source, /selectedNewsId === item.id/);
+    assert.match(source, /aria-label="Pratinjau berita"/);
+    assert.match(source, /<Sheet :open="selectedNewsId !== null"/);
+});
 
 
-test('payment settings are one ordered page with manual QRIS grouped under methods', () => {
+test('catalog create form opens in a sheet instead of pushing the list down', () => {
+    const source = read('Catalog.vue');
+    assert.match(source, /<Sheet :open="showCreateProduct"/);
+    assert.doesNotMatch(source, /<form v-if="showCreateProduct"/);
+});
+
+test('content editors (banner, popup, news, faq, policy) open in sheets', () => {
+    const source = read('Content.vue');
+    assert.match(source, /<Sheet :open="bannerFormOpen"/);
+    assert.match(source, /<Sheet :open="popupFormOpen"/);
+    assert.match(source, /<Sheet :open="newsFormOpen"/);
+    assert.match(source, /<Sheet :open="faqFormOpen"/);
+    assert.match(source, /<Sheet :open="selectedBannerId === item.id"/);
+    assert.match(source, /<Sheet :open="selectedFaqId === item.id"/);
+    assert.match(source, /<Sheet :open="selectedPageKey === item.key"/);
+});
+
+test('payment settings keep one page and edit each method in a sheet', () => {
     const source = read('Payments.vue');
     assert.doesNotMatch(source, /Subbagian pengaturan pembayaran|settingTabs|selectSetting/);
-    const order = ['Metode Pembayaran', 'QRIS Manual', 'Gateway dan Biaya', 'Biaya & Routing', 'Pengaturan Top Up', 'Tampilan Checkout'];
+    // Biaya dan gateway diatur di dalam pop-up metode, bukan tabel terpisah.
+    assert.doesNotMatch(source, /id="payment-routing"/);
+    assert.doesNotMatch(source, /id="payment-gateways"/);
+    assert.match(source, /<Sheet :open="Boolean\(channelEditor\)"/);
+    assert.match(source, /Gateway untuk metode ini/);
+    const order = ['Metode Pembayaran', 'URL Notifikasi Gateway', 'Pengaturan Top Up', 'Tampilan Checkout'];
     let previous = -1;
     for (const heading of order) { const position = source.indexOf('>'+heading+'</h2>'); assert.ok(position > previous, heading); previous = position; }
-    assert.ok(source.indexOf('QRIS Manual') > source.indexOf('payment-methods-heading'));
-    assert.ok(source.indexOf('QRIS Manual') < source.indexOf('payment-gateways-heading'));
     assert.match(source, /area === 'transactions'/);
 });
 
@@ -172,7 +202,8 @@ test('customer detail starts at profile and confirms wallet changes', () => {
     assert.ok(profile > -1);
     assert.ok(source.indexOf('lf-admin-summary') > source.indexOf('customer-profile-heading'));
     assert.ok(source.indexOf('customer-profile-heading') < source.indexOf('customer-tier-heading'));
-    assert.match(source, /window\.confirm\(`Konfirmasi \$\{direction\} saldo pelanggan/);
+    assert.match(source, /withSensitive\(`Konfirmasi \$\{direction\} saldo pelanggan/);
+    assert.match(source, /function saveWallet\(amount, reason\)/);
 });
 
 test('shell never drops backend menu entries and names the support group', () => {
@@ -190,7 +221,10 @@ test('support and fulfillment lead with the work list instead of metric cards', 
 
 test('list-page wallet adjustment confirms before posting', () => {
     const source = read('Customers.vue');
-    assert.match(source, /window\.confirm\(`Konfirmasi \$\{direction\} saldo \$\{editor\.value\.name\}/);
+    // Konfirmasi saldo sekarang lewat pop-up kata sandi (withSensitive), bukan window.confirm.
+    assert.match(source, /withSensitive\(`Konfirmasi \$\{direction\} saldo \$\{editor\.value\.name\}/);
+    assert.match(source, /function saveWallet\(amount, reason\)/);
+    assert.doesNotMatch(source, /window\.confirm\(`Konfirmasi \$\{direction\} saldo/);
 });
 
 test('product notices use dark theme tokens and render a preview', () => {

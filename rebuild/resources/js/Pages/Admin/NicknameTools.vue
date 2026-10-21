@@ -1,5 +1,6 @@
 <script setup>
 import AdminSwitch from '../../Components/AdminSwitch.vue';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../../Components/ui/sheet';
 import AdminResponsiveTable from '../../Components/AdminResponsiveTable.vue';
 import { Head } from '@inertiajs/vue3';
 import { computed, reactive, ref, watch } from 'vue';
@@ -440,16 +441,12 @@ if (nicknameCodes.value.length > 0) gameCode.value = nicknameCodes.value[0].code
                 </div>
             </div>
 
-            <div v-if="editorError" class="mb-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">{{ editorError }}</div>
+        <Sheet :open="editorOpen" @update:open="(value) => { if (!value) { editorOpen = false; resetEditor(); } }">
+            <SheetContent side="right" class="w-full overflow-y-auto sm:max-w-xl">
+                <SheetHeader><SheetTitle>{{ editingId ? 'Edit Kode Game' : 'Tambah Kode Game' }}</SheetTitle><SheetDescription>Perubahan langsung menjadi sumber aturan validasi backend.</SheetDescription></SheetHeader>
+                <div v-if="editorError" class="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">{{ editorError }}</div>
 
-            <div v-if="editorOpen" class="mb-4 rounded-lg border border-border bg-muted p-4">
-                <div class="mb-3 flex items-center justify-between gap-3">
-                    <div>
-                        <h3 class="text-xs font-extrabold text-foreground">{{ editingId ? 'Edit Kode Game' : 'Tambah Kode Game' }}</h3>
-                        <p class="mt-0.5 text-xs text-muted-foreground">Perubahan langsung menjadi sumber aturan validasi backend.</p>
-                    </div>
-                    <Button type="button" variant="ghost" class="h-8 px-2 text-xs" @click="editorOpen=false;resetEditor()">Tutup</Button>
-                </div>
+
 
                 <div v-if="editorNotice" class="mb-3 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">{{ editorNotice }}</div>
 
@@ -490,7 +487,8 @@ if (nicknameCodes.value.length > 0) gameCode.value = nicknameCodes.value[0].code
                     </Button>
                     <Button type="button" :disabled="editorBusy" variant="outline" class="h-9 px-4 text-sm font-bold" @click="editorOpen=false;resetEditor()">Batal</Button>
                 </div>
-            </div>
+                        </SheetContent>
+        </Sheet>
 
             <div class="overflow-x-auto rounded-md border border-border" role="region" aria-label="Daftar aturan validasi game" tabindex="0">
                 <AdminResponsiveTable :mobile-columns="[1,3,6,8]" class="min-w-[980px] w-full text-left text-xs">

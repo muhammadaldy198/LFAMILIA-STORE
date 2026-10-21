@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Http\Controllers\AdminPasswordConfirmController;
 use App\Services\AdminPermissionService;
 use App\Services\StorefrontContentService;
 use App\Services\StoreThemeService;
@@ -73,7 +74,7 @@ class HandleInertiaRequests extends Middleware
                     'turnstile_action' => $config['enabled'] && $required ? $action : null,
                 ];
             },
-            'adminPanel' => function () use ($admin, $permissions): ?array {
+            'adminPanel' => function () use ($admin, $permissions, $request): ?array {
                 if (! $admin) {
                     return null;
                 }
@@ -81,6 +82,14 @@ class HandleInertiaRequests extends Middleware
                 return [
                     'admin' => $admin->only('id', 'name', 'email', 'role'),
                     'base_path' => '/admin',
+                    // Status konfirmasi kata sandi supaya pop-up bisa meminta
+                    // kata sandi di tempat, bukan melempar ke halaman lain.
+                    'sensitive_ready' => (function () use ($request): bool {
+                        $confirmedAt = (int) $request->session()->get(AdminPasswordConfirmController::SESSION_KEY, 0);
+
+                        return $confirmedAt !== 0
+                            && (time() - $confirmedAt) < (int) config('auth.password_timeout', 10800);
+                    })(),
                     'menu' => $permissions->menu($admin),
                     'can_notifications' => $permissions->allows($admin, 'notifications.view'),
                     'unread_notifications' => Schema::hasTable('admin_notifications')

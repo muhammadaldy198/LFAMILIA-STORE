@@ -1,8 +1,9 @@
 <script setup>
 import AdminSwitch from '../../Components/AdminSwitch.vue';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../../Components/ui/sheet';
 import AdminResponsiveTable from '../../Components/AdminResponsiveTable.vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
-import { computed, nextTick, reactive, ref } from 'vue';
+import { computed, reactive, ref } from 'vue';
 import AdminShell from '../../Components/AdminShell.vue';
 import { Badge } from '../../Components/ui/badge';
 import { Button } from '../../Components/ui/button';
@@ -80,7 +81,6 @@ function openCreate() {
         is_active: true,
     });
     editorOpen.value = true;
-    nextTick(() => document.getElementById('access-editor')?.scrollIntoView({ block: 'start' }));
 }
 
 function openEdit(admin) {
@@ -95,7 +95,6 @@ function openEdit(admin) {
         is_active: Boolean(admin.is_active),
     });
     editorOpen.value = true;
-    nextTick(() => document.getElementById('access-editor')?.scrollIntoView({ block: 'start' }));
 }
 
 function closeEditor() {
@@ -264,16 +263,10 @@ function togglePermission(key, checked) {
                 </div>
             </Card>
 
-        <Card v-if="editorOpen" id="access-editor" class="p-4">
-            <div class="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                    <h2 class="text-lg font-semibold">{{ editingId ? 'Edit Akun Admin' : 'Tambah Akun Admin' }}</h2>
-                    <p class="mt-1 text-sm text-muted-foreground">
-                        {{ isEditingSelf ? 'Akun yang sedang digunakan tidak dapat dinonaktifkan atau diturunkan.' : 'Perubahan role, status, password, dan permission dicatat ke Audit Log.' }}
-                    </p>
-                </div>
-                <Button type="button" size="sm" variant="ghost" @click="closeEditor">Tutup</Button>
-            </div>
+        <Sheet :open="editorOpen" @update:open="(value) => { if (!value) closeEditor(); }">
+        <SheetContent side="right" class="w-full overflow-y-auto sm:max-w-3xl">
+            <SheetHeader><SheetTitle>{{ editingId ? 'Edit Akun Admin' : 'Tambah Akun Admin' }}</SheetTitle><SheetDescription>{{ isEditingSelf ? 'Akun yang sedang digunakan tidak dapat dinonaktifkan atau diturunkan.' : 'Perubahan role, status, password, dan permission dicatat ke Audit Log.' }}</SheetDescription></SheetHeader>
+
 
             <form class="mt-4 space-y-4" @submit.prevent="save">
                 <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -345,7 +338,8 @@ function togglePermission(key, checked) {
                     <Button :disabled="form.processing">{{ form.processing ? 'Menyimpan…' : 'Simpan akun' }}</Button>
                 </div>
             </form>
-        </Card>
+        </SheetContent>
+        </Sheet>
 
             <Card class="p-4">
                 <h2 class="text-lg font-semibold">Aturan Akses</h2>

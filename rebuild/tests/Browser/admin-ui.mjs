@@ -78,7 +78,8 @@ try {
                 await pointerClick(`[...document.querySelectorAll('button')].find(b=>b.getBoundingClientRect().height>0&&b.textContent.trim()==='Lanjut pilih SKU')`);
                 if(!await evaluate(`Boolean(document.querySelector('[data-testid="digiflazz-import"]'))`))throw Error('Catalog import action did not open SKU picker');
                 await navigate('/admin/catalog?edit='+editor);
-                if(!await evaluate(`!document.querySelector('input[placeholder="Nama, alamat produk, merek, atau nominal"]')&&!document.querySelector('[role=dialog]')`))throw Error('Product list visible behind editor');
+                // Editor produk sekarang pop-up: daftar tetap di belakang, sheet harus terbuka.
+                if(!await evaluate(`Boolean(document.querySelector('[role=dialog]'))`))throw Error('Product editor sheet did not open');
                 for(const tab of ['Informasi','Nominal & Harga','Tampilan Produk','Data Pelanggan','Penanganan']){
                     await click(tab);await inspect(width+'-product-'+tab);
                     if(tab==='Nominal & Harga'){
@@ -183,7 +184,8 @@ try {
                 }
                 if(path==='/admin/nickname-tools'){
                     await click('Kode Game');await click('Tambah Kode Game');await inspect(width+'-game-code-editor');
-                    const switchState=await evaluate(`(()=>{const s=[...document.querySelectorAll('main [role=switch]')].find(s=>s.textContent===''&&!s.disabled);if(!s)return null;s.click();return true;})()`);
+                    // Editor kode game sekarang pop-up (di luar <main>), jadi cari switch di dialog dulu.
+                    const switchState=await evaluate(`(()=>{const root=document.querySelector('[role=dialog]')||document.querySelector('main');const s=[...root.querySelectorAll('[role=switch]')].find(s=>s.textContent===''&&!s.disabled);if(!s)return null;s.click();return true;})()`);
                     if(!switchState)throw Error('Boolean switch editor missing');await pause(100);await inspect(width+'-game-code-switch');
                 }
             }

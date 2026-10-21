@@ -9,6 +9,7 @@ import { Card } from '../../Components/ui/card';
 import { Input } from '../../Components/ui/input';
 import { TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../Components/ui/table';
 import { walletAdjustmentError } from '../../lib/adminWalletAdjustment';
+import { withSensitive } from '../../lib/sensitivePrompt';
 
 const props = defineProps({
     isSuperAdmin: Boolean,
@@ -69,8 +70,10 @@ function adjustWallet() {
     adjustError.value = walletAdjustmentError(wallet.amount_idr, reason);
     if (adjustError.value) return;
     const direction = amount > 0 ? 'menambah' : 'mengurangi';
-    if (!window.confirm(`Konfirmasi ${direction} saldo pelanggan sebesar ${money(Math.abs(amount))}? Alasan: ${reason}`)) return;
+    void withSensitive(`Konfirmasi ${direction} saldo pelanggan sebesar ${money(Math.abs(amount))}? Alasan: ${reason}`, () => saveWallet(amount, reason));
+}
 
+function saveWallet(amount, reason) {
     saving.value = 'wallet';
     router.post('/admin/customers/' + props.customer.id + '/wallet', {
         amount_idr: amount,

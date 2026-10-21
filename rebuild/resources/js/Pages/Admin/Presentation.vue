@@ -1,5 +1,6 @@
 <script setup>
 import AdminSwitch from '../../Components/AdminSwitch.vue';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../../Components/ui/sheet';
 import { Button } from '../../Components/ui/button';
 import { Input } from '../../Components/ui/input';
 import { Textarea } from '../../Components/ui/textarea';
@@ -12,7 +13,8 @@ const registry = computed(() => props.registry || {});
 const fields = computed(() => props.fields || {});
 const sections = computed(() => props.sections || {});
 const base = usePage().props.adminPanel?.base_path || '/admin';
-const tab = ref('text'), query = ref(''), group = ref('');
+const tab = ref('text'), query = ref(''), group = ref(''), textEditor = ref(null);
+function openText(key, item) { textEditor.value = { key, item }; }
 const groups = computed(() => [...new Set(Object.values(registry.value).map(x => x.group))]);
 const entries = computed(() => Object.entries(registry.value).filter(([, item]) =>
     (!group.value || item.group === group.value) && (!query.value || (item.label + ' ' + item.group).toLowerCase().includes(query.value.toLowerCase()))));
@@ -50,9 +52,11 @@ const restoreTypography = () => {
   <section v-if="tab === 'text'">
    <div class="lf-admin-filter-row"><label>Halaman<select v-model="group"><option value="">Semua halaman</option><option v-for="item in groups" :key="item" :value="item">{{ item.replace('Pages/','').replace('Components/','Layout/') }}</option></select></label><label>Cari tulisan<Input v-model="query" placeholder="Cari judul, tombol, atau informasi" /></label></div>
    <p class="lf-admin-note">Kosongkan perubahan untuk memakai teks bawaan. Produk, nominal, berita, FAQ dan isi kebijakan dikelola melalui menu masing-masing.</p>
-   <div v-for="[key, item] in entries" :key="key" class="lf-admin-copy-field">
-    <label>{{ item.label }}<Textarea :value="form.text[key] ?? item.default" rows="2" maxlength="5000" @input="form.text[key] = $event.target.value"></Textarea></label>
-    <div><small>{{ item.group.replace('Pages/','').replace('Components/','Layout/') }}</small><Button type="button" @click="defaultText(key)">Gunakan bawaan</Button></div>
+   <div class="lf-admin-copy-list">
+    <button v-for="[key, item] in entries" :key="key" type="button" class="lf-admin-copy-row" @click="openText(key, item)">
+     <span class="min-w-0"><strong>{{ item.label }}</strong><small>{{ item.group.replace('Pages/','').replace('Components/','Layout/') }}</small></span>
+     <span class="lf-admin-copy-value">{{ form.text[key] ? form.text[key] : item.default }}</span>
+    </button>
    </div>
    <p v-if="!entries.length">Tidak ada tulisan yang cocok.</p>
   </section>
@@ -70,5 +74,16 @@ const restoreTypography = () => {
   </section>
   <div class="lf-admin-save-bar"><Button class="lf-admin-primary" :disabled="form.processing || themeForm.processing">{{ form.processing ? 'Menyimpan…' : 'Simpan Perubahan' }}</Button><a href="/" target="_blank" rel="noreferrer" class="lf-admin-button">Lihat Toko</a></div>
  </form>
+ <Sheet :open="Boolean(textEditor)" @update:open="(value) => { if (!value) textEditor = null; }">
+  <SheetContent side="right" class="w-full overflow-y-auto sm:max-w-xl">
+   <SheetHeader><SheetTitle>{{ textEditor?.item.label }}</SheetTitle><SheetDescription>{{ textEditor?.item.group.replace('Pages/','').replace('Components/','Layout/') }}</SheetDescription></SheetHeader>
+   <div v-if="textEditor" class="mt-4 space-y-3">
+    <label class="block space-y-1"><span class="text-sm font-medium">Teks</span><Textarea v-model="form.text[textEditor.key]" rows="6" maxlength="5000" :placeholder="textEditor.item.default"></Textarea></label>
+    <p class="text-xs text-muted-foreground">Kosongkan untuk memakai teks bawaan.</p>
+    <div class="flex justify-between gap-2 border-t pt-3"><Button type="button" variant="outline" @click="defaultText(textEditor.key)">Gunakan bawaan</Button><Button type="button" @click="textEditor = null">Selesai</Button></div>
+   </div>
+  </SheetContent>
+ </Sheet>
+
 </AdminShell>
 </template>

@@ -1,5 +1,6 @@
 <script setup>
 import AdminSwitch from '../../Components/AdminSwitch.vue';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../../Components/ui/sheet';
 import AdminResponsiveTable from '../../Components/AdminResponsiveTable.vue';
 import { Button } from '../../Components/ui/button';
 import { Input } from '../../Components/ui/input';
@@ -27,6 +28,10 @@ const selectedBannerId = ref(null);
 const selectedFaqId = ref(null);
 const selectedPageKey = ref(null);
 const selectedNewsId = ref(null);
+const bannerFormOpen = ref(false);
+const faqFormOpen = ref(false);
+const newsFormOpen = ref(false);
+const popupFormOpen = ref(false);
 
 const areas = [
     { key: 'storefront', label: 'Tampilan Toko', tabs: [['banners','Banner Utama'],['popup','Pop-up Pengumuman'],['assets','Logo & Gambar Cadangan'],['support','Teks Footer & Bantuan']] },
@@ -219,7 +224,11 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                     </div>
                 </div>
 
-                <form class="mt-4 grid gap-3 md:grid-cols-3" @submit.prevent="bannerForm.post(base + '/content/banners', { preserveScroll: true, onSuccess: () => bannerForm.reset() })">
+                <div class="mt-4"><Button type="button" class="rounded bg-[#1769e8] px-4 py-2 text-xs font-bold text-white" @click="bannerFormOpen = true">Tambah Banner</Button></div>
+                <Sheet :open="bannerFormOpen" @update:open="(value) => { bannerFormOpen = value; }">
+                <SheetContent side="right" class="w-full overflow-y-auto sm:max-w-2xl">
+                <SheetHeader><SheetTitle>Tambah banner</SheetTitle><SheetDescription>Banner aktif langsung tampil di halaman pelanggan.</SheetDescription></SheetHeader>
+                <form class="grid gap-3 md:grid-cols-3" @submit.prevent="bannerForm.post(base + '/content/banners', { preserveScroll: true, onSuccess: () => { bannerForm.reset(); bannerFormOpen = false; } })">
                     <label class="lf-admin-field "><span>Nama banner (juga menjadi teks alternatif gambar)</span><Input v-model="bannerForm.title" required placeholder="Contoh: Promo akhir pekan" class="rounded border border-border p-2 text-sm" /><span v-if="bannerForm.errors.title" role="alert" class="text-sm font-normal text-destructive">{{ bannerForm.errors.title }}</span></label>
                     <label class="lf-admin-field "><span>Alamat tujuan saat banner ditekan</span><Input v-model="bannerForm.cta_href" placeholder="Contoh: /promo atau https://..." class="rounded border border-border p-2 text-sm" /><span v-if="bannerForm.errors.cta_href" role="alert" class="text-sm font-normal text-destructive">{{ bannerForm.errors.cta_href }}</span></label>
                     <label class="lf-admin-field "><span>Urutan tampil</span><Input v-model.number="bannerForm.sort_order" type="number" min="0" placeholder="Urutan" class="rounded border border-border p-2 text-sm" /><span class="text-xs text-muted-foreground">Angka lebih kecil tampil lebih dulu.</span><span v-if="bannerForm.errors.sort_order" role="alert" class="text-sm font-normal text-destructive">{{ bannerForm.errors.sort_order }}</span></label>
@@ -227,11 +236,16 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                     <label class="flex items-center gap-2 text-xs"><AdminSwitch v-model="bannerForm.show_desktop" /> Desktop</label>
                     <label class="flex items-center gap-2 text-xs"><AdminSwitch v-model="bannerForm.show_mobile" /> Mobile</label>
                     <label class="flex items-center gap-2 text-xs"><AdminSwitch v-model="bannerForm.is_active" /> Aktif</label>
-                    <div class="md:col-span-3"><Button class="rounded bg-[#1769e8] px-4 py-2 text-xs font-bold text-white">Tambah Banner</Button></div>
+                    <div class="md:col-span-3 flex gap-2"><Button class="rounded bg-[#1769e8] px-4 py-2 text-xs font-bold text-white">Tambah Banner</Button><Button type="button" variant="outline" class="px-4 py-2 text-xs" @click="bannerFormOpen = false">Batal</Button></div>
                 </form>
+                </SheetContent>
+                </Sheet>
 
                 <div class="mt-5 space-y-4">
-                    <article v-for="item in banners" :key="item.id" class="border-t border-border py-3"><button type="button" class="text-left font-semibold" :aria-expanded="selectedBannerId === item.id" @click="selectedBannerId = selectedBannerId === item.id ? null : item.id">{{ item.title || 'Banner' }} <span class="text-xs text-muted-foreground">· {{ item.is_active ? 'Aktif' : 'Nonaktif' }}</span></button><div v-if="selectedBannerId === item.id" class="mt-3 grid gap-4 lg:grid-cols-2"> <div class="rounded-lg border border-border p-4">
+                    <article v-for="item in banners" :key="item.id" class="border-t border-border py-3"><button type="button" class="text-left font-semibold" :aria-expanded="selectedBannerId === item.id" @click="selectedBannerId = selectedBannerId === item.id ? null : item.id">{{ item.title || 'Banner' }} <span class="text-xs text-muted-foreground">· {{ item.is_active ? 'Aktif' : 'Nonaktif' }}</span></button><Sheet :open="selectedBannerId === item.id" @update:open="(value) => { if (!value) selectedBannerId = null; }">
+<SheetContent side="right" class="w-full overflow-y-auto sm:max-w-3xl">
+<SheetHeader><SheetTitle>Edit banner</SheetTitle><SheetDescription>Ubah teks, gambar, dan status tampil banner.</SheetDescription></SheetHeader>
+<div class="grid gap-4 lg:grid-cols-2"> <div class="rounded-lg border border-border p-4">
                         <div class="grid gap-2 md:grid-cols-3">
                             <label class="lf-admin-field "><span>Nama banner (juga menjadi teks alternatif gambar)</span><Input v-model="item.title" class="rounded border border-border p-2 text-sm" placeholder="Nama banner" /></label>
                             <label class="lf-admin-field "><span>Alamat tujuan saat banner ditekan</span><Input v-model="item.cta_href" class="rounded border border-border p-2 text-sm" placeholder="Contoh: /promo atau https://..." /></label>
@@ -259,7 +273,10 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                         </div>
                     </div>
                     <aside class="rounded-lg border border-border bg-muted p-4"><h3 class="font-semibold">Pratinjau banner</h3><div class="mt-3 overflow-hidden rounded bg-card"><img v-if="item.desktop_url" :src="item.desktop_url" :alt="item.title || 'Banner toko'" class="max-h-52 w-full object-cover"><div v-else class="flex h-36 items-center justify-center text-sm text-muted-foreground">Gambar desktop belum dipilih</div><p class="p-3 text-sm">{{ item.subtitle || item.title }}</p></div><div class="mx-auto mt-3 max-w-[240px] overflow-hidden rounded border bg-card"><img v-if="item.mobile_url || item.desktop_url" :src="item.mobile_url || item.desktop_url" :alt="item.title || 'Banner toko'" class="h-36 w-full object-cover"><div v-else class="flex h-36 items-center justify-center text-xs text-muted-foreground">Gambar mobile belum dipilih</div><p class="p-2 text-xs">{{ item.subtitle || item.title }}</p></div></aside>
-                    </div></article>
+                    </div>
+                    </SheetContent>
+                    </Sheet>
+                    </article>
                     <p v-if="!banners.length" class="rounded bg-muted p-4 text-xs text-muted-foreground">Belum ada banner utama. Selama kosong, halaman pelanggan memakai gambar banner cadangan yang aktif.</p>
                 </div>
             </section>
@@ -270,17 +287,23 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                     <p class="mt-1 text-xs text-muted-foreground">Hanya satu pop-up pengumuman. Muncul saat pelanggan membuka halaman utama dan dapat disembunyikan sesuai masa yang ditentukan.</p>
                 </div>
 
-                <form v-if="!popups.length" class="mt-4 grid gap-3" @submit.prevent="popupForm.post(base + '/content/popups', { preserveScroll: true })">
+                <div v-if="!popups.length" class="mt-4"><Button type="button" class="rounded bg-[#1769e8] px-4 py-2 text-xs font-bold text-white" @click="popupFormOpen = true">Tambah Pop-up</Button></div>
+                <Sheet :open="popupFormOpen" @update:open="(value) => { popupFormOpen = value; }">
+                <SheetContent side="right" class="w-full overflow-y-auto sm:max-w-xl">
+                <SheetHeader><SheetTitle>Tambah pop-up</SheetTitle><SheetDescription>Pop-up tampil sekali saat pelanggan membuka halaman utama.</SheetDescription></SheetHeader>
+                <form class="grid gap-3" @submit.prevent="popupForm.post(base + '/content/popups', { preserveScroll: true, onSuccess: () => { popupFormOpen = false; } })">
                     <label class="lf-admin-field "><span>Judul</span><Input v-model="popupForm.title" required placeholder="Judul pop-up" class="rounded border border-border p-2 text-sm" /><span v-if="popupForm.errors.title" role="alert" class="text-sm font-normal text-destructive">{{ popupForm.errors.title }}</span></label>
                     <label class="lf-admin-field "><span>Isi</span><Textarea v-model="popupForm.body" required rows="5" placeholder="Isi pengumuman" class="rounded border border-border p-2 text-sm"></Textarea><span v-if="popupForm.errors.body" role="alert" class="text-sm font-normal text-destructive">{{ popupForm.errors.body }}</span></label>
                     <div class="grid gap-3 sm:grid-cols-2">
                         <label class="text-xs">Jangan tampil lagi selama (hari)<Input v-model.number="popupForm.dismiss_days" type="number" min="0" max="365" class="mt-1 w-full rounded border border-border p-2 text-sm" /><span v-if="popupForm.errors.dismiss_days" role="alert" class="text-sm font-normal text-destructive">{{ popupForm.errors.dismiss_days }}</span></label>
                         <label class="flex items-center gap-2 self-end pb-2 text-xs"><AdminSwitch v-model="popupForm.is_active" /> Aktif</label>
                     </div>
-                    <div><Button class="rounded bg-[#1769e8] px-4 py-2 text-xs font-bold text-white">Simpan Pop-up</Button></div>
+                    <div class="flex gap-2"><Button class="rounded bg-[#1769e8] px-4 py-2 text-xs font-bold text-white">Simpan Pop-up</Button><Button type="button" variant="outline" class="px-4 py-2 text-xs" @click="popupFormOpen = false">Batal</Button></div>
                 </form>
+                </SheetContent>
+                </Sheet>
 
-                <div v-else class="mt-4 grid gap-4 lg:grid-cols-2">
+                <div v-if="popups.length" class="mt-4 grid gap-4 lg:grid-cols-2">
                     <div class="space-y-3 border-t border-border py-3">
                         <label class="lf-admin-field "><span>Judul</span><Input v-model="popups[0].title" class="w-full rounded border border-border p-2 text-sm" placeholder="Judul pop-up" /></label>
                         <label class="lf-admin-field "><span>Isi</span><Textarea v-model="popups[0].body" rows="5" class="mt-3 w-full rounded border border-border p-2 text-sm" placeholder="Isi pengumuman"></Textarea></label>
@@ -345,7 +368,11 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
 
             <section v-show="contentTab === 'news'" class="rounded-xl border border-border bg-card p-5">
                 <h2 class="text-lg font-bold">Berita</h2>
-                <form class="mt-4 grid gap-3 md:grid-cols-3" @submit.prevent="newsForm.post(base + '/content/news', { preserveScroll: true, onSuccess: () => { newsForm.reset(); selectedNewsId = null; } })">
+                <div class="mt-4"><Button type="button" class="rounded bg-[#1769e8] px-4 py-2 text-xs font-bold text-white" @click="newsFormOpen = true">Tambah berita</Button></div>
+                <Sheet :open="newsFormOpen" @update:open="(value) => { newsFormOpen = value; }">
+                <SheetContent side="right" class="w-full overflow-y-auto sm:max-w-2xl">
+                <SheetHeader><SheetTitle>Tambah berita</SheetTitle><SheetDescription>Berita aktif tampil di halaman berita pelanggan.</SheetDescription></SheetHeader>
+                <form class="grid gap-3 md:grid-cols-3" @submit.prevent="newsForm.post(base + '/content/news', { preserveScroll: true, onSuccess: () => { newsForm.reset(); newsFormOpen = false; } })">
                     <label class="lf-admin-field "><span>Judul</span><Input v-model="newsForm.title" required placeholder="Judul berita" class="rounded border border-border p-2 text-sm" /><span v-if="newsForm.errors.title" role="alert" class="text-sm font-normal text-destructive">{{ newsForm.errors.title }}</span></label>
                     <details><summary class="cursor-pointer text-sm">Ubah tautan berita (lanjutan)</summary><label class="lf-admin-field mt-2"><span>Bagian alamat halaman</span><Input v-model="newsForm.slug" placeholder="Dibuat otomatis dari judul" class="rounded border border-border p-2 text-sm" /><span v-if="newsForm.errors.slug" role="alert" class="text-sm font-normal text-destructive">{{ newsForm.errors.slug }}</span></label></details>
                     <label class="lf-admin-field "><span>Sumber berita</span><Input v-model="newsForm.source_label" placeholder="Sumber/label" class="rounded border border-border p-2 text-sm" /><span v-if="newsForm.errors.source_label" role="alert" class="text-sm font-normal text-destructive">{{ newsForm.errors.source_label }}</span></label>
@@ -354,10 +381,12 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                     <label class="lf-admin-field "><span>Urutan tampil</span><Input v-model.number="newsForm.sort_order" type="number" min="0" placeholder="Urutan" class="rounded border border-border p-2 text-sm" /><span v-if="newsForm.errors.sort_order" role="alert" class="text-sm font-normal text-destructive">{{ newsForm.errors.sort_order }}</span></label>
                     <label class="lf-admin-field "><span>Tanggal publikasi</span><Input v-model="newsForm.published_at" type="datetime-local" class="rounded border border-border p-2 text-sm" /><span v-if="newsForm.errors.published_at" role="alert" class="text-sm font-normal text-destructive">{{ newsForm.errors.published_at }}</span></label>
                     <label class="flex items-center gap-2 text-xs"><AdminSwitch v-model="newsForm.is_active" /> Aktif</label>
-                    <div class="md:col-span-3"><Button class="rounded bg-[#1769e8] px-4 py-2 text-xs font-bold text-white">Tambah berita</Button></div>
+                    <div class="md:col-span-3 flex gap-2"><Button class="rounded bg-[#1769e8] px-4 py-2 text-xs font-bold text-white">Tambah berita</Button><Button type="button" variant="outline" class="px-4 py-2 text-xs" @click="newsFormOpen = false">Batal</Button></div>
                 </form>
+                </SheetContent>
+                </Sheet>
 
-                <div class="mt-5 grid gap-4 lg:grid-cols-[minmax(220px,0.8fr)_minmax(0,1.5fr)]">
+                <div class="mt-5">
                     <div class="divide-y divide-border border-t border-border">
                         <button v-for="item in news" :key="item.id" type="button" class="flex w-full items-start justify-between gap-3 py-3 text-left" :aria-expanded="selectedNewsId === item.id" @click="selectedNewsId = selectedNewsId === item.id ? null : item.id">
                             <span class="min-w-0"><strong class="block truncate text-sm">{{ item.title }}</strong><span class="mt-1 block text-xs text-muted-foreground">{{ item.is_active ? 'Aktif' : 'Nonaktif' }} · {{ item.source_label || 'Tanpa sumber' }}</span></span>
@@ -365,10 +394,13 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                         </button>
                         <p v-if="!news.length" class="py-5 text-sm text-muted-foreground">Belum ada berita.</p>
                     </div>
+                </div>
+                <Sheet :open="selectedNewsId !== null" @update:open="(value) => { if (!value) selectedNewsId = null; }">
+                    <SheetContent side="right" class="w-full overflow-y-auto sm:max-w-2xl">
+                        <SheetHeader><SheetTitle>Edit berita</SheetTitle><SheetDescription>Ubah isi dan gambar berita. Pratinjau di bawah mengikuti tampilan halaman pelanggan.</SheetDescription></SheetHeader>
                     <template v-for="item in news" :key="'editor-'+item.id">
-                        <div v-if="selectedNewsId === item.id" class="grid gap-4 xl:grid-cols-2">
-                            <div class="space-y-3 rounded-lg border border-border p-4">
-                                <div class="flex items-center justify-between gap-2"><h3 class="font-semibold">Edit berita</h3><Button type="button" size="sm" variant="ghost" @click="selectedNewsId = null">Tutup editor</Button></div>
+                        <div v-if="selectedNewsId === item.id" class="mt-4 grid gap-4">
+                            <div class="space-y-3">
                                 <label class="lf-admin-field"><span>Judul</span><Input v-model="item.title" class="text-sm" /></label>
                                 <details><summary class="cursor-pointer text-sm">Ubah tautan berita (lanjutan)</summary><label class="lf-admin-field mt-2"><span>Bagian alamat halaman</span><Input v-model="item.slug" class="text-sm" /></label></details>
                                 <label class="lf-admin-field"><span>Sumber berita</span><Input v-model="item.source_label" class="text-sm" /></label>
@@ -392,7 +424,8 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                             </aside>
                         </div>
                     </template>
-                </div>
+                    </SheetContent>
+                </Sheet>
             </section>
 
             <section v-show="contentTab === 'reviews'" class="rounded-xl border border-border bg-card p-5">
@@ -422,19 +455,30 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
 
             <section v-show="contentTab === 'faq'" class="rounded-xl border border-border bg-card p-5">
                 <h2 class="text-lg font-bold">Pertanyaan umum</h2>
-                <form class="mt-4 grid gap-3 md:grid-cols-[1fr_120px_auto]" @submit.prevent="faqForm.post(base + '/content/faqs', { preserveScroll: true, onSuccess: () => faqForm.reset() })">
+                <div class="mt-4"><Button type="button" class="rounded bg-[#1769e8] px-4 py-2 text-xs font-bold text-white" @click="faqFormOpen = true">Tambah FAQ</Button></div>
+                <Sheet :open="faqFormOpen" @update:open="(value) => { faqFormOpen = value; }">
+                <SheetContent side="right" class="w-full overflow-y-auto sm:max-w-xl">
+                <SheetHeader><SheetTitle>Tambah FAQ</SheetTitle><SheetDescription>Pertanyaan aktif tampil di halaman bantuan pelanggan.</SheetDescription></SheetHeader>
+                <form class="grid gap-3 md:grid-cols-[1fr_120px_auto]" @submit.prevent="faqForm.post(base + '/content/faqs', { preserveScroll: true, onSuccess: () => { faqForm.reset(); faqFormOpen = false; } })">
                     <label class="lf-admin-field "><span>Pertanyaan</span><Input v-model="faqForm.question" required placeholder="Pertanyaan" class="rounded border border-border p-2 text-sm" /><span v-if="faqForm.errors.question" role="alert" class="text-sm font-normal text-destructive">{{ faqForm.errors.question }}</span></label>
                     <label class="lf-admin-field "><span>Urutan tampil</span><Input v-model.number="faqForm.sort_order" type="number" min="0" class="rounded border border-border p-2 text-sm" /><span v-if="faqForm.errors.sort_order" role="alert" class="text-sm font-normal text-destructive">{{ faqForm.errors.sort_order }}</span></label>
                     <label class="flex items-center gap-2 text-xs"><AdminSwitch v-model="faqForm.is_active" /> Aktif</label>
                     <label class="lf-admin-field md:col-span-3"><span>Jawaban</span><Textarea v-model="faqForm.answer" required rows="3" placeholder="Jawaban" class="rounded border border-border p-2 text-sm"></Textarea><span v-if="faqForm.errors.answer" role="alert" class="text-sm font-normal text-destructive">{{ faqForm.errors.answer }}</span></label>
-                    <div class="md:col-span-3"><Button class="rounded bg-[#1769e8] px-4 py-2 text-xs font-bold text-white">Tambah FAQ</Button></div>
+                    <div class="md:col-span-3 flex gap-2"><Button class="rounded bg-[#1769e8] px-4 py-2 text-xs font-bold text-white">Tambah FAQ</Button><Button type="button" variant="outline" class="px-4 py-2 text-xs" @click="faqFormOpen = false">Batal</Button></div>
                 </form>
+                </SheetContent>
+                </Sheet>
                 <div class="mt-5 space-y-3">
-                    <article v-for="item in faqs" :key="item.id" class="border-t border-border py-3"><button type="button" class="text-left font-semibold" @click="selectedFaqId = selectedFaqId === item.id ? null : item.id">{{ item.question || 'FAQ' }}</button><div v-if="selectedFaqId === item.id" class="mt-3 rounded-lg border border-border p-4">
+                    <article v-for="item in faqs" :key="item.id" class="border-t border-border py-3"><button type="button" class="text-left font-semibold" @click="selectedFaqId = selectedFaqId === item.id ? null : item.id">{{ item.question || 'FAQ' }}</button><Sheet :open="selectedFaqId === item.id" @update:open="(value) => { if (!value) selectedFaqId = null; }">
+<SheetContent side="right" class="w-full overflow-y-auto sm:max-w-xl">
+<SheetHeader><SheetTitle>Edit FAQ</SheetTitle><SheetDescription>Ubah pertanyaan, jawaban, dan status tampil.</SheetDescription></SheetHeader>
+<div class="rounded-lg border border-border p-4">
                         <label class="lf-admin-field "><span>Pertanyaan</span><Input v-model="item.question" class="w-full rounded border border-border p-2 text-sm" /></label>
                         <label class="lf-admin-field "><span>Jawaban</span><Textarea v-model="item.answer" rows="3" class="mt-2 w-full rounded border border-border p-2 text-sm"></Textarea></label>
                         <div class="mt-2 flex flex-wrap items-center gap-3"><label class="text-xs">Urutan <Input v-model.number="item.sort_order" type="number" min="0" class="ml-1 w-20 rounded border border-border p-1" /></label><label class="flex items-center gap-2 text-xs"><AdminSwitch v-model="item.is_active" /> Aktif</label><Button class="rounded bg-primary px-3 py-2 text-xs font-bold text-white" @click="saveFaq(item)">Simpan</Button><Button class="rounded bg-destructive/10 px-3 py-2 text-xs font-bold text-destructive" @click="deleteFaq(item)">Hapus</Button></div>
                     </div>
+                    </SheetContent>
+                    </Sheet>
                     </article>
                 </div>
             </section>
@@ -442,11 +486,16 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
             <section v-show="contentTab === 'legal'" class="rounded-xl border border-border bg-card p-5">
                 <h2 class="text-lg font-bold">Kebijakan toko</h2><p class="lf-admin-note">Gunakan ## di awal paragraf untuk judul bagian, dan - di awal paragraf untuk item daftar.</p>
                 <div class="mt-4 space-y-4">
-                    <article v-for="item in pages" :key="item.key" class="border-t border-border py-3"><button type="button" class="text-left font-semibold" @click="selectedPageKey = selectedPageKey === item.key ? null : item.key">{{ item.title || item.key }}</button><div v-if="selectedPageKey === item.key" class="mt-3 grid gap-4 lg:grid-cols-2"><div class="rounded-lg border border-border p-4">
+                    <article v-for="item in pages" :key="item.key" class="border-t border-border py-3"><button type="button" class="text-left font-semibold" @click="selectedPageKey = selectedPageKey === item.key ? null : item.key">{{ item.title || item.key }}</button><Sheet :open="selectedPageKey === item.key" @update:open="(value) => { if (!value) selectedPageKey = null; }">
+<SheetContent side="right" class="w-full overflow-y-auto sm:max-w-4xl">
+<SheetHeader><SheetTitle>Edit kebijakan</SheetTitle><SheetDescription>Perubahan langsung dipakai halaman kebijakan pelanggan.</SheetDescription></SheetHeader>
+<div class="grid gap-4 lg:grid-cols-2"><div class="rounded-lg border border-border p-4">
                         <strong class="text-xs uppercase text-muted-foreground">{{ item.key }}</strong>
                         <label class="lf-admin-field "><span>Judul</span><Input v-model="item.title" class="mt-2 w-full rounded border border-border p-2 text-sm" /></label>
                         <label class="lf-admin-field mt-2"><span>Pengantar</span><Textarea v-model="item.intro" rows="2" class="w-full rounded border border-border p-2 text-sm"></Textarea></label>
                         <label class="lf-admin-field "><span>Isi</span><Textarea v-model="item.body" rows="7" class="mt-2 w-full rounded border border-border p-2 text-sm"></Textarea></label><div class="mt-2 flex gap-3"><label class="flex items-center gap-2 text-xs"><AdminSwitch v-model="item.is_active" /> Aktif</label><Button class="rounded bg-primary px-3 py-2 text-xs font-bold text-white" @click="savePage(item)">Simpan</Button></div></div><aside class="rounded-lg border border-border bg-muted p-4"><h3 class="font-semibold">Pratinjau kebijakan</h3><h4 class="mt-3 text-lg font-bold">{{ item.title }}</h4><p class="mt-2 whitespace-pre-wrap text-sm">{{ item.intro }}</p><p class="mt-3 whitespace-pre-wrap text-sm">{{ item.body }}</p></aside></div>
+                    </SheetContent>
+                    </Sheet>
                     </article>
                 </div>
             </section>
