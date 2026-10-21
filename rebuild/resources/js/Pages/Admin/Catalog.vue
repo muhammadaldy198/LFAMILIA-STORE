@@ -395,7 +395,10 @@ const savePackage = (pack) => router.put('/admin/catalog/packages/' + pack.id, {
 });
 const saveMapping = (mapping) => router.put('/admin/catalog/mappings/' + mapping.id, {
     priority: mapping.priority, is_active: mapping.is_active,
-    ...(mapping.provider_code === 'MANUAL' ? { cost_idr: mapping.cost_idr } : {}),
+    ...(mapping.provider_code === 'MANUAL' ? {
+        cost_idr: mapping.cost_idr,
+        store_cost_idr: Number(mapping.cost_idr),
+    } : {}),
     ...(mapping.provider_code === 'DIGIFLAZZ' ? {
         ...(mapping.store_cost_idr !== null && mapping.store_cost_idr !== undefined
             ? { store_cost_idr: Number(mapping.store_cost_idr) } : {}),

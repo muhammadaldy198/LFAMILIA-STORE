@@ -896,7 +896,7 @@ class AdminCatalogController
             'cost_idr' => [$provider->code === 'MANUAL' ? 'required' : 'prohibited', 'integer', 'min:0'],
             'is_manual_price' => [$provider->code === 'DIGIFLAZZ' ? 'sometimes' : 'prohibited', 'boolean'],
             'manual_price_idr' => [$provider->code === 'DIGIFLAZZ' ? 'sometimes' : 'prohibited', 'integer', 'min:1', 'max:1000000000'],
-            'store_cost_idr' => [$provider->code === 'DIGIFLAZZ' ? 'sometimes' : 'prohibited', 'integer', 'min:1', 'max:1000000000'],
+            'store_cost_idr' => [$provider->code === 'MANUAL' || $provider->code === 'DIGIFLAZZ' ? 'sometimes' : 'prohibited', 'integer', 'min:1', 'max:1000000000'],
         ]);
         if ($provider->code === 'MANUAL' && array_key_exists('cost_idr', $data)) {
             if ($mapping->store_cost_idr === null || (int) $data['cost_idr'] !== (int) $mapping->cost_idr) {

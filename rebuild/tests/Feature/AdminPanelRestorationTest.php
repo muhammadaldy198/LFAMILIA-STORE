@@ -793,6 +793,17 @@ class AdminPanelRestorationTest extends TestCase
         ])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertSame(9500, (int) $copiedMapping->fresh()->store_cost_idr);
 
+        $this->put('/admin/catalog/mappings/'.$copiedMapping->id, [
+            'priority' => 0, 'is_active' => true, 'cost_idr' => 9000, 'store_cost_idr' => 9000,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame(9000, (int) $copiedMapping->fresh()->store_cost_idr);
+        $product->update(['is_active' => true]);
+        $provider->forceFill(['is_active' => true])->save();
+        $copy->update(['is_active' => true]);
+        $quote = app(CheckoutPricing::class)->forPackage($copy->id);
+        $this->assertSame(9000, $quote['cost_idr']);
+        $this->assertSame(10170, $quote['subtotal_idr']);
+
         $this->delete('/admin/catalog/packages/'.$copy->id)->assertRedirect()->assertSessionHasNoErrors();
         $this->assertNull(ProductPackage::find($copy->id));
 
