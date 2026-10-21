@@ -55,9 +55,11 @@ try {
         const dialog = await evaluate(`(()=>{const d=document.querySelector('[role=dialog]');if(!d)return null;const r=d.getBoundingClientRect();return {left:r.left,right:r.right,height:r.height,width:r.width,viewport:innerHeight,screen:innerWidth,locked:getComputedStyle(document.body).overflow,focus:d.contains(document.activeElement),scroll:d.scrollHeight>d.clientHeight};})()`);
         if(!dialog||dialog.height>dialog.viewport+2||dialog.width>dialog.screen+2||dialog.left< -2||dialog.right>dialog.screen+2||dialog.locked!=='hidden'||!dialog.focus)throw Error('Dialog regression '+label+': '+JSON.stringify(dialog));
         if(label.endsWith('-fulfillment-detail')){
-            const before=mutations.length, confirmations=dialogs.length;
+            // Konfirmasi kini dialog bertema di dalam halaman, bukan window.confirm:
+            // klik harus membuka dialog kedua dan belum mengirim POST apa pun.
+            const before=mutations.length, sheets=await evaluate(`document.querySelectorAll('[role=dialog]').length`);
             const completed=await evaluate(`(()=>{const b=[...document.querySelectorAll('[role=dialog] button')].find(b=>b.textContent.trim()==='Tandai berhasil');if(!b)return false;b.click();return true;})()`);
-            if(completed){await pause(100);if(dialogs.length!==confirmations+1||mutations.length!==before)throw Error('Cancelled fulfillment confirmation sent a mutation: '+JSON.stringify({confirmations,dialogs:dialogs.length,before,mutations:mutations.slice(before)}));console.log('PASS cancelled fulfillment action '+label);}
+            if(completed){await pause(400);const after=await evaluate(`document.querySelectorAll('[role=dialog]').length`);if(after!==sheets+1||mutations.length!==before)throw Error('Cancelled fulfillment confirmation sent a mutation: '+JSON.stringify({sheets,after,before,mutations:mutations.slice(before)}));console.log('PASS cancelled fulfillment action '+label);}
         }
         console.log('PASS dialog '+label); await escape();
     };
