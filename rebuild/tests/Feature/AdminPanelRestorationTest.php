@@ -1181,6 +1181,10 @@ class AdminPanelRestorationTest extends TestCase
             ->firstWhere('package_id', $package->id);
         $this->assertSame(11220, $proposal['sell_price_idr']);
 
+        DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'store-price-sku')->update(['price_idr' => 12500]);
+        $this->assertNull(collect(app(DigiflazzFixedPricePolicy::class)->proposals())->firstWhere('package_id', $package->id));
+        DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'store-price-sku')->update(['price_idr' => 10000]);
+
         $package->update(['pricing_mode' => 'SELL_PRICE', 'sell_price_idr' => 15000]);
         $this->assertSame(15000, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
 

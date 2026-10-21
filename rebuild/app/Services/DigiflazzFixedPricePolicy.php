@@ -36,8 +36,11 @@ class DigiflazzFixedPricePolicy
     {
         $suggestions = [];
         $catalog = app(DigiflazzCatalogService::class);
+        $pricingSettings = app(CatalogPricingSettings::class);
+        $globalMarkup = $pricingSettings->sellMarkupPercent();
         foreach ($this->mappingRows(false) as $row) {
-            if (! $catalog->sellable($row)) {
+            if (! $catalog->sellable($row)
+                || ($row->store_cost_idr !== null && (int) $row->live_price_idr > (int) $row->store_cost_idr)) {
                 continue;
             }
 
@@ -47,10 +50,9 @@ class DigiflazzFixedPricePolicy
                 $legacyPricing = $row->store_cost_idr === null
                     && $row->package_sell_markup_percent === null
                     && $row->product_sell_markup_percent === null;
-                $markup = $legacyPricing ? null : app(CatalogPricingSettings::class)->sellMarkupFor(
-                    $row->package_sell_markup_percent,
-                    $row->product_sell_markup_percent
-                );
+                $markup = $legacyPricing ? null : ($row->package_sell_markup_percent
+                    ?? $row->product_sell_markup_percent
+                    ?? $globalMarkup);
                 $suggestions[$id] = [
                     'package_id' => $id,
                     'product_name' => (string) $row->product_name,
