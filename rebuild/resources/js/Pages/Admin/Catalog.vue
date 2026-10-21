@@ -143,6 +143,7 @@ const submitProduct = () => {
                 productForm.reset();
                 manualRows.value = [emptyManualRow()];
                 productForm.sort_order = Math.max(-1, ...products.value.map((row) => Number(row.sort_order ?? 0))) + 1;
+                showCreateProduct.value = false;
             },
         });
 };
