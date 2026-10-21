@@ -16,7 +16,7 @@ test('wallet UI validation matches backend signed integer and reason limits', ()
     assert.equal(walletAdjustmentError(100, '   valid   '), '');
 });
 test('both admin wallet forms expose client/server validation errors', () => {
-    for (const name of ['Customers.vue', 'CustomerDetail.vue']) {
+    for (const name of ['CustomerDetail.vue']) {
         const source = read(name);
         assert.match(source, /walletAdjustmentError\(/);
         assert.match(source, /onError: \(errors\)/);
@@ -76,7 +76,9 @@ test('catalog prices preserve markup for manual store-cost mappings and shared t
 
     const customers = read('Customers.vue');
     assert.match(customers, /canManageMembershipRules: Boolean/);
-    assert.match(customers, /<Card v-if="canManageMembershipRules"/);
+    // Aturan tingkat member pindah ke tab sendiri di halaman Pelanggan.
+    assert.match(customers, /tab === 'membership'/);
+    assert.match(customers, /<Sheet :open="editingTier === tier"/);
 });
 
 
@@ -219,12 +221,13 @@ test('support and fulfillment lead with the work list instead of metric cards', 
     }
 });
 
-test('list-page wallet adjustment confirms before posting', () => {
-    const source = read('Customers.vue');
-    // Konfirmasi saldo sekarang lewat pop-up kata sandi (withSensitive), bukan window.confirm.
-    assert.match(source, /withSensitive\(`Konfirmasi \$\{direction\} saldo \$\{editor\.value\.name\}/);
+test('wallet adjustment lives on the detail page and confirms before posting', () => {
+    // Daftar pelanggan hanya untuk mencari dan membuka detail (rancangan 4.12).
+    assert.doesNotMatch(read('Customers.vue'), /adjustWallet|saveWallet/);
+    const source = read('CustomerDetail.vue');
+    assert.match(source, /withSensitive\(`Konfirmasi \$\{direction\} saldo pelanggan sebesar/);
     assert.match(source, /function saveWallet\(amount, reason\)/);
-    assert.doesNotMatch(source, /window\.confirm\(`Konfirmasi \$\{direction\} saldo/);
+    assert.doesNotMatch(source, /window\.confirm\(`Konfirmasi/);
 });
 
 test('product notices use dark theme tokens and render a preview', () => {
