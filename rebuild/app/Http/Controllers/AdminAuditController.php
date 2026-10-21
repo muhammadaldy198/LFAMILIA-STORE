@@ -83,8 +83,8 @@ class AdminAuditController
             ->when(in_array($filters['role'], ['SUPER_ADMIN', 'ADMIN'], true), fn ($query) => $query->where('actor_role', $filters['role']))
             ->when($filters['action'] !== '', fn ($query) => $query->where('action', $filters['action']))
             ->when($filters['target_type'] !== '', fn ($query) => $query->where('target_type', $filters['target_type']))
-            ->when($filters['date_from'] !== '', fn ($query) => $query->where('created_at', '>=', Carbon::createFromFormat('Y-m-d', $filters['date_from'])->startOfDay()))
-            ->when($filters['date_to'] !== '', fn ($query) => $query->where('created_at', '<=', Carbon::createFromFormat('Y-m-d', $filters['date_to'])->endOfDay()))
+            ->when($filters['date_from'] !== '', fn ($query) => $query->where('created_at', '>=', $this->wibDayStart($filters['date_from'])))
+            ->when($filters['date_to'] !== '', fn ($query) => $query->where('created_at', '<=', $this->wibDayEnd($filters['date_to'])))
             ->orderByDesc('id');
 
         $logs = $query
@@ -146,8 +146,8 @@ class AdminAuditController
 
         $summary = [
             'total' => DB::table('audit_logs')->count(),
-            'today' => DB::table('audit_logs')->where('created_at', '>=', now()->startOfDay())->count(),
-            'last_7_days' => DB::table('audit_logs')->where('created_at', '>=', now()->subDays(7))->count(),
+            'today' => DB::table('audit_logs')->where('created_at', '>=', $this->wibDayStart(Carbon::now('Asia/Jakarta')->toDateString()))->count(),
+            'last_7_days' => DB::table('audit_logs')->where('created_at', '>=', Carbon::now('Asia/Jakarta')->subDays(7)->utc())->count(),
             'actors' => DB::table('audit_logs')->whereNotNull('actor_id')->distinct()->count('actor_id'),
         ];
 
@@ -197,6 +197,18 @@ class AdminAuditController
             'actions' => $actions,
             'targetTypes' => $targetTypes,
         ]);
+    }
+
+    /** Awal hari WIB dalam UTC, sesuai kolom created_at yang disimpan UTC. */
+    private function wibDayStart(string $date): Carbon
+    {
+        return Carbon::createFromFormat('Y-m-d', $date, 'Asia/Jakarta')->startOfDay()->utc();
+    }
+
+    /** Akhir hari WIB dalam UTC. */
+    private function wibDayEnd(string $date): Carbon
+    {
+        return Carbon::createFromFormat('Y-m-d', $date, 'Asia/Jakarta')->endOfDay()->utc();
     }
 
     private function safeState(mixed $value, AdminAuditService $audit): mixed

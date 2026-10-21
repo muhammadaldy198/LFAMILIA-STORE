@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AdminUser;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -84,8 +85,8 @@ class AdminAuditRestorationTest extends TestCase
             'role' => 'SUPER_ADMIN',
             'action' => 'integration.updated',
             'target_type' => 'integration',
-            'date_from' => now()->format('Y-m-d'),
-            'date_to' => now()->format('Y-m-d'),
+            'date_from' => Carbon::now('Asia/Jakarta')->toDateString(),
+            'date_to' => Carbon::now('Asia/Jakarta')->toDateString(),
             'per_page' => 25,
         ]))
             ->assertOk()
@@ -172,6 +173,8 @@ class AdminAuditRestorationTest extends TestCase
         DB::table('audit_logs')->delete();
         $owner = $this->login();
 
+        $wib = fn () => Carbon::now('Asia/Jakarta');
+
         $this->insertAudit(
             $owner,
             'provider.updated',
@@ -179,7 +182,7 @@ class AdminAuditRestorationTest extends TestCase
             'old',
             null,
             ['name' => 'Old'],
-            now()->subDays(2)->format('Y-m-d H:i:s'),
+            $wib()->copy()->subDays(2)->utc()->format('Y-m-d H:i:s'),
         );
         $this->insertAudit(
             $owner,
@@ -188,16 +191,35 @@ class AdminAuditRestorationTest extends TestCase
             'today',
             null,
             ['name' => 'Today'],
-            now()->format('Y-m-d H:i:s'),
+            $wib()->copy()->utc()->format('Y-m-d H:i:s'),
         );
 
-        $this->get('/admin/audit?date_to='.now()->subDay()->format('Y-m-d'))
+        $this->get('/admin/audit?date_to='.$wib()->copy()->subDay()->toDateString())
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('logs.total', 1)
                 ->where('logs.data.0.target_id', 'old')
                 ->where('filters.date_from', '')
-                ->where('filters.date_to', now()->subDay()->format('Y-m-d')));
+                ->where('filters.date_to', $wib()->copy()->subDay()->toDateString()));
+    }
+
+    public function test_date_filters_follow_jakarta_days_not_utc(): void
+    {
+        DB::table('audit_logs')->delete();
+        $owner = $this->login();
+
+        // 00:30 WIB tanggal 21 = 17:30 UTC tanggal 20. Filter "21" harus ikut.
+        $this->insertAudit($owner, 'provider.updated', 'provider', 'early', null, null, '2026-10-20 17:30:00');
+        // 23:30 WIB tanggal 21 = 16:30 UTC tanggal 21. Masih tanggal 21 WIB.
+        $this->insertAudit($owner, 'provider.updated', 'provider', 'late', null, null, '2026-10-21 16:30:00');
+        // 00:30 WIB tanggal 22 = 17:30 UTC tanggal 21. Sudah tanggal 22 WIB.
+        $this->insertAudit($owner, 'provider.updated', 'provider', 'next', null, null, '2026-10-21 17:30:00');
+
+        $this->get('/admin/audit?date_from=2026-10-21&date_to=2026-10-21')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('logs.total', 2)
+                ->where('logs.data', fn ($rows): bool => collect($rows)->pluck('target_id')->sort()->values()->all() === ['early', 'late']));
     }
 
     public function test_system_actor_role_is_normalized_and_filterable(): void

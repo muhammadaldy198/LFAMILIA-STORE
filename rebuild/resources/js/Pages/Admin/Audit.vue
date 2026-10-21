@@ -42,17 +42,40 @@ const formatDate = (value) => {
     if (!value) return '—';
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return String(value);
-    return date.toLocaleString('id-ID');
+    return new Intl.DateTimeFormat('id-ID', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+        timeZone: 'Asia/Jakarta',
+    }).format(date) + ' WIB';
+};
+
+const humanKey = (key) =>
+    String(key)
+        .replace(/_/g, ' ')
+        .replace(/^./, (c) => c.toUpperCase());
+
+const formatValue = (value) => {
+    if (value === null || value === undefined || value === '') return '—';
+    if (typeof value === 'boolean') return value ? 'Ya' : 'Tidak';
+    if (typeof value === 'object') {
+        try {
+            return JSON.stringify(value);
+        } catch {
+            return '—';
+        }
+    }
+    return String(value);
 };
 
 const formatState = (value) => {
-    if (value === null || value === undefined) return 'Tidak ada data.';
+    if (value === null || value === undefined || value === '') return 'Tidak ada data.';
     if (typeof value === 'string') return value;
-    try {
-        return JSON.stringify(value, null, 2);
-    } catch {
-        return 'Data tidak dapat ditampilkan.';
-    }
+    if (typeof value !== 'object') return String(value);
+
+    const entries = Object.entries(value);
+    if (entries.length === 0) return 'Tidak ada data.';
+
+    return entries.map(([key, val]) => `${humanKey(key)}: ${formatValue(val)}`).join('\n');
 };
 
 const applyFilters = () => {
@@ -85,18 +108,18 @@ const toggleDetail = (id) => {
 </script>
 
 <template>
-    <Head title="Audit Log" />
+    <Head title="Catatan Audit" />
 
     <AdminShell>
         <div class="space-y-5">
             <header class="flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between">
                 <div class="min-w-0">
                     <div class="flex flex-wrap items-center gap-2">
-                        <h1 class="text-2xl font-semibold tracking-tight">Audit Log</h1>
+                        <h1 class="text-2xl font-semibold tracking-tight">Catatan Audit</h1>
                         <Badge variant="outline">Khusus Super Admin</Badge>
                     </div>
                     <p class="mt-1 max-w-3xl text-sm text-muted-foreground">
-                        Riwayat perubahan penting di panel Admin. Data bersifat baca-saja dan nilai rahasia disanitasi kembali sebelum dikirim ke halaman ini.
+                        Riwayat perubahan penting di panel Admin, urutan terbaru lebih dulu. Catatan tidak bisa diedit atau dihapus dari panel, dan nilai rahasia (kata sandi, token, kunci API) disensor saat dicatat lalu disanitasi lagi sebelum ditampilkan.
                     </p>
                 </div>
                 <Button class="w-full sm:w-auto" variant="outline" as-child>
@@ -104,37 +127,25 @@ const toggleDetail = (id) => {
                 </Button>
             </header>
 
-            <div class="mb-4 flex flex-wrap gap-x-6 gap-y-2 border-b pb-3 text-sm">
-                <div class="flex items-baseline gap-2">
-                    <p class="text-xs text-muted-foreground">Total log</p>
-                    <p class="mt-2 text-2xl font-semibold">{{ Number(summary.total || 0).toLocaleString('id-ID') }}</p>
-                </div>
-                <div class="flex items-baseline gap-2">
-                    <p class="text-xs text-muted-foreground">Hari ini</p>
-                    <p class="mt-2 text-2xl font-semibold">{{ Number(summary.today || 0).toLocaleString('id-ID') }}</p>
-                </div>
-                <div class="flex items-baseline gap-2">
-                    <p class="text-xs text-muted-foreground">7 hari terakhir</p>
-                    <p class="mt-2 text-2xl font-semibold">{{ Number(summary.last_7_days || 0).toLocaleString('id-ID') }}</p>
-                </div>
-                <div class="flex items-baseline gap-2">
-                    <p class="text-xs text-muted-foreground">Admin tercatat</p>
-                    <p class="mt-2 text-2xl font-semibold">{{ Number(summary.actors || 0).toLocaleString('id-ID') }}</p>
-                </div>
+            <div class="lf-admin-summary">
+                <Card class="p-4"><p class="text-xs text-muted-foreground">Total catatan</p><p class="mt-2 text-2xl font-semibold">{{ Number(summary.total || 0).toLocaleString('id-ID') }}</p></Card>
+                <Card class="p-4"><p class="text-xs text-muted-foreground">Hari ini</p><p class="mt-2 text-2xl font-semibold">{{ Number(summary.today || 0).toLocaleString('id-ID') }}</p></Card>
+                <Card class="p-4"><p class="text-xs text-muted-foreground">7 hari terakhir</p><p class="mt-2 text-2xl font-semibold">{{ Number(summary.last_7_days || 0).toLocaleString('id-ID') }}</p></Card>
+                <Card class="p-4"><p class="text-xs text-muted-foreground">Admin tercatat</p><p class="mt-2 text-2xl font-semibold">{{ Number(summary.actors || 0).toLocaleString('id-ID') }}</p></Card>
             </div>
 
             <Card class="p-4 md:p-5">
                 <div>
                     <h2 class="text-lg font-semibold">Filter Aktivitas</h2>
                     <p class="mt-1 text-sm text-muted-foreground">
-                        Cari berdasarkan aksi, target, correlation ID, IP, nama Admin, atau email Admin.
+                        Cari berdasarkan aksi, sasaran, ID korelasi, alamat IP, nama Admin, atau email Admin.
                     </p>
                 </div>
 
                 <form class="mt-4 grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-4" @submit.prevent="applyFilters">
                     <label class="space-y-1.5 text-sm xl:col-span-2">
                         <span>Pencarian</span>
-                        <Input v-model="form.q" maxlength="100" placeholder="Contoh: pembayaran, invoice, correlation ID..." />
+                        <Input v-model="form.q" maxlength="100" placeholder="Contoh: pembayaran, pesanan, ID korelasi..." />
                     </label>
 
                     <label class="space-y-1.5 text-sm">
@@ -166,9 +177,9 @@ const toggleDetail = (id) => {
                     </label>
 
                     <label class="space-y-1.5 text-sm">
-                        <span>Target</span>
+                        <span>Sasaran</span>
                         <select v-model="form.target_type" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
-                            <option value="">Semua target</option>
+                            <option value="">Semua sasaran</option>
                             <option v-for="item in targetTypes" :key="item.value" :value="item.value">{{ item.label }}</option>
                         </select>
                     </label>
@@ -184,11 +195,11 @@ const toggleDetail = (id) => {
                     </label>
 
                     <label class="space-y-1.5 text-sm">
-                        <span>Log per halaman</span>
+                        <span>Baris per halaman</span>
                         <select v-model="form.per_page" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
-                            <option value="25">25 log</option>
-                            <option value="50">50 log</option>
-                            <option value="100">100 log</option>
+                            <option value="25">25 baris</option>
+                            <option value="50">50 baris</option>
+                            <option value="100">100 baris</option>
                         </select>
                     </label>
 
@@ -217,7 +228,7 @@ const toggleDetail = (id) => {
                                 <TableHead class="w-[15%]">Waktu</TableHead>
                                 <TableHead class="w-[18%]">Admin</TableHead>
                                 <TableHead class="w-[24%]">Aktivitas</TableHead>
-                                <TableHead class="w-[18%]">Target</TableHead>
+                                <TableHead class="w-[18%]">Sasaran</TableHead>
                                 <TableHead class="w-[13%]">IP</TableHead>
                                 <TableHead class="w-[12%] text-right">Detail</TableHead>
                             </TableRow>
@@ -273,7 +284,7 @@ const toggleDetail = (id) => {
 
                                         <dl class="mt-4 grid gap-3 text-xs md:grid-cols-2 xl:grid-cols-3">
                                             <div class="min-w-0">
-                                                <dt class="text-muted-foreground">Correlation ID</dt>
+                                                <dt class="text-muted-foreground">ID korelasi</dt>
                                                 <dd class="mt-1 break-all font-mono">{{ row.correlation_id || '—' }}</dd>
                                             </div>
                                             <div class="min-w-0">
@@ -298,7 +309,7 @@ const toggleDetail = (id) => {
                     </AdminResponsiveTable>
                 </div>
 
-                <nav v-if="logs?.links?.length > 3" class="flex flex-wrap gap-2 border-t p-4" aria-label="Halaman Audit Log">
+                <nav v-if="logs?.links?.length > 3" class="flex flex-wrap gap-2 border-t p-4" aria-label="Halaman catatan audit">
                     <template v-for="link in logs.links" :key="link.label">
                         <Button v-if="link.url" :variant="link.active ? 'default' : 'outline'" size="sm" as-child>
                             <Link :href="link.url" preserve-state>{{ link.label }}</Link>
@@ -306,13 +317,6 @@ const toggleDetail = (id) => {
                         <Button v-else variant="outline" size="sm" disabled>{{ link.label }}</Button>
                     </template>
                 </nav>
-            </Card>
-
-            <Card class="p-4 md:p-5">
-                <h2 class="text-base font-semibold">Catatan Keamanan</h2>
-                <p class="mt-1 text-sm text-muted-foreground">
-                    Audit Log tidak dapat diedit atau dihapus dari panel. Password, token, API key, secret, signature, credential, dan field sensitif lain disensor saat pencatatan serta disanitasi kembali ketika halaman ini dibuka.
-                </p>
             </Card>
         </div>
     </AdminShell>
