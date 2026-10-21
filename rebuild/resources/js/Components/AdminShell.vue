@@ -14,7 +14,7 @@ const favicon = computed(() => page.props.storefront?.assets?.favicon?.url || ''
 const active = href => {
  const [path, query] = href.split('?');
  if (query) return page.url === href;
- if (path === '/admin/providers') return page.url === path;
+ if (path === '/admin/providers' || path === '/admin/catalog') return page.url.split('?')[0] === path;
  return page.url.split('?')[0] === path || page.url.startsWith(path + '/');
 };
 const icon = href => {

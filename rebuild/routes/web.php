@@ -285,6 +285,9 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
     Route::get('/admin/catalog', [AdminCatalogController::class, 'index'])
         ->middleware('admin.permission:catalog.manage')->name('admin.catalog.index');
 
+    Route::get('/admin/catalog/categories', [AdminCatalogController::class, 'categories'])
+        ->middleware('admin.permission:catalog.manage')->name('admin.categories.index');
+
     Route::middleware('admin.permission:catalog.manage')->prefix('admin/catalog')
         ->name('admin.catalog.')->group(function (): void {
             Route::post('/margin/preview', [AdminCatalogController::class, 'globalMarginPreview'])

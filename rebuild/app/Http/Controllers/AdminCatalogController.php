@@ -107,6 +107,18 @@ class AdminCatalogController
         ]);
     }
 
+    public function categories(): Response
+    {
+        return Inertia::render('Admin/Categories', [
+            'categories' => Category::with('media')->withCount('products')->orderBy('sort_order')->get()
+                ->map(fn (Category $category): array => [
+                    ...$category->only('id', 'name', 'slug', 'icon', 'sort_order', 'is_active'),
+                    'products_count' => (int) $category->products_count,
+                    'image_url' => $category->getFirstMediaUrl('image'),
+                ]),
+        ]);
+    }
+
     public function category(Request $request, CatalogAudit $audit): RedirectResponse
     {
         $data = $request->validate([

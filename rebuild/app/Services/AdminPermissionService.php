@@ -55,6 +55,7 @@ class AdminPermissionService
             ['label' => 'Dashboard', 'href' => '/admin/panel', 'permission' => 'dashboard.view'],
             ['label' => 'Pesanan', 'href' => '/admin/orders', 'permission' => 'orders.view'],
             ['label' => 'Produk', 'href' => '/admin/catalog', 'permission' => 'catalog.manage'],
+            ['label' => 'Kategori', 'href' => '/admin/catalog/categories', 'permission' => 'catalog.manage'],
             ['label' => 'Manual', 'href' => '/admin/fulfillment', 'permission' => 'fulfillment.manage'],
             ['label' => 'Banner & Konten', 'href' => '/admin/content', 'permission' => 'content.manage'],
             ['label' => 'Digiflazz', 'href' => '/admin/digiflazz', 'permission' => 'providers.manage'],

@@ -8,7 +8,11 @@ const providers = readFileSync(new URL('../../resources/js/Pages/Admin/Providers
 const support = readFileSync(new URL('../../resources/js/Pages/Admin/Support.vue', import.meta.url), 'utf8');
 const health = readFileSync(new URL('../../resources/js/Pages/Admin/Health.vue', import.meta.url), 'utf8');
 const audit = readFileSync(new URL('../../resources/js/Pages/Admin/Audit.vue', import.meta.url), 'utf8');
-for (const page of [providers, audit]) assert.doesNotMatch((page.split('<template>')[1] || page), /class="lf-admin-summary/);
+for (const page of [providers]) assert.doesNotMatch((page.split('<template>')[1] || page), /class="lf-admin-summary/);
+// Audit memakai strip ringkasan bersama seperti 13 halaman admin lain (rancangan §2).
+assert.match((audit.split('<template>')[1] || audit), /class="lf-admin-summary/);
+const categories = readFileSync(new URL('../../resources/js/Pages/Admin/Categories.vue', import.meta.url), 'utf8');
+assert.match(categories, /<Sheet :open="creating \|\| Boolean\(selected\)"/);
 assert.match((health.split('<template>')[1] || health), /Perlu perhatian/);
 const customers = readFileSync(new URL('../../resources/js/Pages/Admin/CustomerDetail.vue', import.meta.url), 'utf8');
 
