@@ -14,6 +14,7 @@ use App\Services\CatalogPricingSettings;
 use App\Services\CheckoutPricing;
 use App\Services\CustomerCleanupService;
 use App\Services\DigiflazzCatalogService;
+use App\Services\DigiflazzFixedPricePolicy;
 use App\Services\FulfillmentService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\Client\Factory;
@@ -1148,6 +1149,55 @@ class AdminPanelRestorationTest extends TestCase
             'package_ids' => [$package->id],
         ])->assertSessionHasErrors('package_ids');
         $this->assertSame(13500, (int) $package->fresh()->sell_price_idr);
+    }
+
+    public function test_fixed_price_recommendation_uses_store_cost_and_checkout_price_matches_admin_preview(): void
+    {
+        $this->login();
+        $this->fakeCatalog([$this->row(['buyer_sku_code' => 'store-price-sku', 'price' => 10000])]);
+        Provider::where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
+        $product = $this->product();
+        $product->category->update(['is_active' => true]);
+        $product->update(['sell_markup_percent' => 10]);
+        $package = $product->packages()->create([
+            'code' => 'DF_store_cost', 'name' => 'Paket Store Cost', 'pricing_mode' => 'PRODUCT_MARGIN',
+            'margin_percent' => 0, 'is_active' => true,
+        ]);
+        $package->mappings()->create([
+            'provider_id' => Provider::where('code', 'DIGIFLAZZ')->value('id'),
+            'external_sku' => 'store-price-sku', 'cost_idr' => 10000,
+            'seller_reference_price_idr' => 10000, 'store_cost_idr' => 10200,
+            'max_price_idr' => 10200, 'is_active' => true, 'priority' => 0,
+        ]);
+        app(DigiflazzCatalogService::class)->sync();
+        $package->mappings()->where('external_sku', 'store-price-sku')->update([
+            'store_cost_idr' => 10200, 'max_price_idr' => 10200,
+        ]);
+
+        $quote = app(CheckoutPricing::class)->forPackage($package->id);
+        $this->assertSame(11220, $quote['subtotal_idr']);
+
+        $proposal = collect(app(DigiflazzFixedPricePolicy::class)->proposals())
+            ->firstWhere('package_id', $package->id);
+        $this->assertSame(11220, $proposal['sell_price_idr']);
+
+        DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'store-price-sku')->update(['price_idr' => 12500]);
+        $this->assertNull(collect(app(DigiflazzFixedPricePolicy::class)->proposals())->firstWhere('package_id', $package->id));
+        DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'store-price-sku')->update(['price_idr' => 10000]);
+
+        $package->update(['pricing_mode' => 'SELL_PRICE', 'sell_price_idr' => 15000]);
+        $this->assertSame(15000, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
+
+        $this->get('/admin/catalog')->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
+            ->component('Admin/Catalog')
+            ->where('checkoutPreviews.'.$package->id, 15000)
+            ->has('products', 1)
+            ->where('products.0.packages.0.id', $package->id)
+            ->where('products.0.packages.0.mappings.0.store_cost_idr', 10200));
+
+        $package->mappings()->update(['is_active' => false]);
+        $this->assertArrayNotHasKey($package->id, app(CheckoutPricing::class)->forPackages([$package->id], true));
+        $this->assertArrayNotHasKey($package->id, app(CheckoutPricing::class)->forPackages([$package->id]));
     }
 
     public function test_fixed_sell_price_below_cost_is_rejected(): void

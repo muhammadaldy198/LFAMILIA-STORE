@@ -17,6 +17,7 @@ import { byOrder, bySourcePriority, displayPosition } from '../../lib/ordering.j
 const props = defineProps({
     categories: Array,
     products: Array,
+    checkoutPreviews: { type: Object, default: () => ({}) },
     digiflazzItems: { type: Array, default: () => [] },
     nicknameGameCodes: { type: Array, default: () => [] },
     defaultMargin: Number,
@@ -301,20 +302,9 @@ const dropPackage=(item,index)=>{
  router.put('/admin/catalog/products/'+item.id+'/packages/reorder',{ids:item.packages.map(p=>p.id)},{preserveScroll:true});
 };
 const mappingCost = (mapping) => Number(mapping?.store_cost_idr ?? mapping?.cost_idr ?? 0);
-const previewPrice=(pack,item)=>{
- const active=[...pack.mappings].filter(m=>m.is_active);
- const mapping=(active.length?active:[...pack.mappings]).sort((a,b)=>a.priority-b.priority||mappingCost(a)-mappingCost(b))[0];
- if(!mapping)return 'Belum ada modal';
- const cost=mappingCost(mapping);
- if(!cost)return 'Belum ada modal';
- // Checkout applies the configured markup to any mapping with store cost.
- if(mapping.store_cost_idr!==null&&mapping.store_cost_idr!==undefined){
-  const markup=effectiveMarkupPercent(pack,item);
-  const price=Math.ceil((cost*(1000000+Math.round(markup*10000)))/1000000);
-  return 'Rp'+price.toLocaleString('id-ID')+(price<cost?' · di bawah modal':'');
- }
- const price=pack.pricing_mode==='SELL_PRICE'?Number(pack.sell_price_idr):cost+(pack.pricing_mode==='FIXED'?Number(pack.margin_fixed_idr||0):Math.ceil(cost*Number(pack.pricing_mode==='PERCENT'?pack.margin_percent:item.margin_percent)/100));
- return 'Rp'+price.toLocaleString('id-ID')+(price<cost?' · di bawah modal':'');
+const previewPrice=(pack)=>{
+ const price=props.checkoutPreviews[pack.id];
+ return price===null||price===undefined?'Belum tersedia':`Rp${Number(price).toLocaleString('id-ID')}`;
 };
 watch(()=>props.defaultMargin,value=>{if(!productForm.isDirty)productForm.margin_percent=value;if(!globalMarginForm.isDirty)globalMarginForm.margin_percent=value;if(!importForm.isDirty)importForm.margin_percent=value;});
 const packageForm = useForm({ product_id: '', code: '', name: '', note: '', group_name: '', nominal_value: '', sort_order: 0, cost_idr: '' });
@@ -730,7 +720,7 @@ const deleteNotice = (notice) => {
                             <TableRow v-for="(pack,index) in visiblePackages(item)" :key="pack.id" draggable="true" @dragstart="draggedPackageId=pack.id" @dragover.prevent @drop.prevent="dropPackage(item,(nominalPage-1)*25+index)">
                                 <TableCell><div class="flex items-center gap-2"><img v-if="pack.image_url" :src="pack.image_url" alt="" class="size-8 shrink-0 object-contain"><strong>{{pack.name}}</strong></div><p class="text-xs text-slate-500">{{pack.group_name||'-'}}</p></TableCell>
                                 <TableCell><p v-for="mapping in pack.mappings" :key="mapping.id" class="text-xs">{{ providerLabel(mapping) }}<span v-if="mapping.provider_code==='VOUCHER_STOCK'"> · {{ mapping.stock_key || '-' }}</span><span v-else-if="mapping.external_sku"> · {{ mapping.external_sku }}</span> · Rp{{mappingCost(mapping).toLocaleString('id-ID')}}</p></TableCell>
-                                <TableCell class="text-right">{{previewPrice(pack,item)}}</TableCell><TableCell><template v-if="pack.mappings.some(mapping=>mapping.provider_code==='DIGIFLAZZ'&&mapping.store_cost_idr!==null&&mapping.store_cost_idr!==undefined)">Markup {{effectiveMarkupPercent(pack,item)}}%</template><template v-else>{{pack.pricing_mode==='SELL_PRICE'?'Harga tetap':pack.pricing_mode==='FIXED'?'Rp'+Number(pack.margin_fixed_idr||0).toLocaleString('id-ID'):(pack.pricing_mode==='PERCENT'?pack.margin_percent:item.margin_percent)+'%'}}</template></TableCell><TableCell class="text-right">Posisi {{ packagePosition(item, pack) }}</TableCell><TableCell>{{pack.is_active?'Aktif':'Nonaktif'}}</TableCell>
+                                <TableCell class="text-right">{{previewPrice(pack)}}</TableCell><TableCell><template v-if="pack.mappings.some(mapping=>mapping.provider_code==='DIGIFLAZZ'&&mapping.store_cost_idr!==null&&mapping.store_cost_idr!==undefined)">Markup {{effectiveMarkupPercent(pack,item)}}%</template><template v-else>{{pack.pricing_mode==='SELL_PRICE'?'Harga tetap':pack.pricing_mode==='FIXED'?'Rp'+Number(pack.margin_fixed_idr||0).toLocaleString('id-ID'):(pack.pricing_mode==='PERCENT'?pack.margin_percent:item.margin_percent)+'%'}}</template></TableCell><TableCell class="text-right">Posisi {{ packagePosition(item, pack) }}</TableCell><TableCell>{{pack.is_active?'Aktif':'Nonaktif'}}</TableCell>
                                 <TableCell><div class="flex flex-wrap gap-2"><Button type="button" variant="outline" @click="editPackage(pack.id)">Edit nominal</Button></div></TableCell>
                             </TableRow>
                         </TableBody></AdminResponsiveTable>
@@ -754,7 +744,7 @@ const deleteNotice = (notice) => {
                                 <label v-if="pack.pricing_mode==='PERCENT'" class="text-xs">Margin %<Input v-model.number="pack.margin_percent" type="number" min="0" max="1000" step="0.0001" class="mt-1"/></label>
                                 <label v-if="pack.pricing_mode==='FIXED'" class="text-xs">Margin Rp<Input v-model.number="pack.margin_fixed_idr" type="number" min="0" class="mt-1"/></label>
                                 <label v-if="pack.pricing_mode==='SELL_PRICE'" class="text-xs">Harga jual Rp<Input v-model.number="pack.sell_price_idr" type="number" min="1" class="mt-1"/></label>
-                                <p class="self-center text-sm">Pratinjau harga: <strong>{{previewPrice(pack,item)}}</strong></p>
+                                <p class="self-center text-sm">Harga checkout tersimpan: <strong>{{previewPrice(pack)}}</strong></p>
                             </div>
                             <div class="grid gap-3 md:grid-cols-3">
                                 <label class="text-xs">Markup jual nominal (%)<Input v-model.number="pack.sell_markup_percent" type="number" min="0" max="1000" step="0.0001" placeholder="Ikut game" class="mt-1" /><span class="mt-1 block text-[11px] text-slate-500">Yang berlaku sekarang: {{ effectiveMarkupPercent(pack,item) }}% dari modal toko.</span></label>

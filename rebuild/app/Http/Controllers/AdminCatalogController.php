@@ -16,6 +16,7 @@ use App\Services\AdminPricingPreviewService;
 use App\Services\CatalogAudit;
 use App\Services\CatalogNominalOrder;
 use App\Services\CatalogPricingSettings;
+use App\Services\CheckoutPricing;
 use App\Services\DigiflazzCatalogService;
 use App\Services\DigiflazzFixedPricePolicy;
 use App\Services\VoucherStockService;
@@ -35,8 +36,13 @@ class AdminCatalogController
     {
         $providers = Provider::all(['id', 'code', 'display_name', 'is_active'])->keyBy('id');
         $stockCounts = app(VoucherStockService::class)->counts();
+        $checkoutPreviews = collect(app(CheckoutPricing::class)
+            ->forPackages(ProductPackage::query()->pluck('id')->map(fn ($id): int => (int) $id)->all(), true))
+            ->map(fn (array $quote): int => (int) $quote['subtotal_idr'])
+            ->all();
 
         return Inertia::render('Admin/Catalog', [
+            'checkoutPreviews' => $checkoutPreviews,
             'categories' => Category::with('media')->orderBy('sort_order')->get()->map(fn (Category $category): array => [
                 ...$category->only('id', 'name', 'slug', 'icon', 'sort_order', 'is_active'),
                 'image_url' => $category->getFirstMediaUrl('image'),

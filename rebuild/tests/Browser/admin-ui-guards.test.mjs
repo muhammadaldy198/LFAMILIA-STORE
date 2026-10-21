@@ -64,11 +64,9 @@ test('catalog prices preserve markup for manual store-cost mappings and shared t
 
     assert.match(table, /scroll: \{ type: Boolean, default: false \}/);
     assert.match(source, /<AdminResponsiveTable scroll class="min-w-\[1100px\]"/);
-    assert.match(source, /if\(mapping\.store_cost_idr!==null&&mapping\.store_cost_idr!==undefined\)/);
-    assert.match(source, /mapping\.provider_code === 'DIGIFLAZZ' \? \{/);
-    assert.match(source, /\{ store_cost_idr: Number\(mapping\.store_cost_idr\) \}/);
-    assert.match(source, /1000000\+Math\.round\(markup\*10000\)/);
-    assert.match(source, /Math\.round\(Number\(markup\) \* 10000\)/);
+    assert.match(source, /store_cost_idr: mapping\.store_cost_idr \?\? mapping\.cost_idr/);
+    assert.match(source, /const price=props\.checkoutPreviews\[pack\.id\]/);
+    assert.match(source, /Harga checkout tersimpan/);
     assert.doesNotMatch(source, /customer_no_template: item\.customer_no_template/);
     assert.match(source, /const importRowPreview = \(sku, item\) => markupExample\(\s*sku\.price_idr,\s*effectiveUpliftPercent\(null, item\),\s*item\.sell_markup_percent !== null && item\.sell_markup_percent !== undefined\s*\? effectiveMarkupPercent\(null, item\)\s*: Number\(importForm\.margin_percent\),?\s*\)/);
     assert.match(source, /:disabled="item\.sell_markup_percent !== null && item\.sell_markup_percent !== undefined"/);
