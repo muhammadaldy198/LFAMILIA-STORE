@@ -1,5 +1,6 @@
 <script setup>
 import AdminSwitch from '../../Components/AdminSwitch.vue';
+import AdminConfirmDialog from '../../Components/AdminConfirmDialog.vue';
 import AdminResponsiveTable from '../../Components/AdminResponsiveTable.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { reactive, ref, watch } from 'vue';
@@ -91,6 +92,8 @@ const channelLogoFile = ref(null);
 const channelLogoPreview = ref('');
 const selectedTransaction = ref(null);
 const saving = ref('');
+const notice = ref('');
+const pendingChannel = ref(null);
 
 const freeMethod = (method, code) => method === 'WALLET' || ['saldo', 'manual_qris'].includes(code);
 const routeIsFree = (row) => freeMethod(row.channel_method, row.channel_code);
@@ -221,7 +224,7 @@ function chooseChannelLogo(event) {
     const file = event.target.files?.[0];
     if (!file) return;
     if (file.size > 2 * 1024 * 1024) {
-        window.alert('Ukuran logo maksimal 2 MB.');
+        notice.value = 'Ukuran logo paling besar 2 MB.';
         event.target.value = '';
         return;
     }
@@ -280,8 +283,14 @@ function saveChannel() {
 }
 
 function deleteChannel(channel) {
-    if (!window.confirm('Hapus metode pembayaran "' + channel.name + '"?')) return;
-    router.delete('/admin/payments/channels/' + channel.id, { preserveScroll: true });
+    pendingChannel.value = channel;
+}
+function runDeleteChannel() {
+    if (!pendingChannel.value) return;
+    router.delete('/admin/payments/channels/' + pendingChannel.value.id, {
+        preserveScroll: true,
+        onFinish: () => { pendingChannel.value = null; },
+    });
 }
 
 function syncChannels() {
@@ -351,8 +360,9 @@ async function copy(value) {
     if (!value) return;
     try {
         await navigator.clipboard.writeText(value);
+        notice.value = 'Alamat notifikasi disalin.';
     } catch {
-        window.prompt('Salin URL ini:', value);
+        notice.value = 'Alamat belum dapat disalin. Pilih dan salin alamatnya secara langsung.';
     }
 }
 </script>
@@ -371,6 +381,9 @@ async function copy(value) {
             <Button variant="outline" @click="router.reload({ preserveScroll: true })">Muat ulang</Button>
         </header>
 
+        <p v-if="notice" role="status" class="rounded-md border border-border px-3 py-2 text-sm">{{ notice }}</p>
+        <p v-for="(error,key) in $page.props.errors" :key="key" role="alert" class="text-sm text-destructive">{{ error }}</p>
+
         <nav class="lf-admin-tabs" aria-label="Bagian pembayaran">
             <Button v-for="[key, label] in areas" :key="key" type="button" :variant="area === key ? 'secondary' : 'ghost'" @click="selectArea(key)">{{ label }}</Button>
         </nav>
@@ -383,15 +396,15 @@ async function copy(value) {
             <Card class="p-4"><p class="text-xs text-muted-foreground">Berhasil</p><p class="mt-2 text-2xl font-semibold">{{ successRate() }}%</p><p class="mt-1 text-xs text-muted-foreground">rasio transaksi dibayar</p></Card>
             <Card class="p-4"><p class="text-xs text-muted-foreground">Gagal / kedaluwarsa</p><p class="mt-2 text-2xl font-semibold">{{ Number(summary.failed || 0).toLocaleString('id-ID') }}</p><p class="mt-1 text-xs text-muted-foreground">{{ Number(summary.refunded || 0).toLocaleString('id-ID') }} dikembalikan</p></Card>
         </div>
-<section id="payment-methods" aria-labelledby="payment-methods-heading" class="space-y-3"><h2 id="payment-methods-heading" class="text-lg font-semibold">Metode Pembayaran</h2>                <Card class="min-w-0 p-4">
-                    <div class="flex flex-wrap items-start justify-between gap-3">
-                        <div><h2 class="text-lg font-semibold">Metode Pembayaran</h2><p class="mt-1 text-sm text-muted-foreground">Urutan tabel = urutan pilihan pelanggan. Klik Edit untuk mengubah nama, biaya yang ditagih, dan gateway.</p></div>
-                        <div v-if="isSuperAdmin" class="flex flex-wrap gap-2"><Button size="sm" variant="outline" @click="syncChannels">Pulihkan metode bawaan</Button><Button size="sm" @click="openCreateChannel">Tambah metode</Button></div>
-                    </div>
+<section id="payment-methods" aria-labelledby="payment-methods-heading" class="space-y-3">
+                <div class="flex flex-wrap items-end justify-between gap-3 border-b border-border pb-3">
+                    <div><h2 id="payment-methods-heading" class="text-lg font-semibold">Metode Pembayaran</h2><p class="mt-1 text-sm text-muted-foreground">Urutan tabel = urutan pilihan pelanggan. Buka "Ubah" untuk mengganti nama, biaya yang ditagih, dan gateway.</p></div>
+                    <div v-if="isSuperAdmin" class="flex flex-wrap gap-2"><Button size="sm" variant="outline" @click="syncChannels">Pulihkan metode bawaan</Button><Button size="sm" @click="openCreateChannel">Tambah metode</Button></div>
+                </div>
 
-                    <div class="mt-4 overflow-x-auto">
+                    <div class="overflow-x-auto rounded-md border border-border">
                         <AdminResponsiveTable :mobile-columns="[0,3,4,5]">
-                            <TableHeader><TableRow><TableHead>Metode</TableHead><TableHead>Jenis</TableHead><TableHead>Biaya ditagih</TableHead><TableHead>Kesiapan</TableHead><TableHead>Status</TableHead><TableHead class="text-right">Aksi</TableHead></TableRow></TableHeader>
+                            <TableHeader><TableRow><TableHead>Metode</TableHead><TableHead>Jenis</TableHead><TableHead>Biaya ditagih</TableHead><TableHead>Kesiapan</TableHead><TableHead>Status</TableHead><TableHead class="text-right">Tindakan</TableHead></TableRow></TableHeader>
                             <TableBody>
                                 <TableRow v-for="channel in channels" :key="channel.id">
                                     <TableCell><div class="flex min-w-[190px] items-center gap-3"><div class="grid size-10 shrink-0 place-items-center overflow-hidden rounded-md border bg-muted"><img v-if="channel.logo_url" :src="channel.logo_url" :alt="channel.name" class="size-full object-contain"><span v-else class="text-xs font-semibold">{{ channel.name.slice(0, 2).toUpperCase() }}</span></div><div><strong class="text-sm">{{ channel.name }}</strong><p class="text-[11px] text-muted-foreground">Posisi {{ methodPosition(channel) }} di pilihan pembayaran</p><p class="mt-0.5 max-w-[260px] text-xs text-muted-foreground">{{ channel.description || channel.code }}</p></div></div></TableCell>
@@ -399,13 +412,13 @@ async function copy(value) {
                                     <TableCell><p class="max-w-[220px] text-sm font-semibold text-foreground">{{ chargedFeeText(channel) }}</p><p class="mt-1 max-w-[220px] text-[11px] text-muted-foreground">Dasar: {{ (Number(channel.fee_percent_bps || 0) / 100).toLocaleString('id-ID', { maximumFractionDigits: 2 }) }}% + {{ money(channel.fee_flat_idr) }}</p></TableCell>
                                     <TableCell><div class="flex flex-wrap gap-1"><Badge :variant="channel.available_order ? 'secondary' : 'outline'">Pesanan {{ channel.available_order ? 'siap' : 'belum siap' }}</Badge><Badge v-if="channel.supports_wallet_topup" :variant="channel.available_topup ? 'secondary' : 'outline'">Top up {{ channel.available_topup ? 'siap' : 'belum siap' }}</Badge></div></TableCell>
                                     <TableCell><Badge :variant="channel.is_active ? 'secondary' : 'outline'">{{ channel.is_active ? 'Aktif' : 'Nonaktif' }}</Badge></TableCell>
-                                    <TableCell class="text-right"><div v-if="isSuperAdmin" class="flex justify-end gap-2"><Button size="sm" variant="outline" @click="openEditChannel(channel)">Edit</Button><Button size="sm" variant="destructive" @click="deleteChannel(channel)">Hapus</Button></div><span v-else class="text-xs text-muted-foreground">Lihat saja</span></TableCell>
+                                    <TableCell class="text-right"><div v-if="isSuperAdmin" class="flex justify-end gap-2"><Button size="sm" variant="outline" @click="openEditChannel(channel)">Ubah</Button><Button size="sm" variant="destructive" @click="deleteChannel(channel)">Hapus</Button></div><span v-else class="text-xs text-muted-foreground">Lihat saja</span></TableCell>
                                 </TableRow>
                                 <TableRow v-if="!channels.length"><TableCell colspan="6" class="py-10 text-center text-muted-foreground">Belum ada metode pembayaran.</TableCell></TableRow>
                             </TableBody>
                         </AdminResponsiveTable>
                     </div>
-                </Card>            <Sheet :open="Boolean(channelEditor)" @update:open="(value) => { if (!value) closeChannelEditor(); }">
+            <Sheet :open="Boolean(channelEditor)" @update:open="(value) => { if (!value) closeChannelEditor(); }">
                 <SheetContent side="right" class="w-full overflow-y-auto sm:max-w-xl">
                     <SheetHeader><SheetTitle>{{ channelEditor?.id ? 'Edit Metode Pembayaran' : 'Tambah Metode Pembayaran' }}</SheetTitle><SheetDescription>Atur nama, biaya, dan gateway untuk metode ini. Perubahan berlaku untuk pesanan baru.</SheetDescription></SheetHeader>
                     <div v-if="channelEditor" class="mt-4 space-y-4">
@@ -456,28 +469,33 @@ async function copy(value) {
                         <div class="flex justify-end gap-2 border-t pt-3"><Button variant="outline" @click="closeChannelEditor">Batal</Button><Button :disabled="saving === 'channel'" @click="saveChannel">{{ saving === 'channel' ? 'Menyimpan…' : 'Simpan metode' }}</Button></div>
                     </div>
                 </SheetContent>
-            </Sheet><div class="max-w-xl"><Card class="p-4">
-                        <h2 class="font-semibold">QRIS Manual</h2><p class="mt-1 text-xs text-muted-foreground">QRIS manual membutuhkan gambar aktif dan konfirmasi Admin sebelum pesanan diproses.</p>
+            </Sheet>
+            <div class="max-w-xl border-t border-border pt-4">
+                        <h3 class="font-semibold">QRIS manual</h3><p class="mt-1 text-xs text-muted-foreground">QRIS manual berbeda dari QRIS gateway: pembayaran harus dikonfirmasi admin sebelum pesanan diproses, dan gambar QRIS wajib aktif.</p>
                         <div class="mt-3 overflow-hidden rounded-md border bg-white p-2"><img v-if="manualQrisAsset?.image_url" :src="manualQrisAsset.image_url" alt="QRIS manual" class="mx-auto max-h-48 object-contain"><div v-else class="grid h-32 place-items-center text-sm text-slate-500">Gambar belum diunggah</div></div>
                         <label class="mt-3 block text-sm"><span class="mb-1 block font-medium">Ganti gambar</span><input type="file" accept="image/png,image/jpeg,image/webp" class="block w-full text-xs" @change="uploadManualQris"></label>
-                        <Button class="mt-3 w-full" size="sm" :variant="manualQrisAsset?.is_active ? 'outline' : 'default'" @click="toggleManualQris">{{ manualQrisAsset?.is_active ? 'Nonaktifkan QRIS manual' : 'Aktifkan QRIS manual' }}</Button>
-                    </Card></div></section>
-<section id="payment-callbacks" aria-labelledby="payment-callbacks-heading" class="space-y-3"><h2 id="payment-callbacks-heading" class="text-lg font-semibold">URL Notifikasi Gateway</h2><Card class="p-4">
-                        <h2 class="font-semibold">URL Notifikasi Gateway</h2><p class="mt-1 text-xs text-muted-foreground">URL untuk dashboard gateway. Kredensial tetap di Integrasi.</p>
+                        <Button class="mt-3 w-full sm:w-auto" size="sm" :variant="manualQrisAsset?.is_active ? 'outline' : 'default'" @click="toggleManualQris">{{ manualQrisAsset?.is_active ? 'Nonaktifkan QRIS manual' : 'Aktifkan QRIS manual' }}</Button>
+                    </div>
+        </section>
+<section id="payment-callbacks" aria-labelledby="payment-callbacks-heading" class="space-y-3 border-t border-border pt-4">
+                        <h2 id="payment-callbacks-heading" class="text-lg font-semibold">URL Notifikasi Gateway</h2><p class="text-xs text-muted-foreground">Alamat yang dipasang di dashboard gateway agar status pembayaran masuk otomatis. Kredensial gateway diatur di menu Integrasi.</p>
                         <div class="mt-3 space-y-2">
                             <button type="button" class="w-full rounded-md border p-3 text-left" @click="copy(callbackUrls.midtrans)"><span class="block text-xs font-medium">Midtrans</span><span class="mt-1 block break-all text-[11px] text-muted-foreground">{{ callbackUrls.midtrans }}</span></button>
                             <button type="button" class="w-full rounded-md border p-3 text-left" @click="copy(callbackUrls.doku)"><span class="block text-xs font-medium">DOKU</span><span class="mt-1 block break-all text-[11px] text-muted-foreground">{{ callbackUrls.doku }}</span></button>
                         </div>
-                    </Card></section>
-<section id="payment-wallet" aria-labelledby="payment-wallet-heading" class="space-y-3"><h2 id="payment-wallet-heading" class="text-lg font-semibold">Pengaturan Top Up</h2><div class="max-w-xl"><Card class="p-4">
-                        <div class="flex items-start justify-between gap-3"><div><h2 class="font-semibold">Top Up Saldo</h2><p class="mt-1 text-xs text-muted-foreground">Customer hanya melihat metode yang routing top up-nya aktif.</p></div><label class="flex items-center gap-2 text-sm"><AdminSwitch v-model="walletSettings.topup_enabled" :disabled="!isSuperAdmin" />Aktif</label></div>
+        </section>
+<section id="payment-wallet" aria-labelledby="payment-wallet-heading" class="space-y-3 border-t border-border pt-4">
+                        <h2 id="payment-wallet-heading" class="text-lg font-semibold">Pengaturan Top Up</h2>
+                        <div class="max-w-xl">
+                        <div class="flex items-start justify-between gap-3"><div><p class="text-sm text-muted-foreground">Pelanggan hanya melihat metode yang dipakai untuk top up saldo dan sudah aktif.</p></div><label class="flex items-center gap-2 text-sm"><AdminSwitch v-model="walletSettings.topup_enabled" :disabled="!isSuperAdmin" />Aktif</label></div>
                         <label class="mt-4 block space-y-1"><span class="text-sm font-medium">Minimum top up</span><Input v-model.number="walletSettings.minimum_topup_idr" type="number" min="1" max="100000000" :disabled="!isSuperAdmin" /></label>
-                        <Button v-if="isSuperAdmin" class="mt-3 w-full" size="sm" @click="saveWalletSettings">Simpan top up saldo</Button><p v-else class="mt-3 text-xs text-muted-foreground">Pengaturan top up hanya dapat diubah Super Admin.</p>
-                    </Card></div></section>
-<section id="payment-page" aria-labelledby="payment-page-heading" class="space-y-3"><h2 id="payment-page-heading" class="text-lg font-semibold">Tampilan Checkout</h2>
+                        <Button v-if="isSuperAdmin" class="mt-3 w-full sm:w-auto" size="sm" @click="saveWalletSettings">Simpan top up saldo</Button><p v-else class="mt-3 text-xs text-muted-foreground">Pengaturan top up hanya dapat diubah Super Admin.</p>
+                    </div></section>
+<section id="payment-page" aria-labelledby="payment-page-heading" class="space-y-3 border-t border-border pt-4">
+            <h2 id="payment-page-heading" class="text-lg font-semibold">Tampilan Checkout</h2>
+            <p class="text-sm text-muted-foreground">Tulisan, warna, banner, dan bagian yang tampil di halaman pembayaran pelanggan. Pratinjau di sebelah kanan mengikuti perubahan sebelum disimpan.</p>
             <div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
-                <Card class="p-4">
-                    <h2 class="text-lg font-semibold">Editor Halaman Pembayaran</h2><p class="mt-1 text-sm text-muted-foreground">Teks, warna, banner, instruksi, dan elemen customer dapat diedit tanpa mengubah kode.</p>
+                <div>
                     <div class="mt-4 grid gap-3 md:grid-cols-2">
                         <label class="space-y-1"><span class="text-sm font-medium">Teks kecil di atas judul</span><Input v-model="paymentPage.eyebrow" maxlength="60" /></label>
                         <label class="space-y-1"><span class="text-sm font-medium">Warna utama</span><div class="flex gap-2"><input v-model="paymentPage.accentColor" type="color" class="h-10 w-12 rounded-md border p-1"><Input v-model="paymentPage.accentColor" maxlength="7" /></div></label>
@@ -507,7 +525,7 @@ async function copy(value) {
                         <label class="text-sm"><span class="mb-1 block font-medium">Banner pembayaran</span><input type="file" accept="image/png,image/jpeg,image/webp" class="block text-xs" @change="uploadPaymentHeader"></label>
                         <Button @click="savePaymentPage">Simpan tampilan</Button>
                     </div>
-                </Card>
+                </div>
 
                 <Card class="overflow-hidden">
                     <div v-if="paymentPage.headerImageUrl" class="h-28 overflow-hidden bg-muted"><img :src="paymentPage.headerImageUrl" alt="Preview banner pembayaran" class="size-full object-cover"></div>
@@ -584,6 +602,8 @@ async function copy(value) {
                 </div>
             </Card>
         </template>
+
+        <AdminConfirmDialog :open="Boolean(pendingChannel)" title="Hapus metode pembayaran" :message="'Metode ' + (pendingChannel?.name || '') + ' akan dihapus. Pesanan lama tetap menyimpan riwayat pembayarannya.'" confirm-label="Hapus metode" destructive @update:open="value => { if (!value) pendingChannel = null; }" @confirm="runDeleteChannel" />
 
         <Card v-if="selectedTransaction" class="fixed inset-x-3 bottom-3 z-50 mx-auto max-w-xl border shadow-lg sm:inset-x-auto sm:right-5 sm:w-[520px]">
             <div class="p-4">
