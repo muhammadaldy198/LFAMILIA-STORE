@@ -55,8 +55,8 @@ class FulfillmentService
                 ]);
                 $this->notifications->record(
                     'fulfillment.manual.pending',
-                    'Fulfillment manual menunggu',
-                    'Order '.$order->order_number.' menunggu proses manual.',
+                    'Pesanan menunggu diproses manual',
+                    'Pesanan '.$order->order_number.' menunggu diproses manual oleh admin.',
                     'WARNING',
                     'fulfillment_attempt',
                     $attempt->id,

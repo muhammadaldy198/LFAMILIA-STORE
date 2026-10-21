@@ -360,8 +360,8 @@ class CheckoutService
         $snapshot = json_decode((string) $result['order']->snapshot, true) ?: [];
         $this->notifications->record(
             'order.created',
-            'Order baru',
-            'Order '.$result['order']->order_number.' dibuat dengan total Rp'.number_format((int) $result['order']->total_idr, 0, ',', '.').'.',
+            'Pesanan baru',
+            'Pesanan '.$result['order']->order_number.' dibuat dengan total Rp'.number_format((int) $result['order']->total_idr, 0, ',', '.').'.',
             'INFO',
             'order',
             $result['order']->id,

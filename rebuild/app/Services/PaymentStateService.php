@@ -474,7 +474,7 @@ class PaymentStateService
         $this->notifications->record(
             'payment.paid',
             'Pembayaran berhasil',
-            'Pembayaran order '.$order->order_number.' telah terverifikasi.',
+            'Pembayaran pesanan '.$order->order_number.' sudah terverifikasi.',
             'INFO',
             'order',
             $order->id

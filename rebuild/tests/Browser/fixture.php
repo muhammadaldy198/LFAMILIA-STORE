@@ -44,7 +44,7 @@ DB::transaction(function (): void {
 
     User::updateOrCreate(['email' => 'browser-account@example.test'], [
         'name' => 'Browser Account',
-        'phone' => '081234567890',
+        'phone' => '081200000001',
         'password' => Hash::make('Browser-test-password-123'),
         'membership_tier_code' => 'BASIC',
     ]);
@@ -103,13 +103,15 @@ DB::transaction(function (): void {
         ]
     );
 
+    // Kunci unik tabel adalah (provider_id, external_sku); paket bisa dibuat ulang
+    // dengan id berbeda di run sebelumnya, jadi cocokkan lewat SKU.
     DB::table('provider_mappings')->updateOrInsert(
         [
-            'product_package_id' => $package->id,
             'provider_id' => $providerId,
+            'external_sku' => 'BROWSER-SKU-100',
         ],
         [
-            'external_sku' => 'BROWSER-SKU-100',
+            'product_package_id' => $package->id,
             'cost_idr' => 10000,
             'max_price_idr' => 12000,
             'priority' => 1,
@@ -184,8 +186,8 @@ DB::transaction(function (): void {
             'nominal_value' => 999999, 'sort_order' => 1, 'is_active' => false]
     );
     DB::table('provider_mappings')->updateOrInsert(
-        ['product_package_id' => $largePackage->id, 'provider_id' => $providerId],
-        ['external_sku' => 'BROWSER-SKU-LARGE', 'cost_idr' => 2599000000, 'max_price_idr' => 2599000000,
+        ['provider_id' => $providerId, 'external_sku' => 'BROWSER-SKU-LARGE'],
+        ['product_package_id' => $largePackage->id, 'cost_idr' => 2599000000, 'max_price_idr' => 2599000000,
             'priority' => 1, 'is_active' => false, 'created_at' => now(), 'updated_at' => now()]
     );
 
@@ -200,11 +202,11 @@ DB::transaction(function (): void {
     $customer = User::where('email', 'browser-account@example.test')->firstOrFail();
     $orderId = app(AdminManualOrderService::class)->create([
         'customer_name' => 'Pelanggan fixture dengan nama panjang untuk pemeriksaan tampilan',
-        'phone' => '081234567890', 'email' => 'browser-account@example.test',
+        'phone' => '081200000001', 'email' => 'browser-account@example.test',
         'product_name' => 'Produk manual fixture dengan nama yang panjang dan mudah terbaca',
         'package_name' => 'Paket browser regression', 'destination' => 'BROWSER-DESTINATION-123456789',
         'total_idr' => 99999999, 'note' => 'Data sintetis lokal, bukan transaksi nyata.',
-        'payment_received' => true, 'idempotency_key' => 'browser-ui-fixture-v1',
+        'payment_received' => true, 'idempotency_key' => 'browser-ui-fixture-'.bin2hex(random_bytes(6)),
     ], (int) $admin->id);
     DB::table('orders')->where('id', $orderId)->update(['user_id' => $customer->id]);
 
@@ -212,7 +214,7 @@ DB::transaction(function (): void {
     // cancelling its confirmation never posts a mutation.
     $fulfillmentOrderId = app(AdminManualOrderService::class)->create([
         'customer_name' => 'Pelanggan fixture fulfillment',
-        'phone' => '081234567890',
+        'phone' => '081200000001',
         'email' => 'browser-account@example.test',
         'product_name' => 'Produk manual fixture',
         'package_name' => 'Paket manual fixture',
@@ -220,7 +222,7 @@ DB::transaction(function (): void {
         'total_idr' => 25000,
         'note' => 'Data sintetis lokal untuk smoke test.',
         'payment_received' => true,
-        'idempotency_key' => 'browser-fulfillment-fixture-v1',
+        'idempotency_key' => 'browser-fulfillment-fixture-'.bin2hex(random_bytes(6)),
     ], (int) $admin->id);
     DB::table('orders')->where('id', $fulfillmentOrderId)->update(['user_id' => $customer->id]);
 
@@ -289,8 +291,8 @@ DB::transaction(function (): void {
             'name' => $name, 'sort_order' => $index, 'pricing_mode' => 'FIXED',
             'sell_price_idr' => $price, 'is_active' => true,
         ]);
-        DB::table('provider_mappings')->updateOrInsert(['product_package_id' => $package->id, 'external_sku' => 'VISUAL-SKU-'.$index], [
-            'provider_id' => DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id'),
+        DB::table('provider_mappings')->updateOrInsert(['provider_id' => DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id'), 'external_sku' => 'VISUAL-SKU-'.$index], [
+            'product_package_id' => $package->id,
             'cost_idr' => $price, 'max_price_idr' => $price, 'priority' => 1, 'is_active' => true,
             'created_at' => now(), 'updated_at' => now(),
         ]);

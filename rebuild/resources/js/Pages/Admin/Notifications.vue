@@ -59,6 +59,13 @@ const openNotification = item => {
     // Tunggu POST selesai; kunjungan Inertia kedua akan membatalkan yang pertama.
     void markRead(item).finally(() => router.visit(href));
 };
+const severityLabel = value => ({
+    INFO: 'Informasi',
+    WARNING: 'Peringatan',
+    ERROR: 'Galat',
+    CRITICAL: 'Penting',
+}[String(value || '').toUpperCase()] || 'Pemberitahuan');
+const unreadCount = computed(() => notifications.value.data.filter(item => !item.read_at).length);
 const notificationKeydown = (event, item) => {
     if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault();
@@ -68,18 +75,18 @@ const notificationKeydown = (event, item) => {
 </script>
 
 <template>
-    <Head title="Notifikasi Admin" />
+    <Head title="Notifikasi" />
     <AdminShell>
         <div class="space-y-5">
             <header class="flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between">
                 <div class="min-w-0">
                     <h1 class="text-2xl font-semibold tracking-tight">Notifikasi</h1>
-                    <p class="mt-1 max-w-2xl text-sm text-muted-foreground">Pembaruan pesanan, pembayaran, layanan pelanggan, dan sambungan toko.</p>
+                    <p class="mt-1 max-w-2xl text-sm text-muted-foreground">Pembaruan pesanan, pembayaran, layanan pelanggan, dan sambungan toko. Notifikasi yang belum dibaca ditandai dan tampil lebih tegas.</p>
                 </div>
-                <Button variant="outline" class="w-full sm:w-auto" :disabled="!notifications.data.some(item => !item.read_at)" @click="router.post(base + '/notifications/read-all')">Tandai semua sudah dibaca</Button>
+                <Button variant="outline" class="w-full sm:w-auto" :disabled="!notifications.data.some(item => !item.read_at)" @click="router.post(base + '/notifications/read-all')">Tandai semua dibaca<template v-if="unreadCount"> ({{ unreadCount }})</template></Button>
             </header>
 
-            <section class="overflow-hidden rounded-lg border border-border bg-card" aria-label="Daftar notifikasi"><article v-for="item in notifications.data" :key="item.id" class="lf-admin-record px-4 py-4 sm:px-5" :class="!item.read_at ? 'bg-primary/[0.04]' : ''">
+            <section class="divide-y divide-border rounded-md border border-border" aria-label="Daftar notifikasi"><article v-for="item in notifications.data" :key="item.id" class="px-4 py-4 sm:px-5" :class="!item.read_at ? 'bg-primary/[0.04]' : ''">
                 <div class="flex items-start gap-3">
                     <span class="mt-1 flex size-5 shrink-0 items-center justify-center rounded-full border text-[10px] font-semibold" :class="item.read_at ? 'border-border text-muted-foreground' : 'border-primary bg-primary text-primary-foreground'" :aria-label="item.read_at ? 'Sudah dibaca' : 'Belum dibaca'">{{ item.read_at ? '✓' : '!' }}</span>
                     <div class="min-w-0 flex-1">
@@ -90,7 +97,7 @@ const notificationKeydown = (event, item) => {
                         </div>
                         <p class="mt-1 break-words text-sm leading-6 text-muted-foreground">{{ item.message }}</p>
                         <div class="mt-3 flex flex-wrap items-center justify-between gap-2">
-                            <span class="inline-flex rounded border border-border px-2 py-0.5 text-xs text-muted-foreground">{{ item.severity }}</span>
+                            <span class="inline-flex rounded border border-border px-2 py-0.5 text-xs text-muted-foreground">{{ severityLabel(item.severity) }}</span>
                             <Button v-if="!item.read_at" variant="ghost" size="sm" @click="router.post(base + '/notifications/' + item.id + '/read')">Tandai sudah dibaca</Button>
                             <span v-else class="text-xs text-muted-foreground">Sudah dibaca</span>
                         </div>
