@@ -6,6 +6,7 @@ use App\Models\IntegrationCredential;
 use App\Services\AdminPermissionService;
 use App\Services\IntegrationRegistry;
 use App\Services\IntegrationRuntimeConfig;
+use App\Support\AuditLabels;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -18,7 +19,7 @@ class AdminDashboardController
 {
     public function __construct(private readonly IntegrationRuntimeConfig $runtime) {}
 
-    public function __invoke(Request $request, AdminPermissionService $permissions, IntegrationRegistry $registry): Response
+    public function __invoke(Request $request, AdminPermissionService $permissions, IntegrationRegistry $registry, AuditLabels $labels): Response
     {
         $data = $request->validate(['range' => ['nullable', 'in:today,7d,30d,90d']]);
         $range = $data['range'] ?? '7d';
@@ -59,10 +60,11 @@ class AdminDashboardController
         }
 
         $chart = [];
-        if ($finance) {
+        if ($finance || $canOrders) {
             $offset = Carbon::now($dbZone)->format('P');
             $dateSql = "DATE(CONVERT_TZ(orders.created_at, ?, '+07:00'))";
-            $daily = $period()->selectRaw($dateSql.' AS day, COUNT(*) AS orders, SUM(CASE WHEN paid_at IS NOT NULL THEN total_idr ELSE 0 END) AS revenue_idr', [$offset])
+            $revenue = $finance ? 'SUM(CASE WHEN paid_at IS NOT NULL THEN total_idr ELSE 0 END)' : '0';
+            $daily = $period()->selectRaw($dateSql.' AS day, COUNT(*) AS orders, '.$revenue.' AS revenue_idr', [$offset])
                 ->groupBy('day')->get()->keyBy('day');
             for ($i = 0; $i < $days; $i++) {
                 $day = $first->copy()->addDays($i)->toDateString();
@@ -79,11 +81,13 @@ class AdminDashboardController
                 ->leftJoin('payment_transactions as latest_payment', function ($join): void {
                     $join->on('latest_payment.id', '=', DB::raw('(SELECT MAX(pt.id) FROM payment_transactions pt WHERE pt.order_id = orders.id)'));
                 })
-                ->orderByDesc('orders.created_at')->orderByDesc('orders.id')->limit(8)
+                ->leftJoin('payment_channels as latest_channel', 'latest_channel.code', '=', 'latest_payment.channel_code')
+                ->orderByDesc('orders.created_at')->orderByDesc('orders.id')->limit(5)
                 ->get([
                     'orders.*', 'users.name as buyer_name_db', 'products.name as product_name_db',
                     'product_packages.name as package_name_db',
                     'latest_payment.channel_code as payment_channel_db', 'latest_payment.status as payment_status_db',
+                    'latest_channel.name as payment_channel_name_db',
                 ])
                 ->map(function (object $order) use ($finance): array {
                     $snapshot = json_decode($order->snapshot, true) ?: [];
@@ -93,7 +97,8 @@ class AdminDashboardController
                         'buyer_name' => $order->buyer_name_db ?: ($snapshot['buyer_name'] ?? 'Guest'),
                         'product_name' => data_get($snapshot, 'product.name') ?: ($snapshot['product_name'] ?? $order->product_name_db),
                         'package_name' => data_get($snapshot, 'package.name') ?: ($snapshot['package_name'] ?? $order->package_name_db),
-                        'payment_channel' => $order->payment_channel_db ?: ($snapshot['payment_channel_code'] ?? '—'),
+                        'payment_channel' => $order->payment_channel_name_db
+                            ?: ($order->payment_channel_db ? strtoupper(str_replace('_', ' ', $order->payment_channel_db)) : '—'),
                         'payment_status' => $order->payment_status_db ?: ($order->paid_at ? 'PAID' : 'PENDING'),
                         'created_at' => Carbon::parse($order->created_at, config('app.timezone'))->toIso8601String(),
                         ...($finance ? ['total_idr' => (int) $order->total_idr] : []),
@@ -101,16 +106,10 @@ class AdminDashboardController
                 })->all();
         }
 
-        $top = [];
-        if ($canCatalog && $canOrders) {
-            $top = $period()->join('products', 'products.id', '=', 'orders.product_id')
-                ->select('products.id', 'products.name', 'products.slug')->selectRaw("SUM(CASE WHEN orders.status = 'SUCCESS' THEN 1 ELSE 0 END) AS fulfilled_orders, COUNT(*) AS total_orders")
-                ->groupBy('products.id', 'products.name', 'products.slug')->orderByDesc('fulfilled_orders')->orderByDesc('total_orders')->orderBy('products.name')->limit(5)->get();
-        }
-
         $activities = $finance ? DB::table('audit_logs')->orderByDesc('id')->limit(5)
             ->get(['id', 'action', 'target_type', 'target_id', 'created_at'])->map(fn (object $row): array => [
-                'id' => $row->id, 'action' => $row->action, 'target' => $row->target_type.' #'.$row->target_id,
+                'id' => $row->id, 'action' => $labels->actionLabel((string) $row->action),
+                'target' => $labels->targetLabel((string) $row->target_type).' #'.$row->target_id,
                 'created_at' => Carbon::parse($row->created_at, $dbZone)->toIso8601String(),
             ]) : [];
         $integrations = [];
@@ -134,10 +133,9 @@ class AdminDashboardController
 
         return Inertia::render('Admin/Dashboard', [
             'range' => $range, 'generatedAt' => $now->toIso8601String(), 'canViewFinance' => $finance,
-            'canOrders' => $canOrders, 'canCatalog' => $canCatalog, 'canNotifications' => $canNotifications,
-            'metrics' => $metrics, 'chart' => $chart, 'recentOrders' => $recent, 'topProducts' => $top,
+            'canOrders' => $canOrders, 'canNotifications' => $canNotifications,
+            'metrics' => $metrics, 'chart' => $chart, 'recentOrders' => $recent,
             'activities' => $activities, 'integrations' => $integrations, 'digiflazzBalance' => $balance,
-            'webhookReady' => str_starts_with((string) config('app.url'), 'https://'),
             'lastSyncedAt' => ($finance || $canProviders) ? $this->timestamp(DB::table('digiflazz_catalog_items')->max('synced_at')) : null,
             'notifications' => $canNotifications ? DB::table('admin_notifications as notifications')
                 ->leftJoin('admin_notification_reads as reads', function ($join) use ($admin): void {

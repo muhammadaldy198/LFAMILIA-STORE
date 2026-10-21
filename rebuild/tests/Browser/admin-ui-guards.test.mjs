@@ -32,7 +32,7 @@ test('notification date formatting and collection guards', () => {
 });
 test('admin props are null-safe across dashboard, customer tier, presentation, Digiflazz', () => {
     const dash = read('Dashboard.vue');
-    for (const key of ['chart', 'notifications', 'recentOrders', 'topProducts', 'integrations']) {
+    for (const key of ['chart', 'notifications', 'recentOrders', 'integrations']) {
         assert.ok(dash.includes('Array.isArray(props.' + key + ')'));
     }
     assert.match(read('CustomerDetail.vue'), /v-if="membershipProfile"/);
