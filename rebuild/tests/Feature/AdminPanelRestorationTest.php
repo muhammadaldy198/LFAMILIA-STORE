@@ -825,7 +825,18 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertSame(9500, (int) $copiedMapping->fresh()->store_cost_idr); // Vue omits store_cost_idr until intentionally edited.
 
         $this->put('/admin/catalog/mappings/'.$copiedMapping->id, [
-            'priority' => 0, 'is_active' => true, 'cost_idr' => 9000, 'store_cost_idr' => 9000,
+            'priority' => 0, 'is_active' => true, 'cost_idr' => 10000, 'store_cost_idr' => 11000,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame(10000, (int) $copiedMapping->fresh()->cost_idr);
+        $this->assertSame(11000, (int) $copiedMapping->fresh()->store_cost_idr);
+
+        $this->put('/admin/catalog/mappings/'.$copiedMapping->id, [
+            'priority' => 0, 'is_active' => true, 'cost_idr' => 12000,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame(12000, (int) $copiedMapping->fresh()->store_cost_idr);
+
+        $this->put('/admin/catalog/mappings/'.$copiedMapping->id, [
+            'priority' => 0, 'is_active' => true, 'cost_idr' => 12000, 'store_cost_idr' => 9000,
         ])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertSame(9000, (int) $copiedMapping->fresh()->store_cost_idr);
         $product->update(['is_active' => true]);
