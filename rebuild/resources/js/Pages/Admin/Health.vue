@@ -57,7 +57,11 @@ const formatDate = (value) => {
     if (!value) return 'Belum tersedia';
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return 'Belum tersedia';
-    return date.toLocaleString('id-ID');
+    return new Intl.DateTimeFormat('id-ID', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+        timeZone: 'Asia/Jakarta',
+    }).format(date) + ' WIB';
 };
 
 function refresh() {
@@ -71,18 +75,17 @@ function refresh() {
 </script>
 
 <template>
-    <Head title="Kondisi Sistem" />
+    <Head title="Kesehatan Sistem" />
     <AdminShell>
         <div class="space-y-5">
             <header class="flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between">
                 <div class="min-w-0">
                     <div class="flex flex-wrap items-center gap-2">
-                        <h1 class="text-2xl font-semibold tracking-tight">Kondisi Sistem</h1>
+                        <h1 class="text-2xl font-semibold tracking-tight">Kesehatan Sistem</h1>
                         <Badge :variant="statusVariant(summary.overall)">{{ overallLabel }}</Badge>
                     </div>
                     <p class="mt-1 max-w-3xl text-sm text-muted-foreground">
-                        Pantau kesehatan aplikasi dan antrean tanpa menjalankan transaksi atau mengirim request baru ke provider.
-                        Status integrasi menggunakan hasil Tes Koneksi terakhir yang tersimpan.
+                        Halaman ini hanya membaca status yang sudah tersimpan; tidak menjalankan transaksi atau mengirim permintaan baru ke layanan luar. Status integrasi memakai hasil tes koneksi terakhir.
                     </p>
                     <p class="mt-1 text-xs text-muted-foreground">
                         Pemeriksaan terakhir {{ formatDate(checkedAt) }}
@@ -93,7 +96,7 @@ function refresh() {
                         <Link href="/admin/integrations">Buka Integrasi</Link>
                     </Button>
                     <Button :disabled="refreshing" @click="refresh">
-                        {{ refreshing ? 'Memeriksa…' : 'Muat Ulang' }}
+                        {{ refreshing ? 'Memeriksa…' : 'Muat ulang' }}
                     </Button>
                 </div>
             </header>
@@ -134,39 +137,36 @@ function refresh() {
                 </ul>
             </section>
 
-            <Card class="p-4 md:p-5">
+            <section class="space-y-3" aria-labelledby="health-checks-heading">
                 <div>
-                    <h2 class="text-lg font-semibold">Komponen Inti</h2>
-                    <p class="mt-1 text-sm text-muted-foreground">
-                        Aplikasi, database, Redis, storage, worker, scheduler, failed jobs, dan proses yang perlu rekonsiliasi.
-                    </p>
+                    <h2 id="health-checks-heading" class="text-lg font-semibold">Semua komponen</h2>
+                    <p class="mt-1 text-sm text-muted-foreground">Aplikasi, database, penyimpanan sementara, penyimpanan berkas, pengolah latar belakang, penjadwal, pekerjaan gagal, dan proses yang perlu dicocokkan.</p>
                 </div>
-                <div class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                    <article v-for="check in orderedChecks" :key="check.key" class="rounded-md border p-3">
-                        <div class="flex items-start justify-between gap-3">
+                <ul class="divide-y divide-border rounded-md border border-border">
+                    <li v-for="check in orderedChecks" :key="check.key" class="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-start sm:gap-4">
+                        <div class="min-w-0 flex-1">
                             <strong class="text-sm">{{ check.name }}</strong>
-                            <Badge :variant="statusVariant(check.status)">{{ statusLabel(check.status) }}</Badge>
+                            <p class="mt-1 text-sm text-muted-foreground">{{ check.message }}</p>
+                            <p v-if="check.detail" class="mt-1 break-words text-xs text-muted-foreground">{{ check.detail }}</p>
                         </div>
-                        <p class="mt-2 text-sm">{{ check.message }}</p>
-                        <p v-if="check.detail" class="mt-1 break-words text-xs text-muted-foreground">{{ check.detail }}</p>
-                    </article>
-                </div>
-            </Card>
+                        <Badge class="shrink-0" :variant="statusVariant(check.status)">{{ statusLabel(check.status) }}</Badge>
+                    </li>
+                    <li v-if="!orderedChecks.length" class="px-4 py-8 text-center text-sm text-muted-foreground">Belum ada komponen yang diperiksa.</li>
+                </ul>
+            </section>
 
-            <Card class="p-4 md:p-5">
+            <section class="space-y-3" aria-labelledby="health-integrations-heading">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                        <h2 class="text-lg font-semibold">Kesehatan Integrasi</h2>
-                        <p class="mt-1 text-sm text-muted-foreground">
-                            Hanya status aman yang ditampilkan. API key, token, secret, dan credential tidak dikirim ke halaman ini.
-                        </p>
+                        <h2 id="health-integrations-heading" class="text-lg font-semibold">Kesehatan integrasi</h2>
+                        <p class="mt-1 text-sm text-muted-foreground">Hanya status yang aman ditampilkan. Kunci akses, token, dan sandi layanan tidak pernah dikirim ke halaman ini.</p>
                     </div>
                     <Button size="sm" variant="outline" as-child>
-                        <Link href="/admin/integrations">Kelola Integrasi</Link>
+                        <Link href="/admin/integrations">Kelola integrasi</Link>
                     </Button>
                 </div>
 
-                <div class="mt-4 overflow-x-auto rounded-md border" role="region" aria-label="Status integrasi" tabindex="0">
+                <div class="overflow-x-auto rounded-md border border-border" role="region" aria-label="Status integrasi" tabindex="0">
                     <AdminResponsiveTable :mobile-columns="[0,2,3]" class="min-w-[760px]">
                         <TableHeader>
                             <TableRow>
@@ -193,17 +193,15 @@ function refresh() {
                         </TableBody>
                     </AdminResponsiveTable>
                 </div>
-            </Card>
+            </section>
 
             <div class="grid gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(280px,1fr)]">
-                <Card class="p-4 md:p-5">
+                <section class="space-y-3" aria-labelledby="health-gateways-heading">
                     <div>
-                        <h2 class="text-lg font-semibold">Gateway Pembayaran</h2>
-                        <p class="mt-1 text-sm text-muted-foreground">
-                            Ringkasan status operasional gateway. Routing dan maintenance tetap dikelola dari menu Pembayaran.
-                        </p>
+                        <h2 id="health-gateways-heading" class="text-lg font-semibold">Gateway pembayaran</h2>
+                        <p class="mt-1 text-sm text-muted-foreground">Ringkasan status layanan pembayaran. Pengaturan cara bayar dan perawatan diatur di menu Pembayaran.</p>
                     </div>
-                    <div class="mt-4 overflow-x-auto rounded-md border" role="region" aria-label="Status gateway pembayaran" tabindex="0">
+                    <div class="overflow-x-auto rounded-md border border-border" role="region" aria-label="Status gateway pembayaran" tabindex="0">
                         <AdminResponsiveTable :mobile-columns="[0,1,2]" class="min-w-[560px]">
                             <TableHeader>
                                 <TableRow>
@@ -231,36 +229,36 @@ function refresh() {
                             </TableBody>
                         </AdminResponsiveTable>
                     </div>
-                </Card>
+                </section>
 
-                <Card class="p-4 md:p-5">
-                    <h2 class="text-lg font-semibold">Lingkungan Aplikasi</h2>
-                    <p class="mt-1 text-sm text-muted-foreground">
-                        Informasi operasional non-secret untuk membantu diagnosis.
-                    </p>
-                    <dl class="mt-4 space-y-3 text-sm">
-                        <div class="flex justify-between gap-4 border-b pb-2">
-                            <dt class="text-muted-foreground">Environment</dt>
-                            <dd class="font-medium">{{ environment.app_env || '—' }}</dd>
+                <section class="space-y-3" aria-labelledby="health-env-heading">
+                    <div>
+                        <h2 id="health-env-heading" class="text-lg font-semibold">Lingkungan aplikasi</h2>
+                        <p class="mt-1 text-sm text-muted-foreground">Keterangan teknis tanpa data rahasia, untuk membantu pemeriksaan.</p>
+                    </div>
+                    <dl class="divide-y divide-border rounded-md border border-border text-sm">
+                        <div class="flex justify-between gap-4 px-4 py-2">
+                            <dt class="text-muted-foreground">Mode situs</dt>
+                            <dd class="font-medium">{{ environment.app_env === 'production' ? 'Toko aktif' : 'Masa pengembangan' }}</dd>
                         </div>
-                        <div class="flex justify-between gap-4 border-b pb-2">
-                            <dt class="text-muted-foreground">Debug</dt>
-                            <dd class="font-medium">{{ environment.debug_enabled ? 'Aktif' : 'Nonaktif' }}</dd>
+                        <div class="flex justify-between gap-4 px-4 py-2">
+                            <dt class="text-muted-foreground">Pesan galat rinci</dt>
+                            <dd class="font-medium">{{ environment.debug_enabled ? 'Ditampilkan' : 'Disembunyikan' }}</dd>
                         </div>
-                        <div class="flex justify-between gap-4 border-b pb-2">
-                            <dt class="text-muted-foreground">Queue</dt>
+                        <div class="flex justify-between gap-4 px-4 py-2">
+                            <dt class="text-muted-foreground">Pengolah latar belakang</dt>
                             <dd class="font-medium">{{ environment.queue_connection || '—' }}</dd>
                         </div>
-                        <div class="flex justify-between gap-4 border-b pb-2">
-                            <dt class="text-muted-foreground">Cache</dt>
+                        <div class="flex justify-between gap-4 px-4 py-2">
+                            <dt class="text-muted-foreground">Penyimpanan sementara</dt>
                             <dd class="font-medium">{{ environment.cache_store || '—' }}</dd>
                         </div>
-                        <div class="flex justify-between gap-4">
-                            <dt class="text-muted-foreground">Session</dt>
+                        <div class="flex justify-between gap-4 px-4 py-2">
+                            <dt class="text-muted-foreground">Sesi masuk</dt>
                             <dd class="font-medium">{{ environment.session_driver || '—' }}</dd>
                         </div>
                     </dl>
-                </Card>
+                </section>
             </div>
         </div>
     </AdminShell>
