@@ -147,7 +147,7 @@ class AdminAuditController
         $summary = [
             'total' => DB::table('audit_logs')->count(),
             'today' => DB::table('audit_logs')->where('created_at', '>=', $this->wibDayStart(Carbon::now('Asia/Jakarta')->toDateString()))->count(),
-            'last_7_days' => DB::table('audit_logs')->where('created_at', '>=', Carbon::now('Asia/Jakarta')->subDays(7)->utc())->count(),
+            'last_7_days' => DB::table('audit_logs')->where('created_at', '>=', $this->storageTime(Carbon::now('Asia/Jakarta')->subDays(7)))->count(),
             'actors' => DB::table('audit_logs')->whereNotNull('actor_id')->distinct()->count('actor_id'),
         ];
 
