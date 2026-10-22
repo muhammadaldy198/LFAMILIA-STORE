@@ -424,6 +424,7 @@ async function copy(value) {
                 <SheetContent side="right" class="w-full overflow-y-auto sm:max-w-xl">
                     <SheetHeader><SheetTitle>{{ channelEditor?.id ? 'Ubah metode pembayaran' : 'Tambah metode pembayaran' }}</SheetTitle><SheetDescription>Atur nama, biaya, dan gateway untuk metode ini. Perubahan berlaku untuk pesanan baru.</SheetDescription></SheetHeader>
                     <div v-if="channelEditor" class="mt-4 space-y-4">
+                        <p v-if="notice" role="status" class="rounded-md border border-border px-3 py-2 text-sm">{{ notice }}</p>
                         <div class="grid gap-3 sm:grid-cols-2">
                             <label class="space-y-1"><span class="text-sm font-medium">Nama tampilan</span><Input v-model="channelEditor.name" maxlength="100" /></label>
                             <label class="space-y-1"><span class="text-sm font-medium">Kode metode</span><Input v-model="channelEditor.code" maxlength="60" placeholder="contoh: qris" /></label>

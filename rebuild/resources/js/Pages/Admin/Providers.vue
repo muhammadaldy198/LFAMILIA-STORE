@@ -174,6 +174,7 @@ function saveProvider(row) {
                 <label class="space-y-1"><span class="text-sm font-medium">Urutan</span><Input v-model.number="selectedProvider().sort_order" type="number" min="0" max="9999" /></label>
                 <label class="space-y-1 sm:col-span-2"><span class="text-sm font-medium">Keterangan</span><Input v-model="selectedProvider().description" maxlength="500" /></label>
                 <label class="flex items-center gap-2 text-sm"><AdminSwitch v-model="selectedProvider().is_active" /> Aktif</label>
+                <p v-if="Object.keys($page.props.errors || {}).length" role="alert" class="text-sm text-destructive sm:col-span-2">{{ Object.values($page.props.errors)[0] }}</p>
             </div>
             <div class="mt-4 flex justify-end gap-2 border-t border-border pt-3"><Button variant="outline" @click="selectedProviderId = null">Batal</Button><Button :disabled="saving === selectedProvider().id" @click="saveProvider(selectedProvider())">{{ saving === selectedProvider().id ? 'Menyimpan…' : 'Simpan penyedia' }}</Button></div>
         </SheetContent>

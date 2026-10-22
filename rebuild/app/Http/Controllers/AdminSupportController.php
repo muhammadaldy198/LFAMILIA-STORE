@@ -7,6 +7,7 @@ use App\Services\TransactionalEmailService;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -299,7 +300,7 @@ class AdminSupportController
                     ? ($message->admin_name ?: 'Admin LFAMILIA')
                     : ($message->customer_name ?: ($ticket->customer_name ?: 'Guest')),
                 'message' => (string) $message->message,
-                'created_at' => $message->created_at,
+                'created_at' => $message->created_at ? Carbon::parse($message->created_at, config('app.timezone'))->toIso8601String() : null,
             ])->values();
 
         return [
@@ -325,11 +326,11 @@ class AdminSupportController
             'customer_email' => $ticket->customer_email ?: $ticket->guest_email,
             'order_number' => $ticket->order_number,
             'handler_name' => $ticket->handler_name,
-            'handled_at' => $ticket->handled_at,
+            'handled_at' => $ticket->handled_at ? Carbon::parse($ticket->handled_at, config('app.timezone'))->toIso8601String() : null,
             'message_count' => isset($ticket->message_count) ? 1 + (int) $ticket->message_count : null,
-            'last_message_at' => $ticket->last_message_at ?? $ticket->updated_at,
-            'created_at' => $ticket->created_at,
-            'updated_at' => $ticket->updated_at,
+            'last_message_at' => Carbon::parse($ticket->last_message_at ?? $ticket->updated_at, config('app.timezone'))->toIso8601String(),
+            'created_at' => Carbon::parse($ticket->created_at, config('app.timezone'))->toIso8601String(),
+            'updated_at' => Carbon::parse($ticket->updated_at, config('app.timezone'))->toIso8601String(),
         ];
     }
 }

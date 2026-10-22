@@ -285,6 +285,7 @@ function runCleanup() {
                                 <label class="lf-admin-field"><span>Manfaat tambahan</span><Input v-model="tier.benefit_notes" maxlength="1000" placeholder="Contoh: prioritas layanan" /></label>
                                 <label class="flex items-center gap-2 text-sm"><AdminSwitch v-model="tier.is_active" />Tingkat ini dipakai</label>
                                 <p v-if="tier.has_legacy_requirements || tier.has_legacy_benefits" class="rounded-md border border-border p-2 text-xs text-muted-foreground">Informasi tambahan dari versi sebelumnya tetap disimpan saat kamu menyimpan perubahan.</p>
+                                <p v-if="Object.keys($page.props.errors || {}).length" role="alert" class="text-sm text-destructive">{{ Object.values($page.props.errors)[0] }}</p>
                                 <div class="flex gap-2 border-t border-border pt-4">
                                     <Button type="button" variant="outline" @click="editingTier = null">Tutup</Button>
                                     <Button type="button" class="ml-auto" :disabled="Boolean(saving)" @click="saveTier(tier)">{{ saving === 'tier' ? 'Menyimpan…' : 'Simpan' }}</Button>

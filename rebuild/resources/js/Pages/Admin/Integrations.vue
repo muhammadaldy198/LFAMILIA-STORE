@@ -68,7 +68,19 @@ const toItem = (item) => {
 const items = reactive(props.integrations.map(toItem));
 
 watch(() => props.integrations, (value) => {
-    items.splice(0, items.length, ...(value || []).map(toItem));
+    const draft = new Map(items.map((item) => [item.code, item]));
+    items.splice(0, items.length, ...(value || []).map((raw) => {
+        const fresh = toItem(raw);
+        const current = draft.get(fresh.code);
+        // Isian yang belum disimpan jangan dibuang saat prop disegarkan (mis. tes koneksi).
+        const edited = current && (JSON.stringify(current.config) !== JSON.stringify(fresh.config)
+            || JSON.stringify(current.clear_secrets) !== JSON.stringify(fresh.clear_secrets));
+        if (edited) {
+            fresh.config = current.config;
+            fresh.clear_secrets = current.clear_secrets;
+        }
+        return fresh;
+    }));
     if (!items.some((item) => item.code === selectedCode.value)) {
         selectedCode.value = items[0]?.code || '';
     }

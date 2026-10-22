@@ -54,7 +54,7 @@ const clockTime=computed(()=>new Intl.DateTimeFormat('id-ID',{hour:'2-digit',min
 const chartMetric=ref(props.canViewFinance?'revenue':'orders');
 const chartMaximum=computed(()=>Math.max(1,...chart.value.map(p=>chartMetric.value==='revenue'?p.revenue_idr:p.orders)));
 const severityLabel=value=>({INFO:'Info',WARNING:'Peringatan',ERROR:'Galat',CRITICAL:'Kritis'}[value]||value);
-const statusLabel=status=>({SUCCESS:'Berhasil',PENDING_PAYMENT:'Pending',PAID:'Dibayar',PROCESSING:'Diproses',FAILED:'Gagal',EXPIRED:'Kedaluwarsa',CANCELLED:'Dibatalkan',HEALTHY:'Tes terakhir berhasil',CONFIGURED:'Tersimpan — tes otomatis tidak tersedia',DOWN:'Bermasalah',DEGRADED:'Perlu diperiksa',NOT_CONFIGURED:'Belum dikonfigurasi',UNTESTED:'Belum dites',STALE:'Perlu tes ulang'}[status]||status);
+const statusLabel=status=>({SUCCESS:'Berhasil',PENDING_PAYMENT:'Pending',PAID:'Dibayar',PROCESSING:'Diproses',FAILED:'Gagal',EXPIRED:'Kedaluwarsa',CANCELLED:'Dibatalkan',BLOCKED:'Gagal diproses',REFUND:'Perlu pemeriksaan admin',REFUNDED:'Perlu pemeriksaan admin',HEALTHY:'Tes terakhir berhasil',CONFIGURED:'Tersimpan — tes otomatis tidak tersedia',DOWN:'Bermasalah',DEGRADED:'Perlu diperiksa',NOT_CONFIGURED:'Belum dikonfigurasi',UNTESTED:'Belum dites',STALE:'Perlu tes ulang'}[status]||'Status sedang diperbarui');
 const visibleActivities=computed(()=>props.activities?.length?props.activities:recentOrders.value.slice(0,5).map(o=>({id:o.id,action:'Pesanan '+statusLabel(o.status),target:o.order_number,created_at:o.created_at,href:'/admin/orders/'+o.id})));
 const markRead=n=>router.post('/admin/notifications/'+n.id+'/read',{}, {preserveScroll:true});
 </script>

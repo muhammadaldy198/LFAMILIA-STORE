@@ -10,6 +10,7 @@ use App\Services\CustomerCleanupService;
 use App\Services\MembershipService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -141,8 +142,8 @@ class AdminCustomerController
                     && (int) ($tickets?->ticket_count ?? 0) === 0
                     && (int) ($topups?->topup_count ?? 0) === 0
                     && (int) ($ledger?->ledger_count ?? 0) === 0,
-                'last_active_at' => $row->last_active_at,
-                'created_at' => $row->created_at,
+                'last_active_at' => $row->last_active_at ? Carbon::parse($row->last_active_at, config('app.timezone'))->toIso8601String() : null,
+                'created_at' => Carbon::parse($row->created_at, config('app.timezone'))->toIso8601String(),
             ];
         });
 

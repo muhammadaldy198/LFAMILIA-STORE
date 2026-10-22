@@ -139,7 +139,9 @@ function statusLabel(status) {
         BLOCKED: 'Diblokir',
         MANUAL_PENDING: 'Menunggu manual',
         MANUAL_FAILED: 'Manual gagal',
-    }[status] || status);
+        REFUND: 'Perlu pemeriksaan admin',
+        MANUAL_SUCCESS: 'Manual berhasil',
+    }[status] || 'Status sedang diperbarui');
 }
 </script>
 

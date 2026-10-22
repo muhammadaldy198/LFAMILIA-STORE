@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\ProductPackage;
 use App\Models\SitePopup;
 use App\Models\StoreAsset;
+use App\Services\AdminPermissionService;
 use App\Services\CatalogAudit;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -31,8 +32,17 @@ class AdminCatalogMediaController
         };
     }
 
-    public function store(Request $request, string $type, int $id, CatalogAudit $audit): RedirectResponse
+    private const CATALOG_TYPES = ['category', 'product', 'package'];
+
+    private function authorizeType(Request $request, string $type, AdminPermissionService $permissions): void
     {
+        $permission = in_array($type, self::CATALOG_TYPES, true) ? 'catalog.manage' : 'content.manage';
+        abort_unless($permissions->allows($request->user('admin'), $permission), 403);
+    }
+
+    public function store(Request $request, string $type, int $id, CatalogAudit $audit, AdminPermissionService $permissions): RedirectResponse
+    {
+        $this->authorizeType($request, $type, $permissions);
         $data = $request->validate([
             'image' => ['required', 'image', 'mimes:jpeg,png,webp', 'max:5120'],
             'collection' => ['required', Rule::in(
@@ -57,8 +67,9 @@ class AdminCatalogMediaController
         return back();
     }
 
-    public function destroy(Request $request, string $type, int $id, CatalogAudit $audit): RedirectResponse
+    public function destroy(Request $request, string $type, int $id, CatalogAudit $audit, AdminPermissionService $permissions): RedirectResponse
     {
+        $this->authorizeType($request, $type, $permissions);
         $data = $request->validate([
             'collection' => ['required', Rule::in(
                 $type === 'product' ? ['image', 'banner']

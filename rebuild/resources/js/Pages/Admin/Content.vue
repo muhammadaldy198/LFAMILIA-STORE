@@ -443,6 +443,7 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                         <label class="flex items-center gap-2 text-sm"><AdminSwitch v-model="settingsForm.support_widget_enabled" /> Tombol bantuan mengambang di semua halaman</label>
                     </div>
                     <div class="flex justify-end p-4">
+                        <p v-if="Object.keys(settingsForm.errors).length" role="alert" class="mr-auto self-center text-sm text-destructive">{{ Object.values(settingsForm.errors)[0] }}</p>
                         <Button :disabled="settingsForm.processing">{{ settingsForm.processing ? 'Menyimpan…' : 'Simpan teks bantuan' }}</Button>
                     </div>
                 </form>

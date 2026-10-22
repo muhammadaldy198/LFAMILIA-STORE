@@ -135,7 +135,12 @@ function askRemove(admin) {
 function confirmRemove() {
     const admin = deleting.value;
     deleting.value = null;
-    if (admin) router.delete('/admin/access/' + admin.id, { preserveScroll: true });
+    if (admin) {
+        router.delete('/admin/access/' + admin.id, {
+            preserveScroll: true,
+            onSuccess: () => { if (Number(editingId.value) === Number(admin.id)) closeEditor(); },
+        });
+    }
 }
 
 function permissionChecked(key) {

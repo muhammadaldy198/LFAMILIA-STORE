@@ -28,7 +28,7 @@ onUnmounted(() => { if (preview.value) URL.revokeObjectURL(preview.value); });
         <div class="lf-admin-media-preview" :data-wide="wide"><img v-if="preview || url" :src="preview || url" alt="Pratinjau gambar"><AdminIcon v-else name="content" class="size-6 text-muted-foreground" /></div>
         <p class="lf-admin-note">{{ mediaRecommendation(type, collection, assetKey || '') }}</p>
         <div class="flex flex-wrap items-end gap-2">
-            <label class="lf-admin-field min-w-0 flex-1"><span>Gambar JPEG/PNG/WebP · maks. 5 MB</span><input ref="fileInput" type="file" accept="image/jpeg,image/png,image/webp" required :disabled="form.processing" class="block w-full min-w-0 text-sm" @change="selectImage"></label>
+            <label class="lf-admin-field min-w-0 flex-1"><span>Gambar JPEG/PNG/WebP · maks. 5 MB</span><input ref="fileInput" type="file" accept="image/jpeg,image/png,image/webp" :disabled="form.processing" class="block w-full min-w-0 text-sm" @change="selectImage"></label>
             <Button type="button" :disabled="form.processing || !form.image" @click="upload">{{form.processing?'Mengunggah…':'Unggah gambar'}}</Button>
         </div>
         <p v-if="form.errors.image" role="alert" class="text-sm text-destructive">{{ form.errors.image }}</p>

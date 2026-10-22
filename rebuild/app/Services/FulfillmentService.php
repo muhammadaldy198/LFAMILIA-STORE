@@ -436,8 +436,8 @@ class FulfillmentService
                 ]);
                 $this->notifications->record(
                     'fulfillment.success',
-                    'Order berhasil',
-                    'Order '.$order->order_number.' selesai diproses.',
+                    'Pesanan berhasil',
+                    'Pesanan '.$order->order_number.' selesai diproses.',
                     'INFO',
                     'order',
                     $order->id
@@ -453,8 +453,8 @@ class FulfillmentService
                     ]);
                     $this->notifications->record(
                         'fulfillment.price_guard_breach',
-                        'URGENT: harga penyedia melebihi batas',
-                        'Order '.$order->order_number.' sudah terkirim tetapi harga penyedia melebihi batas harga. Tinjau selisih biaya.',
+                        'PENTING: harga penyedia melebihi batas',
+                        'Pesanan '.$order->order_number.' sudah terkirim tetapi harga penyedia melebihi batas harga. Tinjau selisih biaya.',
                         'ERROR',
                         'order',
                         $order->id
@@ -479,7 +479,7 @@ class FulfillmentService
                 $this->notifications->record(
                     'fulfillment.failed',
                     'Provider mengonfirmasi gagal',
-                    'Fulfillment order '.$order->order_number.' gagal definitif dari provider. Perlu penanganan manual.',
+                    'Pesanan '.$order->order_number.' gagal diproses oleh penyedia. Perlu penanganan manual.',
                     'ERROR',
                     'fulfillment_attempt',
                     $attempt->id,
@@ -529,8 +529,8 @@ class FulfillmentService
             if ($previousAttemptStatus !== $incoming && in_array($incoming, ['PENDING', 'UNKNOWN'], true)) {
                 $this->notifications->record(
                     'fulfillment.'.strtolower($incoming),
-                    'Fulfillment '.$incoming,
-                    'Order '.$order->order_number.' memerlukan reconciliation dengan reference yang sama.',
+                    'Pengiriman '.($incoming === 'PENDING' ? 'masih menunggu hasil penyedia' : 'belum pasti hasilnya'),
+                    'Pesanan '.$order->order_number.' perlu dicek ulang memakai nomor referensi yang sama.',
                     'WARNING',
                     'fulfillment_attempt',
                     $attempt->id,
@@ -797,7 +797,7 @@ class FulfillmentService
                 $this->notifications->record(
                     'fulfillment.blocked',
                     'Pengiriman tertahan - perlu penanganan manual',
-                    'Order '.$order->order_number.' tertahan (BLOCKED) dan perlu penanganan manual. Alasan: '.substr($reason, 0, 500).($orderWasProcessing ? ' Order kembali ke status PAID.' : ''),
+                    'Pesanan '.$order->order_number.' tertahan dan perlu penanganan manual. Alasan: '.substr($reason, 0, 500).($orderWasProcessing ? ' Pesanan kembali ke status sudah dibayar.' : ''),
                     'ERROR',
                     'order',
                     $order->id,
@@ -869,8 +869,8 @@ class FulfillmentService
         ]);
         $this->notifications->record(
             'fulfillment.reconcile.stalled',
-            'Reconciliation mentok - perlu penanganan manual',
-            'Order '.$order->order_number.' sudah dicek otomatis 3 kali tanpa hasil dan tidak lagi dicek otomatis. Tangani manual dari panel fulfillment.',
+            'Pemeriksaan ulang berhenti - perlu penanganan manual',
+            'Pesanan '.$order->order_number.' sudah dicek otomatis 3 kali tanpa hasil dan tidak lagi dicek otomatis. Tangani manual dari menu Pemenuhan.',
             'ERROR',
             'fulfillment_attempt',
             $attempt->id,

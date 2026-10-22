@@ -196,6 +196,11 @@ final class AuditLabels
         'order.delivery.resent' => 'Pesanan — pengiriman pesanan dikirim ulang',
         'order.fulfillment.checked' => 'Pesanan — status penanganan diperiksa',
         'order.payment.checked' => 'Pesanan — status pembayaran diperiksa',
+        'fulfillment.retry.requested' => 'Manual — pengiriman dicoba ulang',
+        'fulfillment.reconcile.requested' => 'Manual — penyelarasan status diminta',
+        'payment.channel.updated' => 'Pembayaran — metode pembayaran diperbarui',
+        'payment.channel.logo.updated' => 'Pembayaran — logo metode pembayaran diperbarui',
+        'wallet.topup_refund.resolved' => 'Pelanggan — peninjauan pengembalian saldo diselesaikan',
 
         'promotion.popular.updated' => 'Promo — produk populer diperbarui',
         'voucher.created' => 'Promo — voucher ditambahkan',
@@ -289,6 +294,9 @@ final class AuditLabels
             'product_review' => 'Ulasan',
             'site_popup' => 'Pop-up',
             'store_asset' => 'Aset Toko',
+            'fulfillment_attempt' => 'Proses Pengiriman',
+            'wallet_topup' => 'Top Up Saldo',
+            'payment_transaction' => 'Transaksi Pembayaran',
         ][$target] ?? ($this->subject(explode('_', $target)) ?: 'Data sistem');
     }
 

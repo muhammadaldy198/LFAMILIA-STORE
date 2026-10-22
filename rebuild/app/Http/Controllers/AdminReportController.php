@@ -195,7 +195,8 @@ class AdminReportController
             $range = '30d';
         }
 
-        $today = now()->startOfDay();
+        // Batas hari memakai WIB lalu diterjemahkan ke zona penyimpanan, sama seperti Dashboard.
+        $today = $this->wibDay(Carbon::now('Asia/Jakarta'));
         [$from, $to] = match ($range) {
             'today' => [$today->copy(), $today->copy()->endOfDay()],
             '7d' => [$today->copy()->subDays(6), $today->copy()->endOfDay()],
@@ -203,13 +204,13 @@ class AdminReportController
             '90d' => [$today->copy()->subDays(89), $today->copy()->endOfDay()],
             'all' => [
                 DB::table('orders')->min('created_at')
-                    ? Carbon::parse((string) DB::table('orders')->min('created_at'))->startOfDay()
+                    ? $this->wibDay(Carbon::parse((string) DB::table('orders')->min('created_at'), config('app.timezone', 'UTC')))
                     : $today->copy(),
                 $today->copy()->endOfDay(),
             ],
             default => [
-                Carbon::parse((string) ($data['from'] ?? $today->toDateString()))->startOfDay(),
-                Carbon::parse((string) ($data['to'] ?? $today->toDateString()))->endOfDay(),
+                $this->wibDay(Carbon::createFromFormat('Y-m-d', (string) ($data['from'] ?? $today->copy()->setTimezone('Asia/Jakarta')->toDateString()), 'Asia/Jakarta')),
+                $this->wibDay(Carbon::createFromFormat('Y-m-d', (string) ($data['to'] ?? $today->copy()->setTimezone('Asia/Jakarta')->toDateString()), 'Asia/Jakarta'))->endOfDay(),
             ],
         };
 
@@ -218,6 +219,14 @@ class AdminReportController
             'from' => $from->toDateString(),
             'to' => $to->toDateString(),
         ], $from, $to];
+    }
+
+    private function wibDay(Carbon $moment): Carbon
+    {
+        return $moment->copy()
+            ->setTimezone('Asia/Jakarta')
+            ->startOfDay()
+            ->setTimezone(config('app.timezone', 'UTC'));
     }
 
     /**
@@ -239,9 +248,14 @@ class AdminReportController
             $select[] = 'SUM(CASE WHEN paid_at IS NOT NULL THEN fee_idr ELSE 0 END) as fee_idr';
         }
 
+        // Kelompokkan per tanggal WIB, bukan tanggal zona penyimpanan.
+        $offset = Carbon::now(config('app.timezone', 'UTC'))->format('P');
+        $day = "DATE(CONVERT_TZ(created_at, '".$offset."', '+07:00'))";
+        $select[0] = $day.' as day';
+
         return DB::table('orders')->whereBetween('created_at', [$from, $to])
             ->selectRaw(implode(', ', $select))
-            ->groupByRaw('DATE(created_at)')->orderBy('day')->get()
+            ->groupByRaw($day)->orderBy('day')->get()
             ->map(function (object $row) use ($finance): array {
                 $data = [
                     'day' => (string) $row->day,

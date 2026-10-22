@@ -271,6 +271,10 @@ async function removeCode(item) {
             body: JSON.stringify({}),
         });
         codes.value = payload.game_codes || [];
+        if (editingId.value === item.id) {
+            editorOpen.value = false;
+            resetEditor();
+        }
         if (gameCode.value === item.code) {
             gameCode.value = nicknameCodes.value[0]?.code || '';
         }

@@ -164,7 +164,10 @@ function runDeleteVoucher() {
     const row = pendingVoucher.value;
     if (!row) return;
     pendingVoucher.value = null;
-    router.delete('/admin/vouchers/' + row.id, { preserveScroll: true });
+    router.delete('/admin/vouchers/' + row.id, {
+        preserveScroll: true,
+        onSuccess: () => { if (editingId.value === row.id) closeEditor(); },
+    });
 }
 
 function discountLabel(row) {
