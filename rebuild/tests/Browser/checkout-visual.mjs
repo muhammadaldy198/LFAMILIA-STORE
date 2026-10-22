@@ -78,8 +78,9 @@ try{
  await admin.locator('input[aria-label="Aksen biru / tombol utama HEX"]').fill('#75AAFF');
  await admin.locator('input[aria-label="Permukaan HEX"]').fill('#17243A');
  await admin.locator('input[aria-label="Kartu HEX"]').fill('#223344');
- await admin.getByRole('button',{name:'Simpan Perubahan',exact:true}).click();
- await admin.getByText('Warna website berhasil disimpan.',{exact:true}).first().waitFor();
+ await admin.getByRole('button',{name:'Simpan perubahan',exact:true}).click();
+ // Halaman presentasi memakai tombol simpan tunggal; tunggu sampai penyimpanan selesai.
+ await admin.waitForFunction(()=>!document.body.textContent.includes('Menyimpan…'),null,{timeout:15000});
  if(await admin.locator('.lf-admin').evaluate(e=>getComputedStyle(e).backgroundColor)!==white)throw Error('Customer palette recolored Admin');
  const customer=await observedPage({viewport:{width:390,height:844}});
  await customer.goto(base+'/catalog/browser-checkout-game');
