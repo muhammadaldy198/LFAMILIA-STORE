@@ -8,6 +8,7 @@ import { Input } from '../../Components/ui/input';
 import { Card } from '../../Components/ui/card';
 import { Badge } from '../../Components/ui/badge';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../Components/ui/table';
+import AdminResponsiveTable from '../../Components/AdminResponsiveTable.vue';
 
 const props = defineProps({
     items: { type: Object, default: () => ({ data: [] }) },
@@ -282,7 +283,7 @@ onUnmounted(() => {
         <section aria-labelledby="sku-heading" class="min-w-0">
             <h2 id="sku-heading" class="sr-only">Daftar SKU Digiflazz</h2>
             <div class="overflow-x-auto overscroll-x-contain rounded-md border border-border" role="region" aria-label="Daftar produk dan harga Digiflazz" tabindex="0">
-                <Table class="min-w-[900px] table-fixed">
+                <AdminResponsiveTable :mobile-columns="[0,2,4,5]" class="min-w-[900px] table-fixed">
                     <TableHeader>
                         <TableRow>
                             <TableHead class="w-[25%]">Produk &amp; nominal</TableHead>
@@ -327,7 +328,7 @@ onUnmounted(() => {
                             <TableCell colspan="6" class="py-10 text-center text-sm text-muted-foreground">Tidak ada SKU yang sesuai dengan filter.</TableCell>
                         </TableRow>
                     </TableBody>
-                </Table>
+                </AdminResponsiveTable>
             </div>
             <div class="flex flex-col gap-3 border-t border-border p-4 sm:flex-row sm:items-center sm:justify-between">
                 <p class="text-sm text-muted-foreground">{{ items.from || 0 }}–{{ items.to || 0 }} dari {{ items.total }} SKU · Halaman {{ items.current_page }} dari {{ items.last_page }}</p>

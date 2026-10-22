@@ -7,7 +7,8 @@ import { Badge } from '../../Components/ui/badge';
 import { Button } from '../../Components/ui/button';
 import { Input } from '../../Components/ui/input';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../../Components/ui/sheet';
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../Components/ui/table';
+import { TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../Components/ui/table';
+import AdminResponsiveTable from '../../Components/AdminResponsiveTable.vue';
 import { byOrder, displayPosition } from '../../lib/ordering.js';
 
 const props = defineProps({
@@ -117,7 +118,7 @@ function saveProvider(row) {
             </div>
 
             <div class="overflow-x-auto overscroll-x-contain rounded-md border border-border" role="region" aria-label="Daftar penyedia" tabindex="0">
-                <Table class="min-w-[950px] table-fixed">
+                <AdminResponsiveTable :mobile-columns="[0,1,2,6]" class="min-w-[950px] table-fixed">
                     <TableHeader>
                         <TableRow>
                             <TableHead class="w-[24%]">Penyedia / keterangan</TableHead>
@@ -164,7 +165,7 @@ function saveProvider(row) {
                             </TableCell>
                         </TableRow>
                     </TableBody>
-                </Table>
+                </AdminResponsiveTable>
             </div>
         </section>
 
@@ -232,7 +233,7 @@ function saveProvider(row) {
             <div class="mt-3 flex flex-wrap items-center gap-2"><Button type="button" size="sm" variant="outline" as-child><Link href="/admin/catalog">Kelola di Produk</Link></Button><p class="text-xs text-muted-foreground">Kode produk penyedia, modal, dan sumber diubah dari ruang kerja produk.</p></div>
 
             <div class="mt-4 overflow-x-auto overscroll-x-contain rounded-md border border-border" role="region" aria-label="Nominal produk yang terhubung ke penyedia" tabindex="0">
-                <Table class="min-w-[950px] table-fixed">
+                <AdminResponsiveTable :mobile-columns="[0,1,2,6]" class="min-w-[950px] table-fixed">
                     <TableHeader>
                         <TableRow>
                             <TableHead class="w-[20%]">Produk</TableHead>
@@ -279,7 +280,7 @@ function saveProvider(row) {
                             <TableCell colspan="7" class="py-10 text-center text-sm text-muted-foreground">Belum ada nominal produk yang sesuai dengan filter.</TableCell>
                         </TableRow>
                     </TableBody>
-                </Table>
+                </AdminResponsiveTable>
             </div>
 
             <div v-if="mappings.links?.length > 3" class="mt-4 flex flex-wrap gap-1">

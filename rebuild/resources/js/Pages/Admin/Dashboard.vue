@@ -63,7 +63,7 @@ const markRead=n=>router.post('/admin/notifications/'+n.id+'/read',{}, {preserve
 <AdminShell><div class="space-y-5">
     <header class="flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between">
         <div class="min-w-0"><h1 class="text-2xl font-semibold tracking-tight">{{title}}</h1><p class="mt-1 max-w-2xl text-sm text-muted-foreground">{{owner?'Kelola seluruh sistem dan data finansial toko.':'Kelola operasional toko sesuai akses akun.'}}</p></div>
-        <div class="flex flex-wrap items-center gap-3"><time class="min-w-36 rounded-md border border-border bg-card px-3 py-2 text-xs"><strong class="block">{{clockDate}}</strong><span class="text-muted-foreground">{{clockTime}} WIB</span></time><Button variant="outline" :disabled="busy" @click="refresh"><AdminIcon name="providers" class="size-4"/>{{busy?'Memuat…':'Muat ulang'}}</Button></div>
+        <div class="flex flex-wrap items-center gap-3"><time class="min-w-36 rounded-md border border-border bg-card px-3 py-2 text-xs"><strong class="block">{{clockDate}}</strong><span class="text-muted-foreground">{{clockTime}}</span></time><Button variant="outline" :disabled="busy" @click="refresh"><AdminIcon name="providers" class="size-4"/>{{busy?'Memuat…':'Muat ulang'}}</Button></div>
     </header>
     <!-- 1. Metric Cards -->
     <section class="lf-admin-summary lf-admin-summary-4" aria-label="Ringkasan dashboard">
