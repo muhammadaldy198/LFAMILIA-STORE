@@ -31,8 +31,9 @@ const filters = reactive({
 });
 
 const saving = ref(null);
-const selectedProviderId = ref(null);
-const selectedProvider = () => rows.value.find((row) => row.id === selectedProviderId.value) || null;
+// Draf terpisah: Batal mengembalikan nilai tanpa menyentuh baris di daftar.
+const providerDraft = ref(null);
+const selectedProvider = () => providerDraft.value;
 
 const money = value => value == null ? '—' : 'Rp' + Number(value).toLocaleString('id-ID');
 const date = value => value
@@ -86,6 +87,7 @@ function saveProvider(row) {
         is_active: Boolean(row.is_active),
     }, {
         preserveScroll: true,
+        onSuccess: () => { providerDraft.value = null; },
         onFinish: () => { saving.value = null; },
     });
 }
@@ -157,7 +159,7 @@ function saveProvider(row) {
                             <TableCell class="align-top text-right">
                                 <div class="flex items-center justify-end gap-2">
                                     <Badge :variant="row.is_active ? 'secondary' : 'outline'" class="text-[10px]">{{ row.is_active ? 'Aktif' : 'Nonaktif' }}</Badge>
-                                    <Button size="sm" variant="outline" class="h-7 px-2 text-xs" @click="selectedProviderId = row.id">Ubah</Button>
+                                    <Button size="sm" variant="outline" class="h-7 px-2 text-xs" @click="providerDraft = { ...row }">Ubah</Button>
                                 </div>
                             </TableCell>
                         </TableRow>
@@ -166,7 +168,7 @@ function saveProvider(row) {
             </div>
         </section>
 
-        <Sheet :open="Boolean(selectedProvider())" @update:open="value => { if (!value) selectedProviderId = null; }">
+        <Sheet :open="Boolean(selectedProvider())" @update:open="value => { if (!value) providerDraft = null; }">
         <SheetContent side="right" class="w-full overflow-y-auto sm:max-w-md">
             <SheetHeader><SheetTitle>Ubah {{ selectedProvider()?.display_name }}</SheetTitle><SheetDescription>Nama tampilan dan urutan pemrosesan penyedia. Perubahan berlaku untuk pesanan baru.</SheetDescription></SheetHeader>
             <div v-if="selectedProvider()" class="mt-4 grid gap-3 sm:grid-cols-2">
@@ -176,7 +178,7 @@ function saveProvider(row) {
                 <label class="flex items-center gap-2 text-sm"><AdminSwitch v-model="selectedProvider().is_active" /> Aktif</label>
                 <p v-if="Object.keys($page.props.errors || {}).length" role="alert" class="text-sm text-destructive sm:col-span-2">{{ Object.values($page.props.errors)[0] }}</p>
             </div>
-            <div class="mt-4 flex justify-end gap-2 border-t border-border pt-3"><Button variant="outline" @click="selectedProviderId = null">Batal</Button><Button :disabled="saving === selectedProvider().id" @click="saveProvider(selectedProvider())">{{ saving === selectedProvider().id ? 'Menyimpan…' : 'Simpan penyedia' }}</Button></div>
+            <div class="mt-4 flex justify-end gap-2 border-t border-border pt-3"><Button variant="outline" @click="providerDraft = null">Batal</Button><Button :disabled="saving === selectedProvider().id" @click="saveProvider(selectedProvider())">{{ saving === selectedProvider().id ? 'Menyimpan…' : 'Simpan penyedia' }}</Button></div>
         </SheetContent>
         </Sheet>
 

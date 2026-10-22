@@ -195,37 +195,43 @@ class AdminReportController
             $range = '30d';
         }
 
-        // Batas hari memakai WIB lalu diterjemahkan ke zona penyimpanan, sama seperti Dashboard.
-        $today = $this->wibDay(Carbon::now('Asia/Jakarta'));
-        [$from, $to] = match ($range) {
-            'today' => [$today->copy(), $today->copy()->endOfDay()],
-            '7d' => [$today->copy()->subDays(6), $today->copy()->endOfDay()],
-            '30d' => [$today->copy()->subDays(29), $today->copy()->endOfDay()],
-            '90d' => [$today->copy()->subDays(89), $today->copy()->endOfDay()],
+        // Batas hari dihitung dalam WIB dulu, baru diterjemahkan ke zona penyimpanan.
+        $today = Carbon::now('Asia/Jakarta')->toDateString();
+        $span = match ($range) {
+            'today' => [$today, $today],
+            '7d' => [Carbon::parse($today, 'Asia/Jakarta')->subDays(6)->toDateString(), $today],
+            '30d' => [Carbon::parse($today, 'Asia/Jakarta')->subDays(29)->toDateString(), $today],
+            '90d' => [Carbon::parse($today, 'Asia/Jakarta')->subDays(89)->toDateString(), $today],
             'all' => [
                 DB::table('orders')->min('created_at')
-                    ? $this->wibDay(Carbon::parse((string) DB::table('orders')->min('created_at'), config('app.timezone', 'UTC')))
-                    : $today->copy(),
-                $today->copy()->endOfDay(),
+                    ? Carbon::parse((string) DB::table('orders')->min('created_at'), config('app.timezone', 'UTC'))->setTimezone('Asia/Jakarta')->toDateString()
+                    : $today,
+                $today,
             ],
             default => [
-                $this->wibDay(Carbon::createFromFormat('Y-m-d', (string) ($data['from'] ?? $today->copy()->setTimezone('Asia/Jakarta')->toDateString()), 'Asia/Jakarta')),
-                $this->wibDay(Carbon::createFromFormat('Y-m-d', (string) ($data['to'] ?? $today->copy()->setTimezone('Asia/Jakarta')->toDateString()), 'Asia/Jakarta'))->endOfDay(),
+                (string) ($data['from'] ?? $today),
+                (string) ($data['to'] ?? $today),
             ],
         };
 
+        [$from, $to] = [$this->wibStart($span[0]), $this->wibEnd($span[1])];
+
         return [[
             'range' => $range,
-            'from' => $from->toDateString(),
-            'to' => $to->toDateString(),
+            'from' => $span[0],
+            'to' => $span[1],
         ], $from, $to];
     }
 
-    private function wibDay(Carbon $moment): Carbon
+    private function wibStart(string $date): Carbon
     {
-        return $moment->copy()
-            ->setTimezone('Asia/Jakarta')
-            ->startOfDay()
+        return Carbon::createFromFormat('Y-m-d', $date, 'Asia/Jakarta')->startOfDay()
+            ->setTimezone(config('app.timezone', 'UTC'));
+    }
+
+    private function wibEnd(string $date): Carbon
+    {
+        return Carbon::createFromFormat('Y-m-d', $date, 'Asia/Jakarta')->endOfDay()
             ->setTimezone(config('app.timezone', 'UTC'));
     }
 
