@@ -96,7 +96,7 @@ try{
  const voucherBackground=await customer.locator('.lfx-offer-modal').evaluate(e=>getComputedStyle(e).backgroundImage);
  if(!voucherBackground.includes('38, 55, 87'))throw Error('Saved surface did not reach voucher modal: '+voucherBackground);
  await admin.getByRole('button',{name:'Kembalikan warna bawaan',exact:true}).click();
- await admin.getByRole('button',{name:'Simpan Perubahan',exact:true}).click();
+ await admin.getByRole('button',{name:'Simpan perubahan',exact:true}).click();
  await admin.waitForFunction(()=>document.documentElement.style.getPropertyValue('--lf-color-primary')==='#609CFF');
  await admin.close();await customer.close();
  await fs.writeFile(output+'/report.json',JSON.stringify({baseline:'a42f97d3a6d5a8a5cb59bd651ce9ffe1a8c928f2',report,quote,adminTheme:{persisted:true,cta:true,paymentCards:true,voucherSurface:true,reset:true,whiteAdmin:true},noFinancialActions:true},null,2));
