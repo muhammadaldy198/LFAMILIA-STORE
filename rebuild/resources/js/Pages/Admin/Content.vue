@@ -115,7 +115,7 @@ const saveBanner = (item) => router.put(base + '/content/banners/' + item.id, {
     is_active: Boolean(item.is_active),
 }, { preserveScroll: true });
 const deleteBanner = (item) => ask('Hapus banner', 'Banner "' + (item.title || 'tanpa nama') + '" akan dihapus dari halaman utama.', 'Hapus banner', () => {
-    router.delete(base + '/content/banners/' + item.id, { preserveScroll: true });
+    router.delete(base + '/content/banners/' + item.id, { preserveScroll: true, onSuccess: () => { selectedBannerId.value = null; } });
 });
 
 const savePopup = (item) => router.put(base + '/content/popups/' + item.id, {

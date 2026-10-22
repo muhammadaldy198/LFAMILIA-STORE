@@ -287,8 +287,10 @@ function deleteChannel(channel) {
 }
 function runDeleteChannel() {
     if (!pendingChannel.value) return;
-    router.delete('/admin/payments/channels/' + pendingChannel.value.id, {
+    const removedId = pendingChannel.value.id;
+    router.delete('/admin/payments/channels/' + removedId, {
         preserveScroll: true,
+        onSuccess: () => { if (channelEditor.value?.id === removedId) channelEditor.value = null; },
         onFinish: () => { pendingChannel.value = null; },
     });
 }

@@ -1,6 +1,6 @@
 <script setup>
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import AdminShell from '../../Components/AdminShell.vue';
 import AdminConfirmDialog from '../../Components/AdminConfirmDialog.vue';
 import AdminMediaControl from '../../Components/AdminMediaControl.vue';
@@ -13,7 +13,10 @@ const props = defineProps({ categories: { type: Array, default: () => [] } });
 const iconOptions = [['gamepad', 'Game'], ['ticket', 'Voucher'], ['play', 'Hiburan'], ['smartphone', 'Pulsa / Data'], ['zap', 'PLN / Listrik'], ['grid', 'Umum']];
 const iconLabel = (value) => (iconOptions.find(([key]) => key === value)?.[1] ?? 'Umum');
 
-const selected = ref(null);
+// Kategori terpilih dicari ulang dari prop terbaru, jadi unggah/hapus gambar
+// langsung terlihat tanpa menutup panel.
+const selectedId = ref(null);
+const selected = computed(() => props.categories.find((item) => item.id === selectedId.value) || null);
 const creating = ref(false);
 const deleting = ref(null);
 const error = ref('');
@@ -27,7 +30,7 @@ const openCreate = () => {
     form.defaults(createDefaults());
     form.reset();
     form.clearErrors();
-    selected.value = null;
+    selectedId.value = null;
     creating.value = true;
 };
 
@@ -40,10 +43,10 @@ const openEdit = (item) => {
     });
     form.reset();
     creating.value = false;
-    selected.value = item;
+    selectedId.value = item.id;
 };
 
-const close = () => { creating.value = false; selected.value = null; form.clearErrors(); };
+const close = () => { creating.value = false; selectedId.value = null; form.clearErrors(); };
 
 const save = () => {
     error.value = '';
@@ -58,7 +61,7 @@ const remove = () => {
     if (!item) return;
     router.delete('/admin/catalog/categories/' + item.id, {
         preserveScroll: true,
-        onSuccess: () => { if (selected.value?.id === item.id) close(); },
+        onSuccess: () => { if (selectedId.value === item.id) close(); },
         onError: (errors) => { error.value = Object.values(errors).join(' · '); },
     });
 };
