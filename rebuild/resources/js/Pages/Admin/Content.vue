@@ -177,7 +177,7 @@ const saveReview = (item) => router.put(base + '/content/reviews/' + item.id, {
 }, { preserveScroll: true });
 
 const deleteReview = (item) => ask('Hapus ulasan', 'Ulasan dari ' + item.display_name + ' akan dihapus permanen. Untuk sekadar menyembunyikan, matikan tombol Tampil.', 'Hapus ulasan', () => {
-    router.delete(base + '/content/reviews/' + item.id, { preserveScroll: true });
+    router.delete(base + '/content/reviews/' + item.id, { preserveScroll: true, onSuccess: () => { selectedReviewId.value = null; } });
 });
 
 const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
