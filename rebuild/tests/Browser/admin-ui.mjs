@@ -177,7 +177,7 @@ try {
                 const tabs=await evaluate(`[...document.querySelectorAll('main .lf-admin-tabs button')].filter(b=>b.getBoundingClientRect().height>0).map(b=>b.textContent.trim())`);
                 for(const tab of tabs){if(await evaluate(`Boolean([...document.querySelectorAll('.lf-admin-tabs button,button')].some(b=>b.getBoundingClientRect().height>0&&b.textContent.trim()===${JSON.stringify(tab)}))`)){await click(tab);await inspect(width+'-'+path+'-'+tab);}}
                 if(path==='/admin/integrations'){
-                    if(!await evaluate(`document.body.textContent.includes('Mulai jualan top up')&&document.body.textContent.includes('fitur tambahan')&&!document.body.textContent.includes('DEFERRED TO TAHAP 9')`))throw Error('Integration selling guide/status regression');
+                    if(!await evaluate(`document.body.textContent.includes('Mulai jualan top up')&&document.body.textContent.includes('tidak wajib aktif')&&!document.body.textContent.includes('DEFERRED TO TAHAP 9')`))throw Error('Integration selling guide/status regression');
                     await click('Midtrans Snap');
                     const production=await evaluate(`(()=>{const select=[...document.querySelectorAll('main select')].find(s=>s.getBoundingClientRect().height>0&&[...s.options].some(o=>o.value==='production'));if(!select)return false;select.value=[...select.options].find(o=>o.value==='production').value;select.dispatchEvent(new Event('change',{bubbles:true}));return true;})()`);
                     if(!production)throw Error('Production environment selector missing');await pause(100);
@@ -185,7 +185,7 @@ try {
                     await inspect(width+'-integration-production-warning');
                 }
                 if(path==='/admin/nickname-tools'){
-                    await click('Kode Game');await click('Tambah Kode Game');await inspect(width+'-game-code-editor');
+                    await click('Daftar kode game');await click('Tambah kode game');await inspect(width+'-game-code-editor');
                     // Editor kode game sekarang pop-up (di luar <main>), jadi cari switch di dialog dulu.
                     const switchState=await evaluate(`(()=>{const root=document.querySelector('[role=dialog]')||document.querySelector('main');const s=[...root.querySelectorAll('[role=switch]')].find(s=>s.textContent===''&&!s.disabled);if(!s)return null;s.click();return true;})()`);
                     if(!switchState)throw Error('Boolean switch editor missing');await pause(100);await inspect(width+'-game-code-switch');
