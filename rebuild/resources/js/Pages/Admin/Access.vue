@@ -247,7 +247,7 @@ function togglePermission(key, checked) {
                                 <TableCell>{{ date(admin.updated_at) }}</TableCell>
                                 <TableCell class="text-right">
                                     <div class="flex justify-end gap-1">
-                                        <Button size="sm" variant="outline" @click="openEdit(admin)">Edit</Button>
+                                        <Button size="sm" variant="outline" @click="openEdit(admin)">Ubah</Button>
                                         <Button size="sm" variant="destructive" :disabled="Number(admin.id) === Number(currentAdminId)" @click="askRemove(admin)">Hapus</Button>
                                     </div>
                                 </TableCell>
@@ -276,7 +276,7 @@ function togglePermission(key, checked) {
 
         <Sheet :open="editorOpen" @update:open="(value) => { if (!value) closeEditor(); }">
         <SheetContent side="right" class="w-full overflow-y-auto sm:max-w-xl">
-            <SheetHeader><SheetTitle>{{ editingId ? 'Edit Akun Admin' : 'Tambah Akun Admin' }}</SheetTitle><SheetDescription>{{ isEditingSelf ? 'Akun yang sedang digunakan tidak dapat dinonaktifkan atau diturunkan.' : 'Perubahan role, status, password, dan permission dicatat ke Audit Log.' }}</SheetDescription></SheetHeader>
+            <SheetHeader><SheetTitle>{{ editingId ? 'Ubah akun admin' : 'Tambah akun admin' }}</SheetTitle><SheetDescription>{{ isEditingSelf ? 'Akun yang sedang digunakan tidak dapat dinonaktifkan atau diturunkan.' : 'Perubahan role, status, password, dan permission dicatat ke Audit Log.' }}</SheetDescription></SheetHeader>
 
 
             <form class="mt-4 space-y-4" @submit.prevent="save">

@@ -422,7 +422,7 @@ async function copy(value) {
                     </div>
             <Sheet :open="Boolean(channelEditor)" @update:open="(value) => { if (!value) closeChannelEditor(); }">
                 <SheetContent side="right" class="w-full overflow-y-auto sm:max-w-xl">
-                    <SheetHeader><SheetTitle>{{ channelEditor?.id ? 'Edit Metode Pembayaran' : 'Tambah Metode Pembayaran' }}</SheetTitle><SheetDescription>Atur nama, biaya, dan gateway untuk metode ini. Perubahan berlaku untuk pesanan baru.</SheetDescription></SheetHeader>
+                    <SheetHeader><SheetTitle>{{ channelEditor?.id ? 'Ubah metode pembayaran' : 'Tambah metode pembayaran' }}</SheetTitle><SheetDescription>Atur nama, biaya, dan gateway untuk metode ini. Perubahan berlaku untuk pesanan baru.</SheetDescription></SheetHeader>
                     <div v-if="channelEditor" class="mt-4 space-y-4">
                         <div class="grid gap-3 sm:grid-cols-2">
                             <label class="space-y-1"><span class="text-sm font-medium">Nama tampilan</span><Input v-model="channelEditor.name" maxlength="100" /></label>

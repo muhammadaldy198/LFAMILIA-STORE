@@ -479,7 +479,7 @@ const savePage = (item) => router.put(base + '/content/pages/' + item.key, {
                 </div>
                 <Sheet :open="selectedNewsId !== null" @update:open="(value) => { if (!value) selectedNewsId = null; }">
                     <SheetContent side="right" class="w-full overflow-y-auto sm:max-w-2xl">
-                        <SheetHeader><SheetTitle>Edit berita</SheetTitle><SheetDescription>Ubah isi dan gambar berita. Pratinjau di bawah mengikuti tampilan halaman pelanggan.</SheetDescription></SheetHeader>
+                        <SheetHeader><SheetTitle>Ubah berita</SheetTitle><SheetDescription>Ubah isi dan gambar berita. Pratinjau di bawah mengikuti tampilan halaman pelanggan.</SheetDescription></SheetHeader>
                     <template v-for="item in news" :key="'editor-'+item.id">
                         <div v-if="selectedNewsId === item.id" class="mt-4 grid gap-4">
                             <div class="space-y-3">
