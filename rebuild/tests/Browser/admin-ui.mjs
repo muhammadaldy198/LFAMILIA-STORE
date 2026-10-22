@@ -206,7 +206,7 @@ try {
                 const input=await send('Runtime.evaluate',{expression:`document.querySelector('[role=dialog] input[type=file]')`});
                 if(!input.result.objectId)throw Error('Favicon file input missing in asset editor');
                 await send('DOM.setFileInputFiles',{objectId:input.result.objectId,files:[file]});await pause(100);
-                await evaluate(`document.querySelector('[role=dialog] input[type=file]').closest('form').requestSubmit()`);
+                await evaluate(`(()=>{const b=[...document.querySelectorAll('[role=dialog] button')].find(x=>x.textContent.trim()==='Unggah gambar'&&!x.disabled);if(!b)throw new Error('Unggah gambar button missing');b.click();})()`);
                 let icon;
                 for(let i=0;i<60;i++){await pause(100);icon=await evaluate(`document.querySelector('link[rel=icon]')?.getAttribute('href')`);if(icon!==previousIcon&&icon?.includes('browser-favicon'))break;}
                 if(icon===previousIcon||!icon?.includes('browser-favicon'))throw Error('Favicon upload did not update Admin');

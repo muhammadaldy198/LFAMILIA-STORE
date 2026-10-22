@@ -27,10 +27,10 @@ onUnmounted(() => { if (preview.value) URL.revokeObjectURL(preview.value); });
     <div class="space-y-3">
         <div class="lf-admin-media-preview" :data-wide="wide"><img v-if="preview || url" :src="preview || url" alt="Pratinjau gambar"><AdminIcon v-else name="content" class="size-6 text-muted-foreground" /></div>
         <p class="lf-admin-note">{{ mediaRecommendation(type, collection, assetKey || '') }}</p>
-        <form class="flex flex-wrap items-end gap-2" @submit.prevent="upload">
+        <div class="flex flex-wrap items-end gap-2">
             <label class="lf-admin-field min-w-0 flex-1"><span>Gambar JPEG/PNG/WebP · maks. 5 MB</span><input ref="fileInput" type="file" accept="image/jpeg,image/png,image/webp" required :disabled="form.processing" class="block w-full min-w-0 text-sm" @change="selectImage"></label>
-            <Button :disabled="form.processing || !form.image">{{form.processing?'Mengunggah…':'Unggah gambar'}}</Button>
-        </form>
+            <Button type="button" :disabled="form.processing || !form.image" @click="upload">{{form.processing?'Mengunggah…':'Unggah gambar'}}</Button>
+        </div>
         <p v-if="form.errors.image" role="alert" class="text-sm text-destructive">{{ form.errors.image }}</p>
         <Button v-if="url" type="button" variant="outline" :disabled="form.processing" @click="confirmingRemove = true">Hapus gambar</Button>
         <AdminConfirmDialog :open="confirmingRemove" title="Hapus gambar" message="Gambar ini akan dihapus dari toko. Tindakan ini tidak dapat dibatalkan." confirm-label="Hapus gambar" destructive @update:open="value => { if (!value) confirmingRemove = false; }" @confirm="removeImage" />
