@@ -101,6 +101,9 @@ try {
                             if(!await evaluate(`Boolean([...document.querySelectorAll('[data-testid="digiflazz-import"] button')].find(b=>b.textContent.trim()==='Impor 1 nominal'&&!b.disabled))`))throw Error('Fixture SKU checkbox did not select through its Vue model');
                             acceptNextDialog=true;dialogs.length=0;
                             await pointerClick(`[...document.querySelectorAll('[data-testid="digiflazz-import"] button')].find(b=>b.textContent.trim()==='Impor 1 nominal')`);
+                            // Nominal serupa kini dikonfirmasi lewat dialog bertema, bukan window.confirm.
+                            await pause(400);
+                            await evaluate(`(()=>{const b=[...document.querySelectorAll('[role=dialog] button')].find(x=>x.textContent.trim()==='Tetap impor');if(b)b.click();return Boolean(b);})()`);
                             let done=false;for(let i=0;i<60;i++){await pause(100);done=await evaluate(`!document.querySelector('[data-testid="digiflazz-import"]')`);if(done)break;}
                             if(!done)throw Error('Local SKU import did not finish: '+JSON.stringify(await evaluate(`({errors:[...document.querySelectorAll('[role=alert]')].map(e=>e.textContent),buttons:[...document.querySelectorAll('[data-testid="digiflazz-import"] button')].map(b=>({text:b.textContent,disabled:b.disabled})),events:window.__pointerEvents})`))+' POSTs='+JSON.stringify(mutations)+' alerts='+JSON.stringify(dialogs));
                             acceptNextDialog=false;
@@ -197,9 +200,13 @@ try {
                 await click('Logo & Gambar Cadangan');
                 const previousIcon=await evaluate(`document.querySelector('link[rel=icon]')?.getAttribute('href')`);
                 const file=join(profile,'browser-favicon.png');await writeFile(file,Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAAY0lEQVR4nO3PQQ3AIADAQMAKwhCNoYngcVnSU9DOfe74s6UDXjWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgfYaaAdUdZaagAAAAAElFTkSuQmCC','base64'));
-                const input=await send('Runtime.evaluate',{expression:`[...document.querySelectorAll('article')].find(a=>a.textContent.includes('Favicon')).querySelector('input[type=file]')`});
+                // Aset toko kini berupa daftar baris + pop-up editor, jadi buka barisnya dulu.
+                await evaluate(`(()=>{const b=[...document.querySelectorAll('main li button')].find(x=>x.textContent.includes('Favicon'));if(b)b.click();return Boolean(b);})()`);
+                await pause(600);
+                const input=await send('Runtime.evaluate',{expression:`document.querySelector('[role=dialog] input[type=file]')`});
+                if(!input.result.objectId)throw Error('Favicon file input missing in asset editor');
                 await send('DOM.setFileInputFiles',{objectId:input.result.objectId,files:[file]});await pause(100);
-                await evaluate(`[...document.querySelectorAll('article')].find(a=>a.textContent.includes('Favicon')).querySelector('form').requestSubmit()`);
+                await evaluate(`document.querySelector('[role=dialog] input[type=file]').closest('form').requestSubmit()`);
                 let icon;
                 for(let i=0;i<60;i++){await pause(100);icon=await evaluate(`document.querySelector('link[rel=icon]')?.getAttribute('href')`);if(icon!==previousIcon&&icon?.includes('browser-favicon'))break;}
                 if(icon===previousIcon||!icon?.includes('browser-favicon'))throw Error('Favicon upload did not update Admin');

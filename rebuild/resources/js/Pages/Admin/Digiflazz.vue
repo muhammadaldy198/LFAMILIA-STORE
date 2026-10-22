@@ -147,7 +147,7 @@ onUnmounted(() => {
                 <h1 class="text-2xl font-semibold tracking-tight">Digiflazz</h1>
                 <p class="mt-1 text-sm text-muted-foreground">Pantau kesehatan SKU, harga modal, stok, dan hasil sinkronisasi. Harga jual dan margin diatur di menu Produk.</p>
             </div>
-            <div class="flex flex-col gap-2 sm:flex-row">
+            <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                 <Link href="/admin/catalog?import=digiflazz" class="inline-flex min-h-10 items-center justify-center rounded-md border px-3 py-2 text-sm font-medium">Impor ke produk</Link>
                 <Button class="w-full sm:w-auto" variant="outline" :disabled="syncForm.processing" @click="refresh">Muat ulang</Button>
                 <Button class="w-full sm:w-auto" :disabled="syncForm.processing" @click="sync()">

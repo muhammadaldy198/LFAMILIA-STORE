@@ -199,7 +199,7 @@ function saveProvider(row) {
                         <option v-for="row in providers" :key="row.id" :value="row.id">{{ row.display_name }}</option>
                     </select>
                 </label>
-                <div class="flex flex-col gap-2 sm:flex-row">
+                <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                     <Button class="w-full sm:w-auto" type="submit">Terapkan</Button>
                     <Button class="w-full sm:w-auto" type="button" variant="outline" @click="reset">Hapus filter</Button>
                 </div>

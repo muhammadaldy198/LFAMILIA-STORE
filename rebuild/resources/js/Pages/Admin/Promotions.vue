@@ -185,7 +185,7 @@ function discountLabel(row) {
                     Buat dan pantau kode voucher yang dipakai pelanggan saat membayar. Produk populer diatur di menu Produk, bagian Tampilan Toko.
                 </p>
             </div>
-            <div class="flex flex-col gap-2 sm:flex-row">
+            <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
                 <Button class="w-full sm:w-auto" variant="outline" @click="router.reload({ preserveScroll: true })">Muat ulang</Button>
                 <Button class="w-full sm:w-auto" @click="openCreate">Tambah voucher</Button>
             </div>
@@ -215,7 +215,7 @@ function discountLabel(row) {
                             <option value="exhausted">Kuota habis</option>
                         </select>
                     </label>
-                    <div class="flex flex-col gap-2 sm:flex-row">
+                    <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                         <Button class="w-full sm:w-auto">Terapkan</Button>
                         <Button class="w-full sm:w-auto" type="button" variant="outline" @click="resetVoucherFilters">Hapus filter</Button>
                     </div>

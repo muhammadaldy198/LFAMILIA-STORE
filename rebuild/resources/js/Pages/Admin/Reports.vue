@@ -154,7 +154,7 @@ function statusLabel(status) {
                     Analisis penjualan, produk, dan operasional toko pada periode yang dipilih. Nilai uang hanya terlihat oleh Super Admin.
                 </p>
             </div>
-            <div class="flex flex-col gap-2 sm:flex-row">
+            <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                 <Button class="w-full sm:w-auto" variant="outline" @click="router.reload({ preserveScroll: true })">Muat ulang</Button>
                 <Button class="w-full sm:w-auto" type="button" @click="exportReport">Unduh laporan</Button>
             </div>

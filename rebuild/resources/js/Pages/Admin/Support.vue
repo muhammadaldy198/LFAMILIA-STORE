@@ -144,7 +144,7 @@ function saveQuickReplies() {
                     Daftar tiket bantuan yang masuk. Membuka satu tiket menampilkan isi pesan, riwayat balasan, dan formulir balasan — bukan percakapan langsung.
                 </p>
             </div>
-            <div class="flex flex-col gap-2 sm:flex-row">
+            <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                 <Button class="w-full sm:w-auto" variant="outline" @click="router.reload({ preserveScroll: true })">Muat ulang</Button>
                 <Button class="w-full sm:w-auto" variant="outline" @click="quickRepliesOpen = !quickRepliesOpen">
                     {{ quickRepliesOpen ? 'Tutup balasan cepat' : 'Atur balasan cepat' }}
@@ -197,7 +197,7 @@ function saveQuickReplies() {
                         <option value="CLOSED">Ditutup</option>
                     </select>
                 </label>
-                <div class="flex flex-col gap-2 sm:flex-row">
+                <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                     <Button class="w-full sm:w-auto">Terapkan</Button>
                     <Button class="w-full sm:w-auto" type="button" variant="outline" @click="resetFilters">Hapus filter</Button>
                 </div>

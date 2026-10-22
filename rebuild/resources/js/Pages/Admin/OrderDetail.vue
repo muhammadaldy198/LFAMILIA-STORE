@@ -212,7 +212,7 @@ async function copy(value) {
         <p v-if="action?.type==='cancel'" class="text-sm font-medium">Tidak ada pengembalian dana otomatis. Pengembalian dana, jika disetujui, dilakukan admin secara terpisah.</p><p v-if="action?.type==='payment'" class="font-semibold">Total pesanan: {{ money(order.total_idr) }}</p><p v-if="action?.type==='resend'" class="text-sm">Email tujuan: <strong class="break-all">{{ order.buyer_email }}</strong></p>
         <label class="flex items-start gap-2 text-sm"><input v-model="form.confirmed" type="checkbox" required class="mt-1 size-4 shrink-0" :disabled="form.processing" /><span>Saya sudah memeriksa pesanan dan memastikan tindakan ini benar.</span></label>
         <p v-for="(error,key) in form.errors" :key="key" role="alert" class="text-sm text-destructive">{{ error }}</p>
-        <div class="flex flex-col gap-2 sm:flex-row"><Button class="w-full sm:w-auto" type="submit" :disabled="form.processing || !form.confirmed">{{ form.processing?'Menyimpan…':'Konfirmasi tindakan' }}</Button><Button class="w-full sm:w-auto" type="button" variant="outline" :disabled="form.processing" @click="actionOpen=false">Batal</Button></div>
+        <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap"><Button class="w-full sm:w-auto" type="submit" :disabled="form.processing || !form.confirmed">{{ form.processing?'Menyimpan…':'Konfirmasi tindakan' }}</Button><Button class="w-full sm:w-auto" type="button" variant="outline" :disabled="form.processing" @click="actionOpen=false">Batal</Button></div>
     </form></SheetContent></Sheet>
 </AdminShell>
 </template>

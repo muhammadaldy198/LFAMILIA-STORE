@@ -276,7 +276,7 @@ async function sendResendTestEmail() {
                 <h2 id="integrations-start-heading" class="font-semibold">Mulai jualan top up</h2>
                 <p class="text-sm">Hubungkan Digiflazz dan satu cara pembayaran, lalu impor nominal dan atur margin di menu Produk.</p>
                 <p class="text-sm text-muted-foreground">Telegram, Discord, masuk dengan Google, dan pengecekan nama akun bersifat tambahan dan tidak wajib aktif. Tes koneksi hanya memeriksa akses layanan; hasil transaksi pelanggan dicatat terpisah.</p>
-                <div class="flex flex-col gap-2 sm:flex-row">
+                <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                     <Button class="w-full sm:w-auto" variant="outline" as-child><Link href="/admin/catalog">Buka Produk</Link></Button>
                     <Button class="w-full sm:w-auto" variant="outline" as-child><Link href="/admin/payments">Buka Pembayaran</Link></Button>
                 </div>

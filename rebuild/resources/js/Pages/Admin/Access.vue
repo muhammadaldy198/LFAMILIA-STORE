@@ -163,7 +163,7 @@ function togglePermission(key, checked) {
                     Kelola akun Super Admin dan Admin, status login, serta izin operasional tiap Admin.
                 </p>
             </div>
-            <div class="flex flex-col gap-2 sm:flex-row">
+            <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                 <Button class="w-full sm:w-auto" variant="outline" @click="router.reload({ preserveScroll: true })">Muat ulang</Button>
                 <Button class="w-full sm:w-auto" @click="openCreate">Tambah Admin</Button>
             </div>
