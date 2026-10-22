@@ -206,7 +206,7 @@ DB::transaction(function (): void {
         'product_name' => 'Produk manual fixture dengan nama yang panjang dan mudah terbaca',
         'package_name' => 'Paket browser regression', 'destination' => 'BROWSER-DESTINATION-123456789',
         'total_idr' => 99999999, 'note' => 'Data sintetis lokal, bukan transaksi nyata.',
-        'payment_received' => true, 'idempotency_key' => 'browser-ui-fixture-'.bin2hex(random_bytes(6)),
+        'payment_received' => true, 'idempotency_key' => 'browser-ui-fixture',
     ], (int) $admin->id);
     DB::table('orders')->where('id', $orderId)->update(['user_id' => $customer->id]);
 
@@ -222,7 +222,7 @@ DB::transaction(function (): void {
         'total_idr' => 25000,
         'note' => 'Data sintetis lokal untuk smoke test.',
         'payment_received' => true,
-        'idempotency_key' => 'browser-fulfillment-fixture-'.bin2hex(random_bytes(6)),
+        'idempotency_key' => 'browser-fulfillment-fixture',
     ], (int) $admin->id);
     DB::table('orders')->where('id', $fulfillmentOrderId)->update(['user_id' => $customer->id]);
 

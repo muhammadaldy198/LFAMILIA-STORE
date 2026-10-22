@@ -154,6 +154,11 @@ final class AuditLabels
         'catalog.mapping.updated' => 'Produk — sumber harga diperbarui',
         'catalog.manual_source_cutoff_attached' => 'Produk — sumber harga cadangan ditambahkan di batas waktu penyedia',
         'catalog.manual_source_ranked' => 'Produk — urutan sumber harga disusun ulang',
+        'catalog.fulfillment_source.attached' => 'Produk — sumber pemenuhan ditambahkan',
+        'catalog.fulfillment_source.auto_bootstrapped' => 'Produk — sumber pemenuhan disiapkan otomatis',
+        'catalog.fulfillment_source.priority_auto_ranked' => 'Produk — urutan sumber pemenuhan disusun otomatis',
+        'catalog.digiflazz.fixed_price_locked' => 'Produk — harga tetap dikunci dari Digiflazz',
+        'catalog.voucher_stock.updated' => 'Produk — stok voucher diperbarui',
 
         'content.banner.created' => 'Banner & Konten — banner ditambahkan',
         'content.banner.updated' => 'Banner & Konten — banner diperbarui',
@@ -196,6 +201,24 @@ final class AuditLabels
         'voucher.created' => 'Promo — voucher ditambahkan',
         'voucher.updated' => 'Promo — voucher diperbarui',
         'voucher.deleted' => 'Promo — voucher dihapus',
+
+        'customer.cleanup.executed' => 'Pelanggan — pembersihan akun dijalankan',
+        'customer.cleanup.settings_updated' => 'Pelanggan — pengaturan pembersihan akun diperbarui',
+        'customer.empty_account.deleted' => 'Pelanggan — akun kosong dihapus',
+        'customer.membership.updated' => 'Pelanggan — tingkatan pelanggan diperbarui',
+        'customer.wallet.adjusted' => 'Pelanggan — saldo pelanggan disesuaikan',
+
+        'nickname_game_code.created' => 'Validasi Akun — kode game ditambahkan',
+        'nickname_game_code.updated' => 'Validasi Akun — kode game diperbarui',
+        'nickname_game_code.deleted' => 'Validasi Akun — kode game dihapus',
+        'nickname_game_code.reordered' => 'Validasi Akun — urutan kode game diubah',
+
+        'provider.updated' => 'Penyedia — penyedia layanan diperbarui',
+
+        'membership_tier.updated' => 'Pengaturan — tingkatan pelanggan diperbarui',
+        'configuration.exported' => 'Pengaturan — konfigurasi diekspor',
+
+        'support.quick_replies.updated' => 'Layanan Pelanggan — balasan cepat diperbarui',
 
         'report.exported' => 'Laporan — data diekspor',
         'settings.store.updated' => 'Pengaturan — identitas toko diperbarui',
@@ -244,6 +267,7 @@ final class AuditLabels
             'payment_gateway' => 'Gerbang Pembayaran',
             'customer' => 'Pelanggan',
             'customer_user' => 'Pelanggan',
+            'user' => 'Pelanggan',
             'wallet' => 'Saldo Pelanggan',
             'voucher' => 'Voucher',
             'support_ticket' => 'Tiket Pelanggan',
@@ -256,6 +280,15 @@ final class AuditLabels
             'membership_tier' => 'Tingkatan Pelanggan',
             'report' => 'Laporan',
             'digiflazz_catalog_item' => 'SKU Digiflazz',
+            'category' => 'Kategori',
+            'configuration' => 'Konfigurasi',
+            'content_page' => 'Halaman Bantuan',
+            'faq_entry' => 'FAQ',
+            'news_article' => 'Berita',
+            'product_notice' => 'Pemberitahuan Produk',
+            'product_review' => 'Ulasan',
+            'site_popup' => 'Pop-up',
+            'store_asset' => 'Aset Toko',
         ][$target] ?? ($this->subject(explode('_', $target)) ?: 'Data sistem');
     }
 

@@ -199,16 +199,22 @@ class AdminAuditController
         ]);
     }
 
-    /** Awal hari WIB dalam UTC, sesuai kolom created_at yang disimpan UTC. */
+    /** Awal hari WIB, dinyatakan dalam zona waktu penyimpanan created_at. */
     private function wibDayStart(string $date): Carbon
     {
-        return Carbon::createFromFormat('Y-m-d', $date, 'Asia/Jakarta')->startOfDay()->utc();
+        return $this->storageTime(Carbon::createFromFormat('Y-m-d', $date, 'Asia/Jakarta')->startOfDay());
     }
 
-    /** Akhir hari WIB dalam UTC. */
+    /** Akhir hari WIB, dinyatakan dalam zona waktu penyimpanan created_at. */
     private function wibDayEnd(string $date): Carbon
     {
-        return Carbon::createFromFormat('Y-m-d', $date, 'Asia/Jakarta')->endOfDay()->utc();
+        return $this->storageTime(Carbon::createFromFormat('Y-m-d', $date, 'Asia/Jakarta')->endOfDay());
+    }
+
+    /** Samakan batas tanggal dengan zona waktu yang dipakai saat baris audit ditulis. */
+    private function storageTime(Carbon $moment): Carbon
+    {
+        return $moment->setTimezone(config('app.timezone', 'UTC'));
     }
 
     private function safeState(mixed $value, AdminAuditService $audit): mixed

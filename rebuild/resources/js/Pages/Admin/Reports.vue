@@ -190,7 +190,7 @@ function statusLabel(status) {
             </form>
         </div>
 
-        <p class="-mt-2 text-xs text-muted-foreground">Unduhan mengikuti bagian yang sedang dibuka: {{ rangeLabel.toLowerCase() }}.</p>
+        <p class="-mt-2 text-xs text-muted-foreground">Unduhan mengikuti bagian yang sedang dibuka: {{ sections.find((item) => item.id === section)?.label }}.</p>
         <nav class="lf-admin-tabs" aria-label="Bagian laporan">
             <Button v-for="item in sections" :key="item.id" type="button" :variant="section === item.id ? 'secondary' : 'ghost'" :aria-current="section === item.id ? 'page' : undefined" @click="section = item.id">{{ item.label }}</Button>
         </nav>

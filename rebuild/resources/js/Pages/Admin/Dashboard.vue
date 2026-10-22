@@ -51,7 +51,7 @@ onMounted(()=>{clockTimer=setInterval(()=>clock.value=new Date(),60000);});
 onUnmounted(()=>clearInterval(clockTimer));
 const clockDate=computed(()=>new Intl.DateTimeFormat('id-ID',{weekday:'long',day:'2-digit',month:'short',year:'numeric',timeZone:'Asia/Jakarta'}).format(clock.value));
 const clockTime=computed(()=>new Intl.DateTimeFormat('id-ID',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'Asia/Jakarta'}).format(clock.value)+' WIB');
-const chartMetric=ref('revenue');
+const chartMetric=ref(props.canViewFinance?'revenue':'orders');
 const chartMaximum=computed(()=>Math.max(1,...chart.value.map(p=>chartMetric.value==='revenue'?p.revenue_idr:p.orders)));
 const severityLabel=value=>({INFO:'Info',WARNING:'Peringatan',ERROR:'Galat',CRITICAL:'Kritis'}[value]||value);
 const statusLabel=status=>({SUCCESS:'Berhasil',PENDING_PAYMENT:'Pending',PAID:'Dibayar',PROCESSING:'Diproses',FAILED:'Gagal',EXPIRED:'Kedaluwarsa',CANCELLED:'Dibatalkan',HEALTHY:'Tes terakhir berhasil',CONFIGURED:'Tersimpan — tes otomatis tidak tersedia',DOWN:'Bermasalah',DEGRADED:'Perlu diperiksa',NOT_CONFIGURED:'Belum dikonfigurasi',UNTESTED:'Belum dites',STALE:'Perlu tes ulang'}[status]||status);

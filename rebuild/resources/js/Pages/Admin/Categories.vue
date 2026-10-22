@@ -20,13 +20,13 @@ const error = ref('');
 
 const form = useForm({ name: '', slug: '', icon: 'grid', sort_order: props.categories.length, is_active: true });
 
+const createDefaults = () => ({ name: '', slug: '', icon: 'grid', sort_order: props.categories.length, is_active: true });
+
 const openCreate = () => {
     error.value = '';
+    form.defaults(createDefaults());
     form.reset();
     form.clearErrors();
-    form.icon = 'grid';
-    form.is_active = true;
-    form.sort_order = props.categories.length;
     selected.value = null;
     creating.value = true;
 };
