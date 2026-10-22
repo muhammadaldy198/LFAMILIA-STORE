@@ -178,7 +178,7 @@ function saveProvider(row) {
                 <label class="flex items-center gap-2 text-sm"><AdminSwitch v-model="selectedProvider().is_active" /> Aktif</label>
                 <p v-if="Object.keys($page.props.errors || {}).length" role="alert" class="text-sm text-destructive sm:col-span-2">{{ Object.values($page.props.errors)[0] }}</p>
             </div>
-            <div class="mt-4 flex justify-end gap-2 border-t border-border pt-3"><Button variant="outline" @click="providerDraft = null">Batal</Button><Button :disabled="saving === selectedProvider().id" @click="saveProvider(selectedProvider())">{{ saving === selectedProvider().id ? 'Menyimpan…' : 'Simpan penyedia' }}</Button></div>
+            <div class="mt-4 flex justify-end gap-2 border-t border-border pt-3"><Button variant="outline" @click="providerDraft = null">Batal</Button><Button :disabled="saving === selectedProvider()?.id" @click="saveProvider(selectedProvider())">{{ saving === selectedProvider()?.id ? 'Menyimpan…' : 'Simpan penyedia' }}</Button></div>
         </SheetContent>
         </Sheet>
 
