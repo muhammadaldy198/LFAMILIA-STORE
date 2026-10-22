@@ -117,7 +117,7 @@ try {
                             await evaluate('window.confirm=window.__nativeConfirm');
                             console.log('PASS real click, SKU selection, and isolated catalog import');
                         }else{await click('Impor nominal Digiflazz');}
-                        await click('Edit nominal');await inspect(width+'-nominal-editor');await click('Tutup editor nominal');
+                        await click('Ubah nominal');await inspect(width+'-nominal-editor');await click('Tutup editor nominal');
                     }
                     if(tab==='Data Pelanggan'&&!await evaluate(`Boolean(document.querySelector('input[placeholder="Masukkan User ID"]'))&&Boolean(document.querySelector('[data-testid="product-customer-template"]'))`))throw Error('Customer fields or shared product format missing from editor');
                 }
