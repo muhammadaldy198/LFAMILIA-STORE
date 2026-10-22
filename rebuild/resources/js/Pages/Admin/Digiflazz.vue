@@ -145,9 +145,9 @@ onUnmounted(() => {
         <header class="flex flex-col gap-4 border-b border-border pb-4 xl:flex-row xl:items-end xl:justify-between">
             <div class="min-w-0">
                 <h1 class="text-2xl font-semibold tracking-tight">Digiflazz</h1>
-                <p class="mt-1 text-sm text-muted-foreground">Pantau harga modal, penjual, stok, jam layanan, pembaruan daftar harga, dan transaksi Digiflazz.</p>
+                <p class="mt-1 text-sm text-muted-foreground">Pantau kesehatan SKU, harga modal, stok, dan hasil sinkronisasi. Harga jual dan margin diatur di menu Produk.</p>
             </div>
-            <div class="flex flex-col gap-2 sm:flex-row">
+            <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                 <Link href="/admin/catalog?import=digiflazz" class="inline-flex min-h-10 items-center justify-center rounded-md border px-3 py-2 text-sm font-medium">Impor ke produk</Link>
                 <Button class="w-full sm:w-auto" variant="outline" :disabled="syncForm.processing" @click="refresh">Muat ulang</Button>
                 <Button class="w-full sm:w-auto" :disabled="syncForm.processing" @click="sync()">
@@ -170,7 +170,7 @@ onUnmounted(() => {
             <Card class="p-4">
                 <p class="text-xs text-muted-foreground">SKU dalam daftar</p>
                 <p class="mt-2 text-2xl font-semibold">{{ Number(summary?.total || 0).toLocaleString('id-ID') }}</p>
-                <p class="mt-1 text-xs text-muted-foreground">{{ mappingCount }} mapping tersimpan</p>
+                <p class="mt-1 text-xs text-muted-foreground">{{ mappingCount }} terhubung ke produk</p>
             </Card>
             <Card class="p-4">
                 <p class="text-xs text-muted-foreground">Normal</p>
@@ -186,13 +186,13 @@ onUnmounted(() => {
             </Card>
         </div>
 
-        <Card class="p-4">
-            <div class="mb-3 space-y-1 text-xs text-muted-foreground">
-                <p>Sinkron daftar harga lengkap: {{ date(catalogSync?.at || lastSyncedAt) }} · Sinkron otomatis {{ autoSync ? 'setiap ' + monitorSettings.sync_interval_minutes + ' menit' : 'nonaktif' }}.</p>
-                <p>Daftar di layar dimuat ulang setiap 30 detik. SKU yang hilang tetapi punya riwayat transaksi disimpan sebagai tidak tersedia; mapping tanpa riwayat dibersihkan.</p>
-                <p v-if="Number(catalogSync?.missing_marked_unavailable || 0) > 0 || Number(catalogSync?.mappings_deleted_without_history || 0) > 0">Sinkron terakhir menandai {{ catalogSync.missing_marked_unavailable || 0 }} SKU hilang yang memiliki riwayat sebagai tidak tersedia. {{ catalogSync.mappings_deleted_without_history || 0 }} mapping tanpa riwayat dibersihkan.</p>
+        <div class="space-y-2 border-b border-border pb-4">
+            <div class="space-y-1 text-xs text-muted-foreground">
+                <p>Sinkron daftar harga terakhir: {{ date(catalogSync?.at || lastSyncedAt) }} · Sinkron otomatis {{ autoSync ? 'setiap ' + monitorSettings.sync_interval_minutes + ' menit' : 'nonaktif' }}.</p>
+                <p>Daftar di layar dimuat ulang setiap 30 detik. SKU yang hilang tetapi pernah dipakai tetap disimpan sebagai tidak tersedia; SKU yang belum pernah dipakai dibersihkan.</p>
+                <p v-if="Number(catalogSync?.missing_marked_unavailable || 0) > 0 || Number(catalogSync?.mappings_deleted_without_history || 0) > 0">Sinkron terakhir menandai {{ catalogSync.missing_marked_unavailable || 0 }} SKU hilang yang pernah dipakai sebagai tidak tersedia, dan membersihkan {{ catalogSync.mappings_deleted_without_history || 0 }} SKU yang belum pernah dipakai.</p>
             </div>
-            <details><summary class="cursor-pointer font-semibold">Pengaturan monitor & sinkron otomatis</summary>
+            <details class="lf-admin-advanced rounded-md border border-border"><summary class="cursor-pointer px-4 py-3 text-sm font-medium">Pengaturan pemantauan &amp; sinkron otomatis</summary><div class="border-t border-border p-4">
             <form class="grid gap-4 md:grid-cols-2 xl:grid-cols-4" @submit.prevent="autoSyncForm.put('/admin/digiflazz/settings', { preserveScroll: true })">
                 <label class="flex items-center gap-2 text-sm md:col-span-2 xl:col-span-1">
                     <AdminSwitch v-model="autoSyncForm.enabled" />
@@ -217,22 +217,21 @@ onUnmounted(() => {
                     </div>
                 </label>
                 <div class="flex flex-wrap items-end justify-between gap-3 md:col-span-2 xl:col-span-4">
-                    <Button size="sm" variant="outline" :disabled="autoSyncForm.processing">Simpan pengaturan monitor</Button>
+                    <Button size="sm" variant="outline" :disabled="autoSyncForm.processing">Simpan pengaturan</Button>
                     <div class="text-right text-xs text-muted-foreground">
-                        <p>Digiflazz {{ providerActive ? 'aktif' : 'nonaktif' }} di menu Provider</p>
+                        <p>Digiflazz {{ providerActive ? 'aktif' : 'nonaktif' }} di menu Penyedia</p>
                         <p>Sinkron terakhir: {{ date(lastSyncedAt) }}</p>
                     </div>
                 </div>
             </form>
-            <p class="mt-3 text-xs text-muted-foreground">Harga jual, margin, dan prioritas sumber dikelola di menu Produk. Credential tetap dikelola di Integrasi.</p>
-            </details>
-        </Card>
+            <p class="mt-3 text-xs text-muted-foreground">Harga jual dan margin diatur di menu Produk. Kunci akses Digiflazz diatur di menu Integrasi.</p>
+            </div></details>
+        </div>
 
-        <Card class="p-4">
-            <form class="grid min-w-0 grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4" @submit.prevent="search">
+        <form class="grid min-w-0 grid-cols-2 gap-3 border-b border-border pb-4 sm:grid-cols-3 md:grid-cols-4" @submit.prevent="search">
 <label class="space-y-1 col-span-2 md:col-span-1">
-                    <span class="text-sm font-medium">Cari</span>
-                    <Input v-model="filters.q" maxlength="100" placeholder="Produk, nominal, SKU, seller, atau brand" />
+                    <span class="text-sm font-medium">Cari SKU</span>
+                    <Input v-model="filters.q" maxlength="100" placeholder="Nama produk, nominal, kode SKU, penjual, atau brand" />
                 </label>
 <label class="space-y-1">
                     <span class="text-sm font-medium">Kategori</span>
@@ -249,7 +248,7 @@ onUnmounted(() => {
                     </select>
                 </label>
 <label class="space-y-1">
-                    <span class="text-sm font-medium">Kesehatan</span>
+                    <span class="text-sm font-medium">Kondisi SKU</span>
                     <select v-model="filters.health" class="digiflazz-select">
                         <option value="">Semua status</option>
                         <option value="healthy">Normal</option>
@@ -258,10 +257,10 @@ onUnmounted(() => {
                     </select>
                 </label>
                 <details class="col-span-2 md:col-span-4"><summary class="cursor-pointer text-sm font-medium">Filter lanjutan</summary><div class="mt-3 grid gap-3 sm:grid-cols-3"><label class="space-y-1">
-                    <span class="text-sm font-medium">Tampilan</span>
+                    <span class="text-sm font-medium">Cakupan daftar</span>
                     <select v-model="filters.scope" class="digiflazz-select">
-                        <option value="mapped">SKU yang terhubung</option>
-                        <option value="all">Semua daftar harga</option>
+                        <option value="mapped">Hanya SKU yang terhubung ke produk</option>
+                        <option value="all">Seluruh daftar harga Digiflazz</option>
                     </select>
                 </label>
 <label class="space-y-1">
@@ -274,23 +273,23 @@ onUnmounted(() => {
 <label class="space-y-1">
                     <span class="text-sm font-medium">Baris per halaman</span>
                     <select v-model="filters.per_page" class="digiflazz-select">
-                        <option v-for="size in [10,25,50,100]" :key="size" :value="size">{{ size }} SKU</option>
+                        <option v-for="size in [10,25,50,100]" :key="size" :value="size">{{ size }} baris</option>
                     </select>
                 </label></div></details>
                 <div class="col-span-2 flex gap-2 md:col-span-4"><Button :disabled="syncForm.processing">Terapkan filter</Button><Button type="button" variant="outline" @click="reset">Hapus filter</Button></div>
-            </form>
-        </Card>
+        </form>
 
-        <Card class="overflow-hidden">
-            <div class="overflow-x-auto overscroll-x-contain" role="region" aria-label="Daftar produk dan harga Digiflazz" tabindex="0">
+        <section aria-labelledby="sku-heading" class="min-w-0">
+            <h2 id="sku-heading" class="sr-only">Daftar SKU Digiflazz</h2>
+            <div class="overflow-x-auto overscroll-x-contain rounded-md border border-border" role="region" aria-label="Daftar produk dan harga Digiflazz" tabindex="0">
                 <Table class="min-w-[900px] table-fixed">
                     <TableHeader>
                         <TableRow>
-                            <TableHead class="w-[25%]">Produk / Nominal</TableHead>
+                            <TableHead class="w-[25%]">Produk &amp; nominal</TableHead>
                             <TableHead class="w-[16%]">SKU / Seller</TableHead>
-                            <TableHead class="w-[16%] text-right">Harga Modal</TableHead>
-                            <TableHead class="w-[15%]">Stok & Cut-off</TableHead>
-                            <TableHead class="w-[16%]">Kesehatan</TableHead>
+                            <TableHead class="w-[16%] text-right">Harga modal</TableHead>
+                            <TableHead class="w-[15%]">Stok &amp; jam layanan</TableHead>
+                            <TableHead class="w-[16%]">Kondisi</TableHead>
                             <TableHead class="w-[12%] text-right">Aksi</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -299,7 +298,7 @@ onUnmounted(() => {
                             <TableCell class="align-top">
                                 <strong class="break-words text-xs block">{{ item.local_product_name || item.product_name }}</strong>
                                 <p class="text-[11px] text-muted-foreground">{{ item.local_package_name || item.product_name }}</p>
-                                <span class="text-[10px] text-muted-foreground">{{ item.mapped ? 'Terhubung' : 'Belum diimpor' }}</span>
+                                <span class="text-[10px] text-muted-foreground">{{ item.mapped ? 'Terhubung ke produk' : 'Belum dipakai di produk' }}</span>
                             </TableCell>
                             <TableCell class="align-top">
                                 <code class="text-xs font-mono text-primary">{{ item.buyer_sku_code }}</code>
@@ -307,11 +306,11 @@ onUnmounted(() => {
                             </TableCell>
                             <TableCell class="align-top text-right">
                                 <strong class="text-xs">{{ money(item.price_idr) }}</strong>
-                                <p v-if="item.baseline_price_idr" class="text-[10px] text-muted-foreground">Base: {{ money(item.baseline_price_idr) }}</p>
+                                <p v-if="item.baseline_price_idr" class="text-[10px] text-muted-foreground">Pembanding: {{ money(item.baseline_price_idr) }}</p>
                             </TableCell>
                             <TableCell class="align-top text-xs">
                                 <span>{{ item.unlimited_stock ? 'Tak terbatas' : Number(item.stock).toLocaleString('id-ID') }}</span>
-                                <p class="text-[10px] text-muted-foreground">{{ item.start_cut_off === item.end_cut_off ? 'Tanpa cut-off' : item.start_cut_off + '–' + item.end_cut_off }}</p>
+                                <p class="text-[10px] text-muted-foreground">{{ item.start_cut_off === item.end_cut_off ? 'Buka 24 jam' : 'Tutup ' + item.start_cut_off + '–' + item.end_cut_off }}</p>
                             </TableCell>
                             <TableCell class="align-top">
                                 <Badge :variant="healthVariant(item.health)" class="text-[10px]">{{ healthLabel(item.health) }}</Badge>
@@ -319,8 +318,8 @@ onUnmounted(() => {
                             </TableCell>
                             <TableCell class="align-top text-right">
                                 <div class="flex items-center justify-end gap-1">
-                                    <Button size="sm" variant="ghost" class="h-6 px-1.5 text-[10px]" :disabled="syncForm.processing" @click="sync(item.id)">Sync</Button>
-                                    <Button size="sm" variant="outline" class="h-6 px-1.5 text-[10px]" @click="baseline(item.id)">Baseline</Button>
+                                    <Button size="sm" variant="ghost" class="h-7 px-2 text-[11px]" :disabled="syncForm.processing" title="Menyinkronkan seluruh katalog Digiflazz, bukan hanya SKU ini" @click="sync(item.id)">Sinkron</Button>
+                                    <Button size="sm" variant="outline" class="h-7 px-2 text-[11px]" title="Jadikan harga sekarang sebagai pembanding peringatan kenaikan harga" @click="baseline(item.id)">Jadikan pembanding</Button>
                                 </div>
                             </TableCell>
                         </TableRow>
@@ -330,22 +329,21 @@ onUnmounted(() => {
                     </TableBody>
                 </Table>
             </div>
-            <div class="flex flex-col gap-3 border-t p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex flex-col gap-3 border-t border-border p-4 sm:flex-row sm:items-center sm:justify-between">
                 <p class="text-sm text-muted-foreground">{{ items.from || 0 }}–{{ items.to || 0 }} dari {{ items.total }} SKU · Halaman {{ items.current_page }} dari {{ items.last_page }}</p>
                 <div class="grid grid-cols-2 gap-2 sm:flex">
                     <Button class="w-full sm:w-auto" variant="outline" size="sm" :disabled="!items.prev_page_url" @click="router.get(items.prev_page_url, {}, { preserveState:true, preserveScroll:true })">Sebelumnya</Button>
                     <Button class="w-full sm:w-auto" variant="outline" size="sm" :disabled="!items.next_page_url" @click="router.get(items.next_page_url, {}, { preserveState:true, preserveScroll:true })">Berikutnya</Button>
                 </div>
             </div>
-        </Card>
+        </section>
 
-        <Card class="overflow-hidden">
-            <div class="border-b p-4">
-                <h2 class="font-semibold text-sm">Transaksi Digiflazz terbaru</h2>
-                <p class="mt-0.5 text-xs text-muted-foreground">Ringkasan operasional transaksi terakhir.</p>
+        <section aria-labelledby="transaksi-heading" class="space-y-3">
+            <div>
+                <h2 id="transaksi-heading" class="text-lg font-semibold">Transaksi Digiflazz terbaru</h2>
+                <p class="mt-1 text-sm text-muted-foreground">Hasil pengiriman produk ke pembeli lewat Digiflazz, terbaru di atas.</p>
             </div>
-
-            <div class="overflow-x-auto overscroll-x-contain" role="region" aria-label="Transaksi Digiflazz" tabindex="0">
+            <div class="overflow-x-auto overscroll-x-contain rounded-md border border-border" role="region" aria-label="Transaksi Digiflazz" tabindex="0">
                 <Table class="min-w-[700px]">
                     <TableHeader>
                         <TableRow>
@@ -370,7 +368,7 @@ onUnmounted(() => {
                     </TableBody>
                 </Table>
             </div>
-        </Card>
+        </section>
     </div>
 </AdminShell>
 </template>

@@ -5,7 +5,6 @@ import { computed, reactive, ref, watch } from 'vue';
 import AdminShell from '../../Components/AdminShell.vue';
 import { Badge } from '../../Components/ui/badge';
 import { Button } from '../../Components/ui/button';
-import { Card } from '../../Components/ui/card';
 import { Input } from '../../Components/ui/input';
 import { Textarea } from '../../Components/ui/textarea';
 import { TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../Components/ui/table';
@@ -135,17 +134,17 @@ function saveQuickReplies() {
 </script>
 
 <template>
-<Head title="Layanan Pelanggan" />
+<Head title="Bantuan pelanggan" />
 <AdminShell>
     <div class="space-y-5">
         <header class="flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between">
             <div class="min-w-0">
-                <h1 class="text-2xl font-semibold tracking-tight">Layanan Pelanggan</h1>
+                <h1 class="text-2xl font-semibold tracking-tight">Bantuan pelanggan</h1>
                 <p class="mt-1 max-w-3xl text-sm text-muted-foreground">
-                    Tangani tiket bantuan dan percakapan pelanggan dari satu tempat.
+                    Daftar tiket bantuan yang masuk. Membuka satu tiket menampilkan isi pesan, riwayat balasan, dan formulir balasan — bukan percakapan langsung.
                 </p>
             </div>
-            <div class="flex flex-col gap-2 sm:flex-row">
+            <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                 <Button class="w-full sm:w-auto" variant="outline" @click="router.reload({ preserveScroll: true })">Muat ulang</Button>
                 <Button class="w-full sm:w-auto" variant="outline" @click="quickRepliesOpen = !quickRepliesOpen">
                     {{ quickRepliesOpen ? 'Tutup balasan cepat' : 'Atur balasan cepat' }}
@@ -158,14 +157,14 @@ function saveQuickReplies() {
             <span><strong class="text-foreground">{{ summary.in_progress || 0 }}</strong> diproses</span>
             <span><strong class="text-foreground">{{ summary.resolved || 0 }}</strong> selesai</span>
             <span><strong class="text-foreground">{{ summary.closed || 0 }}</strong> ditutup</span>
-            <span>{{ summary.total || 0 }} total · {{ summary.account || 0 }} dari akun · {{ summary.guest || 0 }} guest</span>
+            <span>{{ summary.total || 0 }} tiket · {{ summary.account || 0 }} dari akun · {{ summary.guest || 0 }} tanpa akun</span>
         </p>
 
-        <Card v-if="quickRepliesOpen" class="p-4">
+        <section v-if="quickRepliesOpen" class="rounded-md border border-border p-4" aria-labelledby="support-quick-heading">
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                    <h2 class="font-semibold">Balasan Cepat</h2>
-                    <p class="mt-1 text-sm text-muted-foreground">Maksimal 30 template. Template kosong otomatis diabaikan saat disimpan.</p>
+                    <h2 id="support-quick-heading" class="font-semibold">Balasan cepat</h2>
+                    <p class="mt-1 text-sm text-muted-foreground">Paling banyak 30 template. Baris kosong diabaikan saat disimpan.</p>
                 </div>
                 <Button size="sm" variant="outline" :disabled="quickRepliesForm.replies.length >= 30" @click="addQuickReply">Tambah template</Button>
             </div>
@@ -180,13 +179,13 @@ function saveQuickReplies() {
                     <Button :disabled="quickRepliesForm.processing">{{ quickRepliesForm.processing ? 'Menyimpan…' : 'Simpan balasan cepat' }}</Button>
                 </div>
             </form>
-        </Card>
+        </section>
 
-        <Card class="min-w-0 p-4 sm:p-5">
-            <form class="grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-6" @submit.prevent="submitFilters">
-                <label class="space-y-1 md:col-span-2">
+        <form class="border-y border-border py-4" @submit.prevent="submitFilters">
+            <div class="grid min-w-0 items-end gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <label class="space-y-1 sm:col-span-2">
                     <span class="text-sm font-medium">Cari tiket</span>
-                    <Input v-model="filters.q" maxlength="100" placeholder="Nomor tiket, pelanggan, email, subjek, atau invoice" />
+                    <Input v-model="filters.q" maxlength="100" placeholder="Nomor tiket, pelanggan, email, subjek, atau nomor pesanan" />
                 </label>
                 <label class="space-y-1">
                     <span class="text-sm font-medium">Status</span>
@@ -198,72 +197,78 @@ function saveQuickReplies() {
                         <option value="CLOSED">Ditutup</option>
                     </select>
                 </label>
-                <label class="space-y-1">
-                    <span class="text-sm font-medium">Kategori</span>
-                    <select v-model="filters.kind" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
-                        <option value="">Semua kategori</option>
-                        <option v-for="kind in kinds" :key="kind.code" :value="kind.code">{{ kind.label }}</option>
-                    </select>
-                </label>
-                <label class="space-y-1">
-                    <span class="text-sm font-medium">Sumber</span>
-                    <select v-model="filters.source" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
-                        <option value="">Semua sumber</option>
-                        <option value="ACCOUNT">Akun pelanggan</option>
-                        <option value="GUEST">Guest</option>
-                    </select>
-                </label>
-                <label class="space-y-1">
-                    <span class="text-sm font-medium">Tiket per halaman</span>
-                    <select v-model.number="filters.per_page" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
-                        <option :value="10">10</option><option :value="25">25</option><option :value="50">50</option><option :value="100">100</option>
-                    </select>
-                </label>
-                <div class="flex flex-col gap-2 sm:flex-row md:col-span-2 xl:col-span-6">
-                    <Button class="w-full sm:w-auto">Terapkan filter</Button>
+                <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                    <Button class="w-full sm:w-auto">Terapkan</Button>
                     <Button class="w-full sm:w-auto" type="button" variant="outline" @click="resetFilters">Hapus filter</Button>
                 </div>
-            </form>
-        </Card>
+            </div>
+            <details class="lf-admin-advanced mt-3 rounded-md border border-border">
+                <summary class="cursor-pointer px-4 py-3 text-sm font-medium">Filter lanjutan</summary>
+                <div class="grid gap-3 border-t border-border p-4 sm:grid-cols-3">
+                    <label class="space-y-1">
+                        <span class="text-sm font-medium">Kategori</span>
+                        <select v-model="filters.kind" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+                            <option value="">Semua kategori</option>
+                            <option v-for="kind in kinds" :key="kind.code" :value="kind.code">{{ kind.label }}</option>
+                        </select>
+                    </label>
+                    <label class="space-y-1">
+                        <span class="text-sm font-medium">Sumber tiket</span>
+                        <select v-model="filters.source" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+                            <option value="">Semua sumber</option>
+                            <option value="ACCOUNT">Akun pelanggan</option>
+                            <option value="GUEST">Tanpa akun</option>
+                        </select>
+                    </label>
+                    <label class="space-y-1">
+                        <span class="text-sm font-medium">Tiket per halaman</span>
+                        <select v-model.number="filters.per_page" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+                            <option :value="10">10 tiket</option><option :value="25">25 tiket</option><option :value="50">50 tiket</option><option :value="100">100 tiket</option>
+                        </select>
+                    </label>
+                </div>
+            </details>
+        </form>
 
-        <Card v-if="selectedTicket" class="p-4">
+        <section v-if="selectedTicket" class="border-t border-border pt-4" aria-labelledby="ticket-detail-heading">
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <div>
                     <div class="flex flex-wrap items-center gap-2">
-                        <h2 class="text-lg font-semibold">Tiket #{{ selectedTicket.id }}</h2>
+                        <h2 id="ticket-detail-heading" class="text-lg font-semibold">Tiket #{{ selectedTicket.id }}</h2>
                         <Badge :variant="statusVariant(selectedTicket.status)">{{ statusLabel(selectedTicket.status) }}</Badge>
                         <Badge variant="outline">{{ kindLabel(selectedTicket.kind) }}</Badge>
                         <Badge variant="outline">{{ sourceLabel(selectedTicket.source) }}</Badge>
                     </div>
                     <p class="mt-1 text-sm text-muted-foreground">{{ selectedTicket.subject }}</p>
                 </div>
-                <Link :href="closeTicketHref()" preserve-scroll class="inline-flex h-9 items-center rounded-md border px-3 text-sm">Tutup detail</Link>
+                <Link :href="closeTicketHref()" preserve-scroll class="inline-flex h-9 items-center rounded-md border border-border px-3 text-sm">Tutup detail</Link>
             </div>
 
             <div class="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
                 <div class="space-y-3">
-                    <article class="rounded-md border p-3">
+                    <article class="rounded-md border border-border p-3">
                         <div class="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground">
                             <strong class="text-foreground">{{ selectedTicket.customer_name }}</strong>
                             <span>{{ date(selectedTicket.created_at) }}</span>
                         </div>
-                        <p class="mt-2 whitespace-pre-wrap text-sm leading-6">{{ selectedTicket.message }}</p>
+                        <p class="mt-2 whitespace-pre-wrap break-words text-sm leading-6">{{ selectedTicket.message }}</p>
                     </article>
 
                     <article
                         v-for="message in selectedTicket.messages"
                         :key="message.id"
-                        class="rounded-md border p-3"
+                        class="rounded-md border border-border p-3"
                         :class="message.sender_type === 'ADMIN' ? 'bg-muted/35' : ''"
                     >
                         <div class="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground">
                             <strong class="text-foreground">{{ message.sender_name }}</strong>
                             <span>{{ message.sender_type === 'ADMIN' ? 'Admin' : 'Pelanggan' }} · {{ date(message.created_at) }}</span>
                         </div>
-                        <p class="mt-2 whitespace-pre-wrap text-sm leading-6">{{ message.message }}</p>
+                        <p class="mt-2 whitespace-pre-wrap break-words text-sm leading-6">{{ message.message }}</p>
                     </article>
 
-                    <form class="space-y-3 rounded-md border p-3" @submit.prevent="saveTicket">
+                    <form class="space-y-3 rounded-md border border-border p-3" aria-labelledby="ticket-reply-heading" @submit.prevent="saveTicket">
+                        <h3 id="ticket-reply-heading" class="text-sm font-semibold">Balas &amp; perbarui tiket</h3>
                         <div class="grid gap-3 md:grid-cols-2">
                             <label class="space-y-1">
                                 <span class="text-sm font-medium">Status tiket</span>
@@ -289,40 +294,41 @@ function saveQuickReplies() {
                         </div>
 
                         <label class="block space-y-1">
-                            <span class="text-sm font-medium">Balasan ke pelanggan</span>
+                            <span class="text-sm font-medium">Balasan untuk pelanggan</span>
                             <Textarea v-model="ticketForm.reply" rows="5" maxlength="5000" placeholder="Tulis balasan. Boleh dikosongkan jika hanya mengubah status atau kategori." />
                             <span v-if="ticketForm.errors.reply" class="text-xs text-destructive">{{ ticketForm.errors.reply }}</span>
                         </label>
 
                         <div class="flex justify-end">
-                            <Button :disabled="ticketForm.processing">{{ ticketForm.processing ? 'Menyimpan…' : 'Simpan / Kirim Balasan' }}</Button>
+                            <Button :disabled="ticketForm.processing">{{ ticketForm.processing ? 'Menyimpan…' : 'Kirim balasan' }}</Button>
                         </div>
                     </form>
                 </div>
 
-                <div class="space-y-3">
-                    <Card class="p-4">
-                        <p class="text-xs text-muted-foreground">Pelanggan</p>
-                        <strong class="mt-1 block text-sm">{{ selectedTicket.customer_name }}</strong>
-                        <p class="mt-1 break-all text-xs text-muted-foreground">{{ selectedTicket.customer_email || 'Email tidak tersedia' }}</p>
-                        <Link v-if="selectedTicket.user_id && canCustomers" :href="'/admin/customers/' + selectedTicket.user_id" class="mt-3 inline-flex text-sm font-medium underline">Buka pelanggan</Link>
-                    </Card>
-                    <Card class="p-4">
-                        <p class="text-xs text-muted-foreground">Pesanan terkait</p>
-                        <strong class="mt-1 block text-sm">{{ selectedTicket.order_number || 'Tidak terkait pesanan' }}</strong>
-                        <Link v-if="selectedTicket.order_id && canOrders" :href="'/admin/orders/' + selectedTicket.order_id" class="mt-3 inline-flex text-sm font-medium underline">Buka pesanan</Link>
-                    </Card>
-                    <Card class="p-4">
-                        <p class="text-xs text-muted-foreground">Penanganan terakhir</p>
-                        <strong class="mt-1 block text-sm">{{ selectedTicket.handler_name || 'Belum ditangani admin' }}</strong>
-                        <p class="mt-1 text-xs text-muted-foreground">{{ selectedTicket.handled_at ? date(selectedTicket.handled_at) : '—' }}</p>
-                    </Card>
-                </div>
+                <dl class="space-y-4 border-t border-border pt-4 xl:border-l xl:border-t-0 xl:pl-4 xl:pt-0">
+                    <div>
+                        <dt class="text-xs text-muted-foreground">Pelanggan</dt>
+                        <dd class="mt-0.5 text-sm font-medium">{{ selectedTicket.customer_name }}</dd>
+                        <dd class="break-all text-xs text-muted-foreground">{{ selectedTicket.customer_email || 'Email tidak tersedia' }}</dd>
+                        <dd v-if="selectedTicket.user_id && canCustomers"><Link :href="'/admin/customers/' + selectedTicket.user_id" class="mt-1 inline-flex text-sm underline underline-offset-4">Buka data pelanggan</Link></dd>
+                    </div>
+                    <div>
+                        <dt class="text-xs text-muted-foreground">Pesanan terkait</dt>
+                        <dd class="mt-0.5 text-sm font-medium">{{ selectedTicket.order_number || 'Tidak terkait pesanan' }}</dd>
+                        <dd v-if="selectedTicket.order_id && canOrders"><Link :href="'/admin/orders/' + selectedTicket.order_id" class="mt-1 inline-flex text-sm underline underline-offset-4">Buka pesanan</Link></dd>
+                    </div>
+                    <div>
+                        <dt class="text-xs text-muted-foreground">Penanganan terakhir</dt>
+                        <dd class="mt-0.5 text-sm font-medium">{{ selectedTicket.handler_name || 'Belum ditangani admin' }}</dd>
+                        <dd class="text-xs text-muted-foreground">{{ selectedTicket.handled_at ? date(selectedTicket.handled_at) : 'Belum ada' }}</dd>
+                    </div>
+                </dl>
             </div>
-        </Card>
+        </section>
 
-        <Card class="min-w-0 p-4">
-            <div class="overflow-x-auto" role="region" aria-label="Daftar tiket" tabindex="0">
+        <section class="min-w-0 border-t border-border pt-4" aria-labelledby="ticket-list-heading">
+            <h2 id="ticket-list-heading" class="text-lg font-semibold">Daftar tiket</h2>
+            <div class="mt-3 overflow-x-auto rounded-md border border-border" role="region" aria-label="Daftar tiket" tabindex="0">
                 <AdminResponsiveTable :mobile-columns="[0,1,6,7]">
                     <TableHeader>
                         <TableRow>
@@ -330,10 +336,10 @@ function saveQuickReplies() {
                             <TableHead>Pelanggan</TableHead>
                             <TableHead>Kategori</TableHead>
                             <TableHead>Pesanan</TableHead>
-                            <TableHead>Pesan</TableHead>
+                            <TableHead>Subjek</TableHead>
                             <TableHead>Penanganan</TableHead>
                             <TableHead>Status</TableHead>
-                            <TableHead class="text-right">Aksi</TableHead>
+                            <TableHead class="text-right">Tindakan</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -348,7 +354,7 @@ function saveQuickReplies() {
                                 <Badge variant="outline" class="mt-1">{{ sourceLabel(ticket.source) }}</Badge>
                             </TableCell>
                             <TableCell>{{ kindLabel(ticket.kind) }}</TableCell>
-                            <TableCell>{{ ticket.order_number || '—' }}</TableCell>
+                            <TableCell>{{ ticket.order_number || 'Tidak terkait' }}</TableCell>
                             <TableCell>
                                 <strong class="block max-w-64 truncate">{{ ticket.subject }}</strong>
                                 <span class="text-xs text-muted-foreground">{{ ticket.message_count }} pesan</span>
@@ -379,7 +385,7 @@ function saveQuickReplies() {
                     :class="['rounded-md border px-3 py-1.5 text-sm', link.active ? 'bg-primary text-primary-foreground' : 'bg-background', !link.url ? 'pointer-events-none opacity-40' : '']"
                 >{{ link.label }}</Link>
             </nav>
-        </Card>
+        </section>
     </div>
 </AdminShell>
 </template>

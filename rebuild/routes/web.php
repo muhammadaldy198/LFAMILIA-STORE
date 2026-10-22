@@ -285,6 +285,9 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
     Route::get('/admin/catalog', [AdminCatalogController::class, 'index'])
         ->middleware('admin.permission:catalog.manage')->name('admin.catalog.index');
 
+    Route::get('/admin/catalog/categories', [AdminCatalogController::class, 'categories'])
+        ->middleware('admin.permission:catalog.manage')->name('admin.categories.index');
+
     Route::middleware('admin.permission:catalog.manage')->prefix('admin/catalog')
         ->name('admin.catalog.')->group(function (): void {
             Route::post('/margin/preview', [AdminCatalogController::class, 'globalMarginPreview'])
@@ -339,12 +342,14 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
         Route::put('/admin/content/reviews/{review}', [AdminContentController::class, 'updateReview'])->middleware('throttle:admin-mutation')->name('admin.content.reviews.update');
         Route::delete('/admin/content/reviews/{review}', [AdminContentController::class, 'deleteReview'])->middleware('throttle:admin-mutation')->name('admin.content.reviews.delete');
         Route::put('/admin/content/pages/{key}', [AdminContentController::class, 'updatePage'])->middleware('throttle:admin-mutation')->name('admin.content.pages.update');
+        Route::put('/admin/catalog/assets/{asset}', [AdminCatalogController::class, 'asset'])->middleware('throttle:admin-mutation')->name('admin.catalog.assets.update');
+    });
 
-        Route::prefix('admin/catalog')->name('admin.catalog.')->group(function (): void {
-            Route::put('/assets/{asset}', [AdminCatalogController::class, 'asset'])->middleware('throttle:admin-mutation')->name('assets.update');
-            Route::post('/media/{type}/{id}', [AdminCatalogMediaController::class, 'store'])->name('media.store');
-            Route::delete('/media/{type}/{id}', [AdminCatalogMediaController::class, 'destroy'])->name('media.destroy');
-        });
+    // Unggah/hapus gambar dilindungi per jenis objek di controller: katalog butuh
+    // catalog.manage, konten butuh content.manage.
+    Route::prefix('admin/catalog')->name('admin.catalog.')->group(function (): void {
+        Route::post('/media/{type}/{id}', [AdminCatalogMediaController::class, 'store'])->name('media.store');
+        Route::delete('/media/{type}/{id}', [AdminCatalogMediaController::class, 'destroy'])->name('media.destroy');
     });
 
     Route::middleware('admin.permission:providers.manage')->group(function (): void {

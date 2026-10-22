@@ -24,7 +24,7 @@ const submit = () => {
 </script>
 
 <template>
-    <Head title="Masuk Admin" />
+    <Head title="Masuk admin" />
     <main class="lf-admin-auth lf-admin" style="min-height:100svh;display:grid;place-items:center;padding:16px;">
         <div style="width:100%;max-width:400px;">
             <!-- Brand -->
@@ -44,8 +44,8 @@ const submit = () => {
                 @submit.prevent="submit"
             >
                 <div>
-                    <div style="font-size:17px;font-weight:700;margin-bottom:4px;">Masuk ke Panel Admin</div>
-                    <div style="font-size:12px;color:var(--muted-foreground);">Gunakan akun yang telah didaftarkan oleh Super Admin.</div>
+                    <div style="font-size:17px;font-weight:700;margin-bottom:4px;">Masuk ke panel admin</div>
+                    <div style="font-size:12px;color:var(--muted-foreground);">Gunakan akun admin yang sudah didaftarkan oleh Super Admin toko.</div>
                 </div>
 
                 <!-- Status -->
@@ -86,13 +86,13 @@ const submit = () => {
 
                 <!-- Turnstile -->
                 <div v-if="security.turnstile_required" style="display:grid;gap:6px;">
-                    <span style="font-size:11px;color:var(--muted-foreground);">Verifikasi keamanan Cloudflare</span>
+                    <span style="font-size:11px;color:var(--muted-foreground);">Pemeriksaan keamanan</span>
                     <TurnstileWidget ref="turnstile" :site-key="security.turnstile_site_key" :action="security.turnstile_action" @token="form.turnstile_token = $event" />
                 </div>
 
                 <!-- Submit -->
                 <Button type="submit" :disabled="form.processing" style="width:100%;font-weight:600;">
-                    {{ form.processing ? 'Memproses…' : 'Masuk' }}
+                    {{ form.processing ? 'Memeriksa…' : 'Masuk' }}
                 </Button>
 
                 <!-- Forgot -->

@@ -42,6 +42,9 @@ class AdminAccessRestorationTest extends TestCase
 
     public function test_access_workspace_has_summary_filters_pagination_permissions_and_recent_activity(): void
     {
+        // Ringkasan menghitung seluruh akun, jadi mulai dari tabel kosong di dalam
+        // transaksi tes; rollback mengembalikan akun yang sudah ada.
+        AdminUser::query()->delete();
         $owner = $this->loginSuper(['name' => 'Owner Workspace']);
         $target = $this->admin('ADMIN', [
             'name' => 'Finance Operator',

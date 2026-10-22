@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AdminUser;
 use App\Services\AdminAuditService;
+use App\Support\AuditLabels;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -14,7 +15,7 @@ use Throwable;
 
 class AdminAuditController
 {
-    public function index(Request $request, AdminAuditService $audit): Response
+    public function index(Request $request, AdminAuditService $audit, AuditLabels $labels): Response
     {
         $dateToRules = ['nullable', 'date_format:Y-m-d'];
         if ($request->filled('date_from')) {
@@ -82,8 +83,8 @@ class AdminAuditController
             ->when(in_array($filters['role'], ['SUPER_ADMIN', 'ADMIN'], true), fn ($query) => $query->where('actor_role', $filters['role']))
             ->when($filters['action'] !== '', fn ($query) => $query->where('action', $filters['action']))
             ->when($filters['target_type'] !== '', fn ($query) => $query->where('target_type', $filters['target_type']))
-            ->when($filters['date_from'] !== '', fn ($query) => $query->where('created_at', '>=', Carbon::createFromFormat('Y-m-d', $filters['date_from'])->startOfDay()))
-            ->when($filters['date_to'] !== '', fn ($query) => $query->where('created_at', '<=', Carbon::createFromFormat('Y-m-d', $filters['date_to'])->endOfDay()))
+            ->when($filters['date_from'] !== '', fn ($query) => $query->where('created_at', '>=', $this->wibDayStart($filters['date_from'])))
+            ->when($filters['date_to'] !== '', fn ($query) => $query->where('created_at', '<=', $this->wibDayEnd($filters['date_to'])))
             ->orderByDesc('id');
 
         $logs = $query
@@ -116,7 +117,7 @@ class AdminAuditController
             ->get(['id', 'name', 'email'])
             ->keyBy('id');
 
-        $logs->through(function (object $row) use ($actorNames, $audit): array {
+        $logs->through(function (object $row) use ($actorNames, $audit, $labels): array {
             $actorId = is_numeric($row->actor_id) ? (int) $row->actor_id : null;
             $systemActor = $row->actor_type !== 'admin_user' || $actorId === null;
             $actor = ! $systemActor && $actorId !== null ? $actorNames->get($actorId) : null;
@@ -130,9 +131,9 @@ class AdminAuditController
                     'role' => $systemActor ? 'SYSTEM' : $row->actor_role,
                 ],
                 'action' => (string) $row->action,
-                'action_label' => $this->actionLabel((string) $row->action),
+                'action_label' => $labels->actionLabel((string) $row->action),
                 'target_type' => (string) $row->target_type,
-                'target_label' => $this->targetLabel((string) $row->target_type),
+                'target_label' => $labels->targetLabel((string) $row->target_type),
                 'target_id' => $row->target_id,
                 'before_state' => $this->safeState($row->before, $audit),
                 'after_state' => $this->safeState($row->after, $audit),
@@ -145,8 +146,8 @@ class AdminAuditController
 
         $summary = [
             'total' => DB::table('audit_logs')->count(),
-            'today' => DB::table('audit_logs')->where('created_at', '>=', now()->startOfDay())->count(),
-            'last_7_days' => DB::table('audit_logs')->where('created_at', '>=', now()->subDays(7))->count(),
+            'today' => DB::table('audit_logs')->where('created_at', '>=', $this->wibDayStart(Carbon::now('Asia/Jakarta')->toDateString()))->count(),
+            'last_7_days' => DB::table('audit_logs')->where('created_at', '>=', $this->storageTime(Carbon::now('Asia/Jakarta')->subDays(7)))->count(),
             'actors' => DB::table('audit_logs')->whereNotNull('actor_id')->distinct()->count('actor_id'),
         ];
 
@@ -172,7 +173,7 @@ class AdminAuditController
             ->pluck('action')
             ->map(fn (string $action): array => [
                 'value' => $action,
-                'label' => $this->actionLabel($action),
+                'label' => $labels->actionLabel($action),
             ])
             ->values();
 
@@ -184,7 +185,7 @@ class AdminAuditController
             ->pluck('target_type')
             ->map(fn (string $target): array => [
                 'value' => $target,
-                'label' => $this->targetLabel($target),
+                'label' => $labels->targetLabel($target),
             ])
             ->values();
 
@@ -196,6 +197,24 @@ class AdminAuditController
             'actions' => $actions,
             'targetTypes' => $targetTypes,
         ]);
+    }
+
+    /** Awal hari WIB, dinyatakan dalam zona waktu penyimpanan created_at. */
+    private function wibDayStart(string $date): Carbon
+    {
+        return $this->storageTime(Carbon::createFromFormat('Y-m-d', $date, 'Asia/Jakarta')->startOfDay());
+    }
+
+    /** Akhir hari WIB, dinyatakan dalam zona waktu penyimpanan created_at. */
+    private function wibDayEnd(string $date): Carbon
+    {
+        return $this->storageTime(Carbon::createFromFormat('Y-m-d', $date, 'Asia/Jakarta')->endOfDay());
+    }
+
+    /** Samakan batas tanggal dengan zona waktu yang dipakai saat baris audit ditulis. */
+    private function storageTime(Carbon $moment): Carbon
+    {
+        return $moment->setTimezone(config('app.timezone', 'UTC'));
     }
 
     private function safeState(mixed $value, AdminAuditService $audit): mixed
@@ -217,137 +236,5 @@ class AdminAuditController
         }
 
         return $audit->redact($decoded);
-    }
-
-    private function actionLabel(string $action): string
-    {
-        $parts = array_values(array_filter(explode('.', $action), fn (string $part): bool => $part !== ''));
-        if ($parts === []) {
-            return 'Aktivitas Admin';
-        }
-
-        $module = [
-            'admin' => 'Admin & Akses',
-            'order' => 'Pesanan',
-            'catalog' => 'Produk',
-            'product' => 'Produk',
-            'category' => 'Produk',
-            'package' => 'Produk',
-            'fulfillment' => 'Manual',
-            'content' => 'Banner & Konten',
-            'banner' => 'Banner & Konten',
-            'news' => 'Banner & Konten',
-            'review' => 'Banner & Konten',
-            'faq' => 'Banner & Konten',
-            'digiflazz' => 'Digiflazz',
-            'nickname' => 'Validasi Akun',
-            'nickname_game_code' => 'Validasi Akun',
-            'provider' => 'Provider',
-            'payment' => 'Pembayaran',
-            'customer' => 'Pelanggan',
-            'wallet' => 'Pelanggan',
-            'voucher' => 'Promo',
-            'promo' => 'Promo',
-            'popular' => 'Promo',
-            'support' => 'Layanan Pelanggan',
-            'report' => 'Laporan',
-            'settings' => 'Pengaturan',
-            'membership' => 'Pengaturan',
-            'configuration' => 'Pengaturan',
-            'integration' => 'Integrasi',
-        ][$parts[0]] ?? 'Administrasi';
-
-        $operation = array_pop($parts);
-        array_shift($parts);
-
-        $operationLabel = [
-            'created' => 'ditambahkan',
-            'updated' => 'diperbarui',
-            'deleted' => 'dihapus',
-            'enabled' => 'diaktifkan',
-            'disabled' => 'dinonaktifkan',
-            'revealed' => 'ditampilkan',
-            'exported' => 'diekspor',
-            'adjusted' => 'disesuaikan',
-            'confirmed' => 'dikonfirmasi',
-            'completed' => 'diselesaikan',
-            'failed' => 'ditandai gagal',
-            'retried' => 'dicoba ulang',
-            'reconciled' => 'direkonsiliasi',
-            'synced' => 'disinkronkan',
-            'imported' => 'diimpor',
-            'reordered' => 'diurutkan ulang',
-            'uploaded' => 'diunggah',
-            'tested' => 'dites',
-            'settings_updated' => 'pengaturan diperbarui',
-            'status_updated' => 'status diperbarui',
-            'margin_updated' => 'margin diperbarui',
-            'price_updated' => 'harga diperbarui',
-            'toggled' => 'diubah statusnya',
-            'activated' => 'diaktifkan',
-            'deactivated' => 'dinonaktifkan',
-            'replied' => 'dibalas',
-            'sent' => 'dikirim',
-            'resolved' => 'diselesaikan',
-            'closed' => 'ditutup',
-        ][$operation] ?? str_replace('_', ' ', $operation);
-
-        $subjectMap = [
-            'secret' => 'kredensial',
-            'channel' => 'metode pembayaran',
-            'gateway' => 'gateway',
-            'route' => 'routing',
-            'wallet' => 'saldo',
-            'tier' => 'membership',
-            'membership' => 'membership',
-            'monitor' => 'monitor',
-            'settings' => 'pengaturan',
-            'game_code' => 'kode game',
-            'quick_reply' => 'balasan cepat',
-            'presentation' => 'tampilan',
-            'banner' => 'banner',
-            'media' => 'media',
-            'category' => 'kategori',
-            'mapping' => 'mapping provider',
-            'product' => 'produk',
-            'package' => 'nominal',
-            'store' => 'toko',
-        ];
-
-        $subject = collect($parts)
-            ->map(fn (string $part): string => $subjectMap[$part] ?? str_replace('_', ' ', $part))
-            ->filter()
-            ->implode(' ');
-
-        return trim($module.' — '.($subject !== '' ? ucfirst($subject).' ' : '').$operationLabel);
-    }
-
-    private function targetLabel(string $target): string
-    {
-        return [
-            'admin_user' => 'Akun Admin',
-            'order' => 'Pesanan',
-            'product' => 'Produk',
-            'product_package' => 'Nominal',
-            'product_category' => 'Kategori',
-            'provider' => 'Provider',
-            'provider_mapping' => 'Mapping Provider',
-            'payment' => 'Pembayaran',
-            'payment_channel' => 'Metode Pembayaran',
-            'payment_gateway' => 'Gateway Pembayaran',
-            'customer' => 'Pelanggan',
-            'customer_user' => 'Pelanggan',
-            'wallet' => 'Saldo Pelanggan',
-            'voucher' => 'Voucher',
-            'support_ticket' => 'Tiket Pelanggan',
-            'integration' => 'Integrasi',
-            'integration_credential' => 'Integrasi',
-            'settings' => 'Pengaturan',
-            'system_setting' => 'Pengaturan Sistem',
-            'home_banner' => 'Banner',
-            'nickname_game_code' => 'Kode Game',
-            'membership_tier' => 'Membership',
-            'report' => 'Laporan',
-        ][$target] ?? ucwords(str_replace('_', ' ', $target));
     }
 }

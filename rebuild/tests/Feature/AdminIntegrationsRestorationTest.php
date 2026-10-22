@@ -76,7 +76,7 @@ class AdminIntegrationsRestorationTest extends TestCase
                     ->firstWhere('key', 'server_key');
 
                 return $midtrans['environment'] === 'sandbox'
-                    && $midtrans['environment_label'] === 'SANDBOX / TEST'
+                    && $midtrans['environment_label'] === 'Masa uji'
                     && $midtrans['credential_scope'] === 'per_environment'
                     && $sandbox['configured'] === true
                     && $sandbox['value'] === null

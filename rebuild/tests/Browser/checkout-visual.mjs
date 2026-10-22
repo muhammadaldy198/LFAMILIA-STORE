@@ -78,8 +78,9 @@ try{
  await admin.locator('input[aria-label="Aksen biru / tombol utama HEX"]').fill('#75AAFF');
  await admin.locator('input[aria-label="Permukaan HEX"]').fill('#17243A');
  await admin.locator('input[aria-label="Kartu HEX"]').fill('#223344');
- await admin.getByRole('button',{name:'Simpan Perubahan',exact:true}).click();
- await admin.getByText('Warna website berhasil disimpan.',{exact:true}).first().waitFor();
+ await admin.getByRole('button',{name:'Simpan perubahan',exact:true}).click();
+ // Halaman presentasi memakai tombol simpan tunggal; tunggu sampai penyimpanan selesai.
+ await admin.waitForFunction(()=>!document.body.textContent.includes('Menyimpan…'),null,{timeout:15000});
  if(await admin.locator('.lf-admin').evaluate(e=>getComputedStyle(e).backgroundColor)!==white)throw Error('Customer palette recolored Admin');
  const customer=await observedPage({viewport:{width:390,height:844}});
  await customer.goto(base+'/catalog/browser-checkout-game');
@@ -95,7 +96,7 @@ try{
  const voucherBackground=await customer.locator('.lfx-offer-modal').evaluate(e=>getComputedStyle(e).backgroundImage);
  if(!voucherBackground.includes('38, 55, 87'))throw Error('Saved surface did not reach voucher modal: '+voucherBackground);
  await admin.getByRole('button',{name:'Kembalikan warna bawaan',exact:true}).click();
- await admin.getByRole('button',{name:'Simpan Perubahan',exact:true}).click();
+ await admin.getByRole('button',{name:'Simpan perubahan',exact:true}).click();
  await admin.waitForFunction(()=>document.documentElement.style.getPropertyValue('--lf-color-primary')==='#609CFF');
  await admin.close();await customer.close();
  await fs.writeFile(output+'/report.json',JSON.stringify({baseline:'a42f97d3a6d5a8a5cb59bd651ce9ffe1a8c928f2',report,quote,adminTheme:{persisted:true,cta:true,paymentCards:true,voucherSurface:true,reset:true,whiteAdmin:true},noFinancialActions:true},null,2));

@@ -16,7 +16,7 @@ test('wallet UI validation matches backend signed integer and reason limits', ()
     assert.equal(walletAdjustmentError(100, '   valid   '), '');
 });
 test('both admin wallet forms expose client/server validation errors', () => {
-    for (const name of ['Customers.vue', 'CustomerDetail.vue']) {
+    for (const name of ['CustomerDetail.vue']) {
         const source = read(name);
         assert.match(source, /walletAdjustmentError\(/);
         assert.match(source, /onError: \(errors\)/);
@@ -32,7 +32,7 @@ test('notification date formatting and collection guards', () => {
 });
 test('admin props are null-safe across dashboard, customer tier, presentation, Digiflazz', () => {
     const dash = read('Dashboard.vue');
-    for (const key of ['chart', 'notifications', 'recentOrders', 'topProducts', 'integrations']) {
+    for (const key of ['chart', 'notifications', 'recentOrders', 'integrations']) {
         assert.ok(dash.includes('Array.isArray(props.' + key + ')'));
     }
     assert.match(read('CustomerDetail.vue'), /v-if="membershipProfile"/);
@@ -76,7 +76,9 @@ test('catalog prices preserve markup for manual store-cost mappings and shared t
 
     const customers = read('Customers.vue');
     assert.match(customers, /canManageMembershipRules: Boolean/);
-    assert.match(customers, /<Card v-if="canManageMembershipRules"/);
+    // Aturan tingkat member pindah ke tab sendiri di halaman Pelanggan.
+    assert.match(customers, /tab === 'membership'/);
+    assert.match(customers, /<Sheet :open="editingTier === tier"/);
 });
 
 
@@ -108,8 +110,8 @@ test('reports separates sections and keeps operations grouped', () => {
     assert.match(source, /visible\('sales'\)/);
     assert.match(source, /visible\('products'\)/);
     assert.match(source, /visible\('operations'\)/);
-    assert.match(source, /Produk Terlaris/);
-    assert.match(source, /Kategori Teratas/);
+    assert.match(source, /Produk terlaris/);
+    assert.match(source, /Kategori teratas/);
     assert.match(source, /Kinerja penyedia layanan/);
     assert.match(source, /v-if="canViewFinance"/);
     assert.match(source, /v-show="visible\('operations'\)"/);
@@ -198,10 +200,10 @@ test('payment settings keep one page and edit each method in a sheet', () => {
 
 test('customer detail starts at profile and confirms wallet changes', () => {
     const source = read('CustomerDetail.vue');
-    const profile = source.indexOf('customer-profile-heading');
-    assert.ok(profile > -1);
-    assert.ok(source.indexOf('lf-admin-summary') > source.indexOf('customer-profile-heading'));
-    assert.ok(source.indexOf('customer-profile-heading') < source.indexOf('customer-tier-heading'));
+    // Urutan rancangan 4.12: ringkasan -> profil -> tingkat -> pesanan -> saldo -> tiket -> akun.
+    const order = ['lf-admin-summary', 'customer-profile-heading', 'customer-tier-heading', 'customer-orders-heading', 'customer-wallet-heading', 'customer-support-heading', 'customer-accounts-heading'];
+    let previous = -1;
+    for (const marker of order) { const position = source.indexOf(marker); assert.ok(position > previous, marker); previous = position; }
     assert.match(source, /withSensitive\(`Konfirmasi \$\{direction\} saldo pelanggan/);
     assert.match(source, /function saveWallet\(amount, reason\)/);
 });
@@ -219,12 +221,13 @@ test('support and fulfillment lead with the work list instead of metric cards', 
     }
 });
 
-test('list-page wallet adjustment confirms before posting', () => {
-    const source = read('Customers.vue');
-    // Konfirmasi saldo sekarang lewat pop-up kata sandi (withSensitive), bukan window.confirm.
-    assert.match(source, /withSensitive\(`Konfirmasi \$\{direction\} saldo \$\{editor\.value\.name\}/);
+test('wallet adjustment lives on the detail page and confirms before posting', () => {
+    // Daftar pelanggan hanya untuk mencari dan membuka detail (rancangan 4.12).
+    assert.doesNotMatch(read('Customers.vue'), /adjustWallet|saveWallet/);
+    const source = read('CustomerDetail.vue');
+    assert.match(source, /withSensitive\(`Konfirmasi \$\{direction\} saldo pelanggan sebesar/);
     assert.match(source, /function saveWallet\(amount, reason\)/);
-    assert.doesNotMatch(source, /window\.confirm\(`Konfirmasi \$\{direction\} saldo/);
+    assert.doesNotMatch(source, /window\.confirm\(`Konfirmasi/);
 });
 
 test('product notices use dark theme tokens and render a preview', () => {

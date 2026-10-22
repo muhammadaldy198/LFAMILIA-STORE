@@ -20,6 +20,16 @@ const manualOpen = ref(false);
 const notice = ref('');
 const manual = useForm({ customer_name: '', phone: '', email: '', product_name: '', package_name: '', destination: '', total_idr: '', note: '', payment_received: false, idempotency_key: '' });
 const money = value => 'Rp' + Number(value).toLocaleString('id-ID');
+// Status bayar dibaca dari status pesanan + waktu bayar; tabel orders tidak
+// menyimpan kolom payment_status terpisah.
+function paymentLabel(row) {
+    if (row.paid_at) return 'Sudah dibayar';
+    if (row.status === 'PENDING_PAYMENT') return 'Menunggu pembayaran';
+    if (row.status === 'EXPIRED') return 'Kedaluwarsa';
+    if (row.status === 'CANCELLED') return 'Dibatalkan';
+    return 'Belum dibayar';
+}
+const activeFilters = computed(() => ['provider', 'payment', 'from', 'to'].filter(key => String(filters.value[key] ?? '') !== '').length);
 const date = value => value ? new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Jakarta' }).format(new Date(value)) + ' WIB' : 'Belum tersedia';
 const sortedOrders = computed(() => [...props.orders.data].sort((a, b) => {
     // Backend sudah mengurutkan prioritas di SQL sebelum pagination; ini hanya
@@ -75,47 +85,52 @@ onUnmounted(() => clearInterval(timer));
 <Head title="Pesanan" />
 <AdminShell>
     <header class="flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between">
-        <div class="min-w-0"><h1 class="text-2xl font-semibold tracking-tight">Pesanan</h1><p class="mt-1 max-w-2xl text-sm text-muted-foreground">Pantau pembayaran, tujuan, dan status penyelesaian pesanan di satu tempat.</p></div>
+        <div class="min-w-0"><h1 class="text-2xl font-semibold tracking-tight">Pesanan</h1><p class="mt-1 max-w-2xl text-sm text-muted-foreground">Pesanan bermasalah tampil paling atas, lalu pesanan terbaru. Status dan tanggal memakai waktu Indonesia Barat.</p></div>
         <Button v-if="canCreateManual" class="w-full sm:w-auto" @click="openManual">Catat pesanan manual</Button>
     </header>
     <p v-if="notice" role="status" class="mt-3 text-sm">{{ notice }}</p>
     <div class="lf-admin-summary mt-5">
         <Card v-for="metric in metrics" :key="metric.label" class="min-w-0 p-4"><p class="text-sm text-muted-foreground">{{ metric.label }}</p><p class="mt-2 text-2xl font-semibold">{{ Number(metric.value).toLocaleString('id-ID') }}</p></Card>
     </div>
-    <Card class="mt-5 min-w-0 p-4 sm:p-5">
-        <form @submit.prevent="apply" class="grid min-w-0 items-end gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <form @submit.prevent="apply" class="mt-5 space-y-3 border-y border-border py-4">
+        <div class="grid min-w-0 items-end gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <label class="space-y-1 sm:col-span-2"><span class="text-sm font-medium">Cari pesanan</span><Input v-model="filters.q" placeholder="Nomor pesanan, pelanggan, produk, atau tujuan" maxlength="150" /></label>
             <label class="space-y-1"><span class="text-sm font-medium">Status pesanan</span><select v-model="filters.status" class="order-select"><option value="">Semua status</option><option v-for="(label, key) in statuses" :key="key" :value="key">{{ label }}</option><option value="attention">Perlu perhatian</option></select></label>
-            <label class="space-y-1"><span class="text-sm font-medium">Penyedia</span><select v-model="filters.provider" class="order-select"><option value="">Semua penyedia</option><option v-for="provider in providers" :key="provider" :value="provider">{{ provider === 'MANUAL' ? 'Penanganan manual' : provider.charAt(0) + provider.slice(1).toLowerCase() }}</option></select></label>
-            <label class="space-y-1"><span class="text-sm font-medium">Metode pembayaran</span><select v-model="filters.payment" class="order-select"><option value="">Semua metode</option><option v-for="channel in channels" :key="channel.code" :value="channel.code">{{ channel.name }}</option><option v-if="!channels.some(c => c.code === 'WALLET')" value="WALLET">Saldo akun</option><option value="ADMIN_MANUAL">Pembayaran dicatat admin</option></select></label>
-            <label class="space-y-1"><span class="text-sm font-medium">Dari tanggal (WIB)</span><Input v-model="filters.from" type="date" /></label>
-            <label class="space-y-1"><span class="text-sm font-medium">Sampai tanggal (WIB)</span><Input v-model="filters.to" type="date" :min="filters.from || undefined" /></label>
-            <label class="space-y-1"><span class="text-sm font-medium">Pesanan per halaman</span><select v-model="filters.per_page" class="order-select"><option v-for="size in [10,25,50,100]" :key="size" :value="size">{{ size }} pesanan</option></select></label>
-            <div class="flex flex-wrap gap-2 sm:col-span-2 xl:col-span-4"><Button type="submit" :disabled="busy">Terapkan filter</Button><Button type="button" variant="outline" @click="reset" :disabled="busy">Hapus filter</Button></div>
-        </form>
-        <p v-for="(error,key) in $page.props.errors" :key="key" role="alert" class="mt-2 text-sm text-destructive">{{ error }}</p>
-        <p class="mt-3 text-xs text-muted-foreground">Ringkasan mengikuti filter yang diterapkan. Tanggal menggunakan waktu Indonesia Barat.</p>
-    </Card>
+            <div class="flex flex-wrap gap-2"><Button type="submit" :disabled="busy">Terapkan</Button><Button type="button" variant="outline" @click="reset" :disabled="busy">Hapus filter</Button></div>
+        </div>
+        <details class="lf-admin-advanced rounded-md border border-border">
+            <summary class="cursor-pointer px-4 py-3 text-sm font-medium">Filter lanjutan<template v-if="activeFilters"> ({{ activeFilters }} aktif)</template></summary>
+            <div class="grid min-w-0 items-end gap-3 border-t border-border p-4 sm:grid-cols-2 xl:grid-cols-4">
+                <label class="space-y-1"><span class="text-sm font-medium">Penyedia</span><select v-model="filters.provider" class="order-select"><option value="">Semua penyedia</option><option v-for="provider in providers" :key="provider" :value="provider">{{ provider === 'MANUAL' ? 'Penanganan manual' : provider.charAt(0) + provider.slice(1).toLowerCase() }}</option></select></label>
+                <label class="space-y-1"><span class="text-sm font-medium">Metode pembayaran</span><select v-model="filters.payment" class="order-select"><option value="">Semua metode</option><option v-for="channel in channels" :key="channel.code" :value="channel.code">{{ channel.name }}</option><option v-if="!channels.some(c => c.code === 'WALLET')" value="WALLET">Saldo akun</option><option value="ADMIN_MANUAL">Pembayaran dicatat admin</option></select></label>
+                <label class="space-y-1"><span class="text-sm font-medium">Dari tanggal (WIB)</span><Input v-model="filters.from" type="date" /></label>
+                <label class="space-y-1"><span class="text-sm font-medium">Sampai tanggal (WIB)</span><Input v-model="filters.to" type="date" :min="filters.from || undefined" /></label>
+                <label class="space-y-1"><span class="text-sm font-medium">Pesanan per halaman</span><select v-model="filters.per_page" class="order-select"><option v-for="size in [10,25,50,100]" :key="size" :value="size">{{ size }} pesanan</option></select></label>
+            </div>
+        </details>
+        <p v-for="(error,key) in $page.props.errors" :key="key" role="alert" class="text-sm text-destructive">{{ error }}</p>
+        <p class="text-xs text-muted-foreground">Ringkasan mengikuti filter yang diterapkan. Tanggal menggunakan waktu Indonesia Barat.</p>
+    </form>
     <div class="my-4 flex flex-wrap items-center justify-between gap-3">
         <div class="flex flex-wrap items-center gap-3"><Button variant="outline" @click="refresh" :disabled="busy">{{ busy ? 'Memuat…' : 'Muat ulang' }}</Button><label class="flex items-center gap-2 text-sm"><AdminSwitch v-model="auto" />Perbarui otomatis setiap 30 detik</label></div>
         <Button variant="outline" as-child><a :href="exportUrl">Unduh hasil filter</a></Button>
         <p class="w-full text-xs text-muted-foreground">Terakhir diperbarui: {{ date(updatedAt) }}. Pembaruan otomatis berhenti sementara saat formulir diisi atau pesanan dipilih.</p>
     </div>
-    <Card class="min-w-0 overflow-hidden">
+    <div class="min-w-0 overflow-hidden rounded-md border border-border">
         <div class="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between"><label class="flex items-center gap-2 text-sm"><input type="checkbox" :checked="allSelected" @change="toggleAll" :disabled="!orders.data.length" class="size-4" />Pilih pesanan di halaman ini</label><div class="flex flex-wrap items-center gap-3"><span class="text-sm text-muted-foreground" role="status">{{ selected.length }} pesanan dipilih</span><Button class="w-full sm:w-auto" variant="outline" size="sm" @click="exportSelected" :disabled="!selected.length">Unduh yang dipilih</Button></div></div>
         <!-- Tabel Pesanan (Horizontally Scrollable di semua ukuran layar) -->
         <div class="overflow-x-auto overscroll-x-contain" tabindex="0" role="region" aria-label="Daftar pesanan, geser mendatar untuk melihat semua kolom">
             <Table class="min-w-[850px] table-fixed">
                 <TableHeader>
                     <TableRow>
-                        <TableHead class="w-[5%]">Pilih</TableHead>
-                        <TableHead class="w-[18%]">Pesanan</TableHead>
-                        <TableHead class="w-[16%]">Pelanggan</TableHead>
-                        <TableHead class="w-[20%]">Produk & Tujuan</TableHead>
-                        <TableHead class="w-[16%]">Pembayaran</TableHead>
-                        <TableHead class="w-[15%]">Status Pembayaran</TableHead>
-                        <TableHead class="w-[15%]">Status Proses</TableHead>
-                        <TableHead class="w-[10%] text-right">Aksi</TableHead>
+                        <TableHead class="w-[4%]">Pilih</TableHead>
+                        <TableHead class="w-[17%]">Pesanan</TableHead>
+                        <TableHead class="w-[15%]">Pelanggan</TableHead>
+                        <TableHead class="w-[19%]">Produk &amp; tujuan</TableHead>
+                        <TableHead class="w-[14%]">Pembayaran</TableHead>
+                        <TableHead class="w-[11%]">Status Pembayaran</TableHead>
+                        <TableHead class="w-[11%]">Status Proses</TableHead>
+                        <TableHead class="w-[9%] text-right">Tindakan</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -142,25 +157,25 @@ onUnmounted(() => clearInterval(timer));
                             <p class="text-[10px] text-muted-foreground">{{ row.provider }}</p>
                         </TableCell>
                         <TableCell class="break-words">
-                            <Badge variant="outline" class="text-[10px]">{{ row.paid_at ? 'Dibayar' : 'Belum dibayar' }}</Badge>
+                            <Badge variant="outline" class="text-[10px]">{{ paymentLabel(row) }}</Badge>
                         </TableCell>
                         <TableCell class="break-words">
                             <Badge variant="secondary" class="text-[10px]">{{ row.status_label }}</Badge>
-                            <p v-if="row.needs_attention" class="mt-1 text-[10px] font-semibold text-amber-500">Perlu perhatian</p>
+                            <p v-if="row.needs_attention" class="mt-1 text-[10px] font-semibold text-amber-700">Perlu perhatian</p>
                         </TableCell>
                         <TableCell class="text-right">
                             <Button variant="outline" size="sm" as-child class="h-7 text-xs"><Link :href="'/admin/orders/'+row.id">Detail</Link></Button>
                         </TableCell>
                     </TableRow>
                     <TableRow v-if="!orders.data.length">
-                        <TableCell colspan="7" class="p-8 text-center text-sm text-muted-foreground">Tidak ada pesanan yang sesuai.</TableCell>
+                        <TableCell colspan="8" class="p-8 text-center text-sm text-muted-foreground">Tidak ada pesanan yang sesuai.</TableCell>
                     </TableRow>
                 </TableBody>
             </Table>
         </div>
         <div class="flex flex-wrap items-center justify-between gap-3 border-t p-4"><p class="text-sm text-muted-foreground">{{ orders.from || 0 }}–{{ orders.to || 0 }} dari {{ orders.total }} pesanan · Halaman {{ orders.current_page }} dari {{ orders.last_page }}</p><div class="flex gap-2"><Button variant="outline" size="sm" :disabled="!orders.prev_page_url || busy" @click="router.get(orders.prev_page_url, {}, { preserveState:true, preserveScroll:true, onSuccess:()=>selected=[] })">Sebelumnya</Button><Button variant="outline" size="sm" :disabled="!orders.next_page_url || busy" @click="router.get(orders.next_page_url, {}, { preserveState:true, preserveScroll:true, onSuccess:()=>selected=[] })">Berikutnya</Button></div></div>
-    </Card>
-    <Card class="mt-5 p-4"><h2 class="font-semibold">Aktivitas pesanan terbaru</h2><p v-if="!activities.length" class="mt-3 text-sm text-muted-foreground">Belum ada aktivitas pesanan.</p><ol class="mt-3 max-h-80 divide-y overflow-auto"><li v-for="activity in activities" :key="activity.id" class="py-3 text-sm"><Link :href="'/admin/orders/'+activity.order_id" class="break-all font-medium underline underline-offset-4">{{ activity.order_number }}</Link><p>{{ activity.label }}</p><p class="mt-1 text-xs text-muted-foreground">{{ date(activity.created_at) }}</p></li></ol></Card>
+    </div>
+    <section class="mt-6" aria-labelledby="order-activity-heading"><h2 id="order-activity-heading" class="font-semibold">Aktivitas pesanan terbaru</h2><p v-if="!activities.length" class="mt-3 text-sm text-muted-foreground">Belum ada aktivitas pesanan.</p><ol class="mt-3 max-h-80 divide-y overflow-auto"><li v-for="activity in activities" :key="activity.id" class="py-3 text-sm"><Link :href="'/admin/orders/'+activity.order_id" class="break-all font-medium underline underline-offset-4">{{ activity.order_number }}</Link><p>{{ activity.label }}</p><p class="mt-1 text-xs text-muted-foreground">{{ date(activity.created_at) }}</p></li></ol></section>
     <Sheet v-model:open="manualOpen"><SheetContent class="w-full overflow-y-auto sm:max-w-xl"><SheetHeader><SheetTitle>Catat pesanan manual</SheetTitle><SheetDescription>Untuk pesanan khusus yang pembayarannya sudah diterima di luar pembayaran otomatis.</SheetDescription></SheetHeader>
         <form @submit.prevent="createManual" class="mt-6 space-y-4">
             <div v-for="field in [{key:'customer_name',label:'Nama pelanggan'},{key:'phone',label:'Nomor telepon / WhatsApp'},{key:'email',label:'Email (opsional)'},{key:'product_name',label:'Nama produk'},{key:'package_name',label:'Nama paket'},{key:'destination',label:'Tujuan / ID akun'}]" :key="field.key"><label :for="'manual-'+field.key" class="mb-1 block text-sm font-medium">{{ field.label }}</label><Input :id="'manual-'+field.key" v-model="manual[field.key]" :type="field.key==='email'?'email':'text'" :required="field.key!=='email'" :disabled="manual.processing" /><p v-if="manual.errors[field.key]" class="mt-1 text-sm text-destructive">{{ manual.errors[field.key] }}</p></div>
@@ -175,5 +190,6 @@ onUnmounted(() => clearInterval(timer));
 </AdminShell>
 </template>
 <style scoped>
+:deep([data-slot=table]) { min-width:850px; }
 .order-select { display:block;width:100%;height:2.5rem;border:1px solid hsl(var(--border));border-radius:calc(var(--radius) - 2px);background:transparent;padding:0 .75rem;font-size:.875rem; }
 </style>

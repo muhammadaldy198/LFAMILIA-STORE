@@ -140,11 +140,11 @@ class AdminIntegrationController
                 'configured_required' => $currentProfile['configured_required'],
                 'required_complete' => $currentProfile['required_complete'],
                 'credential_status' => $currentProfile['required_complete']
-                    ? 'Credential configured'
+                    ? 'Kredensial lengkap'
                     : 'Belum dikonfigurasi',
                 'credential' => [
                     'status' => $currentProfile['required_complete'] ? 'CONFIGURED' : 'MISSING',
-                    'label' => $currentProfile['required_complete'] ? 'Configured' : 'Kredensial belum lengkap',
+                    'label' => $currentProfile['required_complete'] ? 'Sudah diisi' : 'Kredensial belum lengkap',
                 ],
                 'connection' => $connection,
                 'callback' => $callback,

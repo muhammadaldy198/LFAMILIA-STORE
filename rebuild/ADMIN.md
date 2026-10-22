@@ -18,21 +18,22 @@ Menu dari `AdminPermissionService`:
 1. Dashboard
 2. Pesanan
 3. Produk
-4. Manual
-5. Banner & Konten
-6. Digiflazz
-7. Validasi Akun
-8. Provider
-9. Pembayaran
-10. Pelanggan
-11. Promo
-12. Layanan Pelanggan
-13. Laporan
-14. Admin & Akses
-15. Pengaturan
-16. Integrasi
-17. System Health
-18. Audit Log
+4. Kategori
+5. Manual
+6. Banner & Konten
+7. Digiflazz
+8. Validasi Akun
+9. Provider
+10. Pembayaran
+11. Pelanggan
+12. Promo
+13. Layanan Pelanggan
+14. Laporan
+15. Admin & Akses
+16. Pengaturan
+17. Integrasi
+18. System Health
+19. Audit Log
 
 `Validasi Akun`, `Admin & Akses`, `Integrasi`, `System Health`, dan `Audit Log` bersifat super-only pada menu service. Menu lain tunduk pada permission granular.
 
@@ -40,7 +41,8 @@ Menu dari `AdminPermissionService`:
 
 - **Dashboard** — operational metrics/search/notifications sesuai permission; finance disaring berdasarkan role.
 - **Pesanan** — list/detail, payment/fulfillment history, aksi operasional yang diizinkan.
-- **Produk** — kategori, produk, nominal, input field, media, pricing, provider mapping/import.
+- **Produk** — produk, nominal, input field, media, pricing, provider mapping/import.
+- **Kategori** — daftar kategori toko beserta ikon, urutan tampil, dan status aktifnya.
 - **Manual** — manual fulfillment dan recovery action yang tetap memakai safety service.
 - **Banner & Konten** — storefront assets/content; bukan tempat secret.
 - **Digiflazz** — catalog/operational monitor/sync; credential tetap di Integrasi.

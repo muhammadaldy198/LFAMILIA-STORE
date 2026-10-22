@@ -107,6 +107,18 @@ class AdminCatalogController
         ]);
     }
 
+    public function categories(): Response
+    {
+        return Inertia::render('Admin/Categories', [
+            'categories' => Category::with('media')->withCount('products')->orderBy('sort_order')->get()
+                ->map(fn (Category $category): array => [
+                    ...$category->only('id', 'name', 'slug', 'icon', 'sort_order', 'is_active'),
+                    'products_count' => (int) $category->products_count,
+                    'image_url' => $category->getFirstMediaUrl('image'),
+                ]),
+        ]);
+    }
+
     public function category(Request $request, CatalogAudit $audit): RedirectResponse
     {
         $data = $request->validate([
@@ -114,6 +126,7 @@ class AdminCatalogController
             'slug' => ['nullable', 'string', 'max:255', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/'],
             'icon' => ['nullable', Rule::in(['gamepad', 'ticket', 'play', 'smartphone', 'zap', 'grid'])],
             'sort_order' => ['required', 'integer', 'min:0'],
+            'is_active' => ['sometimes', 'boolean'],
         ]);
         $data['slug'] = ($data['slug'] ?? null) ?: Str::slug($data['name']);
         $data['icon'] = $data['icon'] ?? 'grid';
@@ -125,7 +138,7 @@ class AdminCatalogController
         }
 
         DB::transaction(function () use ($request, $data, $audit): void {
-            $category = Category::create([...$data, 'is_active' => false]);
+            $category = Category::create([...$data, 'is_active' => (bool) ($data['is_active'] ?? false)]);
             $audit->record($request, 'catalog.category.created', 'category', $category->id, null, $category->toArray());
         });
 

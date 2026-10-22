@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\AdminUser;
 use App\Services\AdminAuditService;
 use App\Services\AdminPermissionService;
+use App\Support\AuditLabels;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
@@ -16,7 +18,7 @@ use Inertia\Response;
 
 class AdminAccessController
 {
-    public function index(Request $request, AdminPermissionService $permissions): Response
+    public function index(Request $request, AdminPermissionService $permissions, AuditLabels $labels): Response
     {
         $filters = $request->validate([
             'q' => ['nullable', 'string', 'max:100'],
@@ -56,9 +58,9 @@ class AdminAccessController
                 'role' => (string) $admin->role,
                 'permissions' => $admin->role === 'ADMIN' ? array_values($admin->permissions ?? []) : [],
                 'is_active' => (bool) $admin->is_active,
-                'last_login_at' => $admin->last_login_at,
-                'created_at' => $admin->created_at,
-                'updated_at' => $admin->updated_at,
+                'last_login_at' => $admin->last_login_at ? Carbon::parse($admin->last_login_at, config('app.timezone'))->toIso8601String() : null,
+                'created_at' => Carbon::parse($admin->created_at, config('app.timezone'))->toIso8601String(),
+                'updated_at' => Carbon::parse($admin->updated_at, config('app.timezone'))->toIso8601String(),
             ]);
 
         $supportedAdmins = AdminUser::query()->whereIn('role', ['SUPER_ADMIN', 'ADMIN']);
@@ -69,7 +71,7 @@ class AdminAccessController
             'admins' => AdminUser::where('role', 'ADMIN')->count(),
             'active' => (clone $supportedAdmins)->where('is_active', true)->count(),
             'inactive' => (clone $supportedAdmins)->where('is_active', false)->count(),
-            'active_super_admins' => AdminUser::where('role', 'SUPER_ADMIN')->where('is_active', true)->count(),
+            'active_super_admins' => (clone $supportedAdmins)->where('role', 'SUPER_ADMIN')->where('is_active', true)->count(),
         ];
 
         $activityRows = DB::table('audit_logs')
@@ -99,8 +101,9 @@ class AdminAccessController
             'actor_name' => $actorNames[(int) $row->actor_id] ?? 'Admin #'.$row->actor_id,
             'actor_role' => $row->actor_role,
             'action' => (string) $row->action,
+            'action_label' => $labels->actionLabel((string) $row->action),
             'target_id' => $row->target_id,
-            'created_at' => $row->created_at,
+            'created_at' => Carbon::parse($row->created_at, config('app.timezone'))->toIso8601String(),
         ])->values();
 
         return Inertia::render('Admin/Access', [

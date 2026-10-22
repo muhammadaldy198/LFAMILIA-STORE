@@ -774,6 +774,35 @@ class CatalogTest extends TestCase
         $this->assertSame('second.png', $product->fresh()->getFirstMedia('image')->file_name);
     }
 
+    public function test_catalog_only_admin_can_upload_category_image_but_not_banner_image(): void
+    {
+        Storage::fake('public');
+        $this->actingAs($this->createAdmin([
+            'name' => 'Katalog Saja',
+            'email' => 'katalog-saja@example.test',
+            'password' => Hash::make('secure-password-123'),
+            'role' => 'ADMIN',
+            'permissions' => ['catalog.manage'],
+            'is_active' => true,
+        ]), 'admin');
+
+        $category = Category::where('slug', 'game')->firstOrFail();
+        $this->post('/admin/catalog/media/category/'.$category->id, [
+            'collection' => 'image',
+            'image' => UploadedFile::fake()->image('kategori.png', 512, 512),
+        ])->assertRedirect();
+        $this->assertNotNull($category->fresh()->getFirstMedia('image'));
+
+        $banner = HomeBanner::create([
+            'title' => 'Promo Katalog', 'subtitle' => 'Banner', 'cta_href' => '/promo',
+            'show_desktop' => true, 'show_mobile' => true, 'is_active' => true, 'sort_order' => 0,
+        ]);
+        $this->post('/admin/catalog/media/banner/'.$banner->id, [
+            'collection' => 'desktop',
+            'image' => UploadedFile::fake()->image('banner.png', 1200, 400),
+        ])->assertForbidden();
+    }
+
     public function test_uploaded_favicon_is_activated_and_shared_immediately(): void
     {
         Storage::fake('public');

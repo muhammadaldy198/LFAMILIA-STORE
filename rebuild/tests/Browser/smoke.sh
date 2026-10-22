@@ -80,7 +80,7 @@ assert_page "/" "LFAMILIA STORE" 1440 1000
 assert_page "/login" "Masuk LFAMILIA" 1440 1000
 assert_page "/register" "Daftar LFAMILIA" 1440 1000
 assert_page "/orders/check" "Cek status pesananmu" 1440 1000
-assert_page "/admin/login" "Masuk Admin" 1440 1000
+assert_page "/admin/login" "Masuk admin" 1440 1000
 
 
 # Stage 7.8: render the real customer checkout page at desktop and mobile sizes.

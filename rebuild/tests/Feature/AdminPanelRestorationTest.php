@@ -671,6 +671,20 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertSame('SELL_PRICE', $fixed->fresh()->pricing_mode);
     }
 
+    public function test_categories_have_their_own_page_with_product_counts(): void
+    {
+        $this->login();
+        $category = Category::create([
+            'name' => 'Kategori Menu Sendiri', 'slug' => 'kategori-menu-sendiri', 'sort_order' => 92, 'is_active' => true,
+        ]);
+
+        $this->get('/admin/catalog/categories')->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
+            ->component('Admin/Categories')
+            ->where('categories', fn ($rows): bool => collect($rows)->contains(
+                fn (array $row): bool => $row['id'] === $category->id && array_key_exists('products_count', $row),
+            )));
+    }
+
     public function test_catalog_slugs_are_editable_and_handling_mode_changes_only_while_product_is_empty(): void
     {
         $this->login();

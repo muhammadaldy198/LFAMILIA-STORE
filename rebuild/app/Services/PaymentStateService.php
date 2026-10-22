@@ -266,7 +266,7 @@ class PaymentStateService
                 $this->notifications->record(
                     'payment.late_verified',
                     'Pembayaran terlambat terverifikasi',
-                    'Pembayaran order '.$order->order_number.' masuk setelah order '.$order->status.'. Perlu review.',
+                    'Pembayaran pesanan '.$order->order_number.' masuk setelah pesanan berstatus '.(AdminOrderPresentation::STATUSES[$order->status] ?? $order->status).'. Perlu diperiksa.',
                     'WARNING',
                     'order',
                     $order->id
@@ -288,8 +288,8 @@ class PaymentStateService
             $this->orderEvent((int) $order->id, 'PAYMENT_REFUND_REVIEW', $order->status, $order->status, $metadata);
             $this->notifications->record(
                 'payment.refund_review',
-                'Midtrans melaporkan refund - pemeriksaan manual',
-                'Pembayaran order '.$order->order_number.' direfund oleh gateway. Hubungi customer dan periksa manual; tidak ada perubahan saldo otomatis.',
+                'Gerbang pembayaran melaporkan pengembalian dana - perlu pemeriksaan',
+                'Pembayaran pesanan '.$order->order_number.' dikembalikan oleh gerbang pembayaran. Hubungi pelanggan dan periksa manual; saldo tidak berubah otomatis.',
                 'WARNING',
                 'order',
                 $order->id
@@ -474,7 +474,7 @@ class PaymentStateService
         $this->notifications->record(
             'payment.paid',
             'Pembayaran berhasil',
-            'Pembayaran order '.$order->order_number.' telah terverifikasi.',
+            'Pembayaran pesanan '.$order->order_number.' sudah terverifikasi.',
             'INFO',
             'order',
             $order->id

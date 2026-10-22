@@ -55,9 +55,11 @@ try {
         const dialog = await evaluate(`(()=>{const d=document.querySelector('[role=dialog]');if(!d)return null;const r=d.getBoundingClientRect();return {left:r.left,right:r.right,height:r.height,width:r.width,viewport:innerHeight,screen:innerWidth,locked:getComputedStyle(document.body).overflow,focus:d.contains(document.activeElement),scroll:d.scrollHeight>d.clientHeight};})()`);
         if(!dialog||dialog.height>dialog.viewport+2||dialog.width>dialog.screen+2||dialog.left< -2||dialog.right>dialog.screen+2||dialog.locked!=='hidden'||!dialog.focus)throw Error('Dialog regression '+label+': '+JSON.stringify(dialog));
         if(label.endsWith('-fulfillment-detail')){
-            const before=mutations.length, confirmations=dialogs.length;
+            // Konfirmasi kini dialog bertema di dalam halaman, bukan window.confirm:
+            // klik harus membuka dialog kedua dan belum mengirim POST apa pun.
+            const before=mutations.length, sheets=await evaluate(`document.querySelectorAll('[role=dialog]').length`);
             const completed=await evaluate(`(()=>{const b=[...document.querySelectorAll('[role=dialog] button')].find(b=>b.textContent.trim()==='Tandai berhasil');if(!b)return false;b.click();return true;})()`);
-            if(completed){await pause(100);if(dialogs.length!==confirmations+1||mutations.length!==before)throw Error('Cancelled fulfillment confirmation sent a mutation: '+JSON.stringify({confirmations,dialogs:dialogs.length,before,mutations:mutations.slice(before)}));console.log('PASS cancelled fulfillment action '+label);}
+            if(completed){await pause(400);const after=await evaluate(`document.querySelectorAll('[role=dialog]').length`);if(after!==sheets+1||mutations.length!==before)throw Error('Cancelled fulfillment confirmation sent a mutation: '+JSON.stringify({sheets,after,before,mutations:mutations.slice(before)}));console.log('PASS cancelled fulfillment action '+label);}
         }
         console.log('PASS dialog '+label); await escape();
     };
@@ -99,6 +101,9 @@ try {
                             if(!await evaluate(`Boolean([...document.querySelectorAll('[data-testid="digiflazz-import"] button')].find(b=>b.textContent.trim()==='Impor 1 nominal'&&!b.disabled))`))throw Error('Fixture SKU checkbox did not select through its Vue model');
                             acceptNextDialog=true;dialogs.length=0;
                             await pointerClick(`[...document.querySelectorAll('[data-testid="digiflazz-import"] button')].find(b=>b.textContent.trim()==='Impor 1 nominal')`);
+                            // Nominal serupa kini dikonfirmasi lewat dialog bertema, bukan window.confirm.
+                            await pause(400);
+                            await evaluate(`(()=>{const b=[...document.querySelectorAll('[role=dialog] button')].find(x=>x.textContent.trim()==='Tetap impor');if(b)b.click();return Boolean(b);})()`);
                             let done=false;for(let i=0;i<60;i++){await pause(100);done=await evaluate(`!document.querySelector('[data-testid="digiflazz-import"]')`);if(done)break;}
                             if(!done)throw Error('Local SKU import did not finish: '+JSON.stringify(await evaluate(`({errors:[...document.querySelectorAll('[role=alert]')].map(e=>e.textContent),buttons:[...document.querySelectorAll('[data-testid="digiflazz-import"] button')].map(b=>({text:b.textContent,disabled:b.disabled})),events:window.__pointerEvents})`))+' POSTs='+JSON.stringify(mutations)+' alerts='+JSON.stringify(dialogs));
                             acceptNextDialog=false;
@@ -112,7 +117,7 @@ try {
                             await evaluate('window.confirm=window.__nativeConfirm');
                             console.log('PASS real click, SKU selection, and isolated catalog import');
                         }else{await click('Impor nominal Digiflazz');}
-                        await click('Edit nominal');await inspect(width+'-nominal-editor');await click('Tutup editor nominal');
+                        await click('Ubah nominal');await inspect(width+'-nominal-editor');await click('Tutup editor nominal');
                     }
                     if(tab==='Data Pelanggan'&&!await evaluate(`Boolean(document.querySelector('input[placeholder="Masukkan User ID"]'))&&Boolean(document.querySelector('[data-testid="product-customer-template"]'))`))throw Error('Customer fields or shared product format missing from editor');
                 }
@@ -175,7 +180,7 @@ try {
                 const tabs=await evaluate(`[...document.querySelectorAll('main .lf-admin-tabs button')].filter(b=>b.getBoundingClientRect().height>0).map(b=>b.textContent.trim())`);
                 for(const tab of tabs){if(await evaluate(`Boolean([...document.querySelectorAll('.lf-admin-tabs button,button')].some(b=>b.getBoundingClientRect().height>0&&b.textContent.trim()===${JSON.stringify(tab)}))`)){await click(tab);await inspect(width+'-'+path+'-'+tab);}}
                 if(path==='/admin/integrations'){
-                    if(!await evaluate(`document.body.textContent.includes('Mulai jualan top up')&&document.body.textContent.includes('fitur tambahan')&&!document.body.textContent.includes('DEFERRED TO TAHAP 9')`))throw Error('Integration selling guide/status regression');
+                    if(!await evaluate(`document.body.textContent.includes('Mulai jualan top up')&&document.body.textContent.includes('tidak wajib aktif')&&!document.body.textContent.includes('DEFERRED TO TAHAP 9')`))throw Error('Integration selling guide/status regression');
                     await click('Midtrans Snap');
                     const production=await evaluate(`(()=>{const select=[...document.querySelectorAll('main select')].find(s=>s.getBoundingClientRect().height>0&&[...s.options].some(o=>o.value==='production'));if(!select)return false;select.value=[...select.options].find(o=>o.value==='production').value;select.dispatchEvent(new Event('change',{bubbles:true}));return true;})()`);
                     if(!production)throw Error('Production environment selector missing');await pause(100);
@@ -183,7 +188,7 @@ try {
                     await inspect(width+'-integration-production-warning');
                 }
                 if(path==='/admin/nickname-tools'){
-                    await click('Kode Game');await click('Tambah Kode Game');await inspect(width+'-game-code-editor');
+                    await click('Daftar kode game');await click('Tambah kode game');await inspect(width+'-game-code-editor');
                     // Editor kode game sekarang pop-up (di luar <main>), jadi cari switch di dialog dulu.
                     const switchState=await evaluate(`(()=>{const root=document.querySelector('[role=dialog]')||document.querySelector('main');const s=[...root.querySelectorAll('[role=switch]')].find(s=>s.textContent===''&&!s.disabled);if(!s)return null;s.click();return true;})()`);
                     if(!switchState)throw Error('Boolean switch editor missing');await pause(100);await inspect(width+'-game-code-switch');
@@ -195,9 +200,13 @@ try {
                 await click('Logo & Gambar Cadangan');
                 const previousIcon=await evaluate(`document.querySelector('link[rel=icon]')?.getAttribute('href')`);
                 const file=join(profile,'browser-favicon.png');await writeFile(file,Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAAY0lEQVR4nO3PQQ3AIADAQMAKwhCNoYngcVnSU9DOfe74s6UDXjWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgfYaaAdUdZaagAAAAAElFTkSuQmCC','base64'));
-                const input=await send('Runtime.evaluate',{expression:`[...document.querySelectorAll('article')].find(a=>a.textContent.includes('Favicon')).querySelector('input[type=file]')`});
+                // Aset toko kini berupa daftar baris + pop-up editor, jadi buka barisnya dulu.
+                await evaluate(`(()=>{const b=[...document.querySelectorAll('main li button')].find(x=>x.textContent.includes('Favicon'));if(b)b.click();return Boolean(b);})()`);
+                await pause(600);
+                const input=await send('Runtime.evaluate',{expression:`document.querySelector('[role=dialog] input[type=file]')`});
+                if(!input.result.objectId)throw Error('Favicon file input missing in asset editor');
                 await send('DOM.setFileInputFiles',{objectId:input.result.objectId,files:[file]});await pause(100);
-                await evaluate(`[...document.querySelectorAll('article')].find(a=>a.textContent.includes('Favicon')).querySelector('form').requestSubmit()`);
+                await evaluate(`(()=>{const b=[...document.querySelectorAll('[role=dialog] button')].find(x=>x.textContent.trim()==='Unggah gambar'&&!x.disabled);if(!b)throw new Error('Unggah gambar button missing');b.click();})()`);
                 let icon;
                 for(let i=0;i<60;i++){await pause(100);icon=await evaluate(`document.querySelector('link[rel=icon]')?.getAttribute('href')`);if(icon!==previousIcon&&icon?.includes('browser-favicon'))break;}
                 if(icon===previousIcon||!icon?.includes('browser-favicon'))throw Error('Favicon upload did not update Admin');

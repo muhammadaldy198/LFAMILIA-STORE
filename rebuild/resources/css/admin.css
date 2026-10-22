@@ -92,6 +92,7 @@
  .lf-admin.lf-admin{--lf-admin-page:28px;--lf-admin-heading:18px;--lf-admin-body:14px;--lf-admin-control:40px}
  .lf-admin .lf-admin-content{padding:24px}
  .lf-admin-summary{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+ .lf-admin-summary.lf-admin-summary-4{grid-template-columns:repeat(4,minmax(0,1fr))}
  .lf-admin-content.lf-admin-content .lf-admin-summary>[data-slot=card]{border-bottom:0}
 }
 @media(max-width:767px){
@@ -342,3 +343,23 @@
 @media(max-width:639px){.lf-admin-content .lf-admin-tabs{display:flex;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:thin;white-space:nowrap;padding-bottom:2px}.lf-admin-content .lf-admin-tabs>*{flex:0 0 auto}.lf-admin-content [data-slot=table] th,.lf-admin-content [data-slot=table] td{white-space:nowrap}.lf-admin-content [data-slot=table] td :is(.max-w-xs,.max-w-sm){max-width:220px!important;white-space:normal!important}}
 @media(prefers-reduced-motion:reduce){.lf-admin *,.lf-admin *::before,.lf-admin *::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 .lf-theme-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}.lf-theme-fields label{display:grid;gap:8px}.lf-theme-fields label>span{display:flex;gap:10px}.lf-theme-fields input[type=color]{width:50px;padding:2px}.lf-theme-preview p{color:#a1a1aa}.lf-theme-preview button{margin:14px 0;background:#3b82f6;color:#fff}.lf-theme-preview>span{margin-right:16px}
+
+/* Dashboard strip: aktivitas / integrasi / notifikasi as rows, not stacked cards. */
+.lf-admin-strip{display:grid;grid-template-columns:1fr;border:1px solid var(--border);border-radius:6px;background:var(--card);overflow:hidden}
+.lf-admin-strip-col{min-width:0;padding:12px 16px;border-bottom:1px solid var(--border)}
+.lf-admin-strip-col:last-child{border-bottom:0}
+.lf-admin-strip-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding-bottom:8px;margin-bottom:4px;border-bottom:1px solid var(--border);font-size:13px}
+.lf-admin-strip-head a{font-size:12px}
+.lf-admin-strip-row{padding:8px 0;border-bottom:1px solid var(--border);min-width:0}
+.lf-admin-strip-row:last-of-type{border-bottom:0}
+.lf-admin-strip-inline{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.lf-admin-strip-title{display:block;font-size:12px;font-weight:600;overflow-wrap:anywhere}
+.lf-admin-strip-note{display:block;font-size:11px;color:var(--muted-foreground);overflow-wrap:anywhere}
+.lf-admin-strip-time{display:block;font-size:11px;color:var(--muted-foreground);font-variant-numeric:tabular-nums}
+.lf-admin-strip-empty{padding:16px 0;text-align:center;font-size:12px;color:var(--muted-foreground)}
+.lf-admin-strip-foot{margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:11px;color:var(--muted-foreground)}
+@media(min-width:1024px){
+ .lf-admin-strip{grid-template-columns:repeat(3,minmax(0,1fr))}
+ .lf-admin-strip-col{border-bottom:0;border-right:1px solid var(--border)}
+ .lf-admin-strip-col:last-child{border-right:0}
+}

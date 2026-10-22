@@ -64,7 +64,7 @@ class AdminDashboardRestorationTest extends TestCase
             ->where('recentOrders.1.product_name', 'Snapshot Game')
             ->where('recentOrders.1.package_name', 'Snapshot Diamonds')
             ->where('recentOrders.1.buyer_name', 'Dashboard Guest')
-            ->where('topProducts.0.fulfilled_orders', fn ($value) => (int) $value === 1));
+            ->missing('topProducts'));
         $this->get('/admin/panel?range=7d')->assertInertia(fn (Assert $page) => $page
             ->has('chart', 7)->where('chart.0.orders', 0)->where('chart.0.revenue_idr', 0));
         $this->travelBack();
@@ -85,7 +85,7 @@ class AdminDashboardRestorationTest extends TestCase
         $this->order(now()->format('Y-m-d H:i:s'), 'SUCCESS');
         $this->get('/admin/panel')->assertInertia(fn (Assert $page) => $page
             ->missing('metrics.revenue_today')->missing('metrics.wallet_balance')->missing('metrics.digiflazz_balance')
-            ->has('recentOrders', 1)->missing('recentOrders.0.total_idr')->has('topProducts', 1));
+            ->has('recentOrders', 1)->missing('recentOrders.0.total_idr')->missing('topProducts'));
     }
 
     public function test_read_only_balance_probe_is_cached_and_failure_keeps_dashboard_available(): void
