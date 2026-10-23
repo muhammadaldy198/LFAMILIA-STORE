@@ -107,7 +107,7 @@ test('reports separate sections and keep operations grouped', () => {
     assert.match(source, /Kategori terlaris/);
     assert.match(source, /Kinerja penyedia/);
     assert.match(source, /v-if="canViewFinance"/);
-    assert.match(source, /const exportReport = \(\) => \{/);
+    assert.match(source, /const exportReport = async \(\) => \{/);
     assert.match(source, /props\.providerReport\.map/);
     assert.match(source, /props\.daily\.map/);
     assert.match(source, /props\.topProducts\.map/);
@@ -206,14 +206,21 @@ test('support and fulfillment lead with the work list instead of metric cards', 
         assert.ok(!read(file).includes('lf-admin-summary'), file);
     }
 });
-test('wallet adjustment lives on the detail page and validates before posting', () => {
-    // Daftar pelanggan hanya untuk mencari dan membuka detail.
-    assert.doesNotMatch(read('Customers.vue'), /adjustWallet|walletAdjustmentError/);
-    const source = read('CustomerDetail.vue');
-    assert.match(source, /const adjustWallet = \(\) => \{/);
-    assert.match(source, /if \(problem\) return;/);
-    assert.match(source, /router\.post\('\/admin\/customers\/' \+ props\.customer\.id \+ '\/wallet'/);
-    assert.doesNotMatch(source, /window\.confirm/);
+test('wallet adjustment asks for the password before posting from either page', () => {
+    const detail = read('CustomerDetail.vue');
+    assert.match(detail, /const adjustWallet = \(\) => \{/);
+    assert.match(detail, /if \(problem\) return;/);
+    assert.match(detail, /router\.post\('\/admin\/customers\/' \+ props\.customer\.id \+ '\/wallet'/);
+    assert.doesNotMatch(detail, /window\.confirm/);
+
+    // Form saldo di daftar pelanggan juga wajib lewat konfirmasi sandi lebih dulu.
+    const list = read('Customers.vue');
+    assert.match(list, /import \{ withSensitive \} from '\.\.\/\.\.\/lib\/sensitivePrompt'/);
+    assert.match(list, /withSensitive\(`Konfirmasi \$\{direction\} saldo/);
+    const gate = list.indexOf('withSensitive(`Konfirmasi');
+    const post = list.indexOf("router.post('/admin/customers/' + editor.value.row.id + '/wallet'");
+    assert.ok(gate > 0 && post > gate, 'wallet POST must sit inside withSensitive');
+    assert.match(list, /walletAdjustmentError\(editor\.value\.amount_idr, editor\.value\.reason\)/);
 });
 test('product notices are edited in a modal and render a preview', () => {
     const source = read('Catalog.vue');
@@ -236,8 +243,11 @@ test('report export audits itself and never labels a period it did not load', ()
     assert.match(source, /const applied = props\.filters \|\| \{\}/);
     assert.match(source, /applied\.range === 'custom' \? `\$\{applied\.from\}_\$\{applied\.to\}`/);
     assert.doesNotMatch(source, /const range = form\.range === 'custom'/);
-    // Ekspor klien tetap meninggalkan jejak audit, lewat fetch karena endpoint membalas JSON.
-    assert.match(source, /void fetch\('\/admin\/reports\/export-audit'/);
+    // Jejak audit harus sukses SEBELUM CSV diunduh; ekspor tanpa audit dilarang.
+    const auditAt = source.indexOf("await fetch('/admin/reports/export-audit'");
+    const downloadAt = source.indexOf('URL.createObjectURL');
+    assert.ok(auditAt > 0 && downloadAt > auditAt, 'CSV must be downloaded only after the audit call succeeds');
+    assert.match(source, /if \(!response\.ok\) throw new Error/);
     // Formula setelah whitespace juga dinetralkan.
     assert.match(source, /const safe = \/\^\\s\*\[=\+@-\]\/\.test\(text\)/);
 });
@@ -247,8 +257,8 @@ test('notification open waits for mark-read and report export posts JSON by fetc
     assert.match(notifications, /void markRead\(item\)\.finally\(\(\) => router\.visit\(href\)\)/);
     assert.doesNotMatch(notifications, /markRead\(item\);\s*\n\s*const href = notificationHref\(item\);\s*\n\s*if \(href\) router\.visit\(href\);/);
     const reports = read('Reports.vue');
-    // Endpoint audit membalas JSON, bukan halaman Inertia.
-    assert.match(reports, /void fetch\('\/admin\/reports\/export-audit'/);
+    // Endpoint audit membalas JSON, bukan halaman Inertia, dan ditunggu sebelum unduhan.
+    assert.match(reports, /await fetch\('\/admin\/reports\/export-audit'/);
     assert.doesNotMatch(reports, /router\.post\('\/admin\/reports\/export-audit'/);
 });
 test('no template expression unwraps a ref that Vue already unwraps', () => {

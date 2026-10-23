@@ -7,6 +7,7 @@ use App\Models\Category;
 use App\Models\HomeBanner;
 use App\Models\Product;
 use App\Models\ProductPackage;
+use App\Models\Provider;
 use App\Models\ProviderMapping;
 use App\Models\StoreAsset;
 use App\Services\CheckoutPricing;
@@ -987,5 +988,71 @@ class CatalogTest extends TestCase
         ])->assertSessionHasErrors(['packages.0.name', 'packages.0.cost_idr']);
         $this->assertDatabaseMissing('products', ['name' => 'Manual Cacat']);
         $this->assertSame(0, ProductPackage::where('name', '250 Koin')->count());
+    }
+
+    public function test_new_manual_nominal_keeps_activation_and_sell_price_from_the_form(): void
+    {
+        $category = Category::where('slug', 'game')->firstOrFail();
+        $product = Product::create([
+            'category_id' => $category->id, 'name' => 'Manual Harga', 'slug' => 'manual-harga',
+            'margin_percent' => 10, 'fulfillment_mode' => 'MANUAL',
+        ]);
+        $this->actingAs($this->admin(), 'admin');
+
+        // Harga jual di bawah modal ditolak, bukan disimpan diam-diam.
+        $this->post('/admin/catalog/products/'.$product->id.'/packages', [
+            'code' => 'MH-100', 'name' => '100 Koin', 'sort_order' => 0, 'cost_idr' => 20000,
+            'is_active' => true, 'pricing_mode' => 'SELL_PRICE', 'sell_price_idr' => 15000,
+        ])->assertSessionHasErrors('sell_price_idr');
+        $this->assertDatabaseMissing('product_packages', ['code' => 'MH-100']);
+
+        $this->post('/admin/catalog/products/'.$product->id.'/packages', [
+            'code' => 'MH-100', 'name' => '100 Koin', 'sort_order' => 0, 'cost_idr' => 20000,
+            'is_active' => true, 'pricing_mode' => 'SELL_PRICE', 'sell_price_idr' => 25000,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $package = ProductPackage::where('code', 'MH-100')->firstOrFail();
+        $this->assertTrue($package->is_active);
+        $this->assertSame('SELL_PRICE', $package->pricing_mode);
+        $this->assertSame(25000, (int) $package->sell_price_idr);
+        $mapping = $package->mappings()->firstOrFail();
+        $this->assertSame(20000, (int) $mapping->cost_idr);
+        $this->assertTrue($mapping->is_active);
+    }
+
+    public function test_editing_a_manual_nominal_persists_the_stored_cost(): void
+    {
+        $category = Category::where('slug', 'game')->firstOrFail();
+        $product = Product::create([
+            'category_id' => $category->id, 'name' => 'Manual Modal', 'slug' => 'manual-modal',
+            'margin_percent' => 10, 'fulfillment_mode' => 'MANUAL',
+        ]);
+        $package = $product->packages()->create(['code' => 'MM-100', 'name' => '100 Koin', 'is_active' => true]);
+        $provider = Provider::where('code', 'MANUAL')->firstOrFail();
+        $mapping = ProviderMapping::create([
+            'product_package_id' => $package->id, 'provider_id' => $provider->id,
+            'external_sku' => null, 'cost_idr' => 10000, 'store_cost_idr' => 10000,
+            'priority' => 0, 'is_active' => true,
+        ]);
+        $this->actingAs($this->admin(), 'admin');
+
+        $this->put('/admin/catalog/packages/'.$package->id, [
+            'code' => 'MM-100', 'name' => '100 Koin', 'sort_order' => 0,
+            'is_active' => true, 'pricing_mode' => 'SELL_PRICE', 'sell_price_idr' => 15000, 'cost_idr' => 12000,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertSame(12000, (int) $mapping->fresh()->cost_idr);
+        $this->assertSame(12000, (int) $mapping->fresh()->store_cost_idr);
+        $this->assertSame(15000, (int) $package->fresh()->sell_price_idr);
+
+        // Modal tidak berlaku untuk produk otomatis.
+        $auto = Product::create([
+            'category_id' => $category->id, 'name' => 'Otomatis Modal', 'slug' => 'otomatis-modal',
+            'margin_percent' => 10, 'fulfillment_mode' => 'AUTO_PROVIDER',
+        ]);
+        $autoPackage = $auto->packages()->create(['code' => 'AM-100', 'name' => '100 Koin']);
+        $this->put('/admin/catalog/packages/'.$autoPackage->id, [
+            'code' => 'AM-100', 'name' => '100 Koin', 'sort_order' => 0, 'is_active' => false, 'cost_idr' => 12000,
+        ])->assertSessionHasErrors('cost_idr');
     }
 }

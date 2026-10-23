@@ -4,6 +4,8 @@ import { Head, Link, router } from '@inertiajs/vue3';
 import AdminLayout from '../../Components/Admin/AdminLayout.vue';
 import AdminModal from '../../Components/Admin/AdminModal.vue';
 import { num, rupiah, wibDateTime } from '../../lib/adminFormat';
+import { walletAdjustmentError } from '../../lib/adminWalletAdjustment';
+import { withSensitive } from '../../lib/sensitivePrompt';
 
 const props = defineProps({
     isSuperAdmin: Boolean,
@@ -66,16 +68,24 @@ const saveMembership = () => {
 };
 const saveBalance = () => {
     if (!editor.value) return;
-    busy.value = true;
-    router.post('/admin/customers/' + editor.value.row.id + '/wallet', {
-        amount_idr: Number(editor.value.amount_idr || 0),
-        reason: editor.value.reason,
-        idempotency_key: editor.value.idempotency_key,
-    }, {
-        preserveScroll: true,
-        onError: bag => { errors.value = bag; },
-        onSuccess: () => { editor.value.amount_idr = ''; editor.value.reason = ''; editor.value.idempotency_key = crypto.randomUUID(); },
-        onFinish: () => { busy.value = false; },
+    const problem = walletAdjustmentError(editor.value.amount_idr, editor.value.reason);
+    errors.value = problem ? { amount_idr: problem } : {};
+    if (problem) return;
+    const amount = Number(editor.value.amount_idr || 0);
+    const direction = amount > 0 ? 'menambah' : 'mengurangi';
+    // Route saldo dijaga konfirmasi sandi; POST harus dikirim setelah sandi terbukti.
+    void withSensitive(`Konfirmasi ${direction} saldo ${editor.value.row.name} sebesar ${rupiah(Math.abs(amount))}? Alasan: ${editor.value.reason}`, () => {
+        busy.value = true;
+        router.post('/admin/customers/' + editor.value.row.id + '/wallet', {
+            amount_idr: amount,
+            reason: editor.value.reason,
+            idempotency_key: editor.value.idempotency_key,
+        }, {
+            preserveScroll: true,
+            onError: bag => { errors.value = bag; },
+            onSuccess: () => { editor.value.amount_idr = ''; editor.value.reason = ''; editor.value.idempotency_key = crypto.randomUUID(); },
+            onFinish: () => { busy.value = false; },
+        });
     });
 };
 

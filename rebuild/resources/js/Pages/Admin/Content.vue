@@ -70,7 +70,7 @@ const DEFAULTS = {
 
 const URLS = {
     banner: '/admin/content/banners', popup: '/admin/content/popups', news: '/admin/content/news',
-    faq: '/admin/content/faqs',
+    faq: '/admin/content/faqs', review: '/admin/content/reviews',
 };
 
 const save = () => {

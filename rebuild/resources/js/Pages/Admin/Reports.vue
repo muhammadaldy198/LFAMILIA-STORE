@@ -23,6 +23,8 @@ const form = reactive({
     to: props.filters?.to || '',
 });
 const tab = ref('sales');
+const exporting = ref(false);
+const exportError = ref('');
 const tabs = [['sales', 'Penjualan'], ['products', 'Produk'], ['operations', 'Operasional']];
 
 const submit = () => {
@@ -68,7 +70,7 @@ const csvCell = value => {
     return '"' + safe.replaceAll('"', '""') + '"';
 };
 
-const exportReport = () => {
+const exportReport = async () => {
     let rows;
     if (tab.value === 'products') {
         rows = [
@@ -93,22 +95,31 @@ const exportReport = () => {
     const applied = props.filters || {};
     const range = applied.range === 'custom' ? `${applied.from}_${applied.to}` : (applied.range || '30d');
     const csv = String.fromCharCode(0xFEFF) + rows.map(row => row.map(csvCell).join(',')).join('\r\n');
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `laporan-${tab.value}-${range}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
-    void fetch('/admin/reports/export-audit', {
-        method: 'POST',
-        keepalive: true,
-        headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
-        },
-        body: JSON.stringify({ section: tab.value, range: applied.range || '30d', from: applied.from, to: applied.to }),
-    });
+    // Jejak audit wajib tercatat lebih dulu; ekspor tanpa audit tidak boleh terjadi.
+    exporting.value = true;
+    exportError.value = '';
+    try {
+        const response = await fetch('/admin/reports/export-audit', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+            },
+            body: JSON.stringify({ section: tab.value, range: applied.range || '30d', from: applied.from, to: applied.to }),
+        });
+        if (!response.ok) throw new Error('Jejak audit ekspor gagal dicatat, jadi laporan belum diunduh. Muat ulang halaman lalu coba lagi.');
+        const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `laporan-${tab.value}-${range}.csv`;
+        link.click();
+        URL.revokeObjectURL(url);
+    } catch (error) {
+        exportError.value = error?.message || 'Laporan gagal diunduh.';
+    } finally {
+        exporting.value = false;
+    }
 };
 
 const maxProviderError = computed(() => Math.max(1, ...props.providerReport.map(row => Number(row.errors_count || 0))));
@@ -124,9 +135,11 @@ const maxProviderError = computed(() => Math.max(1, ...props.providerReport.map(
             </div>
             <div class="adm-head-actions">
                 <button type="button" class="adm-btn" @click="router.reload({ preserveScroll: true })">Muat ulang</button>
-                <button type="button" class="adm-btn primary" @click="exportReport">Unduh laporan</button>
+                <button type="button" class="adm-btn primary" :disabled="exporting" @click="exportReport">{{ exporting ? 'Menyiapkan…' : 'Unduh laporan' }}</button>
             </div>
         </header>
+
+        <p v-if="exportError" class="adm-alert" role="alert">{{ exportError }}</p>
 
         <section class="adm-card">
             <form class="adm-filters" @submit.prevent="submit">

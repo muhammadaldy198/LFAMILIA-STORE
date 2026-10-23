@@ -34,6 +34,8 @@ const total = computed(() => Number(props.productPage.total || 0));
 const pageCount = computed(() => Math.max(1, Number(props.productPage.last_page || 1)));
 const categoryName = id => props.categories.find(row => Number(row.id) === Number(id))?.name || 'Tanpa kategori';
 const activePackages = row => row.packages.filter(pkg => pkg.is_active).length;
+// Prioritas beranda dipindah dari halaman Promo ke daftar Produk.
+const togglePopular = row => router.put(`/admin/vouchers/popular/${row.id}`, { popular: !row.popular }, { preserveScroll: true });
 
 const load = (extra = {}) => {
     busy.value = true;
@@ -185,6 +187,8 @@ const saveNominal = () => {
     saveBusy.value = 'nominal';
     const finish = (bag) => { nominalErrors.value = bag; saveBusy.value = ''; };
     if (nominalEditing.value) {
+        // Modal nominal manual tersimpan di pemetaan provider, bukan di paket.
+        if (product.value.fulfillment_mode === 'MANUAL') payload.cost_idr = Number(nominal.cost_idr || 0);
         router.put(`/admin/catalog/packages/${nominalEditing.value.id}`, payload, {
             preserveScroll: true, onError: finish, onSuccess: () => { nominalOpen.value = false; uploadNominalImage(); },
         });
@@ -493,6 +497,7 @@ onMounted(() => {
                         <tr v-for="row in visible" :key="row.id">
                             <td>
                                 <strong>{{ row.name }}</strong>
+                                <span v-if="row.popular" class="adm-tag info" style="margin-left:6px">Unggulan</span>
                                 <p class="dim">{{ row.publisher || 'Tanpa publisher' }} · {{ row.slug }}</p>
                             </td>
                             <td>{{ categoryName(row.category_id) }}</td>
@@ -500,7 +505,10 @@ onMounted(() => {
                             <td>{{ activePackages(row) }} aktif dari {{ row.packages.length }}</td>
                             <td>{{ row.sort_order }}</td>
                             <td><span class="adm-tag" :class="row.is_active ? 'ok' : 'bad'">{{ row.is_active ? 'Aktif' : 'Nonaktif' }}</span></td>
-                            <td><button type="button" class="adm-btn sm" @click="openEditorFull(row)">Ubah</button></td>
+                            <td>
+                                <button type="button" class="adm-btn sm" @click="openEditorFull(row)">Ubah</button>
+                                <button type="button" class="adm-btn sm" @click="togglePopular(row)">{{ row.popular ? 'Lepas unggulan' : 'Jadikan unggulan' }}</button>
+                            </td>
                         </tr>
                         <tr v-if="!visible.length"><td colspan="7" class="adm-empty">Belum ada produk pada tab ini.</td></tr>
                     </tbody>

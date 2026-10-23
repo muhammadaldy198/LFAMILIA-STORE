@@ -38,7 +38,7 @@ class AdminCatalogController
         return [
             ...$product->only('id', 'category_id', 'name', 'publisher', 'slug', 'description', 'fulfillment_mode',
                 'initials', 'accent_color', 'instant', 'package_tabs_enabled', 'package_tabs',
-                'customer_no_template', 'manual_instructions', 'manual_open_time', 'manual_close_time', 'manual_timezone', 'margin_percent', 'sort_order', 'is_active',
+                'customer_no_template', 'manual_instructions', 'manual_open_time', 'manual_close_time', 'manual_timezone', 'margin_percent', 'sort_order', 'is_active', 'popular',
                 'sell_markup_percent', 'cost_uplift_percent',
                 'nickname_check_enabled', 'nickname_game_code', 'nickname_user_field_key',
                 'nickname_server_field_key'),
@@ -669,7 +669,25 @@ class AdminCatalogController
             'sort_order' => ['required', 'integer', 'min:0'],
             'cost_idr' => [$product->fulfillment_mode === 'MANUAL' ? 'required' : 'nullable',
                 'integer', 'min:0', 'max:1000000000'],
+            'is_active' => ['sometimes', 'boolean'],
+            'pricing_mode' => ['sometimes', Rule::in(['PRODUCT_MARGIN', 'PERCENT', 'FIXED', 'SELL_PRICE'])],
+            'margin_percent' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:1000', 'required_if:pricing_mode,PERCENT'],
+            'margin_fixed_idr' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:1000000000', 'required_if:pricing_mode,FIXED'],
+            'sell_price_idr' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:1000000000', 'required_if:pricing_mode,SELL_PRICE'],
+            'sell_markup_percent' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:1000'],
         ]);
+
+        // Nominal otomatis hanya bisa dijual setelah punya sumber Digiflazz aktif.
+        $wantsActive = (bool) ($data['is_active'] ?? false);
+        $canActivate = $product->fulfillment_mode === 'MANUAL';
+        $isActive = $wantsActive && $canActivate;
+        $pricing = collect($data)->only([
+            'pricing_mode', 'margin_percent', 'margin_fixed_idr', 'sell_price_idr', 'sell_markup_percent',
+        ])->filter(fn ($value): bool => $value !== null)->all();
+        if (($pricing['pricing_mode'] ?? null) === 'SELL_PRICE'
+            && (int) $pricing['sell_price_idr'] < (int) ($data['cost_idr'] ?? 0)) {
+            throw ValidationException::withMessages(['sell_price_idr' => 'Harga jual tidak boleh di bawah modal.']);
+        }
 
         if ($product->package_tabs_enabled) {
             $group = trim((string) ($data['group_name'] ?? ''));
@@ -681,7 +699,7 @@ class AdminCatalogController
             }
         }
 
-        DB::transaction(function () use ($request, $product, $data, $audit): void {
+        DB::transaction(function () use ($request, $product, $data, $audit, $isActive, $pricing): void {
             $package = $product->packages()->create([
                 'code' => $data['code'],
                 'name' => $data['name'],
@@ -689,7 +707,8 @@ class AdminCatalogController
                 'group_name' => $data['group_name'] ?? null,
                 'nominal_value' => $data['nominal_value'] ?? null,
                 'sort_order' => $data['sort_order'],
-                'is_active' => false,
+                ...$pricing,
+                'is_active' => $isActive,
             ]);
             if ($product->fulfillment_mode === 'MANUAL') {
                 $provider = Provider::where('code', 'MANUAL')->firstOrFail();
@@ -701,7 +720,7 @@ class AdminCatalogController
                     'store_cost_idr' => $data['cost_idr'],
                     'max_price_idr' => null,
                     'priority' => 0,
-                    'is_active' => false,
+                    'is_active' => $isActive,
                 ]);
                 $audit->record($request, 'catalog.mapping.created', 'provider_mapping',
                     $mapping->id, null, $mapping->toArray());
@@ -709,7 +728,9 @@ class AdminCatalogController
             $audit->record($request, 'catalog.package.created', 'product_package', $package->id, null, $package->toArray());
         });
 
-        return back();
+        return $wantsActive && ! $isActive
+            ? back()->with('status', 'Nominal disimpan nonaktif. Aktifkan setelah sumber Digiflazz dipasang.')
+            : back();
     }
 
     public function updatePackage(Request $request, ProductPackage $package, CatalogAudit $audit): RedirectResponse
@@ -729,9 +750,17 @@ class AdminCatalogController
             'sell_price_idr' => ['nullable', 'integer', 'min:1', 'max:1000000000', 'required_if:pricing_mode,SELL_PRICE'],
             'sell_markup_percent' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:1000'],
             'cost_uplift_percent' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:1000'],
+            'cost_idr' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:1000000000'],
         ]);
 
         $product = $package->product()->firstOrFail();
+        $newCost = array_key_exists('cost_idr', $data) && $data['cost_idr'] !== null
+            ? (int) $data['cost_idr'] : null;
+        if ($newCost !== null && $product->fulfillment_mode !== 'MANUAL') {
+            throw ValidationException::withMessages([
+                'cost_idr' => 'Modal hanya bisa diisi pada produk dengan penanganan manual.',
+            ]);
+        }
         if ($product->package_tabs_enabled) {
             $group = trim((string) ($data['group_name'] ?? $package->group_name ?? ''));
             $tabs = collect($product->package_tabs ?? []);
@@ -745,12 +774,30 @@ class AdminCatalogController
         $highestActiveCost = $package->mappings()->where('is_active', true)
             ->selectRaw('MAX(COALESCE(store_cost_idr, cost_idr)) as aggregate')->value('aggregate');
         if (($data['pricing_mode'] ?? $package->pricing_mode) === 'SELL_PRICE'
-            && (int) ($data['sell_price_idr'] ?? $package->sell_price_idr) < (int) $highestActiveCost) {
+            && (int) ($data['sell_price_idr'] ?? $package->sell_price_idr) < (int) ($newCost ?? $highestActiveCost)) {
             throw ValidationException::withMessages(['sell_price_idr' => 'Harga jual tidak boleh di bawah modal.']);
         }
-        DB::transaction(function () use ($request, $package, $data, $audit): void {
+        DB::transaction(function () use ($request, $package, $data, $audit, $newCost): void {
             $before = $package->toArray();
-            $package->update($data);
+            $package->update(collect($data)->except('cost_idr')->all());
+            if ($newCost !== null) {
+                // Modal nominal manual hidup di pemetaan provider, bukan di paket.
+                $provider = Provider::where('code', 'MANUAL')->firstOrFail();
+                $mapping = $package->mappings()->where('provider_id', $provider->id)->first()
+                    ?? ProviderMapping::create([
+                        'product_package_id' => $package->id,
+                        'provider_id' => $provider->id,
+                        'external_sku' => null,
+                        'cost_idr' => $newCost,
+                        'store_cost_idr' => $newCost,
+                        'max_price_idr' => null,
+                        'priority' => 0,
+                        'is_active' => (bool) $package->is_active,
+                    ]);
+                $mappingBefore = $mapping->toArray();
+                $mapping->update(['cost_idr' => $newCost, 'store_cost_idr' => $newCost]);
+                $audit->record($request, 'catalog.mapping.updated', 'provider_mapping', $mapping->id, $mappingBefore, $mapping->fresh()->toArray());
+            }
             $audit->record($request, 'catalog.package.updated', 'product_package', $package->id, $before, $package->toArray());
         });
 
