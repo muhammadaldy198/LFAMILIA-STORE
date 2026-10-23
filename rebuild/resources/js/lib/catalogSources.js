@@ -27,7 +27,9 @@ export const mappingPayload = (mapping, changes) => {
         is_active: Boolean(changes?.is_active ?? mapping.is_active),
     };
     if (mapping.provider_code === 'MANUAL') {
-        payload.cost_idr = Number(changes?.cost_idr ?? mapping.store_cost_idr ?? mapping.cost_idr ?? 0);
+        // cost_idr wajib untuk MANUAL, tapi harus nilai yang tersimpan — bukan
+        // store_cost_idr, yang bisa berbeda dan akan menimpa modal akuntansi.
+        payload.cost_idr = Number(changes?.cost_idr ?? mapping.cost_idr ?? 0);
     }
     if (mapping.provider_code === 'DIGIFLAZZ' && mappingIsLocked(mapping)) {
         // Kunci harga harus tetap menyala supaya cost_idr manual tidak dilepas.

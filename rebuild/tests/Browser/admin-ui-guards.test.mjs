@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { walletAdjustmentError } from '../../resources/js/lib/adminWalletAdjustment.js';
+import { mappingPayload, sortMappings, mappingStatusLabel } from '../../resources/js/lib/catalogSources.js';
 const path = filename => new URL('../../resources/js/Pages/Admin/' + filename, import.meta.url);
 const read = filename => readFileSync(path(filename), 'utf8');
 const repo = relative => readFileSync(new URL('../../' + relative, import.meta.url), 'utf8');
@@ -366,4 +367,23 @@ test('catalog source tab uses existing mapping and sync routes', () => {
     for (const route of ['mappings.sync', 'mappings.update', 'products.sync']) {
         assert.ok(routes.includes("'" + route + "'"), 'route ' + route + ' harus tetap ada');
     }
+});
+
+
+// CR-05: payload panel Sumber tidak boleh mengubah modal atau melepas kunci harga.
+test('catalog source payload keeps stored cost and manual price lock', () => {
+    const manual = { id: 1, provider_code: 'MANUAL', cost_idr: 9000, store_cost_idr: 9500, priority: 4, is_active: true };
+    assert.equal(mappingPayload(manual, { priority: 2 }).cost_idr, 9000);
+    assert.equal(mappingPayload(manual, { priority: 2 }).priority, 2);
+
+    const locked = { id: 2, provider_code: 'DIGIFLAZZ', is_manual_price: true, cost_idr: 8000, priority: 1, is_active: true };
+    assert.equal(mappingPayload(locked, { is_active: false }).is_manual_price, true);
+
+    // Mapping biasa tidak mengirim field harga sama sekali.
+    const plain = { id: 3, provider_code: 'DIGIFLAZZ', is_manual_price: false, cost_idr: 8000, priority: 1, is_active: true };
+    assert.deepEqual(Object.keys(mappingPayload(plain, { priority: 0 })).sort(), ['is_active', 'priority']);
+
+    assert.deepEqual(sortMappings([{ id: 1, priority: 5, is_active: false }, { id: 2, priority: 9, is_active: true }]).map(m => m.id), [2, 1]);
+    assert.equal(mappingStatusLabel({ provider_code: 'VOUCHER_STOCK', stock_counts: { available: 3 } }), '3 kode siap');
+    assert.equal(mappingStatusLabel({ is_active: false, disabled_by_sync: true }), 'Nonaktif (sinkron)');
 });
