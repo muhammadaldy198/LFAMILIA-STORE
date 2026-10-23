@@ -118,6 +118,23 @@ class VoucherStockService
     }
 
     /**
+     * Kembalikan kode ke stok hanya bila belum terkirim. Kode DELIVERED tidak
+     * pernah dilepas: pembeli sudah memegangnya.
+     */
+    public function release(int $orderId): int
+    {
+        return DB::table('voucher_stock_codes')
+            ->where('order_id', $orderId)
+            ->where('status', 'RESERVED')
+            ->update([
+                'status' => 'AVAILABLE',
+                'order_id' => null,
+                'reserved_at' => null,
+                'updated_at' => now(),
+            ]);
+    }
+
+    /**
      * @return array<string, array{available:int,reserved:int,delivered:int,void:int,total:int}>
      */
     public function counts(): array
