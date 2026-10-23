@@ -112,23 +112,15 @@ Local hook dapat dilewati dengan `--no-verify` atau `HUSKY=0`; karena itu hook b
 
 Workflow aktif: `.github/workflows/validate-rebuild.yml`.
 
-Job utama mencakup:
+Job dipecah agar berjalan paralel:
 
-- Laravel-only repository shape;
-- PHP 8.4 setup;
-- MySQL 8 + Redis;
-- Composer validate/install/audit;
-- PHP syntax;
-- config cache;
-- deployment assets;
-- migration rollback/reapply;
-- frontend build;
-- encrypted backup/restore verification;
-- PHPUnit;
-- browser smoke;
-- Pint.
+- `foundation` — pemeriksaan statis tanpa service container: Laravel-only repository shape, Composer validate/install/audit, guardrail secret, `npm ci` + `npm audit`, validasi hook Git, PHP syntax, Pint, config cache, dan aset deploy;
+- `php-tests` — MySQL 8 + Redis: migrasi, rollback 10 langkah lalu migrasi ulang, verifikasi backup/restore terenkripsi, dan PHPUnit;
+- `browser-mobile` — smoke browser pada viewport admin 360×800, 390×844, 412×915, 430×932 (`SMOKE_STAGES=admin`);
+- `browser-desktop` — smoke browser penuh pada viewport admin 1024×768, 1280×800, 1440×900, 1920×1080, termasuk smoke responsif dan perbandingan checkout;
+- `frontend-static` — npm install, test guard UI, ESLint, Vue SFC static check, dan production build.
 
-Job `frontend-static` menjalankan npm install, ESLint, Vue SFC static check, dan production build.
+Kedua job browser menjalankan `tests/Browser/smoke.sh` dengan `ADMIN_UI_SIZES` dan `SMOKE_STAGES`; tanpa variabel itu script menjalankan seluruh tahap seperti sebelumnya.
 
 Pull request tidak boleh di-merge bila required checks gagal.
 
