@@ -507,6 +507,12 @@ class PaymentStateService
                 'reserved_until' => now(),
                 'updated_at' => now(),
             ]);
+
+        // Kode stok digital yang belum terkirim kembali ke stok.
+        $released = app(VoucherStockService::class)->release($orderId);
+        if ($released > 0) {
+            $this->orderEvent($orderId, 'VOUCHER_STOCK_RELEASED', null, null, ['codes' => $released]);
+        }
     }
 
     private function correlationId(int $orderId): string

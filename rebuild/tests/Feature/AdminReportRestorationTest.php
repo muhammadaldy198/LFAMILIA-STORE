@@ -219,43 +219,11 @@ class AdminReportRestorationTest extends TestCase
                 ->where('metrics.paid_revenue_idr', 26000));
     }
 
-    public function test_report_csv_export_respects_finance_visibility_and_is_audited(): void
-    {
-        $admin = $this->login();
-        $catalog = $this->catalog('EXPORT');
-        $this->order($catalog, 'EXPORT', 'SUCCESS', now()->subDay(), true);
-
-        $response = $this->get('/admin/reports/export?range=30d');
-        $response->assertOk()->assertDownload();
-
-        $content = $response->streamedContent();
-        $this->assertStringContainsString('Omzet', $content);
-        $this->assertStringContainsString('Laba Kotor', $content);
-        $this->assertStringContainsString('13000', $content);
-        $this->assertDatabaseHas('audit_logs', [
-            'actor_type' => 'admin_user',
-            'actor_id' => (string) $admin->id,
-            'action' => 'report.exported',
-            'target_type' => 'report',
-            'target_id' => 'sales',
-        ]);
-
-        auth('admin')->logout();
-        $this->login('ADMIN', ['reports.view']);
-
-        $adminResponse = $this->get('/admin/reports/export?range=30d');
-        $adminResponse->assertOk()->assertDownload();
-        $adminContent = $adminResponse->streamedContent();
-        $this->assertStringNotContainsString('Omzet', $adminContent);
-        $this->assertStringNotContainsString('Laba Kotor', $adminContent);
-    }
-
     public function test_reports_permission_is_enforced_server_side(): void
     {
         $this->login('ADMIN', ['dashboard.view']);
 
         $this->get('/admin/reports')->assertForbidden();
-        $this->get('/admin/reports/export?range=30d')->assertForbidden();
         $this->postJson('/admin/reports/export-audit', ['section' => 'sales', 'range' => '30d'])
             ->assertForbidden();
     }

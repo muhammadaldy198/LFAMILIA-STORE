@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Jobs\ReconcileFulfillmentJob;
 use App\Services\AdminAuditService;
 use App\Services\AdminManualOrderService;
 use App\Services\AdminOrderPresentation;
@@ -42,7 +41,8 @@ class AdminOrdersController
             ->select('orders.*', 'products.name as product_name', 'packages.name as package_name',
                 'users.name as buyer_name', 'users.email as buyer_email', 'users.phone as buyer_phone',
                 'providers.code as provider_code', 'channels.name as channel_name', 'products.manual_instructions')
-            ->selectRaw("EXISTS(SELECT 1 FROM fulfillment_attempts fa WHERE fa.order_id = orders.id AND fa.id = (SELECT MAX(fb.id) FROM fulfillment_attempts fb WHERE fb.order_id = orders.id) AND fa.status IN ('UNKNOWN','BLOCKED','MANUAL_FAILED')) as needs_attention");
+            ->selectRaw("EXISTS(SELECT 1 FROM fulfillment_attempts fa WHERE fa.order_id = orders.id AND fa.id = (SELECT MAX(fb.id) FROM fulfillment_attempts fb WHERE fb.order_id = orders.id) AND fa.status IN ('UNKNOWN','BLOCKED','MANUAL_FAILED')) as needs_attention")
+            ->selectRaw('(SELECT fa.status FROM fulfillment_attempts fa WHERE fa.order_id = orders.id ORDER BY fa.id DESC LIMIT 1) as fulfillment_status');
         if ($q = trim((string) $request->query('q'))) {
             $query->where(function (Builder $query) use ($q): void {
                 foreach (['orders.order_number', 'users.name', 'users.email', 'users.phone', 'orders.guest_email',
@@ -220,20 +220,6 @@ class AdminOrdersController
         ]);
 
         return back()->with('success', 'Hasil pesanan masuk antrean pengiriman email.');
-    }
-
-    public function refreshFulfillment(Request $request, int $id)
-    {
-        $order = DB::table('orders')->where('id', $id)->first();
-        abort_unless($order, 404);
-        $attempt = DB::table('fulfillment_attempts')->where('order_id', $id)->orderByDesc('id')->first();
-        if (! in_array($order->status, ['PAID', 'PROCESSING'], true) || ! $attempt || ! in_array($attempt->status, ['PENDING', 'UNKNOWN', 'SENDING'], true)) {
-            throw ValidationException::withMessages(['order' => 'Pesanan ini tidak memerlukan pemeriksaan hasil pengiriman.']);
-        }
-        ReconcileFulfillmentJob::dispatch((int) $attempt->id);
-        app(AdminAuditService::class)->record($request, 'order.fulfillment.checked', 'order', $id, null, ['attempt_id' => $attempt->id]);
-
-        return back()->with('success', 'Pemeriksaan dijadwalkan. Muat ulang detail untuk melihat hasilnya.');
     }
 
     public function refreshPayment(Request $request, int $id)

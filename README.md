@@ -17,6 +17,13 @@ Runtime Next.js/Vinext, Cloudflare Worker/D1, Drizzle, dan runtime Laravel lama 
 
 ## Dokumentasi utama
 
+**Urutan kekuasaan dokumen** — kalau dua dokumen berbeda, yang lebih atas menang:
+
+1. [docs/PRD.md](docs/PRD.md) — aturan produk (satu-satunya).
+2. [AGENTS.md](AGENTS.md) — cara kerja, alur git, larangan.
+3. [docs/ADMIN-PANEL.md](docs/ADMIN-PANEL.md) — spesifikasi panel admin.
+4. Dokumen teknis di bawah — menjelaskan **cara kode bekerja**, bukan aturan produk.
+
 - Arsitektur aktual: [rebuild/ARCHITECTURE.md](rebuild/ARCHITECTURE.md)
 - Aplikasi: [rebuild/README.md](rebuild/README.md)
 - Database: [rebuild/DATABASE.md](rebuild/DATABASE.md)
@@ -26,7 +33,9 @@ Runtime Next.js/Vinext, Cloudflare Worker/D1, Drizzle, dan runtime Laravel lama 
 - Security: [rebuild/SECURITY.md](rebuild/SECURITY.md)
 - Testing/CI: [rebuild/TESTING.md](rebuild/TESTING.md)
 - Deployment/backup/rollback: [rebuild/deploy/README.md](rebuild/deploy/README.md)
-- PRD: [docs/PRD-LFAMILIA-STORE-v1.md](docs/PRD-LFAMILIA-STORE-v1.md)
+- Status pengerjaan: [docs/STATUS.md](docs/STATUS.md)
+
+Dokumen lama yang sudah tidak berlaku dipindahkan ke `docs/archive/` dan `rebuild/docs/archive/`. **Jangan dibaca sebagai aturan** — hanya untuk melacak keputusan masa lalu.
 
 ## Pengembangan lokal
 

@@ -42,6 +42,19 @@ class AdminOrderCancellationService
                 'created_at' => now(),
             ]);
             // Never initiate gateway refunds or wallet balance changes.
+            // Kode stok yang belum terkirim kembali ke stok.
+            $released = app(VoucherStockService::class)->release($orderId);
+            if ($released > 0) {
+                DB::table('order_events')->insert([
+                    'order_id' => $orderId,
+                    'event_type' => 'VOUCHER_STOCK_RELEASED',
+                    'from_status' => 'CANCELLED',
+                    'to_status' => 'CANCELLED',
+                    'correlation_id' => (string) Str::uuid(),
+                    'metadata' => json_encode(['codes' => $released], JSON_THROW_ON_ERROR),
+                    'created_at' => now(),
+                ]);
+            }
         }, 3);
     }
 }

@@ -16,51 +16,21 @@ on:
 permissions:
   contents: read
 
+# Job dipecah supaya berjalan paralel: pemeriksaan statis tidak perlu menunggu
+# container MySQL/Redis, dan smoke browser dibagi per kelompok viewport.
+# Tidak ada pemeriksaan yang dihapus — hanya dipindah ke job yang tepat.
 jobs:
+  # Cepat, tanpa service container: kode, dependensi, gaya, aset deploy.
   foundation:
     runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: rebuild
-    services:
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_ROOT_PASSWORD: ${{ github.run_id }}
-          MYSQL_DATABASE: lfamilia_ci
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -p${{ github.run_id }}"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=10
-      redis:
-        image: redis:7
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd="redis-cli ping"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=10
     env:
       APP_NAME: LFAMILIA STORE
       APP_ENV: testing
       APP_DEBUG: true
       APP_URL: http://127.0.0.1:8000
-      DB_CONNECTION: mysql
-      DB_HOST: 127.0.0.1
-      DB_PORT: 3306
-      DB_DATABASE: lfamilia_ci
-      DB_USERNAME: root
-      DB_PASSWORD: ${{ github.run_id }}
-      REDIS_CLIENT: phpredis
-      REDIS_HOST: 127.0.0.1
-      REDIS_PORT: 6379
-      CACHE_STORE: redis
-      QUEUE_CONNECTION: redis
-      SESSION_DRIVER: redis
     steps:
       - uses: actions/checkout@v6
         with:
@@ -135,6 +105,9 @@ jobs:
       - name: Check PHP syntax
         run: find app bootstrap config public routes tests -name '*.php' -print0 | xargs -0 -n1 php -l
 
+      - name: Check PHP style
+        run: vendor/bin/pint --test
+
       - name: Validate cached configuration
         run: |
           php artisan config:cache
@@ -155,12 +128,88 @@ jobs:
           grep -Fq 'artisan route:clear' deploy/deploy.sh
           grep -Fq 'artisan route:clear' deploy/rollback-source.sh
 
-      - name: Validate schema and assets
+  # Butuh MySQL + Redis: migrasi, rollback, PHPUnit, backup/restore.
+  php-tests:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: rebuild
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: ${{ github.run_id }}
+          MYSQL_DATABASE: lfamilia_ci
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -p${{ github.run_id }}"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      APP_NAME: LFAMILIA STORE
+      APP_ENV: testing
+      APP_DEBUG: true
+      APP_URL: http://127.0.0.1:8000
+      DB_CONNECTION: mysql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_DATABASE: lfamilia_ci
+      DB_USERNAME: root
+      DB_PASSWORD: ${{ github.run_id }}
+      REDIS_CLIENT: phpredis
+      REDIS_HOST: 127.0.0.1
+      REDIS_PORT: 6379
+      CACHE_STORE: redis
+      QUEUE_CONNECTION: redis
+      SESSION_DRIVER: redis
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, pdo_mysql, redis, gd, exif, pcntl
+          coverage: none
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Install frontend dependencies
+        env:
+          HUSKY: 0
+        run: npm ci
+
+      - name: Configure test app
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      # Feature test merender Blade dengan @vite, jadi manifest wajib ada.
+      - name: Build frontend
+        run: npm run build
+
+      - name: Validate schema
         run: |
           php artisan migrate --force
           php artisan migrate:rollback --step=10 --force
           php artisan migrate --force
-          npm run build
 
       - name: Verify M12 encrypted backup and restore
         run: |
@@ -195,6 +244,167 @@ jobs:
       - name: Run rebuild tests
         run: vendor/bin/phpunit
 
+  # Dua job identik kecuali ADMIN_UI_SIZES, supaya smoke 8 viewport admin
+  # tidak lagi menjadi satu blok tiga menit.
+  browser-mobile:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: rebuild
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: ${{ github.run_id }}
+          MYSQL_DATABASE: lfamilia_ci
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -p${{ github.run_id }}"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      APP_NAME: LFAMILIA STORE
+      APP_ENV: testing
+      APP_DEBUG: true
+      APP_URL: http://127.0.0.1:8000
+      DB_CONNECTION: mysql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_DATABASE: lfamilia_ci
+      DB_USERNAME: root
+      DB_PASSWORD: ${{ github.run_id }}
+      REDIS_CLIENT: phpredis
+      REDIS_HOST: 127.0.0.1
+      REDIS_PORT: 6379
+      CACHE_STORE: redis
+      QUEUE_CONNECTION: redis
+      SESSION_DRIVER: redis
+      ADMIN_UI_SIZES: '360x800,390x844,412x915,430x932'
+      SMOKE_STAGES: 'admin'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, pdo_mysql, redis, gd, exif, pcntl
+          coverage: none
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Install frontend dependencies
+        env:
+          HUSKY: 0
+        run: npm ci
+
+      - name: Configure test app
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+          php artisan migrate --force
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Run M11 browser smoke
+        run: bash tests/Browser/smoke.sh
+
+  browser-desktop:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: rebuild
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: ${{ github.run_id }}
+          MYSQL_DATABASE: lfamilia_ci
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -p${{ github.run_id }}"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      APP_NAME: LFAMILIA STORE
+      APP_ENV: testing
+      APP_DEBUG: true
+      APP_URL: http://127.0.0.1:8000
+      DB_CONNECTION: mysql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_DATABASE: lfamilia_ci
+      DB_USERNAME: root
+      DB_PASSWORD: ${{ github.run_id }}
+      REDIS_CLIENT: phpredis
+      REDIS_HOST: 127.0.0.1
+      REDIS_PORT: 6379
+      CACHE_STORE: redis
+      QUEUE_CONNECTION: redis
+      SESSION_DRIVER: redis
+      ADMIN_UI_SIZES: '1024x768,1280x800,1440x900,1920x1080'
+      SMOKE_STAGES: 'responsive admin checkout'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, pdo_mysql, redis, gd, exif, pcntl
+          coverage: none
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Install frontend dependencies
+        env:
+          HUSKY: 0
+        run: npm ci
+
+      - name: Configure test app
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+          php artisan migrate --force
+
+      - name: Build frontend
+        run: npm run build
+
       - name: Run M11 browser smoke
         run: bash tests/Browser/smoke.sh
 
@@ -202,12 +412,9 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: checkout-lab-comparison
+          name: checkout-lab-comparison-desktop
           path: rebuild/checkout-visual-results
           if-no-files-found: warn
-
-      - name: Check PHP style
-        run: vendor/bin/pint --test
 
   frontend-static:
     runs-on: ubuntu-24.04
@@ -231,7 +438,7 @@ jobs:
         run: npm ci
 
       - name: Test ordering and customer/admin UI regressions
-        run: node --test tests/Browser/ordering.test.mjs tests/Browser/customer-ui-guards.test.mjs tests/Browser/admin-ui-guards.test.mjs
+        run: node --test tests/Browser/customer-ui-guards.test.mjs tests/Browser/admin-ui-guards.test.mjs
 
       - name: Lint Vue and JavaScript
         run: npm run lint

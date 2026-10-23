@@ -1,14 +1,11 @@
 <script setup>
-import AdminConfirmDialog from '../../Components/AdminConfirmDialog.vue';
-import AdminSwitch from '../../Components/AdminSwitch.vue';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../../Components/ui/sheet';
-import { Head, Link, router } from '@inertiajs/vue3';
 import { computed, reactive, ref, watch } from 'vue';
-import AdminShell from '../../Components/AdminShell.vue';
-import { Badge } from '../../Components/ui/badge';
-import { Button } from '../../Components/ui/button';
-import { Card } from '../../Components/ui/card';
-import { Input } from '../../Components/ui/input';
+import { Head, Link, router } from '@inertiajs/vue3';
+import AdminLayout from '../../Components/Admin/AdminLayout.vue';
+import AdminModal from '../../Components/Admin/AdminModal.vue';
+import { num, rupiah, wibDateTime } from '../../lib/adminFormat';
+import { walletAdjustmentError } from '../../lib/adminWalletAdjustment';
+import { withSensitive } from '../../lib/sensitivePrompt';
 
 const props = defineProps({
     isSuperAdmin: Boolean,
@@ -21,76 +18,114 @@ const props = defineProps({
     summary: { type: Object, default: () => ({}) },
 });
 
-const tab = ref('pelanggan');
-const pendingAction = ref(null);
-const ask = (title, message, confirmLabel, run, destructive = false) => {
-    pendingAction.value = { title, message, confirmLabel, run, destructive };
-};
-const runPending = () => {
-    const action = pendingAction.value;
-    pendingAction.value = null;
-    action?.run();
-};
+const tab = ref('list');
+const rows = computed(() => (Array.isArray(props.customers?.data) ? props.customers.data : []));
 
-const filters = reactive({
-    q: props.filters?.q || '',
-    tier: props.filters?.tier || '',
-    membership_mode: props.filters?.membership_mode || '',
-    verification: props.filters?.verification || '',
-    activity: props.filters?.activity || '',
-    orders: props.filters?.orders || '',
+const filter = reactive({
+    q: props.filters?.q || '', tier: props.filters?.tier || '',
+    membership_mode: props.filters?.membership_mode || '', verification: props.filters?.verification || '',
+    activity: props.filters?.activity || '', orders: props.filters?.orders || '',
     per_page: Number(props.filters?.per_page || 25),
 });
+const advanced = ref(false);
+const apply = () => {
+    router.get('/admin/customers', Object.fromEntries(
+        Object.entries(filter).filter(([, value]) => value !== '' && value !== null)
+    ), { preserveState: true, preserveScroll: true });
+};
+const reset = () => {
+    Object.assign(filter, { q: '', tier: '', membership_mode: '', verification: '', activity: '', orders: '', per_page: 25 });
+    apply();
+};
 
+const tiers = computed(() => [...props.membershipRules].sort((a, b) => a.rank - b.rank));
+const tierName = code => code === 'AUTO' ? 'Otomatis' : code;
+
+// ---------- atur pelanggan ----------
+const editor = ref(null);
+const busy = ref(false);
+const errors = ref({});
+const openEditor = row => {
+    editor.value = {
+        row,
+        mode: row.membership_mode === 'MANUAL' ? (row.membership_assignment || 'BASIC') : 'AUTO',
+        amount_idr: '',
+        reason: '',
+        idempotency_key: crypto.randomUUID(),
+    };
+    errors.value = {};
+};
+const saveMembership = () => {
+    if (!editor.value) return;
+    busy.value = true;
+    router.put('/admin/customers/' + editor.value.row.id + '/membership', {
+        membership_tier_code: editor.value.mode,
+    }, {
+        preserveScroll: true,
+        onError: bag => { errors.value = bag; },
+        onFinish: () => { busy.value = false; },
+    });
+};
+const saveBalance = () => {
+    if (!editor.value) return;
+    const problem = walletAdjustmentError(editor.value.amount_idr, editor.value.reason);
+    errors.value = problem ? { amount_idr: problem } : {};
+    if (problem) return;
+    const amount = Number(editor.value.amount_idr || 0);
+    const direction = amount > 0 ? 'menambah' : 'mengurangi';
+    // Route saldo dijaga konfirmasi sandi; POST harus dikirim setelah sandi terbukti.
+    void withSensitive(`Konfirmasi ${direction} saldo ${editor.value.row.name} sebesar ${rupiah(Math.abs(amount))}? Alasan: ${editor.value.reason}`, () => {
+        busy.value = true;
+        router.post('/admin/customers/' + editor.value.row.id + '/wallet', {
+            amount_idr: amount,
+            reason: editor.value.reason,
+            idempotency_key: editor.value.idempotency_key,
+        }, {
+            preserveScroll: true,
+            onError: bag => { errors.value = bag; },
+            onSuccess: () => { editor.value.amount_idr = ''; editor.value.reason = ''; editor.value.idempotency_key = crypto.randomUUID(); },
+            onFinish: () => { busy.value = false; },
+        });
+    });
+};
+
+// ---------- hapus / nonaktifkan ----------
+const pendingDelete = ref(null);
+const removeAccount = () => {
+    router.delete('/admin/customers/' + pendingDelete.value.id, {
+        preserveScroll: true,
+        onFinish: () => { pendingDelete.value = null; },
+    });
+};
+
+// ---------- pembersihan akun kosong ----------
 const cleanup = reactive({
     enabled: props.cleanupSettings?.enabled ?? true,
     inactivity_days: Number(props.cleanupSettings?.inactivity_days || 30),
 });
+watch(() => props.cleanupSettings, value => {
+    cleanup.enabled = value?.enabled ?? true;
+    cleanup.inactivity_days = Number(value?.inactivity_days || 30);
+}, { deep: true });
+const saveCleanup = () => {
+    router.put('/admin/customers/cleanup/settings', {
+        enabled: Boolean(cleanup.enabled), inactivity_days: Number(cleanup.inactivity_days),
+    }, { preserveScroll: true });
+};
+const runCleanup = () => {
+    router.post('/admin/customers/cleanup/run', {}, { preserveScroll: true });
+};
 
-const membershipRules = reactive((props.membershipRules || []).map(tier => ({ ...tier })));
-watch(() => props.membershipRules, value => membershipRules.splice(0, membershipRules.length, ...(value || []).map(tier => ({ ...tier }))));
-const editingTier = ref(null);
-const saving = ref('');
-
-const money = (value) => 'Rp' + Number(value || 0).toLocaleString('id-ID');
-const percent = (value) => Number(value || 0).toLocaleString('id-ID', { maximumFractionDigits: 2 }) + '%';
-const date = (value) => value ? new Intl.DateTimeFormat('id-ID', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-    timeZone: 'Asia/Jakarta',
-}).format(new Date(value)) + ' WIB' : 'Belum ada';
-
-const activeFilterCount = computed(() => ['verification', 'membership_mode', 'activity', 'orders']
-    .filter((key) => filters[key]).length);
-
-function search() {
-    router.get('/admin/customers', {
-        q: filters.q || undefined,
-        tier: filters.tier || undefined,
-        membership_mode: filters.membership_mode || undefined,
-        verification: filters.verification || undefined,
-        activity: filters.activity || undefined,
-        orders: filters.orders || undefined,
-        per_page: filters.per_page,
-    }, { preserveState: true, preserveScroll: true });
-}
-
-function reset() {
-    Object.assign(filters, {
-        q: '',
-        tier: '',
-        membership_mode: '',
-        verification: '',
-        activity: '',
-        orders: '',
-        per_page: 25,
-    });
-    search();
-}
-
-function saveTier(tier) {
-    if (saving.value) return;
-    saving.value = 'tier';
+// ---------- tingkat member ----------
+const tierEditor = ref(null);
+const openTier = tier => {
+    if (!props.canManageMembershipRules) return;
+    tierEditor.value = { ...tier };
+    errors.value = {};
+};
+const saveTier = () => {
+    const tier = tierEditor.value;
+    busy.value = true;
     router.put('/admin/settings/membership/' + encodeURIComponent(tier.code), {
         is_active: Boolean(tier.is_active),
         minimum_spend_idr: Number(tier.minimum_spend_idr || 0),
@@ -98,215 +133,302 @@ function saveTier(tier) {
         benefit_notes: tier.benefit_notes || '',
     }, {
         preserveScroll: true,
-        onSuccess: () => { editingTier.value = null; },
-        onFinish: () => { saving.value = ''; },
+        onError: bag => { errors.value = bag; },
+        onSuccess: () => { tierEditor.value = null; },
+        onFinish: () => { busy.value = false; },
     });
-}
-
-function saveCleanup() {
-    router.put('/admin/customers/cleanup/settings', {
-        enabled: Boolean(cleanup.enabled),
-        inactivity_days: Number(cleanup.inactivity_days),
-    }, { preserveScroll: true });
-}
-
-function runCleanup() {
-    ask('Jalankan pembersihan', 'Akun dengan saldo atau riwayat transaksi dan tiket tetap dilindungi. Lanjutkan pembersihan sekarang?', 'Jalankan', () => {
-        router.post('/admin/customers/cleanup/run', {}, { preserveScroll: true });
-    });
-}
+};
 </script>
 
 <template>
-<Head title="Pelanggan" />
-<AdminShell>
-    <div class="space-y-5">
-        <header class="flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between">
-            <div class="min-w-0">
-                <h1 class="text-2xl font-semibold tracking-tight">Pelanggan</h1>
-                <p class="mt-1 max-w-3xl text-sm text-muted-foreground">
-                    Cari pelanggan dan lihat ringkasan saldo serta aktivitasnya. Pilih satu baris untuk membuka profil lengkap berisi pesanan, saldo, tiket, dan akun game.
-                </p>
+    <Head title="Pelanggan" />
+    <AdminLayout>
+        <header class="adm-head">
+            <div>
+                <h1>Pelanggan</h1>
+                <p>Cari pelanggan, pantau saldo, dan atur tingkat member toko.</p>
             </div>
-            <Button class="w-full sm:w-auto" variant="outline" @click="router.reload({ preserveScroll: true })">Muat ulang</Button>
+            <div class="adm-head-actions">
+                <button type="button" class="adm-btn" @click="router.reload({ preserveScroll: true })">Muat ulang</button>
+            </div>
         </header>
 
-        <nav class="lf-admin-tabs" aria-label="Bagian pelanggan">
-            <Button type="button" variant="ghost" :class="{ active: tab === 'pelanggan' }" :aria-current="tab === 'pelanggan' ? 'page' : undefined" @click="tab = 'pelanggan'">Daftar pelanggan</Button>
-            <Button type="button" variant="ghost" :class="{ active: tab === 'membership' }" :aria-current="tab === 'membership' ? 'page' : undefined" @click="tab = 'membership'">Tingkat member</Button>
-        </nav>
+        <section class="adm-stats" aria-label="Ringkasan pelanggan">
+            <div class="adm-stat"><span class="lb">Total pelanggan</span><strong class="vl">{{ num(summary.total) }}</strong></div>
+            <div class="adm-stat"><span class="lb">Baru 30 hari</span><strong class="vl">{{ num(summary.new_30d) }}</strong></div>
+            <div class="adm-stat"><span class="lb">Email terverifikasi</span><strong class="vl">{{ num(summary.verified) }}</strong></div>
+            <div class="adm-stat"><span class="lb">Masuk lewat Google</span><strong class="vl">{{ num(summary.google_linked) }}</strong></div>
+            <div class="adm-stat"><span class="lb">Saldo pelanggan</span><strong class="vl" style="font-size:16px">{{ rupiah(summary.wallet_total_idr) }}</strong></div>
+            <div class="adm-stat"><span class="lb">Tiket terbuka</span><strong class="vl" :style="{ color: Number(summary.open_tickets) ? 'var(--a-warn)' : 'inherit' }">{{ num(summary.open_tickets) }}</strong></div>
+        </section>
 
-        <div v-show="tab === 'pelanggan'" class="space-y-5">
-            <section class="lf-admin-summary" aria-label="Ringkasan pelanggan">
-                <Card class="p-4"><p class="text-xs text-muted-foreground">Total pelanggan</p><p class="mt-2 text-2xl font-semibold">{{ Number(summary.total || 0).toLocaleString('id-ID') }}</p></Card>
-                <Card class="p-4"><p class="text-xs text-muted-foreground">Baru 30 hari</p><p class="mt-2 text-2xl font-semibold">{{ Number(summary.new_30d || 0).toLocaleString('id-ID') }}</p></Card>
-                <Card class="p-4"><p class="text-xs text-muted-foreground">Email terverifikasi</p><p class="mt-2 text-2xl font-semibold">{{ Number(summary.verified || 0).toLocaleString('id-ID') }}</p></Card>
-                <Card class="p-4"><p class="text-xs text-muted-foreground">Terhubung Google</p><p class="mt-2 text-2xl font-semibold">{{ Number(summary.google_linked || 0).toLocaleString('id-ID') }}</p></Card>
-                <Card class="p-4"><p class="text-xs text-muted-foreground">Total saldo</p><p class="mt-2 text-2xl font-semibold">{{ money(summary.wallet_total_idr) }}</p></Card>
-                <Card class="p-4"><p class="text-xs text-muted-foreground">Tiket aktif</p><p class="mt-2 text-2xl font-semibold">{{ Number(summary.open_tickets || 0).toLocaleString('id-ID') }}</p></Card>
-            </section>
+        <div class="adm-tabs" role="tablist" aria-label="Bagian pelanggan">
+            <button type="button" role="tab" :aria-selected="tab === 'list'" @click="tab = 'list'">Daftar pelanggan</button>
+            <button type="button" role="tab" :aria-selected="tab === 'tiers'" @click="tab = 'tiers'">Tingkat member</button>
+        </div>
 
-            <form class="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_200px_auto]" @submit.prevent="search">
-                <label class="space-y-1">
-                    <span class="text-sm font-medium">Cari pelanggan</span>
-                    <Input v-model="filters.q" maxlength="100" placeholder="Nama, email, atau nomor telepon" />
-                </label>
-                <label class="space-y-1">
-                    <span class="text-sm font-medium">Tingkat member</span>
-                    <select v-model="filters.tier" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
-                        <option value="">Semua tingkat</option>
-                        <option v-for="tier in membershipTiers" :key="tier.code" :value="tier.code">{{ tier.code }}</option>
-                    </select>
-                </label>
-                <div class="flex items-end gap-2">
-                    <Button type="submit">Cari</Button>
-                    <Button type="button" variant="outline" @click="reset">Atur ulang</Button>
-                </div>
-            </form>
-
-            <details class="lf-admin-advanced rounded-md border border-border">
-                <summary class="cursor-pointer px-4 py-3 text-sm font-medium">Filter lanjutan<template v-if="activeFilterCount"> · {{ activeFilterCount }} aktif</template></summary>
-                <form class="grid gap-3 border-t border-border p-4 sm:grid-cols-2 lg:grid-cols-4" @submit.prevent="search">
-                    <label class="space-y-1"><span class="text-sm font-medium">Verifikasi email</span>
-                        <select v-model="filters.verification" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+        <!-- Daftar pelanggan -->
+        <template v-if="tab === 'list'">
+            <section class="adm-card">
+                <form class="adm-filters" @submit.prevent="apply">
+                    <label class="adm-field search">
+                        <span>Cari pelanggan</span>
+                        <input v-model="filter.q" class="adm-input" maxlength="100" placeholder="Nama, email, atau nomor WhatsApp">
+                    </label>
+                    <label class="adm-field narrow">
+                        <span>Tingkat</span>
+                        <select v-model="filter.tier" class="adm-select">
+                            <option value="">Semua tingkat</option>
+                            <option v-for="tier in tiers" :key="tier.code" :value="tier.code">{{ tier.code }}</option>
+                        </select>
+                    </label>
+                    <label class="adm-field narrow">
+                        <span>Status email</span>
+                        <select v-model="filter.verification" class="adm-select">
                             <option value="">Semua</option>
                             <option value="verified">Terverifikasi</option>
                             <option value="unverified">Belum terverifikasi</option>
                         </select>
                     </label>
-                    <label class="space-y-1"><span class="text-sm font-medium">Cara penetapan tingkat</span>
-                        <select v-model="filters.membership_mode" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
-                            <option value="">Semua</option>
-                            <option value="AUTO">Otomatis dari transaksi</option>
-                            <option value="MANUAL">Ditetapkan admin</option>
-                        </select>
-                    </label>
-                    <label class="space-y-1"><span class="text-sm font-medium">Aktivitas</span>
-                        <select v-model="filters.activity" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
-                            <option value="">Semua</option>
-                            <option value="active_30d">Aktif 30 hari terakhir</option>
-                            <option value="inactive_30d">Tidak aktif 30 hari</option>
-                        </select>
-                    </label>
-                    <label class="space-y-1"><span class="text-sm font-medium">Riwayat pesanan</span>
-                        <select v-model="filters.orders" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
-                            <option value="">Semua</option>
-                            <option value="with_orders">Pernah memesan</option>
-                            <option value="without_orders">Belum pernah memesan</option>
-                        </select>
-                    </label>
-                    <label class="space-y-1"><span class="text-sm font-medium">Baris per halaman</span>
-                        <select v-model.number="filters.per_page" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
-                            <option :value="10">10 baris</option>
-                            <option :value="25">25 baris</option>
-                            <option :value="50">50 baris</option>
-                            <option :value="100">100 baris</option>
-                        </select>
-                    </label>
-                    <div class="flex items-end gap-2 sm:col-span-2 lg:col-span-4"><Button type="submit">Terapkan filter</Button><Button type="button" variant="outline" @click="reset">Hapus filter</Button></div>
-                </form>
-            </details>
-
-            <ul v-if="customers.data?.length" class="divide-y divide-border rounded-md border border-border">
-                <li v-for="row in customers.data" :key="row.id">
-                    <Link :href="'/admin/customers/' + row.id" class="flex flex-col gap-2 px-4 py-3 hover:bg-muted/40 sm:flex-row sm:items-center sm:gap-4">
-                        <span class="min-w-0 flex-1">
-                            <strong class="block truncate">{{ row.name }}</strong>
-                            <small class="mt-0.5 block truncate text-muted-foreground">{{ row.email || 'Email belum diisi' }} · {{ row.phone || 'Nomor telepon belum diisi' }}</small>
-                            <span class="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                                <Badge variant="secondary">{{ row.membership_tier_code }}</Badge>
-                                <span>{{ row.membership_mode === 'MANUAL' ? 'Ditetapkan admin' : 'Otomatis dari transaksi' }}</span>
-                                <Badge v-if="!row.email_verified" variant="outline">Email belum terverifikasi</Badge>
-                                <Badge v-if="row.open_ticket_count" variant="outline">{{ row.open_ticket_count }} tiket belum selesai</Badge>
-                            </span>
-                        </span>
-                        <span class="grid grid-cols-3 gap-3 text-xs sm:w-72 sm:text-right">
-                            <span><small class="block text-muted-foreground">Saldo</small><strong class="tabular-nums">{{ money(row.balance_idr) }}</strong></span>
-                            <span><small class="block text-muted-foreground">Pesanan</small><strong class="tabular-nums">{{ row.order_count }}</strong></span>
-                            <span><small class="block text-muted-foreground">Terakhir aktif</small><strong>{{ date(row.last_active_at || row.created_at) }}</strong></span>
-                        </span>
-                        <span class="shrink-0 text-xs text-muted-foreground">Buka</span>
-                    </Link>
-                </li>
-            </ul>
-            <p v-else class="rounded-md border border-border px-4 py-10 text-center text-sm text-muted-foreground">Tidak ada pelanggan yang cocok dengan pencarian ini.</p>
-
-            <div v-if="customers.links?.length > 3" class="flex flex-wrap gap-1">
-                <Link
-                    v-for="link in customers.links"
-                    :key="link.label"
-                    :href="link.url || '#'"
-                    preserve-scroll
-                    :aria-current="link.active ? 'page' : undefined"
-                    :class="[
-                        'rounded-md border px-3 py-1.5 text-sm',
-                        link.active ? 'bg-primary text-primary-foreground' : 'bg-background',
-                        !link.url ? 'pointer-events-none opacity-40' : '',
-                    ]"
-                    >{{ link.label }}</Link>
-            </div>
-
-            <details v-if="isSuperAdmin" class="lf-admin-advanced rounded-md border border-border">
-                <summary class="cursor-pointer px-4 py-3 text-sm font-medium">Pembersihan akun kosong</summary>
-                <div class="space-y-3 border-t border-border p-4">
-                    <p class="text-sm text-muted-foreground">Hanya akun lama yang benar-benar kosong yang dibersihkan. Saldo, catatan perubahan saldo, pesanan, top up, dan tiket selalu dilindungi.</p>
-                    <div class="flex flex-wrap items-end gap-3">
-                        <label class="flex items-center gap-2 text-sm"><AdminSwitch v-model="cleanup.enabled" />Jalankan otomatis setiap hari</label>
-                        <label class="space-y-1"><span class="text-sm font-medium">Tidak aktif selama</span><div class="flex items-center gap-2"><Input v-model.number="cleanup.inactivity_days" type="number" min="7" max="365" class="w-28" /><span class="text-sm">hari</span></div></label>
-                        <Button size="sm" @click="saveCleanup">Simpan pengaturan</Button>
-                        <Button size="sm" variant="outline" @click="runCleanup">Jalankan sekarang</Button>
+                    <div class="adm-filter-actions">
+                        <button type="submit" class="adm-btn primary">Terapkan</button>
+                        <button type="button" class="adm-btn" @click="reset">Hapus filter</button>
                     </div>
-                    <p class="text-xs text-muted-foreground">Terakhir dijalankan: {{ cleanupSettings?.last_run_at ? date(cleanupSettings.last_run_at) : 'Belum pernah' }} · {{ Number(cleanupSettings?.last_deleted_count || 0).toLocaleString('id-ID') }} akun dibersihkan.</p>
+                    <div style="flex:1 0 100%">
+                        <button type="button" class="adm-btn link" @click="advanced = !advanced">Filter lanjutan</button>
+                    </div>
+                    <template v-if="advanced">
+                        <label class="adm-field narrow">
+                            <span>Cara penetapan</span>
+                            <select v-model="filter.membership_mode" class="adm-select">
+                                <option value="">Semua</option>
+                                <option value="AUTO">Otomatis</option>
+                                <option value="MANUAL">Ditetapkan admin</option>
+                            </select>
+                        </label>
+                        <label class="adm-field narrow">
+                            <span>Aktivitas</span>
+                            <select v-model="filter.activity" class="adm-select">
+                                <option value="">Semua</option>
+                                <option value="active_30d">Aktif 30 hari</option>
+                                <option value="inactive_30d">Tidak aktif 30 hari</option>
+                            </select>
+                        </label>
+                        <label class="adm-field narrow">
+                            <span>Riwayat pesanan</span>
+                            <select v-model="filter.orders" class="adm-select">
+                                <option value="">Semua</option>
+                                <option value="with_orders">Sudah pernah pesan</option>
+                                <option value="without_orders">Belum pernah pesan</option>
+                            </select>
+                        </label>
+                        <label class="adm-field narrow">
+                            <span>Pelanggan per halaman</span>
+                            <select v-model.number="filter.per_page" class="adm-select">
+                                <option v-for="size in [10, 25, 50, 100]" :key="size" :value="size">{{ size }} pelanggan</option>
+                            </select>
+                        </label>
+                    </template>
+                </form>
+
+                <div class="adm-scroll">
+                    <table class="adm-table">
+                        <thead>
+                            <tr>
+                                <th>Pelanggan</th><th>Tingkat</th><th style="text-align:right">Saldo</th>
+                                <th style="text-align:right">Pesanan</th><th>Terakhir aktif</th><th>Status</th><th>Tindakan</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="row in rows" :key="row.id">
+                                <td>
+                                    <Link :href="'/admin/customers/' + row.id" style="font-weight:600">{{ row.name }}</Link>
+                                    <div class="adm-note">{{ row.email || 'Tanpa email' }}</div>
+                                    <div class="adm-note">{{ row.phone || 'Tanpa nomor' }}</div>
+                                </td>
+                                <td>
+                                    <span class="adm-tag" :class="row.membership_mode === 'MANUAL' ? 'info' : 'plain'">
+                                        {{ tierName(row.membership_assignment || row.membership_tier_code) }}
+                                    </span>
+                                    <div v-if="row.membership_mode === 'MANUAL'" class="adm-note">Ditetapkan admin</div>
+                                </td>
+                                <td style="text-align:right">{{ rupiah(row.balance_idr) }}</td>
+                                <td style="text-align:right">
+                                    {{ num(row.order_count) }}
+                                    <div class="adm-note">{{ num(row.successful_order_count) }} berhasil</div>
+                                </td>
+                                <td class="adm-note">{{ wibDateTime(row.last_active_at) || 'Belum pernah' }}</td>
+                                <td>
+                                    <span class="adm-tag" :class="row.email_verified ? 'ok' : 'warn'">{{ row.email_verified ? 'Terverifikasi' : 'Belum verifikasi' }}</span>
+                                    <div v-if="row.open_ticket_count" class="adm-note" style="color:var(--a-warn)">{{ row.open_ticket_count }} tiket terbuka</div>
+                                </td>
+                                <td>
+                                    <div style="display:flex;gap:4px;flex-wrap:wrap">
+                                        <Link :href="'/admin/customers/' + row.id" class="adm-btn sm">Buka</Link>
+                                        <button v-if="isSuperAdmin" type="button" class="adm-btn sm" @click="openEditor(row)">Atur</button>
+                                        <button v-if="isSuperAdmin && row.deletable" type="button" class="adm-btn sm danger" @click="pendingDelete = row">Hapus</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
-            </details>
-        </div>
+                <p v-if="!rows.length" class="adm-empty">Tidak ada pelanggan yang sesuai filter.</p>
+                <div class="adm-pager">
+                    <span>{{ customers.from || 0 }}–{{ customers.to || 0 }} dari {{ num(customers.total) }} pelanggan · Halaman {{ customers.current_page || 1 }} dari {{ customers.last_page || 1 }}</span>
+                    <span class="sp" />
+                    <button type="button" class="adm-btn sm" :disabled="!customers.prev_page_url" @click="router.get(customers.prev_page_url, {}, { preserveState: true, preserveScroll: true })">Sebelumnya</button>
+                    <button type="button" class="adm-btn sm" :disabled="!customers.next_page_url" @click="router.get(customers.next_page_url, {}, { preserveState: true, preserveScroll: true })">Berikutnya</button>
+                </div>
+            </section>
+        </template>
 
-        <div v-show="tab === 'membership'" class="space-y-4">
-            <p class="max-w-3xl text-sm text-muted-foreground">
-                Atur syarat dan diskon tiap tingkat member. Diskon tetap dihitung sistem saat pelanggan membayar. Tingkat milik satu pelanggan diubah dari halaman detail pelanggan.
-            </p>
-            <p v-if="!canManageMembershipRules" role="status" class="rounded-md border border-border px-4 py-3 text-sm text-muted-foreground">Hanya admin dengan izin pengaturan yang dapat mengubah tingkat member.</p>
-            <ul v-if="membershipRules.length" class="divide-y divide-border rounded-md border border-border">
-                <li v-for="tier in membershipRules" :key="tier.code">
-                    <button type="button" class="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-muted/40" @click="canManageMembershipRules ? editingTier = tier : null">
-                        <span class="min-w-0 flex-1">
-                            <strong class="block">{{ tier.rank }}. {{ tier.code }}</strong>
-                            <small class="mt-0.5 block text-muted-foreground">Minimum {{ money(tier.minimum_spend_idr) }} · diskon {{ percent(tier.discount_percent) }}<template v-if="tier.benefit_notes"> · {{ tier.benefit_notes }}</template></small>
-                        </span>
-                        <span :class="['shrink-0 rounded border px-2 py-0.5 text-xs', tier.is_active ? 'border-emerald-500/40 text-emerald-400' : 'border-border text-muted-foreground']">{{ tier.is_active ? 'Aktif' : 'Nonaktif' }}</span>
-                        <span v-if="canManageMembershipRules" class="shrink-0 text-xs text-muted-foreground">Ubah</span>
-                    </button>
-                    <Sheet :open="editingTier === tier" @update:open="(value) => { if (!value) editingTier = null; }">
-                        <SheetContent side="right" class="w-full overflow-y-auto sm:max-w-xl">
-                            <SheetHeader><SheetTitle>Ubah tingkat {{ tier.code }}</SheetTitle><SheetDescription>Syarat, diskon, dan manfaat berlaku untuk semua pelanggan di tingkat ini.</SheetDescription></SheetHeader>
-                            <div v-if="editingTier === tier" class="mt-4 space-y-4">
-                                <label class="lf-admin-field"><span>Minimum total transaksi berhasil (Rp)</span><Input v-model.number="tier.minimum_spend_idr" type="number" min="0" max="1000000000000" step="1" /><span class="text-xs font-normal text-muted-foreground">Isi 0 bila tidak ada minimum.</span></label>
-                                <label class="lf-admin-field"><span>Diskon untuk pelanggan tingkat ini (%)</span><Input v-model.number="tier.discount_percent" type="number" min="0" max="100" step="0.01" /><span class="text-xs font-normal text-muted-foreground">Maksimum 100%.</span></label>
-                                <label class="lf-admin-field"><span>Manfaat tambahan</span><Input v-model="tier.benefit_notes" maxlength="1000" placeholder="Contoh: prioritas layanan" /></label>
-                                <label class="flex items-center gap-2 text-sm"><AdminSwitch v-model="tier.is_active" />Tingkat ini dipakai</label>
-                                <p v-if="tier.has_legacy_requirements || tier.has_legacy_benefits" class="rounded-md border border-border p-2 text-xs text-muted-foreground">Informasi tambahan dari versi sebelumnya tetap disimpan saat kamu menyimpan perubahan.</p>
-                                <p v-if="Object.keys($page.props.errors || {}).length" role="alert" class="text-sm text-destructive">{{ Object.values($page.props.errors)[0] }}</p>
-                                <div class="flex gap-2 border-t border-border pt-4">
-                                    <Button type="button" variant="outline" @click="editingTier = null">Tutup</Button>
-                                    <Button type="button" class="ml-auto" :disabled="Boolean(saving)" @click="saveTier(tier)">{{ saving === 'tier' ? 'Menyimpan…' : 'Simpan' }}</Button>
-                                </div>
-                            </div>
-                        </SheetContent>
-                    </Sheet>
-                </li>
-            </ul>
-            <p v-else class="rounded-md border border-border px-4 py-10 text-center text-sm text-muted-foreground">Belum ada tingkat member yang diatur.</p>
-        </div>
+        <!-- Tingkat member -->
+        <template v-else>
+            <section class="adm-card">
+                <div class="adm-card-head">
+                    <div>
+                        <h2>Tingkat member</h2>
+                        <p>Minimum dihitung dari total transaksi berhasil. MAFIA hanya dapat ditetapkan admin dan tidak pernah ditampilkan ke pelanggan.</p>
+                    </div>
+                </div>
+                <div class="adm-scroll">
+                    <table class="adm-table">
+                        <thead>
+                            <tr><th>Tingkat</th><th style="text-align:right">Minimum transaksi</th><th style="text-align:right">Diskon</th><th>Manfaat tambahan</th><th>Status</th><th>Tindakan</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="tier in tiers" :key="tier.code">
+                                <td><strong>{{ tier.rank }}. {{ tier.code }}</strong><div v-if="tier.code === 'MAFIA'" class="adm-note">Hanya di panel</div></td>
+                                <td style="text-align:right">{{ rupiah(tier.minimum_spend_idr) }}</td>
+                                <td style="text-align:right">{{ tier.discount_percent }}%</td>
+                                <td class="adm-note">{{ tier.benefit_notes || '—' }}</td>
+                                <td><span class="adm-tag" :class="tier.is_active ? 'ok' : 'bad'">{{ tier.is_active ? 'Aktif' : 'Nonaktif' }}</span></td>
+                                <td><button type="button" class="adm-btn sm" :disabled="!canManageMembershipRules" @click="openTier(tier)">Ubah</button></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p v-if="!tiers.length" class="adm-empty">Belum ada tingkat member.</p>
+            </section>
 
-        <AdminConfirmDialog
-            :open="Boolean(pendingAction)"
-            :title="pendingAction?.title || ''"
-            :message="pendingAction?.message || ''"
-            :confirm-label="pendingAction?.confirmLabel || 'Lanjutkan'"
-            :destructive="Boolean(pendingAction?.destructive)"
-            @update:open="(value) => { if (!value) pendingAction = null; }"
-            @confirm="runPending"
-        />
-    </div>
-</AdminShell>
+            <section class="adm-card">
+                <div class="adm-card-head">
+                    <div>
+                        <h2>Pembersihan akun kosong</h2>
+                        <p>Akun tanpa saldo, tanpa pesanan, tanpa tiket, dan tanpa riwayat saldo akan dinonaktifkan lalu data pribadinya dihapus.</p>
+                    </div>
+                </div>
+                <div class="adm-card-body">
+                    <div class="adm-grid">
+                        <label class="adm-switch-row" style="align-self:end">
+                            <button type="button" class="adm-switch" role="switch" :aria-checked="cleanup.enabled" :disabled="!isSuperAdmin" @click="cleanup.enabled = !cleanup.enabled" />
+                            Jalankan otomatis setiap hari
+                        </label>
+                        <label class="adm-field">
+                            <span>Tidak aktif selama (hari)</span>
+                            <input v-model.number="cleanup.inactivity_days" type="number" min="7" max="365" class="adm-input" :disabled="!isSuperAdmin">
+                        </label>
+                    </div>
+                    <p class="adm-note" style="margin-top:8px">
+                        Terakhir dijalankan: {{ wibDateTime(cleanupSettings?.last_run_at) || 'Belum pernah' }} ·
+                        {{ num(cleanupSettings?.last_deleted_count) }} akun dibersihkan.
+                    </p>
+                    <div v-if="isSuperAdmin" style="display:flex;gap:6px;justify-content:flex-end;margin-top:10px">
+                        <button type="button" class="adm-btn" @click="saveCleanup">Simpan pengaturan</button>
+                        <button type="button" class="adm-btn danger" @click="runCleanup">Jalankan sekarang</button>
+                    </div>
+                    <p v-else class="adm-note">Pembersihan akun hanya dapat diubah Super Admin.</p>
+                </div>
+            </section>
+        </template>
+
+        <!-- pop-up atur pelanggan -->
+        <AdminModal :open="!!editor" :title="'Atur ' + (editor?.row?.name || 'pelanggan')"
+            description="Tingkat member dan penyesuaian saldo. Keduanya dicatat di Catatan Audit."
+            @update:open="value => { if (!value) editor = null; }">
+            <div v-if="editor" class="adm-grid">
+                <div class="adm-block full">
+                    <strong>Tingkat member</strong>
+                    <div class="adm-grid">
+                        <label class="adm-field">
+                            <span>Tingkat</span>
+                            <select v-model="editor.mode" class="adm-select">
+                                <option value="AUTO">Otomatis dari transaksi</option>
+                                <option v-for="tier in tiers" :key="tier.code" :value="tier.code">{{ tier.code }}</option>
+                            </select>
+                            <span class="hint">MAFIA hanya bisa ditetapkan di sini, tidak pernah muncul ke pelanggan.</span>
+                        </label>
+                        <div class="adm-field" style="align-self:end">
+                            <button type="button" class="adm-btn primary" :disabled="busy" @click="saveMembership">Simpan tingkat</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="adm-block full">
+                    <strong>Penyesuaian saldo</strong>
+                    <p class="adm-note">Saldo saat ini: {{ rupiah(editor.row.balance_idr) }}</p>
+                    <div class="adm-grid">
+                        <label class="adm-field">
+                            <span>Jumlah (Rp)</span>
+                            <input v-model="editor.amount_idr" type="number" class="adm-input" placeholder="Contoh: 10000 atau -5000">
+                            <span class="hint">Angka negatif mengurangi saldo.</span>
+                        </label>
+                        <label class="adm-field">
+                            <span>Alasan</span>
+                            <input v-model="editor.reason" class="adm-input" maxlength="500" placeholder="Wajib diisi, minimal 3 huruf">
+                        </label>
+                    </div>
+                    <span v-if="errors.amount_idr" class="err">{{ errors.amount_idr }}</span>
+                    <span v-if="errors.reason" class="err">{{ errors.reason }}</span>
+                    <div style="display:flex;justify-content:flex-end;margin-top:6px">
+                        <button type="button" class="adm-btn primary" :disabled="busy || !editor.amount_idr" @click="saveBalance">Simpan saldo</button>
+                    </div>
+                </div>
+            </div>
+            <template #footer>
+                <button type="button" class="adm-btn" @click="editor = null">Tutup</button>
+            </template>
+        </AdminModal>
+
+        <!-- pop-up tingkat -->
+        <AdminModal :open="!!tierEditor" :title="'Ubah tingkat ' + (tierEditor?.code || '')"
+            description="Syarat, diskon, dan manfaat berlaku untuk semua pelanggan di tingkat ini."
+            @update:open="value => { if (!value) tierEditor = null; }">
+            <div v-if="tierEditor" class="adm-grid">
+                <label class="adm-field">
+                    <span>Minimum total transaksi berhasil (Rp)</span>
+                    <input v-model.number="tierEditor.minimum_spend_idr" type="number" min="0" class="adm-input">
+                    <span class="hint">Isi 0 bila tidak ada minimum.</span>
+                </label>
+                <label class="adm-field">
+                    <span>Diskon untuk pelanggan tingkat ini (%)</span>
+                    <input v-model.number="tierEditor.discount_percent" type="number" min="0" max="100" step="0.01" class="adm-input">
+                </label>
+                <label class="adm-field full">
+                    <span>Manfaat tambahan</span>
+                    <input v-model="tierEditor.benefit_notes" class="adm-input" maxlength="1000" placeholder="Contoh: prioritas layanan">
+                </label>
+                <label class="adm-switch-row full">
+                    <button type="button" class="adm-switch" role="switch" :aria-checked="tierEditor.is_active" @click="tierEditor.is_active = !tierEditor.is_active" />
+                    Tingkat ini dipakai
+                </label>
+            </div>
+            <template #footer>
+                <button type="button" class="adm-btn" @click="tierEditor = null">Batal</button>
+                <button type="button" class="adm-btn primary" :disabled="busy" @click="saveTier">Simpan tingkat</button>
+            </template>
+        </AdminModal>
+
+        <!-- pop-up hapus akun -->
+        <AdminModal :open="!!pendingDelete" title="Hapus akun pelanggan"
+            :description="pendingDelete ? 'Akun ' + pendingDelete.name + ' akan dihapus permanen.' : ''"
+            @update:open="value => { if (!value) pendingDelete = null; }">
+            <p class="adm-note">Hanya akun tanpa saldo, tanpa pesanan, tanpa tiket, dan tanpa riwayat saldo yang bisa dihapus. Selain itu gunakan Nonaktifkan.</p>
+            <template #footer>
+                <button type="button" class="adm-btn" @click="pendingDelete = null">Batal</button>
+                <button type="button" class="adm-btn danger" @click="removeAccount">Hapus akun</button>
+            </template>
+        </AdminModal>
+    </AdminLayout>
 </template>

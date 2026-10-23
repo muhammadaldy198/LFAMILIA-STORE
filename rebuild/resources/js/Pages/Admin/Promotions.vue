@@ -1,362 +1,307 @@
 <script setup>
-import AdminSwitch from '../../Components/AdminSwitch.vue';
-import AdminConfirmDialog from '../../Components/AdminConfirmDialog.vue';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../../Components/ui/sheet';
-import AdminResponsiveTable from '../../Components/AdminResponsiveTable.vue';
+import { computed, reactive, ref } from 'vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
-import { reactive, ref } from 'vue';
-import AdminShell from '../../Components/AdminShell.vue';
-import { Badge } from '../../Components/ui/badge';
-import { Button } from '../../Components/ui/button';
-import { Card } from '../../Components/ui/card';
-import { Input } from '../../Components/ui/input';
-import { Textarea } from '../../Components/ui/textarea';
-import { TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../Components/ui/table';
+import AdminLayout from '../../Components/Admin/AdminLayout.vue';
+import AdminModal from '../../Components/Admin/AdminModal.vue';
+import AdminMultiSelect from '../../Components/Admin/AdminMultiSelect.vue';
+import { label, num, rupiah, tone, wibDateTime } from '../../lib/adminFormat';
 
 const props = defineProps({
     filters: { type: Object, default: () => ({}) },
-    vouchers: { type: Object, default: () => ({ data: [], links: [] }) },
+    vouchers: { type: Object, default: () => ({ data: [] }) },
     categories: { type: Array, default: () => [] },
     scopeProducts: { type: Array, default: () => [] },
     summary: { type: Object, default: () => ({}) },
 });
 
-const editorOpen = ref(false);
-const editingId = ref(null);
-const pendingVoucher = ref(null);
+const rows = computed(() => (Array.isArray(props.vouchers?.data) ? props.vouchers.data : []));
+const meta = computed(() => props.vouchers || {});
+const busy = ref(false);
 
-const voucherFilters = reactive({
-    q: props.filters?.q || '',
-    status: props.filters?.status || '',
-    discount_type: props.filters?.discount_type || '',
-    per_page: Number(props.filters?.per_page || 25),
+const current = reactive({ q: '', status: '', discount_type: '', per_page: 25, ...(props.filters || {}) });
+const apply = () => {
+    busy.value = true;
+    router.get('/admin/vouchers', { ...current }, { preserveState: true, preserveScroll: true, onFinish: () => { busy.value = false; } });
+};
+const reset = () => { Object.assign(current, { q: '', status: '', discount_type: '', per_page: 25 }); apply(); };
+
+const categoryOptions = computed(() => props.categories.map(row => ({ value: row.id, label: row.name + (row.is_active ? '' : ' (nonaktif)') })));
+const productOptions = computed(() => props.scopeProducts.map(row => ({ value: row.id, label: row.name + (row.is_active ? '' : ' (nonaktif)') })));
+
+const boxes = computed(() => [
+    { label: 'Total voucher', value: props.summary?.total_vouchers },
+    { label: 'Voucher aktif', value: props.summary?.active_vouchers },
+    { label: 'Terpakai', value: props.summary?.used_count },
+    { label: 'Sedang dipakai', value: props.summary?.reserved_count },
+]);
+
+const open = ref(false);
+const editing = ref(null);
+const form = useForm({
+    code: '', name: '', description: '', discount_type: 'PERCENT', discount_value: '',
+    max_discount_idr: '', minimum_total_idr: 0, total_quota: '', per_customer_limit: '',
+    starts_at: '', ends_at: '', is_active: true, category_ids: [], product_ids: [],
 });
 
-const voucherForm = useForm({
-    code: '',
-    name: '',
-    description: '',
-    discount_type: 'PERCENT',
-    discount_value: 10,
-    max_discount_idr: null,
-    minimum_total_idr: 0,
-    total_quota: null,
-    per_customer_limit: null,
-    starts_at: '',
-    ends_at: '',
-    product_ids: [],
-    category_ids: [],
-    is_active: true,
+const blank = () => ({
+    code: '', name: '', description: '', discount_type: 'PERCENT', discount_value: '',
+    max_discount_idr: '', minimum_total_idr: 0, total_quota: '', per_customer_limit: '',
+    starts_at: '', ends_at: '', is_active: true, category_ids: [], product_ids: [],
 });
 
-const money = (value) => 'Rp' + Number(value || 0).toLocaleString('id-ID');
-const date = (value) => value ? new Intl.DateTimeFormat('id-ID', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-    timeZone: 'Asia/Jakarta',
-}).format(new Date(value)) + ' WIB' : 'Tanpa batas';
+const openCreate = () => {
+    editing.value = null;
+    form.defaults(blank());
+    form.reset();
+    form.clearErrors();
+    open.value = true;
+};
 
-const statusLabel = (value) => ({
-    active: 'Aktif',
-    scheduled: 'Terjadwal',
-    expired: 'Berakhir',
-    inactive: 'Nonaktif',
-    exhausted: 'Kuota habis',
-}[value] || value);
-
-const statusVariant = (value) => value === 'active' ? 'secondary' : 'outline';
-
-function submitVoucherFilters() {
-    router.get('/admin/vouchers', voucherFilters, { preserveState: true, preserveScroll: true });
-}
-
-function resetVoucherFilters() {
-    Object.assign(voucherFilters, { q: '', status: '', discount_type: '', per_page: 25 });
-    submitVoucherFilters();
-}
-
-function openCreate() {
-    editingId.value = null;
-    voucherForm.reset();
-    voucherForm.clearErrors();
-    Object.assign(voucherForm, {
-        code: '',
-        name: '',
-        description: '',
-        discount_type: 'PERCENT',
-        discount_value: 10,
-        max_discount_idr: null,
-        minimum_total_idr: 0,
-        total_quota: null,
-        per_customer_limit: null,
-        starts_at: '',
-        ends_at: '',
-        product_ids: [],
-        category_ids: [],
-        is_active: true,
-    });
-    editorOpen.value = true;
-}
-
-function openEdit(row) {
-    editingId.value = row.id;
-    voucherForm.clearErrors();
-    Object.assign(voucherForm, {
+const openEdit = (row) => {
+    editing.value = row;
+    form.defaults({
         code: row.code,
         name: row.name,
         description: row.description || '',
         discount_type: row.discount_type,
-        discount_value: Number(row.discount_value),
-        max_discount_idr: row.max_discount_idr,
-        minimum_total_idr: Number(row.minimum_total_idr || 0),
-        total_quota: row.total_quota,
-        per_customer_limit: row.per_customer_limit,
+        discount_value: row.discount_value,
+        max_discount_idr: row.max_discount_idr ?? '',
+        minimum_total_idr: row.minimum_total_idr ?? 0,
+        total_quota: row.total_quota ?? '',
+        per_customer_limit: row.per_customer_limit ?? '',
         starts_at: row.starts_at || '',
         ends_at: row.ends_at || '',
-        product_ids: [...(row.product_ids || [])],
+        is_active: row.is_active,
         category_ids: [...(row.category_ids || [])],
-        is_active: Boolean(row.is_active),
+        product_ids: [...(row.product_ids || [])],
     });
-    editorOpen.value = true;
-}
+    form.reset();
+    form.clearErrors();
+    open.value = true;
+};
 
-function closeEditor() {
-    editorOpen.value = false;
-    editingId.value = null;
-    voucherForm.clearErrors();
-}
-
-function saveVoucher() {
-    const options = {
-        preserveScroll: true,
-        onSuccess: () => closeEditor(),
+const save = () => {
+    const payload = {
+        ...form.data(),
+        max_discount_idr: form.max_discount_idr === '' ? null : Number(form.max_discount_idr),
+        total_quota: form.total_quota === '' ? null : Number(form.total_quota),
+        per_customer_limit: form.per_customer_limit === '' ? null : Number(form.per_customer_limit),
+        minimum_total_idr: Number(form.minimum_total_idr || 0),
+        discount_value: Number(form.discount_value || 0),
+        starts_at: form.starts_at || null,
+        ends_at: form.ends_at || null,
     };
-    if (editingId.value) {
-        voucherForm.put('/admin/vouchers/' + editingId.value, options);
-        return;
-    }
-    voucherForm.post('/admin/vouchers', options);
-}
+    const options = { preserveScroll: true, onSuccess: () => { open.value = false; } };
+    form.transform(() => payload);
+    if (editing.value) form.put(`/admin/vouchers/${editing.value.id}`, options);
+    else form.post('/admin/vouchers', options);
+};
 
-function quickToggle(row) {
-    router.put('/admin/vouchers/' + row.id, {
-        code: row.code,
-        name: row.name,
-        description: row.description,
-        discount_type: row.discount_type,
-        discount_value: Number(row.discount_value),
-        max_discount_idr: row.max_discount_idr,
-        minimum_total_idr: Number(row.minimum_total_idr || 0),
-        total_quota: row.total_quota,
-        per_customer_limit: row.per_customer_limit,
-        starts_at: row.starts_at,
-        ends_at: row.ends_at,
-        product_ids: row.product_ids || [],
-        category_ids: row.category_ids || [],
-        is_active: !row.is_active,
+const toggle = (row) => {
+    router.put(`/admin/vouchers/${row.id}`, {
+        code: row.code, name: row.name, description: row.description, discount_type: row.discount_type,
+        discount_value: row.discount_value, max_discount_idr: row.max_discount_idr,
+        minimum_total_idr: row.minimum_total_idr, total_quota: row.total_quota,
+        per_customer_limit: row.per_customer_limit, starts_at: row.starts_at, ends_at: row.ends_at,
+        is_active: !row.is_active, category_ids: row.category_ids || [], product_ids: row.product_ids || [],
     }, { preserveScroll: true });
-}
+};
 
-function deleteVoucher(row) {
-    pendingVoucher.value = row;
-}
-function runDeleteVoucher() {
-    const row = pendingVoucher.value;
-    if (!row) return;
-    pendingVoucher.value = null;
-    router.delete('/admin/vouchers/' + row.id, {
-        preserveScroll: true,
-        onSuccess: () => { if (editingId.value === row.id) closeEditor(); },
-    });
-}
+const removeTarget = ref(null);
+const remove = () => {
+    if (!removeTarget.value) return;
+    router.delete(`/admin/vouchers/${removeTarget.value.id}`, { preserveScroll: true, onFinish: () => { removeTarget.value = null; } });
+};
 
-function discountLabel(row) {
-    return row.discount_type === 'PERCENT'
-        ? Number(row.discount_value).toLocaleString('id-ID') + '%'
-        : money(row.discount_value);
-}
+const discountText = row => row.discount_type === 'PERCENT'
+    ? `${row.discount_value}%` + (row.max_discount_idr ? ` · Maks. ${rupiah(row.max_discount_idr)}` : '')
+    : rupiah(row.discount_value);
+
+const usageText = row => {
+    const used = `${num(row.used_count)} terpakai · ${num(row.reserved_count)} dipesan`;
+    if (row.total_quota == null) return used;
+    return `${used} · ${num(row.remaining_quota)} dari ${num(row.total_quota)} tersisa`;
+};
+
+const limitText = row => row.per_customer_limit == null ? 'Tanpa batas per pelanggan' : `maks. ${row.per_customer_limit} per pelanggan`;
 </script>
 
 <template>
-<Head title="Voucher &amp; promo" />
-<AdminShell>
-    <div class="space-y-5">
-        <header class="flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between">
-            <div class="min-w-0">
-                <h1 class="text-2xl font-semibold tracking-tight">Voucher &amp; promo</h1>
-                <p class="mt-1 max-w-3xl text-sm text-muted-foreground">
-                    Buat dan pantau kode voucher yang dipakai pelanggan saat membayar. Produk populer diatur di menu Produk, bagian Tampilan Toko.
-                </p>
+    <Head title="Voucher & Promo" />
+    <AdminLayout>
+        <header class="adm-head">
+            <div>
+                <h1>Voucher &amp; Promo</h1>
+                <p>Voucher berlaku sesuai cakupan kategori dan produk. Jika keduanya kosong, voucher berlaku global.</p>
             </div>
-            <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
-                <Button class="w-full sm:w-auto" variant="outline" @click="router.reload({ preserveScroll: true })">Muat ulang</Button>
-                <Button class="w-full sm:w-auto" @click="openCreate">Tambah voucher</Button>
+            <div class="adm-head-actions">
+                <button type="button" class="adm-btn" :disabled="busy" @click="router.reload({ only: ['vouchers', 'summary'] })">Muat ulang</button>
+                <button type="button" class="adm-btn primary" @click="openCreate">Tambah voucher</button>
             </div>
         </header>
 
-        <div class="lf-admin-summary ">
-            <Card class="p-4"><p class="text-xs text-muted-foreground">Total voucher</p><p class="mt-2 text-2xl font-semibold">{{ summary.total_vouchers || 0 }}</p></Card>
-            <Card class="p-4"><p class="text-xs text-muted-foreground">Voucher aktif</p><p class="mt-2 text-2xl font-semibold">{{ summary.active_vouchers || 0 }}</p></Card>
-            <Card class="p-4"><p class="text-xs text-muted-foreground">Terpakai</p><p class="mt-2 text-2xl font-semibold">{{ summary.used_count || 0 }}</p></Card>
-            <Card class="p-4"><p class="text-xs text-muted-foreground">Sedang dipakai</p><p class="mt-2 text-2xl font-semibold">{{ summary.reserved_count || 0 }}</p></Card>
-        </div>
+        <section class="adm-stats" aria-label="Angka voucher">
+            <div v-for="box in boxes" :key="box.label" class="adm-stat">
+                <span class="lb">{{ box.label }}</span>
+                <strong class="vl">{{ box.value == null ? '—' : num(box.value) }}</strong>
+            </div>
+        </section>
 
-            <form class="border-y border-border py-4" @submit.prevent="submitVoucherFilters">
-                <div class="grid min-w-0 items-end gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                    <label class="space-y-1 sm:col-span-2">
-                        <span class="text-sm font-medium">Cari voucher</span>
-                        <Input v-model="voucherFilters.q" maxlength="100" placeholder="Kode, nama, atau deskripsi" />
-                    </label>
-                    <label class="space-y-1">
-                        <span class="text-sm font-medium">Status</span>
-                        <select v-model="voucherFilters.status" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
-                            <option value="">Semua status</option>
-                            <option value="active">Aktif</option>
-                            <option value="scheduled">Terjadwal</option>
-                            <option value="expired">Berakhir</option>
-                            <option value="inactive">Nonaktif</option>
-                            <option value="exhausted">Kuota habis</option>
-                        </select>
-                    </label>
-                    <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                        <Button class="w-full sm:w-auto">Terapkan</Button>
-                        <Button class="w-full sm:w-auto" type="button" variant="outline" @click="resetVoucherFilters">Hapus filter</Button>
-                    </div>
+        <section class="adm-card">
+            <form class="adm-filters" @submit.prevent="apply">
+                <label class="adm-field search">
+                    <span>Cari</span>
+                    <input v-model="current.q" class="adm-input" placeholder="Kode voucher atau nama promo" maxlength="100">
+                </label>
+                <label class="adm-field narrow">
+                    <span>Status</span>
+                    <select v-model="current.status" class="adm-select">
+                        <option value="">Semua status</option>
+                        <option value="active">Aktif</option>
+                        <option value="scheduled">Terjadwal</option>
+                        <option value="expired">Berakhir</option>
+                        <option value="inactive">Nonaktif</option>
+                        <option value="exhausted">Kuota habis</option>
+                    </select>
+                </label>
+                <label class="adm-field narrow">
+                    <span>Jenis diskon</span>
+                    <select v-model="current.discount_type" class="adm-select">
+                        <option value="">Semua jenis</option>
+                        <option value="PERCENT">Persentase</option>
+                        <option value="FIXED">Nominal tetap</option>
+                    </select>
+                </label>
+                <label class="adm-field narrow">
+                    <span>Per halaman</span>
+                    <select v-model="current.per_page" class="adm-select">
+                        <option v-for="size in [10, 25, 50, 100]" :key="size" :value="size">{{ size }} voucher</option>
+                    </select>
+                </label>
+                <div class="adm-filter-actions">
+                    <button type="submit" class="adm-btn primary" :disabled="busy">Terapkan</button> <button type="button" class="adm-btn" :disabled="busy" @click="reset">Hapus filter</button>
                 </div>
-                <details class="lf-admin-advanced mt-3 rounded-md border border-border">
-                    <summary class="cursor-pointer px-4 py-3 text-sm font-medium">Filter lanjutan</summary>
-                    <div class="grid gap-3 border-t border-border p-4 sm:grid-cols-2">
-                        <label class="space-y-1">
-                            <span class="text-sm font-medium">Jenis diskon</span>
-                            <select v-model="voucherFilters.discount_type" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
-                                <option value="">Semua jenis</option>
-                                <option value="PERCENT">Persentase</option>
-                                <option value="FIXED">Nominal tetap</option>
-                            </select>
-                        </label>
-                        <label class="space-y-1">
-                            <span class="text-sm font-medium">Voucher per halaman</span>
-                            <select v-model.number="voucherFilters.per_page" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
-                                <option :value="10">10 voucher</option><option :value="25">25 voucher</option><option :value="50">50 voucher</option><option :value="100">100 voucher</option>
-                            </select>
-                        </label>
-                    </div>
-                </details>
+
             </form>
 
-            <div class="min-w-0">
-                <div class="overflow-x-auto rounded-md border border-border" role="region" aria-label="Daftar voucher" tabindex="0">
-                    <AdminResponsiveTable :mobile-columns="[0,1,6,7]">
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Voucher</TableHead>
-                                <TableHead>Diskon</TableHead>
-                                <TableHead>Minimum</TableHead>
-                                <TableHead>Pemakaian</TableHead>
-                                <TableHead>Periode</TableHead>
-                                <TableHead>Cakupan</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead class="text-right">Tindakan</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            <TableRow v-for="row in vouchers.data" :key="row.id">
-                                <TableCell>
-                                    <strong class="block">{{ row.code }}</strong>
-                                    <span class="text-xs text-muted-foreground">{{ row.name }}</span>
-                                </TableCell>
-                                <TableCell>
-                                    <strong>{{ discountLabel(row) }}</strong>
-                                    <p v-if="row.max_discount_idr" class="text-xs text-muted-foreground">Maks. {{ money(row.max_discount_idr) }}</p>
-                                </TableCell>
-                                <TableCell>{{ money(row.minimum_total_idr) }}</TableCell>
-                                <TableCell>
-                                    <span>{{ row.used_count }} terpakai · {{ row.reserved_count }} dipesan</span>
-                                    <p class="text-xs text-muted-foreground">
-                                        {{ row.total_quota === null ? 'Kuota tanpa batas' : (row.remaining_quota + ' dari ' + row.total_quota + ' tersisa') }}
-                                        · {{ row.per_customer_limit === null ? 'tanpa batas per pelanggan' : ('maks. ' + row.per_customer_limit + ' per pelanggan') }}
-                                    </p>
-                                </TableCell>
-                                <TableCell>
-                                    <p>{{ row.starts_at ? date(row.starts_at) : 'Mulai langsung' }}</p>
-                                    <p class="text-xs text-muted-foreground">s.d. {{ row.ends_at ? date(row.ends_at) : 'tanpa batas' }}</p>
-                                </TableCell>
-                                <TableCell>{{ row.scope_label }}</TableCell>
-                                <TableCell><Badge :variant="statusVariant(row.status)">{{ statusLabel(row.status) }}</Badge></TableCell>
-                                <TableCell class="text-right">
-                                    <div class="flex justify-end gap-1">
-                                        <Button size="sm" variant="outline" @click="openEdit(row)">Ubah</Button>
-                                        <Button size="sm" variant="outline" @click="quickToggle(row)">{{ row.is_active ? 'Nonaktifkan' : 'Aktifkan' }}</Button>
-                                        <Button size="sm" variant="destructive" @click="deleteVoucher(row)">Hapus</Button>
-                                    </div>
-                                </TableCell>
-                            </TableRow>
-                            <TableRow v-if="!vouchers.data?.length"><TableCell colspan="8" class="py-10 text-center text-muted-foreground">Tidak ada voucher sesuai filter.</TableCell></TableRow>
-                        </TableBody>
-                    </AdminResponsiveTable>
-                </div>
-
-                <div v-if="vouchers.links?.length > 3" class="mt-4 flex flex-wrap gap-1">
-                    <Link
-                        v-for="link in vouchers.links"
-                        :key="link.label"
-                        :href="link.url || '#'"
-                        preserve-scroll
-                        :class="['rounded-md border px-3 py-1.5 text-sm', link.active ? 'bg-primary text-primary-foreground' : 'bg-background', !link.url ? 'pointer-events-none opacity-40' : '']"
-                        >{{ link.label }}</Link>
-                </div>
+            <div class="adm-scroll">
+                <table class="adm-table">
+                    <thead>
+                        <tr><th>Voucher</th><th>Diskon</th><th>Minimum</th><th>Pemakaian</th><th>Periode</th><th>Cakupan</th><th>Status</th><th>Tindakan</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="row in rows" :key="row.id">
+                            <td><span class="mono">{{ row.code }}</span><p class="dim">{{ row.name }}</p></td>
+                            <td>{{ discountText(row) }}</td>
+                            <td>{{ row.minimum_total_idr ? rupiah(row.minimum_total_idr) : 'Tanpa minimum' }}</td>
+                            <td>{{ usageText(row) }}<p class="dim">{{ limitText(row) }}</p></td>
+                            <td>
+                                {{ row.starts_at ? wibDateTime(row.starts_at) : 'Langsung' }}
+                                <p class="dim">{{ row.ends_at ? 'sampai ' + wibDateTime(row.ends_at) : 'tanpa batas akhir' }}</p>
+                            </td>
+                            <td>{{ row.scope_label }}</td>
+                            <td><span class="adm-tag" :class="tone(row.status)">{{ label(row.status) }}</span></td>
+                            <td>
+                                <div style="display:flex;flex-wrap:wrap;gap:4px">
+                                    <button type="button" class="adm-btn sm" @click="openEdit(row)">Ubah</button>
+                                    <button type="button" class="adm-btn sm" @click="toggle(row)">{{ row.is_active ? 'Nonaktifkan' : 'Aktifkan' }}</button>
+                                    <button type="button" class="adm-btn sm danger" @click="removeTarget = row">Hapus</button>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr v-if="!rows.length"><td colspan="8" class="adm-empty">Belum ada voucher yang cocok dengan filter.</td></tr>
+                    </tbody>
+                </table>
             </div>
 
-        <Sheet :open="editorOpen" @update:open="(value) => { if (!value) closeEditor(); }">
-        <SheetContent side="right" class="w-full overflow-y-auto sm:max-w-3xl">
-            <SheetHeader><SheetTitle>{{ editingId ? 'Ubah voucher' : 'Tambah voucher' }}</SheetTitle><SheetDescription>Atur kode, nilai diskon, batas, jadwal, dan cakupan. Perubahan tidak menulis ulang harga pesanan yang sudah dibuat.</SheetDescription></SheetHeader>
+            <div class="adm-pager">
+                <span>Menampilkan {{ rows.length }} dari {{ num(meta.total ?? 0) }} voucher · Halaman {{ meta.current_page ?? 1 }} dari {{ meta.last_page ?? 1 }}</span>
+                <span class="sp" />
+                <Link v-if="meta.prev_page_url" :href="meta.prev_page_url" class="adm-btn sm" preserve-scroll>Sebelumnya</Link>
+                <button v-else type="button" class="adm-btn sm" disabled>Sebelumnya</button>
+                <Link v-if="meta.next_page_url" :href="meta.next_page_url" class="adm-btn sm" preserve-scroll>Berikutnya</Link>
+                <button v-else type="button" class="adm-btn sm" disabled>Berikutnya</button>
+            </div>
+        </section>
 
+        <AdminModal v-model:open="open" :title="editing ? 'Ubah voucher' : 'Tambah voucher'" :description="editing ? editing.code : 'Voucher baru langsung tampil setelah disimpan.'">
+            <form id="voucher-form" class="adm-grid two" @submit.prevent="save">
+                <label class="adm-field"><span>Kode voucher <b class="req">*</b></span><input v-model="form.code" class="adm-input" maxlength="40" required><span v-if="form.errors.code" class="err">{{ form.errors.code }}</span></label>
+                <label class="adm-field"><span>Nama promo <b class="req">*</b></span><input v-model="form.name" class="adm-input" maxlength="100" required><span v-if="form.errors.name" class="err">{{ form.errors.name }}</span></label>
 
-            <form class="mt-4 space-y-4" @submit.prevent="saveVoucher">
-                <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                    <label class="space-y-1"><span class="text-sm font-medium">Kode voucher</span><Input v-model="voucherForm.code" maxlength="40" required placeholder="LFHEMAT" /><span v-if="voucherForm.errors.code" class="text-xs text-destructive">{{ voucherForm.errors.code }}</span></label>
-                    <label class="space-y-1"><span class="text-sm font-medium">Nama promo</span><Input v-model="voucherForm.name" maxlength="100" required placeholder="Hemat Akhir Pekan" /><span v-if="voucherForm.errors.name" class="text-xs text-destructive">{{ voucherForm.errors.name }}</span></label>
-                    <label class="space-y-1"><span class="text-sm font-medium">Jenis diskon</span><select v-model="voucherForm.discount_type" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"><option value="PERCENT">Persentase</option><option value="FIXED">Nominal tetap</option></select></label>
-                    <label class="space-y-1"><span class="text-sm font-medium">Nilai diskon</span><Input v-model.number="voucherForm.discount_value" type="number" min="1" :max="voucherForm.discount_type === 'PERCENT' ? 100 : 1000000000" required /><span v-if="voucherForm.errors.discount_value" class="text-xs text-destructive">{{ voucherForm.errors.discount_value }}</span></label>
-                    <label class="space-y-1"><span class="text-sm font-medium">Maksimum diskon</span><Input v-model.number="voucherForm.max_discount_idr" type="number" min="1" placeholder="Tanpa batas" /><span class="text-xs text-muted-foreground">Opsional; berguna terutama untuk diskon persen.</span></label>
-                    <label class="space-y-1"><span class="text-sm font-medium">Minimum transaksi</span><Input v-model.number="voucherForm.minimum_total_idr" type="number" min="0" required /></label>
-                    <label class="space-y-1"><span class="text-sm font-medium">Total kuota</span><Input v-model.number="voucherForm.total_quota" type="number" min="1" placeholder="Tanpa batas" /><span v-if="voucherForm.errors.total_quota" class="text-xs text-destructive">{{ voucherForm.errors.total_quota }}</span></label>
-                    <label class="space-y-1"><span class="text-sm font-medium">Limit per pelanggan</span><Input v-model.number="voucherForm.per_customer_limit" type="number" min="1" placeholder="Tanpa batas" /></label>
-                    <label class="space-y-1"><span class="text-sm font-medium">Mulai</span><Input v-model="voucherForm.starts_at" type="datetime-local" /><span class="text-xs text-muted-foreground">Kosong = langsung.</span></label>
-                    <label class="space-y-1"><span class="text-sm font-medium">Berakhir</span><Input v-model="voucherForm.ends_at" type="datetime-local" /><span v-if="voucherForm.errors.ends_at" class="text-xs text-destructive">{{ voucherForm.errors.ends_at }}</span></label>
-                    <label class="flex items-center gap-2 self-end rounded-md border px-3 py-2 text-sm"><AdminSwitch v-model="voucherForm.is_active" />Voucher aktif</label>
-                </div>
-
-                <label class="block space-y-1">
-                    <span class="text-sm font-medium">Deskripsi internal</span>
-                    <Textarea v-model="voucherForm.description" maxlength="300" rows="2" placeholder="Catatan singkat tentang promo ini" />
+                <label class="adm-field">
+                    <span>Jenis diskon <b class="req">*</b></span>
+                    <select v-model="form.discount_type" class="adm-select">
+                        <option value="PERCENT">Persentase</option>
+                        <option value="FIXED">Nominal tetap</option>
+                    </select>
+                    <span v-if="form.errors.discount_type" class="err">{{ form.errors.discount_type }}</span>
+                </label>
+                <label class="adm-field">
+                    <span>Nilai diskon <b class="req">*</b></span>
+                    <input v-model="form.discount_value" type="number" min="1" class="adm-input" required>
+                    <span class="hint">{{ form.discount_type === 'PERCENT' ? 'Persen, maksimal 100.' : 'Nominal rupiah.' }}</span>
+                    <span v-if="form.errors.discount_value" class="err">{{ form.errors.discount_value }}</span>
                 </label>
 
-                <div class="grid gap-4 lg:grid-cols-2">
-                    <label class="space-y-1">
-                        <span class="text-sm font-medium">Cakupan kategori</span>
-                        <select v-model="voucherForm.category_ids" multiple class="min-h-36 w-full rounded-md border border-input bg-background p-2 text-sm">
-                            <option v-for="category in categories" :key="category.id" :value="category.id">{{ category.name }}{{ category.is_active ? '' : ' · nonaktif' }}</option>
-                        </select>
-                        <span class="text-xs text-muted-foreground">Kosong berarti tidak membatasi berdasarkan kategori.</span>
-                    </label>
-                    <label class="space-y-1">
-                        <span class="text-sm font-medium">Cakupan produk</span>
-                        <select v-model="voucherForm.product_ids" multiple class="min-h-36 w-full rounded-md border border-input bg-background p-2 text-sm">
-                            <option v-for="product in scopeProducts" :key="product.id" :value="product.id">{{ product.name }}{{ product.is_active ? '' : ' · nonaktif' }}</option>
-                        </select>
-                        <span class="text-xs text-muted-foreground">Kategori dan produk memakai logika OR. Jika keduanya kosong, voucher berlaku global.</span>
-                    </label>
-                </div>
+                <label class="adm-field">
+                    <span>Maksimum diskon</span>
+                    <input v-model="form.max_discount_idr" type="number" min="1" class="adm-input">
+                    <span class="hint">Opsional; berguna terutama untuk diskon persen.</span>
+                    <span v-if="form.errors.max_discount_idr" class="err">{{ form.errors.max_discount_idr }}</span>
+                </label>
+                <label class="adm-field">
+                    <span>Minimum transaksi</span>
+                    <input v-model="form.minimum_total_idr" type="number" min="0" class="adm-input">
+                    <span class="hint">Isi 0 bila tidak ada minimum.</span>
+                    <span v-if="form.errors.minimum_total_idr" class="err">{{ form.errors.minimum_total_idr }}</span>
+                </label>
 
-                <div class="flex flex-col-reverse gap-2 border-t border-border pt-4 sm:flex-row sm:justify-end">
-                    <Button class="w-full sm:w-auto" type="button" variant="outline" @click="closeEditor">Batal</Button>
-                    <Button class="w-full sm:w-auto" :disabled="voucherForm.processing">{{ voucherForm.processing ? 'Menyimpan…' : 'Simpan voucher' }}</Button>
+                <label class="adm-field">
+                    <span>Total kuota</span>
+                    <input v-model="form.total_quota" type="number" min="1" class="adm-input">
+                    <span class="hint">Kosong = tanpa batas kuota.</span>
+                    <span v-if="form.errors.total_quota" class="err">{{ form.errors.total_quota }}</span>
+                </label>
+                <label class="adm-field">
+                    <span>Limit per pelanggan</span>
+                    <input v-model="form.per_customer_limit" type="number" min="1" class="adm-input">
+                    <span class="hint">Kosong = tanpa batas per pelanggan.</span>
+                    <span v-if="form.errors.per_customer_limit" class="err">{{ form.errors.per_customer_limit }}</span>
+                </label>
+
+                <label class="adm-field"><span>Mulai</span><input v-model="form.starts_at" type="datetime-local" class="adm-input"><span class="hint">Kosong = langsung.</span><span v-if="form.errors.starts_at" class="err">{{ form.errors.starts_at }}</span></label>
+                <label class="adm-field"><span>Berakhir</span><input v-model="form.ends_at" type="datetime-local" class="adm-input"><span v-if="form.errors.ends_at" class="err">{{ form.errors.ends_at }}</span></label>
+
+                <label class="adm-switch-row full">
+                    <button type="button" class="adm-switch" role="switch" :aria-checked="form.is_active" @click="form.is_active = !form.is_active" />
+                    Voucher aktif
+                </label>
+
+                <label class="adm-field full"><span>Deskripsi internal</span><textarea v-model="form.description" class="adm-textarea" maxlength="300" /><span v-if="form.errors.description" class="err">{{ form.errors.description }}</span></label>
+
+                <div class="adm-field">
+                    <span>Cakupan kategori</span>
+                    <AdminMultiSelect v-model="form.category_ids" :options="categoryOptions" placeholder="Semua kategori" search-placeholder="Cari kategori…" />
                 </div>
+                <div class="adm-field">
+                    <span>Cakupan produk</span>
+                    <AdminMultiSelect v-model="form.product_ids" :options="productOptions" placeholder="Semua produk" search-placeholder="Cari produk…" />
+                </div>
+                <p class="adm-note full">Kategori dan produk memakai logika OR. Jika keduanya kosong, voucher berlaku global.</p>
             </form>
-                </SheetContent>
-        </Sheet>
-        <AdminConfirmDialog :open="Boolean(pendingVoucher)" title="Hapus voucher" :message="'Voucher ' + (pendingVoucher?.code || '') + ' akan dihapus. Voucher yang sudah dipakai pada transaksi tidak dapat dihapus.'" confirm-label="Hapus voucher" destructive @update:open="value => { if (!value) pendingVoucher = null; }" @confirm="runDeleteVoucher" />
-    </div>
-</AdminShell>
+            <template #footer>
+                <button type="button" class="adm-btn" @click="open = false">Batal</button>
+                <button type="submit" form="voucher-form" class="adm-btn primary" :disabled="form.processing">Simpan voucher</button>
+            </template>
+        </AdminModal>
+
+        <AdminModal :open="!!removeTarget" title="Hapus voucher" :description="removeTarget?.code || ''" @update:open="value => { if (!value) removeTarget = null; }">
+            <p class="adm-note">Voucher yang sudah dipakai pesanan tidak dapat dihapus. Nonaktifkan bila hanya ingin menghentikan pemakaian.</p>
+            <template #footer>
+                <button type="button" class="adm-btn" @click="removeTarget = null">Batal</button>
+                <button type="button" class="adm-btn danger" @click="remove">Hapus voucher</button>
+            </template>
+        </AdminModal>
+    </AdminLayout>
 </template>

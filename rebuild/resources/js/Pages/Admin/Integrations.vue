@@ -1,12 +1,8 @@
 <script setup>
-import AdminSwitch from '../../Components/AdminSwitch.vue';
-import { Head, Link, router } from '@inertiajs/vue3';
 import { computed, reactive, ref, watch } from 'vue';
-import AdminShell from '../../Components/AdminShell.vue';
-import { Badge } from '../../Components/ui/badge';
-import { Button } from '../../Components/ui/button';
-import { Card } from '../../Components/ui/card';
-import { Input } from '../../Components/ui/input';
+import { Head, router } from '@inertiajs/vue3';
+import AdminLayout from '../../Components/Admin/AdminLayout.vue';
+import { num, wibDateTime, copyText } from '../../lib/adminFormat';
 
 const props = defineProps({
     integrations: { type: Array, default: () => [] },
@@ -14,146 +10,89 @@ const props = defineProps({
     callbackUrls: { type: Object, default: () => ({}) },
 });
 
-const selectedCode = ref(props.integrations[0]?.code || '');
-const copiedCallback = ref('');
-const testRecipient = ref('');
-const testEmailBusy = ref(false);
-const testEmailResult = ref(null);
+const tab = ref(props.integrations[0]?.code || '');
+const copied = ref('');
+const busy = ref('');
+const result = reactive({});
 
 const editableProfile = (profile = {}) => {
-    const fields = (profile.fields || []).map((field) => ({ ...field }));
-
+    const fields = (profile.fields || []).map(field => ({ ...field }));
     return {
         fields,
-        config: Object.fromEntries(fields.map((field) => [
-            field.key,
-            field.value ?? (field.type === 'boolean' ? false : ''),
+        config: Object.fromEntries(fields.map(field => [
+            field.key, field.value ?? (field.type === 'boolean' ? false : ''),
         ])),
         clear_secrets: [],
-        required_total: profile.required_total ?? 0,
-        configured_required: profile.configured_required ?? 0,
-        required_complete: Boolean(profile.required_complete),
     };
 };
 
-const toItem = (item) => {
-    const profileCache = {};
+const toItem = item => {
+    const profiles = {};
     Object.entries(item.environment_profiles || {}).forEach(([environment, profile]) => {
-        profileCache[environment] = editableProfile(profile);
+        profiles[environment] = editableProfile(profile);
     });
-
-    const selected = item.environment && profileCache[item.environment]
-        ? profileCache[item.environment]
-        : editableProfile({
-            fields: item.fields,
-            required_total: item.required_total,
-            configured_required: item.configured_required,
-            required_complete: item.required_complete,
-        });
-
-    return {
-        ...item,
-        result: null,
-        busy: false,
-        profile_cache: profileCache,
-        fields: selected.fields,
-        config: selected.config,
-        clear_secrets: selected.clear_secrets,
-        required_total: selected.required_total,
-        configured_required: selected.configured_required,
-        required_complete: selected.required_complete,
-    };
+    const selected = item.environment && profiles[item.environment] ? profiles[item.environment] : editableProfile(item);
+    return { ...item, profiles, fields: selected.fields, config: selected.config, clear_secrets: selected.clear_secrets };
 };
 
 const items = reactive(props.integrations.map(toItem));
-
-watch(() => props.integrations, (value) => {
-    const draft = new Map(items.map((item) => [item.code, item]));
-    items.splice(0, items.length, ...(value || []).map((raw) => {
+watch(() => props.integrations, value => {
+    const draft = new Map(items.map(item => [item.code, item]));
+    items.splice(0, items.length, ...(value || []).map(raw => {
         const fresh = toItem(raw);
         const current = draft.get(fresh.code);
-        // Isian yang belum disimpan jangan dibuang saat prop disegarkan (mis. tes koneksi).
-        const edited = current && (JSON.stringify(current.config) !== JSON.stringify(fresh.config)
-            || JSON.stringify(current.clear_secrets) !== JSON.stringify(fresh.clear_secrets));
-        if (edited) {
+        // Isian yang belum disimpan jangan dibuang saat prop disegarkan.
+        if (current && JSON.stringify(current.config) !== JSON.stringify(fresh.config)) {
             fresh.config = current.config;
             fresh.clear_secrets = current.clear_secrets;
         }
         return fresh;
     }));
-    if (!items.some((item) => item.code === selectedCode.value)) {
-        selectedCode.value = items[0]?.code || '';
-    }
+    if (!items.some(item => item.code === tab.value)) tab.value = items[0]?.code || '';
 });
 
-const activeCount = computed(() => items.filter((item) => item.is_active).length);
-const healthyCount = computed(() => items.filter((item) => item.is_active && item.connection?.status === 'VERIFIED').length);
-const requiresAction = (item) => item.is_active && (
+const current = computed(() => items.find(item => item.code === tab.value) || items[0] || null);
+
+const needsAttention = item => item.is_active && (
     !item.required_complete || item.connection?.status === 'FAILED' || item.callback?.status === 'NOT_READY'
 );
-const attentionCount = computed(() => items.filter(requiresAction).length);
-const awaitingCount = computed(() => items.filter((item) => item.is_active && !requiresAction(item)
-    && ['CONFIGURED', 'UNVERIFIED', 'NOT_TESTED'].includes(item.connection?.status)).length);
-const completeCount = computed(() => items.filter((item) => item.required_complete).length);
 
-const csrf = () => decodeURIComponent(
-    document.cookie.split('; ').find((value) => value.startsWith('XSRF-TOKEN='))?.slice(11) || '',
-);
-
-const statusLabel = (status) => ({
-    HEALTHY: 'Tes terakhir berhasil',
-    DEGRADED: 'Belum terverifikasi',
-    DOWN: 'Bermasalah',
-    NOT_CONFIGURED: 'Belum dikonfigurasi',
-    UNTESTED: 'Belum dites',
-    OK: 'Berhasil',
+const connectionLabel = status => ({
+    VERIFIED: 'Sudah terhubung', FAILED: 'Gagal terhubung', CONFIGURED: 'Data akses lengkap',
+    UNVERIFIED: 'Belum dipastikan', NOT_TESTED: 'Belum diuji', NOT_CONFIGURED: 'Belum diatur',
 }[status] || 'Belum diketahui');
 
-const testedAt = (value) => {
-    if (!value) return 'Belum pernah dites';
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return 'Waktu tes tidak tersedia';
-    return 'Terakhir dites ' + new Intl.DateTimeFormat('id-ID', {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-        timeZone: 'Asia/Jakarta',
-    }).format(date) + ' WIB';
+const connectionTone = status => ({
+    VERIFIED: 'ok', FAILED: 'bad', NOT_CONFIGURED: 'bad', CONFIGURED: 'warn', UNVERIFIED: 'warn',
+}[status] || 'plain');
+
+const readinessTone = item => {
+    if (!item.is_active) return 'plain';
+    if (needsAttention(item)) return 'bad';
+    return item.readiness?.status === 'READY' ? 'ok' : 'warn';
 };
 
-const selectedEnvironment = (item) => item.environment_options?.find(
-    (option) => option.value === item.environment,
-) || null;
+const callbackTone = status => ({ READY: 'ok', NOT_READY: 'bad', NOT_REQUIRED: 'plain' }[status] || 'plain');
 
-function switchEnvironment(item, event) {
+const switchEnvironment = (item, event) => {
     const next = event.target.value;
     if (!next || next === item.environment) return;
-
     if (item.credential_scope === 'per_environment') {
-        item.profile_cache[item.environment] = {
-            fields: item.fields,
-            config: { ...item.config },
-            clear_secrets: [...item.clear_secrets],
-            required_total: item.required_total,
-            configured_required: item.configured_required,
-            required_complete: item.required_complete,
+        item.profiles[item.environment] = {
+            fields: item.fields, config: { ...item.config }, clear_secrets: [...item.clear_secrets],
         };
-
-        const target = item.profile_cache[next];
+        const target = item.profiles[next];
         if (target) {
-            item.fields = target.fields.map((field) => ({ ...field }));
+            item.fields = target.fields.map(field => ({ ...field }));
             item.config = { ...target.config };
             item.clear_secrets = [...target.clear_secrets];
-            item.required_total = target.required_total;
-            item.configured_required = target.configured_required;
-            item.required_complete = target.required_complete;
         }
     }
-
     item.environment = next;
-    item.result = null;
-}
+    delete result[item.code];
+};
 
-function toggleClearSecret(item, key) {
+const toggleClearSecret = (item, key) => {
     const index = item.clear_secrets.indexOf(key);
     if (index >= 0) {
         item.clear_secrets.splice(index, 1);
@@ -161,411 +100,217 @@ function toggleClearSecret(item, key) {
         item.clear_secrets.push(key);
         item.config[key] = '';
     }
-}
+};
 
-async function copyCallback(key, value) {
-    if (!value) return;
-    try {
-        await navigator.clipboard.writeText(value);
-        copiedCallback.value = key;
-        window.setTimeout(() => {
-            if (copiedCallback.value === key) copiedCallback.value = '';
-        }, 1800);
-    } catch {
-        copiedCallback.value = '';
-    }
-}
-
-function save(item) {
+const save = item => {
+    busy.value = item.code;
     router.put('/admin/integrations/' + encodeURIComponent(item.code), {
         is_active: Boolean(item.is_active),
         environment: item.environment,
         config: item.config,
         clear_secrets: item.clear_secrets,
-    }, { preserveScroll: true });
-}
+    }, {
+        preserveScroll: true,
+        onFinish: () => { busy.value = ''; },
+    });
+};
 
-async function testConnection(item) {
-    if (item.busy) return;
-    item.busy = true;
+const csrf = () => decodeURIComponent(
+    document.cookie.split('; ').find(value => value.startsWith('XSRF-TOKEN='))?.slice(11) || '',
+);
 
+const testConnection = async item => {
+    busy.value = item.code;
     try {
         const response = await fetch('/admin/integrations/' + encodeURIComponent(item.code) + '/test', {
             method: 'POST',
             credentials: 'same-origin',
-            headers: {
-                Accept: 'application/json',
-                'X-XSRF-TOKEN': csrf(),
-            },
+            headers: { Accept: 'application/json', 'X-XSRF-TOKEN': csrf() },
         });
-        const result = await response.json().catch(() => ({
-            status: 'DOWN',
-            message: 'Tes koneksi gagal.',
-        }));
-
-        item.result = response.ok
-            ? result
-            : { status: 'DOWN', message: result.message || 'Tes koneksi ditolak.' };
-
-        if (response.ok) {
-            item.health = result;
-            item.connection = {
-                status: result.verified === true
-                    ? 'VERIFIED'
-                    : result.status === 'DOWN'
-                        ? 'FAILED'
-                        : result.status === 'DEGRADED'
-                            ? (['SAFE_PROBE_UNAVAILABLE', 'PERMISSION_LIMITED'].includes(result.reason) ? 'CONFIGURED' : 'UNVERIFIED')
-                            : result.status === 'NOT_CONFIGURED'
-                                ? 'NOT_CONFIGURED'
-                                : 'NOT_TESTED',
-                label: result.verified === true
-                    ? 'Tes terakhir berhasil'
-                    : result.status === 'DOWN'
-                        ? 'Koneksi bermasalah'
-                        : result.status === 'DEGRADED'
-                            ? (['SAFE_PROBE_UNAVAILABLE', 'PERMISSION_LIMITED'].includes(result.reason) ? 'Tersimpan — tes otomatis tidak tersedia' : 'Belum dapat diverifikasi')
-                            : result.status === 'NOT_CONFIGURED'
-                                ? 'Belum dikonfigurasi'
-                                : 'Belum dites',
-                message: result.message,
-                tested_at: result.tested_at,
-                reason: result.reason,
-            };
-            router.reload({ only: ['integrations', 'summary'], preserveScroll: true });
-        }
-    } catch {
-        item.result = { status: 'DOWN', message: 'Koneksi terputus. Coba lagi.' };
+        const payload = await response.json().catch(() => ({ status: 'DOWN', message: 'Tes koneksi gagal.' }));
+        result[item.code] = response.ok ? payload : { status: 'DOWN', message: payload.message || 'Tes koneksi ditolak.' };
+        if (response.ok) router.reload({ preserveScroll: true, only: ['integrations', 'summary'] });
     } finally {
-        item.busy = false;
+        busy.value = '';
     }
-}
-async function sendResendTestEmail() {
-    if (testEmailBusy.value || !testRecipient.value.trim()) return;
-    testEmailBusy.value = true;
-    testEmailResult.value = null;
+};
+
+const copy = async (key, value) => {
+    if (!value) return;
+    await copyText(value);
+    copied.value = key;
+    window.setTimeout(() => { if (copied.value === key) copied.value = ''; }, 1800);
+};
+
+const addresses = computed(() => [
+    { key: 'digiflazz', label: 'Pemberitahuan Digiflazz', url: props.callbackUrls.digiflazz },
+    { key: 'midtrans', label: 'Pemberitahuan Midtrans', url: props.callbackUrls.midtrans },
+    { key: 'doku', label: 'Pemberitahuan DOKU', url: props.callbackUrls.doku },
+    { key: 'google', label: 'Callback Google', url: props.callbackUrls.google },
+].filter(address => address.url));
+
+const testEmail = reactive({ open: false, recipient: '', sending: false, message: '' });
+const sendTestEmail = async () => {
+    testEmail.sending = true;
+    testEmail.message = '';
     try {
         const response = await fetch('/admin/integrations/resend/send-test-email', {
             method: 'POST',
             credentials: 'same-origin',
-            headers: {
-                Accept: 'application/json',
-                'Content-Type': 'application/json',
-                'X-XSRF-TOKEN': csrf(),
-            },
-            body: JSON.stringify({ recipient: testRecipient.value.trim() }),
+            headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-XSRF-TOKEN': csrf() },
+            body: JSON.stringify({ recipient: testEmail.recipient }),
         });
-        const data = await response.json().catch(() => ({}));
-        testEmailResult.value = {
-            ok: response.ok,
-            message: response.ok ? data.message : (data.message || 'Pengiriman email uji gagal.'),
-        };
-    } catch {
-        testEmailResult.value = { ok: false, message: 'Koneksi terputus. Coba lagi.' };
+        const payload = await response.json().catch(() => ({}));
+        testEmail.message = response.ok ? (payload.message || 'Email uji terkirim.') : (payload.message || 'Email uji gagal dikirim.');
     } finally {
-        testEmailBusy.value = false;
+        testEmail.sending = false;
     }
-}
+};
 </script>
 
 <template>
     <Head title="Integrasi" />
-    <AdminShell>
-        <div class="space-y-5">
-            <header class="flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between">
-                <div class="min-w-0">
-                    <h1 class="text-2xl font-semibold tracking-tight">Integrasi</h1>
-                    <p class="mt-1 max-w-3xl text-sm text-muted-foreground">
-                        Kelola sambungan ke layanan luar di satu tempat. Kunci akses disimpan dengan aman dan tidak ditampilkan kembali setelah tersimpan.
-                    </p>
-                </div>
-                <Button class="w-full sm:w-auto" variant="outline" as-child>
-                    <Link href="/admin/nickname-tools">Buka Alat Cek Nama Game</Link>
-                </Button>
-            </header>
-
-            <section class="space-y-2 border-b border-border pb-4" aria-labelledby="integrations-start-heading">
-                <h2 id="integrations-start-heading" class="font-semibold">Mulai jualan top up</h2>
-                <p class="text-sm">Hubungkan Digiflazz dan satu cara pembayaran, lalu impor nominal dan atur margin di menu Produk.</p>
-                <p class="text-sm text-muted-foreground">Telegram, Discord, masuk dengan Google, dan pengecekan nama akun bersifat tambahan dan tidak wajib aktif. Tes koneksi hanya memeriksa akses layanan; hasil transaksi pelanggan dicatat terpisah.</p>
-                <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                    <Button class="w-full sm:w-auto" variant="outline" as-child><Link href="/admin/catalog">Buka Produk</Link></Button>
-                    <Button class="w-full sm:w-auto" variant="outline" as-child><Link href="/admin/payments">Buka Pembayaran</Link></Button>
-                </div>
-            </section>
-
-            <div class="lf-admin-summary ">
-                <Card class="p-4">
-                    <p class="text-xs text-muted-foreground">Total integrasi</p>
-                    <p class="mt-2 text-2xl font-semibold">{{ summary.total ?? items.length }}</p>
-                </Card>
-                <Card class="p-4">
-                    <p class="text-xs text-muted-foreground">Aktif</p>
-                    <p class="mt-2 text-2xl font-semibold">{{ activeCount }}</p>
-                </Card>
-                <Card class="p-4">
-                    <p class="text-xs text-muted-foreground">Sudah terhubung</p>
-                    <p class="mt-2 text-2xl font-semibold">{{ healthyCount }}</p>
-                </Card>
-                <Card class="p-4">
-                    <p class="text-xs text-muted-foreground">Butuh tindakan</p>
-                    <p class="mt-2 text-2xl font-semibold">{{ attentionCount }}</p>
-                </Card>
-                <Card class="p-4">
-                    <p class="text-xs text-muted-foreground">Belum dipastikan</p>
-                    <p class="mt-2 text-2xl font-semibold">{{ awaitingCount }}</p>
-                </Card>
-                <Card class="col-span-2 p-4 md:col-span-1">
-                    <p class="text-xs text-muted-foreground">Data akses wajib lengkap</p>
-                    <p class="mt-2 text-2xl font-semibold">{{ completeCount }}/{{ items.length }}</p>
-                </Card>
+    <AdminLayout>
+        <header class="adm-head">
+            <div>
+                <h1>Integrasi</h1>
+                <p>Data akses layanan luar yang dipakai toko. Kredensial disimpan terenkripsi dan hanya bisa diubah Super Admin.</p>
             </div>
-            <p class="text-xs text-muted-foreground">
-                Butuh tindakan berarti data akses, alamat pemberitahuan, atau tes koneksi bermasalah. Belum dipastikan berarti sambungan belum bisa dicek otomatis dan belum tentu rusak; tidak perlu mengulang tes terus-menerus.
-            </p>
+            <div class="adm-head-actions">
+                <button type="button" class="adm-btn" @click="router.reload({ preserveScroll: true })">Muat ulang</button>
+            </div>
+        </header>
 
-            <details class="lf-admin-advanced rounded-md border border-border">
-                    <summary class="cursor-pointer px-4 py-3 text-sm font-medium">Alamat pemberitahuan &amp; masuk kembali</summary>
-                    <p class="border-t border-border px-4 pt-3 text-sm text-muted-foreground">
-                        Salin alamat yang sesuai ke pengaturan layanan terkait. Alamat ini dipakai untuk menerima pemberitahuan transaksi atau proses masuk kembali, dan tidak dapat diubah dari panel.
-                    </p>
-                <div class="grid gap-3 p-4 md:grid-cols-2">
-                    <div
-                        v-for="(value, key) in callbackUrls"
-                        :key="key"
-                        class="p-3"
-                    >
-                        <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                            {{ key === 'midtrans' ? 'Pemberitahuan pembayaran Midtrans'
-                                : key === 'doku' ? 'Pemberitahuan pembayaran DOKU'
-                                : key === 'digiflazz' ? 'Pemberitahuan transaksi Digiflazz'
-                                : 'Alamat kembali masuk Google' }}
-                        </p>
-                        <div class="mt-2 flex items-center gap-2">
-                            <code class="min-w-0 flex-1 break-all text-xs">{{ value }}</code>
-                            <Button type="button" size="sm" variant="outline" @click="copyCallback(key, value)">
-                                {{ copiedCallback === key ? 'Tersalin' : 'Salin' }}
-                            </Button>
-                        </div>
+        <section class="adm-stats" aria-label="Ringkasan integrasi">
+            <div class="adm-stat"><span class="lb">Total integrasi</span><strong class="vl">{{ num(summary.total) }}</strong></div>
+            <div class="adm-stat"><span class="lb">Aktif</span><strong class="vl">{{ num(summary.active) }}</strong></div>
+            <div class="adm-stat"><span class="lb">Sudah terhubung</span><strong class="vl">{{ num(summary.healthy) }}</strong></div>
+            <div class="adm-stat"><span class="lb">Butuh tindakan</span><strong class="vl" :style="{ color: Number(summary.attention) ? 'var(--a-danger)' : 'inherit' }">{{ num(summary.attention) }}</strong></div>
+            <div class="adm-stat"><span class="lb">Belum dipastikan</span><strong class="vl">{{ num(summary.awaiting_verification) }}</strong></div>
+            <div class="adm-stat"><span class="lb">Data akses lengkap</span><strong class="vl">{{ num(summary.configuration_complete) }}<span style="font-size:13px;font-weight:400"> / {{ num(summary.total) }}</span></strong></div>
+        </section>
+
+        <section class="adm-card">
+            <div class="adm-card-head">
+                <div>
+                    <h2>Mulai jualan top up</h2>
+                    <p>Urutan pengisian: Digiflazz untuk produk, Validasi Akun untuk cek nama panggilan, lalu Midtrans atau DOKU untuk pembayaran.</p>
+                </div>
+            </div>
+            <div class="adm-card-body">
+                <div v-if="addresses.length">
+                    <strong>Alamat pemberitahuan</strong>
+                    <p class="adm-note">Tempel alamat ini di pengaturan layanan luar. Alamat muncul otomatis mengikuti integrasi yang memilikinya.</p>
+                    <div v-for="address in addresses" :key="address.key" class="adm-copyrow">
+                        <span>{{ address.label }}</span>
+                        <code class="adm-code">{{ address.url }}</code>
+                        <button type="button" class="adm-btn sm" @click="copy(address.key, address.url)">
+                            {{ copied === address.key ? 'Tersalin' : 'Salin' }}
+                        </button>
                     </div>
                 </div>
-            </details>
+                <p v-else class="adm-note">Belum ada integrasi yang memakai alamat pemberitahuan.</p>
+            </div>
+        </section>
 
-            <p v-if="!items.length" role="status" class="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">Belum ada integrasi yang tersedia. Periksa konfigurasi integrasi toko.</p>
-
-            <nav v-if="items.length" class="lf-admin-tabs" aria-label="Daftar integrasi">
-                <Button
-                    v-for="item in items"
-                    :key="item.code"
-                    type="button"
-                    :variant="selectedCode === item.code ? 'secondary' : 'ghost'"
-                    :aria-current="selectedCode === item.code ? 'page' : undefined"
-                    class="shrink-0"
-                    @click="selectedCode = item.code"
-                >
-                    {{ item.name }}
-                </Button>
-            </nav>
-
-            <section
-                v-for="item in items"
-                v-show="selectedCode === item.code"
-                :key="item.code"
-                class="space-y-5 rounded-md border border-border p-4 md:p-5"
-            >
-                <div class="flex flex-wrap items-start justify-between gap-4">
-                    <div class="max-w-3xl">
-                        <div class="flex flex-wrap items-center gap-2">
-                            <h2 class="text-xl font-semibold">{{ item.name }}</h2>
-                            <Badge variant="outline">{{ item.group }}</Badge>
-                            <Badge :variant="item.is_active ? 'secondary' : 'outline'">
-                                {{ item.is_active ? 'Aktif' : 'Nonaktif' }}
-                            </Badge>
-                            <Badge
-                                v-if="selectedEnvironment(item)"
-                                :variant="selectedEnvironment(item)?.live ? 'destructive' : 'outline'"
-                            >
-                                {{ selectedEnvironment(item)?.label }}
-                            </Badge>
-                            <Badge variant="outline">{{ item.credential_status }}</Badge>
-                            <Badge :variant="item.readiness?.status === 'READY' ? 'secondary' : 'outline'">
-                                {{ item.readiness?.label }}
-                            </Badge>
-                        </div>
-                        <p v-if="item.description" class="mt-2 text-sm text-muted-foreground">
-                            {{ item.description }}
-                        </p>
-                        <p class="mt-1 text-xs text-muted-foreground">
-                            {{ item.configured_required }}/{{ item.required_total }} data akses wajib tersimpan ·
-                            {{ testedAt(item.health?.tested_at) }}
-                        </p>
-                    </div>
-
-                    <label class="flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium">
-                        <AdminSwitch v-model="item.is_active" />
-                        Integrasi aktif
-                    </label>
-                </div>
-
-                <div class="lf-admin-readiness mt-5">
-                    <div class="p-3">
-                        <p class="text-xs text-muted-foreground">Data akses</p>
-                        <p class="mt-1 text-sm font-medium">
-                            {{ item.required_complete ? 'Lengkap' : 'Belum lengkap' }}
-                        </p>
-                    </div>
-                    <div class="p-3">
-                        <p class="text-xs text-muted-foreground">Koneksi</p>
-                        <p class="mt-1 text-sm font-medium">
-                            {{ item.connection?.label || statusLabel(item.health?.status) }}
-                        </p>
-                    </div>
-                    <div class="p-3">
-                        <p class="text-xs text-muted-foreground">Pemberitahuan layanan</p>
-                        <p class="mt-1 text-sm font-medium">
-                            {{ item.callback?.label || 'Belum diketahui' }}
-                        </p>
-                    </div>
-                </div>
-
-                <div
-                    v-if="item.environment_options?.length"
-                    class="mt-5 grid gap-3 rounded-md border p-4 md:grid-cols-[minmax(0,260px)_1fr]"
-                >
-                    <label class="space-y-1.5">
-                        <span class="text-sm font-medium">Mode layanan</span>
-                        <select
-                            :value="item.environment"
-                            class="h-9 w-full rounded-md border bg-background px-3 text-sm"
-                            @change="switchEnvironment(item, $event)"
-                        >
-                            <option
-                                v-for="option in item.environment_options"
-                                :key="option.value"
-                                :value="option.value"
-                            >
-                                {{ option.label }}
-                            </option>
-                        </select>
-                    </label>
-                    <div class="text-sm text-muted-foreground">
-                        <p v-if="selectedEnvironment(item)?.live" role="status" class="mb-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 font-medium text-destructive">Mode layanan sungguhan sedang aktif. Pastikan data akses yang disimpan memang untuk layanan ini.</p>
-                        <p>{{ selectedEnvironment(item)?.description }}</p>
-                        <p v-if="item.credential_scope === 'per_environment'" class="mt-1">
-                            Data akses untuk mode ini disimpan terpisah dan tidak memakai data akses mode lain.
-                        </p>
-                        <p v-else class="mt-1">
-                            Data akses dipakai bersama; permintaan mengikuti mode yang dipilih.
-                        </p>
-                    </div>
-                </div>
-
-                <div
-                    v-else-if="item.environment_note"
-                    class="mt-4 rounded-md border p-3 text-sm text-muted-foreground"
-                >
-                    {{ item.environment_note }}
-                </div>
-
-                <div
-                    v-if="item.note"
-                    class="mt-4 rounded-md border p-3 text-sm text-muted-foreground"
-                >
-                    {{ item.note }}
-                </div>
-
-                <div class="mt-5 grid gap-4 md:grid-cols-2">
-                    <template v-for="field in item.fields" :key="field.key">
-                        <label v-if="field.type !== 'boolean'" class="space-y-1.5">
-                            <span class="flex flex-wrap items-center gap-2 text-sm font-medium">
-                                {{ field.label }}
-                                <span v-if="field.required" class="text-xs text-destructive">Wajib</span>
-                                <Badge v-if="field.secret && field.configured" variant="outline">
-                                    {{ item.clear_secrets.includes(field.key) ? 'Akan dihapus' : 'Tersimpan' }}
-                                </Badge>
-                            </span>
-
-                            <div class="flex flex-wrap gap-2">
-                                <Input
-                                    v-model="item.config[field.key]"
-                                    :type="field.secret ? 'password' : 'text'"
-                                    :autocomplete="field.secret ? 'new-password' : undefined"
-                                    :disabled="field.secret && item.clear_secrets.includes(field.key)"
-                                    :placeholder="field.secret && field.configured
-                                        ? 'Kosong = pertahankan, isi = ganti'
-                                        : ''"
-                                    class="min-w-0 flex-1"
-                                />
-                                <Button
-                                    v-if="field.secret && field.configured"
-                                    type="button"
-                                    variant="outline"
-                                    @click="toggleClearSecret(item, field.key)"
-                                >
-                                    {{ item.clear_secrets.includes(field.key) ? 'Batalkan hapus' : 'Hapus data akses' }}
-                                </Button>
-                            </div>
-
-                            <span v-if="field.help" class="block text-xs text-muted-foreground">
-                                {{ field.help }}
-                            </span>
-                        </label>
-
-                        <label
-                            v-else
-                            class="flex items-start justify-between gap-4 rounded-md border p-3"
-                        >
-                            <span>
-                                <span class="block text-sm font-medium">{{ field.label }}</span>
-                                <span v-if="field.help" class="mt-1 block text-xs text-muted-foreground">
-                                    {{ field.help }}
-                                </span>
-                            </span>
-                            <AdminSwitch v-model="item.config[field.key]" />
-                        </label>
-                    </template>
-                </div>
-
-                <div v-if="item.code === 'resend'" class="mt-5 rounded-md border p-4">
-                    <h3 class="font-semibold">Kirim email uji</h3>
-                    <p class="mt-1 text-sm text-muted-foreground">Uji pengiriman memakai data akses Resend yang tersimpan. Simpan perubahan dulu. Pengiriman ini bukan simulasi dan benar-benar mengirim email.</p>
-                    <div class="mt-3 flex flex-wrap items-end gap-2">
-                        <label class="min-w-0 flex-1 space-y-1.5">
-                            <span class="text-sm font-medium">Email penerima</span>
-                            <Input v-model="testRecipient" type="email" autocomplete="email" placeholder="admin@example.com" />
-                        </label>
-                        <Button type="button" variant="outline" :disabled="testEmailBusy || !testRecipient.trim() || !item.is_active" @click="sendResendTestEmail">
-                            {{ testEmailBusy ? 'Mengirim…' : 'Kirim email uji' }}
-                        </Button>
-                    </div>
-                    <p v-if="testEmailResult" role="status" class="mt-3 text-sm" :class="testEmailResult.ok ? 'text-foreground' : 'text-destructive'">{{ testEmailResult.message }}</p>
-                </div>
-
-                <div class="mt-5 flex flex-wrap gap-2">
-                    <Button :disabled="item.busy" @click="save(item)">
-                        Simpan integrasi
-                    </Button>
-                    <Button variant="outline" :disabled="item.busy" @click="testConnection(item)">
-                        {{ item.busy ? 'Memeriksa…' : 'Tes koneksi' }}
-                    </Button>
-                </div>
-
-                <div
-                    v-if="item.result"
-                    class="mt-4 rounded-md border p-3 text-sm"
-                    :class="item.result.status === 'HEALTHY' || item.result.status === 'OK'
-                        ? 'text-foreground'
-                        : 'text-muted-foreground'"
-                >
-                    <strong>{{ statusLabel(item.result.status) }}</strong>
-                    <span> · {{ item.result.message }}</span>
-                </div>
-
-                <div v-else-if="item.health?.message" class="mt-4 rounded-md border border-border p-3 text-sm text-muted-foreground">
-                    <strong>{{ statusLabel(item.health.status) }}</strong>
-                    <span> · {{ item.health.message }}</span>
-                </div>
-            </section>
+        <div class="adm-tabs" role="tablist" aria-label="Daftar integrasi">
+            <button v-for="item in items" :key="item.code" type="button" role="tab"
+                :aria-selected="tab === item.code" @click="tab = item.code">
+                {{ item.name }}<span class="adm-dot" :class="readinessTone(item)" aria-hidden="true" />
+            </button>
         </div>
-    </AdminShell>
+
+        <section v-if="current" class="adm-card">
+            <div class="adm-card-head">
+                <div>
+                    <h2>{{ current.name }}</h2>
+                    <p>{{ current.description || 'Integrasi layanan luar.' }}</p>
+                </div>
+                <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+                    <span class="adm-tag" :class="current.is_active ? 'ok' : 'bad'">{{ current.is_active ? 'Aktif' : 'Nonaktif' }}</span>
+                    <span v-if="current.environment_label" class="adm-tag info">{{ current.environment_label }}</span>
+                    <span class="adm-tag" :class="readinessTone(current)">{{ connectionLabel(current.connection?.status) }}</span>
+                    <button type="button" class="adm-switch" role="switch" :aria-checked="current.is_active"
+                        :aria-label="current.is_active ? 'Nonaktifkan integrasi' : 'Aktifkan integrasi'"
+                        @click="current.is_active = !current.is_active" />
+                </div>
+            </div>
+            <div class="adm-card-body">
+                <p v-if="current.note" class="adm-alert">{{ current.note }}</p>
+
+                <div class="adm-grid">
+                    <div class="adm-block">
+                        <strong>Data akses</strong>
+                        <p class="adm-note">{{ current.credential_status }} · {{ num(current.configured_required) }} dari {{ num(current.required_total) }} isian wajib terisi</p>
+                        <span class="adm-tag" :class="connectionTone(current.credential?.status)">{{ current.credential?.label }}</span>
+                    </div>
+                    <div class="adm-block">
+                        <strong>Koneksi</strong>
+                        <p class="adm-note">{{ current.connection?.message || 'Belum pernah menjalankan Tes Koneksi.' }}</p>
+                        <p class="adm-note">{{ wibDateTime(current.health?.tested_at) || 'Belum pernah dites' }}</p>
+                    </div>
+                    <div class="adm-block">
+                        <strong>Pemberitahuan layanan</strong>
+                        <p class="adm-note">{{ current.callback?.message || 'Integrasi ini tidak memakai alamat pemberitahuan.' }}</p>
+                        <span v-if="current.callback" class="adm-tag" :class="callbackTone(current.callback.status)">
+                            {{ current.callback.status === 'READY' ? 'Siap' : current.callback.status === 'NOT_READY' ? 'Belum siap' : 'Tidak perlu' }}
+                        </span>
+                    </div>
+                </div>
+
+                <div v-if="current.environment_options?.length" class="adm-field" style="max-width:320px;margin-top:10px">
+                    <span>Mode layanan</span>
+                    <select :value="current.environment" class="adm-select" @change="switchEnvironment(current, $event)">
+                        <option v-for="option in current.environment_options" :key="option.value" :value="option.value">{{ option.label }}</option>
+                    </select>
+                    <span class="hint">{{ current.environment_note || 'Data akses disimpan terpisah untuk setiap mode.' }}</span>
+                </div>
+
+                <div class="adm-grid" style="margin-top:10px">
+                    <label v-for="field in current.fields" :key="field.key" class="adm-field" :class="{ full: field.type === 'csv' }">
+                        <span>{{ field.label }}<template v-if="field.required"> *</template></span>
+                        <input v-if="field.type !== 'boolean'" v-model="current.config[field.key]" class="adm-input"
+                            :type="field.secret ? 'password' : 'text'" :disabled="field.secret && current.clear_secrets.includes(field.key)"
+                            :placeholder="field.secret && field.configured ? 'Tersimpan — kosongkan bila tidak diubah' : (field.placeholder || '')">
+                        <label v-else class="adm-switch-row">
+                            <button type="button" class="adm-switch" role="switch" :aria-checked="!!current.config[field.key]"
+                                @click="current.config[field.key] = !current.config[field.key]" />
+                            {{ current.config[field.key] ? 'Dinyalakan' : 'Dimatikan' }}
+                        </label>
+                        <span v-if="field.help" class="hint">{{ field.help }}</span>
+                        <span v-if="field.secret && field.configured" class="adm-tag" :class="current.clear_secrets.includes(field.key) ? 'bad' : 'ok'" style="align-self:flex-start">
+                            {{ current.clear_secrets.includes(field.key) ? 'Akan dihapus' : 'Tersimpan' }}
+                        </span>
+                        <button v-if="field.secret && field.configured" type="button" class="adm-btn sm link" style="align-self:flex-start"
+                            @click="toggleClearSecret(current, field.key)">
+                            {{ current.clear_secrets.includes(field.key) ? 'Batalkan hapus' : 'Hapus data akses' }}
+                        </button>
+                    </label>
+                </div>
+
+                <p v-if="current.code === 'kokinpay' && current.environment_live" class="adm-alert bad">
+                    Mode produksi aktif. Validasi nama panggilan akan memakai kuota layanan sungguhan.
+                </p>
+
+                <div v-if="current.code === 'resend'" class="adm-block full" style="margin-top:10px">
+                    <strong>Kirim email uji</strong>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+                        <input v-model="testEmail.recipient" class="adm-input" style="flex:1 1 240px" placeholder="alamat@contoh.com">
+                        <button type="button" class="adm-btn" :disabled="testEmail.sending || !testEmail.recipient" @click="sendTestEmail">Kirim email uji</button>
+                    </div>
+                    <p v-if="testEmail.message" class="adm-note">{{ testEmail.message }}</p>
+                </div>
+
+                <div v-if="result[current.code]" class="adm-alert" :class="result[current.code].status === 'DOWN' ? 'bad' : 'ok'" style="margin-top:10px">
+                    <strong>{{ connectionLabel(result[current.code].status) }}</strong>
+                    <p>{{ result[current.code].message }}</p>
+                </div>
+
+                <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap">
+                    <button type="button" class="adm-btn" :disabled="busy === current.code" @click="testConnection(current)">Tes koneksi</button>
+                    <button type="button" class="adm-btn primary" :disabled="busy === current.code" @click="save(current)">Simpan integrasi</button>
+                </div>
+            </div>
+        </section>
+    </AdminLayout>
 </template>

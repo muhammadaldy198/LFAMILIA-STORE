@@ -1,5 +1,7 @@
 # Customer account & guest
 
+> Aturan produk ada di [`docs/PRD.md`](../docs/PRD.md). Dokumen ini menjelaskan **cara kode bekerja**, bukan aturan produk. Kalau berbeda, PRD yang menang.
+
 ## Registered customer
 
 Area account yang diimplementasikan mencakup profile, password/account actions, wallet dan ledger, membership tier, riwayat/detail order, support ticket, serta saved game account sesuai route/controller aktual.

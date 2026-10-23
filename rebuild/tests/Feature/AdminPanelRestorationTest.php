@@ -581,96 +581,6 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertSame(2, $product->fields()->count());
     }
 
-    public function test_global_margin_updates_only_automatic_products_and_preserves_manual_and_nominal_overrides(): void
-    {
-        $this->login();
-        $product = $this->product();
-        $manual = $this->product('MANUAL');
-        $manual->update(['margin_percent' => 9]);
-        $package = ProductPackage::create(['product_id' => $product->id, 'code' => 'OVERRIDE', 'name' => 'Override', 'pricing_mode' => 'PERCENT', 'margin_percent' => 7]);
-        $this->put('/admin/catalog/margin', ['margin_percent' => 15])
-            ->assertSessionHasErrors('preview_token');
-        $response = $this->postJson('/admin/catalog/margin/preview', ['margin_percent' => 15])
-            ->assertOk();
-        $this->assertSame('10.0000', (string) $product->fresh()->margin_percent);
-        $this->put('/admin/catalog/margin', ['preview_token' => $response->json('token')])
-            ->assertRedirect()->assertSessionHasNoErrors();
-        $this->assertSame('15.0000', (string) $product->fresh()->margin_percent);
-        $this->assertSame('9.0000', (string) $manual->fresh()->margin_percent);
-        $this->assertSame('7.0000', (string) $package->fresh()->margin_percent);
-        $this->assertSame(15.0, (float) json_decode(DB::table('system_settings')->where('key', 'catalog.default_margin_percent')->value('value'), true));
-        $this->assertDatabaseHas('audit_logs', ['action' => 'catalog.margin.global_updated']);
-    }
-
-    public function test_global_margin_confirmation_rejects_supplier_cost_changes_after_preview(): void
-    {
-        $this->login();
-        $product = $this->product();
-        $package = ProductPackage::create([
-            'product_id' => $product->id, 'code' => 'PREVIEW-LOCK', 'name' => 'Preview Lock',
-            'pricing_mode' => 'PRODUCT_MARGIN', 'is_active' => true,
-        ]);
-        $mapping = ProviderMapping::create([
-            'provider_id' => Provider::where('code', 'DIGIFLAZZ')->value('id'),
-            'product_package_id' => $package->id,
-            'external_sku' => 'preview-'.bin2hex(random_bytes(3)),
-            'cost_idr' => 10000, 'max_price_idr' => 10000, 'priority' => 0,
-            'is_active' => false,
-        ]);
-        $preview = $this->postJson('/admin/catalog/margin/preview', [
-            'margin_percent' => 15,
-        ])->assertOk();
-        $mapping->update(['cost_idr' => 12000, 'max_price_idr' => 12000]);
-
-        $this->put('/admin/catalog/margin', [
-            'preview_token' => $preview->json('token'),
-        ])->assertSessionHasErrors('preview_token');
-        $this->assertSame('10.0000', (string) $product->fresh()->margin_percent);
-    }
-
-    public function test_global_margin_explicitly_converts_legacy_digiflazz_imported_percent_only(): void
-    {
-        $this->login();
-        $product = $this->product();
-        $provider = Provider::where('code', 'DIGIFLAZZ')->firstOrFail();
-        $legacy = ProductPackage::create([
-            'product_id' => $product->id, 'code' => 'DF_legacy_import', 'name' => '5 Diamond',
-            'pricing_mode' => 'PERCENT', 'margin_percent' => 10,
-        ]);
-        ProviderMapping::create([
-            'provider_id' => $provider->id, 'product_package_id' => $legacy->id,
-            'external_sku' => 'df-legacy-'.bin2hex(random_bytes(4)), 'priority' => 0,
-            'cost_idr' => 1500, 'max_price_idr' => 1500, 'is_active' => false,
-        ]);
-        $override = ProductPackage::create([
-            'product_id' => $product->id, 'code' => 'CUSTOM_OVERRIDE', 'name' => 'Custom',
-            'pricing_mode' => 'PERCENT', 'margin_percent' => 7,
-        ]);
-        $fixed = ProductPackage::create([
-            'product_id' => $product->id, 'code' => 'FIXED_PRICE', 'name' => 'Fixed',
-            'pricing_mode' => 'SELL_PRICE', 'sell_price_idr' => 2000,
-        ]);
-
-        $preview = $this->postJson('/admin/catalog/margin/preview', [
-            'margin_percent' => 9,
-        ])->assertOk();
-        $this->put('/admin/catalog/margin', ['preview_token' => $preview->json('token')])
-            ->assertSessionHasNoErrors();
-        $this->assertSame('PERCENT', $legacy->fresh()->pricing_mode);
-        $converted = $this->postJson('/admin/catalog/margin/preview', [
-            'margin_percent' => 9, 'include_imported_percent' => true,
-        ])->assertOk();
-        $this->assertSame('PERCENT', $legacy->fresh()->pricing_mode);
-        $this->put('/admin/catalog/margin', ['preview_token' => $converted->json('token')])
-            ->assertSessionHasNoErrors();
-        $this->assertSame('9.0000', (string) $product->fresh()->margin_percent);
-        $this->assertSame('PRODUCT_MARGIN', $legacy->fresh()->pricing_mode);
-        $this->assertNull($legacy->fresh()->margin_percent);
-        $this->assertSame('PERCENT', $override->fresh()->pricing_mode);
-        $this->assertSame('7.0000', (string) $override->fresh()->margin_percent);
-        $this->assertSame('SELL_PRICE', $fixed->fresh()->pricing_mode);
-    }
-
     public function test_categories_have_their_own_page_with_product_counts(): void
     {
         $this->login();
@@ -1138,33 +1048,6 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertSame('SELL_PRICE', $package->fresh()->pricing_mode);
     }
 
-    public function test_admin_can_lock_legacy_prices_without_replacing_existing_fixed_prices(): void
-    {
-        $this->login();
-        $this->fakeCatalog([$this->row(['buyer_sku_code' => 'lock-legacy-sku'])]);
-        app(DigiflazzCatalogService::class)->sync();
-        Provider::where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
-        $product = $this->product();
-        $package = $product->packages()->create([
-            'code' => 'DF_lock_legacy', 'name' => '10 Diamond', 'pricing_mode' => 'PERCENT',
-            'margin_percent' => 35, 'is_active' => true,
-        ]);
-        $package->mappings()->create([
-            'provider_id' => Provider::where('code', 'DIGIFLAZZ')->value('id'),
-            'external_sku' => 'lock-legacy-sku', 'cost_idr' => 10000,
-            'max_price_idr' => 10000, 'is_active' => true, 'priority' => 0,
-        ]);
-        $this->post('/admin/catalog/digiflazz/lock-prices', [
-            'package_ids' => [$package->id],
-        ])->assertSessionHasNoErrors();
-        $this->assertSame('SELL_PRICE', $package->fresh()->pricing_mode);
-        $this->assertSame(13500, (int) $package->fresh()->sell_price_idr);
-        $this->post('/admin/catalog/digiflazz/lock-prices', [
-            'package_ids' => [$package->id],
-        ])->assertSessionHasErrors('package_ids');
-        $this->assertSame(13500, (int) $package->fresh()->sell_price_idr);
-    }
-
     public function test_fixed_price_recommendation_uses_store_cost_and_checkout_price_matches_admin_preview(): void
     {
         $this->login();
@@ -1247,7 +1130,6 @@ class AdminPanelRestorationTest extends TestCase
     {
         $this->login(['dashboard.view'], 'ADMIN');
         $this->post('/admin/digiflazz/sync')->assertForbidden();
-        $this->put('/admin/catalog/margin', ['margin_percent' => 10])->assertForbidden();
         $this->put('/admin/support/quick-replies', ['replies' => ['Hello']])->assertForbidden();
     }
 

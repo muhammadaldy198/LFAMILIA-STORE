@@ -12,15 +12,12 @@ use App\Models\Provider;
 use App\Models\ProviderMapping;
 use App\Models\StoreAsset;
 use App\Services\AdminAuditService;
-use App\Services\AdminPricingPreviewService;
 use App\Services\CatalogAudit;
 use App\Services\CatalogNominalOrder;
 use App\Services\CatalogPricingSettings;
 use App\Services\CheckoutPricing;
 use App\Services\DigiflazzCatalogService;
-use App\Services\DigiflazzFixedPricePolicy;
 use App\Services\VoucherStockService;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -32,8 +29,71 @@ use Inertia\Response;
 
 class AdminCatalogController
 {
-    public function index(): Response
+    // Dipakai halaman Produk: data per halaman dari server, bukan disaring di browser.
+    private function productRow(Product $product, $providers, array $stockCounts): array
     {
+        return [
+            ...$product->only('id', 'category_id', 'name', 'publisher', 'slug', 'description', 'fulfillment_mode',
+                'initials', 'accent_color', 'instant', 'package_tabs_enabled', 'package_tabs',
+                'customer_no_template', 'manual_instructions', 'manual_open_time', 'manual_close_time', 'manual_timezone', 'margin_percent', 'sort_order', 'is_active', 'popular',
+                'sell_markup_percent', 'cost_uplift_percent',
+                'nickname_check_enabled', 'nickname_game_code', 'nickname_user_field_key',
+                'nickname_server_field_key'),
+            'image_url' => $product->getFirstMediaUrl('image'),
+            'banner_url' => $product->getFirstMediaUrl('banner'),
+            'fields' => $product->fields->sortBy('sort_order')->values()->toArray(),
+            'notices' => $product->notices->sortBy('sort_order')->values()->map(fn (ProductNotice $notice): array => [
+                ...$notice->only('id', 'title', 'body', 'sort_order', 'is_active'),
+            ])->all(),
+            'packages' => $product->packages->sortBy([
+                ['sort_order', 'asc'], ['nominal_value', 'asc'],
+            ])->values()->map(fn (ProductPackage $package): array => [
+                ...$package->only('id', 'code', 'name', 'note', 'group_name', 'nominal_value', 'sort_order', 'is_active', 'pricing_mode', 'margin_percent', 'margin_fixed_idr', 'sell_price_idr', 'sell_markup_percent', 'cost_uplift_percent'),
+                'image_url' => $package->getFirstMediaUrl('image'),
+                'mappings' => $package->mappings->map(fn (ProviderMapping $mapping): array => [
+                    ...$mapping->only('id', 'provider_id', 'external_sku', 'cost_idr',
+                        'max_price_idr', 'is_manual_price', 'priority', 'is_active', 'disabled_by_sync',
+                        'store_cost_idr', 'seller_reference_price_idr'),
+                    'provider_code' => $providers->get($mapping->provider_id)?->code,
+                    'provider_name' => $providers->get($mapping->provider_id)?->display_name ?: $providers->get($mapping->provider_id)?->code,
+                    'customer_no_template' => data_get($mapping->fulfillment_config, 'customer_no_template'),
+                    'stock_key' => $providers->get($mapping->provider_id)?->code === 'VOUCHER_STOCK'
+                        ? data_get($mapping->fulfillment_config, 'stock_key') : null,
+                    'stock_counts' => $providers->get($mapping->provider_id)?->code === 'VOUCHER_STOCK'
+                        ? ($stockCounts[(string) data_get($mapping->fulfillment_config, 'stock_key', '')]
+                            ?? ['available' => 0, 'reserved' => 0, 'delivered' => 0, 'void' => 0, 'total' => 0])
+                        : null,
+                ])->all(),
+            ])->all(),
+        ];
+    }
+
+    public function index(Request $request): Response
+    {
+        $filters = $request->validate([
+            'tab' => ['nullable', Rule::in(['auto', 'manual'])],
+            'q' => ['nullable', 'string', 'max:150'],
+            'category' => ['nullable', 'integer', 'min:1'],
+            'status' => ['nullable', Rule::in(['active', 'inactive'])],
+            'sort' => ['nullable', Rule::in(['order', 'name'])],
+            'per_page' => ['nullable', Rule::in([10, 25, 50, 100])],
+            'page' => ['nullable', 'integer', 'min:1'],
+        ]);
+        $products = Product::with(['media', 'packages.mappings', 'fields', 'notices'])
+            ->when(($filters['tab'] ?? 'auto') === 'manual', fn ($query) => $query->where('fulfillment_mode', 'MANUAL'))
+            ->when(($filters['tab'] ?? 'auto') !== 'manual', fn ($query) => $query->where('fulfillment_mode', '!=', 'MANUAL'))
+            ->when(trim((string) ($filters['q'] ?? '')) !== '', function ($query) use ($filters): void {
+                $term = '%'.trim((string) $filters['q']).'%';
+                $query->where(fn ($query) => $query->where('name', 'like', $term)->orWhere('publisher', 'like', $term));
+            })
+            ->when($filters['category'] ?? null, fn ($query, $id) => $query->where('category_id', (int) $id))
+            ->when(($filters['status'] ?? '') === 'active', fn ($query) => $query->where('is_active', true))
+            ->when(($filters['status'] ?? '') === 'inactive', fn ($query) => $query->where('is_active', false));
+        ($filters['sort'] ?? 'order') === 'name'
+            ? $products->orderBy('name')
+            : $products->orderBy('sort_order')->orderBy('name');
+        $products = $products->paginate((int) ($filters['per_page'] ?? 25), ['*'], 'page', (int) ($filters['page'] ?? 1))->withQueryString();
+
         $providers = Provider::all(['id', 'code', 'display_name', 'is_active'])->keyBy('id');
         $stockCounts = app(VoucherStockService::class)->counts();
         $checkoutPreviews = collect(app(CheckoutPricing::class)
@@ -43,6 +103,9 @@ class AdminCatalogController
 
         return Inertia::render('Admin/Catalog', [
             'checkoutPreviews' => $checkoutPreviews,
+            'autoProductOptions' => Product::where('fulfillment_mode', 'AUTO_PROVIDER')
+                ->orderBy('name')->get(['id', 'name'])
+                ->map(fn (Product $product): array => ['id' => (int) $product->id, 'name' => $product->name]),
             'categories' => Category::with('media')->orderBy('sort_order')->get()->map(fn (Category $category): array => [
                 ...$category->only('id', 'name', 'slug', 'icon', 'sort_order', 'is_active'),
                 'image_url' => $category->getFirstMediaUrl('image'),
@@ -52,48 +115,17 @@ class AdminCatalogController
                 ->orderBy('sort_order')
                 ->orderBy('name')
                 ->get(['id', 'name', 'code', 'requires_server', 'requires_region_check']),
-            'products' => Product::with(['media', 'packages.mappings', 'fields', 'notices'])->orderBy('sort_order')->get()
-                ->map(fn (Product $product): array => [
-                    ...$product->only('id', 'category_id', 'name', 'publisher', 'slug', 'description', 'fulfillment_mode',
-                        'initials', 'accent_color', 'instant', 'package_tabs_enabled', 'package_tabs',
-                        'customer_no_template', 'manual_instructions', 'manual_open_time', 'manual_close_time', 'manual_timezone', 'margin_percent', 'sort_order', 'is_active',
-                        'sell_markup_percent', 'cost_uplift_percent',
-                        'nickname_check_enabled', 'nickname_game_code', 'nickname_user_field_key',
-                        'nickname_server_field_key'),
-                    'image_url' => $product->getFirstMediaUrl('image'),
-                    'banner_url' => $product->getFirstMediaUrl('banner'),
-                    'fields' => $product->fields->sortBy('sort_order')->values()->toArray(),
-                    'notices' => $product->notices->sortBy('sort_order')->values()->map(fn (ProductNotice $notice): array => [
-                        ...$notice->only('id', 'title', 'body', 'sort_order', 'is_active'),
-                    ])->all(),
-                    'packages' => $product->packages->sortBy([
-                        ['sort_order', 'asc'], ['nominal_value', 'asc'],
-                    ])->values()->map(fn (ProductPackage $package): array => [
-                        ...$package->only('id', 'code', 'name', 'note', 'group_name', 'nominal_value', 'sort_order', 'is_active', 'pricing_mode', 'margin_percent', 'margin_fixed_idr', 'sell_price_idr', 'sell_markup_percent', 'cost_uplift_percent'),
-                        'image_url' => $package->getFirstMediaUrl('image'),
-                        'mappings' => $package->mappings->map(fn (ProviderMapping $mapping): array => [
-                            ...$mapping->only('id', 'provider_id', 'external_sku', 'cost_idr',
-                                'max_price_idr', 'is_manual_price', 'priority', 'is_active', 'disabled_by_sync',
-                                'store_cost_idr', 'seller_reference_price_idr'),
-                            'provider_code' => $providers->get($mapping->provider_id)?->code,
-                            'provider_name' => $providers->get($mapping->provider_id)?->display_name ?: $providers->get($mapping->provider_id)?->code,
-                            'customer_no_template' => data_get($mapping->fulfillment_config, 'customer_no_template'),
-                            'stock_key' => $providers->get($mapping->provider_id)?->code === 'VOUCHER_STOCK'
-                                ? data_get($mapping->fulfillment_config, 'stock_key') : null,
-                            'stock_counts' => $providers->get($mapping->provider_id)?->code === 'VOUCHER_STOCK'
-                                ? ($stockCounts[(string) data_get($mapping->fulfillment_config, 'stock_key', '')]
-                                    ?? ['available' => 0, 'reserved' => 0, 'delivered' => 0, 'void' => 0, 'total' => 0])
-                                : null,
-                        ])->all(),
-                    ])->all(),
-                ]),
+            'productFilters' => [
+                'tab' => $filters['tab'] ?? 'auto', 'q' => $filters['q'] ?? '', 'category' => $filters['category'] ?? '',
+                'status' => $filters['status'] ?? '', 'sort' => $filters['sort'] ?? 'order', 'per_page' => (int) ($filters['per_page'] ?? 25),
+            ],
+            'products' => $products->getCollection()->map(fn (Product $product): array => $this->productRow($product, $providers, $stockCounts))->all(),
+            'productPage' => $products->toArray(),
             'defaultMargin' => json_decode((string) DB::table('system_settings')->where('key', 'catalog.default_margin_percent')->value('value'), true) ?? 0,
             'pricingSettings' => [
                 'cost_uplift_percent' => app(CatalogPricingSettings::class)->costUpliftPercent(),
                 'sell_markup_percent' => app(CatalogPricingSettings::class)->sellMarkupPercent(),
             ],
-            'fixedPriceProposals' => app(DigiflazzFixedPricePolicy::class)->proposals(),
-            'fixedPriceAlerts' => app(DigiflazzFixedPricePolicy::class)->alerts(),
             'digiflazzItems' => (function () {
                 // N+1 fix: preload mapped SKUs sekali, bukan per item
                 $digiflazzIds = Provider::where('code', 'DIGIFLAZZ')->pluck('id');
@@ -632,7 +664,28 @@ class AdminCatalogController
             'sort_order' => ['required', 'integer', 'min:0'],
             'cost_idr' => [$product->fulfillment_mode === 'MANUAL' ? 'required' : 'nullable',
                 'integer', 'min:0', 'max:1000000000'],
+            'is_active' => ['sometimes', 'boolean'],
+            'pricing_mode' => ['sometimes', Rule::in(['PRODUCT_MARGIN', 'PERCENT', 'FIXED', 'SELL_PRICE'])],
+            'margin_percent' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:1000', 'required_if:pricing_mode,PERCENT'],
+            'margin_fixed_idr' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:1000000000', 'required_if:pricing_mode,FIXED'],
+            'sell_price_idr' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:1000000000', 'required_if:pricing_mode,SELL_PRICE'],
+            'sell_markup_percent' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:1000'],
         ]);
+
+        // Nominal otomatis hanya bisa dijual setelah punya sumber Digiflazz aktif.
+        $wantsActive = (bool) ($data['is_active'] ?? false);
+        $canActivate = $product->fulfillment_mode === 'MANUAL';
+        $isActive = $wantsActive && $canActivate;
+        $pricing = collect($data)->only([
+            'pricing_mode', 'margin_percent', 'margin_fixed_idr', 'sell_price_idr', 'sell_markup_percent',
+        ])->filter(fn ($value): bool => $value !== null)->all();
+        if (($pricing['pricing_mode'] ?? null) === 'SELL_PRICE'
+            && (int) $pricing['sell_price_idr'] < (int) ($data['cost_idr'] ?? 0)) {
+            throw ValidationException::withMessages(['sell_price_idr' => 'Harga jual tidak boleh di bawah modal.']);
+        }
+        if ($isActive && $product->fulfillment_mode === 'MANUAL' && (int) ($data['cost_idr'] ?? 0) < 1) {
+            throw ValidationException::withMessages(['cost_idr' => 'Nominal aktif harus punya modal lebih dari Rp 0.']);
+        }
 
         if ($product->package_tabs_enabled) {
             $group = trim((string) ($data['group_name'] ?? ''));
@@ -644,7 +697,7 @@ class AdminCatalogController
             }
         }
 
-        DB::transaction(function () use ($request, $product, $data, $audit): void {
+        DB::transaction(function () use ($request, $product, $data, $audit, $isActive, $pricing): void {
             $package = $product->packages()->create([
                 'code' => $data['code'],
                 'name' => $data['name'],
@@ -652,7 +705,8 @@ class AdminCatalogController
                 'group_name' => $data['group_name'] ?? null,
                 'nominal_value' => $data['nominal_value'] ?? null,
                 'sort_order' => $data['sort_order'],
-                'is_active' => false,
+                ...$pricing,
+                'is_active' => $isActive,
             ]);
             if ($product->fulfillment_mode === 'MANUAL') {
                 $provider = Provider::where('code', 'MANUAL')->firstOrFail();
@@ -664,7 +718,7 @@ class AdminCatalogController
                     'store_cost_idr' => $data['cost_idr'],
                     'max_price_idr' => null,
                     'priority' => 0,
-                    'is_active' => false,
+                    'is_active' => $isActive,
                 ]);
                 $audit->record($request, 'catalog.mapping.created', 'provider_mapping',
                     $mapping->id, null, $mapping->toArray());
@@ -672,7 +726,9 @@ class AdminCatalogController
             $audit->record($request, 'catalog.package.created', 'product_package', $package->id, null, $package->toArray());
         });
 
-        return back();
+        return $wantsActive && ! $isActive
+            ? back()->with('status', 'Nominal disimpan nonaktif. Aktifkan setelah sumber Digiflazz dipasang.')
+            : back();
     }
 
     public function updatePackage(Request $request, ProductPackage $package, CatalogAudit $audit): RedirectResponse
@@ -692,9 +748,35 @@ class AdminCatalogController
             'sell_price_idr' => ['nullable', 'integer', 'min:1', 'max:1000000000', 'required_if:pricing_mode,SELL_PRICE'],
             'sell_markup_percent' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:1000'],
             'cost_uplift_percent' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:1000'],
+            'cost_idr' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:1000000000'],
         ]);
 
         $product = $package->product()->firstOrFail();
+        $newCost = array_key_exists('cost_idr', $data) && $data['cost_idr'] !== null
+            ? (int) $data['cost_idr'] : null;
+        if ($newCost !== null && $product->fulfillment_mode !== 'MANUAL') {
+            throw ValidationException::withMessages([
+                'cost_idr' => 'Modal hanya bisa diisi pada produk dengan penanganan manual.',
+            ]);
+        }
+        $isActive = (bool) ($data['is_active'] ?? $package->is_active);
+        // Nominal aktif tanpa modal > 0 tidak akan pernah lolos CheckoutPricing.
+        $manualMapping = $product->fulfillment_mode === 'MANUAL'
+            ? $package->mappings()->where('provider_id', Provider::where('code', 'MANUAL')->value('id'))->first()
+            : null;
+        $effectiveCost = $newCost ?? (int) ($manualMapping?->store_cost_idr ?? $manualMapping?->cost_idr ?? 0);
+        if ($isActive && $product->fulfillment_mode === 'MANUAL' && $effectiveCost < 1) {
+            throw ValidationException::withMessages([
+                'cost_idr' => 'Nominal aktif harus punya modal lebih dari Rp 0.',
+            ]);
+        }
+        // Nominal otomatis hanya bisa dijual lewat sumber penyedia yang aktif.
+        if ($isActive && $product->fulfillment_mode !== 'MANUAL'
+            && ! $package->mappings()->where('is_active', true)->exists()) {
+            throw ValidationException::withMessages([
+                'is_active' => 'Aktifkan sumber Digiflazz nominal ini sebelum menjualnya.',
+            ]);
+        }
         if ($product->package_tabs_enabled) {
             $group = trim((string) ($data['group_name'] ?? $package->group_name ?? ''));
             $tabs = collect($product->package_tabs ?? []);
@@ -708,12 +790,35 @@ class AdminCatalogController
         $highestActiveCost = $package->mappings()->where('is_active', true)
             ->selectRaw('MAX(COALESCE(store_cost_idr, cost_idr)) as aggregate')->value('aggregate');
         if (($data['pricing_mode'] ?? $package->pricing_mode) === 'SELL_PRICE'
-            && (int) ($data['sell_price_idr'] ?? $package->sell_price_idr) < (int) $highestActiveCost) {
+            && (int) ($data['sell_price_idr'] ?? $package->sell_price_idr) < (int) ($newCost ?? $highestActiveCost)) {
             throw ValidationException::withMessages(['sell_price_idr' => 'Harga jual tidak boleh di bawah modal.']);
         }
-        DB::transaction(function () use ($request, $package, $data, $audit): void {
+        DB::transaction(function () use ($request, $package, $product, $isActive, $data, $audit, $newCost): void {
             $before = $package->toArray();
-            $package->update($data);
+            $package->update(collect($data)->except('cost_idr')->all());
+            if ($product->fulfillment_mode === 'MANUAL') {
+                // Modal nominal manual hidup di pemetaan provider, bukan di paket,
+                // dan status aktif nominal harus ikut supaya CheckoutPricing melihatnya.
+                $provider = Provider::where('code', 'MANUAL')->firstOrFail();
+                $mapping = $package->mappings()->where('provider_id', $provider->id)->first()
+                    ?? ProviderMapping::create([
+                        'product_package_id' => $package->id,
+                        'provider_id' => $provider->id,
+                        'external_sku' => null,
+                        'cost_idr' => $newCost ?? 0,
+                        'store_cost_idr' => $newCost ?? 0,
+                        'max_price_idr' => null,
+                        'priority' => 0,
+                        'is_active' => $isActive,
+                    ]);
+                $mappingBefore = $mapping->toArray();
+                $mapping->update([
+                    'cost_idr' => $newCost ?? $mapping->cost_idr,
+                    'store_cost_idr' => $newCost ?? $mapping->store_cost_idr,
+                    'is_active' => $isActive,
+                ]);
+                $audit->record($request, 'catalog.mapping.updated', 'provider_mapping', $mapping->id, $mappingBefore, $mapping->fresh()->toArray());
+            }
             $audit->record($request, 'catalog.package.updated', 'product_package', $package->id, $before, $package->toArray());
         });
 
@@ -1023,73 +1128,6 @@ class AdminCatalogController
      * One-time, audited conversion of legacy dynamic Digiflazz prices.
      * Existing fixed/manual prices are never overwritten.
      */
-    public function lockDigiflazzPrices(
-        Request $request,
-        DigiflazzFixedPricePolicy $policy,
-        AdminAuditService $audit
-    ): RedirectResponse {
-        $data = $request->validate([
-            'package_ids' => ['required', 'array', 'min:1', 'max:2000'],
-            'package_ids.*' => ['required', 'integer', 'distinct', 'exists:product_packages,id'],
-        ]);
-        $ids = array_map('intval', $data['package_ids']);
-
-        DB::transaction(function () use ($policy, $audit, $request, $ids): void {
-            $packages = ProductPackage::whereIn('id', $ids)->orderBy('id')->lockForUpdate()->get()->keyBy('id');
-            $proposals = collect($policy->proposals())->keyBy('package_id');
-            foreach ($ids as $id) {
-                $missingPackage = $packages->has($id) === false;
-                $missingProposal = $proposals->has($id) === false;
-                $alreadyFixed = $missingPackage === false && $packages->get($id)->pricing_mode === 'SELL_PRICE';
-                if ($missingPackage || $missingProposal || $alreadyFixed) {
-                    throw ValidationException::withMessages([
-                        'package_ids' => 'SKU/harga berubah. Muat ulang pratinjau sebelum menerapkan harga tetap.',
-                    ]);
-                }
-            }
-            foreach ($ids as $id) {
-                $package = $packages->get($id);
-                $before = $package->toArray();
-                $package->update([
-                    'pricing_mode' => 'SELL_PRICE',
-                    'sell_price_idr' => $proposals->get($id)['sell_price_idr'],
-                    'margin_percent' => null,
-                    'margin_fixed_idr' => null,
-                ]);
-                $audit->record(
-                    $request,
-                    'catalog.digiflazz.fixed_price_locked',
-                    'product_package',
-                    $id,
-                    $before,
-                    $package->toArray()
-                );
-            }
-        }, 3);
-
-        return back()->with('status', count($ids).' harga jual nominal Digiflazz dikunci mengikuti pengaturan admin.');
-    }
-
-    public function globalMarginPreview(Request $request, AdminPricingPreviewService $previews): JsonResponse
-    {
-        $data = $request->validate([
-            'margin_percent' => ['required', 'numeric', 'min:0', 'max:1000', 'regex:/^\\d+(?:\\.\\d{1,4})?$/'],
-            'include_imported_percent' => ['sometimes', 'boolean'],
-        ]);
-
-        return response()->json($previews->previewGlobalMargin(
-            $request, (string) $data['margin_percent'], (bool) ($data['include_imported_percent'] ?? false)
-        ));
-    }
-
-    public function globalMargin(Request $request, AdminAuditService $audit, AdminPricingPreviewService $previews): RedirectResponse
-    {
-        $data = $request->validate(['preview_token' => ['required', 'string', 'size:48']]);
-        $previews->executeGlobalMargin($request, $data['preview_token'], $audit);
-
-        return back()->with('status', 'Margin global diterapkan sesuai preview yang telah dikonfirmasi.');
-    }
-
     /**
      * Global pricing controls of the catalog redesign: the one-time cost uplift
      * that produces the admin store cost, and the sell markup applied to it.

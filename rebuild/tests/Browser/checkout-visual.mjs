@@ -73,15 +73,18 @@ try{
  const login=await admin.evaluate(async()=>{const response=await fetch('/admin/login',{method:'POST',headers:{Accept:'application/json','Content-Type':'application/json','X-CSRF-TOKEN':document.querySelector('meta[name=csrf-token]').content},body:JSON.stringify({email:'browser-admin@example.test',password:'Browser-admin-test-password-123'})});return response.status;});
  if(![200,204].includes(login))throw Error('Admin theme fixture login failed: '+login);
  await admin.goto(base+'/admin/content/presentation');
- const white=await admin.locator('.lf-admin').evaluate(e=>getComputedStyle(e).backgroundColor);
- await admin.getByRole('button',{name:'Warna Website',exact:true}).click();
- await admin.locator('input[aria-label="Aksen biru / tombol utama HEX"]').fill('#75AAFF');
- await admin.locator('input[aria-label="Permukaan HEX"]').fill('#17243A');
- await admin.locator('input[aria-label="Kartu HEX"]').fill('#223344');
- await admin.getByRole('button',{name:'Simpan perubahan',exact:true}).click();
- // Halaman presentasi memakai tombol simpan tunggal; tunggu sampai penyimpanan selesai.
- await admin.waitForFunction(()=>!document.body.textContent.includes('Menyimpan…'),null,{timeout:15000});
- if(await admin.locator('.lf-admin').evaluate(e=>getComputedStyle(e).backgroundColor)!==white)throw Error('Customer palette recolored Admin');
+ const shell=admin.locator('.adm');
+ const white=await shell.evaluate(e=>getComputedStyle(e).backgroundColor);
+ await admin.getByRole('tab',{name:'Warna Website',exact:true}).click();
+ const hex=(label,value)=>admin.locator('.adm-field').filter({hasText:label}).locator('input.adm-input').fill(value);
+ await hex('Aksen biru / tombol utama','#75AAFF');
+ await hex('Permukaan','#17243A');
+ await hex('Kartu','#223344');
+ await Promise.all([
+  admin.waitForResponse(r=>r.url().includes('/admin/content/theme')&&r.request().method()==='PUT'),
+  admin.getByRole('button',{name:'Simpan warna',exact:true}).click(),
+ ]);
+ if(await shell.evaluate(e=>getComputedStyle(e).backgroundColor)!==white)throw Error('Customer palette recolored Admin');
  const customer=await observedPage({viewport:{width:390,height:844}});
  await customer.goto(base+'/catalog/browser-checkout-game');
  const gradient=await customer.locator('#lfx-bottom-pay').evaluate(e=>getComputedStyle(e).backgroundImage);
@@ -95,8 +98,8 @@ try{
  await customer.locator('.lfx-voucher-browse').click();await customer.locator('.lfx-offer-modal').waitFor();
  const voucherBackground=await customer.locator('.lfx-offer-modal').evaluate(e=>getComputedStyle(e).backgroundImage);
  if(!voucherBackground.includes('38, 55, 87'))throw Error('Saved surface did not reach voucher modal: '+voucherBackground);
- await admin.getByRole('button',{name:'Kembalikan warna bawaan',exact:true}).click();
- await admin.getByRole('button',{name:'Simpan perubahan',exact:true}).click();
+ await admin.getByRole('button',{name:'Kembalikan bawaan',exact:true}).click();
+ await admin.getByRole('button',{name:'Simpan warna',exact:true}).click();
  await admin.waitForFunction(()=>document.documentElement.style.getPropertyValue('--lf-color-primary')==='#609CFF');
  await admin.close();await customer.close();
  await fs.writeFile(output+'/report.json',JSON.stringify({baseline:'a42f97d3a6d5a8a5cb59bd651ce9ffe1a8c928f2',report,quote,adminTheme:{persisted:true,cta:true,paymentCards:true,voucherSurface:true,reset:true,whiteAdmin:true},noFinancialActions:true},null,2));

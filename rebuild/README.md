@@ -1,5 +1,7 @@
 # LFAMILIA STORE — Laravel runtime
 
+> Aturan produk ada di [`docs/PRD.md`](../docs/PRD.md). Dokumen ini menjelaskan **cara kode bekerja**, bukan aturan produk. Kalau berbeda, PRD yang menang.
+
 Direktori `rebuild/` adalah runtime aplikasi LFAMILIA STORE yang aktif. Narasi lama bahwa direktori ini hanya “M1 foundation” sudah tidak berlaku.
 
 ## Stack

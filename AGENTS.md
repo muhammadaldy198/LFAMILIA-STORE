@@ -1,135 +1,230 @@
 # AGENTS.md — LFAMILIA STORE
 
-Operating manual for any AI agent (or developer) working in this repo — whoever you are, whenever you pick this up.
+Manual kerja untuk siapa pun yang menulis kode di repo ini: agen AI, asisten, atau manusia.
 
-Read `CLAUDE.md` FIRST for project invariants (it is canonical). This file tells you HOW to work here. If the two conflict, `CLAUDE.md` wins on invariants; an explicit user instruction wins over both.
+**Baca ini dulu sebelum menyentuh apa pun.** Kalau ada aturan di file lain yang bertentangan dengan file ini, urutan yang menang ada di §1.
 
-## 0. Who works here
+---
 
-- Leader + code writer: ChatGPT. BETOL: QA/support, and also writes PRs (owner decision 2026-10-14).
-- Either way, all work goes through: branch → PR → green CI → review → merge on user order.
-- Specialist roles live in `.claude/agents/` — one file per role. Pick the role that matches the task. One task = one primary role; switch roles explicitly when the task changes.
-- Never campaign for a different role. Never silently do another role's job (e.g. don't deploy while reviewing).
+## 1. Di mana aturan tinggal
 
-## 1. Mandatory skill lookup (WAJIB)
+Ada empat lapis. Yang atas menang atas yang bawah.
 
-Skills do NOT auto-run. Before starting a coding/audit task, look up the mapping table below, READ the `SKILL.md` files listed, and follow them. No "asal trabas" (plowing ahead without skills).
+| Lapis | File | Isi |
+|---|---|---|
+| 1 | `docs/PRD.md` | **Aturan produk.** Apa yang dijual, alur, uang, status, refund, larangan. |
+| 2 | `AGENTS.md` (file ini) | **Cara kerja.** Alur, git, deploy, batas VPS, laporan. |
+| 3 | `docs/ADMIN-PANEL.md` | Spesifikasi panel admin (menu, halaman, peran, tampilan). |
+| 4 | `rebuild/*.md`, `.claude/agents/*`, `.claude/skills/*` | **Cara kode bekerja** dan cara teknis mengerjakannya. |
 
-Skills live in `.claude/skills/`. Read the `SKILL.md`, not just the skill name.
+Aturan tambahan:
 
-| Task | Mandatory skills |
+- **Instruksi pemilik pada tugas yang sedang berjalan menang atas semuanya.** Kalau pemilik bilang "jangan sentuh X", X tidak disentuh walau dokumen bilang sebaliknya.
+- **`docs/archive/` dan `rebuild/docs/archive/` bukan aturan.** Isinya rekaman keputusan lama. Jangan dipakai sebagai perintah, jangan dikutip sebagai "seharusnya begitu".
+- **`CLAUDE.md` bukan aturan.** Isinya hanya penunjuk ke file ini.
+- Kalau dokumen bertentangan dan tidak jelas mana yang benar: **berhenti dan tanya**. Jangan pilih sendiri lalu jalan.
+
+---
+
+## 2. Siapa yang bekerja di sini
+
+- **Pemilik** menentukan arah, menyetujui, dan memutuskan. Pemilik bukan programmer — jelaskan dengan bahasa awam, bukan istilah teknis.
+- **Agen** menulis kode, menguji, dan melapor. Tidak memutuskan aturan bisnis sendiri.
+- Peran spesialis ada di `.claude/agents/` (8 file). Satu tugas = satu peran utama. Ganti peran secara sadar kalau tugasnya berganti; jangan diam-diam mengerjakan pekerjaan peran lain (mis. deploy sambil mengulas).
+- **Jangan pernah mengarang pembagian tugas.** Tidak ada "ChatGPT yang menulis, BETOL yang QA". Yang berlaku: siapa pun yang memegang tugas, mengikuti file ini.
+
+---
+
+## 3. Skill wajib (tidak otomatis)
+
+Skill **tidak** jalan sendiri. Sebelum mulai, baca tabel di bawah, buka `SKILL.md` yang disebut, lalu ikuti. Bukan sekadar menyebut namanya.
+
+Skill ada di `.claude/skills/`.
+
+| Tugas | Skill wajib |
 |---|---|
-| Write/change PHP/Laravel code | laravel-best-practices + karpathy-coder + zero-hallucination-coder + strict-api |
-| Write/change Vue/Inertia frontend | inertia-vue-development + tailwindcss-development (+ frontend-design for design direction) |
-| Connect frontend to backend routes | wayfinder-development |
-| Write/change tests | pest-testing (+ webapp-testing for browser tests) |
-| Audit/review code | data-fetch-analysis + karpathy-coder + skill-security-auditor (for security) |
-| Payment/Midtrans | integrate-midtrans-payments (hanya Snap/webhook/verifikasi/status; bagian refund TIDAK berlaku — refund manual via CS, DE-2026-10-17-05) + fortify-development (if auth) |
-| Build new feature/module | code-scaffolding + stack skills above |
+| Menulis/mengubah PHP Laravel | laravel-best-practices + karpathy-coder + zero-hallucination-coder + strict-api |
+| Menulis/mengubah Vue/Inertia | inertia-vue-development + tailwindcss-development (+ frontend-design untuk arah desain) |
+| Menyambung frontend ke route | wayfinder-development |
+| Menulis/mengubah test | pest-testing (+ webapp-testing untuk uji browser) |
+| Audit/review kode | data-fetch-analysis + karpathy-coder + skill-security-auditor (untuk keamanan) |
+| Payment/Midtrans | integrate-midtrans-payments — **hanya** bagian Snap/webhook/verifikasi/status. Bagian refund di skill itu **tidak berlaku** (lihat §5) |
+| Fitur/modul baru | code-scaffolding + skill stack di atas |
 | Deploy/CI | cicd-deployment |
-| Walkthrough / big PR review | code-tour |
-| Plan before coding | grill-me |
-| Slow debug / N+1 | debug-using-debugbar |
+| Review PR besar | code-tour |
+| Rencana sebelum koding | grill-me |
+| Debug lambat / N+1 | debug-using-debugbar |
 | Media/upload | medialibrary-development |
 | Auth (login/2FA/passkey) | fortify-development |
 
-**Mandatory report:** at the end of every coding/audit task, state which skills were used + which were skipped and why. If a mandatory skill wasn't used, the reason must be written — no silent skipping.
+**Laporan wajib:** di akhir setiap tugas koding/audit, sebutkan skill mana yang dipakai dan mana yang dilewati beserta alasannya. Tidak ada pelewatan diam-diam.
 
-**Conflict rule:** explicit current owner-approved decisions in this file and `CLAUDE.md` override skills, role files, PRDs, old prompts, and historical plans. Explicit user instructions for the current task override repository defaults. Example: the Midtrans skill teaches automatic refund implementation → rejected, the store's refund is manual via CS (DE-2026-10-17-05), never automatic. When an active role/prompt conflicts with a settled decision, update that active instruction file; do not re-litigate the decision or report archived history as a current defect.
+**Pemilik boleh memaksa skill** dengan menyebut namanya. Itu menang atas tabel.
 
-**Override:** the user can force a skill by naming it ("pake skill X") — that overrides the table.
+**Skill itu salinan dari luar.** Jangan ubah isinya untuk mengubah maknanya. Kalau skill bertentangan dengan aturan pemilik, aturan pemilik yang menang — catat pertentangannya di laporan.
 
-**Vendored skills:** skills in `.claude/skills/` are vendored copies from upstream. Do not edit their content to change their meaning. If a skill conflicts with owner rules, the owner rule wins; note the conflict in the task/PR report — don't silently rewrite the skill.
+---
 
-## 2. Working method
-
-```
-READ → VERIFY → PLAN → CHANGE → TEST → REVIEW DIFF → PR → CI → MERGE → DEPLOY → VERIFY
-```
-
-Not every task reaches DEPLOY. Documentation-only work may correctly stop after merge verification.
-
-Never: ASSUME → EDIT → CLAIM DONE.
-
-Never claim success without tool output / evidence. A failed, unavailable, timed-out, or ambiguous tool call is not success.
-
-Never report a PR as merged when it is only open. Never report production as deployed when only repository changes were merged.
-
-Bugs (even minor) must be audited and discussed with the user BEFORE being fixed, unless the user has already explicitly authorized the specific correction. When asked to align agent instructions with a settled owner decision, update the conflicting active instruction files directly; do not pause to re-ask about the already-approved business rule. Bring the full findings list for unrelated defects.
-
-## 3. Hard rules from the owner (non-negotiable)
-
-- **NOL teks dummy hardcoded** (`'QA'`, `'dummy'`, `'percobaan'`, `'test'`). Placeholder IMAGE allowed. Desktop + mobile screenshots required before PR.
-- **Every PR must pass CI and review** — no yellow/red, MUST be green.
-- **Do NOT touch production** without explicit user instruction.
-- **Do NOT use the built-in GitHub connector** — use the custom GitHub OAuth connector.
-- **Do NOT commit secrets** (`.env`, API keys, tokens, passwords, private keys, backup encryption material). Never put real secrets in Markdown, screenshots, fixtures, logs, PR comments, issues, or CI output.
-- **Payment tests ONLY simulation/sandbox.** No real production payment transactions without user approval.
-- **REFUND = manual via CS (DE-2026-10-17-05).** Refund DILAYANI untuk kondisi tertentu (Kebijakan Pengembalian Dana: gagal tak diproses ulang, pembayaran ganda, produk tak tersedia, nominal kurang, transaksi tak sah; ajukan ≤7 hari kalender via Hubungi Kami; review 1–7 hari kerja; dana 1–14 hari kerja). **Jangan pernah bangun/trigger refund OTOMATIS di sistem** — sistem nggak mengotomatiskan refund. Failed/expired payments handled via retry, bukan refund. Masalah order berbayar: settlement manual via Super Admin wallet adjustment (member) atau kontak langsung (guest). Jangan pernah initiate gateway refund otomatis.
-- **Digiflazz rules.** Cheapest seller with rating ≥ 4.8. Harga Max = seller price × 1.02, rounded to nearest rupiah. Save one-by-one (not bulk). Navigate Buyer Area → Produk. Single browser session. All products ON. No seller ≥ 4.8 → delete the product. The `_A`/`_B` backup-SKU concept is DEAD — 1 SKU per nominal (model `_A`).
-- **Pricing (active catalog redesign decision).** The effective store cost is the admin-editable `store_cost_idr` (fallback to provider `cost_idr` for legacy mappings). Initial Digiflazz store cost uses the configured cost uplift (default 2%), and sale markup is configurable globally, per game, and per nominal (default 10%; nominal overrides game, game overrides global) for every game. Checkout applies the effective markup to store cost without rounding the sale percentage result. These rules supersede the archived 2026-10-12 ML-only `cost × 1.06` decision; never reintroduce an ML-only rate or fixed 1.06 pricing assumption.
-- **Real customer data:** never use as fixtures, screenshots, or public issue content.
-- **Text the user must copy on their phone:** plain text, not code blocks. Commands to copy go alone on their own line/message, without other words.
-- **No estimates.** Do not say "sabar" (be patient).
-
-## 4. Git workflow
-
-Never develop directly on main.
+## 4. Cara kerja
 
 ```
-main → focused branch → structured commit(s) → PR → CI → review/fix → merge only when required checks are green
+BACA → VERIFIKASI → RENCANA → UBAH → UJI → TINJAU DIFF → PR → CI → MERGE → DEPLOY → VERIFIKASI
 ```
 
-- No force-push main. No merging with failing checks. No "fixing" CI by disabling tests/checks. No mixing unrelated features in one PR.
-- Commit messages describe the real change.
-- PR description: what changed, why, evidence (tests/checks run), and what is NOT changed.
+Tidak semua tugas sampai DEPLOY. Pekerjaan dokumen boleh berhenti setelah merge.
 
-## 5. Local checks before push
+**Dilarang:** MENGANGGAP → MENGUBAH → MENGAKU SELESAI.
 
-- PHP syntax: `php -l` on changed files (or the repo's find/xargs command from `CLAUDE.md` §36).
-- PHP style: `vendor/bin/pint --test` on changed PHP files — the SAME check CI runs. `php -l` checks syntax only, NOT style — never rely on it alone.
-- Tests: `vendor/bin/phpunit` (or `composer test`) for affected areas.
-- Frontend: `npm run lint`, `npm run check`, `npm run build` when frontend changed.
-- If lint/build errors appear, fix ALL of them at once, not one by one.
-- Full command reference: `CLAUDE.md` §36. Do not invent replacement commands.
+- Jangan mengaku berhasil tanpa bukti dari alat (output, test, tangkapan layar).
+- Alat yang gagal, timeout, atau jawabannya tidak jelas **bukan** keberhasilan.
+- Jangan lapor PR "sudah merge" padahal masih terbuka. Jangan lapor "sudah deploy" padahal baru merge.
+- **Bug sekecil apa pun: audit dulu, bahas dengan pemilik, baru betulkan** — kecuali pemilik sudah memberi izin untuk kasus itu.
+- **Jangan pernah menyajikan data karangan sebagai hasil.** Kalau tidak bisa memeriksa, bilang tidak bisa.
 
-## 6. Deploy rules (only on explicit user order)
+---
 
-- Deploy only if the target commit's CI is green.
-- Database backup created and verified BEFORE deploy.
-- Preflight passes per repo runbook (`rebuild/deploy/README.md`).
-- Only use the official deploy mechanism. Never deploy if backup or preflight fails.
-- Never change Cloudflare Tunnel, DNS, firewall, SSH, or networking during deploy.
-- Never delete catalog/database/order data or change manual prices during deploy.
-- Sequence: PR merged → CI green → encrypted DB backup → `deploy/preflight.sh` → `deploy/deploy.sh` → `deploy/healthcheck.sh` → verify queue/scheduler/logs/services.
-- Documentation-only changes do not require a production deployment.
+## 5. Aturan keras pemilik (tidak bisa ditawar)
 
-## 7. VPS boundaries
+### Uang & pesanan
 
-- Read-only by default. No cleanup/deletion on VPS without explicit user instruction.
-- Never use VPS as a substitute for normal GitHub repo work.
-- Never edit files directly on production (no manual file-by-file editing).
+- **Refund tidak pernah otomatis.** Tidak ada kode yang memindahkan uang tanpa keputusan admin. Member diselesaikan lewat **penyesuaian saldo oleh Super Admin** (wajib alasan, tercatat di audit). Guest lewat transfer manual di luar sistem.
+- **Jangan pernah memicu refund lewat gateway.**
+- **Pengiriman tidak pernah dimulai sebelum pembayaran lunas.**
+- **Tidak ada pengiriman ganda.** Satu pesanan dikirim sekali.
+- **Tidak ada failover otomatis** ke sumber kedua. Penyedia konfirmasi gagal → pesanan jadi "perlu tindakan superadmin", berhenti.
+- **Saldo tidak boleh minus.** Semua mutasi lewat ledger, tidak bisa dihapus atau diubah.
+- **Harga pesanan tidak pernah berubah setelah pesanan dibuat.**
+- **Uji pembayaran hanya simulasi/sandbox.** Tidak ada transaksi uang nyata tanpa izin pemilik.
 
-## 8. Role files
+### Digiflazz
 
-`.claude/agents/` holds one file per specialist role. Read the role file for the task at hand before starting.
+- Endpoint `POST https://api.digiflazz.com/v1/transaction`; `sign = md5(username + apiKey + ref_id)`.
+- Respons sinkron (sukses/gagal/pending). Pending dicek ulang dengan **`ref_id` yang sama**, tidak lebih sering dari **1 menit**.
+- **Jangan pernah cek transaksi lebih dari 90 hari** — Digiflazz akan membuat transaksi baru.
+- Webhook: `X-Hub-Signature: sha1=HMAC-SHA1(body, secret)`, `X-Digiflazz-Event`.
+- Daftar harga (`cmd=prepaid`, `sign = md5(username+apiKey+"pricelist")`) **disimpan sendiri**, tidak ditanyakan saat pengunjung membuka toko.
+- Satu SKU per nominal. Konsep `_A`/`_B` sudah mati.
 
-| Role | File | Use for |
+### Data & rahasia
+
+- **Jangan commit rahasia** (`.env`, API key, token, password, private key). Jangan taruh di Markdown, tangkapan layar, fixture, log, komentar PR, atau output CI.
+- **Data pelanggan nyata tidak pernah dipakai** sebagai fixture, tangkapan layar, atau isi laporan publik.
+- Jangan pernah minta atau menyimpan password game, PIN, atau kode OTP pelanggan.
+- Kredensial integrasi tidak pernah tampil terbuka di layar atau log.
+
+### Kode & tampilan
+
+- **Tidak ada teks dummy** (`'QA'`, `'dummy'`, `'percobaan'`, `'test'`) di antarmuka. Gambar placeholder boleh.
+- **Panel admin tidak menampilkan angka palsu.** Belum ada data → tampilkan kosong dengan keterangan.
+- Tangkapan layar desktop **dan** HP wajib sebelum PR yang menyentuh tampilan.
+- Jangan mematikan test atau pemeriksaan CI untuk membuat CI hijau.
+
+### Lingkungan
+
+- **Jangan menyentuh produksi** tanpa perintah tegas.
+- **VPS: hanya baca** secara bawaan. Tidak menghapus/membersihkan tanpa perintah.
+- **Jangan mengedit file langsung di produksi.**
+- Jangan mengubah Cloudflare Tunnel, DNS, firewall, SSH, atau jaringan saat deploy.
+- Jangan menghentikan, mematikan, atau me-restart proses tanpa perintah tegas.
+
+### Komunikasi
+
+- **Tanpa perkiraan.** Jangan bilang "sabar".
+- Teks yang harus disalin pemilik ke HP: teks biasa, bukan blok kode. Perintah yang harus disalin berdiri sendiri di barisnya.
+- Jangan melaporkan kemajuan berulang-ulang. Laporkan sekali di akhir, atau saat macet.
+
+---
+
+## 6. Alur git
+
+Jangan pernah bekerja langsung di `main`.
+
+```
+main → branch fokus → commit terstruktur → PR → CI → review/perbaikan → merge hanya saat hijau
+```
+
+- Tidak ada force-push ke `main`.
+- Tidak merge dengan pemeriksaan gagal.
+- Satu PR = satu urusan. Jangan campur fitur tak berhubungan.
+- Pesan commit menjelaskan perubahan sebenarnya.
+- Isi PR: apa yang berubah, kenapa, bukti (test/pemeriksaan yang dijalankan), dan apa yang **tidak** berubah.
+- **Jangan push, buka PR, atau merge tanpa izin pemilik.** Ini aturan yang berlaku sekarang.
+- Setelah PR dibuka, minta review `@codex` di komentar PR tanpa menunggu CI.
+
+---
+
+## 7. Pemeriksaan lokal sebelum push
+
+- **Gaya PHP:** `vendor/bin/pint --test` pada file PHP yang berubah. Ini pemeriksaan yang sama dengan CI. `php -l` hanya sintaks, **bukan** gaya — jangan andalkan itu saja.
+- **Sintaks PHP:** `php -l` pada file yang berubah.
+- **Test:** hanya test yang relevan dengan perubahan. Suite penuh dijalankan di CI, bukan di lokal.
+- **Frontend:** `npm run lint`, `npm run check`, `npm run build` bila frontend berubah.
+- Kalau muncul error lint/build, betulkan **semuanya sekaligus**, bukan satu per satu.
+- Jalankan pemeriksaan yang tidak saling bergantung **bersamaan**, bukan berurutan.
+- **Hook pre-push tidak boleh dilewati** (`--no-verify` dilarang).
+
+---
+
+## 8. Deploy (hanya atas perintah tegas)
+
+- Deploy hanya kalau CI commit tujuan hijau.
+- Backup database dibuat **dan diverifikasi** sebelum deploy.
+- Preflight lulus sesuai `rebuild/deploy/README.md`.
+- Hanya memakai mekanisme deploy resmi. Backup atau preflight gagal → **jangan deploy**.
+- Urutan: PR merge → CI hijau → backup terenkripsi → `deploy/preflight.sh` → `deploy/deploy.sh` → `deploy/healthcheck.sh` → periksa queue, scheduler, log, service.
+- Perubahan dokumen saja tidak perlu deploy.
+- **PR dan deploy adalah dua hal terpisah.** Merge tidak berarti deploy. Deploy butuh izin sendiri.
+
+---
+
+## 9. Batas VPS
+
+- Bawaan: **baca saja**.
+- Tidak ada pembersihan atau penghapusan di VPS tanpa perintah tegas.
+- VPS bukan pengganti pekerjaan repo biasa.
+- Jangan mengedit file satu per satu di produksi.
+
+---
+
+## 10. Peran
+
+`.claude/agents/` berisi satu file per peran. Baca file perannya sebelum mulai.
+
+| Peran | File | Dipakai untuk |
 |---|---|---|
-| Coder | `coder.md` | Writing Laravel code |
-| Reviewer | `reviewer.md` | Review + audit + security |
-| Payment | `payment.md` | Midtrans + refund manual via CS (no auto-refund) |
-| Frontend | `frontend.md` | Vue/Inertia/Tailwind + design |
-| Tester | `tester.md` | Pest + webapp-testing |
-| Deployer | `deployer.md` | CI/CD + deploy runbook |
-| Data | `data.md` | Queries + reconciliation (read-only default) |
-| Planner | `planner.md` | grill-me, plan before coding |
+| Coder | `coder.md` | Menulis kode Laravel |
+| Reviewer | `reviewer.md` | Review, audit, keamanan |
+| Payment | `payment.md` | Midtrans, verifikasi, status (bukan refund otomatis) |
+| Frontend | `frontend.md` | Vue/Inertia/Tailwind, arah desain |
+| Tester | `tester.md` | Pest, uji browser |
+| Deployer | `deployer.md` | CI/CD, runbook deploy |
+| Data | `data.md` | Query, rekonsiliasi (baca saja secara bawaan) |
+| Planner | `planner.md` | Rencana sebelum koding |
 
-## 9. File map
+---
 
-- Active app: `rebuild/` (Laravel 12, PHP 8.4, Vue 3 + Inertia v2 + Tailwind v4).
-- Skills: `.claude/skills/`
-- Agent roles: `.claude/agents/`
-- Invariants: `CLAUDE.md` (read first)
-- Domain docs: `rebuild/*.md` (ARCHITECTURE, DATABASE, AUTH, PRODUCT, CHECKOUT, PAYMENT, FULFILLMENT, ADMIN, SECURITY, TESTING, `deploy/README.md`)
-- Product intent: `docs/PRD-LFAMILIA-STORE-v1.md`
+## 11. Peta file
+
+| Lokasi | Isi |
+|---|---|
+| `rebuild/` | Aplikasi aktif — Laravel 12, PHP 8.4, Vue 3 + Inertia v2 + Tailwind v4 |
+| `docs/PRD.md` | Aturan produk |
+| `docs/ADMIN-PANEL.md` | Spesifikasi panel admin |
+| `docs/STATUS.md` | Apa yang sudah jalan, apa yang belum |
+| `docs/archive/` | Dokumen lama — bukan aturan |
+| `rebuild/*.md` | Dokumen teknis per domain (arsitektur, database, auth, produk, checkout, pembayaran, fulfillment, admin, keamanan, testing, deploy) |
+| `.claude/agents/` | Peran |
+| `.claude/skills/` | Cara teknis |
+
+---
+
+## 12. Standar selesai
+
+Sebuah pekerjaan selesai kalau:
+
+1. Perilakunya sesuai `docs/PRD.md` (dan `docs/ADMIN-PANEL.md` bila menyentuh panel).
+2. Ada test yang membuktikan perilakunya, **termasuk kasus gagal**.
+3. Tidak melanggar satu pun aturan di §5.
+4. Sudah dilihat di layar HP dan desktop (untuk pekerjaan tampilan).
+5. Tidak ada teks dummy, tombol palsu, atau data contoh yang tertinggal.
+6. Laporan menyebut: apa yang berubah, bukti, apa yang tidak berubah, skill yang dipakai/dilewati, dan apa yang masih terbuka.

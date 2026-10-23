@@ -21,5 +21,7 @@
         <server name="SESSION_DRIVER" value="array" force="true"/>
         <server name="CACHE_STORE" value="array" force="true"/>
         <env name="TRUSTED_PROXIES" value="*" force="true"/>
+        <!-- Database tes terpisah; tanpa force supaya CI (DB_DATABASE=lfamilia_ci) tidak tertimpa. -->
+        <env name="DB_DATABASE" value="lfamilia_admin_redesign_test"/>
     </php>
 </phpunit>

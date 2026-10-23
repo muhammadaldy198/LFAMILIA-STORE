@@ -1,5 +1,7 @@
 # Admin panel, RBAC & integrations
 
+> Aturan produk ada di [`docs/PRD.md`](../docs/PRD.md). Dokumen ini menjelaskan **cara kode bekerja**, bukan aturan produk. Kalau berbeda, PRD yang menang.
+
 Admin panel menggunakan Laravel + Vue/Inertia. Authorization selalu server-side; menu visibility hanya presentasi.
 
 ## Role
@@ -81,7 +83,7 @@ Pembayaran memisahkan Channel, Gateway, Routing, QRIS Manual, Top Up Saldo, Tamp
 
 Media menggunakan endpoint Spatie existing. Gambar terpilih dapat dipratinjau sebelum unggah, error unggahan tampil di tempat, dan hapus meminta konfirmasi. Upload favicon otomatis mengaktifkan asset dan memperbarui link favicon Admin/storefront melalui shared props existing.
 
-Audit source/history dan rencana komponen dicatat di `ADMIN-UI-AUDIT.md`.
+Audit source/history dan rencana komponen dicatat di `docs/archive/2026-10-22-pra-redesign/2026-10-04-audit-ui-admin-lama.md` (arsip — panel admin akan dibangun ulang, lihat `../docs/ADMIN-PANEL.md`).
 
 ## Digiflazz: sinkronisasi dan kesegaran katalog
 

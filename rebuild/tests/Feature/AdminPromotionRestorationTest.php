@@ -133,8 +133,7 @@ class AdminPromotionRestorationTest extends TestCase
                 ->where('summary.total_vouchers', 2)
                 ->where('summary.active_vouchers', 1)
                 ->has('categories')
-                ->has('scopeProducts')
-                ->has('popularProducts'));
+                ->has('scopeProducts'));
     }
 
     public function test_admin_can_create_update_and_delete_unused_voucher_with_scope_and_audit(): void

@@ -58,6 +58,7 @@ class AdminPermissionService
             ['label' => 'Kategori', 'href' => '/admin/catalog/categories', 'permission' => 'catalog.manage'],
             ['label' => 'Manual', 'href' => '/admin/fulfillment', 'permission' => 'fulfillment.manage'],
             ['label' => 'Banner & Konten', 'href' => '/admin/content', 'permission' => 'content.manage'],
+            ['label' => 'Tampilan Toko', 'href' => '/admin/content/presentation', 'permission' => 'content.manage'],
             ['label' => 'Digiflazz', 'href' => '/admin/digiflazz', 'permission' => 'providers.manage'],
             ['label' => 'Validasi Akun', 'href' => '/admin/nickname-tools', 'permission' => null, 'super_only' => true],
             ['label' => 'Provider', 'href' => '/admin/providers', 'permission' => 'providers.manage'],
@@ -68,9 +69,10 @@ class AdminPermissionService
             ['label' => 'Laporan', 'href' => '/admin/reports', 'permission' => 'reports.view'],
             ['label' => 'Admin & Akses', 'href' => '/admin/access', 'permission' => null, 'super_only' => true],
             ['label' => 'Pengaturan', 'href' => '/admin/settings', 'permission' => 'settings.manage'],
+            ['label' => 'Notifikasi', 'href' => '/admin/notifications', 'permission' => 'notifications.view'],
             ['label' => 'Integrasi', 'href' => '/admin/integrations', 'permission' => null, 'super_only' => true],
-            ['label' => 'System Health', 'href' => '/admin/health', 'permission' => null, 'super_only' => true],
-            ['label' => 'Audit Log', 'href' => '/admin/audit', 'permission' => null, 'super_only' => true],
+            ['label' => 'Kesehatan Sistem', 'href' => '/admin/health', 'permission' => null, 'super_only' => true],
+            ['label' => 'Catatan Audit', 'href' => '/admin/audit', 'permission' => null, 'super_only' => true],
         ];
 
         return collect($items)

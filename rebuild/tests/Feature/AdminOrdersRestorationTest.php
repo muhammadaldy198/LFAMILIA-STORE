@@ -277,21 +277,21 @@ class AdminOrdersRestorationTest extends TestCase
             ->where('attempts.0.can_manual', false)->where('canCheckFulfillment', false)->where('canViewCustomer', false));
         $this->post('/admin/orders/manual', $this->data())->assertForbidden();
         $this->post('/admin/orders/'.$id.'/check-payment')->assertForbidden();
-        $this->post('/admin/orders/'.$id.'/check-process')->assertForbidden();
         $this->post('/admin/orders/'.$id.'/resend-delivery')->assertForbidden();
         $this->login('ADMIN', ['dashboard.view']);
         $this->get('/admin/orders')->assertForbidden();
         $this->get('/admin/orders/export')->assertForbidden();
     }
 
-    public function test_check_process_reuses_existing_attempt_and_unknown_result_cannot_be_retried(): void
+    public function test_reconcile_reuses_existing_attempt_and_unknown_result_cannot_be_retried(): void
     {
         $admin = $this->login();
         $id = $this->order($admin);
         $attempt = DB::table('fulfillment_attempts')->where('order_id', $id)->first();
         DB::table('fulfillment_attempts')->where('id', $attempt->id)->update(['status' => 'UNKNOWN']);
         Queue::fake();
-        $this->post('/admin/orders/'.$id.'/check-process')->assertRedirect();
+        // Panel baru hanya punya satu pintu periksa status: antrean manual.
+        $this->post('/admin/fulfillment/'.$attempt->id.'/reconcile')->assertRedirect();
         Queue::assertPushed(ReconcileFulfillmentJob::class, fn ($job) => $job->attemptId === (int) $attempt->id);
         $this->post('/admin/fulfillment/'.$attempt->id.'/retry')->assertSessionHasErrors('fulfillment');
         $this->assertSame(1, DB::table('fulfillment_attempts')->where('order_id', $id)->count());
