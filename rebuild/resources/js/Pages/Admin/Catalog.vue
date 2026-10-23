@@ -384,7 +384,7 @@ const openEditorFull = (row) => {
 
         <section class="adm-card" style="margin-top:12px">
             <form class="adm-filters" @submit.prevent="applyFilters">
-                <label class="adm-field" style="flex:2 1 220px">
+                <label class="adm-field search">
                     <span>Cari produk</span>
                     <input v-model="q" class="adm-input" placeholder="Nama produk atau publisher" maxlength="150">
                 </label>
@@ -416,8 +416,10 @@ const openEditorFull = (row) => {
                         <option v-for="size in [10, 25, 50, 100]" :key="size" :value="size">{{ size }} produk</option>
                     </select>
                 </label>
-                <button type="submit" class="adm-btn primary" :disabled="busy">Terapkan</button>
-                <button type="button" class="adm-btn" :disabled="busy || !hasFilters" @click="resetFilters">Hapus filter</button>
+                <div class="adm-filter-actions">
+                    <button type="submit" class="adm-btn primary" :disabled="busy">Terapkan</button> <button type="button" class="adm-btn" :disabled="busy || !hasFilters" @click="resetFilters">Hapus filter</button>
+                </div>
+
             </form>
 
             <div class="adm-scroll">

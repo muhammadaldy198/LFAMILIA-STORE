@@ -1,4 +1,5 @@
 <script setup>
+import { computed } from 'vue';
 import { DialogContent, DialogDescription, DialogOverlay, DialogPortal, DialogRoot, DialogTitle } from 'reka-ui';
 
 defineProps({
@@ -6,11 +7,17 @@ defineProps({
     description: { type: String, default: '' },
     wide: { type: Boolean, default: false },
 });
-const open = defineModel('open', { type: Boolean, default: false });
+// Halaman Antrean & Detail Pesanan memakai string sebagai penanda jenis pop-up,
+// jadi nilai apa pun selain kosong dianggap "buka".
+const open = defineModel('open', { default: false });
+const isOpen = computed({
+    get: () => !!open.value,
+    set: (value) => { if (!value) open.value = false; },
+});
 </script>
 
 <template>
-    <DialogRoot v-model:open="open">
+    <DialogRoot v-model:open="isOpen">
         <DialogPortal>
             <DialogOverlay class="adm-overlay" />
             <DialogContent class="adm-dialog" :class="{ wide }">

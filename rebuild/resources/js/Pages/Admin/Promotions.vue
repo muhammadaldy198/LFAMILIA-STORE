@@ -149,7 +149,7 @@ const limitText = row => row.per_customer_limit == null ? 'Tanpa batas per pelan
 
         <section class="adm-card">
             <form class="adm-filters" @submit.prevent="apply">
-                <label class="adm-field" style="flex:2 1 220px">
+                <label class="adm-field search">
                     <span>Cari</span>
                     <input v-model="current.q" class="adm-input" placeholder="Kode voucher atau nama promo" maxlength="100">
                 </label>
@@ -178,8 +178,10 @@ const limitText = row => row.per_customer_limit == null ? 'Tanpa batas per pelan
                         <option v-for="size in [10, 25, 50, 100]" :key="size" :value="size">{{ size }} voucher</option>
                     </select>
                 </label>
-                <button type="submit" class="adm-btn primary" :disabled="busy">Terapkan</button>
-                <button type="button" class="adm-btn" :disabled="busy" @click="reset">Hapus filter</button>
+                <div class="adm-filter-actions">
+                    <button type="submit" class="adm-btn primary" :disabled="busy">Terapkan</button> <button type="button" class="adm-btn" :disabled="busy" @click="reset">Hapus filter</button>
+                </div>
+
             </form>
 
             <div class="adm-scroll">

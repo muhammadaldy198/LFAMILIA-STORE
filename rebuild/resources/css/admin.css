@@ -726,11 +726,21 @@ body:has(.adm) { background: var(--a-bg); margin: 0; }
     padding: 11px 14px; border-bottom: 1px solid var(--a-line);
 }
 
-.adm-filters .adm-field { flex: 1 1 168px; }
+/* Semua kolom filter berbagi lebar sama; kolom cari dua bagian; tombol selebar isinya. */
+.adm-filters .adm-field,
+.adm-filters .adm-field.narrow { flex: 1 1 110px; min-width: 0; }
+.adm-filters .adm-field:first-child { flex: 2 1 190px; }
+.adm-filters > button { flex: 0 0 auto; margin-left: auto; }
+.adm-filter-actions { display: flex; gap: 8px; margin-left: auto; flex: 0 0 auto; }
 
-/* Tombol aksi filter menempel ke tepi kanan kartu supaya barisnya tidak menggantung. */
-.adm-filters > button:first-of-type { margin-left: auto; }
-.adm-filters .adm-field.narrow { flex: 0 1 132px; }
+/* Di HP: kolom cari selebar kartu, sisanya dua-dua; kolom yang sendirian melebar penuh. */
+@media (max-width: 620px) {
+    .adm-filters .adm-field,
+    .adm-filters .adm-field.narrow { flex: 1 1 calc(50% - 4px); min-width: 0; }
+    .adm-filters .adm-field.search { flex: 1 0 100%; }
+    .adm-filter-actions { flex: 1 0 100%; margin-left: 0; }
+    .adm-filter-actions > button { flex: 1 1 0; }
+}
 
 .adm-toolbar {
     display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
@@ -782,6 +792,13 @@ body:has(.adm) { background: var(--a-bg); margin: 0; }
 }
 
 .adm-pager .sp { margin-left: auto; }
+
+/* Di HP: keterangan penuh satu baris, dua tombol halaman berdampingan di bawahnya. */
+@media (max-width: 620px) {
+    .adm-pager > span:first-child { flex: 1 0 100%; }
+    .adm-pager .sp { display: none; }
+    .adm-pager > button { flex: 1 1 0; }
+}
 
 /* ---------- badges ---------- */
 

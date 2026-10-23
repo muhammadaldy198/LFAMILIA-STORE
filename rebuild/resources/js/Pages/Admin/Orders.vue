@@ -113,7 +113,7 @@ const submitManual = () => {
 
         <section class="adm-card">
             <form class="adm-filters" @submit.prevent="apply">
-                <label class="adm-field" style="flex:2 1 260px">
+                <label class="adm-field search">
                     <span>Cari</span>
                     <input v-model="current.q" class="adm-input" placeholder="Nomor pesanan, pelanggan, produk, atau tujuan" maxlength="150">
                 </label>
@@ -125,8 +125,10 @@ const submitManual = () => {
                         <option v-for="option in statusOptions" :key="option.value" :value="option.value">{{ option.text }}</option>
                     </select>
                 </label>
-                <button type="submit" class="adm-btn" :disabled="busy">Terapkan</button>
-                <button type="button" class="adm-btn" :disabled="busy || !hasFilters" @click="reset">Hapus filter</button>
+                <div class="adm-filter-actions">
+                    <button type="submit" class="adm-btn" :disabled="busy">Terapkan</button> <button type="button" class="adm-btn" :disabled="busy || !hasFilters" @click="reset">Hapus filter</button>
+                </div>
+
             </form>
 
             <div v-if="advanced" class="adm-filters">
