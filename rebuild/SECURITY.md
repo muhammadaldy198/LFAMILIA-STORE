@@ -1,5 +1,7 @@
 # Security baseline
 
+> Aturan produk ada di [`docs/PRD.md`](../docs/PRD.md). Dokumen ini menjelaskan **cara kode bekerja**, bukan aturan produk. Kalau berbeda, PRD yang menang.
+
 Dokumen ini memisahkan security yang ada di aplikasi dari kondisi server/edge yang diverifikasi pada Tahap 4.
 
 ## Application security

@@ -1,0 +1,62 @@
+// Format tampilan admin. Tidak mengubah data apa pun.
+export const num = (value) => new Intl.NumberFormat('id-ID').format(Number(value ?? 0));
+
+export const rupiah = (value) => 'Rp ' + num(value);
+
+const WIB = { timeZone: 'Asia/Jakarta' };
+
+export const wibDateTime = (iso) => {
+    if (!iso) return '—';
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return '—';
+    return new Intl.DateTimeFormat('id-ID', {
+        ...WIB, day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    }).format(date).replace('.', ':') + ' WIB';
+};
+
+export const wibTime = (iso) => {
+    if (!iso) return '—';
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return '—';
+    return new Intl.DateTimeFormat('id-ID', { ...WIB, hour: '2-digit', minute: '2-digit' }).format(date).replace('.', ':') + ' WIB';
+};
+
+export const wibDate = (iso) => {
+    if (!iso) return '—';
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return '—';
+    return new Intl.DateTimeFormat('id-ID', { ...WIB, day: '2-digit', month: 'short', year: 'numeric' }).format(date);
+};
+
+export const shortDate = (iso) => {
+    if (!iso) return '';
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return '';
+    return new Intl.DateTimeFormat('id-ID', { ...WIB, day: '2-digit', month: '2-digit' }).format(date);
+};
+
+export const clockNow = () => wibDateTime(new Date().toISOString());
+
+// Warna tag mengikuti makna status, bukan nomor urut.
+const TONE = {
+    SUCCESS: 'ok', ACTIVE: 'ok', PAID: 'ok', HEALTHY: 'ok', CONFIGURED: 'ok', accept: 'ok',
+    PENDING: 'warn', PROCESSING: 'warn', PENDING_PAYMENT: 'warn', MANUAL_PENDING: 'warn',
+    SENDING: 'warn', UNKNOWN: 'warn', SCHEDULED: 'warn', DEGRADED: 'warn', UNTESTED: 'plain',
+    FAILED: 'bad', BLOCKED: 'bad', MANUAL_FAILED: 'bad', FAILED_CONFIRMED: 'bad', DOWN: 'bad',
+    EXPIRED: 'plain', CANCELLED: 'plain', INACTIVE: 'plain', NOT_CONFIGURED: 'plain', EXHAUSTED: 'plain',
+    REFUND: 'info', REFUNDED: 'info', CREATED: 'plain',
+};
+
+export const tone = (status) => TONE[String(status || '').toUpperCase()] || 'plain';
+
+export const statusLabel = {
+    PENDING_PAYMENT: 'Menunggu pembayaran', PAID: 'Pembayaran diterima', PROCESSING: 'Sedang diproses',
+    SUCCESS: 'Berhasil', FAILED: 'Pesanan gagal', EXPIRED: 'Pembayaran kedaluwarsa',
+    CANCELLED: 'Pesanan dibatalkan', BLOCKED: 'Pesanan gagal', REFUND: 'Perlu pemeriksaan',
+    REFUNDED: 'Perlu pemeriksaan', CREATED: 'Dibuat', SENDING: 'Dikirim', PENDING: 'Menunggu',
+    UNKNOWN: 'Belum pasti', MANUAL_PENDING: 'Menunggu manual', MANUAL_FAILED: 'Manual gagal',
+    FAILED_CONFIRMED: 'Gagal terkonfirmasi', SUCCESS_ATTEMPT: 'Berhasil',
+    active: 'Aktif', scheduled: 'Terjadwal', expired: 'Berakhir', inactive: 'Nonaktif', exhausted: 'Kuota habis',
+};
+
+export const label = (status) => statusLabel[status] || statusLabel[String(status || '').toUpperCase()] || status || '—';

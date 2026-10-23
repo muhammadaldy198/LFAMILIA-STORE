@@ -1,5 +1,7 @@
 # Payment, routing & wallet safety
 
+> Aturan produk ada di [`docs/PRD.md`](../docs/PRD.md). Dokumen ini menjelaskan **cara kode bekerja**, bukan aturan produk. Kalau berbeda, PRD yang menang.
+
 ## Gateway/channel model
 
 Customer memilih **payment channel** publik. Gateway internal dipilih backend.

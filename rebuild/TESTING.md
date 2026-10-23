@@ -1,5 +1,7 @@
 # Testing & CI
 
+> Aturan produk ada di [`docs/PRD.md`](../docs/PRD.md). Dokumen ini menjelaskan **cara kode bekerja**, bukan aturan produk. Kalau berbeda, PRD yang menang.
+
 Dokumen ini mencatat gate yang benar-benar tersedia di repository. Project menggunakan Playwright untuk visual comparison dan browser smoke, namun tidak menggunakan Cypress.
 
 ## Frontend

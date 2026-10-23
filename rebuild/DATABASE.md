@@ -1,5 +1,7 @@
 # Database
 
+> Aturan produk ada di [`docs/PRD.md`](../docs/PRD.md). Dokumen ini menjelaskan **cara kode bekerja**, bukan aturan produk. Kalau berbeda, PRD yang menang.
+
 MySQL 8 adalah database bisnis runtime LFAMILIA STORE. Schema dikelola melalui Laravel migrations di `database/migrations/`. D1 dan MariaDB bukan database final/current.
 
 ## Domain tabel penting

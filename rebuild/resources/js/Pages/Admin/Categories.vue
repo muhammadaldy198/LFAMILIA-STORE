@@ -1,170 +1,143 @@
 <script setup>
-import { Head, Link, router, useForm } from '@inertiajs/vue3';
-import { computed, ref } from 'vue';
-import AdminShell from '../../Components/AdminShell.vue';
-import AdminConfirmDialog from '../../Components/AdminConfirmDialog.vue';
-import AdminMediaControl from '../../Components/AdminMediaControl.vue';
-import AdminSwitch from '../../Components/AdminSwitch.vue';
-import { Button } from '../../Components/ui/button';
-import { Input } from '../../Components/ui/input';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../../Components/ui/sheet';
+import { reactive, ref } from 'vue';
+import { Head, Link, router } from '@inertiajs/vue3';
+import AdminLayout from '../../Components/Admin/AdminLayout.vue';
+import AdminModal from '../../Components/Admin/AdminModal.vue';
 
-const props = defineProps({ categories: { type: Array, default: () => [] } });
-const iconOptions = [['gamepad', 'Game'], ['ticket', 'Voucher'], ['play', 'Hiburan'], ['smartphone', 'Pulsa / Data'], ['zap', 'PLN / Listrik'], ['grid', 'Umum']];
-const iconLabel = (value) => (iconOptions.find(([key]) => key === value)?.[1] ?? 'Umum');
+defineProps({
+    categories: { type: Array, default: () => [] },
+});
 
-// Kategori terpilih dicari ulang dari prop terbaru, jadi unggah/hapus gambar
-// langsung terlihat tanpa menutup panel.
-const selectedId = ref(null);
-const selected = computed(() => props.categories.find((item) => item.id === selectedId.value) || null);
-const creating = ref(false);
-const deleting = ref(null);
-const error = ref('');
-
-const form = useForm({ name: '', slug: '', icon: 'grid', sort_order: props.categories.length, is_active: true });
-
-const createDefaults = () => ({ name: '', slug: '', icon: 'grid', sort_order: props.categories.length, is_active: true });
+const modal = ref(false);
+const editing = ref(null);
+const busy = ref(false);
+const errors = ref({});
+const form = reactive({ name: '', slug: '', sort_order: 0, is_active: true, icon: 'grid' });
+const advanced = ref(false);
 
 const openCreate = () => {
-    error.value = '';
-    form.defaults(createDefaults());
-    form.reset();
-    form.clearErrors();
-    selectedId.value = null;
-    creating.value = true;
+    editing.value = null;
+    Object.assign(form, { name: '', slug: '', sort_order: 0, is_active: true, icon: 'grid' });
+    errors.value = {};
+    advanced.value = false;
+    modal.value = true;
 };
 
-const openEdit = (item) => {
-    error.value = '';
-    form.clearErrors();
-    form.defaults({
-        name: item.name, slug: item.slug || '', icon: item.icon || 'grid',
-        sort_order: item.sort_order, is_active: item.is_active,
+const openEdit = (row) => {
+    editing.value = row;
+    Object.assign(form, {
+        name: row.name, slug: row.slug || '', sort_order: row.sort_order ?? 0,
+        is_active: Boolean(row.is_active), icon: row.icon || 'grid',
     });
-    form.reset();
-    creating.value = false;
-    selectedId.value = item.id;
+    errors.value = {};
+    advanced.value = false;
+    modal.value = true;
 };
-
-const close = () => { creating.value = false; selectedId.value = null; form.clearErrors(); };
 
 const save = () => {
-    error.value = '';
-    const options = { preserveScroll: true, onSuccess: close, onError: (errors) => { error.value = Object.values(errors).join(' · '); } };
-    if (creating.value) form.post('/admin/catalog/categories', options);
-    else if (selected.value) form.put('/admin/catalog/categories/' + selected.value.id, options);
+    const options = {
+        preserveScroll: true,
+        onStart: () => { busy.value = true; },
+        onFinish: () => { busy.value = false; },
+        onSuccess: () => { modal.value = false; },
+        onError: (bag) => { errors.value = bag; },
+    };
+    if (editing.value) router.put(`/admin/catalog/categories/${editing.value.id}`, { ...form }, options);
+    else router.post('/admin/catalog/categories', { ...form }, options);
 };
 
+const removeTarget = ref(null);
 const remove = () => {
-    const item = deleting.value;
-    deleting.value = null;
-    if (!item) return;
-    router.delete('/admin/catalog/categories/' + item.id, {
+    if (!removeTarget.value) return;
+    router.delete(`/admin/catalog/categories/${removeTarget.value.id}`, {
         preserveScroll: true,
-        onSuccess: () => { if (selectedId.value === item.id) close(); },
-        onError: (errors) => { error.value = Object.values(errors).join(' · '); },
+        onFinish: () => { removeTarget.value = null; },
     });
 };
 </script>
 
 <template>
     <Head title="Kategori" />
-    <AdminShell>
-        <div class="space-y-5">
-            <header class="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between">
-                <div class="min-w-0">
-                    <h1 class="text-2xl font-semibold tracking-tight">Kategori</h1>
-                    <p class="mt-1 max-w-3xl text-sm text-muted-foreground">
-                        Pengelompokan produk di halaman toko. Urutan di sini menentukan posisi kategori: angka lebih kecil tampil lebih dulu.
-                    </p>
-                </div>
-                <div class="flex flex-wrap gap-2">
-                    <Button variant="outline" as-child><Link href="/admin/catalog">Daftar produk</Link></Button>
-                    <Button @click="openCreate">Tambah kategori</Button>
-                </div>
-            </header>
-
-            <p v-if="error && !creating && !selected" role="alert" class="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{{ error }}</p>
-
-            <div v-if="!categories.length" role="status" class="rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-                Belum ada kategori. Tambahkan kategori pertama supaya produk bisa dikelompokkan di toko.
+    <AdminLayout>
+        <header class="adm-head">
+            <div>
+                <h1>Kategori</h1>
+                <p>Kategori mengelompokkan produk di toko. Urutan lebih kecil tampil lebih dulu.</p>
             </div>
+            <div class="adm-head-actions">
+                <Link href="/admin/catalog" class="adm-btn">Daftar produk</Link>
+                <button type="button" class="adm-btn primary" @click="openCreate">Tambah kategori</button>
+            </div>
+        </header>
 
-            <ul v-else class="divide-y divide-border rounded-md border border-border">
-                <li v-for="item in categories" :key="item.id">
-                    <button type="button" class="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-muted/40" @click="openEdit(item)">
-                        <span class="min-w-0 flex-1">
-                            <strong class="block truncate">{{ item.name }}</strong>
-                            <small class="mt-0.5 block text-muted-foreground">{{ iconLabel(item.icon) }} · {{ item.products_count }} produk · posisi {{ item.sort_order }}</small>
-                        </span>
-                        <span :class="['shrink-0 rounded border px-2 py-0.5 text-xs', item.is_active ? 'border-emerald-500/40 text-emerald-400' : 'border-border text-muted-foreground']">
-                            {{ item.is_active ? 'Aktif' : 'Nonaktif' }}
-                        </span>
-                        <span class="shrink-0 text-xs text-muted-foreground">Ubah</span>
-                    </button>
-                </li>
-            </ul>
+        <div class="adm-grid two">
+            <article v-for="row in categories" :key="row.id" class="adm-card" style="margin:0">
+                <div class="adm-card-body">
+                    <div style="display:flex;gap:10px;align-items:flex-start">
+                        <img v-if="row.image_url" :src="row.image_url" :alt="row.name" style="width:48px;height:48px;object-fit:contain;border-radius:7px;border:1px solid var(--a-line);background:#fafbf9">
+                        <div style="min-width:0;flex:1">
+                            <strong style="font-size:13.5px">{{ row.name }}</strong>
+                            <p class="adm-note">{{ row.products_count }} produk · posisi {{ row.sort_order }}</p>
+                            <p class="adm-note">{{ row.slug }}</p>
+                        </div>
+                        <span class="adm-tag" :class="row.is_active ? 'ok' : 'plain'">{{ row.is_active ? 'Aktif' : 'Nonaktif' }}</span>
+                    </div>
+                    <div style="display:flex;gap:6px;margin-top:10px">
+                        <button type="button" class="adm-btn sm" @click="openEdit(row)">Ubah</button>
+                        <button type="button" class="adm-btn sm danger" @click="removeTarget = row">Hapus</button>
+                    </div>
+                </div>
+            </article>
+            <p v-if="!categories.length" class="adm-empty">Belum ada kategori. Tambahkan kategori pertama.</p>
         </div>
 
-        <Sheet :open="creating || Boolean(selected)" @update:open="value => { if (!value) close(); }">
-            <SheetContent side="right" class="w-full overflow-y-auto sm:max-w-xl">
-                <SheetHeader>
-                    <SheetTitle>{{ creating ? 'Tambah kategori' : 'Ubah kategori' }}</SheetTitle>
-                    <SheetDescription>Nama, ikon, gambar, dan posisi kategori di halaman toko.</SheetDescription>
-                </SheetHeader>
+        <AdminModal v-model:open="modal" :title="editing ? 'Ubah kategori' : 'Tambah kategori'" :description="editing ? editing.slug : 'Kategori baru tidak tampil di toko sampai diaktifkan.'">
+            <form id="category-form" class="adm-grid" @submit.prevent="save">
+                <label class="adm-field full">
+                    <span>Nama kategori <b class="req">*</b></span>
+                    <input v-model="form.name" class="adm-input" maxlength="255" required>
+                    <span v-if="errors.name" class="err">{{ errors.name }}</span>
+                </label>
+                <label class="adm-field">
+                    <span>Posisi di toko</span>
+                    <input v-model="form.sort_order" type="number" min="0" class="adm-input">
+                    <span class="hint">Angka lebih kecil tampil lebih dulu.</span>
+                    <span v-if="errors.sort_order" class="err">{{ errors.sort_order }}</span>
+                </label>
+                <label class="adm-switch-row">
+                    <button type="button" class="adm-switch" role="switch" :aria-checked="form.is_active" @click="form.is_active = !form.is_active" />
+                    Aktif di toko
+                </label>
 
-                <form class="mt-4 space-y-4" @submit.prevent="save">
-                    <label class="lf-admin-field"><span>Nama kategori</span>
-                        <Input v-model="form.name" required placeholder="Contoh: Mobile Legends" />
-                        <span v-if="form.errors.name" role="alert" class="text-xs font-normal text-destructive">{{ form.errors.name }}</span>
-                    </label>
+                <div class="full">
+                    <button type="button" class="adm-btn link" @click="advanced = !advanced">Ubah alamat halaman kategori (lanjutan)</button>
+                </div>
+                <label v-if="advanced" class="adm-field full">
+                    <span>Alamat halaman</span>
+                    <input v-model="form.slug" class="adm-input" placeholder="contoh: top-up-game" maxlength="255">
+                    <span class="hint">Kosongkan untuk dibuat otomatis dari nama.</span>
+                    <span v-if="errors.slug" class="err">{{ errors.slug }}</span>
+                </label>
 
-                    <label class="lf-admin-field"><span>Ikon bila belum ada gambar</span>
-                        <select v-model="form.icon" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
-                            <option v-for="[value, label] in iconOptions" :key="value" :value="value">{{ label }}</option>
-                        </select>
-                    </label>
+                <div v-if="editing" class="adm-field full">
+                    <span>Gambar kategori</span>
+                    <p class="adm-note">Rekomendasi 512×512 piksel, PNG atau WebP transparan. Bila tidak ada gambar, kartu di toko tampil tanpa gambar.</p>
+                    <img v-if="editing.image_url" :src="editing.image_url" :alt="editing.name" style="width:96px;height:96px;object-fit:contain;border:1px solid var(--a-line);border-radius:7px;background:#fafbf9;margin-top:6px">
+                    <p v-else class="adm-note">Belum ada gambar.</p>
+                </div>
+            </form>
+            <template #footer>
+                <button type="button" class="adm-btn" @click="modal = false">Batal</button>
+                <button type="submit" form="category-form" class="adm-btn primary" :disabled="busy">Simpan</button>
+            </template>
+        </AdminModal>
 
-                    <label class="lf-admin-field"><span>Posisi di toko</span>
-                        <Input v-model.number="form.sort_order" type="number" min="0" required />
-                        <span class="text-xs font-normal text-muted-foreground">Angka lebih kecil tampil lebih dulu.</span>
-                    </label>
-
-                    <label class="flex items-center gap-2 text-sm"><AdminSwitch v-model="form.is_active" /> Aktif di toko</label>
-
-                    <details class="text-sm">
-                        <summary class="cursor-pointer text-muted-foreground">Ubah alamat halaman kategori (lanjutan)</summary>
-                        <label class="lf-admin-field mt-2"><span>Bagian alamat halaman</span>
-                            <Input v-model="form.slug" placeholder="Dibuat otomatis dari nama" />
-                        </label>
-                    </details>
-
-                    <div v-if="selected" class="rounded-md border border-border p-3">
-                        <strong class="text-xs">Gambar kategori</strong>
-                        <p class="mt-1 text-[11px] text-muted-foreground">Rekomendasi 512×512 (1:1). Dipakai sebagai ikon/tab kategori di toko.</p>
-                        <div class="mt-2"><AdminMediaControl type="category" :id="selected.id" :url="selected.image_url" /></div>
-                    </div>
-                    <p v-else class="text-xs text-muted-foreground">Gambar bisa diunggah setelah kategori disimpan.</p>
-
-                    <p v-if="error" role="alert" class="text-sm text-destructive">{{ error }}</p>
-
-                    <div class="flex flex-wrap justify-end gap-2 border-t border-border pt-4">
-                        <Button v-if="selected" type="button" variant="destructive" @click="deleting = selected">Hapus</Button>
-                        <Button type="button" variant="outline" @click="close">Batal</Button>
-                        <Button type="submit" :disabled="form.processing">{{ form.processing ? 'Menyimpan…' : 'Simpan' }}</Button>
-                    </div>
-                </form>
-            </SheetContent>
-        </Sheet>
-
-        <AdminConfirmDialog
-            :open="Boolean(deleting)"
-            title="Hapus kategori"
-            :message="deleting ? 'Kategori ' + deleting.name + ' akan dihapus. Kategori yang masih memiliki produk akan ditolak oleh sistem.' : ''"
-            confirm-label="Hapus kategori"
-            destructive
-            @update:open="value => { if (!value) deleting = null; }"
-            @confirm="remove"
-        />
-    </AdminShell>
+        <AdminModal :open="!!removeTarget" title="Hapus kategori" :description="removeTarget?.name || ''" @update:open="value => { if (!value) removeTarget = null; }">
+            <p class="adm-note">Kategori yang masih memiliki produk tidak dapat dihapus. Pindahkan produknya lebih dulu.</p>
+            <template #footer>
+                <button type="button" class="adm-btn" @click="removeTarget = null">Batal</button>
+                <button type="button" class="adm-btn danger" @click="remove">Hapus kategori</button>
+            </template>
+        </AdminModal>
+    </AdminLayout>
 </template>

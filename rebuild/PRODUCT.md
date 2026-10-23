@@ -1,5 +1,7 @@
 # Product, catalog & media
 
+> Aturan produk ada di [`docs/PRD.md`](../docs/PRD.md). Dokumen ini menjelaskan **cara kode bekerja**, bukan aturan produk. Kalau berbeda, PRD yang menang.
+
 ## Model katalog
 
 Struktur bisnis:

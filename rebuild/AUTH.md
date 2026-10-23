@@ -1,5 +1,7 @@
 # Authentication & identity
 
+> Aturan produk ada di [`docs/PRD.md`](../docs/PRD.md). Dokumen ini menjelaskan **cara kode bekerja**, bukan aturan produk. Kalau berbeda, PRD yang menang.
+
 ## Customer auth
 
 Customer web auth menggunakan Fortify pada guard `web`. Implementasi mencakup register, login, logout, email verification, forgot password, password reset, perubahan password, dan account/profile flow.

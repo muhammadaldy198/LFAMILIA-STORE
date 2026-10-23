@@ -1,5 +1,7 @@
 # Arsitektur aktual LFAMILIA STORE
 
+> Aturan produk ada di [`docs/PRD.md`](../docs/PRD.md). Dokumen ini menjelaskan **cara kode bekerja**, bukan aturan produk. Kalau berbeda, PRD yang menang.
+
 Dokumen ini menjelaskan implementasi dan operasi yang diverifikasi pada Tahap 4. PRD menjelaskan requirement produk; file ini menjelaskan bentuk runtime yang sekarang.
 
 ## Request flow

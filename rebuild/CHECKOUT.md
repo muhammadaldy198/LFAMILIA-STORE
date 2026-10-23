@@ -1,5 +1,7 @@
 # Checkout
 
+> Aturan produk ada di [`docs/PRD.md`](../docs/PRD.md). Dokumen ini menjelaskan **cara kode bekerja**, bukan aturan produk. Kalau berbeda, PRD yang menang.
+
 Checkout adalah server-authoritative. Browser tidak dipercaya sebagai sumber cost, margin, discount, fee, total, provider mapping, external SKU, atau payment gateway.
 
 ## Flow

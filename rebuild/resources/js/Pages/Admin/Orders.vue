@@ -1,195 +1,261 @@
 <script setup>
-import AdminSwitch from '../../Components/AdminSwitch.vue';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
-import AdminShell from '../../Components/AdminShell.vue';
-import { Button } from '../../Components/ui/button';
-import { Input } from '../../Components/ui/input';
-import { Textarea } from '../../Components/ui/textarea';
-import { Card } from '../../Components/ui/card';
-import { Badge } from '../../Components/ui/badge';
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../Components/ui/table';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../../Components/ui/sheet';
+import AdminLayout from '../../Components/Admin/AdminLayout.vue';
+import AdminModal from '../../Components/Admin/AdminModal.vue';
+import { label, num, rupiah, tone, wibDateTime, wibTime } from '../../lib/adminFormat';
 
-const props = defineProps({ orders: Object, filters: Object, metrics: Array, statuses: Object, providers: Array, channels: Array, activities: Array, canCreateManual: Boolean, updatedAt: String });
-const filters = ref({ q: '', status: '', provider: '', payment: '', from: '', to: '', per_page: 25, ...props.filters });
-const selected = ref([]);
-const auto = ref(true);
-const busy = ref(false);
-const manualOpen = ref(false);
-const notice = ref('');
-const manual = useForm({ customer_name: '', phone: '', email: '', product_name: '', package_name: '', destination: '', total_idr: '', note: '', payment_received: false, idempotency_key: '' });
-const money = value => 'Rp' + Number(value).toLocaleString('id-ID');
-// Status bayar dibaca dari status pesanan + waktu bayar; tabel orders tidak
-// menyimpan kolom payment_status terpisah.
-function paymentLabel(row) {
-    if (row.paid_at) return 'Sudah dibayar';
-    if (row.status === 'PENDING_PAYMENT') return 'Menunggu pembayaran';
-    if (row.status === 'EXPIRED') return 'Kedaluwarsa';
-    if (row.status === 'CANCELLED') return 'Dibatalkan';
-    return 'Belum dibayar';
-}
-const activeFilters = computed(() => ['provider', 'payment', 'from', 'to'].filter(key => String(filters.value[key] ?? '') !== '').length);
-const date = value => value ? new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Jakarta' }).format(new Date(value)) + ' WIB' : 'Belum tersedia';
-const sortedOrders = computed(() => [...props.orders.data].sort((a, b) => {
-    // Backend sudah mengurutkan prioritas di SQL sebelum pagination; ini hanya
-    // menjaga urutan yang sama setelah data sampai di klien. Tiga tingkat,
-    // supaya pesanan bermasalah tidak pernah tenggelam di bawah yang belum bayar.
-    const priority = row => row.needs_attention ? 0 : row.status === 'PENDING_PAYMENT' ? 1 : 2;
-    return priority(a) - priority(b) || new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-}));
-const allSelected = computed(() => props.orders.data.length > 0 && props.orders.data.every(row => selected.value.includes(row.id)));
-function toggleAll(event) { selected.value = event.target.checked ? props.orders.data.map(row => row.id) : []; }
-function apply() {
-    busy.value = true;
-    router.get('/admin/orders', Object.fromEntries(Object.entries(filters.value).filter(([, value]) => value !== '')), {
-        preserveState: true, preserveScroll: true,
-        onSuccess: () => { selected.value = []; },
-        onFinish: () => { busy.value = false; },
-    });
-}
-function reset() { filters.value = { q: '', status: '', provider: '', payment: '', from: '', to: '', per_page: 25 }; apply(); }
-function refresh() {
-    if (busy.value) return;
-    busy.value = true;
-    router.reload({ preserveScroll: true, onFinish: () => { busy.value = false; } });
-}
-const exportUrl = computed(() => {
-    const params = new URLSearchParams();
-    Object.entries(props.filters).forEach(([key, value]) => { if (value !== '' && value != null) params.set(key, value); });
-    return '/admin/orders/export?' + params.toString();
+const props = defineProps({
+    orders: { type: Object, default: () => ({ data: [], links: [] }) },
+    filters: { type: Object, default: () => ({}) },
+    metrics: { type: Array, default: () => [] },
+    statuses: { type: Object, default: () => ({}) },
+    providers: { type: Array, default: () => [] },
+    channels: { type: Array, default: () => [] },
+    activities: { type: Array, default: () => [] },
+    canCreateManual: Boolean,
+    updatedAt: String,
 });
-function exportSelected() {
-    if (!selected.value.length) return;
-    const params = new URLSearchParams(exportUrl.value.split('?')[1]);
-    selected.value.forEach(id => params.append('selected[]', id));
-    window.location.assign('/admin/orders/export?' + params.toString());
-}
-function openManual() {
-    manual.reset(); manual.clearErrors(); manual.idempotency_key = crypto.randomUUID(); manualOpen.value = true;
-}
-function createManual() { manual.post('/admin/orders/manual', { onSuccess: () => { manualOpen.value = false; } }); }
-async function copy(value) {
-    try { await navigator.clipboard.writeText(value); notice.value = 'Nomor pesanan disalin.'; }
-    catch { notice.value = 'Nomor belum dapat disalin. Pilih dan salin nomor pesanan secara langsung.'; }
-}
+
+const rows = computed(() => (Array.isArray(props.orders?.data) ? props.orders.data : []));
+const meta = computed(() => props.orders || {});
+const current = ref({ q: '', status: '', provider: '', payment: '', from: '', to: '', per_page: 25, ...(props.filters || {}) });
+const advanced = ref(false);
+const busy = ref(false);
+const auto = ref(true);
+const selected = ref([]);
+const lastUpdated = ref(props.updatedAt || new Date().toISOString());
+
+const statusOptions = computed(() => Object.entries(props.statuses || {}).map(([value, text]) => ({ value, text })));
+
+const apply = () => {
+    busy.value = true;
+    const query = Object.fromEntries(Object.entries(current.value).filter(([, value]) => value !== '' && value !== null));
+    router.get('/admin/orders', query, {
+        preserveState: true, preserveScroll: true,
+        onFinish: () => { busy.value = false; selected.value = []; },
+    });
+};
+
+const reset = () => {
+    current.value = { q: '', status: '', provider: '', payment: '', from: '', to: '', per_page: 25 };
+    apply();
+};
+
+const reload = () => {
+    router.reload({
+        only: ['orders', 'metrics', 'activities', 'updatedAt'],
+        preserveScroll: true,
+        onSuccess: () => { lastUpdated.value = props.updatedAt || new Date().toISOString(); },
+    });
+};
+
+const exportUrl = computed(() => {
+    const query = new URLSearchParams(Object.entries(current.value).filter(([, value]) => value !== '' && value !== null)).toString();
+    return `/admin/orders/export${query ? '?' + query : ''}`;
+});
+
 let timer;
-onMounted(() => { timer = setInterval(() => {
-    const changed = ['q','status','provider','payment','from','to','per_page'].some(key => String(filters.value[key] ?? '') !== String(props.filters[key] ?? (key === 'per_page' ? 25 : '')));
-    if (auto.value && !busy.value && !manualOpen.value && !selected.value.length && !changed && document.visibilityState === 'visible') refresh();
-}, 30000); });
+onMounted(() => { timer = setInterval(() => { if (auto.value && !busy.value) reload(); }, 30000); });
 onUnmounted(() => clearInterval(timer));
+
+const allSelected = computed(() => rows.value.length > 0 && selected.value.length === rows.value.length);
+const toggleAll = () => { selected.value = allSelected.value ? [] : rows.value.map(row => row.id); };
+
+const copy = async (text) => {
+    try { await navigator.clipboard.writeText(text); } catch { /* clipboard ditolak browser */ }
+};
+
+const manualOpen = ref(false);
+const manual = useForm({
+    customer_name: '', phone: '', email: '', product_name: '', package_name: '',
+    destination: '', total_idr: '', note: '', payment_received: false, idempotency_key: '',
+});
+const openManual = () => {
+    manual.reset();
+    manual.idempotency_key = crypto.randomUUID();
+    manualOpen.value = true;
+};
+const submitManual = () => {
+    manual.post('/admin/orders/manual', {
+        preserveScroll: true,
+        onSuccess: () => { manualOpen.value = false; manual.reset(); },
+    });
+};
 </script>
 
 <template>
-<Head title="Pesanan" />
-<AdminShell>
-    <header class="flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between">
-        <div class="min-w-0"><h1 class="text-2xl font-semibold tracking-tight">Pesanan</h1><p class="mt-1 max-w-2xl text-sm text-muted-foreground">Pesanan bermasalah tampil paling atas, lalu pesanan terbaru. Status dan tanggal memakai waktu Indonesia Barat.</p></div>
-        <Button v-if="canCreateManual" class="w-full sm:w-auto" @click="openManual">Catat pesanan manual</Button>
-    </header>
-    <p v-if="notice" role="status" class="mt-3 text-sm">{{ notice }}</p>
-    <div class="lf-admin-summary mt-5">
-        <Card v-for="metric in metrics" :key="metric.label" class="min-w-0 p-4"><p class="text-sm text-muted-foreground">{{ metric.label }}</p><p class="mt-2 text-2xl font-semibold">{{ Number(metric.value).toLocaleString('id-ID') }}</p></Card>
-    </div>
-    <form @submit.prevent="apply" class="mt-5 space-y-3 border-y border-border py-4">
-        <div class="grid min-w-0 items-end gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <label class="space-y-1 sm:col-span-2"><span class="text-sm font-medium">Cari pesanan</span><Input v-model="filters.q" placeholder="Nomor pesanan, pelanggan, produk, atau tujuan" maxlength="150" /></label>
-            <label class="space-y-1"><span class="text-sm font-medium">Status pesanan</span><select v-model="filters.status" class="order-select"><option value="">Semua status</option><option v-for="(label, key) in statuses" :key="key" :value="key">{{ label }}</option><option value="attention">Perlu perhatian</option></select></label>
-            <div class="flex flex-wrap gap-2"><Button type="submit" :disabled="busy">Terapkan</Button><Button type="button" variant="outline" @click="reset" :disabled="busy">Hapus filter</Button></div>
-        </div>
-        <details class="lf-admin-advanced rounded-md border border-border">
-            <summary class="cursor-pointer px-4 py-3 text-sm font-medium">Filter lanjutan<template v-if="activeFilters"> ({{ activeFilters }} aktif)</template></summary>
-            <div class="grid min-w-0 items-end gap-3 border-t border-border p-4 sm:grid-cols-2 xl:grid-cols-4">
-                <label class="space-y-1"><span class="text-sm font-medium">Penyedia</span><select v-model="filters.provider" class="order-select"><option value="">Semua penyedia</option><option v-for="provider in providers" :key="provider" :value="provider">{{ provider === 'MANUAL' ? 'Penanganan manual' : provider.charAt(0) + provider.slice(1).toLowerCase() }}</option></select></label>
-                <label class="space-y-1"><span class="text-sm font-medium">Metode pembayaran</span><select v-model="filters.payment" class="order-select"><option value="">Semua metode</option><option v-for="channel in channels" :key="channel.code" :value="channel.code">{{ channel.name }}</option><option v-if="!channels.some(c => c.code === 'WALLET')" value="WALLET">Saldo akun</option><option value="ADMIN_MANUAL">Pembayaran dicatat admin</option></select></label>
-                <label class="space-y-1"><span class="text-sm font-medium">Dari tanggal (WIB)</span><Input v-model="filters.from" type="date" /></label>
-                <label class="space-y-1"><span class="text-sm font-medium">Sampai tanggal (WIB)</span><Input v-model="filters.to" type="date" :min="filters.from || undefined" /></label>
-                <label class="space-y-1"><span class="text-sm font-medium">Pesanan per halaman</span><select v-model="filters.per_page" class="order-select"><option v-for="size in [10,25,50,100]" :key="size" :value="size">{{ size }} pesanan</option></select></label>
+    <Head title="Pesanan" />
+    <AdminLayout>
+        <header class="adm-head">
+            <div>
+                <h1>Pesanan</h1>
+                <p>Pesanan yang perlu perhatian tampil paling atas, lalu pesanan terbaru. Tanggal memakai WIB.</p>
             </div>
-        </details>
-        <p v-for="(error,key) in $page.props.errors" :key="key" role="alert" class="text-sm text-destructive">{{ error }}</p>
-        <p class="text-xs text-muted-foreground">Ringkasan mengikuti filter yang diterapkan. Tanggal menggunakan waktu Indonesia Barat.</p>
-    </form>
-    <div class="my-4 flex flex-wrap items-center justify-between gap-3">
-        <div class="flex flex-wrap items-center gap-3"><Button variant="outline" @click="refresh" :disabled="busy">{{ busy ? 'Memuat…' : 'Muat ulang' }}</Button><label class="flex items-center gap-2 text-sm"><AdminSwitch v-model="auto" />Perbarui otomatis setiap 30 detik</label></div>
-        <Button variant="outline" as-child><a :href="exportUrl">Unduh hasil filter</a></Button>
-        <p class="w-full text-xs text-muted-foreground">Terakhir diperbarui: {{ date(updatedAt) }}. Pembaruan otomatis berhenti sementara saat formulir diisi atau pesanan dipilih.</p>
-    </div>
-    <div class="min-w-0 overflow-hidden rounded-md border border-border">
-        <div class="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between"><label class="flex items-center gap-2 text-sm"><input type="checkbox" :checked="allSelected" @change="toggleAll" :disabled="!orders.data.length" class="size-4" />Pilih pesanan di halaman ini</label><div class="flex flex-wrap items-center gap-3"><span class="text-sm text-muted-foreground" role="status">{{ selected.length }} pesanan dipilih</span><Button class="w-full sm:w-auto" variant="outline" size="sm" @click="exportSelected" :disabled="!selected.length">Unduh yang dipilih</Button></div></div>
-        <!-- Tabel Pesanan (Horizontally Scrollable di semua ukuran layar) -->
-        <div class="overflow-x-auto overscroll-x-contain" tabindex="0" role="region" aria-label="Daftar pesanan, geser mendatar untuk melihat semua kolom">
-            <Table class="min-w-[850px] table-fixed">
-                <TableHeader>
-                    <TableRow>
-                        <TableHead class="w-[4%]">Pilih</TableHead>
-                        <TableHead class="w-[17%]">Pesanan</TableHead>
-                        <TableHead class="w-[15%]">Pelanggan</TableHead>
-                        <TableHead class="w-[19%]">Produk &amp; tujuan</TableHead>
-                        <TableHead class="w-[14%]">Pembayaran</TableHead>
-                        <TableHead class="w-[11%]">Status Pembayaran</TableHead>
-                        <TableHead class="w-[11%]">Status Proses</TableHead>
-                        <TableHead class="w-[9%] text-right">Tindakan</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    <TableRow v-for="row in sortedOrders" :key="row.id" :class="{'bg-destructive/5': row.needs_attention}">
-                        <TableCell><input v-model="selected" :value="row.id" type="checkbox" :aria-label="'Pilih ' + row.order_number" class="size-4" /></TableCell>
-                        <TableCell class="break-all">
-                            <strong class="font-medium text-primary">{{ row.order_number }}</strong>
-                            <p class="mt-0.5 text-[11px] text-muted-foreground">{{ date(row.created_at) }}</p>
-                            <Button variant="ghost" size="sm" class="h-6 px-1.5 text-[10px]" @click="copy(row.order_number)">Salin</Button>
-                        </TableCell>
-                        <TableCell class="break-words">
-                            <span class="font-medium block text-xs">{{ row.buyer_name }}</span>
-                            <span class="text-[11px] text-muted-foreground break-all">{{ row.buyer_phone || row.buyer_email || '—' }}</span>
-                        </TableCell>
-                        <TableCell class="break-words">
-                            <strong class="font-medium text-xs">{{ row.product_name }}</strong>
-                            <p class="text-[11px] text-muted-foreground">{{ row.package_name }}</p>
-                            <p v-for="(target,index) in row.destinations" :key="index" class="text-[10px] text-muted-foreground break-all">{{ target.label }}: {{ target.value }}</p>
-                            <p v-if="row.nickname" class="text-[10px] text-foreground">Nama: {{ row.nickname }}</p>
-                        </TableCell>
-                        <TableCell class="break-words">
-                            <strong class="text-xs">{{ money(row.total_idr) }}</strong>
-                            <p class="text-[11px] text-muted-foreground">{{ row.payment_method }}</p>
-                            <p class="text-[10px] text-muted-foreground">{{ row.provider }}</p>
-                        </TableCell>
-                        <TableCell class="break-words">
-                            <Badge variant="outline" class="text-[10px]">{{ paymentLabel(row) }}</Badge>
-                        </TableCell>
-                        <TableCell class="break-words">
-                            <Badge variant="secondary" class="text-[10px]">{{ row.status_label }}</Badge>
-                            <p v-if="row.needs_attention" class="mt-1 text-[10px] font-semibold text-amber-700">Perlu perhatian</p>
-                        </TableCell>
-                        <TableCell class="text-right">
-                            <Button variant="outline" size="sm" as-child class="h-7 text-xs"><Link :href="'/admin/orders/'+row.id">Detail</Link></Button>
-                        </TableCell>
-                    </TableRow>
-                    <TableRow v-if="!orders.data.length">
-                        <TableCell colspan="8" class="p-8 text-center text-sm text-muted-foreground">Tidak ada pesanan yang sesuai.</TableCell>
-                    </TableRow>
-                </TableBody>
-            </Table>
-        </div>
-        <div class="flex flex-wrap items-center justify-between gap-3 border-t p-4"><p class="text-sm text-muted-foreground">{{ orders.from || 0 }}–{{ orders.to || 0 }} dari {{ orders.total }} pesanan · Halaman {{ orders.current_page }} dari {{ orders.last_page }}</p><div class="flex gap-2"><Button variant="outline" size="sm" :disabled="!orders.prev_page_url || busy" @click="router.get(orders.prev_page_url, {}, { preserveState:true, preserveScroll:true, onSuccess:()=>selected=[] })">Sebelumnya</Button><Button variant="outline" size="sm" :disabled="!orders.next_page_url || busy" @click="router.get(orders.next_page_url, {}, { preserveState:true, preserveScroll:true, onSuccess:()=>selected=[] })">Berikutnya</Button></div></div>
-    </div>
-    <section class="mt-6" aria-labelledby="order-activity-heading"><h2 id="order-activity-heading" class="font-semibold">Aktivitas pesanan terbaru</h2><p v-if="!activities.length" class="mt-3 text-sm text-muted-foreground">Belum ada aktivitas pesanan.</p><ol class="mt-3 max-h-80 divide-y overflow-auto"><li v-for="activity in activities" :key="activity.id" class="py-3 text-sm"><Link :href="'/admin/orders/'+activity.order_id" class="break-all font-medium underline underline-offset-4">{{ activity.order_number }}</Link><p>{{ activity.label }}</p><p class="mt-1 text-xs text-muted-foreground">{{ date(activity.created_at) }}</p></li></ol></section>
-    <Sheet v-model:open="manualOpen"><SheetContent class="w-full overflow-y-auto sm:max-w-xl"><SheetHeader><SheetTitle>Catat pesanan manual</SheetTitle><SheetDescription>Untuk pesanan khusus yang pembayarannya sudah diterima di luar pembayaran otomatis.</SheetDescription></SheetHeader>
-        <form @submit.prevent="createManual" class="mt-6 space-y-4">
-            <div v-for="field in [{key:'customer_name',label:'Nama pelanggan'},{key:'phone',label:'Nomor telepon / WhatsApp'},{key:'email',label:'Email (opsional)'},{key:'product_name',label:'Nama produk'},{key:'package_name',label:'Nama paket'},{key:'destination',label:'Tujuan / ID akun'}]" :key="field.key"><label :for="'manual-'+field.key" class="mb-1 block text-sm font-medium">{{ field.label }}</label><Input :id="'manual-'+field.key" v-model="manual[field.key]" :type="field.key==='email'?'email':'text'" :required="field.key!=='email'" :disabled="manual.processing" /><p v-if="manual.errors[field.key]" class="mt-1 text-sm text-destructive">{{ manual.errors[field.key] }}</p></div>
-            <label class="block space-y-1"><span class="text-sm font-medium">Total pembayaran (Rp)</span><Input v-model="manual.total_idr" type="number" min="1" max="100000000" step="1" required :disabled="manual.processing" /></label><p v-if="manual.errors.total_idr" class="text-sm text-destructive">{{ manual.errors.total_idr }}</p>
-            <label class="block space-y-1"><span class="text-sm font-medium">Catatan pembayaran (opsional)</span><Textarea v-model="manual.note" maxlength="1000" :disabled="manual.processing" /></label>
-            <label class="flex items-start gap-2 text-sm"><input v-model="manual.payment_received" type="checkbox" required class="mt-1 size-4 shrink-0" :disabled="manual.processing" /><span>Saya sudah memastikan pembayaran sebesar {{ money(manual.total_idr || 0) }} benar-benar diterima.</span></label>
-            <p v-if="manual.errors.payment_received || manual.errors.order" role="alert" class="text-sm text-destructive">{{ manual.errors.payment_received || manual.errors.order }}</p>
-            <p class="text-xs text-muted-foreground">Pesanan masuk antrean penanganan manual. Formulir ini tidak menagih atau mengirim pesanan ke penyedia otomatis.</p>
-            <div class="flex flex-wrap gap-2 pb-6"><Button type="submit" :disabled="manual.processing">{{ manual.processing ? 'Menyimpan…' : 'Simpan pesanan' }}</Button><Button type="button" variant="outline" @click="manualOpen=false" :disabled="manual.processing">Batal</Button></div>
-        </form>
-    </SheetContent></Sheet>
-</AdminShell>
+            <div class="adm-head-actions">
+                <button v-if="canCreateManual" type="button" class="adm-btn primary" @click="openManual">Catat pesanan manual</button>
+            </div>
+        </header>
+
+        <section class="adm-stats" aria-label="Angka pesanan">
+            <div v-for="metric in metrics" :key="metric.label" class="adm-stat">
+                <span class="lb">{{ metric.label }}</span>
+                <strong class="vl">{{ num(metric.value) }}</strong>
+            </div>
+        </section>
+
+        <section class="adm-card">
+            <form class="adm-filters" @submit.prevent="apply">
+                <label class="adm-field" style="flex:2 1 260px">
+                    <span>Cari</span>
+                    <input v-model="current.q" class="adm-input" placeholder="Nomor pesanan, pelanggan, produk, atau tujuan" maxlength="150">
+                </label>
+                <label class="adm-field narrow">
+                    <span>Status</span>
+                    <select v-model="current.status" class="adm-select">
+                        <option value="">Semua status</option>
+                        <option value="attention">Perlu perhatian</option>
+                        <option v-for="option in statusOptions" :key="option.value" :value="option.value">{{ option.text }}</option>
+                    </select>
+                </label>
+                <button type="submit" class="adm-btn primary" :disabled="busy">Terapkan</button>
+                <button type="button" class="adm-btn" :disabled="busy" @click="reset">Hapus filter</button>
+            </form>
+
+            <div v-if="advanced" class="adm-filters">
+                <label class="adm-field narrow">
+                    <span>Penyedia</span>
+                    <select v-model="current.provider" class="adm-select">
+                        <option value="">Semua penyedia</option>
+                        <option v-for="provider in providers" :key="provider" :value="provider">{{ provider === 'MANUAL' ? 'Penanganan manual' : provider }}</option>
+                    </select>
+                </label>
+                <label class="adm-field narrow">
+                    <span>Metode pembayaran</span>
+                    <select v-model="current.payment" class="adm-select">
+                        <option value="">Semua metode</option>
+                        <option v-for="channel in channels" :key="channel.code" :value="channel.code">{{ channel.name }}</option>
+                        <option value="WALLET">Saldo akun</option>
+                        <option value="ADMIN_MANUAL">Pembayaran dicatat admin</option>
+                    </select>
+                </label>
+                <label class="adm-field narrow">
+                    <span>Dari tanggal (WIB)</span>
+                    <input v-model="current.from" type="date" class="adm-input">
+                </label>
+                <label class="adm-field narrow">
+                    <span>Sampai tanggal (WIB)</span>
+                    <input v-model="current.to" type="date" class="adm-input" :min="current.from || undefined">
+                </label>
+                <label class="adm-field narrow">
+                    <span>Pesanan per halaman</span>
+                    <select v-model="current.per_page" class="adm-select">
+                        <option v-for="size in [10, 25, 50, 100]" :key="size" :value="size">{{ size }} pesanan</option>
+                    </select>
+                </label>
+            </div>
+
+            <div class="adm-toolbar">
+                <span>Terakhir diperbarui: {{ wibTime(lastUpdated) }}</span>
+                <label class="adm-switch-row"><button type="button" class="adm-switch" role="switch" :aria-checked="auto" aria-label="Perbarui otomatis" @click="auto = !auto" />Perbarui otomatis setiap 30 detik</label>
+                <button type="button" class="adm-btn sm" :disabled="busy" @click="reload">Muat ulang</button>
+                <button type="button" class="adm-btn sm" @click="advanced = !advanced">{{ advanced ? 'Sembunyikan filter lanjutan' : 'Filter lanjutan' }}</button>
+                <a class="adm-btn sm sp" :href="exportUrl">Unduh hasil filter</a>
+            </div>
+
+            <p class="adm-hint-sm">Geser tabel ke samping untuk melihat semua kolom.</p>
+            <div class="adm-scroll">
+                <table class="adm-table">
+                    <thead>
+                        <tr>
+                            <th style="width:34px"><input type="checkbox" :checked="allSelected" :disabled="!rows.length" aria-label="Pilih semua pesanan di halaman ini" @change="toggleAll"></th>
+                            <th>Pesanan</th>
+                            <th>Pelanggan</th>
+                            <th>Produk &amp; tujuan</th>
+                            <th>Pembayaran</th>
+                            <th>Status Pembayaran</th>
+                            <th>Status Proses</th>
+                            <th>Tindakan</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="row in rows" :key="row.id" :class="{ attn: row.needs_attention }">
+                            <td><input v-model="selected" type="checkbox" :value="row.id" :aria-label="'Pilih ' + row.order_number"></td>
+                            <td>
+                                <Link :href="`/admin/orders/${row.id}`" class="mono">{{ row.order_number }}</Link>
+                                <p class="dim">{{ wibDateTime(row.created_at) }}</p>
+                                <button type="button" class="adm-btn link" @click="copy(row.order_number)">Salin nomor</button>
+                            </td>
+                            <td>
+                                {{ row.buyer_name || 'Pelanggan tamu' }}
+                                <p class="dim">{{ row.buyer_phone || row.buyer_email || 'Tanpa kontak' }}</p>
+                            </td>
+                            <td>
+                                {{ row.product_name }}
+                                <p class="dim">{{ row.package_name }}</p>
+                                <p v-for="item in row.destinations" :key="item.label" class="dim">{{ item.label }}: {{ item.value }}</p>
+                            </td>
+                            <td>
+                                {{ rupiah(row.total_idr) }}
+                                <p class="dim">{{ row.payment_method }}</p>
+                            </td>
+                            <td><span class="adm-tag" :class="tone(row.status)">{{ row.status_label || label(row.status) }}</span></td>
+                            <td>
+                                <span class="adm-tag" :class="row.needs_attention ? 'bad' : 'plain'">{{ row.needs_attention ? 'Perlu perhatian' : 'Normal' }}</span>
+                                <p class="dim">{{ row.provider }}</p>
+                            </td>
+                            <td>
+                                <Link :href="`/admin/orders/${row.id}`" class="adm-btn sm">Lihat</Link>
+                            </td>
+                        </tr>
+                        <tr v-if="!rows.length"><td colspan="8" class="adm-empty">Tidak ada pesanan yang cocok dengan filter.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="adm-pager">
+                <span>{{ meta.from ?? 0 }}–{{ meta.to ?? 0 }} dari {{ num(meta.total ?? 0) }} pesanan · Halaman {{ meta.current_page ?? 1 }} dari {{ meta.last_page ?? 1 }}</span>
+                <span class="sp" />
+                <Link v-if="meta.prev_page_url" :href="meta.prev_page_url" class="adm-btn sm" preserve-scroll>Sebelumnya</Link>
+                <button v-else type="button" class="adm-btn sm" disabled>Sebelumnya</button>
+                <Link v-if="meta.next_page_url" :href="meta.next_page_url" class="adm-btn sm" preserve-scroll>Berikutnya</Link>
+                <button v-else type="button" class="adm-btn sm" disabled>Berikutnya</button>
+            </div>
+        </section>
+
+        <section class="adm-card">
+            <div class="adm-card-head"><h2>Aktivitas pesanan terbaru</h2></div>
+            <div class="adm-card-body">
+                <div v-if="activities.length" class="adm-list">
+                    <div v-for="row in activities" :key="row.id" class="adm-list-row">
+                        <strong>{{ row.label || row.event_type }}</strong>
+                        <span>{{ row.order_number }} · {{ wibDateTime(row.created_at) }}</span>
+                    </div>
+                </div>
+                <p v-else class="adm-empty">Belum ada aktivitas pesanan.</p>
+            </div>
+        </section>
+
+        <AdminModal v-model:open="manualOpen" title="Catat pesanan manual" description="Pesanan dicatat setelah pembayaran benar-benar diterima.">
+            <form id="manual-order" class="adm-grid two" @submit.prevent="submitManual">
+                <label class="adm-field"><span>Nama pelanggan <b class="req">*</b></span><input v-model="manual.customer_name" class="adm-input" maxlength="120" required><span v-if="manual.errors.customer_name" class="err">{{ manual.errors.customer_name }}</span></label>
+                <label class="adm-field"><span>Nomor telepon/WhatsApp <b class="req">*</b></span><input v-model="manual.phone" class="adm-input" maxlength="32" required><span v-if="manual.errors.phone" class="err">{{ manual.errors.phone }}</span></label>
+                <label class="adm-field"><span>Email</span><input v-model="manual.email" type="email" class="adm-input" maxlength="255"><span v-if="manual.errors.email" class="err">{{ manual.errors.email }}</span></label>
+                <label class="adm-field"><span>Produk <b class="req">*</b></span><input v-model="manual.product_name" class="adm-input" maxlength="120" required><span v-if="manual.errors.product_name" class="err">{{ manual.errors.product_name }}</span></label>
+                <label class="adm-field"><span>Paket / nominal <b class="req">*</b></span><input v-model="manual.package_name" class="adm-input" maxlength="120" required><span v-if="manual.errors.package_name" class="err">{{ manual.errors.package_name }}</span></label>
+                <label class="adm-field"><span>Tujuan <b class="req">*</b></span><input v-model="manual.destination" class="adm-input" maxlength="300" required><span v-if="manual.errors.destination" class="err">{{ manual.errors.destination }}</span></label>
+                <label class="adm-field"><span>Total pembayaran <b class="req">*</b></span><input v-model="manual.total_idr" type="number" min="1" class="adm-input" required><span v-if="manual.errors.total_idr" class="err">{{ manual.errors.total_idr }}</span></label>
+                <label class="adm-field full"><span>Catatan</span><textarea v-model="manual.note" class="adm-textarea" maxlength="1000" /><span v-if="manual.errors.note" class="err">{{ manual.errors.note }}</span></label>
+                <label class="adm-switch-row full">
+                    <button type="button" class="adm-switch" role="switch" :aria-checked="manual.payment_received" @click="manual.payment_received = !manual.payment_received" />
+                    Pembayaran sudah diterima
+                </label>
+                <span v-if="manual.errors.payment_received" class="err full">{{ manual.errors.payment_received }}</span>
+            </form>
+            <template #footer>
+                <button type="button" class="adm-btn" @click="manualOpen = false">Batal</button>
+                <button type="submit" form="manual-order" class="adm-btn primary" :disabled="manual.processing || !manual.payment_received">Simpan pesanan</button>
+            </template>
+        </AdminModal>
+    </AdminLayout>
 </template>
-<style scoped>
-:deep([data-slot=table]) { min-width:850px; }
-.order-select { display:block;width:100%;height:2.5rem;border:1px solid hsl(var(--border));border-radius:calc(var(--radius) - 2px);background:transparent;padding:0 .75rem;font-size:.875rem; }
-</style>
