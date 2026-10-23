@@ -48,11 +48,11 @@ class AdminM9Test extends TestCase
         $menu = app(AdminPermissionService::class)->menu($super);
 
         $this->assertSame([
-            'Dashboard', 'Pesanan', 'Produk', 'Kategori', 'Manual', 'Banner & Konten', 'Digiflazz',
+            'Dashboard', 'Pesanan', 'Produk', 'Kategori', 'Manual', 'Banner & Konten', 'Tampilan Toko', 'Digiflazz',
             'Validasi Akun', 'Provider', 'Pembayaran', 'Pelanggan', 'Promo', 'Layanan Pelanggan', 'Laporan',
-            'Admin & Akses', 'Pengaturan', 'Integrasi', 'System Health', 'Audit Log',
+            'Admin & Akses', 'Pengaturan', 'Notifikasi', 'Integrasi', 'Kesehatan Sistem', 'Catatan Audit',
         ], collect($menu)->pluck('label')->all());
-        $this->assertCount(19, $menu);
+        $this->assertCount(21, $menu);
 
         $unsupported = $this->createAdmin([
             'name' => 'Unsupported Staff',

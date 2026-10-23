@@ -39,6 +39,7 @@ const MENU = [
         { label: 'Layanan Pelanggan', href: '/admin/support' },
     ] },
     { group: 'Sistem', items: [
+        { label: 'Notifikasi', href: '/admin/notifications' },
         { label: 'Integrasi', href: '/admin/integrations' },
         { label: 'Kesehatan Sistem', href: '/admin/health' },
         { label: 'Catatan Audit', href: '/admin/audit' },

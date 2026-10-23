@@ -4,6 +4,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { walletAdjustmentError } from '../../resources/js/lib/adminWalletAdjustment.js';
 const path = filename => new URL('../../resources/js/Pages/Admin/' + filename, import.meta.url);
 const read = filename => readFileSync(path(filename), 'utf8');
+const repo = relative => readFileSync(new URL('../../' + relative, import.meta.url), 'utf8');
 
 test('orphaned admin activation page is removed', () => {
     assert.equal(existsSync(path('Activate.vue')), false);
@@ -15,113 +16,100 @@ test('wallet UI validation matches backend signed integer and reason limits', ()
     for (const reason of ['', 'AB', '   ', 'A'.repeat(501)]) assert.notEqual(walletAdjustmentError(100, reason), '');
     assert.equal(walletAdjustmentError(100, '   valid   '), '');
 });
-test('both admin wallet forms expose client/server validation errors', () => {
-    for (const name of ['CustomerDetail.vue']) {
-        const source = read(name);
-        assert.match(source, /walletAdjustmentError\(/);
-        assert.match(source, /onError: \(errors\)/);
-        assert.match(source, /v-if="adjustError" role="alert"/);
-        assert.match(source, /idempotency_key/);
-    }
+test('admin wallet form exposes client and server validation errors', () => {
+    const source = read('CustomerDetail.vue');
+    assert.match(source, /import \{ walletAdjustmentError \} from '\.\.\/\.\.\/lib\/adminWalletAdjustment'/);
+    assert.match(source, /const problem = walletAdjustmentError\(wallet\.amount_idr, wallet\.reason\)/);
+    assert.match(source, /errors\.value = problem \? \{ amount_idr: problem \} : \{\}/);
+    assert.match(source, /onError: bag => \{ errors\.value = bag; \}/);
+    assert.match(source, /v-if="errors\.amount_idr" class="err"/);
+    assert.match(source, /v-if="errors\.reason" class="err"/);
+    assert.match(source, /idempotency_key: crypto\.randomUUID\(\)/);
 });
-test('notification date formatting and collection guards', () => {
+test('notification dates use the WIB formatter and collections are guarded', () => {
     const source = read('Notifications.vue');
-    assert.match(source, /date\(item\.created_at\)/);
-    assert.match(source, /timeZone: 'Asia\/Jakarta'/);
+    assert.match(source, /import \{ num, wibDateTime \} from '\.\.\/\.\.\/lib\/adminFormat'/);
+    assert.match(source, /wibDateTime\(item\.created_at\)/);
     assert.match(source, /Array\.isArray\(props\.notifications\?\.data\)/);
+    assert.match(repo('resources/js/lib/adminFormat.js'), /timeZone: 'Asia\/Jakarta'/);
 });
-test('admin props are null-safe across dashboard, customer tier, presentation, Digiflazz', () => {
+test('admin props are null-safe across dashboard, presentation, Digiflazz', () => {
     const dash = read('Dashboard.vue');
-    for (const key of ['chart', 'notifications', 'recentOrders', 'integrations']) {
-        assert.ok(dash.includes('Array.isArray(props.' + key + ')'));
+    assert.match(dash, /Array\.isArray\(props\.chart\)/);
+    for (const key of ['recentOrders', 'integrations', 'notifications', 'activities']) {
+        assert.ok(dash.includes(key + ': { type: Array, default: () => [] }'), key);
     }
     assert.match(read('CustomerDetail.vue'), /v-if="membershipProfile"/);
     const view = read('Presentation.vue');
     assert.match(view, /props\.presentation\?\.typography \|\| \{\}/);
-    assert.match(view, /props\.registry \|\| \{\}/);
-    assert.match(view, /props\.fields \|\| \{\}/);
+    assert.match(view, /props\.presentation\?\.text \|\| \{\}/);
+    assert.match(view, /registry: \{ type: Object, default: \(\) => \(\{\}\) \}/);
     const digi = read('Digiflazz.vue');
     assert.match(digi, /Array\.isArray\(props\.items\?\.data\)/);
-    assert.match(digi, /Array\.isArray\(props\.recentTransactions\)/);
+    assert.match(digi, /recentTransactions: \{ type: Array, default: \(\) => \[\] \}/);
 });
-test('integration empty state is meaningful', () => {
+test('integration page guards an empty integration list', () => {
     const source = read('Integrations.vue');
-    assert.match(source, /v-if="!items\.length" role="status"/);
-    assert.match(source, /v-if="items\.length" class="lf-admin-tabs"/);
+    assert.match(source, /const current = computed\(\(\) => items\.find/);
+    assert.match(source, /<section v-if="current" class="adm-card">/);
+    assert.match(source, /v-else class="adm-note">Belum ada integrasi yang memakai alamat pemberitahuan\./);
 });
-
-test('per-product sync button label admits it syncs the whole catalog', () => {
-    const source = read('Catalog.vue');
-    assert.match(source, /Sinkron seluruh katalog/);
-    assert.match(source, /Menyinkronkan seluruh katalog Digiflazz, bukan hanya produk ini/);
-    assert.doesNotMatch(source, /Sinkron semua nominal produk/);
-    assert.match(source, /router\.post\('\/admin\/catalog\/products\/'\+item\.id\+'\/sync'/);
+test('Digiflazz owns catalog sync with an honest whole-catalog label', () => {
+    const catalog = read('Catalog.vue');
+    assert.doesNotMatch(catalog, /\/admin\/catalog\/products\/'\+item\.id\+'\/sync|Sinkron seluruh katalog/);
+    const digi = read('Digiflazz.vue');
+    assert.match(digi, /router\.post\('\/admin\/digiflazz\/sync'/);
+    assert.match(digi, /Sinkron daftar harga/);
+    assert.match(digi, /Menyinkronkan…/);
 });
-
-test('catalog prices preserve markup for manual store-cost mappings and shared tables keep mobile cards by default', () => {
+test('catalog keeps stored-cost fallback and wide tables scroll on mobile', () => {
     const source = read('Catalog.vue');
-    const table = readFileSync(new URL('../../resources/js/Components/AdminResponsiveTable.vue', import.meta.url), 'utf8');
-
-    assert.match(table, /scroll: \{ type: Boolean, default: false \}/);
-    assert.match(source, /<AdminResponsiveTable scroll class="min-w-\[1100px\]"/);
-    assert.match(source, /store_cost_idr: mapping\.store_cost_idr \?\? mapping\.cost_idr/);
-    assert.match(source, /const price=props\.checkoutPreviews\[pack\.id\]/);
-    assert.match(source, /Harga checkout tersimpan/);
+    assert.match(source, /Number\(mapping\.store_cost_idr \?\? mapping\.cost_idr \?\? 0\)/);
+    assert.match(source, /props\.checkoutPreviews\?\.\[row\.id\]/);
     assert.doesNotMatch(source, /customer_no_template: item\.customer_no_template/);
-    assert.match(source, /const importRowPreview = \(sku, item\) => markupExample\(\s*sku\.price_idr,\s*effectiveUpliftPercent\(null, item\),\s*item\.sell_markup_percent !== null && item\.sell_markup_percent !== undefined\s*\? effectiveMarkupPercent\(null, item\)\s*: Number\(importForm\.margin_percent\),?\s*\)/);
-    assert.match(source, /:disabled="item\.sell_markup_percent !== null && item\.sell_markup_percent !== undefined"/);
-    assert.match(source, /@click="saveFields"/);
-    assert.match(source, /Modal toko \/ batas harga \(Rp\)<Input v-model\.number="mapping\.store_cost_idr"/);
-    assert.match(source, /\{ store_cost_idr: Number\(mapping\.store_cost_idr\) \}/);
-
+    assert.match(repo('resources/css/admin.css'), /\.adm-table \{ min-width: 760px; \}/);
     const customers = read('Customers.vue');
     assert.match(customers, /canManageMembershipRules: Boolean/);
-    // Aturan tingkat member pindah ke tab sendiri di halaman Pelanggan.
-    assert.match(customers, /tab === 'membership'/);
-    assert.match(customers, /<Sheet :open="editingTier === tier"/);
+    assert.match(customers, /:aria-selected="tab === 'tiers'"/);
+    assert.match(customers, /<AdminModal :open="!!tierEditor"/);
 });
-
-
-test('dashboard exposes selectable revenue/orders chart and split order statuses', () => {
-    const source = read('Dashboard.vue');
-    assert.match(source, /chartMetric/);
-    assert.match(source, /payment_status/);
-    assert.match(source, /order\.status/);
+test('dashboard chart shows orders and revenue while orders split payment and process columns', () => {
+    const dash = read('Dashboard.vue');
+    assert.match(dash, /role="img" :aria-label="`Grafik jumlah pesanan/);
+    assert.match(dash, /rupiah\(row\.revenue_idr\)/);
+    assert.match(dash, /Number\(row\.orders \|\| 0\)/);
+    const orders = read('Orders.vue');
+    assert.match(orders, /<th>Status Pembayaran<\/th>/);
+    assert.match(orders, /<th>Status Proses<\/th>/);
 });
-
 test('Digiflazz UI omits Harga Max controls and client requests while keeping SKU health tools', () => {
     const source = read('Digiflazz.vue');
     assert.doesNotMatch(source, /Harga Max|max-prices|_previewMaxPrices|_applyMaxPrices/);
     assert.match(source, /healthLabel/);
     assert.match(source, /Sinkron daftar harga/);
 });
-
 test('password confirmation uses the admin dark theme', () => {
     const source = read('PasswordConfirm.vue');
     assert.match(source, /lf-admin lf-admin-auth/);
     assert.match(source, /bg-slate-900/);
     assert.match(source, /focus-visible:ring/);
 });
-
-test('reports separates sections and keeps operations grouped', () => {
+test('reports separate sections and keep operations grouped', () => {
     const source = read('Reports.vue');
     for (const section of ['Penjualan', 'Produk', 'Operasional']) assert.match(source, new RegExp(section));
     assert.match(source, /aria-label="Bagian laporan"/);
-    assert.match(source, /visible\('sales'\)/);
-    assert.match(source, /visible\('products'\)/);
-    assert.match(source, /visible\('operations'\)/);
+    assert.match(source, /\[\[?.*'sales', 'Penjualan'.*\], \['products', 'Produk'\], \['operations', 'Operasional'\]\]/);
+    assert.match(source, /tab === 'sales'/);
     assert.match(source, /Produk terlaris/);
-    assert.match(source, /Kategori teratas/);
-    assert.match(source, /Kinerja penyedia layanan/);
+    assert.match(source, /Kategori terlaris/);
+    assert.match(source, /Kinerja penyedia/);
     assert.match(source, /v-if="canViewFinance"/);
-    assert.match(source, /v-show="visible\('operations'\)"/);
-    assert.match(source, /function exportReport\(\)/);
+    assert.match(source, /const exportReport = \(\) => \{/);
     assert.match(source, /props\.providerReport\.map/);
     assert.match(source, /props\.daily\.map/);
     assert.match(source, /props\.topProducts\.map/);
-    assert.match(source, /link\.download = `laporan-\$\{section\.value\}-\$\{range\}\.csv`/);
+    assert.match(source, /link\.download = `laporan-\$\{tab\.value\}-\$\{range\}\.csv`/);
 });
-
 test('notifications link only to authorized in-app order and ticket targets', () => {
     const source = read('Notifications.vue');
     assert.match(source, /item\.target_type === 'order' && canOrders\.value/);
@@ -130,112 +118,108 @@ test('notifications link only to authorized in-app order and ticket targets', ()
     assert.match(source, /Number\.isSafeInteger\(relatedOrderId\)/);
     assert.match(source, /@click="openNotification\(item\)"/);
 });
-
 test('health puts attention checks first and describes all-clear state', () => {
     const source = read('Health.vue');
-    assert.match(source, /const attentionChecks = computed\(\(\) => props\.checks\.filter/);
-    assert.match(source, /const orderedChecks = computed/);
-    assert.match(source, /v-for="check in orderedChecks"/);
+    assert.match(source, /const attention = computed\(\(\) => \[/);
+    assert.match(source, /\.filter\(check => check\.status !== 'HEALTHY'\)/);
+    assert.match(source, /v-for="item in attention"/);
     assert.match(source, /Perlu perhatian/);
-    assert.match(source, /Tidak ada komponen yang memerlukan perhatian/);
+    assert.match(source, /Semua komponen berstatus normal\./);
 });
-
-test('orders prioritize attention and pending then newest with split status columns', () => {
+test('orders prioritize attention then pending, newest last', () => {
+    const controller = repo('app/Http/Controllers/AdminOrdersController.php');
+    assert.match(controller, /THEN 0 WHEN orders\.status = 'PENDING_PAYMENT' THEN 1 ELSE 2 END/);
+    assert.match(controller, /orderByDesc\('orders\.id'\)/);
     const source = read('Orders.vue');
-    assert.match(source, /sortedOrders/);
-    assert.match(source, /needs_attention/);
-    assert.match(source, /PENDING_PAYMENT/);
-    assert.match(source, /Status Pembayaran/);
-    assert.match(source, /Status Proses/);
+    assert.match(source, /:class="\{ attn: row\.needs_attention \}"/);
+    assert.match(source, /<option value="attention">Perlu perhatian<\/option>/);
+    assert.match(source, /<p v-if="row\.needs_attention" class="dim" style="color:var\(--a-danger\)">Perlu perhatian<\/p>/);
+    assert.match(source, /Pesanan yang perlu perhatian tampil paling atas/);
 });
-
-
-test('customer detail is a sequential profile-to-accounts page', () => { const source = read('CustomerDetail.vue'); assert.doesNotMatch(source, /<nav class="lf-admin-tabs"/); for (const id of ['customer-profile-heading','customer-orders-heading','customer-wallet-heading','customer-support-heading','customer-accounts-heading']) assert.match(source, new RegExp('id="'+id+'"')); assert.match(source, /v-if="isSuperAdmin"/); });
-
-test('admin access editor opens in a sheet over the account list', () => {
-    const source = read('Access.vue');
-    assert.match(source, /<Sheet :open="editorOpen"/);
-    assert.match(source, /@click="openEdit\(admin\)"/);
-    assert.doesNotMatch(source, /id="access-editor"/);
-});
-
-test('news entries use a compact list and open the editor in a sheet', () => {
-    const source = read('Content.vue');
-    assert.match(source, /selectedNewsId === item.id/);
-    assert.match(source, /aria-label="Pratinjau berita"/);
-    assert.match(source, /<Sheet :open="selectedNewsId !== null"/);
-});
-
-
-test('catalog create form opens in a sheet instead of pushing the list down', () => {
-    const source = read('Catalog.vue');
-    assert.match(source, /<Sheet :open="showCreateProduct"/);
-    assert.doesNotMatch(source, /<form v-if="showCreateProduct"/);
-});
-
-test('content editors (banner, popup, news, faq, policy) open in sheets', () => {
-    const source = read('Content.vue');
-    assert.match(source, /<Sheet :open="bannerFormOpen"/);
-    assert.match(source, /<Sheet :open="popupFormOpen"/);
-    assert.match(source, /<Sheet :open="newsFormOpen"/);
-    assert.match(source, /<Sheet :open="faqFormOpen"/);
-    assert.match(source, /<Sheet :open="selectedBannerId === item.id"/);
-    assert.match(source, /<Sheet :open="selectedFaqId === item.id"/);
-    assert.match(source, /<Sheet :open="selectedPageKey === item.key"/);
-});
-
-test('payment settings keep one page and edit each method in a sheet', () => {
-    const source = read('Payments.vue');
-    assert.doesNotMatch(source, /Subbagian pengaturan pembayaran|settingTabs|selectSetting/);
-    // Biaya dan gateway diatur di dalam pop-up metode, bukan tabel terpisah.
-    assert.doesNotMatch(source, /id="payment-routing"/);
-    assert.doesNotMatch(source, /id="payment-gateways"/);
-    assert.match(source, /<Sheet :open="Boolean\(channelEditor\)"/);
-    assert.match(source, /Gateway untuk metode ini/);
-    const order = ['Metode Pembayaran', 'URL Notifikasi Gateway', 'Pengaturan Top Up', 'Tampilan Checkout'];
-    let previous = -1;
-    for (const heading of order) { const position = source.indexOf('>'+heading+'</h2>'); assert.ok(position > previous, heading); previous = position; }
-    assert.match(source, /area === 'transactions'/);
-});
-
-test('customer detail starts at profile and confirms wallet changes', () => {
+test('customer detail is a sequential profile-to-accounts page', () => {
     const source = read('CustomerDetail.vue');
-    // Urutan rancangan 4.12: ringkasan -> profil -> tingkat -> pesanan -> saldo -> tiket -> akun.
-    const order = ['lf-admin-summary', 'customer-profile-heading', 'customer-tier-heading', 'customer-orders-heading', 'customer-wallet-heading', 'customer-support-heading', 'customer-accounts-heading'];
+    const order = ['<h2>Profil</h2>', '<h2>Tingkat member</h2>', '<h2>Riwayat pesanan</h2>', '<h2>Perubahan saldo</h2>', '<h2>Tiket bantuan</h2>', '<h2>Akun game tersimpan</h2>'];
     let previous = -1;
     for (const marker of order) { const position = source.indexOf(marker); assert.ok(position > previous, marker); previous = position; }
-    assert.match(source, /withSensitive\(`Konfirmasi \$\{direction\} saldo pelanggan/);
-    assert.match(source, /function saveWallet\(amount, reason\)/);
+    assert.match(source, /<button v-if="isSuperAdmin" type="button" class="adm-btn primary" @click="openManage">Atur pelanggan<\/button>/);
+    assert.doesNotMatch(source, /lf-admin/);
 });
-
-test('shell never drops backend menu entries and names the support group', () => {
-    const source = readFileSync(new URL('../../resources/js/Components/AdminShell.vue', import.meta.url), 'utf8');
-    assert.match(source, /Layanan Pelanggan/);
-    assert.match(source, /const rest = items\.filter/);
-    assert.match(source, /label: 'Lainnya'/);
+test('admin access editor opens in a modal over the account list', () => {
+    const source = read('Access.vue');
+    assert.match(source, /<AdminModal :open="!!editor"/);
+    assert.match(source, /@click="openEdit\(row\)"/);
+    assert.match(source, /import \{ withSensitive \} from '\.\.\/\.\.\/lib\/sensitivePrompt'/);
+    assert.doesNotMatch(source, /lf-admin/);
 });
-
+test('news entries use a compact list and open the editor in a modal', () => {
+    const source = read('Content.vue');
+    assert.match(source, /<h2>Berita<\/h2>/);
+    assert.match(source, /@click="open\('news', row\)"/);
+    assert.match(source, /<AdminModal v-model:open="modal"/);
+    assert.doesNotMatch(source, /lf-admin/);
+});
+test('catalog create form opens in a modal instead of pushing the list down', () => {
+    const source = read('Catalog.vue');
+    assert.match(source, /<AdminModal v-model:open="addOpen" title="Tambah produk"/);
+    assert.doesNotMatch(source, /<form v-if="addOpen"/);
+    assert.doesNotMatch(source, /lf-admin/);
+});
+test('content editors (banner, popup, news, faq, policy) share one modal', () => {
+    const source = read('Content.vue');
+    assert.match(source, /const open = \(type, row = null\) => \{/);
+    for (const type of ['banner', 'popup', 'news', 'faq', 'page']) assert.ok(source.includes(`open('${type}'`), type);
+    assert.match(source, /<AdminModal v-model:open="modal"/);
+    assert.match(source, /:wide="editing\?\.type === 'news' \|\| editing\?\.type === 'page'"/);
+});
+test('payment settings keep one page and edit each method in a modal', () => {
+    const source = read('Payments.vue');
+    assert.match(source, /<AdminModal :open="!!editor" :title="editor\?\.id \? 'Ubah metode pembayaran' : 'Tambah metode pembayaran'"/);
+    const order = ['<h2>Metode Pembayaran</h2>', '<h2>QRIS manual</h2>', '<h2>Top up LFAMILIA Coin</h2>', '<h2>Tampilan halaman pembayaran</h2>'];
+    let previous = -1;
+    for (const marker of order) { const position = source.indexOf(marker); assert.ok(position > previous, marker); previous = position; }
+    assert.doesNotMatch(source, /lf-admin/);
+});
+test('customer detail starts at profile and confirms wallet changes before posting', () => {
+    const source = read('CustomerDetail.vue');
+    assert.ok(source.indexOf('<h2>Profil</h2>') < source.indexOf('<h2>Akun game tersimpan</h2>'));
+    assert.match(source, /withSensitive\(`Konfirmasi \$\{direction\} saldo pelanggan sebesar \$\{rupiah\(Math\.abs\(amount\)\)\}\? Alasan: \$\{wallet\.reason\}`/);
+    assert.match(source, /onSuccess: \(\) => \{[\s\S]*?wallet\.idempotency_key = crypto\.randomUUID\(\);/);
+    assert.doesNotMatch(source, /window\.confirm/);
+});
+test('sidebar covers every backend menu entry and names the support group', () => {
+    const layout = repo('resources/js/Components/Admin/AdminLayout.vue');
+    const service = repo('app/Services/AdminPermissionService.php');
+    const backend = [...service.matchAll(/'href' => '([^']+)'/g)].map(match => match[1]);
+    const sidebar = [...layout.matchAll(/href: '([^']+)'/g)].map(match => match[1]);
+    assert.equal(backend.length, 21, 'daftar menu backend harus 21');
+    for (const href of backend) assert.ok(sidebar.includes(href), 'sidebar kehilangan ' + href);
+    assert.ok(sidebar.includes('/admin/notifications'));
+    assert.match(layout, /label: 'Layanan Pelanggan'/);
+    assert.doesNotMatch(layout, /lf-admin(?!-)/);
+});
 test('support and fulfillment lead with the work list instead of metric cards', () => {
+    assert.match(read('Support.vue'), /class="adm-summary"/);
     for (const file of ['Support.vue', 'Fulfillment.vue', 'Settings.vue']) {
         assert.ok(!read(file).includes('lf-admin-summary'), file);
     }
 });
-
-test('wallet adjustment lives on the detail page and confirms before posting', () => {
-    // Daftar pelanggan hanya untuk mencari dan membuka detail (rancangan 4.12).
-    assert.doesNotMatch(read('Customers.vue'), /adjustWallet|saveWallet/);
+test('wallet adjustment lives on the detail page and validates before posting', () => {
+    // Daftar pelanggan hanya untuk mencari dan membuka detail.
+    assert.doesNotMatch(read('Customers.vue'), /adjustWallet|walletAdjustmentError/);
     const source = read('CustomerDetail.vue');
-    assert.match(source, /withSensitive\(`Konfirmasi \$\{direction\} saldo pelanggan sebesar/);
-    assert.match(source, /function saveWallet\(amount, reason\)/);
-    assert.doesNotMatch(source, /window\.confirm\(`Konfirmasi/);
+    assert.match(source, /const adjustWallet = \(\) => \{/);
+    assert.match(source, /if \(problem\) return;/);
+    assert.match(source, /router\.post\('\/admin\/customers\/' \+ props\.customer\.id \+ '\/wallet'/);
+    assert.doesNotMatch(source, /window\.confirm/);
 });
-
-test('product notices use dark theme tokens and render a preview', () => {
+test('product notices are edited in a modal and render a preview', () => {
     const source = read('Catalog.vue');
     assert.doesNotMatch(source, /border-slate-200 bg-white/);
-    assert.match(source, /aria-label="Pratinjau pemberitahuan"/);
+    assert.match(source, /<AdminModal v-model:open="noticeOpen"/);
+    assert.match(source, /v-if="product\?\.notices\?\.length" class="adm-list"/);
+    assert.match(source, /const preview = computed\(\(\) => \{/);
+    assert.match(source, /\{\{ preview \|\| '—' \}\}/);
 });
-
 test('contact cards stack vertically on mobile so WhatsApp and email are not side by side', () => {
     const css = readFileSync(new URL('../../resources/css/app.css', import.meta.url), 'utf8');
     const mobile = css.slice(css.indexOf('@media(max-width:640px)'));
@@ -243,19 +227,17 @@ test('contact cards stack vertically on mobile so WhatsApp and email are not sid
     assert.match(mobile, /\.lf-contact-grid>a>div[^{]*\{min-width:0;width:100%\}/);
     assert.match(mobile, /\.lf-contact-grid small[^{]*\{overflow-wrap:anywhere\}/);
 });
-
 test('report export audits itself and never labels a period it did not load', () => {
     const source = read('Reports.vue');
     // Nama file dan data memakai filter yang benar-benar diterapkan, bukan form yang belum disubmit.
     assert.match(source, /const applied = props\.filters \|\| \{\}/);
-    assert.match(source, /applied\.range === 'custom' \? `\$\{applied\.from\}-\$\{applied\.to\}`/);
+    assert.match(source, /applied\.range === 'custom' \? `\$\{applied\.from\}_\$\{applied\.to\}`/);
     assert.doesNotMatch(source, /const range = form\.range === 'custom'/);
     // Ekspor klien tetap meninggalkan jejak audit, lewat fetch karena endpoint membalas JSON.
     assert.match(source, /void fetch\('\/admin\/reports\/export-audit'/);
     // Formula setelah whitespace juga dinetralkan.
     assert.match(source, /const safe = \/\^\\s\*\[=\+@-\]\/\.test\(text\)/);
 });
-
 test('notification open waits for mark-read and report export posts JSON by fetch', () => {
     const notifications = read('Notifications.vue');
     // Kunjungan Inertia kedua membatalkan POST pertama, jadi navigasi menunggu markRead.
@@ -266,7 +248,6 @@ test('notification open waits for mark-read and report export posts JSON by fetc
     assert.match(reports, /void fetch\('\/admin\/reports\/export-audit'/);
     assert.doesNotMatch(reports, /router\.post\('\/admin\/reports\/export-audit'/);
 });
-
 test('no template expression unwraps a ref that Vue already unwraps', () => {
     const pages = new URL('../../resources/js/Pages/', import.meta.url);
     const walk = dir => readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
@@ -282,9 +263,7 @@ test('no template expression unwraps a ref that Vue already unwraps', () => {
         const refs = [...script.matchAll(/const\s+(\w+)\s*=\s*ref\(/g)].map(match => match[1]);
         for (const name of refs) {
             // Di template ref sudah di-unwrap; `.value` akan mengakses properti dari nilai aslinya.
-            if (new RegExp('\\b' + name + '\\.value\\b').test(template)) {
-                offenders.push(file.pathname.split('/Pages/')[1] + ' -> ' + name);
-            }
+            if (new RegExp('\\b' + name + '\\.value\\b').test(template)) offenders.push(file.pathname + ' → ' + name);
         }
     }
     assert.deepEqual(offenders, []);
