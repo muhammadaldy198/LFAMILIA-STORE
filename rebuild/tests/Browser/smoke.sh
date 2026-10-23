@@ -19,6 +19,11 @@ if [[ -z "${CHROME_BIN}" ]]; then
   exit 1
 fi
 
+# CI memecah smoke ke dua job paralel. SMOKE_STAGES memilih tahap yang
+# dijalankan (default: semua), ADMIN_UI_SIZES membatasi viewport admin.
+STAGES=" ${SMOKE_STAGES:-responsive admin checkout} "
+has_stage() { [[ "${STAGES}" == *" $1 "* ]]; }
+
 php artisan cache:clear >/dev/null
 php artisan storage:link >/dev/null
 
@@ -92,20 +97,26 @@ assert_page "/catalog/browser-checkout-game" "100 Diamonds" 1440 1000
 assert_page "/catalog/browser-checkout-game" "Ringkasan Pesanan" 390 844
 assert_page "/catalog/browser-checkout-game" "Lihat voucher" 390 844
 
-echo "Running responsive browser smoke (maximum 5 minutes)"
-timeout --signal=TERM --kill-after=10s 5m node tests/Browser/responsive.mjs "$CHROME_BIN"
-echo "Running admin browser smoke (maximum 15 minutes)"
-timeout --signal=TERM --kill-after=10s 15m node tests/Browser/admin-ui.mjs "$CHROME_BIN"
+if has_stage responsive; then
+  echo "Running responsive browser smoke (maximum 5 minutes)"
+  timeout --signal=TERM --kill-after=10s 5m node tests/Browser/responsive.mjs "$CHROME_BIN"
+fi
+if has_stage admin; then
+  echo "Running admin browser smoke (maximum 15 minutes)"
+  timeout --signal=TERM --kill-after=10s 15m node tests/Browser/admin-ui.mjs "$CHROME_BIN"
+fi
 
-# Browser-fallback icon must exist even when no Admin favicon is configured.
-curl --fail --silent --show-error "$APP_URL/favicon.ico" >/dev/null || {
-  echo "Default favicon is unavailable (GET /favicon.ico)."
-  exit 1
-}
-echo "Running checkout Lab comparison across ten viewports"
-if ! timeout --signal=TERM --kill-after=10s 5m node tests/Browser/checkout-visual.mjs "$CHROME_BIN"; then
-  echo "Browser server HTTP errors:"
-  grep -n -E '404|Not Found' "$LOG_FILE" || true
-  exit 1
+if has_stage checkout; then
+  # Browser-fallback icon must exist even when no Admin favicon is configured.
+  curl --fail --silent --show-error "$APP_URL/favicon.ico" >/dev/null || {
+    echo "Default favicon is unavailable (GET /favicon.ico)."
+    exit 1
+  }
+  echo "Running checkout Lab comparison across ten viewports"
+  if ! timeout --signal=TERM --kill-after=10s 5m node tests/Browser/checkout-visual.mjs "$CHROME_BIN"; then
+    echo "Browser server HTTP errors:"
+    grep -n -E '404|Not Found' "$LOG_FILE" || true
+    exit 1
+  fi
 fi
 echo "M11 browser smoke passed."
