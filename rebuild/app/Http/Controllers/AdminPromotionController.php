@@ -95,35 +95,6 @@ class AdminPromotionController
             $categoryScopes->get($voucher->id, collect())->pluck('category_id')->map(fn ($id): int => (int) $id)->all(),
         ));
 
-        $products = Product::query()
-            ->with(['category', 'media'])
-            ->withCount(['packages'])
-            ->when($filters['popular_q'] !== '', function ($query) use ($filters): void {
-                $like = '%'.$filters['popular_q'].'%';
-                $query->where(fn ($query) => $query->where('name', 'like', $like)->orWhere('slug', 'like', $like));
-            })
-            ->when($filters['popular_category'], fn ($query, $categoryId) => $query->where('category_id', $categoryId))
-            ->when($filters['popular_status'] === 'popular', fn ($query) => $query->where('popular', true))
-            ->when($filters['popular_status'] === 'not_popular', fn ($query) => $query->where('popular', false))
-            ->when($filters['popular_status'] === 'active', fn ($query) => $query->where('is_active', true))
-            ->when($filters['popular_status'] === 'inactive', fn ($query) => $query->where('is_active', false))
-            ->orderByDesc('popular')
-            ->orderBy('sort_order')
-            ->orderBy('name')
-            ->paginate($filters['product_per_page'], ['*'], 'product_page')
-            ->withQueryString()
-            ->through(fn (Product $product): array => [
-                'id' => (int) $product->id,
-                'name' => $product->name,
-                'slug' => $product->slug,
-                'category_id' => (int) $product->category_id,
-                'category_name' => $product->category?->name,
-                'packages_count' => (int) $product->packages_count,
-                'popular' => (bool) $product->popular,
-                'is_active' => (bool) $product->is_active,
-                'image_url' => $product->getFirstMediaUrl('image'),
-            ]);
-
         $summaryRows = DB::table('vouchers')
             ->leftJoinSub($this->redemptionCounts($now), 'redemptions', 'redemptions.voucher_id', '=', 'vouchers.id')
             ->get([
@@ -136,7 +107,6 @@ class AdminPromotionController
         return Inertia::render('Admin/Promotions', [
             'filters' => $filters,
             'vouchers' => $vouchers,
-            'popularProducts' => $products,
             'categories' => DB::table('categories')->orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'is_active']),
             'scopeProducts' => DB::table('products')
                 ->orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'category_id', 'is_active']),

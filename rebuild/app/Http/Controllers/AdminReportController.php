@@ -12,7 +12,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AdminReportController
 {
@@ -125,55 +124,6 @@ class AdminReportController
         ]);
 
         return response()->json(['recorded' => true]);
-    }
-
-    public function export(Request $request, AdminAuditService $audit): StreamedResponse
-    {
-        [$filters, $from, $to] = $this->period($request);
-        $finance = app(AdminPermissionService::class)->allows($request->user('admin'), 'reports.finance');
-        $daily = $this->dailyRows($from, $to, $finance);
-
-        $audit->record($request, 'report.exported', 'report', 'sales', null, [
-            'range' => $filters['range'],
-            'from' => $filters['from'],
-            'to' => $filters['to'],
-            'finance' => $finance,
-        ]);
-
-        $name = 'laporan-lfamilia-'.$filters['from'].'-'.$filters['to'].'.csv';
-
-        return response()->streamDownload(function () use ($daily, $finance): void {
-            $stream = fopen('php://output', 'w');
-            if (! is_resource($stream)) {
-                return;
-            }
-
-            fwrite($stream, "\xEF\xBB\xBF");
-            fputcsv($stream, $finance
-                ? ['Tanggal', 'Pesanan', 'Berhasil', 'Gagal', 'Omzet', 'Laba Kotor', 'Diskon', 'Biaya Pembayaran']
-                : ['Tanggal', 'Pesanan', 'Berhasil', 'Gagal']);
-
-            foreach ($daily as $row) {
-                $values = [
-                    $row['day'],
-                    $row['orders_count'],
-                    $row['success_count'],
-                    $row['failed_count'],
-                ];
-                if ($finance) {
-                    $values[] = $row['revenue_idr'];
-                    $values[] = $row['profit_idr'];
-                    $values[] = $row['discount_idr'];
-                    $values[] = $row['fee_idr'];
-                }
-                fputcsv($stream, $values);
-            }
-
-            fclose($stream);
-        }, $name, [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-            'Cache-Control' => 'no-store, private',
-        ]);
     }
 
     /**
