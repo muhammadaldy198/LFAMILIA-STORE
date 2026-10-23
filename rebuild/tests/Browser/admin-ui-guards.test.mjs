@@ -347,3 +347,23 @@ test('creating an admin account asks for password confirmation', () => {
     assert.match(repo('routes/web.php'), /Route::put\('\/admin\/access\/\{admin\}'[\s\S]{0,160}admin\.password\.confirm/);
     assert.match(repo('routes/web.php'), /Route::delete\('\/admin\/access\/\{admin\}'[\s\S]{0,160}admin\.password\.confirm/);
 });
+
+// CR-05: tab Sumber pulih memakai route yang sudah ada, tanpa menghapus route
+// sumber/sync/gateway.
+test('catalog source tab uses existing mapping and sync routes', () => {
+    const catalog = read('Catalog.vue');
+    assert.match(catalog, /editTab === 'sources'/);
+    assert.match(catalog, /Sumber<\/button>/);
+    assert.match(catalog, /\/admin\/catalog\/mappings\/\$\{mapping\.id\}/);
+    assert.match(catalog, /\/admin\/catalog\/mappings\/\$\{mapping\.id\}\/sync/);
+    assert.match(catalog, /\/admin\/catalog\/products\/\$\{product\.value\.id\}\/sync/);
+    // Daftar, prioritas, status, dan sinkron ada di panel.
+    assert.match(catalog, /movePriority\(mapping, -1\)/);
+    assert.match(catalog, /toggleMapping\(mapping\)/);
+    assert.match(catalog, /mappingStatusLabel\(mapping\)/);
+    // Nama route ditulis di dalam group ber-prefix, jadi yang dicek nama lokalnya.
+    const routes = repo('routes/web.php');
+    for (const route of ['mappings.sync', 'mappings.update', 'products.sync']) {
+        assert.ok(routes.includes("'" + route + "'"), 'route ' + route + ' harus tetap ada');
+    }
+});

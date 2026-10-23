@@ -16,6 +16,7 @@ use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 use InvalidArgumentException;
@@ -1159,6 +1160,47 @@ class CatalogTest extends TestCase
         ])->assertRedirect();
         $this->assertNull($broken->fresh()->nominal_value);
         $this->assertSame('PERCENT', $broken->fresh()->pricing_mode);
+    }
+
+    public function test_catalog_source_tab_routes_stay_available_for_the_panel(): void
+    {
+        $this->actingAs($this->admin(), 'admin');
+        $category = Category::where('slug', 'game')->firstOrFail();
+        $product = Product::create([
+            'category_id' => $category->id, 'name' => 'Sumber Panel', 'slug' => 'sumber-panel',
+            'margin_percent' => 10, 'fulfillment_mode' => 'AUTO_PROVIDER', 'is_active' => true,
+        ]);
+        $package = $product->packages()->create(['code' => 'SP-10', 'name' => '10 Koin', 'is_active' => true]);
+        $mapping = ProviderMapping::create([
+            'product_package_id' => $package->id,
+            'provider_id' => Provider::where('code', 'DIGIFLAZZ')->value('id'),
+            'external_sku' => 'sumber-panel-sku', 'cost_idr' => 9000, 'store_cost_idr' => 9000,
+            'max_price_idr' => 9500, 'priority' => 3, 'is_active' => true,
+        ]);
+
+        // Panel memakai route yang sudah ada: prioritas, aktif/nonaktif, sinkron.
+        $this->put('/admin/catalog/mappings/'.$mapping->id, ['priority' => 1, 'is_active' => true])
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame(1, (int) $mapping->fresh()->priority);
+
+        $this->put('/admin/catalog/mappings/'.$mapping->id, ['priority' => 1, 'is_active' => false])
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertFalse($mapping->fresh()->is_active);
+
+        // Kunci harga manual tidak boleh terlepas hanya karena panel mengirim
+        // prioritas/status.
+        $mapping->update(['is_manual_price' => true, 'max_price_idr' => 9000, 'is_active' => true]);
+        $this->put('/admin/catalog/mappings/'.$mapping->id, [
+            'priority' => 2, 'is_active' => true, 'is_manual_price' => true,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertTrue($mapping->fresh()->is_manual_price);
+        $this->assertSame(2, (int) $mapping->fresh()->priority);
+
+        // Route sinkron per mapping dan per produk tetap ada (bukan 404/405).
+        $this->assertSame(200, $this->get('/admin/catalog')->status());
+        $this->assertTrue(Route::has('admin.catalog.mappings.update'));
+        $this->assertTrue(Route::has('admin.catalog.mappings.sync'));
+        $this->assertTrue(Route::has('admin.catalog.products.sync'));
     }
 
     public function test_activating_an_automatic_nominal_requires_an_active_provider_mapping(): void

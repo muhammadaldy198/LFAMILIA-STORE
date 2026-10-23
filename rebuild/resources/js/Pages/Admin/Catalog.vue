@@ -5,6 +5,7 @@ import AdminLayout from '../../Components/Admin/AdminLayout.vue';
 import AdminModal from '../../Components/Admin/AdminModal.vue';
 import { rupiah } from '../../lib/adminFormat';
 import { nominalMode, nominalPayload, nominalPriceValue } from '../../lib/catalogNominal';
+import { canSyncMapping, mappingPayload, mappingStatusLabel, sortMappings } from '../../lib/catalogSources';
 
 const props = defineProps({
     products: { type: Array, default: () => [] },
@@ -106,6 +107,36 @@ const openEditor = (row) => {
     editErrors.value = {};
     editorOpen.value = true;
 };
+
+/* ---------- sumber nominal ---------- */
+const sourceRows = computed(() => (product.value?.packages || []).map(row => ({
+    ...row,
+    mappings: sortMappings(row.mappings),
+})));
+
+const saveMapping = (mapping, changes) => {
+    saveBusy.value = 'source-'+mapping.id;
+    router.put(`/admin/catalog/mappings/${mapping.id}`, mappingPayload(mapping, changes), {
+        preserveScroll: true,
+        onError: bag => { editErrors.value = bag; },
+        onFinish: () => { saveBusy.value = ''; },
+    });
+};
+const toggleMapping = mapping => saveMapping(mapping, { is_active: !mapping.is_active });
+const movePriority = (mapping, direction) => saveMapping(mapping, { priority: Math.max(0, Number(mapping.priority || 0) + direction) });
+const syncMapping = mapping => {
+    saveBusy.value = 'sync-'+mapping.id;
+    router.post(`/admin/catalog/mappings/${mapping.id}/sync`, {}, {
+        preserveScroll: true, onFinish: () => { saveBusy.value = ''; },
+    });
+};
+const syncProductSources = () => {
+    saveBusy.value = 'sync-product';
+    router.post(`/admin/catalog/products/${product.value.id}/sync`, {}, {
+        preserveScroll: true, onFinish: () => { saveBusy.value = ''; },
+    });
+};
+const hasSyncableSource = computed(() => sourceRows.value.some(row => row.mappings.some(canSyncMapping)));
 
 const info = reactive({
     name: '', slug: '', publisher: '', category_id: '', fulfillment_mode: 'AUTO_PROVIDER',
@@ -656,6 +687,7 @@ onMounted(() => {
             <div class="adm-tabs" role="tablist">
                 <button type="button" role="tab" :aria-selected="editTab === 'info'" @click="editTab = 'info'">Informasi</button>
                 <button type="button" role="tab" :aria-selected="editTab === 'price'" @click="editTab = 'price'">Nominal &amp; Harga</button>
+                <button type="button" role="tab" :aria-selected="editTab === 'sources'" @click="editTab = 'sources'">Sumber</button>
                 <button type="button" role="tab" :aria-selected="editTab === 'look'" @click="editTab = 'look'">Tampilan Produk</button>
                 <button type="button" role="tab" :aria-selected="editTab === 'fields'" @click="editTab = 'fields'">Data Pelanggan</button>
             </div>
@@ -758,6 +790,46 @@ onMounted(() => {
                                 </td>
                             </tr>
                             <tr v-if="!product?.packages?.length"><td colspan="7" class="adm-empty">Belum ada nominal. Tambahkan nominal pertama.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div v-if="editTab === 'sources'" style="padding-top:12px">
+                <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:8px">
+                    <p class="adm-note">Sumber pemenuhan per nominal. Prioritas kecil dipakai lebih dulu. Sinkron hanya untuk sumber Digiflazz.</p>
+                    <button type="button" class="adm-btn sm" :disabled="!hasSyncableSource || saveBusy === 'sync-product'" @click="syncProductSources">
+                        {{ saveBusy === 'sync-product' ? 'Menyinkronkan…' : 'Sinkron produk' }}
+                    </button>
+                </div>
+                <div class="adm-scroll">
+                    <table class="adm-table">
+                        <thead><tr><th>Nominal</th><th>Sumber</th><th class="num">Modal</th><th class="num">Prioritas</th><th>Status</th><th>Aksi</th></tr></thead>
+                        <tbody>
+                            <template v-for="row in sourceRows" :key="row.id">
+                                <tr v-for="mapping in row.mappings" :key="mapping.id">
+                                    <td><strong>{{ row.name }}</strong><p class="dim">{{ row.group_name || 'Umum' }}</p></td>
+                                    <td>
+                                        {{ mapping.provider_name || mapping.provider_code }}
+                                        <p v-if="mapping.external_sku" class="dim">{{ mapping.external_sku }}</p>
+                                    </td>
+                                    <td class="num">{{ rupiah(Number(mapping.store_cost_idr ?? mapping.cost_idr ?? 0)) }}</td>
+                                    <td class="num">{{ mapping.priority }}</td>
+                                    <td>{{ mappingStatusLabel(mapping) }}</td>
+                                    <td>
+                                        <button type="button" class="adm-btn sm" :disabled="saveBusy === 'source-'+mapping.id" @click="movePriority(mapping, -1)">Naik</button>
+                                        <button type="button" class="adm-btn sm" :disabled="saveBusy === 'source-'+mapping.id" @click="movePriority(mapping, 1)">Turun</button>
+                                        <button type="button" class="adm-btn sm" :disabled="saveBusy === 'source-'+mapping.id" @click="toggleMapping(mapping)">
+                                            {{ mapping.is_active ? 'Nonaktifkan' : 'Aktifkan' }}
+                                        </button>
+                                        <button v-if="canSyncMapping(mapping)" type="button" class="adm-btn sm" :disabled="saveBusy === 'sync-'+mapping.id" @click="syncMapping(mapping)">
+                                            {{ saveBusy === 'sync-'+mapping.id ? 'Sinkron…' : 'Sinkron' }}
+                                        </button>
+                                    </td>
+                                </tr>
+                                <tr v-if="!row.mappings.length"><td><strong>{{ row.name }}</strong></td><td colspan="5" class="adm-empty">Belum ada sumber. Tambahkan lewat Impor nominal Digiflazz.</td></tr>
+                            </template>
+                            <tr v-if="!sourceRows.length"><td colspan="6" class="adm-empty">Belum ada nominal pada produk ini.</td></tr>
                         </tbody>
                     </table>
                 </div>
