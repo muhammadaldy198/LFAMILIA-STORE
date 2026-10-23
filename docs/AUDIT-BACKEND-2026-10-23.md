@@ -3,7 +3,7 @@
 Dokumen ini dibuat supaya kamu (pemilik toko, bukan programmer) bisa menilai sendiri
 apa yang saya temukan dan memutuskan apa yang dibuang atau dibiarkan.
 
-Sampai sekarang **belum ada satu pun yang dihapus**. Ini daftar periksa, bukan laporan kerja.
+**Keadaan 23 Oktober 2026, setelah eksekusi:** bagian A sudah dijalankan — 7 komponen lama, `lib/ordering.js`, 2 tes Node yang mengunci markup lama, route `GET /admin/reports/export` yang tidak terpakai, dan 338 aturan CSS `lf-admin-*` sudah dibuang (commit `760e118f`, −848 baris). Bagian B dan C masih berlaku sebagai daftar kerja. Rincian keadaan sekarang ada di `docs/ADMIN-PANEL.md` §10.
 
 ---
 

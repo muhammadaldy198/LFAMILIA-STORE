@@ -1,559 +1,405 @@
-# ADMIN-PANEL.md — Spesifikasi panel admin LFAMILIA STORE
+# ADMIN-PANEL.md — Panel admin LFAMILIA STORE
 
-**Versi:** 1.0
-**Tanggal:** 22 Oktober 2026
-**Status:** spesifikasi untuk pembangunan ulang. Panel yang berjalan sekarang masih versi lama (gelap).
-**Acuan tampilan:** `template-panel-admin-lfamilia.html` (prototipe 23 halaman). Template adalah **acuan rasa dan tata letak**, bukan acuan fitur — semua tombol di template dummy.
+**Versi:** 2.0
+**Tanggal:** 23 Oktober 2026
+**Status:** **sudah dibangun.** 21 menu + 2 halaman detail berjalan di branch `admin-panel-redesign`, belum digabung ke `main`, belum di-deploy.
+**Sumber isi:** `rebuild/routes/web.php`, controller `Admin*`, props Inertia, dan halaman Vue yang benar-benar dipakai. Template `docs/referensi/template-panel-admin-lfamilia.html` hanya menyumbang rasa visual — daftar halaman, kolom, dan tombol di dokumen ini berasal dari kode.
 **Aturan yang menang:** `docs/PRD.md`. Kalau dokumen ini bertentangan dengan PRD, PRD menang.
 
 ---
 
 ## 1. Prinsip
 
-1. **Panel adalah alat kerja, bukan pajangan.** Yang penting: cepat, jelas, tidak salah klik.
-2. **Terang.** Putih dan abu, sidebar hitam, satu aksen hijau. Tema gelap tidak dipakai.
-3. **Padat tapi kebaca.** Desktop 13px, HP 14px.
-4. **Jujur.** Belum ada data → tampilkan kosong dengan keterangan. Tidak ada angka contoh, tidak ada tombol palsu.
-5. **Satu bahasa.** Semua tulisan Indonesia. Tidak ada campuran "System Health", "Audit Log", "Manual".
-6. **Aman secara bawaan.** Aksi yang mengubah uang atau data penting selalu minta konfirmasi.
+1. **Panel adalah alat kerja, bukan pajangan.** Cepat, jelas, tidak salah klik.
+2. **Terang.** Latar abu-putih, sidebar hitam, satu aksen hijau. Tema gelap tidak dipakai.
+3. **Padat tapi kebaca.** Isi 13px, tombol 12px, jarak rapat tapi tidak berdempet.
+4. **Jujur.** Belum ada data → tulis apa adanya. Tidak ada angka contoh, tidak ada tombol palsu.
+5. **Satu bahasa.** Semua tulisan Indonesia.
+6. **Aman secara bawaan.** Aksi yang mengubah uang atau data penting minta konfirmasi; izin diperiksa server.
 
 ---
 
 ## 2. Aturan tampilan
 
-### 2.1 Warna
+### 2.1 Warna (token nyata di `resources/css/admin.css`)
 
-| Peran | Terang |
+| Peran | Nilai |
 |---|---|
-| Latar halaman | `#f4f5f3` |
-| Kartu / panel | `#ffffff` |
-| Panel sekunder | `#fafbfa` |
-| Garis | `#e2e5e0` |
-| Teks utama | `#171a17` |
-| Teks kedua | `#5c665c` |
-| Teks samar | `#8a948a` |
-| Aksen (utama) | `#65a30d` |
-| Aksen kuat | `#4d7c0f` |
-| Aksen lembut | `#eef6dd` |
-| Sidebar | `#101410` |
-| Teks sidebar | `#c9d1c5` |
-| Teks sidebar samar | `#7d887a` |
-| Merah (gagal) | `#dc2626` |
-| Kuning (perlu diperiksa) | `#b45309` |
-| Biru (sedang proses) | `#2563eb` |
-| Hijau (berhasil) | `#15803d` |
+| Latar halaman | `--a-bg` `#f4f5f3` |
+| Panel / kartu | `--a-panel` `#ffffff` |
+| Teks utama | `--a-ink` `#101410` |
+| Teks kedua | `--a-ink-2` `#3d443c` |
+| Teks samar | `--a-muted` `#6b736a` |
+| Garis | `--a-line` `#e2e5df`, garis tipis `--a-line-2` `#eef0eb` |
+| Sidebar | `--a-side` `#101410`, hover `--a-side-2` `#1a1f19` |
+| Teks sidebar | `--a-side-ink` `#e8ebe6`, samar `--a-side-muted` `#8f9a8c` |
+| Aksen | `--a-accent` `#65a30d`, terang `--a-accent-2` `#a3e635`, lembut `--a-accent-soft` `#f3f9e6` |
+| Gagal | `--a-danger` `#b42318`, latar `#fef3f2` |
+| Perlu diperiksa | `--a-warn` `#b54708`, latar `#fffaeb` |
+| Berhasil | `--a-ok` `#067647`, latar `#ecfdf3` |
 
-Aturan: **satu aksen saja**. Hijau hanya untuk tindakan utama, menu aktif, dan status berhasil. Jangan menambah warna dekoratif.
+Satu aksen saja. Hijau hanya untuk tindakan utama, menu aktif, dan status berhasil.
 
 ### 2.2 Bentuk & ukuran
 
-- Sudut: **8px** untuk kartu, tombol, input.
-- Garis: **1px** tipis. **Tanpa bayangan** — pemisah memakai garis dan latar abu.
-- Huruf: 13px desktop, 14px HP. Label huruf kecil **KAPITAL** dengan jarak huruf.
-- Angka uang rata kanan, memakai pemisah ribuan titik (`Rp 4.812.500`).
-- Baris tabel: **44px** desktop, 52px HP.
-- Tombol: tinggi 32px desktop, 40px HP. Sasaran sentuh minimal 40×40 di HP.
+- Sudut: **8px** (`--a-radius`), kontrol tinggi **34px** (`--a-control`).
+- Tanpa bayangan; pemisah memakai garis dan latar.
+- Huruf: 13px untuk isi panel, 12px untuk tombol; label kecil KAPITAL dengan jarak huruf.
+- Uang rata kanan, pemisah ribuan titik (`Rp 4.812.500`).
+- Kontrol (tombol/input) tinggi 34px; di HP semua tombol tetap bisa diklik dan halaman tidak melebar.
 
 ### 2.3 Tabel
 
-- Kolom yang tidak muat → **geser ke samping di dalam tabel**, jangan memotong halaman.
-- Kode panjang (nomor invoice) **tidak boleh membungkus jadi 3 baris**. Pakai satu baris dengan elipsis + tombol salin.
-- Baris bisa diklik untuk membuka detail.
-- Kosong → satu baris "Belum ada data" di tengah, bukan tabel kosong tanpa keterangan.
+- Tabel lebar **digeser mendatar** di dalam kartunya (`min-width: 760px`), halaman tidak ikut melebar.
+- Nomor invoice satu baris + tombol salin.
+- Kosong → satu baris keterangan di tengah.
 
 ### 2.4 Grafik
 
-- Grafik penjualan **wajib ada angkanya** (di atas batang atau saat disentuh). Template tidak punya angka; itu tidak ditiru.
+- Grafik penjualan **selalu punya angka**; sumbu dan rentang tanggal ditulis jelas.
 - Omzet hanya dari pesanan lunas, waktu WIB.
-- Rentang tanggal ditampilkan jelas di bawah grafik.
+
+### 2.5 Pop-up
+
+Semua penyuntingan (tambah/ubah) memakai **pop-up tengah** (`AdminModal`). Pengecualian: detail tiket di Layanan Pelanggan tampil sebagai panel di halaman, bukan pop-up.
 
 ---
 
 ## 3. Struktur & navigasi
 
-Sidebar kiri tetap (224px), gelap, berkelompok. Di HP jadi laci yang dibuka tombol.
+Sidebar 216px, gelap, berkelompok; di HP jadi laci. Urutan dan label diambil dari `AdminLayout.vue` + `AdminPermissionService::menu()`.
 
-```
-Dashboard
+| Grup | Menu | Alamat | Izin |
+|---|---|---|---|
+| — | Dashboard | `/admin/panel` | `dashboard.view` |
+| Transaksi | Pesanan | `/admin/orders` | `orders.view` |
+| Transaksi | Manual | `/admin/fulfillment` | `fulfillment.manage` |
+| Transaksi | Promo | `/admin/vouchers` | `vouchers.manage` |
+| Katalog | Produk | `/admin/catalog` | `catalog.manage` |
+| Katalog | Kategori | `/admin/catalog/categories` | `catalog.manage` |
+| Konten | Banner & Konten | `/admin/content` | `content.manage` |
+| Konten | Tampilan Toko | `/admin/content/presentation` | `content.manage` |
+| Integrasi | Digiflazz | `/admin/digiflazz` | `providers.manage` |
+| Integrasi | Validasi Akun | `/admin/nickname-tools` | Super Admin |
+| Integrasi | Provider | `/admin/providers` | `providers.manage` |
+| Keuangan | Pembayaran | `/admin/payments` | `payments.manage` |
+| Keuangan | Laporan | `/admin/reports` | `reports.view` |
+| Pelanggan | Pelanggan | `/admin/customers` | `customers.view` |
+| Pelanggan | Layanan Pelanggan | `/admin/support` | `support.manage` |
+| Sistem | Notifikasi | `/admin/notifications` | `notifications.view` |
+| Sistem | Integrasi | `/admin/integrations` | Super Admin |
+| Sistem | Kesehatan Sistem | `/admin/health` | Super Admin |
+| Sistem | Catatan Audit | `/admin/audit` | Super Admin |
+| Pengaturan | Admin & Akses | `/admin/access` | Super Admin |
+| Pengaturan | Pengaturan | `/admin/settings` | `settings.manage` |
 
-TRANSAKSI
-  Pesanan                 (jumlah yang perlu perhatian)
-  Antrean Manual          (jumlah menunggu)
-  Promo & Voucher
+Aturan:
 
-KATALOG
-  Produk
-  Kategori
-
-KONTEN
-  Banner & Konten
-  Tampilan Toko
-
-INTEGRASI
-  Digiflazz
-  Validasi Akun
-  Provider
-
-KEUANGAN
-  Pembayaran
-  Laporan
-
-PELANGGAN
-  Pelanggan
-
-LAYANAN PELANGGAN
-  Bantuan               (jumlah tiket terbuka)
-
-SISTEM
-  Integrasi
-  Kesehatan Sistem
-  Catatan Audit
-  Notifikasi
-
-PENGATURAN
-  Admin & Akses
-  Pengaturan
-```
-
-Aturan navigasi:
-
-- **Nama menu memakai bahasa Indonesia.** "System Health" → **Kesehatan Sistem**. "Audit Log" → **Catatan Audit**. "Manual" → **Antrean Manual**. "Validasi Akun" tetap.
-- **Menu Integrasi (Sistem) dan grup Integrasi berbeda.** Grup = kategori; menu = halaman status sambungan. Beri keterangan di judul halaman supaya tidak tertukar.
-- Menu yang tidak boleh diakses peran tetap tidak muncul (bukan muncul lalu ditolak).
-- **Angka kecil di menu** (jumlah pesanan/tiket) hanya muncul kalau lebih dari nol.
-- Pencarian global di topbar, jalan dengan `Ctrl+K`.
+- **Server tetap penentu.** Sidebar hanya menampilkan menu yang dikirim backend; menyembunyikan menu bukan pengaman.
+- Label yang dipakai apa adanya: **Manual**, **Promo**, **Layanan Pelanggan** (grup Pelanggan). Istilah Inggris lama sudah diganti: `System Health` → **Kesehatan Sistem**, `Audit Log` → **Catatan Audit**.
+- Pencarian global di kepala panel (`/admin/search`) mencari pesanan, pelanggan, dan produk.
 
 ---
 
-## 4. Halaman — 23 halaman
+## 4. Halaman
 
-Untuk tiap halaman: **untuk apa**, **isi**, **aksi**, dan **catatan teknis** (apakah controller sekarang cukup).
+Format tiap halaman: **untuk apa · isi · aksi · catatan**. Nama berkas Vue ada di `rebuild/resources/js/Pages/Admin/`.
 
-### 4.1 Dashboard
+### 4.1 Dashboard — `/admin/panel`
+`AdminDashboardController` · izin `dashboard.view` · `Dashboard.vue`
 
-**Untuk apa:** tahu keadaan toko dalam 10 detik.
+**Untuk apa.** Melihat keadaan toko hari ini dalam satu layar.
+**Isi.** Pemilih rentang; kotak angka (pesanan, omzet, laba bila berizin, pesanan perlu perhatian); grafik pesanan & omzet berangka; pesanan terbaru; aktivitas terbaru; status integrasi; notifikasi terbaru; saldo Digiflazz dan waktu sinkron terakhir.
+**Aksi.** Muat ulang, tandai notifikasi dibaca, buka pesanan/integrasi.
+**Catatan.** Omzet, laba, dan saldo penyedia hanya dikirim bila izinnya ada (`canViewFinance`, `canSeeBalance`).
 
-**Isi:**
-- 8 kartu angka: omzet hari ini, pesanan hari ini, produk aktif, saldo Digiflazz, pembayaran berhasil, saldo wallet pelanggan, tiket terbuka, antrean manual.
-- Grafik penjualan (7/30 hari), bisa ganti antara omzet dan jumlah pesanan. **Dengan angka.**
-- Tabel 5 pesanan terbaru.
-- Tiga panel bawah: aktivitas terbaru, status integrasi, notifikasi terbaru.
-- Tombol muat ulang + waktu terakhir diperbarui.
+### 4.2 Pesanan — `/admin/orders`
+`AdminOrdersController` · `orders.view` · `Orders.vue`
 
-**Aksi:** pindah ke pesanan, buka detail, buka audit, buka integrasi.
+**Untuk apa.** Mencari pesanan dan menindak yang macet.
+**Isi.** Kotak angka; filter (status, metode bayar, penyedia, tanggal, pencarian); tabel pesanan dengan nomor, pelanggan, produk, nominal, status, waktu; aktivitas terbaru.
+**Aksi.** Catat pesanan manual (`POST /admin/orders/manual`), terapkan/hapus filter, buka detail, salin nomor, unduh CSV (`GET /admin/orders/export`).
+**Catatan.** Urutan mendahulukan pesanan yang perlu perhatian, lalu yang menunggu.
 
-**Catatan:** controller sekarang sudah menyediakan angka. Yang perlu ditambah: **keadaan kosong** yang jelas saat toko belum punya transaksi, dan angka di grafik.
+### 4.3 Detail Pesanan — `/admin/orders/{id}`
+`AdminOrderDetailController` · `orders.view` · `OrderDetail.vue`
+
+**Untuk apa.** Menyelesaikan satu pesanan.
+**Isi.** Status saat ini; ringkasan pesanan; pelanggan & tujuan; hasil pengiriman (percobaan otomatis/manual); pembayaran; riwayat pesanan; panel proses.
+**Aksi.** Salin nomor, cek ulang pembayaran (bila `can_check`), kirim ulang pengiriman, batalkan pesanan, selesaikan/gagalkan percobaan manual.
+**Catatan.** Pembatalan memakai pop-up + konfirmasi kata sandi server. Tombol muncul menurut props (`canCancel`, `canResendDelivery`, `canCheckFulfillment`), bukan disembunyikan di klien saja.
+
+### 4.4 Antrean Manual — `/admin/fulfillment`
+`AdminFulfillmentController` · `fulfillment.manage` · `Fulfillment.vue`
+
+**Untuk apa.** Menangani pesanan yang tidak selesai otomatis.
+**Isi.** Kotak angka; filter status; tabel percobaan pengiriman (pesanan, produk, tujuan, percobaan ke-, status, waktu); waktu pembaruan.
+**Aksi.** Tangani (pop-up): ulangi, rekonsiliasi, nyatakan selesai, nyatakan gagal — `POST /admin/fulfillment/{attemptId}/{retry|reconcile|complete|fail}`.
+**Catatan.** Gagal terkonfirmasi menaikkan pesanan ke `BLOCKED`; tidak ada pengiriman ulang tanpa bukti.
+
+### 4.5 Promo — `/admin/vouchers`
+`AdminPromotionController` · `vouchers.manage` · `Promotions.vue`
+
+**Untuk apa.** Mengatur voucher dan diskon.
+**Isi.** Ringkasan voucher; filter (kode, jenis diskon, status); tabel voucher (kode, nama, jenis, nilai, kuota terpakai, masa berlaku, status).
+**Aksi.** Tambah/ubah voucher (pop-up, cakupan produk & kategori lewat pemilih berganda), aktifkan/nonaktifkan, hapus.
+**Catatan.** Produk populer **tidak** lagi diatur di sini — pindah ke menu Produk.
+
+### 4.6 Produk — `/admin/catalog`
+`AdminCatalogController` · `catalog.manage` · `Catalog.vue`
+
+**Untuk apa.** Mengelola katalog yang dijual.
+**Isi.** Dua tab: **Produk Otomatis** dan **Produk Manual**. Filter (kategori, status, pencarian), paginasi server; tabel produk (gambar, nama, kategori, jumlah nominal, status, penanda populer); pratinjau harga di kasir.
+**Aksi.** Tambah produk, ubah, hapus, sinkron per produk, atur margin global + pratinjau, kunci harga, kelola nominal (tambah/ubah/hapus/urutkan/duplikat), kelola sumber Digiflazz, kelola stok kode voucher, kelola pemberitahuan produk, unggah/hapus media, atur kode kolom & field.
+**Catatan.** Editor produk 4 tab: Produk, Nominal, Sumber, Pemberitahuan. Produk yang sudah punya riwayat pesanan tidak bisa dihapus — nonaktifkan saja. Tombol "Impor ke produk" ada di menu Digiflazz dan mengarah ke halaman ini (`/admin/catalog?import=digiflazz`); layar pemilihan nominalnya belum dibuat — lihat §10.
+
+### 4.7 Kategori — `/admin/catalog/categories`
+`AdminCatalogController@categories` · `catalog.manage` · `Categories.vue`
+
+**Untuk apa.** Menyusun kelompok produk.
+**Isi.** Tabel kategori: nama, jumlah produk, status, urutan, gambar.
+**Aksi.** Tambah/ubah/hapus kategori (pop-up).
+**Catatan.** Kategori yang masih dipakai produk tidak bisa dihapus.
+
+### 4.8 Banner & Konten — `/admin/content`
+`AdminContentController` · `content.manage` · `Content.vue`
+
+**Untuk apa.** Mengatur isi toko yang dibaca pelanggan.
+**Isi.** Tiga bagian, masing-masing berisi sub-tab:
+- **Tampilan Toko** — Banner Utama, Pop-up Pengumuman, Logo & Gambar Cadangan, Teks Footer & Bantuan.
+- **Bantuan & Kebijakan** — Pertanyaan Umum (FAQ), Kebijakan Toko.
+- **Berita & Ulasan** — Berita, Ulasan Pelanggan.
+**Aksi.** Tambah/ubah/hapus banner, pop-up, berita, FAQ, halaman kebijakan; ubah/aktifkan aset; setujui/hapus ulasan; simpan teks footer.
+**Catatan.** Gambar diunggah lewat `AdminMedia` (JPG/PNG/WebP).
+
+### 4.9 Tampilan Toko — `/admin/content/presentation`
+`AdminPresentationController` · `content.manage` · `Presentation.vue`
+
+**Untuk apa.** Mengubah wajah toko tanpa menyentuh kode.
+**Isi.** Empat tab: **Teks halaman**, **Font & Panel**, **Bagian Homepage**, **Warna Website**. Daftar bagian diambil dari `registry`, nilai tersimpan dari `presentation`/`theme`.
+**Aksi.** Ubah tiap bagian (pop-up), simpan teks (`PUT /admin/content/presentation`), simpan warna (`PUT /admin/content/theme`).
+**Catatan.** Semua warna toko diatur di sini — bukan di CSS.
+
+### 4.10 Digiflazz — `/admin/digiflazz`
+`AdminDigiflazzController` · `providers.manage` · `Digiflazz.vue`
+
+**Untuk apa.** Memantau harga dan sambungan Digiflazz.
+**Isi.** Ringkasan (normal / peringatan / kritis, bisa diklik sebagai filter); daftar harga (kategori, merek, produk, harga modal, status); pengaturan pemantauan; transaksi Digiflazz terbaru; status sambungan dan waktu sinkron.
+**Aksi.** Sinkron daftar harga (`POST /admin/digiflazz/sync` — memengaruhi **seluruh katalog**), impor ke produk (tautan ke Produk), simpan pengaturan pemantauan, terapkan/hapus filter.
+**Catatan.** Sinkron otomatis berjalan tiap 5 menit lewat penjadwal. Sinkron manual dan otomatis memakai jalur yang sama.
+
+### 4.11 Validasi Akun — `/admin/nickname-tools`
+`AdminNicknameController` · Super Admin · `NicknameTools.vue`
+
+**Untuk apa.** Menguji layanan cek nama akun game.
+**Isi.** Empat tab: **Cek nama game**, **Cek server**, **Cek PLN**, **Daftar kode game**. Hasil pemeriksaan dan alamat layanan yang dipakai.
+**Aksi.** Cek data (`POST /admin/nickname-tools/check`), tambah/ubah/hapus/urutkan kode game.
+**Catatan.** Kode game di sini yang dipakai `customer_no_template` di Produk.
+
+### 4.12 Provider — `/admin/providers`
+`AdminProviderController` · `providers.manage` · `Providers.vue`
+
+**Untuk apa.** Melihat penyedia dan nominal yang dilayaninya.
+**Isi.** Ringkasan; daftar penyedia (status, prioritas); tabel pemetaan nominal per produk beserta status rekonsiliasi.
+**Aksi.** Ubah penyedia (status/prioritas) lewat pop-up; terapkan filter.
+**Catatan.** Failover otomatis dimatikan; penyedia bermasalah ditandai, bukan dipindah diam-diam.
+
+### 4.13 Pembayaran — `/admin/payments`
+`AdminPaymentController` · `payments.manage` · `Payments.vue`
+
+**Untuk apa.** Mengatur cara pelanggan membayar.
+**Isi.** Tiga tab: **Metode Pembayaran**, **Transaksi Pembayaran**, **Halaman Pembayaran**. Bagian: gateway & kanal, QRIS manual, top up LFAMILIA Coin, alamat notifikasi gateway, pengaturan halaman pembayaran (warna aksen, banner, teks, sakelar).
+**Aksi.** Tambah/ubah/hapus kanal, sinkron kanal, unggah logo & gambar QRIS, aktifkan QRIS manual, konfirmasi pembayaran QRIS manual, simpan top up, ubah route gateway, simpan pengaturan halaman + unggah banner, pulihkan metode bawaan.
+**Catatan.** Konfirmasi QRIS manual memakai konfirmasi kata sandi. DOKU tampil sebagai belum dipakai.
+
+### 4.14 Laporan — `/admin/reports`
+`AdminReportController` · `reports.view` (+ `reports.finance`) · `Reports.vue`
+
+**Untuk apa.** Membaca angka penjualan dan operasi.
+**Isi.** Tiga tab: **Penjualan**, **Produk**, **Operasional**. Kotak angka, grafik pesanan per hari, rincian harian, produk terlaris, kategori teratas, kinerja penyedia, status pesanan/pembayaran/pengiriman, saldo pelanggan saat ini.
+**Aksi.** Pilih rentang, tampilkan, unduh CSV (dihitung di peramban, lalu dicatat ke audit lewat `POST /admin/reports/export-audit`).
+**Catatan.** Baris omzet/laba/diskon/biaya hanya dikirim bila `reports.finance`; batas hari 00:00–23:59 WIB.
+
+### 4.15 Pelanggan — `/admin/customers`
+`AdminCustomerController` · `customers.view` · `Customers.vue`
+
+**Untuk apa.** Melihat dan mengatur pelanggan.
+**Isi.** Dua tab: **Daftar pelanggan** (ringkasan, filter, tabel: nama, kontak, tingkat, total belanja, pesanan berhasil, saldo, tiket terbuka, status) dan **Tingkat member** (ambang belanja + diskon per tingkat, catatan manfaat).
+**Aksi.** Buka detail, atur ambang & diskon tiap tingkatan (`PUT /admin/settings/membership/{code}`, bila `canManageMembershipRules`), atur pembersihan akun kosong (`PUT /admin/customers/cleanup/settings`, `POST /admin/customers/cleanup/run`), terapkan filter.
+**Catatan.** MAFIA adalah tingkat internal; tidak pernah ditampilkan sebagai tingkatan ke pelanggan.
+
+### 4.16 Detail Pelanggan — `/admin/customers/{userId}`
+`AdminCustomerController@show` · `customers.view` · `CustomerDetail.vue`
+
+**Untuk apa.** Melihat satu pelanggan dari profil sampai uangnya.
+**Isi.** Tujuh bagian berurutan: Profil, Tingkat member, Riwayat pesanan, Perubahan saldo, Riwayat top up, Tiket bantuan, Akun game tersimpan. Ringkasan total belanja, pesanan berhasil, saldo.
+**Aksi.** Atur pelanggan (pop-up), **penyesuaian saldo** (Super Admin, pop-up + konfirmasi kata sandi, alasan wajib, arah tambah/kurang), hapus pelanggan bila `deletable`, buka tiket/pesanan.
+**Catatan.** Namanya "Penyesuaian saldo", bukan "Refund". Batas jumlah dan alasan divalidasi di klien dan server.
+
+### 4.17 Layanan Pelanggan — `/admin/support`
+`AdminSupportController` · `support.manage` · `Support.vue`
+
+**Untuk apa.** Menjawab tiket pelanggan dan guest.
+**Isi.** Kotak angka (terbuka, dikerjakan, selesai, ditutup); filter jenis/status/pencarian; tabel tiket; panel detail tiket di samping (bukan pop-up) berisi percakapan dan data pelanggan/pesanan.
+**Aksi.** Buka tiket, balas/tutup (`PUT /admin/support/{id}`), atur balasan cepat (`PUT /admin/support/quick-replies`).
+**Catatan.** Balasan cepat tidak boleh memuat data pelanggan lain.
+
+### 4.18 Notifikasi — `/admin/notifications`
+`AdminNotificationController` · `notifications.view` · `Notifications.vue`
+
+**Untuk apa.** Membaca pemberitahuan panel.
+**Isi.** Daftar notifikasi (belum dibaca ditandai), waktu WIB, jenis, tautan sasaran, paginasi.
+**Aksi.** Tandai dibaca (`POST /admin/notifications/{id}/read`), tandai semua dibaca (`POST /admin/notifications/read-all`).
+**Catatan.** Waktu kosong/rusak tidak boleh membuat halaman error.
+
+### 4.19 Integrasi — `/admin/integrations`
+`AdminIntegrationController` · Super Admin · `Integrations.vue`
+
+**Untuk apa.** Memasang kunci sambungan layanan.
+**Isi.** Sembilan tab: Digiflazz, Validasi Akun, Midtrans Snap, DOKU Checkout, Resend Email, Google OAuth, Notifikasi Telegram, Notifikasi Discord, Cloudflare Turnstile. Tiap tab: status, tiga kotak keadaan, kolom kredensial, alamat callback untuk disalin, petunjuk lipatan alamat otomatis.
+**Aksi.** Simpan integrasi (`PUT /admin/integrations/{code}`), tes koneksi (`POST /admin/integrations/{code}/test`), kirim email uji (Resend), salin alamat callback, hapus data akses.
+**Catatan.** Kredensial tidak pernah ditampilkan; kosong = pertahankan, isi = ganti. Tes koneksi tidak memakai transaksi nyata. DOKU tidak bisa diaktifkan tanpa keputusan tertulis.
+
+### 4.20 Kesehatan Sistem — `/admin/health`
+`AdminHealthController` · Super Admin · `Health.vue`
+
+**Untuk apa.** Mengetahui apa yang rusak sebelum pelanggan tahu.
+**Isi.** Lima bagian: Perlu perhatian (di urutan pertama), Pemeriksaan komponen, Kesehatan integrasi, Gateway pembayaran, Lingkungan aplikasi; waktu pemeriksaan; pesanan dengan pengiriman basi (`stale_fulfillment`); pekerjaan gagal.
+**Aksi.** Muat ulang, buka integrasi terkait.
+**Catatan.** Pemeriksaan yang belum pernah jalan ditulis **"Belum diperiksa"**, bukan hijau.
+
+### 4.21 Catatan Audit — `/admin/audit`
+`AdminAuditController` · Super Admin · `Audit.vue`
+
+**Untuk apa.** Melacak siapa melakukan apa.
+**Isi.** Ringkasan; filter waktu, admin, jenis aktivitas, jenis sasaran; tabel waktu/admin/aktivitas/sasaran/IP/detail; paginasi.
+**Aksi.** Terapkan/hapus filter, muat ulang.
+**Catatan.** Hanya baca — tidak bisa diubah atau dihapus. IP disamarkan sebagian.
+
+### 4.22 Admin & Akses — `/admin/access`
+`AdminAccessController` · Super Admin · `Access.vue`
+
+**Untuk apa.** Mengatur siapa boleh masuk panel.
+**Isi.** Ringkasan; daftar admin (nama, email, peran, status, login terakhir); editor izin 14 butir; aktivitas admin terbaru.
+**Aksi.** Tambah/ubah admin (pop-up), atur izin, nonaktifkan, hapus — dengan konfirmasi kata sandi.
+**Catatan.** Admin tidak bisa menaikkan izinnya sendiri atau mengubah Super Admin lain.
+
+### 4.23 Pengaturan — `/admin/settings`
+`AdminSettingsController` · `settings.manage` · `Settings.vue`
+
+**Untuk apa.** Identitas toko dan ekspor konfigurasi.
+**Isi.** Toko & kontak (nama, tagline, legal, registrasi, WhatsApp, Instagram, email, Discord, alamat, jam operasional); ringkasan kelengkapan; ekspor pengaturan (Super Admin).
+**Aksi.** Simpan pengaturan toko (`PUT /admin/settings`), unduh konfigurasi (`GET /admin/configuration/export`).
+**Catatan.** Discord di sini untuk tautan footer toko, bukan notifikasi admin. Tingkatan member diatur di menu Pelanggan.
 
 ---
 
-### 4.2 Pesanan
+## 5. Halaman masuk
 
-**Untuk apa:** mencari pesanan dan memeriksa keadaannya.
+| Halaman | Alamat | Berkas |
+|---|---|---|
+| Masuk | `/admin/login` | `Login.vue` |
+| Lupa kata sandi | `/admin/forgot-password` | `ForgotPassword.vue` |
+| Atur ulang kata sandi | `/admin/reset-password/{token}` | `ResetPassword.vue` |
+| Konfirmasi kata sandi | `/admin/password/confirm` | `PasswordConfirm.vue` |
 
-**Isi:**
-- Filter: kata kunci (invoice/pelanggan), status, tanggal, kanal pembayaran.
-- Tabel: nomor pesanan, pelanggan, produk & tujuan, pembayaran, status bayar, status proses, tindakan.
-- Pilihan baris (untuk aksi massal kalau ada).
-- Ekspor hasil filter.
-- Tombol **Catat pesanan manual**.
-
-**Aksi:** buka detail, salin nomor, catat pesanan manual.
-
-**Catatan:** `AdminOrdersController` sudah menangani semua ini. Yang perlu diperiksa: kolom status sekarang mencampur status bayar dan status proses — di layar dipisah dua kolom, dan hanya status pelanggan (6 status) yang dipakai untuk label.
+**Catatan:** keempat halaman ini masih memakai gaya lama (`lf-admin-auth`, tema gelap kebiruan). Sisa gaya itu sengaja dipertahankan supaya halaman masuk tetap bisa dipakai; menyamakannya ke tema terang adalah pekerjaan terpisah.
 
 ---
 
-### 4.3 Detail Pesanan
+## 6. Peran & izin
 
-**Untuk apa:** menyelesaikan satu pesanan.
-
-**Isi (urut atas ke bawah):**
-1. **Status saat ini** — besar, jelas, dengan alasan.
-2. **Ringkasan pesanan** — nomor, waktu, produk, nominal, total.
-3. **Pelanggan dan tujuan** — siapa, kontak, data tujuan yang dipakai.
-4. **Hasil pengiriman** — serial number / isi kiriman, sumber, waktu.
-5. **Riwayat pesanan** — semua kejadian, urut waktu.
-6. **Pembayaran** — percobaan bayar, status, bukti.
-7. **Proses pesanan** — tombol tindakan.
-
-**Aksi:** periksa pembayaran, konfirmasi pembayaran manual, kirim ulang, batalkan, nyatakan gagal, hubungi pelanggan, salin nomor.
-
-**Aturan:**
-- **Pesanan yang sudah berhasil tidak bisa dibatalkan.**
-- Aksi yang mengubah uang **wajib konfirmasi** dan wajib alasan.
-- Tombol "selesaikan pesanan" hanya muncul kalau memang ada yang bisa diselesaikan.
-
-**Catatan:** `AdminOrderDetailController` + `AdminOrderCancellationController` sudah ada. Perlu ditambah: alasan wajib pada pembatalan, dan pemisahan tegas antara "gagal" dan "perlu diperiksa".
-
----
-
-### 4.4 Antrean Manual
-
-**Untuk apa:** memproses pesanan yang tidak otomatis.
-
-**Isi:**
-- Filter status dan tanggal.
-- Tabel: pesanan, pelanggan, produk & tujuan, sumber, status, aksi.
-- Penanda **lewat 1 jam** (jam layanan aktif) berwarna kuning.
-- Jam operasional produk ditampilkan di baris kalau di luar jam.
-
-**Aksi:** tangani (buka lembar kerja), lihat pesanan.
-
-**Catatan:** `AdminFulfillmentController` sudah ada. Perlu ditambah: hitungan 1 jam berbasis jam layanan, bukan jam biasa.
-
----
-
-### 4.5 Promo & Voucher
-
-**Untuk apa:** mengatur kode diskon dan stok kode voucher.
-
-**Isi:**
-- Filter kata kunci dan status.
-- Tabel: voucher, diskon, minimum, pemakaian, periode, cakupan, status, tindakan.
-
-**Aksi:** tambah, ubah, nonaktifkan, hapus.
-
-**Catatan:** `AdminPromotionController` sudah ada. Stok kode voucher (gift card) dikelola dari halaman Produk, bukan di sini.
-
----
-
-### 4.6 Produk
-
-**Untuk apa:** mengatur katalog dan harga.
-
-**Isi:**
-- Pencarian (nama, merek, nominal).
-- Tab: Produk Otomatis / Produk Manual.
-- Tabel: produk, kategori, jenis, jumlah nominal, urutan, status, aksi.
-- Panel **Impor nominal Digiflazz** (pratinjau → setujui).
-- Pengaturan harga: margin global, per game, per nominal.
-
-**Aksi:** tambah produk, ubah, atur nominal, impor, sinkron, atur urutan, aktif/nonaktif.
-
-**Aturan:**
-- Impor **selalu lewat pratinjau**. Tidak ada impor langsung tanpa melihat perubahan.
-- Harga jual tidak boleh di bawah modal. Kalau terjadi, tampilkan peringatan dan tolak simpan.
-- Perubahan harga tercatat di audit.
-
-**Catatan:** `AdminCatalogController` + `AdminCatalogMediaController` sudah ada dan lengkap. Ini halaman paling berat; jangan disederhanakan sampai kehilangan fungsi.
-
----
-
-### 4.7 Kategori
-
-**Isi:** daftar kategori dengan ikon, urutan, status. Aksi: tambah, ubah, hapus, atur urutan.
-
-**Catatan:** bagian dari `AdminCatalogController`.
-
----
-
-### 4.8 Banner & Konten
-
-**Untuk apa:** mengatur semua yang dilihat pengunjung.
-
-**Isi (dalam tab):**
-- Banner utama
-- Pop-up pengumuman
-- Logo & gambar cadangan
-- Teks footer & bantuan
-- Berita & ulasan
-- Bantuan & kebijakan (FAQ, halaman hukum)
-
-**Aksi:** tambah, ubah, hapus, atur urutan, unggah gambar.
-
-**Aturan:**
-- **Halaman hukum (`/terms`, `/privacy`, `/refund`) tidak boleh dihapus**, hanya diedit isinya.
-- Gambar wajib punya teks alternatif.
-
-**Catatan:** `AdminContentController` + `AdminPresentationController` sudah ada.
-
----
-
-### 4.9 Tampilan Toko
-
-**Untuk apa:** mengatur rupa toko di sisi pelanggan.
-
-**Isi:** teks halaman, font & panel, bagian homepage, warna website.
-
-**Aturan penting:** ini **bukan** halaman untuk mengubah panel admin. Ini mengubah **toko yang dilihat pembeli**. Beri peringatan jelas di atas halaman supaya admin tidak bingung.
-
-**Catatan:** `AdminPresentationController` sudah ada.
-
----
-
-### 4.10 Digiflazz
-
-**Untuk apa:** memantau pemasok utama.
-
-**Isi:**
-- Saldo, status sambungan, waktu sinkron terakhir.
-- Pengaturan: ambang saldo rendah (5 transaksi), interval sinkron (minimal 5 menit).
-- Tabel nominal tertaut: produk & nominal, SKU/seller, harga modal, stok & jam layanan, kondisi, aksi.
-- Tabel transaksi Digiflazz terbaru.
-
-**Aksi:** sinkron daftar harga, impor ke produk, simpan pengaturan.
-
-**Aturan:**
-- **Kredensial tidak pernah tampil.** Hanya status "tersambung / belum".
-- Sinkron tidak boleh menghapus produk yang sudah ada.
-- Tampilkan peringatan keras kalau saldo di bawah ambang.
-
-**Catatan:** `AdminDigiflazzController` + `AdminDigiflazzMonitorService` sudah ada.
-
----
-
-### 4.11 Validasi Akun
-
-**Untuk apa:** mengecek nama pemain sebelum pembeli bayar.
-
-**Isi:**
-- Alat cek: nama game, server, PLN.
-- Tabel kode game: urutan, game, kode, dukungan cek nama, server/zona, region, status, produk tertaut.
-
-**Aksi:** cek data, bersihkan hasil, tambah/ubah kode game.
-
-**Aturan:** kalau layanan cek mati, **pembelian tetap jalan**. Halaman ini tidak boleh jadi penghalang.
-
-**Catatan:** `AdminNicknameController` sudah ada.
-
----
-
-### 4.12 Provider
-
-**Isi:** daftar penyedia (Digiflazz, dan lainnya), jenis layanan, status koneksi, jumlah nominal tertaut, performa 24 jam, urutan.
-
-**Aksi:** ubah, buka integrasi, kelola di produk.
-
-**Catatan:** `AdminProviderController` sudah ada.
-
----
-
-### 4.13 Pembayaran
-
-**Untuk apa:** mengatur uang masuk.
-
-**Isi (dalam tab):**
-- **Metode pembayaran:** metode, jenis, biaya ditagih, kesiapan, status.
-- **Pengaturan Top Up:** aktif/tidak, nominal minimum.
-- **QRIS manual:** gambar QRIS, status, daftar menunggu konfirmasi.
-- **URL Notifikasi Gateway:** alamat webhook yang harus dipasang di Midtrans (dengan tombol salin).
-- **Tampilan Checkout.**
-- **Transaksi Pembayaran:** referensi, pelanggan, metode, status, waktu.
-
-**Aksi:** tambah/ubah/hapus metode, pulihkan bawaan, konfirmasi QRIS manual, atur top up.
-
-**Aturan:**
-- **Tidak ada tombol refund.** Tidak ada.
-- Konfirmasi QRIS manual **wajib** menampilkan jumlah dan nama pembayar sebelum disetujui.
-- **Blok "Refund Top Up Perlu Rekonsiliasi" di template TIDAK dibuat.** Yang ada hanya "Top up perlu diperiksa" — tanpa aksi memindahkan uang.
-
-**Catatan:** `AdminPaymentController` sudah ada dan cukup besar. Perlu disesuaikan: buang semua jalur yang berujung pada pemindahan uang otomatis.
-
----
-
-### 4.14 Laporan
-
-**Isi:** tab Penjualan / Produk / Operasional. Tabel omzet, pesanan, berhasil, laba kotor. Ekspor.
-
-**Aturan:** batas hari **00:00–23:59 WIB**. Angka harus sama dengan dashboard.
-
-**Catatan:** `AdminReportController` sudah ada.
-
----
-
-### 4.15 Pelanggan
-
-**Isi:** pencarian, filter, tabel pelanggan. Tab **Tingkat member** untuk mengatur ambang dan diskon per tingkat.
-
-**Aksi:** buka detail, ubah tingkatan, atur pembersihan akun kosong.
-
-**Catatan:** `AdminCustomerController` sudah ada.
-
----
-
-### 4.16 Detail Pelanggan
-
-**Isi:** profil, tingkat member, riwayat pesanan, saldo & top up, tiket bantuan, akun game tersimpan.
-
-**Aksi:** atur pelanggan, **penyesuaian saldo** (Super Admin saja), buka bantuan, buka pesanan.
-
-**Aturan penyesuaian saldo:**
-- Hanya Super Admin. Tombol tidak muncul untuk Admin biasa.
-- Wajib: jumlah, alasan, rujukan (kalau ada).
-- Konfirmasi kata sandi sebelum menyimpan.
-- Masuk audit log, tidak bisa dihapus.
-- **Namanya "Penyesuaian saldo", bukan "Refund".**
-
-**Catatan:** `AdminCustomerController::updateWallet` sudah ada. Perlu diperketat: khusus Super Admin, alasan wajib.
-
----
-
-### 4.17 Bantuan Pelanggan
-
-**Isi:** daftar tiket, detail tiket, balasan cepat.
-
-**Aksi:** balas, tutup, buka data pelanggan, buka pesanan, atur balasan cepat.
-
-**Aturan:** balasan cepat tidak boleh memuat data pelanggan lain.
-
-**Catatan:** `AdminSupportController` sudah ada.
-
----
-
-### 4.18 Admin & Akses
-
-**Isi:** daftar admin, peran, status, hak akses, login terakhir. Aktivitas admin terbaru.
-
-**Aksi:** tambah admin, ubah, nonaktifkan, hapus, atur izin.
-
-**Aturan:** hanya Super Admin. Admin tidak bisa menaikkan izinnya sendiri.
-
-**Catatan:** `AdminAccessController` sudah ada.
-
----
-
-### 4.19 Pengaturan
-
-**Isi:** identitas toko (nama, tagline, legal, registrasi), kontak (WhatsApp, Instagram, email, Discord), alamat, jam operasional, ekspor pengaturan.
-
-**Aturan:** **Discord di sini untuk tautan footer toko**, bukan untuk notifikasi admin. Dua hal berbeda, jangan digabung.
-
-**Catatan:** `AdminSettingsController` sudah ada.
-
----
-
-### 4.20 Integrasi
-
-**Untuk apa:** memasang kunci sambungan.
-
-**Isi:** kartu per integrasi — Digiflazz, Midtrans, DOKU, Resend, Google, Telegram, Discord, Validasi Akun, Turnstile. Tiap kartu: status, tes sambungan, kolom kredensial.
-
-**Aksi:** simpan kredensial, tes sambungan, salin URL webhook.
-
-**Aturan:**
-- Kredensial **tidak pernah ditampilkan** setelah disimpan. Kosong = pertahankan, isi = ganti.
-- **DOKU tampil sebagai "belum dipakai"** dan tidak bisa diaktifkan tanpa keputusan tertulis.
-- Tes sambungan tidak boleh memakai transaksi nyata.
-
-**Catatan:** `AdminIntegrationController` + `IntegrationRegistry` sudah ada. DOKU perlu ditandai.
-
----
-
-### 4.21 Kesehatan Sistem
-
-**Isi:** panel "perlu perhatian", semua komponen, kesehatan integrasi, gateway pembayaran, lingkungan aplikasi.
-
-**Aksi:** muat ulang, buka integrasi.
-
-**Catatan:** `AdminHealthController` sudah ada.
-
----
-
-### 4.22 Catatan Audit
-
-**Isi:** filter (waktu, admin, jenis aktivitas), tabel waktu/admin/aktivitas/sasaran/IP/detail.
-
-**Aturan:** **tidak bisa dihapus, tidak bisa diubah.** Hanya dibaca.
-
-**Catatan:** `AdminAuditController` + `AuditLabels` sudah ada.
-
----
-
-### 4.23 Notifikasi
-
-**Isi:** daftar notifikasi, belum dibaca/dibaca, tandai semua dibaca.
-
-**Catatan:** `AdminNotificationController` sudah ada.
-
----
-
-## 5. Peran & izin
-
-Dua peran: **Super Admin** dan **Admin**.
+Dua peran: **Super Admin** dan **Admin**. 14 izin di `AdminPermissionService::DEFINITIONS`.
 
 | Izin | Arti |
 |---|---|
 | `dashboard.view` | Dashboard |
 | `orders.view` | Pesanan |
 | `catalog.manage` | Produk & katalog |
-| `content.manage` | Banner & konten |
-| `fulfillment.manage` | Antrean manual |
+| `content.manage` | Banner & konten, Tampilan Toko |
+| `fulfillment.manage` | Penanganan manual |
 | `providers.manage` | Digiflazz & provider |
 | `payments.manage` | Pembayaran operasional |
 | `customers.view` | Pelanggan |
-| `vouchers.manage` | Promo & voucher |
+| `vouchers.manage` | Promo / voucher |
 | `support.manage` | Layanan pelanggan |
 | `reports.view` | Laporan |
 | `reports.finance` | Laporan finansial |
-| `settings.manage` | Pengaturan non-rahasia |
+| `settings.manage` | Pengaturan non-secret |
 | `notifications.view` | Notifikasi |
 
-**Hanya Super Admin, tanpa izin khusus:** Admin & Akses, Integrasi, Kesehatan Sistem, Catatan Audit, Validasi Akun, **penyesuaian saldo**.
+**Super Admin saja (tanpa izin terpisah):** Admin & Akses, Integrasi, Kesehatan Sistem, Catatan Audit, Validasi Akun, penyesuaian saldo pelanggan.
 
 Aturan:
 
-- Izin diperiksa **di server**, bukan hanya menyembunyikan tombol.
-- Menu yang tidak boleh diakses tidak muncul.
-- Admin tidak bisa menaikkan izinnya sendiri, dan tidak bisa mengubah Super Admin lain.
+- Izin diperiksa di server (`EnsureAdminPermission`, `EnsureSuperAdmin`), bukan hanya menyembunyikan tombol.
+- Menu yang tidak diizinkan tidak dikirim backend, jadi tidak muncul di sidebar.
+- Admin tidak bisa menaikkan izinnya sendiri dan tidak bisa mengubah Super Admin lain.
 
 ---
 
-## 6. Aksi yang wajib konfirmasi
+## 7. Aksi yang minta konfirmasi
 
-| Aksi | Konfirmasi |
-|---|---|
-| Penyesuaian saldo | Kata sandi + alasan wajib |
-| Batalkan pesanan | Alasan wajib |
-| Hapus produk/kategori/voucher | Ketik nama untuk konfirmasi |
-| Nonaktifkan admin | Kata sandi |
-| Ubah kredensial integrasi | Kata sandi |
-| Ekspor laporan keuangan | Kata sandi |
-| Impor katalog | Pratinjau + setujui |
+| Aksi | Konfirmasi | Bukti di kode |
+|---|---|---|
+| Penyesuaian saldo pelanggan | Pop-up + kata sandi + alasan wajib | `POST /admin/customers/{id}/wallet` + `RequireAdminPasswordConfirm` |
+| Batalkan pesanan | Pop-up + kata sandi server | `POST /admin/orders/{id}/cancel` + `RequireAdminPasswordConfirm` |
+| Konfirmasi QRIS manual | Konfirmasi + kata sandi server | `POST /admin/payments/manual/{id}/confirm` + `RequireAdminPasswordConfirm` |
+| Tambah/ubah/nonaktifkan admin | Kata sandi (diperiksa `/admin/password/confirm`) | `Access.vue` |
+| Hapus produk/kategori/voucher/pelanggan | Pop-up konfirmasi | `AdminModal` |
+| Impor katalog | Pratinjau sebelum setuju | `Catalog.vue` |
 
 Semua aksi di atas masuk audit log.
 
 ---
 
-## 7. Keadaan kosong & peringatan
+## 8. Keadaan kosong & peringatan
 
-Panel harus jujur saat belum ada data:
-
-- Belum ada pesanan → "Belum ada pesanan. Pesanan akan muncul di sini setelah ada pembeli."
-- Saldo Digiflazz belum diatur → "Belum tersambung" + tombol ke Integrasi.
-- Toko belum pernah transaksi → kartu omzet menampilkan `Rp 0` dengan keterangan "Belum ada transaksi", bukan angka contoh.
-- Integrasi mati → peringatan kuning di atas halaman terkait, bukan halaman kosong.
+- Belum ada pesanan → "Belum ada pesanan" + keterangan, bukan tabel kosong tanpa teks.
+- Belum ada transaksi → `Rp 0` dengan keterangan "Belum ada transaksi".
+- Integrasi belum diisi → status "Belum tersambung" + tombol ke Integrasi.
+- Pemeriksaan kesehatan belum jalan → "Belum diperiksa".
+- Data kosong/null tidak boleh membuat halaman putih: props dijaga `Array.isArray`, `?? []`, dan nilai tanggal kosong ditulis "—".
 
 ---
 
-## 8. Yang dibuang dari template
-
-Template dipakai sebagai acuan tampilan, **bukan** acuan fitur. Ini yang **tidak** dibuat:
+## 9. Yang sengaja tidak dibuat (dari template)
 
 | Di template | Kenapa tidak dibuat |
 |---|---|
-| Blok "Refund Top Up Perlu Rekonsiliasi" + tombol "Selesaikan refund" | Refund tidak pernah otomatis (PRD §19) |
-| Tombol "Selesaikan pesanan" yang mengirim ulang tanpa bukti | Harus ada bukti dan alasan |
-| Menu "Manual" sebagai nama | Diganti "Antrean Manual" |
-| Istilah "System Health", "Audit Log" | Diganti "Kesehatan Sistem", "Catatan Audit" |
+| Blok "Refund Top Up Perlu Rekonsiliasi" | Refund tidak otomatis (PRD §19) — lihat catatan temuan di §10 |
+| Tombol "Selesaikan pesanan" tanpa bukti | Harus lewat percobaan pengiriman yang tercatat |
 | Tombol dummy tanpa fungsi | Tidak ada tombol yang tidak melakukan apa pun |
 | Grafik tanpa angka | Wajib ada angka |
+| Tema gelap | Panel terang |
+| Inisial/placeholder saat gambar tidak ada | Biarkan kosong |
 
 ---
 
-## 9. Yang belum diputuskan
+## 10. Batas yang diketahui
 
-1. **Controller: dipertahankan atau ditulis ulang.** Saran: **dipertahankan**. Alamat URL, controller, dan service tidak berubah; yang diganti CSS, layout, dan 27 file Vue. Controller hanya disentuh kalau memang ada yang harus disesuaikan (mis. alasan wajib, penyesuaian saldo khusus Super Admin).
-2. **Halaman yang tidak ada di template** (Kategori, Tampilan Toko, Notifikasi, Detail Pesanan, Detail Pelanggan) — dibuat mengikuti gaya baru sekalian, atau dibiarkan dulu.
-3. **Urutan kerja:** satu halaman selesai → dilihat → lanjut, atau semua sekaligus.
+1. **Aksi backend yang belum punya tombol** (sengaja ditunda, menunggu tahap backend): `max-prices/preview`, `max-prices/apply`, `check-process`, `lock-prices`, `packages/{id}/duplicate`, `packages/{id}/voucher-stock`, `mappings/{id}` + `mappings/{id}/sync`, `packages/{id}/sources/digiflazz`, `digiflazz/baseline/{id}`.
+2. **Impor Digiflazz belum punya layar.** Tombol "Impor ke produk" di menu Digiflazz membuka `/admin/catalog?import=digiflazz`, tetapi halaman Produk belum membaca parameter itu, dan `POST /admin/catalog/products/{id}/import` belum dipanggil dari UI. Jadi tombolnya ada, ujungnya belum.
+3. **Blok rekonsiliasi refund top up masih tampil** di Pembayaran (warisan mesin pembayaran: top up ganda ditahan sampai direkonsiliasi). Tombolnya memotong saldo pelanggan dan butuh kata sandi. Ini bertentangan dengan aturan "tidak ada alur refund"; keputusan menyembunyikan atau mempertahankannya belum diambil.
+4. **Halaman masuk masih gelap** (lihat §5).
+5. **DOKU** belum dipakai; tampil sebagai belum aktif.
+6. **Data lokal adalah data uji** — angka di layar lokal bukan angka produksi.
+7. **Konfirmasi kata sandi di Admin & Akses masih penjaga klien.** Kata sandi diperiksa server lewat `/admin/password/confirm`, tetapi route `admin/access` belum memakai middleware `RequireAdminPasswordConfirm`; permintaan langsung tanpa lewat panel tidak akan ditanya sandi. Perlu ditambahkan bila ingin setara dengan penyesuaian saldo.
 
 ---
 
-## 10. Definisi selesai (panel)
+## 11. Gerbang verifikasi
 
-1. Semua 23 halaman terbuka tanpa error, di desktop dan HP.
-2. Warna, huruf, sudut, dan jarak mengikuti §2 — bukan kompromi "mirip".
-3. Tidak ada teks dummy, tombol palsu, atau angka contoh.
-4. Semua aksi di §6 meminta konfirmasi.
-5. Tidak ada tombol refund otomatis di mana pun.
-6. Peran diuji: Admin biasa tidak bisa membuka halaman Super Admin, dan tidak bisa menyesuaikan saldo.
-7. Tangkapan layar desktop dan HP untuk tiap halaman yang berubah.
+Panel dianggap sehat bila semua ini lulus:
+
+| Gerbang | Perintah | Hasil terakhir (23 Okt 2026) |
+|---|---|---|
+| Suite PHPUnit penuh | `php vendor/bin/phpunit` | 530 tes, 5.296 asersi, 2 dilewati, 0 gagal |
+| Penjaga panel (Node) | `node --test tests/Browser/customer-ui-guards.test.mjs tests/Browser/admin-ui-guards.test.mjs` | 46 lulus, 0 gagal |
+| Gaya PHP | `php-pint --test` pada berkas berubah | lulus |
+| Lint Vue | `npx eslint resources/js/Pages/Admin/*.vue resources/js/Components/Admin/*.vue` | 0 error |
+| Build | `npx vite build` | sukses |
+| Lebar 375px | buka Dashboard, Produk, Laporan | luapan mendatar 0 px |
+| Semua halaman | 21 menu + 2 detail | terbuka, tidak ada 404 |
+
+Database tes lokal: `lfamilia_admin_redesign_test` (di `phpunit.xml` tanpa `force`, jadi CI tetap memakai `DB_DATABASE=lfamilia_ci`).

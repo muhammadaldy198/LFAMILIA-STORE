@@ -1,8 +1,8 @@
 # STATUS — LFAMILIA STORE
 
-Catatan apa yang **sudah jalan** dan apa yang **belum**. File ini berubah setiap kali ada pekerjaan selesai; aturan produk tidak di sini, tapi di [`PRD.md`](PRD.md).
+Catatan apa yang **sudah jalan** dan apa yang **belum**. Aturan produk ada di [`PRD.md`](PRD.md), spesifikasi panel ada di [`ADMIN-PANEL.md`](ADMIN-PANEL.md).
 
-**Terakhir diperbarui:** 22 Oktober 2026
+**Terakhir diperbarui:** 23 Oktober 2026
 **Keadaan situs:** ada di alamat publik `lfamiliastore.my.id`, **belum beroperasi produksi**. Belum ada pelanggan nyata, belum ada transaksi nyata.
 
 ---
@@ -11,10 +11,11 @@ Catatan apa yang **sudah jalan** dan apa yang **belum**. File ini berubah setiap
 
 | Pekerjaan | Status |
 |---|---|
-| PRD ditulis ulang (`docs/PRD.md`) | selesai, menunggu commit |
-| Pembersihan dokumen (arsip, README, AGENTS, CLAUDE) | selesai, menunggu commit |
-| Spesifikasi panel admin (`docs/ADMIN-PANEL.md`) | belum dimulai |
-| Panel admin dibangun ulang (tema terang) | belum dimulai |
+| Panel admin baru (21 menu + 2 halaman detail, tema terang) | selesai di branch lokal `admin-panel-redesign`, belum digabung, belum deploy |
+| Pembuangan lapisan tampilan admin lama | selesai (7 komponen, 1 berkas bantu, 338 aturan CSS) |
+| Isolasi database tes | selesai — lokal `lfamilia_admin_redesign_test`, CI tetap `lfamilia_ci` |
+| Spesifikasi panel (`docs/ADMIN-PANEL.md`) | selesai, disusun ulang dari route/controller/props |
+| Penggabungan ke branch rilis `admin-panel-v2` | belum dimulai |
 
 ---
 
@@ -57,10 +58,16 @@ Bagian ini menyatakan **kode tersedia**, bukan "sudah dipakai pelanggan".
 - Tiket bantuan + balasan cepat
 
 **Panel admin**
-- 27 halaman, 74 route, 27 controller
-- Peran Super Admin dan Admin dengan 14 izin
-- Audit log, kesehatan sistem, laporan + ekspor
-- **Tampilan masih versi lama (gelap).** Akan dibangun ulang.
+- **21 menu + 2 halaman detail** (23 halaman) dengan tema terang, sidebar hitam, aksen hijau
+- 141 route admin, 27 controller, 14 izin, dua peran (Super Admin dan Admin)
+- Semua penyuntingan lewat pop-up tengah; detail tiket tampil sebagai panel di halaman
+- Audit log, kesehatan sistem, laporan + ekspor CSV, notifikasi panel
+- Halaman masuk (masuk, lupa sandi, atur ulang, konfirmasi sandi) masih memakai gaya lama gelap — belum diseragamkan
+
+**Pengujian**
+- Suite penuh: 530 tes, 5.296 asersi, 2 dilewati, 0 gagal
+- Penjaga panel (Node): 46 tes lulus
+- Database tes terpisah dari database pengembangan; CI memakai database sendiri
 
 ---
 
@@ -72,10 +79,10 @@ Bagian ini menyatakan **kode tersedia**, bukan "sudah dipakai pelanggan".
 | Transaksi nyata | belum ada |
 | Top up saldo oleh pelanggan | belum pernah |
 | Discord webhook untuk notifikasi admin | belum diisi |
-| Diskon per tingkatan member | ambang sudah ada, besar diskon belum diisi |
 | DOKU | belum dipasang |
-| Panel admin versi terang | belum dibuat |
-| `docs/ADMIN-PANEL.md` | belum ditulis |
+| Deploy panel baru ke server | belum — masih branch lokal |
+| Sebagian aksi backend tanpa tombol di panel | 9 endpoint (lihat `ADMIN-PANEL.md` §10) |
+| Keputusan blok rekonsiliasi refund top up di Pembayaran | belum diputuskan |
 
 ---
 
@@ -84,3 +91,4 @@ Bagian ini menyatakan **kode tersedia**, bukan "sudah dipakai pelanggan".
 - **Data di lingkungan lokal adalah data uji**, bukan data produksi.
 - **Refund tidak otomatis.** Member lewat penyesuaian saldo (Super Admin), guest lewat transfer manual.
 - Semua status di atas berarti "kode tersedia", bukan "sudah terbukti dipakai orang".
+- Perubahan panel belum di-push dan belum di-PR; penggabungan butuh persetujuan pemilik.

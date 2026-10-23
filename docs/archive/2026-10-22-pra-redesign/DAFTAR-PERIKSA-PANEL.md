@@ -1,5 +1,7 @@
 # DAFTAR PERIKSA — panel admin, sebelum dibangun baru
 
+> **Arsip.** Dokumen kerja 22 Oktober 2026, ditulis sebelum panel baru dibangun. Angka dan pertanyaannya sudah tidak berlaku; keadaan sekarang ada di `docs/ADMIN-PANEL.md` dan `docs/STATUS.md`.
+
 **Tanggal:** 22 Oktober 2026
 **Sifat:** dokumen kerja. Bukan aturan. Dipakai untuk memutuskan nasib setiap route, controller, dan kolom sebelum panel baru ditulis.
 **Cara pakai:** tiap baris punya usulan nasib. Koreksi yang salah, lalu dokumen ini jadi dasar kerja.
