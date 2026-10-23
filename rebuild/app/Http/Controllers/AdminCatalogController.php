@@ -120,7 +120,12 @@ class AdminCatalogController
                 'status' => $filters['status'] ?? '', 'sort' => $filters['sort'] ?? 'order', 'per_page' => (int) ($filters['per_page'] ?? 25),
             ],
             'products' => $products->getCollection()->map(fn (Product $product): array => $this->productRow($product, $providers, $stockCounts))->all(),
-            'productPage' => $products->toArray(),
+            'productPage' => [
+                'current_page' => $products->currentPage(),
+                'last_page' => $products->lastPage(),
+                'per_page' => $products->perPage(),
+                'total' => $products->total(),
+            ],
             'pricingSettings' => [
                 'cost_uplift_percent' => app(CatalogPricingSettings::class)->costUpliftPercent(),
                 'sell_markup_percent' => app(CatalogPricingSettings::class)->sellMarkupPercent(),

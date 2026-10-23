@@ -1162,6 +1162,20 @@ class CatalogTest extends TestCase
         $this->assertSame('PERCENT', $broken->fresh()->pricing_mode);
     }
 
+    public function test_product_paginator_sends_only_pagination_metadata(): void
+    {
+        $this->actingAs($this->admin(), 'admin');
+
+        $this->get('/admin/catalog?per_page=10&page=1')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('productPage.current_page', 1)
+                ->where('productPage.per_page', 10)
+                ->missing('productPage.data')
+                ->missing('productPage.first_page_url')
+                ->missing('productPage.links'));
+    }
+
     public function test_catalog_source_tab_routes_stay_available_for_the_panel(): void
     {
         $this->actingAs($this->admin(), 'admin');
