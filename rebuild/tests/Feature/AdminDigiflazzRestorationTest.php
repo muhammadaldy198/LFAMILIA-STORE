@@ -1148,6 +1148,39 @@ class AdminDigiflazzRestorationTest extends TestCase
         ]);
     }
 
+    public function test_sync_never_deletes_manual_mappings(): void
+    {
+        // A-06 diverifikasi: pembersihan sinkron selalu dibatasi
+        // where('provider_id', $providerId) dengan $providerId = DIGIFLAZZ,
+        // jadi mapping MANUAL tidak pernah masuk kandidat hapus.
+        $this->login();
+        $this->fakeCatalog([$this->row(['buyer_sku_code' => 'manual-safe-sku'])]);
+        $this->post('/admin/digiflazz/sync')->assertRedirect()->assertSessionHasNoErrors();
+
+        $product = Product::create([
+            'category_id' => Category::where('slug', 'game')->value('id'),
+            'name' => 'Produk Manual A06', 'slug' => 'produk-manual-a06',
+            'fulfillment_mode' => 'MANUAL', 'margin_percent' => 10, 'is_active' => true,
+        ]);
+        $package = $product->packages()->create([
+            'code' => 'MANUAL-10', 'name' => 'Manual 10', 'sort_order' => 1, 'is_active' => true,
+        ]);
+        $manualId = DB::table('providers')->where('code', 'MANUAL')->value('id');
+        $mapping = ProviderMapping::create([
+            'product_package_id' => $package->id, 'provider_id' => $manualId,
+            'external_sku' => null, 'cost_idr' => 9000, 'store_cost_idr' => 9000,
+            'max_price_idr' => null, 'priority' => 0, 'is_active' => true,
+        ]);
+
+        // Sinkron ulang dengan katalog kosong: SKU Digiflazz hilang, mapping
+        // Digiflazz boleh dibersihkan — mapping MANUAL harus tetap utuh.
+        $this->fakeCatalog([]);
+        $this->post('/admin/digiflazz/sync')->assertRedirect();
+
+        $this->assertDatabaseHas('provider_mappings', ['id' => $mapping->id, 'provider_id' => $manualId]);
+        $this->assertSame(9000, (int) $mapping->fresh()->store_cost_idr);
+    }
+
     public function test_import_uses_active_sell_markup_setting_not_legacy_default_margin(): void
     {
         $this->login();
@@ -1171,13 +1204,22 @@ class AdminDigiflazzRestorationTest extends TestCase
             ->where('pricingSettings.sell_markup_percent', '12')
             ->missing('defaultMargin'));
 
-        $catalog = file_get_contents(resource_path('js/Pages/Admin/Catalog.vue'));
-        $this->assertStringNotContainsString('defaultMargin', $catalog);
-        $this->assertStringContainsString('props.pricingSettings?.sell_markup_percent', $catalog);
+        // Impor sungguhan (bukan grep sumber): SKU tersedia, produk tanpa
+        // override, margin yang dikirim form = setting aktif (12), bukan 35.
+        $this->fakeCatalog([$this->row(['buyer_sku_code' => 'cr02-sku', 'product_name' => 'CR02 10', 'price' => 10000])]);
+        $this->post('/admin/digiflazz/sync')->assertRedirect()->assertSessionHasNoErrors();
+        $item = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'cr02-sku')->first();
+        $this->post('/admin/catalog/products/'.$product->id.'/import', [
+            'item_ids' => [$item->id], 'margin_percent' => 12,
+        ])->assertRedirect()->assertSessionHasNoErrors();
 
-        // Nilai margin tidak diubah oleh impor: produk tanpa override tetap null
-        // sampai admin sendiri menyimpan margin.
-        $this->assertNull($product->fresh()->sell_markup_percent);
+        $package = $product->packages()->firstOrFail();
+        $mapping = $package->mappings()->firstOrFail();
+        // Modal toko = seller + uplift 2%; batas harga = modal, bukan markup 35%.
+        $this->assertSame(10200, (int) $mapping->store_cost_idr);
+        $this->assertSame(10200, (int) $mapping->max_price_idr);
+        $this->assertSame(12, (int) round((float) $product->fresh()->sell_markup_percent));
+        $this->assertNotSame(35, (int) round((float) $product->fresh()->sell_markup_percent));
     }
 
     public function test_sync_failure_creates_only_one_admin_alert_per_hour(): void

@@ -1166,14 +1166,39 @@ class CatalogTest extends TestCase
     {
         $this->actingAs($this->admin(), 'admin');
 
-        $this->get('/admin/catalog?per_page=10&page=1')
+        $category = Category::where('slug', 'game')->firstOrFail();
+        foreach (range(1, 3) as $n) {
+            Product::create([
+                'category_id' => $category->id, 'name' => 'A07 Produk '.$n, 'slug' => 'a07-produk-'.$n,
+                'fulfillment_mode' => 'AUTO_PROVIDER', 'margin_percent' => 10, 'is_active' => true,
+                'sort_order' => $n,
+            ]);
+        }
+
+        // Metadata saja: baris produk tetap datang lewat products, bukan
+        // disalin ulang di productPage.
+        $this->get('/admin/catalog?per_page=10&page=1&q=A07+Produk')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('productPage.current_page', 1)
                 ->where('productPage.per_page', 10)
+                ->where('productPage.total', 3)
+                ->where('products', fn ($rows): bool => count($rows) === 3)
                 ->missing('productPage.data')
                 ->missing('productPage.first_page_url')
                 ->missing('productPage.links'));
+
+        // Urutan nama menurun tetap berlaku dan ikut ke halaman berikutnya.
+        $this->get('/admin/catalog?per_page=10&sort=name&q=A07+Produk')
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('products', fn ($rows): bool => collect($rows)->pluck('name')->all() === ['A07 Produk 1', 'A07 Produk 2', 'A07 Produk 3']));
+
+        // Halaman 2 kosong tapi metadata tetap benar (tidak ada data mentah).
+        $this->get('/admin/catalog?per_page=10&page=2&q=A07+Produk')
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('productPage.current_page', 2)
+                ->where('productPage.total', 3)
+                ->missing('productPage.data'));
     }
 
     public function test_catalog_source_tab_routes_stay_available_for_the_panel(): void
