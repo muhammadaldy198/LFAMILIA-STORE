@@ -907,6 +907,21 @@ class FulfillmentService
         }
 
         $next = $this->createAttempt($order, $mapping, 'CREATED');
+
+        // Sumber stok kode ditinggalkan: kode yang sudah dipesan tidak akan
+        // pernah terkirim, jadi kembalikan ke stok sekarang. Kalau tidak, kode
+        // itu menggantung RESERVED selamanya dan hilang dari stok yang dijual.
+        $blockedMapping = $this->mapping((int) $blockedAttempt->provider_mapping_id);
+        if ($blockedMapping?->provider_code === 'VOUCHER_STOCK') {
+            $released = $this->voucherStock->release((int) $order->id);
+            if ($released > 0) {
+                $this->event((int) $order->id, 'VOUCHER_STOCK_RELEASED', $order->status, $order->status, [
+                    'attempt_id' => $blockedAttempt->id,
+                    'codes' => $released,
+                ]);
+            }
+        }
+
         DB::table('orders')->where('id', $order->id)->update([
             'status' => 'PROCESSING',
             'updated_at' => now(),

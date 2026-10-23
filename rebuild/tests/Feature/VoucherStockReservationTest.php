@@ -186,6 +186,52 @@ class VoucherStockReservationTest extends TestCase
         $this->assertSame('DELIVERED', DB::table('voucher_stock_codes')->value('status'));
     }
 
+    public function test_reserved_code_is_released_when_fulfillment_switches_source(): void
+    {
+        $this->importCodes(1);
+        $order = app(CheckoutService::class)->create($this->payload('skip'), null)['order'];
+        $this->assertSame('RESERVED', DB::table('voucher_stock_codes')->value('status'));
+
+        // Admin menonaktifkan sumber stok kode dan menyiapkan sumber Digiflazz.
+        DB::table('provider_mappings')
+            ->where('product_package_id', $this->ctx['package'])
+            ->update(['is_active' => false]);
+        $sku = 'skip-'.$this->ctx['package'];
+        DB::table('provider_mappings')->insert([
+            'product_package_id' => $this->ctx['package'],
+            'provider_id' => DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id'),
+            'external_sku' => $sku,
+            'cost_idr' => 5000,
+            'max_price_idr' => 5000,
+            'priority' => 0,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('digiflazz_catalog_items')->insert([
+            'buyer_sku_code' => $sku, 'product_name' => 'Provider '.$sku, 'category' => 'Games',
+            'brand' => 'Brand', 'type' => 'Umum', 'seller_name' => 'Seller A',
+            'price_idr' => 5000, 'baseline_price_idr' => 5000,
+            'buyer_active' => true, 'seller_active' => true, 'unlimited_stock' => true,
+            'stock' => 0, 'multi' => false, 'start_cut_off' => '00:00', 'end_cut_off' => '00:00',
+            'synced_at' => now(), 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        DB::table('orders')->where('id', $order->id)->update(['status' => 'PAID', 'paid_at' => now()]);
+
+        app(FulfillmentService::class)->startOrder((int) $order->id);
+
+        // Order dialihkan ke Digiflazz, dan kode yang tak akan terkirim kembali dijual.
+        $code = DB::table('voucher_stock_codes')->first();
+        $this->assertSame('AVAILABLE', $code->status, 'Kode harus dilepas saat sumber stok ditinggalkan.');
+        $this->assertNull($code->order_id);
+        $this->assertSame(
+            'DIGIFLAZZ',
+            DB::table('providers')->where('id', DB::table('fulfillment_attempts')
+                ->where('order_id', $order->id)->orderByDesc('id')->value('provider_id'))->value('code')
+        );
+    }
+
     public function test_delivered_code_is_never_released(): void
     {
         $this->importCodes(1);
