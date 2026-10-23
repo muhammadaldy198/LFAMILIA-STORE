@@ -22,7 +22,7 @@ const props = defineProps({
 
 const m = computed(() => props.metrics || {});
 const chart = computed(() => (Array.isArray(props.chart) ? props.chart : []));
-const peak = computed(() => Math.max(1, ...chart.value.map(row => Number(row.revenue_idr || 0))));
+const peak = computed(() => Math.max(1, ...chart.value.map(row => Number(row.orders || 0))));
 const busiest = computed(() => chart.value.reduce((best, row) => (Number(row.orders) > Number(best?.orders ?? -1) ? row : best), null));
 const totalRevenue = computed(() => chart.value.reduce((sum, row) => sum + Number(row.revenue_idr || 0), 0));
 const totalOrders = computed(() => chart.value.reduce((sum, row) => sum + Number(row.orders || 0), 0));
@@ -32,7 +32,7 @@ const boxes = computed(() => [
     { key: 'orders', label: 'Pesanan Hari Ini', value: m.value.orders_today == null ? null : num(m.value.orders_today), note: 'Semua status' },
     { key: 'products', label: 'Produk Aktif', value: m.value.active_products == null ? null : num(m.value.active_products), note: 'Tampil di toko' },
     { key: 'digiflazz', label: 'Saldo Digiflazz', value: props.digiflazzBalance?.amount_idr == null ? null : rupiah(props.digiflazzBalance.amount_idr), note: props.digiflazzBalance?.status === 'DOWN' ? 'Tidak dapat diperiksa' : 'Diperiksa dari penyedia' },
-    { key: 'paid', label: 'Pembayaran Berhasil', value: m.value.success_period == null ? null : num(m.value.success_period), note: 'Periode grafik terpilih' },
+    { key: 'paid', label: 'Pembayaran Berhasil', value: m.value.success_period == null ? null : num(m.value.success_period), note: 'Pesanan berstatus sukses di periode grafik' },
     { key: 'wallet', label: 'Saldo Wallet', value: m.value.wallet_balance == null ? null : rupiah(m.value.wallet_balance), note: 'Total saldo pelanggan' },
     { key: 'tickets', label: 'Tiket Terbuka', value: m.value.open_tickets == null ? null : num(m.value.open_tickets), note: 'Belum selesai' },
     { key: 'fulfillment', label: 'Pending Fulfillment', value: m.value.pending_fulfillment == null ? null : num(m.value.pending_fulfillment), note: 'Belum terkirim' },
@@ -110,9 +110,10 @@ const markRead = async (row) => {
                 </select>
             </div>
             <div class="adm-card-body">
-                <div v-if="chart.length" class="adm-chart" role="img" :aria-label="`Grafik omzet ${chart.length} hari`">
-                    <div v-for="row in chart" :key="row.day" class="adm-chart-bar" :title="`${shortDate(row.day)} · ${rupiah(row.revenue_idr)} · ${row.orders} pesanan`">
-                        <i :style="{ height: Math.max(2, Math.round((Number(row.revenue_idr || 0) / peak) * 130)) + 'px' }" />
+                <p v-if="chart.length" class="adm-note" style="margin-bottom:6px">Tinggi batang = jumlah pesanan. Puncak {{ num(peak) }} pesanan.</p>
+                <div v-if="chart.length" class="adm-chart" role="img" :aria-label="`Grafik jumlah pesanan ${chart.length} hari terakhir`">
+                    <div v-for="row in chart" :key="row.day" class="adm-chart-bar" :title="`${shortDate(row.day)} · ${num(row.orders)} pesanan · ${rupiah(row.revenue_idr)}`">
+                        <i :style="{ height: Math.max(2, Math.round((Number(row.orders || 0) / peak) * 130)) + 'px' }" />
                     </div>
                 </div>
                 <p v-else class="adm-empty">Belum ada data untuk periode ini.</p>
