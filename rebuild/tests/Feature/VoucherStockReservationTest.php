@@ -163,6 +163,29 @@ class VoucherStockReservationTest extends TestCase
         $this->assertSame((int) $order->id, (int) DB::table('voucher_stock_codes')->value('order_id'));
     }
 
+    public function test_reservation_survives_admin_changing_the_stock_key(): void
+    {
+        $this->importCodes(1);
+        $order = app(CheckoutService::class)->create($this->payload('rekey'), null)['order'];
+
+        // Admin mengganti stock_key setelah checkout; kode lama tetap milik order.
+        DB::table('provider_mappings')
+            ->where('product_package_id', $this->ctx['package'])
+            ->update(['fulfillment_config' => json_encode(['stock_key' => 'batch02.rekeyed'], JSON_THROW_ON_ERROR)]);
+
+        DB::table('orders')->where('id', $order->id)->update(['status' => 'PAID', 'paid_at' => now()]);
+
+        app(FulfillmentService::class)->startOrder((int) $order->id);
+        $attempt = DB::table('fulfillment_attempts')->where('order_id', $order->id)->first();
+        $this->assertSame('CREATED', $attempt?->status, 'Reservasi order tidak boleh hilang karena stock_key diganti.');
+
+        DB::table('fulfillment_attempts')->where('id', $attempt->id)->update(['status' => 'SENDING']);
+        app(FulfillmentService::class)->reconcileAttempt((int) $attempt->id);
+
+        $this->assertSame('SUCCESS', DB::table('orders')->where('id', $order->id)->value('status'));
+        $this->assertSame('DELIVERED', DB::table('voucher_stock_codes')->value('status'));
+    }
+
     public function test_delivered_code_is_never_released(): void
     {
         $this->importCodes(1);

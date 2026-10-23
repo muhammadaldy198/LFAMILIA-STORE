@@ -60,18 +60,20 @@ class VoucherStockService
     }
 
     /**
-     * Stok layak dipakai order ini: kode bebas, atau kode yang sudah dipesan
-     * untuk order tersebut saat checkout.
+     * Stok layak dipakai order ini: kode yang sudah dipesan untuk order tersebut
+     * (kunci apa pun, karena admin bisa mengganti stock_key setelah checkout),
+     * atau kode bebas pada kunci yang diminta.
      */
     public function availableFor(int $orderId, string $stockKey): bool
     {
         return DB::table('voucher_stock_codes')
-            ->where('stock_key', $this->normalizeKey($stockKey))
-            ->where(function ($query) use ($orderId): void {
-                $query->where('status', 'AVAILABLE')
-                    ->orWhere(function ($reserved) use ($orderId): void {
-                        $reserved->where('status', 'RESERVED')->where('order_id', $orderId);
-                    });
+            ->where(function ($query) use ($orderId, $stockKey): void {
+                $query->where(function ($reserved) use ($orderId): void {
+                    $reserved->where('status', 'RESERVED')->where('order_id', $orderId);
+                })->orWhere(function ($free) use ($stockKey): void {
+                    $free->where('status', 'AVAILABLE')
+                        ->where('stock_key', $this->normalizeKey($stockKey));
+                });
             })
             ->exists();
     }
