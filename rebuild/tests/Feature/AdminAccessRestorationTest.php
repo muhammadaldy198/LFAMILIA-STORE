@@ -40,6 +40,15 @@ class AdminAccessRestorationTest extends TestCase
         return $admin;
     }
 
+    /**
+     * Mutasi akses admin mewajibkan konfirmasi kata sandi (CR-03). Tes yang
+     * menguji aturan lain memakai sesi konfirmasi yang sah.
+     */
+    private function confirmed(): static
+    {
+        return $this->withSession(['admin.password_confirmed_at' => time()]);
+    }
+
     public function test_access_workspace_has_summary_filters_pagination_permissions_and_recent_activity(): void
     {
         // Ringkasan menghitung seluruh akun, jadi mulai dari tabel kosong di dalam
@@ -99,7 +108,7 @@ class AdminAccessRestorationTest extends TestCase
     {
         $owner = $this->loginSuper();
 
-        $this->post('/admin/access', [
+        $this->confirmed()->post('/admin/access', [
             'name' => 'Support Operator',
             'email' => 'support-operator@example.test',
             'password' => 'temporary-password-123',
@@ -124,11 +133,42 @@ class AdminAccessRestorationTest extends TestCase
         $this->assertStringNotContainsString('temporary-password-123', (string) $audit->after);
     }
 
+    public function test_admin_access_mutations_require_password_confirmation(): void
+    {
+        $this->loginSuper();
+        $target = $this->admin('ADMIN');
+
+        $newPassword = 'test-'.bin2hex(random_bytes(8));
+        $create = [
+            'name' => 'Admin Tanpa Konfirmasi', 'email' => 'tanpa-konfirmasi@example.test',
+            'password' => $newPassword, 'role' => 'SUPER_ADMIN',
+            'permissions' => [], 'is_active' => true,
+        ];
+
+        // Permintaan langsung tanpa konfirmasi kata sandi harus ditolak.
+        $this->post('/admin/access', $create)->assertRedirect(route('admin.password.confirm'));
+        $this->assertDatabaseMissing('admin_users', ['email' => 'tanpa-konfirmasi@example.test']);
+
+        $this->put('/admin/access/'.$target->id, [
+            'name' => 'Nama Baru', 'email' => $target->email, 'role' => 'SUPER_ADMIN',
+            'permissions' => [], 'is_active' => true,
+        ])->assertRedirect(route('admin.password.confirm'));
+        $this->assertSame('ADMIN', $target->fresh()->role);
+
+        $this->delete('/admin/access/'.$target->id)->assertRedirect(route('admin.password.confirm'));
+        $this->assertNotNull($target->fresh());
+
+        // Sesudah konfirmasi, aksi yang sama berjalan normal.
+        $this->withSession(['admin.password_confirmed_at' => time()])->post('/admin/access', $create)
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('admin_users', ['email' => 'tanpa-konfirmasi@example.test']);
+    }
+
     public function test_staff_role_is_not_reintroduced(): void
     {
         $this->loginSuper();
 
-        $this->post('/admin/access', [
+        $this->confirmed()->post('/admin/access', [
             'name' => 'Legacy Staff',
             'email' => 'legacy-staff@example.test',
             'password' => 'temporary-password-123',
@@ -148,7 +188,7 @@ class AdminAccessRestorationTest extends TestCase
             'permissions' => ['dashboard.view', 'orders.view'],
         ]);
 
-        $this->put('/admin/access/'.$target->id, [
+        $this->confirmed()->put('/admin/access/'.$target->id, [
             'name' => 'Updated Operator',
             'email' => 'updated-operator@example.test',
             'password' => 'new-secure-password-456',
@@ -180,7 +220,7 @@ class AdminAccessRestorationTest extends TestCase
     {
         $owner = $this->loginSuper();
 
-        $this->put('/admin/access/'.$owner->id, [
+        $this->confirmed()->put('/admin/access/'.$owner->id, [
             'name' => $owner->name,
             'email' => $owner->email,
             'password' => null,
@@ -189,7 +229,7 @@ class AdminAccessRestorationTest extends TestCase
             'is_active' => true,
         ])->assertSessionHasErrors(['role']);
 
-        $this->put('/admin/access/'.$owner->id, [
+        $this->confirmed()->put('/admin/access/'.$owner->id, [
             'name' => $owner->name,
             'email' => $owner->email,
             'password' => null,
@@ -198,7 +238,7 @@ class AdminAccessRestorationTest extends TestCase
             'is_active' => false,
         ])->assertSessionHasErrors(['role']);
 
-        $this->delete('/admin/access/'.$owner->id)
+        $this->confirmed()->delete('/admin/access/'.$owner->id)
             ->assertSessionHasErrors(['admin']);
 
         $owner->refresh();
@@ -216,7 +256,7 @@ class AdminAccessRestorationTest extends TestCase
 
         $owner->forceFill(['is_active' => false])->save();
 
-        $this->put('/admin/access/'.$other->id, [
+        $this->confirmed()->put('/admin/access/'.$other->id, [
             'name' => $other->name,
             'email' => $other->email,
             'password' => null,
@@ -238,7 +278,7 @@ class AdminAccessRestorationTest extends TestCase
         ]);
         $id = $target->id;
 
-        $this->delete('/admin/access/'.$id)
+        $this->confirmed()->delete('/admin/access/'.$id)
             ->assertRedirect('/admin/access')
             ->assertSessionHasNoErrors();
 
@@ -260,7 +300,7 @@ class AdminAccessRestorationTest extends TestCase
         $this->actingAs($admin, 'admin');
 
         $this->get('/admin/access')->assertForbidden();
-        $this->post('/admin/access', [
+        $this->confirmed()->post('/admin/access', [
             'name' => 'No Access',
             'email' => 'no-access@example.test',
             'password' => 'temporary-password-123',
@@ -268,6 +308,6 @@ class AdminAccessRestorationTest extends TestCase
             'permissions' => ['dashboard.view'],
             'is_active' => true,
         ])->assertForbidden();
-        $this->delete('/admin/access/'.$admin->id)->assertForbidden();
+        $this->confirmed()->delete('/admin/access/'.$admin->id)->assertForbidden();
     }
 }

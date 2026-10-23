@@ -336,3 +336,14 @@ test('editing a nominal keeps stored pricing and nominal_value', async () => {
     assert.match(catalog, /const payload = nominalPayload\(nominalEditing\.value, nominal,/);
     assert.doesNotMatch(catalog, /nominal_value: null,\s*\n\s*pricing_mode:/);
 });
+
+// CR-03: membuat akun admin baru (termasuk Super Admin) juga menanyakan kata
+// sandi di UI, bukan hanya perubahan peran/izin.
+test('creating an admin account asks for password confirmation', () => {
+    const access = read('Access.vue');
+    assert.match(access, /const needsPassword = !target\.id \|\| \(before && \(/);
+    assert.match(access, /if \(!target\.id\) return 'Membuat akun admin baru memerlukan konfirmasi kata sandi\.'/);
+    assert.match(repo('routes/web.php'), /Route::post\('\/admin\/access'[\s\S]{0,160}admin\.password\.confirm/);
+    assert.match(repo('routes/web.php'), /Route::put\('\/admin\/access\/\{admin\}'[\s\S]{0,160}admin\.password\.confirm/);
+    assert.match(repo('routes/web.php'), /Route::delete\('\/admin\/access\/\{admin\}'[\s\S]{0,160}admin\.password\.confirm/);
+});

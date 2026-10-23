@@ -433,12 +433,14 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
 
     Route::middleware('admin.super')->group(function (): void {
         Route::get('/admin/access', [AdminAccessController::class, 'index'])->name('admin.access');
+        // Membuat/mengubah/menghapus admin adalah aksi sensitif: ditegakkan di
+        // server, bukan hanya pop-up di UI.
         Route::post('/admin/access', [AdminAccessController::class, 'store'])
-            ->middleware('throttle:admin-sensitive')->name('admin.access.store');
+            ->middleware(['throttle:admin-sensitive', 'admin.password.confirm'])->name('admin.access.store');
         Route::put('/admin/access/{admin}', [AdminAccessController::class, 'update'])
-            ->middleware('throttle:admin-sensitive')->name('admin.access.update');
+            ->middleware(['throttle:admin-sensitive', 'admin.password.confirm'])->name('admin.access.update');
         Route::delete('/admin/access/{admin}', [AdminAccessController::class, 'destroy'])
-            ->middleware('throttle:admin-sensitive')->name('admin.access.destroy');
+            ->middleware(['throttle:admin-sensitive', 'admin.password.confirm'])->name('admin.access.destroy');
 
         Route::get('/admin/integrations', [AdminIntegrationController::class, 'index'])->name('admin.integrations');
         Route::put('/admin/integrations/{code}', [AdminIntegrationController::class, 'update'])
