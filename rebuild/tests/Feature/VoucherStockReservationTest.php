@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Category;
 use App\Models\Product;
 use App\Services\CheckoutService;
+use App\Services\FulfillmentService;
 use App\Services\PaymentStateService;
 use App\Services\VoucherStockService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
@@ -133,6 +134,33 @@ class VoucherStockReservationTest extends TestCase
         $replacement = app(CheckoutService::class)->create($this->payload('retry'), null);
         $this->assertTrue($replacement['created']);
         $this->assertSame('RESERVED', DB::table('voucher_stock_codes')->value('status'));
+    }
+
+    public function test_checkout_payment_then_fulfillment_delivers_the_reserved_code(): void
+    {
+        $this->importCodes(1);
+        $order = app(CheckoutService::class)->create($this->payload('e2e'), null)['order'];
+        $this->assertSame('RESERVED', DB::table('voucher_stock_codes')->value('status'));
+
+        // Pembayaran terverifikasi → order PAID, kode tetap milik order ini.
+        DB::table('orders')->where('id', $order->id)->update([
+            'status' => 'PAID',
+            'paid_at' => now(),
+        ]);
+
+        app(FulfillmentService::class)->startOrder((int) $order->id);
+        $attempt = DB::table('fulfillment_attempts')->where('order_id', $order->id)->first();
+        $this->assertNotNull($attempt, 'Fulfillment tidak boleh memblokir order yang sudah memesan kode.');
+        $this->assertSame('CREATED', $attempt->status, 'Order yang sudah memesan kode tidak boleh berstatus BLOCKED.');
+
+        DB::table('fulfillment_attempts')->where('id', $attempt->id)->update(['status' => 'SENDING']);
+        app(FulfillmentService::class)->reconcileAttempt((int) $attempt->id);
+
+        $delivered = DB::table('orders')->where('id', $order->id)->first();
+        $this->assertSame('SUCCESS', $delivered->status);
+        $this->assertStringContainsString('CODE-'.$this->ctx['stock_key'].'-1', (string) $delivered->delivery_payload);
+        $this->assertSame('DELIVERED', DB::table('voucher_stock_codes')->value('status'));
+        $this->assertSame((int) $order->id, (int) DB::table('voucher_stock_codes')->value('order_id'));
     }
 
     public function test_delivered_code_is_never_released(): void

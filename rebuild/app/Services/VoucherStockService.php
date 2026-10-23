@@ -60,6 +60,23 @@ class VoucherStockService
     }
 
     /**
+     * Stok layak dipakai order ini: kode bebas, atau kode yang sudah dipesan
+     * untuk order tersebut saat checkout.
+     */
+    public function availableFor(int $orderId, string $stockKey): bool
+    {
+        return DB::table('voucher_stock_codes')
+            ->where('stock_key', $this->normalizeKey($stockKey))
+            ->where(function ($query) use ($orderId): void {
+                $query->where('status', 'AVAILABLE')
+                    ->orWhere(function ($reserved) use ($orderId): void {
+                        $reserved->where('status', 'RESERVED')->where('order_id', $orderId);
+                    });
+            })
+            ->exists();
+    }
+
+    /**
      * Caller must wrap this method in a database transaction.
      *
      * @return array{id:int,code:string}
