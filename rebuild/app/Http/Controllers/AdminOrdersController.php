@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Jobs\ReconcileFulfillmentJob;
 use App\Services\AdminAuditService;
 use App\Services\AdminManualOrderService;
 use App\Services\AdminOrderPresentation;
@@ -221,20 +220,6 @@ class AdminOrdersController
         ]);
 
         return back()->with('success', 'Hasil pesanan masuk antrean pengiriman email.');
-    }
-
-    public function refreshFulfillment(Request $request, int $id)
-    {
-        $order = DB::table('orders')->where('id', $id)->first();
-        abort_unless($order, 404);
-        $attempt = DB::table('fulfillment_attempts')->where('order_id', $id)->orderByDesc('id')->first();
-        if (! in_array($order->status, ['PAID', 'PROCESSING'], true) || ! $attempt || ! in_array($attempt->status, ['PENDING', 'UNKNOWN', 'SENDING'], true)) {
-            throw ValidationException::withMessages(['order' => 'Pesanan ini tidak memerlukan pemeriksaan hasil pengiriman.']);
-        }
-        ReconcileFulfillmentJob::dispatch((int) $attempt->id);
-        app(AdminAuditService::class)->record($request, 'order.fulfillment.checked', 'order', $id, null, ['attempt_id' => $attempt->id]);
-
-        return back()->with('success', 'Pemeriksaan dijadwalkan. Muat ulang detail untuk melihat hasilnya.');
     }
 
     public function refreshPayment(Request $request, int $id)

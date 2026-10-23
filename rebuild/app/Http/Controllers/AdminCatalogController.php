@@ -12,15 +12,12 @@ use App\Models\Provider;
 use App\Models\ProviderMapping;
 use App\Models\StoreAsset;
 use App\Services\AdminAuditService;
-use App\Services\AdminPricingPreviewService;
 use App\Services\CatalogAudit;
 use App\Services\CatalogNominalOrder;
 use App\Services\CatalogPricingSettings;
 use App\Services\CheckoutPricing;
 use App\Services\DigiflazzCatalogService;
-use App\Services\DigiflazzFixedPricePolicy;
 use App\Services\VoucherStockService;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -129,8 +126,6 @@ class AdminCatalogController
                 'cost_uplift_percent' => app(CatalogPricingSettings::class)->costUpliftPercent(),
                 'sell_markup_percent' => app(CatalogPricingSettings::class)->sellMarkupPercent(),
             ],
-            'fixedPriceProposals' => app(DigiflazzFixedPricePolicy::class)->proposals(),
-            'fixedPriceAlerts' => app(DigiflazzFixedPricePolicy::class)->alerts(),
             'digiflazzItems' => (function () {
                 // N+1 fix: preload mapped SKUs sekali, bukan per item
                 $digiflazzIds = Provider::where('code', 'DIGIFLAZZ')->pluck('id');
@@ -688,6 +683,9 @@ class AdminCatalogController
             && (int) $pricing['sell_price_idr'] < (int) ($data['cost_idr'] ?? 0)) {
             throw ValidationException::withMessages(['sell_price_idr' => 'Harga jual tidak boleh di bawah modal.']);
         }
+        if ($isActive && $product->fulfillment_mode === 'MANUAL' && (int) ($data['cost_idr'] ?? 0) < 1) {
+            throw ValidationException::withMessages(['cost_idr' => 'Nominal aktif harus punya modal lebih dari Rp 0.']);
+        }
 
         if ($product->package_tabs_enabled) {
             $group = trim((string) ($data['group_name'] ?? ''));
@@ -761,6 +759,24 @@ class AdminCatalogController
                 'cost_idr' => 'Modal hanya bisa diisi pada produk dengan penanganan manual.',
             ]);
         }
+        $isActive = (bool) ($data['is_active'] ?? $package->is_active);
+        // Nominal aktif tanpa modal > 0 tidak akan pernah lolos CheckoutPricing.
+        $manualMapping = $product->fulfillment_mode === 'MANUAL'
+            ? $package->mappings()->where('provider_id', Provider::where('code', 'MANUAL')->value('id'))->first()
+            : null;
+        $effectiveCost = $newCost ?? (int) ($manualMapping?->store_cost_idr ?? $manualMapping?->cost_idr ?? 0);
+        if ($isActive && $product->fulfillment_mode === 'MANUAL' && $effectiveCost < 1) {
+            throw ValidationException::withMessages([
+                'cost_idr' => 'Nominal aktif harus punya modal lebih dari Rp 0.',
+            ]);
+        }
+        // Nominal otomatis hanya bisa dijual lewat sumber penyedia yang aktif.
+        if ($isActive && $product->fulfillment_mode !== 'MANUAL'
+            && ! $package->mappings()->where('is_active', true)->exists()) {
+            throw ValidationException::withMessages([
+                'is_active' => 'Aktifkan sumber Digiflazz nominal ini sebelum menjualnya.',
+            ]);
+        }
         if ($product->package_tabs_enabled) {
             $group = trim((string) ($data['group_name'] ?? $package->group_name ?? ''));
             $tabs = collect($product->package_tabs ?? []);
@@ -777,25 +793,30 @@ class AdminCatalogController
             && (int) ($data['sell_price_idr'] ?? $package->sell_price_idr) < (int) ($newCost ?? $highestActiveCost)) {
             throw ValidationException::withMessages(['sell_price_idr' => 'Harga jual tidak boleh di bawah modal.']);
         }
-        DB::transaction(function () use ($request, $package, $data, $audit, $newCost): void {
+        DB::transaction(function () use ($request, $package, $product, $isActive, $data, $audit, $newCost): void {
             $before = $package->toArray();
             $package->update(collect($data)->except('cost_idr')->all());
-            if ($newCost !== null) {
-                // Modal nominal manual hidup di pemetaan provider, bukan di paket.
+            if ($product->fulfillment_mode === 'MANUAL') {
+                // Modal nominal manual hidup di pemetaan provider, bukan di paket,
+                // dan status aktif nominal harus ikut supaya CheckoutPricing melihatnya.
                 $provider = Provider::where('code', 'MANUAL')->firstOrFail();
                 $mapping = $package->mappings()->where('provider_id', $provider->id)->first()
                     ?? ProviderMapping::create([
                         'product_package_id' => $package->id,
                         'provider_id' => $provider->id,
                         'external_sku' => null,
-                        'cost_idr' => $newCost,
-                        'store_cost_idr' => $newCost,
+                        'cost_idr' => $newCost ?? 0,
+                        'store_cost_idr' => $newCost ?? 0,
                         'max_price_idr' => null,
                         'priority' => 0,
-                        'is_active' => (bool) $package->is_active,
+                        'is_active' => $isActive,
                     ]);
                 $mappingBefore = $mapping->toArray();
-                $mapping->update(['cost_idr' => $newCost, 'store_cost_idr' => $newCost]);
+                $mapping->update([
+                    'cost_idr' => $newCost ?? $mapping->cost_idr,
+                    'store_cost_idr' => $newCost ?? $mapping->store_cost_idr,
+                    'is_active' => $isActive,
+                ]);
                 $audit->record($request, 'catalog.mapping.updated', 'provider_mapping', $mapping->id, $mappingBefore, $mapping->fresh()->toArray());
             }
             $audit->record($request, 'catalog.package.updated', 'product_package', $package->id, $before, $package->toArray());
@@ -1107,73 +1128,6 @@ class AdminCatalogController
      * One-time, audited conversion of legacy dynamic Digiflazz prices.
      * Existing fixed/manual prices are never overwritten.
      */
-    public function lockDigiflazzPrices(
-        Request $request,
-        DigiflazzFixedPricePolicy $policy,
-        AdminAuditService $audit
-    ): RedirectResponse {
-        $data = $request->validate([
-            'package_ids' => ['required', 'array', 'min:1', 'max:2000'],
-            'package_ids.*' => ['required', 'integer', 'distinct', 'exists:product_packages,id'],
-        ]);
-        $ids = array_map('intval', $data['package_ids']);
-
-        DB::transaction(function () use ($policy, $audit, $request, $ids): void {
-            $packages = ProductPackage::whereIn('id', $ids)->orderBy('id')->lockForUpdate()->get()->keyBy('id');
-            $proposals = collect($policy->proposals())->keyBy('package_id');
-            foreach ($ids as $id) {
-                $missingPackage = $packages->has($id) === false;
-                $missingProposal = $proposals->has($id) === false;
-                $alreadyFixed = $missingPackage === false && $packages->get($id)->pricing_mode === 'SELL_PRICE';
-                if ($missingPackage || $missingProposal || $alreadyFixed) {
-                    throw ValidationException::withMessages([
-                        'package_ids' => 'SKU/harga berubah. Muat ulang pratinjau sebelum menerapkan harga tetap.',
-                    ]);
-                }
-            }
-            foreach ($ids as $id) {
-                $package = $packages->get($id);
-                $before = $package->toArray();
-                $package->update([
-                    'pricing_mode' => 'SELL_PRICE',
-                    'sell_price_idr' => $proposals->get($id)['sell_price_idr'],
-                    'margin_percent' => null,
-                    'margin_fixed_idr' => null,
-                ]);
-                $audit->record(
-                    $request,
-                    'catalog.digiflazz.fixed_price_locked',
-                    'product_package',
-                    $id,
-                    $before,
-                    $package->toArray()
-                );
-            }
-        }, 3);
-
-        return back()->with('status', count($ids).' harga jual nominal Digiflazz dikunci mengikuti pengaturan admin.');
-    }
-
-    public function globalMarginPreview(Request $request, AdminPricingPreviewService $previews): JsonResponse
-    {
-        $data = $request->validate([
-            'margin_percent' => ['required', 'numeric', 'min:0', 'max:1000', 'regex:/^\\d+(?:\\.\\d{1,4})?$/'],
-            'include_imported_percent' => ['sometimes', 'boolean'],
-        ]);
-
-        return response()->json($previews->previewGlobalMargin(
-            $request, (string) $data['margin_percent'], (bool) ($data['include_imported_percent'] ?? false)
-        ));
-    }
-
-    public function globalMargin(Request $request, AdminAuditService $audit, AdminPricingPreviewService $previews): RedirectResponse
-    {
-        $data = $request->validate(['preview_token' => ['required', 'string', 'size:48']]);
-        $previews->executeGlobalMargin($request, $data['preview_token'], $audit);
-
-        return back()->with('status', 'Margin global diterapkan sesuai preview yang telah dikonfirmasi.');
-    }
-
     /**
      * Global pricing controls of the catalog redesign: the one-time cost uplift
      * that produces the admin store cost, and the sell markup applied to it.

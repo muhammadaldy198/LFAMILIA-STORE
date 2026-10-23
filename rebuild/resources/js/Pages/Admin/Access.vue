@@ -15,6 +15,22 @@ const props = defineProps({
     currentAdminId: { type: Number, default: 0 },
 });
 
+const pendingDelete = ref(null);
+const deleteBusy = ref(false);
+// Server menolak penghapusan diri sendiri dan Super Admin terakhir.
+const deleteAdmin = () => {
+    const target = pendingDelete.value;
+    if (!target) return;
+    // Menghapus akun lebih berat daripada menonaktifkan, jadi ikut minta kata sandi.
+    void withSensitive('Menghapus akun admin memerlukan konfirmasi kata sandi.', () => {
+        deleteBusy.value = true;
+        router.delete(`/admin/access/${target.id}`, {
+            preserveScroll: true,
+            onFinish: () => { deleteBusy.value = false; pendingDelete.value = null; },
+        });
+    });
+};
+
 const filter = reactive({
     q: props.filters?.q || '',
     role: props.filters?.role || '',
@@ -193,7 +209,8 @@ const deactivate = () => {
                             <td>
                                 <div style="display:flex;gap:4px;flex-wrap:wrap">
                                     <button type="button" class="adm-btn sm" @click="openEdit(row)">Ubah</button>
-                                    <button v-if="row.is_active && row.id !== currentAdminId" type="button" class="adm-btn sm danger" @click="pendingOff = row">Nonaktifkan</button>
+                                    <button v-if="row.is_active && row.id !== currentAdminId" type="button" class="adm-btn sm" @click="pendingOff = row">Nonaktifkan</button>
+                                    <button v-if="row.id !== currentAdminId" type="button" class="adm-btn sm danger" @click="pendingDelete = row">Hapus</button>
                                 </div>
                             </td>
                         </tr>
@@ -290,6 +307,15 @@ const deactivate = () => {
             <template #footer>
                 <button type="button" class="adm-btn" @click="pendingOff = null">Batal</button>
                 <button type="button" class="adm-btn danger" @click="deactivate">Nonaktifkan</button>
+            </template>
+        </AdminModal>
+        <AdminModal :open="!!pendingDelete" title="Hapus akun admin"
+            :description="pendingDelete ? 'Akun ' + pendingDelete.name + ' dihapus permanen.' : ''"
+            @update:open="value => { if (!value) pendingDelete = null; }">
+            <p class="adm-note">Riwayat audit akun ini tetap tersimpan. Akun yang sedang dipakai atau Super Admin terakhir akan ditolak server.</p>
+            <template #footer>
+                <button type="button" class="adm-btn" @click="pendingDelete = null">Batal</button>
+                <button type="button" class="adm-btn danger" :disabled="deleteBusy" @click="deleteAdmin">{{ deleteBusy ? 'Menghapus…' : 'Hapus akun' }}</button>
             </template>
         </AdminModal>
     </AdminLayout>

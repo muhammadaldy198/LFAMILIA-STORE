@@ -281,3 +281,24 @@ test('no template expression unwraps a ref that Vue already unwraps', () => {
     }
     assert.deepEqual(offenders, []);
 });
+
+test('round-two admin fixes keep their UI entry points', () => {
+    const catalog = read('Catalog.vue');
+    // Nominal manual: modal layanan, harga katalog, hapus produk.
+    assert.match(catalog, /manual_instructions/);
+    assert.match(catalog, /\/admin\/catalog\/pricing/);
+    // Margin global sudah dibuang dari rancangan; hanya tiga harga yang tersisa.
+    assert.doesNotMatch(catalog, /margin\/preview|Margin global|catalog\/margin/);
+    assert.match(catalog, /\/packages\/\$\{row\.id\}\/duplicate/);
+    assert.match(catalog, /\/voucher-stock/);
+    assert.match(catalog, /removeKind === 'product'/);
+    assert.match(catalog, /\/admin\/catalog\/products\/\$\{/);
+    const fulfillment = read('Fulfillment.vue');
+    assert.match(fulfillment, /can_reconcile/);
+    assert.match(fulfillment, /can_retry/);
+    assert.match(fulfillment, /can_fail/);
+    const access = read('Access.vue');
+    assert.match(access, /withSensitive\('Menghapus akun admin/);
+    const customer = read('CustomerDetail.vue');
+    assert.match(customer, /deletable && isSuperAdmin/);
+});

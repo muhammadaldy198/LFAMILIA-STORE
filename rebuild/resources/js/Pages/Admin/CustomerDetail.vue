@@ -71,6 +71,17 @@ const adjustWallet = () => {
     });
 };
 
+// Akun tanpa saldo & riwayat boleh dibersihkan; server tetap memeriksa ulang.
+const deleteOpen = ref(false);
+const deleteBusy = ref(false);
+const deleteAccount = () => {
+    deleteBusy.value = true;
+    router.delete(`/admin/customers/${props.customer.id}`, {
+        preserveScroll: true,
+        onFinish: () => { deleteBusy.value = false; },
+    });
+};
+
 const ledgerLabel = value => ({
     CHECKOUT: 'Bayar pesanan dengan saldo', REFUND: 'Pengembalian ke saldo',
     TOPUP: 'Top up saldo', ADMIN_ADJUSTMENT: 'Penyesuaian oleh admin',
@@ -93,6 +104,7 @@ const ticketLabel = value => ({
             <div class="adm-head-actions">
                 <span class="adm-tag" :class="customer.email_verified_at ? 'ok' : 'warn'">{{ customer.email_verified_at ? 'Email terverifikasi' : 'Email belum terverifikasi' }}</span>
                 <span v-if="customer.google_linked" class="adm-tag info">Google terhubung</span>
+                <button v-if="deletable && isSuperAdmin" type="button" class="adm-btn danger" @click="deleteOpen = true">Hapus akun kosong</button>
                 <button v-if="isSuperAdmin" type="button" class="adm-btn primary" @click="openManage">Atur pelanggan</button>
             </div>
         </header>
@@ -275,6 +287,13 @@ const ticketLabel = value => ({
             </div>
             <template #footer>
                 <button type="button" class="adm-btn" @click="managing = false">Tutup</button>
+            </template>
+        </AdminModal>
+        <AdminModal v-model:open="deleteOpen" title="Hapus akun kosong" :description="customer.name || customer.email || ''">
+            <p class="adm-note">Akun ini tidak punya saldo dan riwayat transaksi. Penghapusan tidak bisa dibatalkan. Server menolak akun yang ternyata masih memiliki saldo atau riwayat.</p>
+            <template #footer>
+                <button type="button" class="adm-btn" @click="deleteOpen = false">Batal</button>
+                <button type="button" class="adm-btn danger" :disabled="deleteBusy" @click="deleteAccount">{{ deleteBusy ? 'Menghapus…' : 'Hapus akun' }}</button>
             </template>
         </AdminModal>
     </AdminLayout>

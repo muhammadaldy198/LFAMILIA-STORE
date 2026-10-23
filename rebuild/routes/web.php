@@ -290,14 +290,8 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
 
     Route::middleware('admin.permission:catalog.manage')->prefix('admin/catalog')
         ->name('admin.catalog.')->group(function (): void {
-            Route::post('/margin/preview', [AdminCatalogController::class, 'globalMarginPreview'])
-                ->middleware('throttle:admin-sensitive')->name('margin.preview');
-            Route::put('/margin', [AdminCatalogController::class, 'globalMargin'])
-                ->middleware('throttle:admin-sensitive')->name('margin.update');
             Route::put('/pricing', [AdminCatalogController::class, 'pricing'])
                 ->middleware('throttle:admin-sensitive')->name('pricing.update');
-            Route::post('/digiflazz/lock-prices', [AdminCatalogController::class, 'lockDigiflazzPrices'])
-                ->middleware('throttle:admin-sensitive')->name('digiflazz.lock-prices');
             Route::put('/products/{product}/packages/reorder', [AdminCatalogController::class, 'reorderPackages'])->middleware('throttle:admin-mutation')->name('packages.reorder');
             Route::post('/products/{product}/sync', [AdminDigiflazzController::class, 'syncProduct'])->middleware('throttle:admin-sensitive')->name('products.sync');
             Route::post('/products/{product}/import', [AdminDigiflazzController::class, 'import'])->name('products.import');
@@ -357,12 +351,6 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
         Route::put('/admin/digiflazz/settings', [AdminDigiflazzController::class, 'settings'])
             ->middleware('throttle:admin-mutation')->name('admin.digiflazz.settings.update');
         Route::post('/admin/digiflazz/sync', [AdminDigiflazzController::class, 'sync'])->middleware('throttle:admin-sensitive');
-        Route::post('/admin/digiflazz/max-prices/preview', [AdminDigiflazzController::class, 'previewMaxPrices'])
-            ->middleware('throttle:admin-sensitive');
-        Route::post('/admin/digiflazz/max-prices/apply', [AdminDigiflazzController::class, 'applyMaxPrices'])
-            ->middleware('throttle:admin-sensitive');
-        Route::put('/admin/digiflazz/baseline/{id}', [AdminDigiflazzController::class, 'baseline'])
-            ->middleware('throttle:admin-sensitive');
 
         Route::get('/admin/providers', [AdminProviderController::class, 'index'])->name('admin.providers');
         Route::put('/admin/providers/{provider}', [AdminProviderController::class, 'update'])
@@ -375,8 +363,6 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
         ->middleware(['admin.permission:orders.view', 'admin.permission:fulfillment.manage', 'admin.permission:payments.manage', 'throttle:30,1'])->name('admin.orders.manual');
     Route::post('/admin/orders/{id}/check-payment', [AdminOrdersController::class, 'refreshPayment'])
         ->middleware(['admin.permission:orders.view', 'admin.permission:payments.manage', 'throttle:10,1'])->name('admin.orders.check-payment');
-    Route::post('/admin/orders/{id}/check-process', [AdminOrdersController::class, 'refreshFulfillment'])
-        ->middleware(['admin.permission:orders.view', 'admin.permission:fulfillment.manage', 'throttle:10,1'])->name('admin.orders.check-process');
     Route::post('/admin/orders/{id}/resend-delivery', [AdminOrdersController::class, 'resendDelivery'])
         ->middleware(['admin.permission:orders.view', 'admin.permission:fulfillment.manage', 'throttle:10,1'])->name('admin.orders.resend-delivery');
     Route::post('/admin/orders/{id}/cancel', AdminOrderCancellationController::class)

@@ -9,12 +9,10 @@ use App\Models\ProviderMapping;
 use App\Services\AdminAuditService;
 use App\Services\AdminDigiflazzMonitorService;
 use App\Services\AdminPermissionService;
-use App\Services\AdminPricingPreviewService;
 use App\Services\CatalogNominalOrder;
 use App\Services\DigiflazzAutoSources;
 use App\Services\DigiflazzCatalogImport;
 use App\Services\DigiflazzCatalogService;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -299,36 +297,6 @@ class AdminDigiflazzController
         return back()->with('status', $count === 0
             ? 'SKU tidak tersedia dari Digiflazz; data katalog dan mapping diperbarui sesuai riwayat transaksi.'
             : 'Harga nominal berhasil disinkronkan.');
-    }
-
-    public function previewMaxPrices(Request $request, AdminPricingPreviewService $previews): JsonResponse
-    {
-        $data = $request->validate(['sku_text' => ['required', 'string', 'max:200000']]);
-
-        return response()->json($previews->previewMaxPrices($request, $data['sku_text']));
-    }
-
-    public function applyMaxPrices(
-        Request $request,
-        AdminPricingPreviewService $previews,
-        AdminAuditService $audit,
-    ): RedirectResponse {
-        $data = $request->validate(['preview_token' => ['required', 'string', 'size:48']]);
-        $previews->executeMaxPrices($request, $data['preview_token'], $audit);
-
-        return back()->with('status', 'Harga Max Buyer Area diterapkan sesuai SKU dan preview yang dikonfirmasi.');
-    }
-
-    public function baseline(Request $request, int $id, AdminAuditService $audit): RedirectResponse
-    {
-        DB::transaction(function () use ($request, $id, $audit): void {
-            $item = DB::table('digiflazz_catalog_items')->where('id', $id)->lockForUpdate()->first();
-            abort_unless($item, 404);
-            DB::table('digiflazz_catalog_items')->where('id', $id)->update(['baseline_price_idr' => $item->price_idr, 'updated_at' => now()]);
-            $audit->record($request, 'digiflazz.baseline.updated', 'digiflazz_catalog_item', $id, ['price_idr' => $item->baseline_price_idr], ['price_idr' => $item->price_idr]);
-        });
-
-        return back();
     }
 
     public function attachSource(Request $request, ProductPackage $package, DigiflazzCatalogService $service, DigiflazzCatalogImport $importer, AdminAuditService $audit): RedirectResponse

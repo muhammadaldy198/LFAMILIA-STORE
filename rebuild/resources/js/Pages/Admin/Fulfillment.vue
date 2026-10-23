@@ -63,6 +63,14 @@ const run = (action) => {
 };
 
 const rowStatus = row => row.status_label || label(row.status);
+
+// Tindakan antrean tanpa isian (periksa status & proses ulang) langsung dikirim.
+const runOn = (action, row) => {
+    busy.value = true;
+    router.post(`/admin/fulfillment/${row.id}/${action}`, {}, {
+        preserveScroll: true, onFinish: () => { busy.value = false; },
+    });
+};
 </script>
 
 <template>
@@ -154,7 +162,10 @@ const rowStatus = row => row.status_label || label(row.status);
                             </td>
                             <td>
                                 <button v-if="row.can_complete" type="button" class="adm-btn sm" @click="openModal('complete', row)">Tangani</button>
-                                <Link v-else :href="`/admin/orders/${row.order_id}`" class="adm-btn sm">Lihat</Link>
+                                <button v-if="row.can_reconcile" type="button" class="adm-btn sm" :disabled="busy" @click="runOn('reconcile', row)">Periksa status</button>
+                                <button v-if="row.can_retry" type="button" class="adm-btn sm" :disabled="busy" @click="runOn('retry', row)">Proses ulang</button>
+                                <button v-if="row.can_fail" type="button" class="adm-btn sm danger" @click="openModal('fail', row)">Gagalkan</button>
+                                <Link :href="`/admin/orders/${row.order_id}`" class="adm-btn sm">Lihat</Link>
                             </td>
                         </tr>
                         <tr v-if="!rows.length"><td colspan="6" class="adm-empty">Tidak ada proses yang cocok dengan filter.</td></tr>

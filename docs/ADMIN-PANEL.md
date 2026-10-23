@@ -150,7 +150,8 @@ Format tiap halaman: **untuk apa · isi · aksi · catatan**. Nama berkas Vue ad
 
 **Untuk apa.** Mengelola katalog yang dijual.
 **Isi.** Dua tab: **Produk Otomatis** dan **Produk Manual**. Filter (kategori, status, pencarian), paginasi server; tabel produk (gambar, nama, kategori, jumlah nominal, status, penanda populer); pratinjau harga di kasir.
-**Aksi.** Tambah produk, ubah, hapus, sinkron per produk, atur margin global + pratinjau, kunci harga, kelola nominal (tambah/ubah/hapus/urutkan/duplikat), kelola sumber Digiflazz, kelola stok kode voucher, kelola pemberitahuan produk, unggah/hapus media, atur kode kolom & field.
+**Aksi.** Tambah produk, ubah, hapus, sinkron per produk, atur tambahan modal + markup jual (dua angka bawaan impor), kelola nominal (tambah/ubah/salin/hapus/urutkan), kelola stok kode pada nominal produk voucher, kelola pemberitahuan produk, unggah/hapus media, atur kode kolom & field.
+**Harga.** Hanya tiga angka: **harga seller** (dari penyedia) → **modal toko** (seller + tambahan modal, bawaan 2%) → **harga jual** (modal + markup, bawaan 10%). Tidak ada margin global.
 **Catatan.** Editor produk 4 tab: Produk, Nominal, Sumber, Pemberitahuan. Produk yang sudah punya riwayat pesanan tidak bisa dihapus — nonaktifkan saja. Tombol "Impor ke produk" ada di menu Digiflazz dan mengarah ke halaman ini (`/admin/catalog?import=digiflazz`); layar pemilihan nominalnya belum dibuat — lihat §10.
 
 ### 4.7 Kategori — `/admin/catalog/categories`
@@ -378,12 +379,13 @@ Semua aksi di atas masuk audit log.
 
 ## 10. Batas yang diketahui
 
-1. **Aksi backend yang belum punya tombol** (sengaja ditunda, menunggu tahap backend): `max-prices/preview`, `max-prices/apply`, `check-process`, `lock-prices`, `packages/{id}/duplicate`, `packages/{id}/voucher-stock`, `mappings/{id}` + `mappings/{id}/sync`, `packages/{id}/sources/digiflazz`, `digiflazz/baseline/{id}`.
-2. **Impor Digiflazz punya layar, tapi hanya dari tautan.** Menu Digiflazz → "Impor ke produk" membuka `/admin/catalog?import=digiflazz` dan pop-up impor langsung terbuka; tombol "Impor dari Digiflazz" juga ada di kepala halaman Produk. Yang belum: memilih SKU dari halaman detail Digiflazz satu per satu (`?import_sku=`).
-3. **Blok rekonsiliasi refund top up disembunyikan** dari Pembayaran (23 Okt 2026). Tombolnya tidak lagi dikirim ke peramban, tetapi `POST /admin/payments/refund-reviews/{topupId}/resolve` masih ada di server sebagai jalur pemeliharaan; pesanan dengan top up berstatus `REFUND_REVIEW` tetap ditahan mesin pembayaran sampai rekonsiliasi manual lewat basis data.
-4. **DOKU** belum dipakai; tampil sebagai belum aktif.
-5. **Data lokal adalah data uji** — angka di layar lokal bukan angka produksi.
-6. **Konfirmasi kata sandi di Admin & Akses masih penjaga klien.** Kata sandi diperiksa server lewat `/admin/password/confirm`, tetapi route `admin/access` belum memakai middleware `RequireAdminPasswordConfirm`; permintaan langsung tanpa lewat panel tidak akan ditanya sandi. Perlu ditambahkan bila ingin setara dengan penyesuaian saldo.
+1. **Dibuang karena tidak ada di rancangan panel:** margin global (`catalog/margin` + pratinjau), batas harga atas (`max-prices/*`, `digiflazz/baseline/{id}`), kunci harga massal (`lock-prices`), dan `orders/{id}/check-process` (digantikan tombol "Periksa status" di Antrean Manual). Pagar modal+1% tetap berjalan otomatis di server; yang dibuang hanya layar pengaturannya.
+2. **Aksi backend yang belum punya tombol:** `mappings/{id}` + `mappings/{id}/sync`, `packages/{id}/sources/digiflazz` (kelola sumber harga per nominal).
+3. **Impor Digiflazz punya layar, tapi hanya dari tautan.** Menu Digiflazz → "Impor ke produk" membuka `/admin/catalog?import=digiflazz` dan pop-up impor langsung terbuka; tombol "Impor dari Digiflazz" juga ada di kepala halaman Produk. Yang belum: memilih SKU dari halaman detail Digiflazz satu per satu (`?import_sku=`).
+4. **Blok rekonsiliasi refund top up disembunyikan** dari Pembayaran (23 Okt 2026). Tombolnya tidak lagi dikirim ke peramban, tetapi `POST /admin/payments/refund-reviews/{topupId}/resolve` masih ada di server sebagai jalur pemeliharaan; pesanan dengan top up berstatus `REFUND_REVIEW` tetap ditahan mesin pembayaran sampai rekonsiliasi manual lewat basis data.
+5. **DOKU** belum dipakai; tampil sebagai belum aktif.
+6. **Data lokal adalah data uji** — angka di layar lokal bukan angka produksi.
+7. **Konfirmasi kata sandi di Admin & Akses masih penjaga klien.** Kata sandi diperiksa server lewat `/admin/password/confirm`, tetapi route `admin/access` belum memakai middleware `RequireAdminPasswordConfirm`; permintaan langsung tanpa lewat panel tidak akan ditanya sandi. Perlu ditambahkan bila ingin setara dengan penyesuaian saldo.
 
 ---
 

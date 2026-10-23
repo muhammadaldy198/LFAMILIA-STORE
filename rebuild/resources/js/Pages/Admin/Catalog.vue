@@ -57,10 +57,11 @@ const addOpen = ref(false);
 const addAdvanced = ref(false);
 const addBusy = ref(false);
 const addErrors = ref({});
-const add = reactive({ category_id: '', name: '', slug: '', publisher: '', description: '', sort_order: 0 });
+const MANUAL_DEFAULTS = { manual_instructions: '', manual_open_time: '', manual_close_time: '', manual_timezone: 'Asia/Jakarta' };
+const add = reactive({ category_id: '', name: '', slug: '', publisher: '', description: '', sort_order: 0, ...MANUAL_DEFAULTS });
 
 const openAdd = () => {
-    Object.assign(add, { category_id: '', name: '', slug: '', publisher: '', description: '', sort_order: 0 });
+    Object.assign(add, { category_id: '', name: '', slug: '', publisher: '', description: '', sort_order: 0, ...MANUAL_DEFAULTS });
     addErrors.value = {};
     addAdvanced.value = false;
     addOpen.value = true;
@@ -77,6 +78,13 @@ const submitAdd = () => {
         fulfillment_mode: mode.value,
         sort_order: Number(add.sort_order || 0),
         margin_percent: 0,
+        // Petunjuk & jam layanan dipakai pemberitahuan fulfillment dan toko.
+        ...(mode.value === 'MANUAL' ? {
+            manual_instructions: add.manual_instructions || null,
+            manual_open_time: add.manual_open_time || null,
+            manual_close_time: add.manual_close_time || null,
+            manual_timezone: add.manual_timezone || null,
+        } : {}),
     }, {
         preserveScroll: true,
         onError: bag => { addErrors.value = bag; },
@@ -103,6 +111,7 @@ const info = reactive({
     name: '', slug: '', publisher: '', category_id: '', fulfillment_mode: 'AUTO_PROVIDER',
     sort_order: 0, description: '', is_active: false, nickname_check_enabled: false,
     nickname_game_code: '', nickname_user_field_key: '', nickname_server_field_key: '',
+    ...MANUAL_DEFAULTS,
 });
 
 const loadInfo = () => {
@@ -120,6 +129,10 @@ const loadInfo = () => {
         nickname_game_code: product.value.nickname_game_code || '',
         nickname_user_field_key: product.value.nickname_user_field_key || '',
         nickname_server_field_key: product.value.nickname_server_field_key || '',
+        manual_instructions: product.value.manual_instructions || '',
+        manual_open_time: product.value.manual_open_time || '',
+        manual_close_time: product.value.manual_close_time || '',
+        manual_timezone: product.value.manual_timezone || 'Asia/Jakarta',
     });
 };
 
@@ -131,6 +144,10 @@ const saveInfo = () => {
         sort_order: Number(info.sort_order || 0),
         margin_percent: Number(product.value.margin_percent ?? 0),
         nickname_check_enabled: info.nickname_game_code ? info.nickname_check_enabled : false,
+        manual_instructions: info.manual_instructions || null,
+        manual_open_time: info.manual_open_time || null,
+        manual_close_time: info.manual_close_time || null,
+        manual_timezone: info.manual_timezone || null,
     }, {
         preserveScroll: true,
         onError: bag => { editErrors.value = bag; },
@@ -216,7 +233,9 @@ const askRemove = (row, kind) => { removeTarget.value = row; removeKind.value = 
 const confirmRemove = () => {
     const row = removeTarget.value;
     if (!row) return;
-    const url = removeKind.value === 'notice' ? `/admin/catalog/notices/${row.id}` : `/admin/catalog/packages/${row.id}`;
+    const url = removeKind.value === 'notice' ? `/admin/catalog/notices/${row.id}`
+        : removeKind.value === 'product' ? `/admin/catalog/products/${row.id}`
+        : `/admin/catalog/packages/${row.id}`;
     router.delete(url, { preserveScroll: true, onFinish: () => { removeTarget.value = null; } });
 };
 
@@ -368,6 +387,82 @@ const openEditorFull = (row) => {
     loadInfo();
     loadFields();
 };
+/* ---------- pengaturan harga katalog ---------- */
+const priceOpen = ref(false);
+const priceBusy = ref('');
+const priceErrors = ref({});
+const price = reactive({
+    cost_uplift_percent: Number(props.pricingSettings?.cost_uplift_percent ?? 2),
+    sell_markup_percent: Number(props.pricingSettings?.sell_markup_percent ?? 10),
+});
+const openPricing = () => {
+    priceErrors.value = {};
+    price.cost_uplift_percent = Number(props.pricingSettings?.cost_uplift_percent ?? 2);
+    price.sell_markup_percent = Number(props.pricingSettings?.sell_markup_percent ?? 10);
+    priceOpen.value = true;
+};
+const savePricing = () => {
+    priceBusy.value = 'pricing';
+    router.put('/admin/catalog/pricing', {
+        cost_uplift_percent: Number(price.cost_uplift_percent || 0),
+        sell_markup_percent: Number(price.sell_markup_percent || 0),
+    }, {
+        preserveScroll: true,
+        onError: bag => { priceErrors.value = bag; },
+        onFinish: () => { priceBusy.value = ''; },
+        onSuccess: () => { priceOpen.value = false; },
+    });
+};
+/* ---------- salin nominal & stok kode ---------- */
+// Produk stok kode = produk yang nominalnya mengambil kode dari stok sendiri.
+const stockProduct = computed(() => (product.value?.packages || [])
+    .some(row => (row.mappings || []).some(mapping => mapping.provider_code === 'VOUCHER_STOCK')));
+const canStock = row => product.value?.fulfillment_mode === 'AUTO_PROVIDER'
+    && (stockProduct.value
+        ? (row.mappings || []).some(mapping => mapping.provider_code === 'VOUCHER_STOCK')
+        : !(row.mappings || []).some(mapping => mapping.provider_code === 'DIGIFLAZZ'));
+const duplicate = row => {
+    saveBusy.value = 'duplicate';
+    router.post(`/admin/catalog/packages/${row.id}/duplicate`, {}, {
+        preserveScroll: true,
+        onError: bag => { nominalErrors.value = bag; },
+        onFinish: () => { saveBusy.value = ''; },
+    });
+};
+const stockOpen = ref(false);
+const stockBusy = ref(false);
+const stockErrors = ref({});
+const stockRow = ref(null);
+const stock = reactive({ stock_key: '', cost_idr: 0, priority: 0, is_active: true, codes_text: '' });
+const openStock = row => {
+    stockRow.value = row;
+    const mapping = (row.mappings || []).find(item => item.provider_code === 'VOUCHER_STOCK');
+    stock.stock_key = mapping?.stock_key || '';
+    stock.cost_idr = costOf(row) ?? 0;
+    stock.priority = mapping?.priority ?? 0;
+    stock.is_active = mapping ? Boolean(mapping.is_active) : true;
+    stock.codes_text = '';
+    stockErrors.value = {};
+    stockOpen.value = true;
+};
+const saveStock = () => {
+    if (!stockRow.value) return;
+    stockBusy.value = true;
+    stockErrors.value = {};
+    router.post(`/admin/catalog/packages/${stockRow.value.id}/voucher-stock`, {
+        stock_key: stock.stock_key,
+        cost_idr: Number(stock.cost_idr || 0),
+        priority: Number(stock.priority || 0),
+        is_active: Boolean(stock.is_active),
+        codes_text: stock.codes_text || null,
+    }, {
+        preserveScroll: true,
+        onError: bag => { stockErrors.value = bag; },
+        onSuccess: () => { stockOpen.value = false; },
+        onFinish: () => { stockBusy.value = false; },
+    });
+};
+
 /* ---------- impor nominal Digiflazz ---------- */
 const importOpen = ref(false);
 const importBusy = ref(false);
@@ -438,6 +533,7 @@ onMounted(() => {
             <div class="adm-head-actions">
                 <Link href="/admin/catalog/categories" class="adm-btn">Kategori</Link>
                 <a href="/" target="_blank" rel="noopener" class="adm-btn">Lihat toko</a>
+                <button type="button" class="adm-btn" @click="openPricing">Pengaturan harga</button>
                 <button v-if="autoProducts.length" type="button" class="adm-btn" @click="openImport">Impor dari Digiflazz</button>
                 <button type="button" class="adm-btn primary" @click="openAdd">Tambah produk</button>
             </div>
@@ -508,6 +604,7 @@ onMounted(() => {
                             <td>
                                 <button type="button" class="adm-btn sm" @click="openEditorFull(row)">Ubah</button>
                                 <button type="button" class="adm-btn sm" @click="togglePopular(row)">{{ row.popular ? 'Lepas unggulan' : 'Jadikan unggulan' }}</button>
+                                <button type="button" class="adm-btn sm danger" @click="askRemove(row, 'product')">Hapus</button>
                             </td>
                         </tr>
                         <tr v-if="!visible.length"><td colspan="7" class="adm-empty">Belum ada produk pada tab ini.</td></tr>
@@ -541,6 +638,18 @@ onMounted(() => {
                 <label class="adm-field"><span>Merek game / publisher</span><input v-model="add.publisher" class="adm-input" maxlength="255"></label>
                 <label class="adm-field"><span>Posisi di toko</span><input v-model="add.sort_order" type="number" min="0" class="adm-input"></label>
                 <label class="adm-field full"><span>Deskripsi</span><textarea v-model="add.description" class="adm-textarea" maxlength="5000" /></label>
+                <template v-if="mode === 'MANUAL'">
+                    <label class="adm-field full"><span>Petunjuk pengerjaan</span><textarea v-model="add.manual_instructions" class="adm-textarea" maxlength="5000" /><span class="hint">Dipakai operator dan pemberitahuan jam layanan.</span></label>
+                    <label class="adm-field"><span>Jam buka layanan</span><input v-model="add.manual_open_time" type="time" class="adm-input"></label>
+                    <label class="adm-field"><span>Jam tutup layanan</span><input v-model="add.manual_close_time" type="time" class="adm-input"></label>
+                    <label class="adm-field"><span>Zona waktu</span>
+                        <select v-model="add.manual_timezone" class="adm-select">
+                            <option value="Asia/Jakarta">WIB (Asia/Jakarta)</option>
+                            <option value="Asia/Makassar">WITA (Asia/Makassar)</option>
+                            <option value="Asia/Jayapura">WIT (Asia/Jayapura)</option>
+                        </select>
+                    </label>
+                </template>
                 <div class="full"><button type="button" class="adm-btn link" @click="addAdvanced = !addAdvanced">Ubah tautan halaman produk (lanjutan)</button></div>
                 <label v-if="addAdvanced" class="adm-field full">
                     <span>Alamat halaman produk</span>
@@ -584,6 +693,18 @@ onMounted(() => {
                     <label class="adm-field"><span>Posisi di toko</span><input v-model="info.sort_order" type="number" min="0" class="adm-input"></label>
                     <label class="adm-switch-row"><button type="button" class="adm-switch" role="switch" :aria-checked="info.is_active" @click="info.is_active = !info.is_active" />Aktif di toko</label>
                     <label class="adm-field full"><span>Deskripsi</span><textarea v-model="info.description" class="adm-textarea" maxlength="5000" /></label>
+                    <template v-if="info.fulfillment_mode === 'MANUAL'">
+                        <label class="adm-field full"><span>Petunjuk pengerjaan</span><textarea v-model="info.manual_instructions" class="adm-textarea" maxlength="5000" /><span class="hint">Tampil ke operator dan pelanggan saat pesanan manual.</span></label>
+                        <label class="adm-field"><span>Jam buka layanan</span><input v-model="info.manual_open_time" type="time" class="adm-input"></label>
+                        <label class="adm-field"><span>Jam tutup layanan</span><input v-model="info.manual_close_time" type="time" class="adm-input"></label>
+                        <label class="adm-field"><span>Zona waktu</span>
+                            <select v-model="info.manual_timezone" class="adm-select">
+                                <option value="Asia/Jakarta">WIB (Asia/Jakarta)</option>
+                                <option value="Asia/Makassar">WITA (Asia/Makassar)</option>
+                                <option value="Asia/Jayapura">WIT (Asia/Jayapura)</option>
+                            </select>
+                        </label>
+                    </template>
                     <label class="adm-switch-row full"><button type="button" class="adm-switch" role="switch" :aria-checked="info.nickname_check_enabled" :disabled="!info.nickname_game_code" @click="info.nickname_check_enabled = !info.nickname_check_enabled" />Aktifkan cek nickname</label>
                     <label class="adm-field">
                         <span>Kode game</span>
@@ -642,6 +763,8 @@ onMounted(() => {
                                 <td>
                                     <div style="display:flex;gap:4px">
                                         <button type="button" class="adm-btn sm" @click="openNominal(row)">Ubah</button>
+                                        <button type="button" class="adm-btn sm" :disabled="saveBusy === 'duplicate'" @click="duplicate(row)">Salin</button>
+                                        <button v-if="canStock(row)" type="button" class="adm-btn sm" @click="openStock(row)">Stok kode</button>
                                         <button type="button" class="adm-btn sm danger" @click="askRemove(row, 'package')">Hapus</button>
                                     </div>
                                 </td>
@@ -855,11 +978,42 @@ onMounted(() => {
                 <button type="submit" form="notice-form" class="adm-btn primary">Simpan</button>
             </template>
         </AdminModal>
-        <AdminModal :open="!!removeTarget" :title="removeKind === 'notice' ? 'Hapus pemberitahuan' : 'Hapus nominal'" :description="removeTarget?.name || removeTarget?.title || ''" @update:open="value => { if (!value) removeTarget = null; }">
-            <p class="adm-note">{{ removeKind === 'notice' ? 'Pemberitahuan ini akan hilang dari halaman produk toko.' : 'Nominal yang memiliki riwayat pesanan tidak dapat dihapus; nonaktifkan bila hanya ingin menghentikan penjualan.' }}</p>
+        <AdminModal :open="!!removeTarget" :title="removeKind === 'notice' ? 'Hapus pemberitahuan' : removeKind === 'product' ? 'Hapus produk' : 'Hapus nominal'" :description="removeTarget?.name || removeTarget?.title || ''" @update:open="value => { if (!value) removeTarget = null; }">
+            <p class="adm-note">{{ removeKind === 'notice' ? 'Pemberitahuan ini akan hilang dari halaman produk toko.' : removeKind === 'product' ? 'Produk beserta seluruh nominalnya dihapus permanen. Produk yang punya riwayat pesanan akan ditolak; nonaktifkan saja bila hanya ingin menghentikan penjualan.' : 'Nominal yang memiliki riwayat pesanan tidak dapat dihapus; nonaktifkan bila hanya ingin menghentikan penjualan.' }}</p>
             <template #footer>
                 <button type="button" class="adm-btn" @click="removeTarget = null">Batal</button>
                 <button type="button" class="adm-btn danger" @click="confirmRemove">Hapus</button>
+            </template>
+        </AdminModal>
+        <AdminModal v-model:open="priceOpen" title="Pengaturan harga katalog" description="Tambahan modal dari harga seller dan markup jual berlaku untuk impor berikutnya." wide>
+            <div class="adm-grid two">
+                <label class="adm-field">
+                    <span>Tambahan modal (%)</span>
+                    <input v-model="price.cost_uplift_percent" type="number" min="0" max="1000" step="0.1" class="adm-input">
+                    <span v-if="priceErrors.cost_uplift_percent" class="err">{{ priceErrors.cost_uplift_percent }}</span>
+                </label>
+                <label class="adm-field">
+                    <span>Markup jual (%)</span>
+                    <input v-model="price.sell_markup_percent" type="number" min="0" max="1000" step="0.1" class="adm-input">
+                    <span v-if="priceErrors.sell_markup_percent" class="err">{{ priceErrors.sell_markup_percent }}</span>
+                </label>
+            </div>
+            <template #footer>
+                <button type="button" class="adm-btn" @click="priceOpen = false">Tutup</button>
+                <button type="button" class="adm-btn primary" :disabled="!!priceBusy" @click="savePricing">{{ priceBusy === 'pricing' ? 'Menyimpan…' : 'Simpan persentase' }}</button>
+            </template>
+        </AdminModal>
+        <AdminModal v-model:open="stockOpen" title="Stok kode" :description="stockRow?.name || ''">
+            <div class="adm-grid two">
+                <label class="adm-field"><span>Nama stok <b class="req">*</b></span><input v-model="stock.stock_key" class="adm-input" maxlength="100" placeholder="steam-wallet-50k"><span v-if="stockErrors.stock_key" class="err">{{ stockErrors.stock_key }}</span></label>
+                <label class="adm-field"><span>Modal (Rp) <b class="req">*</b></span><input v-model="stock.cost_idr" type="number" min="1" class="adm-input"><span v-if="stockErrors.cost_idr" class="err">{{ stockErrors.cost_idr }}</span></label>
+                <label class="adm-field"><span>Prioritas</span><input v-model="stock.priority" type="number" min="0" class="adm-input"><span v-if="stockErrors.priority" class="err">{{ stockErrors.priority }}</span></label>
+                <label class="adm-switch-row"><button type="button" class="adm-switch" role="switch" :aria-checked="stock.is_active" @click="stock.is_active = !stock.is_active" />Sumber aktif</label>
+                <label class="adm-field full"><span>Kode baru (satu per baris)</span><textarea v-model="stock.codes_text" class="adm-textarea" rows="6" maxlength="500000" placeholder="AAAA-BBBB-CCCC" /><span class="hint">Kode disimpan terenkripsi dan hanya dikirim sekali. Kosongkan bila hanya mengubah modal atau status.</span><span v-if="stockErrors.codes_text" class="err">{{ stockErrors.codes_text }}</span></label>
+            </div>
+            <template #footer>
+                <button type="button" class="adm-btn" @click="stockOpen = false">Batal</button>
+                <button type="button" class="adm-btn primary" :disabled="stockBusy" @click="saveStock">{{ stockBusy ? 'Menyimpan…' : 'Simpan stok' }}</button>
             </template>
         </AdminModal>
     </AdminLayout>
