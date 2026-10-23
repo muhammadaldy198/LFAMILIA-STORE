@@ -72,7 +72,7 @@ class FulfillmentService
                 return null;
             }
 
-            $blockReason = $this->mappingBlockReason($mapping, $snapshot);
+            $blockReason = $this->mappingBlockReason($mapping, $snapshot, (int) $order->id);
             if ($blockReason !== null) {
                 $blocked = $this->blockedWithoutSend($order, $mapping, $blockReason);
 
@@ -117,7 +117,7 @@ class FulfillmentService
                     throw ValidationException::withMessages(['fulfillment' => 'Mapping provider tidak ditemukan.']);
                 }
 
-                $blockReason = $this->mappingBlockReason($mapping, $snapshot);
+                $blockReason = $this->mappingBlockReason($mapping, $snapshot, (int) $order->id);
                 if ($blockReason !== null) {
                     throw ValidationException::withMessages(['fulfillment' => $blockReason]);
                 }
@@ -907,6 +907,21 @@ class FulfillmentService
         }
 
         $next = $this->createAttempt($order, $mapping, 'CREATED');
+
+        // Sumber stok kode ditinggalkan: kode yang sudah dipesan tidak akan
+        // pernah terkirim, jadi kembalikan ke stok sekarang. Kalau tidak, kode
+        // itu menggantung RESERVED selamanya dan hilang dari stok yang dijual.
+        $blockedMapping = $this->mapping((int) $blockedAttempt->provider_mapping_id);
+        if ($blockedMapping?->provider_code === 'VOUCHER_STOCK') {
+            $released = $this->voucherStock->release((int) $order->id);
+            if ($released > 0) {
+                $this->event((int) $order->id, 'VOUCHER_STOCK_RELEASED', $order->status, $order->status, [
+                    'attempt_id' => $blockedAttempt->id,
+                    'codes' => $released,
+                ]);
+            }
+        }
+
         DB::table('orders')->where('id', $order->id)->update([
             'status' => 'PROCESSING',
             'updated_at' => now(),
@@ -992,7 +1007,7 @@ class FulfillmentService
     /**
      * @param  array<string, mixed>  $snapshot
      */
-    private function mappingBlockReason(object $mapping, array $snapshot): ?string
+    private function mappingBlockReason(object $mapping, array $snapshot, ?int $orderId = null): ?string
     {
         if (! $mapping->is_active || ! $mapping->provider_active) {
             return 'Provider atau mapping sedang nonaktif.';
@@ -1032,7 +1047,12 @@ class FulfillmentService
             if ($stockKey === '') {
                 return 'Kunci stok kode belum diatur.';
             }
-            if (! $this->voucherStock->available($stockKey)) {
+            if ($orderId !== null) {
+                // Kode yang sudah dipesan order ini tetap sah dipakai.
+                if (! $this->voucherStock->availableFor($orderId, $stockKey)) {
+                    return 'Stok kode untuk nominal ini habis.';
+                }
+            } elseif (! $this->voucherStock->available($stockKey)) {
                 return 'Stok kode untuk nominal ini habis.';
             }
         }

@@ -60,6 +60,25 @@ class VoucherStockService
     }
 
     /**
+     * Stok layak dipakai order ini: kode yang sudah dipesan untuk order tersebut
+     * (kunci apa pun, karena admin bisa mengganti stock_key setelah checkout),
+     * atau kode bebas pada kunci yang diminta.
+     */
+    public function availableFor(int $orderId, string $stockKey): bool
+    {
+        return DB::table('voucher_stock_codes')
+            ->where(function ($query) use ($orderId, $stockKey): void {
+                $query->where(function ($reserved) use ($orderId): void {
+                    $reserved->where('status', 'RESERVED')->where('order_id', $orderId);
+                })->orWhere(function ($free) use ($stockKey): void {
+                    $free->where('status', 'AVAILABLE')
+                        ->where('stock_key', $this->normalizeKey($stockKey));
+                });
+            })
+            ->exists();
+    }
+
+    /**
      * Caller must wrap this method in a database transaction.
      *
      * @return array{id:int,code:string}
@@ -113,6 +132,23 @@ class VoucherStockService
             ->update([
                 'status' => 'DELIVERED',
                 'delivered_at' => DB::raw('COALESCE(delivered_at, CURRENT_TIMESTAMP)'),
+                'updated_at' => now(),
+            ]);
+    }
+
+    /**
+     * Kembalikan kode ke stok hanya bila belum terkirim. Kode DELIVERED tidak
+     * pernah dilepas: pembeli sudah memegangnya.
+     */
+    public function release(int $orderId): int
+    {
+        return DB::table('voucher_stock_codes')
+            ->where('order_id', $orderId)
+            ->where('status', 'RESERVED')
+            ->update([
+                'status' => 'AVAILABLE',
+                'order_id' => null,
+                'reserved_at' => null,
                 'updated_at' => now(),
             ]);
     }

@@ -320,6 +320,9 @@ class CheckoutPricing
             'provider_mapping_id' => (int) $mapping->mapping_id,
             'provider_code' => $mapping->provider_code,
             'provider_sku' => $mapping->external_sku,
+            // Kunci stok kode hanya untuk sumber VOUCHER_STOCK; dipakai
+            // CheckoutService untuk memesan kode sebelum pembayaran.
+            'stock_key' => $this->stockKey($mapping),
             // Snapshot the admin's exact manual cap, or the existing
             // automatic-source cap, for fulfillment and reconciliation.
             'max_price_idr' => $maxPrice,
@@ -327,6 +330,22 @@ class CheckoutPricing
             'margin_idr' => $margin,
             'subtotal_idr' => $cost + $margin,
         ];
+    }
+
+    /**
+     * Kunci stok hanya berlaku untuk sumber VOUCHER_STOCK.
+     */
+    private function stockKey(object $mapping): ?string
+    {
+        if (($mapping->provider_code ?? null) !== 'VOUCHER_STOCK') {
+            return null;
+        }
+
+        $config = $mapping->fulfillment_config ?? null;
+        $config = is_string($config) ? (json_decode($config, true) ?: []) : (array) $config;
+        $key = trim((string) ($config['stock_key'] ?? ''));
+
+        return $key === '' ? null : $key;
     }
 
     private function digiflazzMaxPrice(int $highestEligibleCost): int

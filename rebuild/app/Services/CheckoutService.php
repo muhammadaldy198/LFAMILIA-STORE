@@ -321,6 +321,14 @@ class CheckoutService
                     ]);
                 }
 
+                // Stok kode digital dipesan di sini, bukan saat fulfillment: kalau
+                // kode habis, seluruh transaksi batal sehingga pembeli tidak pernah
+                // membayar pesanan yang tidak bisa dikirim.
+                $stockKey = trim((string) ($price['stock_key'] ?? ''));
+                if ($stockKey !== '') {
+                    app(VoucherStockService::class)->claim((int) $orderId, $stockKey);
+                }
+
                 DB::table('order_events')->insert([
                     'order_id' => $orderId,
                     'event_type' => 'ORDER_CREATED',
