@@ -104,16 +104,9 @@ const submit = () => {
         if (target.id) router.put('/admin/access/' + target.id, payload, options);
         else router.post('/admin/access', payload, options);
     };
-    // Kata sandi ulang untuk pembuatan akun baru (termasuk Super Admin), serta
-    // saat peran, status aktif, atau izin berubah.
-    const before = target.original;
-    const needsPassword = !target.id || (before && (
-        target.role !== before.role
-        || Boolean(target.is_active) !== before.is_active
-        || JSON.stringify([...target.permissions].sort()) !== JSON.stringify([...before.permissions].sort())
-    ));
-    if (needsPassword) void withSensitive(sensitiveReason(), run);
-    else run();
+    // Server menjaga SEMUA mutasi /admin/access, jadi UI harus selalu bertanya —
+    // kalau tidak, ubah nama/email saja akan ditolak middleware dan form hilang.
+    void withSensitive(sensitiveReason(), run);
 };
 
 // ---------- nonaktifkan ----------

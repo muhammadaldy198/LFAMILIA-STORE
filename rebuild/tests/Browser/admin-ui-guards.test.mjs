@@ -327,6 +327,13 @@ test('editing a nominal keeps stored pricing and nominal_value', async () => {
         assert.equal(payload.sort_order, row.sort_order + 1);
         assert.equal(payload.is_active, !row.is_active);
     }
+    // Nilai yang tampil harus mengikuti mode tersimpan: PERCENT dari
+    // margin_percent, FIXED dari margin_fixed_idr — bukan kolom lain.
+    assert.equal(nominalMode(rows.PERCENT), 'MARKUP');
+    assert.equal(nominalPriceValue(rows.PERCENT), 12.5);
+    assert.equal(nominalMode(rows.FIXED), 'MARKUP');
+    assert.equal(nominalPriceValue(rows.FIXED), 3500);
+    assert.equal(nominalPriceValue(rows.PRODUCT_MARGIN), '');
     // Harga tetap terkirim saat admin memang mengubahnya.
     const changed = nominalPayload(rows.SELL_PRICE, { ...form(rows.SELL_PRICE), price_value: 25000 }, 'x');
     assert.equal(changed.pricing_mode, 'SELL_PRICE');
@@ -342,7 +349,9 @@ test('editing a nominal keeps stored pricing and nominal_value', async () => {
 // sandi di UI, bukan hanya perubahan peran/izin.
 test('creating an admin account asks for password confirmation', () => {
     const access = read('Access.vue');
-    assert.match(access, /const needsPassword = !target\.id \|\| \(before && \(/);
+    // Server menjaga semua mutasi, jadi UI selalu bertanya (bukan bersyarat).
+    assert.match(access, /void withSensitive\(sensitiveReason\(\), run\);/);
+    assert.doesNotMatch(access, /if \(needsPassword\)/);
     assert.match(access, /if \(!target\.id\) return 'Membuat akun admin baru memerlukan konfirmasi kata sandi\.'/);
     assert.match(repo('routes/web.php'), /Route::post\('\/admin\/access'[\s\S]{0,160}admin\.password\.confirm/);
     assert.match(repo('routes/web.php'), /Route::put\('\/admin\/access\/\{admin\}'[\s\S]{0,160}admin\.password\.confirm/);

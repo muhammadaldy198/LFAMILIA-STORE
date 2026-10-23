@@ -2,9 +2,14 @@
 // mengedit nama/grup/urutan/status TIDAK boleh mengubah harga tersimpan.
 export const nominalMode = row => (row?.pricing_mode === 'SELL_PRICE' ? 'FIXED' : row ? 'MARKUP' : 'FIXED');
 
-export const nominalPriceValue = row => (row?.pricing_mode === 'SELL_PRICE'
-    ? row.sell_price_idr
-    : (row?.sell_markup_percent ?? ''));
+// Nilai yang ditampilkan harus mengikuti mode yang tersimpan, bukan kolom
+// lain: PERCENT hidup di margin_percent, FIXED di margin_fixed_idr.
+export const nominalPriceValue = row => {
+    if (row?.pricing_mode === 'SELL_PRICE') return row.sell_price_idr;
+    if (row?.pricing_mode === 'PERCENT') return row.margin_percent ?? '';
+    if (row?.pricing_mode === 'FIXED') return row.margin_fixed_idr ?? '';
+    return row?.sell_markup_percent ?? '';
+};
 
 const pricingOf = form => ({
     mode: form.price_mode === 'FIXED' ? 'SELL_PRICE' : 'PERCENT',
