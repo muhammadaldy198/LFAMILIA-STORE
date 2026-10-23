@@ -331,7 +331,7 @@ test('editing a nominal keeps stored pricing and nominal_value', async () => {
     // margin_percent, FIXED dari margin_fixed_idr — bukan kolom lain.
     assert.equal(nominalMode(rows.PERCENT), 'MARKUP');
     assert.equal(nominalPriceValue(rows.PERCENT), 12.5);
-    assert.equal(nominalMode(rows.FIXED), 'MARKUP');
+    assert.equal(nominalMode(rows.FIXED), 'FIXED');
     assert.equal(nominalPriceValue(rows.FIXED), 3500);
     assert.equal(nominalPriceValue(rows.PRODUCT_MARGIN), '');
     // Harga tetap terkirim saat admin memang mengubahnya.
@@ -351,6 +351,14 @@ test('editing a nominal keeps stored pricing and nominal_value', async () => {
     assert.equal(percentEdit.pricing_mode, 'PERCENT');
     assert.equal(percentEdit.margin_percent, 15);
     assert.equal(percentEdit.margin_fixed_idr, undefined);
+
+    // Admin MENGGANTI mode di form tetap dihormati (bukan dikunci ke mode lama).
+    const fixedToMarkup = nominalPayload(rows.FIXED, { ...form(rows.FIXED), price_mode: 'MARKUP', price_value: 15 }, 'x');
+    assert.equal(fixedToMarkup.pricing_mode, 'PERCENT');
+    assert.equal(fixedToMarkup.margin_percent, 15);
+    const percentToFixed = nominalPayload(rows.PERCENT, { ...form(rows.PERCENT), price_mode: 'FIXED', price_value: 20000 }, 'x');
+    assert.equal(percentToFixed.pricing_mode, 'SELL_PRICE');
+    assert.equal(percentToFixed.sell_price_idr, 20000);
     // Catalog.vue memakai helper itu, bukan payload lama yang menimpa null.
     const catalog = read('Catalog.vue');
     assert.match(catalog, /import \{ nominalMode, nominalPayload, nominalPriceValue \} from '\.\.\/\.\.\/lib\/catalogNominal'/);
