@@ -423,7 +423,7 @@ const openEditorFull = (row) => {
             <div class="adm-scroll">
                 <table class="adm-table">
                     <thead>
-                        <tr><th>Produk</th><th>Kategori</th><th>Jenis</th><th>Nominal</th><th>Urutan</th><th>Status</th><th>Aksi</th></tr>
+                        <tr><th>Produk</th><th>Kategori</th><th>Jenis</th><th>Nominal aktif</th><th>Urutan</th><th>Status</th><th>Aksi</th></tr>
                     </thead>
                     <tbody>
                         <tr v-for="row in visible" :key="row.id">
