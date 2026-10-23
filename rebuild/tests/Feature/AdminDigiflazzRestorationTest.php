@@ -1148,6 +1148,38 @@ class AdminDigiflazzRestorationTest extends TestCase
         ]);
     }
 
+    public function test_import_uses_active_sell_markup_setting_not_legacy_default_margin(): void
+    {
+        $this->login();
+        // Setting warisan yang dulu dibaca form impor, sengaja dibedakan.
+        DB::table('system_settings')->updateOrInsert(['key' => 'catalog.default_margin_percent'], [
+            'value' => json_encode(35, JSON_THROW_ON_ERROR), 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('system_settings')->updateOrInsert(['key' => 'pricing.sell_markup_percent'], [
+            'value' => json_encode('12', JSON_THROW_ON_ERROR), 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        // Produk tanpa override margin: form impor harus memakai setting aktif.
+        $product = Product::create([
+            'category_id' => Category::where('slug', 'game')->value('id'),
+            'name' => 'Impor Tanpa Override', 'slug' => 'impor-tanpa-override',
+            'fulfillment_mode' => 'AUTO_PROVIDER', 'margin_percent' => 10, 'is_active' => true,
+            'sell_markup_percent' => null,
+        ]);
+
+        $this->get('/admin/catalog')->assertInertia(fn (Assert $page) => $page
+            ->where('pricingSettings.sell_markup_percent', '12')
+            ->missing('defaultMargin'));
+
+        $catalog = file_get_contents(resource_path('js/Pages/Admin/Catalog.vue'));
+        $this->assertStringNotContainsString('defaultMargin', $catalog);
+        $this->assertStringContainsString('props.pricingSettings?.sell_markup_percent', $catalog);
+
+        // Nilai margin tidak diubah oleh impor: produk tanpa override tetap null
+        // sampai admin sendiri menyimpan margin.
+        $this->assertNull($product->fresh()->sell_markup_percent);
+    }
+
     public function test_sync_failure_creates_only_one_admin_alert_per_hour(): void
     {
         $this->fakeCatalog([]);

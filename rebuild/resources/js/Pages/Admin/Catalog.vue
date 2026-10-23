@@ -16,7 +16,6 @@ const props = defineProps({
     digiflazzItems: { type: Array, default: () => [] },
     autoProductOptions: { type: Array, default: () => [] },
     pricingSettings: { type: Object, default: () => ({}) },
-    defaultMargin: { type: [Number, String], default: 0 },
 });
 
 // Saringan dikerjakan server supaya hasil tidak bohong saat produk banyak.
@@ -466,7 +465,7 @@ const autoProducts = computed(() => props.autoProductOptions);
 const importProduct = computed(() => props.products.find(row => Number(row.id) === Number(importProductId.value))
     || props.autoProductOptions.find(row => Number(row.id) === Number(importProductId.value)) || null);
 const importUplift = computed(() => Number(importProduct.value?.cost_uplift_percent ?? props.pricingSettings?.cost_uplift_percent ?? 2));
-const importMargin = ref(Number(props.defaultMargin || 0));
+const importMargin = ref(Number(props.pricingSettings?.sell_markup_percent ?? 0));
 const importBrands = computed(() => [...new Set(props.digiflazzItems.map(row => row.brand))].sort((a, b) => a.localeCompare(b, 'id-ID')));
 const importRows = computed(() => props.digiflazzItems.filter(row => {
     if (row.mapped || !row.available) return false;
@@ -484,7 +483,7 @@ const openImport = () => {
     importBrand.value = '';
     importPublish.value = true;
     if (!importProductId.value && autoProducts.value.length) importProductId.value = String(autoProducts.value[0].id);
-    importMargin.value = Number(importProduct.value?.sell_markup_percent ?? props.defaultMargin ?? 0);
+    importMargin.value = Number(importProduct.value?.sell_markup_percent ?? props.pricingSettings?.sell_markup_percent ?? 0);
     importOpen.value = true;
 };
 const toggleImportRow = id => {
