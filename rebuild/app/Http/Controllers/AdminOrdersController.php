@@ -42,7 +42,8 @@ class AdminOrdersController
             ->select('orders.*', 'products.name as product_name', 'packages.name as package_name',
                 'users.name as buyer_name', 'users.email as buyer_email', 'users.phone as buyer_phone',
                 'providers.code as provider_code', 'channels.name as channel_name', 'products.manual_instructions')
-            ->selectRaw("EXISTS(SELECT 1 FROM fulfillment_attempts fa WHERE fa.order_id = orders.id AND fa.id = (SELECT MAX(fb.id) FROM fulfillment_attempts fb WHERE fb.order_id = orders.id) AND fa.status IN ('UNKNOWN','BLOCKED','MANUAL_FAILED')) as needs_attention");
+            ->selectRaw("EXISTS(SELECT 1 FROM fulfillment_attempts fa WHERE fa.order_id = orders.id AND fa.id = (SELECT MAX(fb.id) FROM fulfillment_attempts fb WHERE fb.order_id = orders.id) AND fa.status IN ('UNKNOWN','BLOCKED','MANUAL_FAILED')) as needs_attention")
+            ->selectRaw('(SELECT fa.status FROM fulfillment_attempts fa WHERE fa.order_id = orders.id ORDER BY fa.id DESC LIMIT 1) as fulfillment_status');
         if ($q = trim((string) $request->query('q'))) {
             $query->where(function (Builder $query) use ($q): void {
                 foreach (['orders.order_number', 'users.name', 'users.email', 'users.phone', 'orders.guest_email',

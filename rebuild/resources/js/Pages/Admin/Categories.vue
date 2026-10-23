@@ -1,10 +1,10 @@
 <script setup>
-import { reactive, ref } from 'vue';
+import { reactive, ref, watch } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import AdminLayout from '../../Components/Admin/AdminLayout.vue';
 import AdminModal from '../../Components/Admin/AdminModal.vue';
 
-defineProps({
+const props = defineProps({
     categories: { type: Array, default: () => [] },
 });
 
@@ -44,6 +44,31 @@ const save = () => {
     };
     if (editing.value) router.put(`/admin/catalog/categories/${editing.value.id}`, { ...form }, options);
     else router.post('/admin/catalog/categories', { ...form }, options);
+};
+
+// Setelah unggah/hapus gambar, salinan kategori di pop-up disegarkan dari data server.
+watch(() => props.categories, () => {
+    if (!editing.value) return;
+    const fresh = props.categories.find(row => row.id === editing.value.id);
+    if (fresh) editing.value = fresh;
+});
+
+const imageBusy = ref(false);
+const uploadImage = (event) => {
+    const file = event.target.files?.[0];
+    if (!file || !editing.value) return;
+    imageBusy.value = true;
+    router.post(`/admin/catalog/media/category/${editing.value.id}`, { image: file, collection: 'image' }, {
+        forceFormData: true,
+        preserveScroll: true,
+        onFinish: () => { imageBusy.value = false; event.target.value = ''; },
+    });
+};
+const removeImage = () => {
+    if (!editing.value) return;
+    router.delete(`/admin/catalog/media/category/${editing.value.id}`, {
+        data: { collection: 'image' }, preserveScroll: true,
+    });
 };
 
 const removeTarget = ref(null);
@@ -124,6 +149,8 @@ const remove = () => {
                     <p class="adm-note">Rekomendasi 512×512 piksel, PNG atau WebP transparan. Bila tidak ada gambar, kartu di toko tampil tanpa gambar.</p>
                     <img v-if="editing.image_url" :src="editing.image_url" :alt="editing.name" style="width:96px;height:96px;object-fit:contain;border:1px solid var(--a-line);border-radius:7px;background:#fafbf9;margin-top:6px">
                     <p v-else class="adm-note">Belum ada gambar.</p>
+                    <input type="file" accept="image/jpeg,image/png,image/webp" class="adm-input" style="padding:5px;margin-top:6px" :disabled="imageBusy" @change="uploadImage">
+                    <button v-if="editing.image_url" type="button" class="adm-btn sm danger" style="justify-self:start;margin-top:6px" :disabled="imageBusy" @click="removeImage">Hapus gambar</button>
                 </div>
             </form>
             <template #footer>

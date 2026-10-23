@@ -32,8 +32,71 @@ use Inertia\Response;
 
 class AdminCatalogController
 {
-    public function index(): Response
+    // Dipakai halaman Produk: data per halaman dari server, bukan disaring di browser.
+    private function productRow(Product $product, $providers, array $stockCounts): array
     {
+        return [
+            ...$product->only('id', 'category_id', 'name', 'publisher', 'slug', 'description', 'fulfillment_mode',
+                'initials', 'accent_color', 'instant', 'package_tabs_enabled', 'package_tabs',
+                'customer_no_template', 'manual_instructions', 'manual_open_time', 'manual_close_time', 'manual_timezone', 'margin_percent', 'sort_order', 'is_active',
+                'sell_markup_percent', 'cost_uplift_percent',
+                'nickname_check_enabled', 'nickname_game_code', 'nickname_user_field_key',
+                'nickname_server_field_key'),
+            'image_url' => $product->getFirstMediaUrl('image'),
+            'banner_url' => $product->getFirstMediaUrl('banner'),
+            'fields' => $product->fields->sortBy('sort_order')->values()->toArray(),
+            'notices' => $product->notices->sortBy('sort_order')->values()->map(fn (ProductNotice $notice): array => [
+                ...$notice->only('id', 'title', 'body', 'sort_order', 'is_active'),
+            ])->all(),
+            'packages' => $product->packages->sortBy([
+                ['sort_order', 'asc'], ['nominal_value', 'asc'],
+            ])->values()->map(fn (ProductPackage $package): array => [
+                ...$package->only('id', 'code', 'name', 'note', 'group_name', 'nominal_value', 'sort_order', 'is_active', 'pricing_mode', 'margin_percent', 'margin_fixed_idr', 'sell_price_idr', 'sell_markup_percent', 'cost_uplift_percent'),
+                'image_url' => $package->getFirstMediaUrl('image'),
+                'mappings' => $package->mappings->map(fn (ProviderMapping $mapping): array => [
+                    ...$mapping->only('id', 'provider_id', 'external_sku', 'cost_idr',
+                        'max_price_idr', 'is_manual_price', 'priority', 'is_active', 'disabled_by_sync',
+                        'store_cost_idr', 'seller_reference_price_idr'),
+                    'provider_code' => $providers->get($mapping->provider_id)?->code,
+                    'provider_name' => $providers->get($mapping->provider_id)?->display_name ?: $providers->get($mapping->provider_id)?->code,
+                    'customer_no_template' => data_get($mapping->fulfillment_config, 'customer_no_template'),
+                    'stock_key' => $providers->get($mapping->provider_id)?->code === 'VOUCHER_STOCK'
+                        ? data_get($mapping->fulfillment_config, 'stock_key') : null,
+                    'stock_counts' => $providers->get($mapping->provider_id)?->code === 'VOUCHER_STOCK'
+                        ? ($stockCounts[(string) data_get($mapping->fulfillment_config, 'stock_key', '')]
+                            ?? ['available' => 0, 'reserved' => 0, 'delivered' => 0, 'void' => 0, 'total' => 0])
+                        : null,
+                ])->all(),
+            ])->all(),
+        ];
+    }
+
+    public function index(Request $request): Response
+    {
+        $filters = $request->validate([
+            'tab' => ['nullable', Rule::in(['auto', 'manual'])],
+            'q' => ['nullable', 'string', 'max:150'],
+            'category' => ['nullable', 'integer', 'min:1'],
+            'status' => ['nullable', Rule::in(['active', 'inactive'])],
+            'sort' => ['nullable', Rule::in(['order', 'name'])],
+            'per_page' => ['nullable', Rule::in([10, 25, 50, 100])],
+            'page' => ['nullable', 'integer', 'min:1'],
+        ]);
+        $products = Product::with(['media', 'packages.mappings', 'fields', 'notices'])
+            ->when(($filters['tab'] ?? 'auto') === 'manual', fn ($query) => $query->where('fulfillment_mode', 'MANUAL'))
+            ->when(($filters['tab'] ?? 'auto') !== 'manual', fn ($query) => $query->where('fulfillment_mode', '!=', 'MANUAL'))
+            ->when(trim((string) ($filters['q'] ?? '')) !== '', function ($query) use ($filters): void {
+                $term = '%'.trim((string) $filters['q']).'%';
+                $query->where(fn ($query) => $query->where('name', 'like', $term)->orWhere('publisher', 'like', $term));
+            })
+            ->when($filters['category'] ?? null, fn ($query, $id) => $query->where('category_id', (int) $id))
+            ->when(($filters['status'] ?? '') === 'active', fn ($query) => $query->where('is_active', true))
+            ->when(($filters['status'] ?? '') === 'inactive', fn ($query) => $query->where('is_active', false));
+        ($filters['sort'] ?? 'order') === 'name'
+            ? $products->orderBy('name')
+            : $products->orderBy('sort_order')->orderBy('name');
+        $products = $products->paginate((int) ($filters['per_page'] ?? 25), ['*'], 'page', (int) ($filters['page'] ?? 1))->withQueryString();
+
         $providers = Provider::all(['id', 'code', 'display_name', 'is_active'])->keyBy('id');
         $stockCounts = app(VoucherStockService::class)->counts();
         $checkoutPreviews = collect(app(CheckoutPricing::class)
@@ -52,41 +115,12 @@ class AdminCatalogController
                 ->orderBy('sort_order')
                 ->orderBy('name')
                 ->get(['id', 'name', 'code', 'requires_server', 'requires_region_check']),
-            'products' => Product::with(['media', 'packages.mappings', 'fields', 'notices'])->orderBy('sort_order')->get()
-                ->map(fn (Product $product): array => [
-                    ...$product->only('id', 'category_id', 'name', 'publisher', 'slug', 'description', 'fulfillment_mode',
-                        'initials', 'accent_color', 'instant', 'package_tabs_enabled', 'package_tabs',
-                        'customer_no_template', 'manual_instructions', 'manual_open_time', 'manual_close_time', 'manual_timezone', 'margin_percent', 'sort_order', 'is_active',
-                        'sell_markup_percent', 'cost_uplift_percent',
-                        'nickname_check_enabled', 'nickname_game_code', 'nickname_user_field_key',
-                        'nickname_server_field_key'),
-                    'image_url' => $product->getFirstMediaUrl('image'),
-                    'banner_url' => $product->getFirstMediaUrl('banner'),
-                    'fields' => $product->fields->sortBy('sort_order')->values()->toArray(),
-                    'notices' => $product->notices->sortBy('sort_order')->values()->map(fn (ProductNotice $notice): array => [
-                        ...$notice->only('id', 'title', 'body', 'sort_order', 'is_active'),
-                    ])->all(),
-                    'packages' => $product->packages->sortBy([
-                        ['sort_order', 'asc'], ['nominal_value', 'asc'],
-                    ])->values()->map(fn (ProductPackage $package): array => [
-                        ...$package->only('id', 'code', 'name', 'note', 'group_name', 'nominal_value', 'sort_order', 'is_active', 'pricing_mode', 'margin_percent', 'margin_fixed_idr', 'sell_price_idr', 'sell_markup_percent', 'cost_uplift_percent'),
-                        'image_url' => $package->getFirstMediaUrl('image'),
-                        'mappings' => $package->mappings->map(fn (ProviderMapping $mapping): array => [
-                            ...$mapping->only('id', 'provider_id', 'external_sku', 'cost_idr',
-                                'max_price_idr', 'is_manual_price', 'priority', 'is_active', 'disabled_by_sync',
-                                'store_cost_idr', 'seller_reference_price_idr'),
-                            'provider_code' => $providers->get($mapping->provider_id)?->code,
-                            'provider_name' => $providers->get($mapping->provider_id)?->display_name ?: $providers->get($mapping->provider_id)?->code,
-                            'customer_no_template' => data_get($mapping->fulfillment_config, 'customer_no_template'),
-                            'stock_key' => $providers->get($mapping->provider_id)?->code === 'VOUCHER_STOCK'
-                                ? data_get($mapping->fulfillment_config, 'stock_key') : null,
-                            'stock_counts' => $providers->get($mapping->provider_id)?->code === 'VOUCHER_STOCK'
-                                ? ($stockCounts[(string) data_get($mapping->fulfillment_config, 'stock_key', '')]
-                                    ?? ['available' => 0, 'reserved' => 0, 'delivered' => 0, 'void' => 0, 'total' => 0])
-                                : null,
-                        ])->all(),
-                    ])->all(),
-                ]),
+            'productFilters' => [
+                'tab' => $filters['tab'] ?? 'auto', 'q' => $filters['q'] ?? '', 'category' => $filters['category'] ?? '',
+                'status' => $filters['status'] ?? '', 'sort' => $filters['sort'] ?? 'order', 'per_page' => (int) ($filters['per_page'] ?? 25),
+            ],
+            'products' => $products->getCollection()->map(fn (Product $product): array => $this->productRow($product, $providers, $stockCounts))->all(),
+            'productPage' => $products->toArray(),
             'defaultMargin' => json_decode((string) DB::table('system_settings')->where('key', 'catalog.default_margin_percent')->value('value'), true) ?? 0,
             'pricingSettings' => [
                 'cost_uplift_percent' => app(CatalogPricingSettings::class)->costUpliftPercent(),

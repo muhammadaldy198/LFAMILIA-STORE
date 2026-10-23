@@ -148,6 +148,8 @@ class AdminOrderPresentation
                 default => 'Belum dipilih',
             },
             'needs_attention' => (bool) ($row->needs_attention ?? false),
+            'fulfillment_status' => $row->fulfillment_status ?? null,
+            'fulfillment_label' => isset($row->fulfillment_status) ? self::STATUSES[$row->fulfillment_status] ?? null : null,
             'delivery' => $this->json($row->delivery_payload ?? null),
             'manual_note' => $snapshot['manual_note'] ?? null,
             'manual_instructions' => $row->manual_instructions ?? null,

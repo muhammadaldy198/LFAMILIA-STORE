@@ -7,39 +7,44 @@ import { rupiah } from '../../lib/adminFormat';
 
 const props = defineProps({
     products: { type: Array, default: () => [] },
+    productPage: { type: Object, default: () => ({ data: [], total: 0, current_page: 1, last_page: 1 }) },
+    productFilters: { type: Object, default: () => ({}) },
     categories: { type: Array, default: () => [] },
     nicknameGameCodes: { type: Array, default: () => [] },
     checkoutPreviews: { type: Object, default: () => ({}) },
 });
 
-const tab = ref('auto');
-const q = ref('');
-const categoryId = ref('');
-const status = ref('');
-const sort = ref('order');
-const perPage = ref(25);
-const page = ref(1);
+// Saringan dikerjakan server supaya hasil tidak bohong saat produk banyak.
+const tab = ref(props.productFilters.tab || 'auto');
+const q = ref(props.productFilters.q || '');
+const categoryId = ref(props.productFilters.category || '');
+const status = ref(props.productFilters.status || '');
+const sort = ref(props.productFilters.sort || 'order');
+const perPage = ref(props.productFilters.per_page || 25);
+const page = ref(props.productPage.current_page || 1);
+const busy = ref(false);
 
 const mode = computed(() => (tab.value === 'auto' ? 'AUTO_PROVIDER' : 'MANUAL'));
-
-const filtered = computed(() => {
-    const term = q.value.trim().toLowerCase();
-    let rows = props.products.filter(row => row.fulfillment_mode === mode.value);
-    if (term) rows = rows.filter(row => row.name.toLowerCase().includes(term) || (row.publisher || '').toLowerCase().includes(term));
-    if (categoryId.value) rows = rows.filter(row => Number(row.category_id) === Number(categoryId.value));
-    if (status.value === 'active') rows = rows.filter(row => row.is_active);
-    if (status.value === 'inactive') rows = rows.filter(row => !row.is_active);
-    if (sort.value === 'name') rows = [...rows].sort((a, b) => a.name.localeCompare(b.name, 'id'));
-    else rows = [...rows].sort((a, b) => Number(a.sort_order) - Number(b.sort_order) || a.name.localeCompare(b.name, 'id'));
-    return rows;
-});
-
-const pageCount = computed(() => Math.max(1, Math.ceil(filtered.value.length / perPage.value)));
-const visible = computed(() => filtered.value.slice((page.value - 1) * perPage.value, page.value * perPage.value));
+const visible = computed(() => props.products);
+const total = computed(() => Number(props.productPage.total || 0));
+const pageCount = computed(() => Math.max(1, Number(props.productPage.last_page || 1)));
 const categoryName = id => props.categories.find(row => Number(row.id) === Number(id))?.name || 'Tanpa kategori';
 const activePackages = row => row.packages.filter(pkg => pkg.is_active).length;
 
-const resetFilters = () => { q.value = ''; categoryId.value = ''; status.value = ''; sort.value = 'order'; perPage.value = 25; page.value = 1; };
+const load = (extra = {}) => {
+    busy.value = true;
+    const query = { tab: tab.value, q: q.value, category: categoryId.value, status: status.value, sort: sort.value, per_page: perPage.value, page: page.value, ...extra };
+    Object.keys(query).forEach(key => { if (query[key] === '' || query[key] === null) delete query[key]; });
+    router.get('/admin/catalog', query, {
+        preserveState: true, preserveScroll: true,
+        onFinish: () => { busy.value = false; },
+    });
+};
+const applyFilters = () => { page.value = 1; load(); };
+const resetFilters = () => { q.value = ''; categoryId.value = ''; status.value = ''; sort.value = 'order'; perPage.value = 25; page.value = 1; load(); };
+const goPage = value => { page.value = value; load(); };
+const hasFilters = computed(() => Boolean(q.value || categoryId.value || status.value || sort.value !== 'order' || Number(perPage.value) !== 25));
+const switchTab = value => { tab.value = value; page.value = 1; load(); };
 
 /* ---------- tambah produk ---------- */
 const addOpen = ref(false);
@@ -315,23 +320,30 @@ const template = computed(() => {
 // Contoh nilai per kode kolom, dipakai bila admin belum mengisi contoh isian.
 const SAMPLES = { user_id: '12345678', zone_id: '1234', destination: '12345678', email: 'nama@email.com', phone: '08123456789' };
 
+// Pratinjau memakai contoh angka lebih dulu supaya bentuk hasilnya kelihatan,
+// bukan kalimat perintah yang kebetulan diisi di kolom "Contoh isian".
 const preview = computed(() => {
     let text = template.value;
     fieldRows.value.forEach(row => {
-        text = text.replaceAll(`{{${row.field_key}}}`, row.placeholder || SAMPLES[row.field_key] || row.field_key);
+        const filled = String(row.placeholder || '').trim();
+        const sample = SAMPLES[row.field_key];
+        text = text.replaceAll(`{{${row.field_key}}}`, sample || filled || row.field_key);
     });
     return text;
 });
 
+const fieldSaved = ref(false);
 const saveFields = () => {
     fieldBusy.value = true;
     fieldErrors.value = {};
+    fieldSaved.value = false;
     router.put(`/admin/catalog/products/${product.value.id}/fields`, {
         fields: fieldRows.value.map((row, index) => ({ ...row, is_required: Boolean(row.is_required), sort_order: index })),
         customer_no_template: template.value || null,
     }, {
         preserveScroll: true,
         onError: bag => { fieldErrors.value = bag; },
+        onSuccess: () => { fieldSaved.value = true; setTimeout(() => { fieldSaved.value = false; }, 2500); },
         onFinish: () => { fieldBusy.value = false; },
     });
 };
@@ -366,26 +378,26 @@ const openEditorFull = (row) => {
         </header>
 
         <div class="adm-tabs" role="tablist">
-            <button type="button" role="tab" :aria-selected="tab === 'auto'" @click="tab = 'auto'; page = 1">Produk Otomatis</button>
-            <button type="button" role="tab" :aria-selected="tab === 'manual'" @click="tab = 'manual'; page = 1">Produk Manual</button>
+            <button type="button" role="tab" :aria-selected="tab === 'auto'" @click="switchTab('auto')">Produk Otomatis</button>
+            <button type="button" role="tab" :aria-selected="tab === 'manual'" @click="switchTab('manual')">Produk Manual</button>
         </div>
 
         <section class="adm-card" style="margin-top:12px">
-            <div class="adm-filters">
+            <form class="adm-filters" @submit.prevent="applyFilters">
                 <label class="adm-field" style="flex:2 1 220px">
-                    <span>Cari produk atau nominal</span>
-                    <input v-model="q" class="adm-input" placeholder="Nama produk atau publisher">
+                    <span>Cari produk</span>
+                    <input v-model="q" class="adm-input" placeholder="Nama produk atau publisher" maxlength="150">
                 </label>
                 <label class="adm-field narrow">
                     <span>Kategori</span>
-                    <select v-model="categoryId" class="adm-select">
+                    <select v-model="categoryId" class="adm-select" @change="applyFilters">
                         <option value="">Semua kategori</option>
                         <option v-for="row in categories" :key="row.id" :value="row.id">{{ row.name }}</option>
                     </select>
                 </label>
                 <label class="adm-field narrow">
                     <span>Status</span>
-                    <select v-model="status" class="adm-select">
+                    <select v-model="status" class="adm-select" @change="applyFilters">
                         <option value="">Semua status</option>
                         <option value="active">Aktif</option>
                         <option value="inactive">Nonaktif</option>
@@ -393,19 +405,20 @@ const openEditorFull = (row) => {
                 </label>
                 <label class="adm-field narrow">
                     <span>Urutkan</span>
-                    <select v-model="sort" class="adm-select">
+                    <select v-model="sort" class="adm-select" @change="applyFilters">
                         <option value="order">Urutan toko</option>
                         <option value="name">Nama A–Z</option>
                     </select>
                 </label>
                 <label class="adm-field narrow">
                     <span>Per halaman</span>
-                    <select v-model="perPage" class="adm-select">
+                    <select v-model="perPage" class="adm-select" @change="applyFilters">
                         <option v-for="size in [10, 25, 50, 100]" :key="size" :value="size">{{ size }} produk</option>
                     </select>
                 </label>
-                <button type="button" class="adm-btn" @click="resetFilters">Hapus filter</button>
-            </div>
+                <button type="submit" class="adm-btn primary" :disabled="busy">Terapkan</button>
+                <button type="button" class="adm-btn" :disabled="busy || !hasFilters" @click="resetFilters">Hapus filter</button>
+            </form>
 
             <div class="adm-scroll">
                 <table class="adm-table">
@@ -431,10 +444,10 @@ const openEditorFull = (row) => {
             </div>
 
             <div class="adm-pager">
-                <span>{{ filtered.length }} produk · Halaman {{ page }} dari {{ pageCount }}</span>
+                <span>{{ total }} produk · Halaman {{ page }} dari {{ pageCount }}</span>
                 <span class="sp" />
-                <button type="button" class="adm-btn sm" :disabled="page <= 1" @click="page--">Sebelumnya</button>
-                <button type="button" class="adm-btn sm" :disabled="page >= pageCount" @click="page++">Berikutnya</button>
+                <button type="button" class="adm-btn sm" :disabled="busy || page <= 1" @click="goPage(page - 1)">Sebelumnya</button>
+                <button type="button" class="adm-btn sm" :disabled="busy || page >= pageCount" @click="goPage(page + 1)">Berikutnya</button>
             </div>
         </section>
 
@@ -644,7 +657,6 @@ const openEditorFull = (row) => {
                 </div>
                 <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">
                     <button type="button" class="adm-btn sm" @click="addField">Tambah kolom</button>
-                    <button type="button" class="adm-btn primary sm" :disabled="fieldBusy" @click="saveFields">Simpan kolom</button>
                 </div>
                 <div class="adm-note" style="margin-top:10px;padding:8px 10px;border:1px solid var(--a-line);border-radius:7px;background:#fafbf9">
                     Hasil kirim ke penyedia:
@@ -658,6 +670,8 @@ const openEditorFull = (row) => {
             <template #footer>
                 <button type="button" class="adm-btn" @click="editorOpen = false">Tutup</button>
                 <button v-if="editTab === 'info'" type="submit" form="product-info" class="adm-btn primary" :disabled="saveBusy === 'info'">Simpan informasi</button>
+                <span v-if="editTab === 'fields' && fieldSaved" class="adm-ok" style="margin-right:auto">Data pelanggan tersimpan</span>
+                <button v-else-if="editTab === 'fields'" type="button" class="adm-btn primary" :disabled="fieldBusy" @click="saveFields">Simpan data pelanggan</button>
             </template>
         </AdminModal>
 

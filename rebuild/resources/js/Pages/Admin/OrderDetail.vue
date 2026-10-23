@@ -3,7 +3,7 @@ import { computed, reactive, ref } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import AdminLayout from '../../Components/Admin/AdminLayout.vue';
 import AdminModal from '../../Components/Admin/AdminModal.vue';
-import { label, rupiah, tone, wibDateTime } from '../../lib/adminFormat';
+import { label, rupiah, tone, wibDateTime, copyText } from '../../lib/adminFormat';
 
 const props = defineProps({
     order: { type: Object, required: true },
@@ -22,7 +22,12 @@ const post = (url, body = {}, labelText = '') => {
     router.post(url, body, { preserveScroll: true, onFinish: () => { busy.value = ''; } });
 };
 
-const copy = async (text) => { try { await navigator.clipboard.writeText(text); } catch { /* ditolak browser */ } };
+const copied = ref('');
+const copy = async (text) => {
+    if (!await copyText(text)) return;
+    copied.value = text;
+    setTimeout(() => { if (copied.value === text) copied.value = ''; }, 2000);
+};
 
 const latest = computed(() => props.attempts[0] || null);
 const delivery = computed(() => props.order.delivery || {});
@@ -84,7 +89,7 @@ const whatsapp = computed(() => {
                 </p>
             </div>
             <div class="adm-head-actions">
-                <button type="button" class="adm-btn" @click="copy(order.order_number)">Salin nomor</button>
+                <button type="button" class="adm-btn" @click="copy(order.order_number)">{{ copied === order.order_number ? 'Tersalin' : 'Salin nomor' }}</button>
                 <a v-if="whatsapp" class="adm-btn" :href="whatsapp" target="_blank" rel="noopener">Hubungi pelanggan</a>
                 <button v-else type="button" class="adm-btn" disabled>Hubungi pelanggan</button>
                 <button type="button" class="adm-btn" @click="router.reload({ only: ['order', 'attempts', 'payments', 'events'] })">Muat ulang</button>

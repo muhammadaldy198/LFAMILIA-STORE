@@ -3,7 +3,7 @@ import { computed, onMounted, onUnmounted, reactive, ref } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import AdminLayout from '../../Components/Admin/AdminLayout.vue';
 import AdminModal from '../../Components/Admin/AdminModal.vue';
-import { label, num, rupiah, tone, wibDateTime, wibTime } from '../../lib/adminFormat';
+import { label, num, rupiah, tone, wibDateTime, wibTime, copyText } from '../../lib/adminFormat';
 
 const props = defineProps({
     attempts: { type: Object, default: () => ({ data: [] }) },
@@ -34,7 +34,12 @@ let timer;
 onMounted(() => { timer = setInterval(() => { if (auto.value && !busy.value) reload(); }, 30000); });
 onUnmounted(() => clearInterval(timer));
 
-const copy = async (text) => { try { await navigator.clipboard.writeText(text); } catch { /* ditolak browser */ } };
+const copied = ref('');
+const copy = async (text) => {
+    if (!await copyText(text)) return;
+    copied.value = text;
+    setTimeout(() => { if (copied.value === text) copied.value = ''; }, 2000);
+};
 
 const modal = ref('');
 const selected = ref(null);
@@ -128,7 +133,7 @@ const rowStatus = row => row.status_label || label(row.status);
                                 <Link :href="`/admin/orders/${row.order_id}`" class="mono">{{ row.order_number }}</Link>
                                 <p class="dim">{{ wibDateTime(row.created_at) }}</p>
                                 <span class="adm-tag plain">Ke-{{ row.attempt_no }}</span>
-                                <button type="button" class="adm-btn link" @click="copy(row.order_number)">Salin</button>
+                                <button type="button" class="adm-btn link" @click="copy(row.order_number)">{{ copied === row.order_number ? 'Tersalin' : 'Salin' }}</button>
                             </td>
                             <td>{{ row.buyer_name }}<p class="dim">{{ row.buyer_phone || row.buyer_email || 'Tanpa kontak' }}</p></td>
                             <td>

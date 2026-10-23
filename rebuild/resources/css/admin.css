@@ -706,7 +706,7 @@ body:has(.adm) { background: var(--a-bg); margin: 0; }
 .adm-input:focus, .adm-select:focus, .adm-textarea:focus { outline: 2px solid var(--a-accent); outline-offset: -1px; }
 .adm-textarea { min-height: 72px; resize: vertical; }
 
-.adm-field { display: grid; gap: 4px; min-width: 0; }
+.adm-field { display: grid; gap: 4px; min-width: 0; align-content: start; }
 .adm-field > label { font-size: 11.5px; font-weight: 600; color: var(--a-ink-2); }
 .adm-field .req { color: var(--a-danger); }
 .adm-field .hint { font-size: 10.5px; color: var(--a-muted); }
@@ -716,12 +716,20 @@ body:has(.adm) { background: var(--a-bg); margin: 0; }
 .adm-grid.two { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
 .adm-grid .full { grid-column: 1 / -1; }
 
+/* Label panjang turun dua baris tidak boleh menggeser kolom sebelahnya. */
+.adm-grid .adm-field > span:first-child { display: block; min-height: 2.9em; }
+.adm-grid .adm-input, .adm-grid .adm-select { height: var(--a-control); padding-top: 0; padding-bottom: 0; }
+.adm-grid .adm-field > .hint, .adm-grid .adm-field > .err { margin-top: -2px; }
+
 .adm-filters {
     display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end;
     padding: 11px 14px; border-bottom: 1px solid var(--a-line);
 }
 
 .adm-filters .adm-field { flex: 1 1 168px; }
+
+/* Tombol aksi filter menempel ke tepi kanan kartu supaya barisnya tidak menggantung. */
+.adm-filters > button:first-of-type { margin-left: auto; }
 .adm-filters .adm-field.narrow { flex: 0 1 132px; }
 
 .adm-toolbar {

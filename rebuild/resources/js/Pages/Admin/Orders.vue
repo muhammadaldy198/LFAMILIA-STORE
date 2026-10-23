@@ -3,7 +3,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import AdminLayout from '../../Components/Admin/AdminLayout.vue';
 import AdminModal from '../../Components/Admin/AdminModal.vue';
-import { label, num, rupiah, tone, wibDateTime, wibTime } from '../../lib/adminFormat';
+import { label, num, rupiah, tone, wibDateTime, wibTime, copyText } from '../../lib/adminFormat';
 
 const props = defineProps({
     orders: { type: Object, default: () => ({ data: [], links: [] }) },
@@ -51,19 +51,26 @@ const reload = () => {
 };
 
 const exportUrl = computed(() => {
-    const query = new URLSearchParams(Object.entries(current.value).filter(([, value]) => value !== '' && value !== null)).toString();
+    const params = new URLSearchParams(Object.entries(current.value).filter(([, value]) => value !== '' && value !== null));
+    selected.value.forEach(id => params.append('selected[]', id));
+    const query = params.toString();
     return `/admin/orders/export${query ? '?' + query : ''}`;
 });
+
+const hasFilters = computed(() => Object.entries(current.value).some(([key, value]) => key !== 'per_page' && value !== '' && value !== null));
+const markAll = () => { selected.value = allSelected.value ? [] : rows.value.map(row => row.id); };
 
 let timer;
 onMounted(() => { timer = setInterval(() => { if (auto.value && !busy.value) reload(); }, 30000); });
 onUnmounted(() => clearInterval(timer));
 
 const allSelected = computed(() => rows.value.length > 0 && selected.value.length === rows.value.length);
-const toggleAll = () => { selected.value = allSelected.value ? [] : rows.value.map(row => row.id); };
 
+const copied = ref('');
 const copy = async (text) => {
-    try { await navigator.clipboard.writeText(text); } catch { /* clipboard ditolak browser */ }
+    if (!await copyText(text)) return;
+    copied.value = text;
+    setTimeout(() => { if (copied.value === text) copied.value = ''; }, 2000);
 };
 
 const manualOpen = ref(false);
@@ -118,8 +125,8 @@ const submitManual = () => {
                         <option v-for="option in statusOptions" :key="option.value" :value="option.value">{{ option.text }}</option>
                     </select>
                 </label>
-                <button type="submit" class="adm-btn primary" :disabled="busy">Terapkan</button>
-                <button type="button" class="adm-btn" :disabled="busy" @click="reset">Hapus filter</button>
+                <button type="submit" class="adm-btn" :disabled="busy">Terapkan</button>
+                <button type="button" class="adm-btn" :disabled="busy || !hasFilters" @click="reset">Hapus filter</button>
             </form>
 
             <div v-if="advanced" class="adm-filters">
@@ -156,11 +163,13 @@ const submitManual = () => {
             </div>
 
             <div class="adm-toolbar">
-                <span>Terakhir diperbarui: {{ wibTime(lastUpdated) }}</span>
-                <label class="adm-switch-row"><button type="button" class="adm-switch" role="switch" :aria-checked="auto" aria-label="Perbarui otomatis" @click="auto = !auto" />Perbarui otomatis setiap 30 detik</label>
+                <span>Terakhir diperbarui {{ wibTime(lastUpdated) }}</span>
+                <label class="adm-switch-row"><button type="button" class="adm-switch" role="switch" :aria-checked="auto" aria-label="Perbarui otomatis" @click="auto = !auto" /><span>Otomatis 30 detik</span></label>
                 <button type="button" class="adm-btn sm" :disabled="busy" @click="reload">Muat ulang</button>
                 <button type="button" class="adm-btn sm" @click="advanced = !advanced">{{ advanced ? 'Sembunyikan filter lanjutan' : 'Filter lanjutan' }}</button>
-                <a class="adm-btn sm sp" :href="exportUrl">Unduh hasil filter</a>
+                <span class="sp" />
+                <span v-if="selected.length" class="adm-tag ok">{{ selected.length }} dipilih</span>
+                <a class="adm-btn sm" :href="exportUrl">{{ selected.length ? 'Unduh yang dipilih' : 'Unduh hasil filter' }}</a>
             </div>
 
             <p class="adm-hint-sm">Geser tabel ke samping untuk melihat semua kolom.</p>
@@ -168,7 +177,7 @@ const submitManual = () => {
                 <table class="adm-table">
                     <thead>
                         <tr>
-                            <th style="width:34px"><input type="checkbox" :checked="allSelected" :disabled="!rows.length" aria-label="Pilih semua pesanan di halaman ini" @change="toggleAll"></th>
+                            <th style="width:34px"><input type="checkbox" :checked="allSelected" :disabled="!rows.length" aria-label="Pilih semua pesanan di halaman ini" @change="markAll"></th>
                             <th>Pesanan</th>
                             <th>Pelanggan</th>
                             <th>Produk &amp; tujuan</th>
@@ -184,7 +193,7 @@ const submitManual = () => {
                             <td>
                                 <Link :href="`/admin/orders/${row.id}`" class="mono">{{ row.order_number }}</Link>
                                 <p class="dim">{{ wibDateTime(row.created_at) }}</p>
-                                <button type="button" class="adm-btn link" @click="copy(row.order_number)">Salin nomor</button>
+                                <button type="button" class="adm-btn link" @click="copy(row.order_number)">{{ copied === row.order_number ? 'Tersalin' : 'Salin nomor' }}</button>
                             </td>
                             <td>
                                 {{ row.buyer_name || 'Pelanggan tamu' }}
@@ -201,7 +210,8 @@ const submitManual = () => {
                             </td>
                             <td><span class="adm-tag" :class="tone(row.status)">{{ row.status_label || label(row.status) }}</span></td>
                             <td>
-                                <span class="adm-tag" :class="row.needs_attention ? 'bad' : 'plain'">{{ row.needs_attention ? 'Perlu perhatian' : 'Normal' }}</span>
+                                <span class="adm-tag" :class="tone(row.fulfillment_status || '')">{{ row.fulfillment_label || 'Belum dikirim' }}</span>
+                                <p v-if="row.needs_attention" class="dim" style="color:var(--a-danger)">Perlu perhatian</p>
                                 <p class="dim">{{ row.provider }}</p>
                             </td>
                             <td>
