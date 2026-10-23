@@ -184,13 +184,26 @@ jobs:
           extensions: mbstring, pdo_mysql, redis, gd, exif, pcntl
           coverage: none
 
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
       - name: Install PHP dependencies
         run: composer install --no-interaction --prefer-dist
+
+      - name: Install frontend dependencies
+        env:
+          HUSKY: 0
+        run: npm ci
 
       - name: Configure test app
         run: |
           cp .env.example .env
           php artisan key:generate
+
+      # Feature test merender Blade dengan @vite, jadi manifest wajib ada.
+      - name: Build frontend
+        run: npm run build
 
       - name: Validate schema
         run: |
