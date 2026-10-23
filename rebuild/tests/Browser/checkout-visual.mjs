@@ -73,15 +73,18 @@ try{
  const login=await admin.evaluate(async()=>{const response=await fetch('/admin/login',{method:'POST',headers:{Accept:'application/json','Content-Type':'application/json','X-CSRF-TOKEN':document.querySelector('meta[name=csrf-token]').content},body:JSON.stringify({email:'browser-admin@example.test',password:'Browser-admin-test-password-123'})});return response.status;});
  if(![200,204].includes(login))throw Error('Admin theme fixture login failed: '+login);
  await admin.goto(base+'/admin/content/presentation');
- const white=await admin.locator('.lf-admin').evaluate(e=>getComputedStyle(e).backgroundColor);
+ const shell=admin.locator('.adm');
+ const white=await shell.evaluate(e=>getComputedStyle(e).backgroundColor);
  await admin.getByRole('button',{name:'Warna Website',exact:true}).click();
- await admin.locator('input[aria-label="Aksen biru / tombol utama HEX"]').fill('#75AAFF');
- await admin.locator('input[aria-label="Permukaan HEX"]').fill('#17243A');
- await admin.locator('input[aria-label="Kartu HEX"]').fill('#223344');
- await admin.getByRole('button',{name:'Simpan perubahan',exact:true}).click();
- // Halaman presentasi memakai tombol simpan tunggal; tunggu sampai penyimpanan selesai.
- await admin.waitForFunction(()=>!document.body.textContent.includes('Menyimpan…'),null,{timeout:15000});
- if(await admin.locator('.lf-admin').evaluate(e=>getComputedStyle(e).backgroundColor)!==white)throw Error('Customer palette recolored Admin');
+ const hex=(label,value)=>admin.locator('.adm-field').filter({hasText:label}).locator('input.adm-input').fill(value);
+ await hex('Aksen biru / tombol utama','#75AAFF');
+ await hex('Permukaan','#17243A');
+ await hex('Kartu','#223344');
+ await Promise.all([
+  admin.waitForResponse(r=>r.url().includes('/admin/content/theme')&&r.request().method()==='PUT'),
+  admin.getByRole('button',{name:'Simpan warna',exact:true}).click(),
+ ]);
+ if(await shell.evaluate(e=>getComputedStyle(e).backgroundColor)!==white)throw Error('Customer palette recolored Admin');
  const customer=await observedPage({viewport:{width:390,height:844}});
  await customer.goto(base+'/catalog/browser-checkout-game');
  const gradient=await customer.locator('#lfx-bottom-pay').evaluate(e=>getComputedStyle(e).backgroundImage);
