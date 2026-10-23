@@ -1,25 +1,17 @@
 <script setup>
-import AdminConfirmDialog from '../../Components/AdminConfirmDialog.vue';
-import AdminSwitch from '../../Components/AdminSwitch.vue';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../../Components/ui/sheet';
-import AdminResponsiveTable from '../../Components/AdminResponsiveTable.vue';
-import { Head } from '@inertiajs/vue3';
 import { computed, reactive, ref, watch } from 'vue';
-import AdminShell from '../../Components/AdminShell.vue';
-import { Badge } from '../../Components/ui/badge';
-import { Button } from '../../Components/ui/button';
-import { Input } from '../../Components/ui/input';
-import { TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../Components/ui/table';
+import { Head, Link } from '@inertiajs/vue3';
+import AdminLayout from '../../Components/Admin/AdminLayout.vue';
+import AdminModal from '../../Components/Admin/AdminModal.vue';
+import { copyText } from '../../lib/adminFormat';
 
 const props = defineProps({
     gameCodes: { type: Array, default: () => [] },
     validationConfig: { type: Object, default: () => ({}) },
 });
 
-const codes = ref(props.gameCodes.map((item) => ({ ...item })));
-watch(() => props.gameCodes, (value) => {
-    codes.value = value.map((item) => ({ ...item }));
-}, { deep: true });
+const codes = ref(props.gameCodes.map(item => ({ ...item })));
+watch(() => props.gameCodes, value => { codes.value = value.map(item => ({ ...item })); }, { deep: true });
 
 const tab = ref('game');
 const gameCode = ref('');
@@ -32,68 +24,39 @@ const error = ref('');
 const busy = ref(false);
 const copied = ref('');
 
-const editorOpen = ref(false);
-const editingId = ref(null);
-const editorBusy = ref(false);
-const editorError = ref('');
-const editorNotice = ref('');
-const reorderBusy = ref(false);
-const pendingAction = ref(null);
-const ask = (title, message, confirmLabel, run, destructive = false) => {
-    pendingAction.value = { title, message, confirmLabel, run, destructive };
-};
-const runPending = () => {
-    const action = pendingAction.value;
-    pendingAction.value = null;
-    action?.run();
-};
-const form = reactive({
-    name: '',
-    code: '',
-    supports_nickname_check: false,
-    requires_server: false,
-    requires_region_check: false,
-    is_active: true,
-    sort_order: null,
-});
-
-const activeCodes = computed(() => codes.value.filter((item) => item.is_active));
-const nicknameCodes = computed(() => activeCodes.value.filter((item) => item.supports_nickname_check));
-const regionCodes = computed(() => nicknameCodes.value.filter((item) => item.requires_region_check));
-const selectedGame = computed(() => codes.value.find((item) => item.code === gameCode.value) || null);
+const activeCodes = computed(() => codes.value.filter(item => item.is_active));
+const nicknameCodes = computed(() => activeCodes.value.filter(item => item.supports_nickname_check));
+const regionCodes = computed(() => nicknameCodes.value.filter(item => item.requires_region_check));
+const selectedGame = computed(() => codes.value.find(item => item.code === gameCode.value) || null);
 const requiresServer = computed(() => Boolean(selectedGame.value?.requires_server));
 const filteredCodes = computed(() => {
     const needle = query.value.trim().toLowerCase();
     if (!needle) return codes.value;
-    return codes.value.filter((item) =>
-        item.name.toLowerCase().includes(needle) || item.code.toLowerCase().includes(needle)
-    );
+    return codes.value.filter(item => item.name.toLowerCase().includes(needle) || item.code.toLowerCase().includes(needle));
 });
+
 const integrationStatus = computed(() => {
-    if (!props.validationConfig?.is_active) return { text: 'Nonaktif', className: 'border-border bg-muted text-muted-foreground' };
-    if (!props.validationConfig?.is_configured) return { text: 'Belum lengkap', className: 'border-amber-200 bg-amber-50 text-amber-700' };
-    return { text: 'Siap digunakan', className: 'border-emerald-200 bg-emerald-50 text-emerald-700' };
+    if (!props.validationConfig?.is_active) return { text: 'Nonaktif', tone: 'bad' };
+    if (!props.validationConfig?.is_configured) return { text: 'Belum lengkap', tone: 'warn' };
+    return { text: 'Siap digunakan', tone: 'ok' };
 });
 const endpointText = computed(() => {
-    const nickname = props.validationConfig?.nickname_path || 'Path nickname belum diatur';
-    const region = props.validationConfig?.region_path || 'Path region belum diatur';
-    const pln = props.validationConfig?.pln_path || 'Path PLN belum diatur';
-
+    const nickname = props.validationConfig?.nickname_path || 'Alamat cek nama belum diatur';
+    const region = props.validationConfig?.region_path || 'Alamat cek server belum diatur';
+    const pln = props.validationConfig?.pln_path || 'Alamat cek PLN belum diatur';
     if (tab.value === 'pln') return pln;
     if (tab.value === 'region' || selectedGame.value?.requires_region_check) return `${nickname} + ${region}`;
     return nickname;
 });
 
-function csrf() {
-    return decodeURIComponent(document.cookie.split('; ').find((value) => value.startsWith('XSRF-TOKEN='))?.slice(11) || '');
-}
+const csrf = () => decodeURIComponent(document.cookie.split('; ').find(value => value.startsWith('XSRF-TOKEN='))?.slice(11) || '');
 
-async function requestJson(url, options = {}) {
+const requestJson = async (url, options = {}) => {
     const response = await fetch(url, {
         credentials: 'same-origin',
         ...options,
         headers: {
-            'Accept': 'application/json',
+            Accept: 'application/json',
             'Content-Type': 'application/json',
             'X-XSRF-TOKEN': csrf(),
             ...(options.headers || {}),
@@ -105,149 +68,123 @@ async function requestJson(url, options = {}) {
         throw new Error(validation || payload.message || 'Permintaan tidak berhasil.');
     }
     return payload;
-}
+};
 
-function resetResult() {
-    result.value = null;
-    error.value = '';
-}
+const resetResult = () => { result.value = null; error.value = ''; };
 
-function selectTab(nextTab) {
+const selectTab = nextTab => {
     tab.value = nextTab;
     resetResult();
-
-    if (nextTab === 'region' && !regionCodes.value.some((item) => item.code === gameCode.value)) {
+    if (nextTab === 'region' && !regionCodes.value.some(item => item.code === gameCode.value)) {
         gameCode.value = regionCodes.value[0]?.code || '';
     }
-    if (nextTab === 'game' && !nicknameCodes.value.some((item) => item.code === gameCode.value)) {
+    if (nextTab === 'game' && !nicknameCodes.value.some(item => item.code === gameCode.value)) {
         gameCode.value = nicknameCodes.value[0]?.code || '';
     }
-}
+};
 
-function clearForm() {
-    gameCode.value = tab.value === 'region'
-        ? (regionCodes.value[0]?.code || '')
-        : (nicknameCodes.value[0]?.code || '');
+const clearForm = () => {
+    gameCode.value = tab.value === 'region' ? (regionCodes.value[0]?.code || '') : (nicknameCodes.value[0]?.code || '');
     userId.value = '';
     server.value = '';
     customerNumber.value = '';
     resetResult();
-}
+};
 
-async function runCheck() {
+const runCheck = async () => {
     if (busy.value) return;
     resetResult();
     busy.value = true;
-
     try {
         const body = tab.value === 'game'
             ? { action: 'game', game_code: gameCode.value, user_id: userId.value.trim(), server: server.value.trim() || null }
             : tab.value === 'region'
                 ? { action: 'region', game_code: gameCode.value, user_id: userId.value.trim(), server: server.value.trim() }
                 : { action: 'pln', customer_number: customerNumber.value.replace(/\D/g, '') };
-
-        result.value = await requestJson('/admin/nickname-tools/check', {
-            method: 'POST',
-            body: JSON.stringify(body),
-        });
+        result.value = await requestJson('/admin/nickname-tools/check', { method: 'POST', body: JSON.stringify(body) });
     } catch (reason) {
         error.value = reason instanceof Error ? reason.message : 'Pemeriksaan tidak berhasil.';
     } finally {
         busy.value = false;
     }
-}
+};
 
-async function copyCode(code) {
-    await navigator.clipboard.writeText(code);
+const copy = async code => {
+    if (!await copyText(code)) return;
     copied.value = code;
-    window.setTimeout(() => {
-        if (copied.value === code) copied.value = '';
-    }, 1200);
-}
+    setTimeout(() => { if (copied.value === code) copied.value = ''; }, 1500);
+};
 
-function resetEditor() {
+// ---------- daftar kode game ----------
+const editorOpen = ref(false);
+const editingId = ref(null);
+const editorBusy = ref(false);
+const editorError = ref('');
+const editorNotice = ref('');
+const reorderBusy = ref(false);
+const pending = ref(null);
+const form = reactive({
+    name: '', code: '', supports_nickname_check: false, requires_server: false,
+    requires_region_check: false, is_active: true, sort_order: null,
+});
+
+const resetEditor = () => {
     editingId.value = null;
-    form.name = '';
-    form.code = '';
-    form.supports_nickname_check = false;
-    form.requires_server = false;
-    form.requires_region_check = false;
-    form.is_active = true;
-    form.sort_order = null;
+    Object.assign(form, {
+        name: '', code: '', supports_nickname_check: false, requires_server: false,
+        requires_region_check: false, is_active: true, sort_order: null,
+    });
     editorError.value = '';
     editorNotice.value = '';
-}
+};
 
-function createCode() {
-    resetEditor();
-    editorOpen.value = true;
-}
+const createCode = () => { resetEditor(); editorOpen.value = true; };
 
-function editCode(item) {
+const editCode = item => {
     editingId.value = item.id;
-    form.name = item.name;
-    form.code = item.code;
-    form.supports_nickname_check = item.supports_nickname_check;
-    form.requires_server = item.requires_server;
-    form.requires_region_check = item.requires_region_check;
-    form.is_active = item.is_active;
-    form.sort_order = item.sort_order;
+    Object.assign(form, {
+        name: item.name, code: item.code, supports_nickname_check: item.supports_nickname_check,
+        requires_server: item.requires_server, requires_region_check: item.requires_region_check,
+        is_active: item.is_active, sort_order: item.sort_order,
+    });
     editorError.value = '';
     editorNotice.value = item.product_count > 0
         ? `Kode ini dipakai oleh ${item.product_count} produk. Jika kode diubah, produk terkait ikut diperbarui otomatis.`
         : '';
     editorOpen.value = true;
-}
+};
 
-function syncNicknameSupportRules() {
-    if (!form.supports_nickname_check) {
-        form.requires_server = false;
-        form.requires_region_check = false;
-    }
-}
+const normalizeCodeInput = () => {
+    form.code = form.code.toLowerCase().trim().replace(/[^a-z0-9-]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+};
 
-function normalizeCodeInput() {
-    form.code = form.code
-        .toLowerCase()
-        .trim()
-        .replace(/[^a-z0-9-]+/g, '-')
-        .replace(/-+/g, '-')
-        .replace(/^-|-$/g, '');
-}
-
-async function saveCode() {
+const saveCode = async () => {
     if (editorBusy.value) return;
     editorBusy.value = true;
     editorError.value = '';
-
     if (!form.supports_nickname_check) {
         form.requires_server = false;
         form.requires_region_check = false;
     } else if (form.requires_region_check) {
         form.requires_server = true;
     }
-
     try {
         const payload = await requestJson(
             editingId.value ? `/admin/nickname-tools/game-codes/${editingId.value}` : '/admin/nickname-tools/game-codes',
             {
                 method: editingId.value ? 'PUT' : 'POST',
                 body: JSON.stringify({
-                    name: form.name.trim(),
-                    code: form.code.trim(),
+                    name: form.name.trim(), code: form.code.trim(),
                     supports_nickname_check: form.supports_nickname_check,
-                    requires_server: form.requires_server,
-                    requires_region_check: form.requires_region_check,
-                    is_active: form.is_active,
-                    sort_order: form.sort_order,
+                    requires_server: form.requires_server, requires_region_check: form.requires_region_check,
+                    is_active: form.is_active, sort_order: form.sort_order,
                 }),
             },
         );
         codes.value = payload.game_codes || [];
         editorOpen.value = false;
         resetEditor();
-
-        if (!nicknameCodes.value.some((item) => item.code === gameCode.value)) {
+        if (!nicknameCodes.value.some(item => item.code === gameCode.value)) {
             gameCode.value = nicknameCodes.value[0]?.code || '';
         }
     } catch (reason) {
@@ -255,52 +192,19 @@ async function saveCode() {
     } finally {
         editorBusy.value = false;
     }
-}
+};
 
-async function deleteCode(item) {
-    if (editorBusy.value || item.product_count > 0) return;
-    ask('Hapus kode game', 'Kode “' + item.name + '” akan dihapus dan tidak bisa dikembalikan.', 'Hapus kode', () => removeCode(item), true);
-}
-
-async function removeCode(item) {
-    editorBusy.value = true;
-    editorError.value = '';
-    try {
-        const payload = await requestJson(`/admin/nickname-tools/game-codes/${item.id}`, {
-            method: 'DELETE',
-            body: JSON.stringify({}),
-        });
-        codes.value = payload.game_codes || [];
-        if (editingId.value === item.id) {
-            editorOpen.value = false;
-            resetEditor();
-        }
-        if (gameCode.value === item.code) {
-            gameCode.value = nicknameCodes.value[0]?.code || '';
-        }
-    } catch (reason) {
-        editorError.value = reason instanceof Error ? reason.message : 'Kode game tidak berhasil dihapus.';
-    } finally {
-        editorBusy.value = false;
-    }
-}
-
-async function toggleCode(item) {
+const toggleCode = async item => {
     if (editorBusy.value) return;
     editorBusy.value = true;
     editorError.value = '';
-
     try {
         const payload = await requestJson(`/admin/nickname-tools/game-codes/${item.id}`, {
             method: 'PUT',
             body: JSON.stringify({
-                name: item.name,
-                code: item.code,
-                supports_nickname_check: item.supports_nickname_check,
-                requires_server: item.requires_server,
-                requires_region_check: item.requires_region_check,
-                is_active: !item.is_active,
-                sort_order: item.sort_order,
+                name: item.name, code: item.code, supports_nickname_check: item.supports_nickname_check,
+                requires_server: item.requires_server, requires_region_check: item.requires_region_check,
+                is_active: !item.is_active, sort_order: item.sort_order,
             }),
         });
         codes.value = payload.game_codes || [];
@@ -309,23 +213,35 @@ async function toggleCode(item) {
     } finally {
         editorBusy.value = false;
     }
-}
+};
 
-async function moveCode(item, direction) {
+const removeCode = async item => {
+    editorBusy.value = true;
+    editorError.value = '';
+    try {
+        const payload = await requestJson(`/admin/nickname-tools/game-codes/${item.id}`, { method: 'DELETE', body: JSON.stringify({}) });
+        codes.value = payload.game_codes || [];
+        if (gameCode.value === item.code) gameCode.value = nicknameCodes.value[0]?.code || '';
+    } catch (reason) {
+        editorError.value = reason instanceof Error ? reason.message : 'Kode game tidak berhasil dihapus.';
+    } finally {
+        editorBusy.value = false;
+        pending.value = null;
+    }
+};
+
+const moveCode = async (item, direction) => {
     if (reorderBusy.value) return;
-    const index = codes.value.findIndex((candidate) => candidate.id === item.id);
+    const index = codes.value.findIndex(candidate => candidate.id === item.id);
     const target = index + direction;
     if (index < 0 || target < 0 || target >= codes.value.length) return;
-
-    const reordered = codes.value.map((candidate) => ({ ...candidate }));
+    const reordered = codes.value.map(candidate => ({ ...candidate }));
     [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
-
     reorderBusy.value = true;
     editorError.value = '';
     try {
         const payload = await requestJson('/admin/nickname-tools/game-codes/reorder', {
-            method: 'PUT',
-            body: JSON.stringify({ ordered_ids: reordered.map((candidate) => candidate.id) }),
+            method: 'PUT', body: JSON.stringify({ ordered_ids: reordered.map(candidate => candidate.id) }),
         });
         codes.value = payload.game_codes || reordered;
     } catch (reason) {
@@ -333,242 +249,200 @@ async function moveCode(item, direction) {
     } finally {
         reorderBusy.value = false;
     }
-}
+};
 
 if (nicknameCodes.value.length > 0) gameCode.value = nicknameCodes.value[0].code;
 </script>
 
 <template>
-<Head title="Alat cek nama game" />
-<AdminShell>
-<div class="mx-auto max-w-[1540px]">
-    <header class="mb-4 flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between">
-        <div class="min-w-0">
-            <h1 class="text-2xl font-semibold tracking-tight">Alat cek nama game</h1>
-            <p class="mt-1 max-w-3xl text-sm text-muted-foreground">Cek nama panggilan pemain, server/region, atau nomor pelanggan PLN sebelum pelanggan membeli. Data akses layanan tetap tersimpan di server.</p>
-        </div>
-        <div class="flex flex-wrap items-center gap-2">
-            <span class="rounded-full border px-3 py-1.5 text-xs font-bold" :class="integrationStatus.className">{{ integrationStatus.text }}</span>
-            <a href="/admin/integrations" class="rounded-md border border-border bg-card px-3 py-2 text-xs font-bold text-muted-foreground hover:bg-muted">Pengaturan integrasi</a>
-        </div>
-    </header>
-
-    <section>
-        <header>
-            <nav class="lf-admin-tabs" aria-label="Validasi akun">
-                <Button
-                    v-for="item in [['game','Cek nama game'],['region','Cek server'],['pln','Cek PLN'],['codes','Daftar kode game']]"
-                    :key="item[0]"
-                    type="button"
-                    class="shrink-0"
-                    :aria-current="tab===item[0] ? 'page' : undefined"
-                    :variant="tab===item[0] ? 'secondary' : 'ghost'"
-                    @click="selectTab(item[0])"
-                >
-                    {{ item[1] }}
-                </Button>
-            </nav>
+    <Head title="Alat cek nama game" />
+    <AdminLayout>
+        <header class="adm-head">
+            <div>
+                <h1>Alat cek nama game</h1>
+                <p>Cek nama panggilan pemain, server/region, atau nomor pelanggan PLN sebelum pelanggan membeli.</p>
+            </div>
+            <div class="adm-head-actions">
+                <span class="adm-tag" :class="integrationStatus.tone">{{ integrationStatus.text }}</span>
+                <Link href="/admin/integrations" class="adm-btn">Pengaturan integrasi</Link>
+            </div>
         </header>
 
-        <div v-if="tab!=='codes'" class="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_360px]">
-            <div class="grid content-start gap-4 sm:grid-cols-2">
-                <label v-if="tab==='game' || tab==='region'" class="text-sm font-bold text-muted-foreground">
-                    Pilih game
-                    <select v-model="gameCode" class="mt-1 block h-10 w-full rounded-md border border-border bg-muted px-3 text-xs text-foreground outline-none focus:border-primary">
-                        <option value="" disabled>Pilih game</option>
-                        <option v-for="item in (tab==='region' ? regionCodes : nicknameCodes)" :key="item.id" :value="item.code">
-                            {{ item.name }} · {{ item.code }}
-                        </option>
-                    </select>
-                </label>
+        <div class="adm-tabs" role="tablist" aria-label="Validasi akun">
+            <button v-for="[key, text] in [['game', 'Cek nama game'], ['region', 'Cek server'], ['pln', 'Cek PLN'], ['codes', 'Daftar kode game']]"
+                :key="key" type="button" role="tab" :aria-selected="tab === key" @click="selectTab(key)">{{ text }}</button>
+        </div>
 
-                <label v-if="tab!=='pln'" class="text-sm font-bold text-muted-foreground">
-                    ID pemain
-                    <Input v-model="userId" maxlength="80" placeholder="Masukkan ID pemain" class="mt-1 h-10 text-xs" />
-                </label>
-
-                <label v-if="tab!=='pln'" class="text-sm font-bold text-muted-foreground">
-                    Server / zona
-                    <Input
-                        v-model="server"
-                        maxlength="40"
-                        :placeholder="requiresServer || tab==='region' ? 'Wajib diisi' : 'Boleh dikosongkan'"
-                        class="mt-1 h-10 text-xs"
-                    />
-                    <small class="mt-1 block font-normal text-muted-foreground">
-                        {{ requiresServer || tab==='region' ? 'Wajib untuk pemeriksaan ini.' : 'Isi bila akun game memakai server atau zona.' }}
-                    </small>
-                </label>
-
-                <label v-if="tab==='pln'" class="text-sm font-bold text-muted-foreground sm:col-span-2">
-                    Nomor meter / ID pelanggan PLN
-                    <Input
-                        :value="customerNumber"
-                        inputmode="numeric"
-                        maxlength="12"
-                        placeholder="11–12 angka"
-                        class="mt-1 h-10 text-xs"
-                        @input="customerNumber=$event.target.value.replace(/\D/g,'').slice(0,12)"
-                    />
-                </label>
-
-                <p v-if="tab==='region'" class="rounded-md border border-border bg-muted px-3 py-2 text-sm text-muted-foreground sm:col-span-2">Hanya game aktif yang ditandai perlu cek server yang bisa diperiksa di sini.</p>
-
-                <div class="flex flex-wrap gap-2 border-t border-border pt-4 sm:col-span-2">
-                    <Button type="button" :disabled="busy" class="h-9 bg-primary px-4 text-sm font-bold text-white disabled:opacity-50" @click="runCheck">
-                        {{ busy ? 'Memeriksa…' : 'Cek data' }}
-                    </Button>
-                    <Button type="button" :disabled="busy" variant="outline" class="h-9 px-4 text-sm font-bold" @click="clearForm">
-                        Bersihkan
-                    </Button>
-                </div>
-            </div>
-
-            <aside class="space-y-3">
-                <div class="rounded-md border border-border bg-muted p-3">
-                    <div class="flex items-center justify-between gap-2">
-                        <strong class="text-sm">Alamat layanan yang dipakai</strong>
-                        <span class="rounded-full border border-border bg-card px-2 py-1 text-xs font-bold text-muted-foreground">Disimpan di server</span>
+        <section v-if="tab !== 'codes'" class="adm-split">
+            <div class="adm-card">
+                <div class="adm-card-head"><h2>{{ tab === 'pln' ? 'Cek pelanggan PLN' : tab === 'region' ? 'Cek server / zona' : 'Cek nama panggilan' }}</h2></div>
+                <form class="adm-card-body" @submit.prevent="runCheck">
+                    <div class="adm-grid">
+                        <label v-if="tab !== 'pln'" class="adm-field full">
+                            <span>Pilih game</span>
+                            <select v-model="gameCode" class="adm-select">
+                                <option value="" disabled>Pilih game</option>
+                                <option v-for="item in (tab === 'region' ? regionCodes : nicknameCodes)" :key="item.id" :value="item.code">
+                                    {{ item.name }} · {{ item.code }}
+                                </option>
+                            </select>
+                        </label>
+                        <label v-if="tab !== 'pln'" class="adm-field">
+                            <span>ID pemain</span>
+                            <input v-model="userId" class="adm-input" maxlength="80" placeholder="Masukkan ID pemain">
+                        </label>
+                        <label v-if="tab !== 'pln'" class="adm-field">
+                            <span>Server / zona</span>
+                            <input v-model="server" class="adm-input" maxlength="40"
+                                :placeholder="requiresServer || tab === 'region' ? 'Wajib diisi' : 'Boleh dikosongkan'">
+                            <span class="hint">{{ requiresServer || tab === 'region' ? 'Wajib untuk pemeriksaan ini.' : 'Isi bila akun game memakai server atau zona.' }}</span>
+                        </label>
+                        <label v-if="tab === 'pln'" class="adm-field full">
+                            <span>Nomor meter / ID pelanggan PLN</span>
+                            <input :value="customerNumber" class="adm-input" inputmode="numeric" maxlength="12" placeholder="11–12 angka"
+                                @input="customerNumber = $event.target.value.replace(/\D/g, '').slice(0, 12)">
+                        </label>
                     </div>
-                    <code class="mt-2 block break-all rounded border border-border bg-card px-2.5 py-2 text-xs text-primary">{{ endpointText }}</code>
-                    <p v-if="validationConfig?.base_url" class="mt-2 break-all text-xs text-muted-foreground">{{ validationConfig.base_url }}</p>
-                </div>
-                <p v-if="error" role="alert" class="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-sm font-medium">{{ error }}</p>
-                <div v-if="result" role="status" class="rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-2.5 text-sm font-medium">
-                    <template v-if="tab==='pln'">Nama pelanggan: {{ result.customer_name || 'Tidak ditemukan' }}</template>
-                    <template v-else>Nama panggilan: {{ result.nickname || 'Tidak ditemukan' }}<span v-if="result.region"> · Server: {{ result.region }}</span></template>
-                </div>
-                <p class="rounded-md border border-border p-3 text-sm text-muted-foreground">Kunci akses tidak pernah dikirim ke peramban. Alamat layanan diatur di menu Integrasi.</p>
-            </aside>
-        </div>
+                    <p v-if="tab === 'region'" class="adm-note" style="margin-top:10px">Hanya game aktif yang ditandai perlu cek server yang bisa diperiksa di sini.</p>
+                    <div style="display:flex;gap:6px;margin-top:12px">
+                        <button type="submit" class="adm-btn primary" :disabled="busy">{{ busy ? 'Memeriksa…' : 'Cek data' }}</button>
+                        <button type="button" class="adm-btn" :disabled="busy" @click="clearForm">Bersihkan</button>
+                    </div>
+                </form>
+            </div>
 
-        <div v-else class="p-4">
-            <div class="mb-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div class="adm-card">
+                <div class="adm-card-head">
+                    <div>
+                        <h2>Alamat layanan yang dipakai</h2>
+                    </div>
+                </div>
+                <div class="adm-card-body" style="display:grid;gap:8px">
+                    <code class="adm-code">{{ endpointText }}</code>
+                    <p v-if="validationConfig?.base_url" class="adm-note">{{ validationConfig.base_url }}</p>
+                    <p v-if="error" class="adm-alert bad">{{ error }}</p>
+                    <div v-if="result" class="adm-alert ok">
+                        <template v-if="tab === 'pln'">Nama pelanggan: {{ result.customer_name || 'Tidak ditemukan' }}</template>
+                        <template v-else>Nama panggilan: {{ result.nickname || 'Tidak ditemukan' }}<span v-if="result.region"> · Server: {{ result.region }}</span></template>
+                    </div>
+                    <p class="adm-note">Kunci akses tidak pernah dikirim ke peramban. Alamat layanan diatur di menu Integrasi.</p>
+                </div>
+            </div>
+        </section>
+
+        <section v-else class="adm-card">
+            <div class="adm-card-head">
                 <div>
-                    <h2 class="text-lg font-semibold">Daftar kode game</h2>
-                    <p class="mt-1 text-sm text-muted-foreground">Game yang aktif belum tentu bisa dicek nama panggilannya. Dukungan cek nama, kebutuhan server, cek region, status, dan urutan diatur per game.</p>
+                    <h2>Daftar kode game</h2>
+                    <p>Game yang aktif belum tentu bisa dicek nama panggilannya. Dukungan cek nama, kebutuhan server, cek region, status, dan urutan diatur per game.</p>
                 </div>
-                <div class="flex w-full flex-col gap-2 sm:flex-row lg:w-auto">
-                    <Input aria-label="Cari game atau kode" v-model="query" placeholder="Cari nama game atau kode" class="h-10 w-full text-sm sm:w-[280px]" />
-                    <Button type="button" class="h-9 bg-primary px-4 text-sm font-bold text-white" @click="createCode">Tambah kode game</Button>
-                </div>
+                <button type="button" class="adm-btn primary" @click="createCode">Tambah kode game</button>
             </div>
-
-        <Sheet :open="editorOpen" @update:open="(value) => { if (!value) { editorOpen = false; resetEditor(); } }">
-            <SheetContent side="right" class="w-full overflow-y-auto sm:max-w-xl">
-                <SheetHeader><SheetTitle>{{ editingId ? 'Ubah kode game' : 'Tambah kode game' }}</SheetTitle><SheetDescription>Perubahan di sini langsung dipakai sistem saat memeriksa akun.</SheetDescription></SheetHeader>
-                <p v-if="editorError" role="alert" class="mt-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm font-medium">{{ editorError }}</p>
-
-
-
-                <p v-if="editorNotice" class="mb-3 rounded-md border border-border bg-muted px-3 py-2 text-sm text-muted-foreground">{{ editorNotice }}</p>
-
-                <div class="grid gap-3 md:grid-cols-2">
-                    <label class="text-xs font-bold text-muted-foreground">
-                        Nama game
-                        <Input v-model="form.name" maxlength="120" placeholder="Contoh: Mobile Legends" class="mt-1 h-10 text-xs" />
-                    </label>
-                    <label class="text-xs font-bold text-muted-foreground">
-                        Kode game
-                        <Input v-model="form.code" maxlength="100" placeholder="contoh-kode-game" class="mt-1 h-10 font-mono text-xs" @blur="normalizeCodeInput" />
-                        <small class="mt-1 block font-normal text-muted-foreground">Huruf kecil, angka, dan tanda hubung. Jika kode yang sudah dipakai produk diubah, relasi produk ikut diperbarui.</small>
-                    </label>
+            <form class="adm-filters" @submit.prevent>
+                <label class="adm-field search">
+                    <span>Cari</span>
+                    <input v-model="query" class="adm-input" placeholder="Nama game atau kode">
+                </label>
+                <div class="adm-filter-actions">
+                    <button type="button" class="adm-btn" @click="query = ''">Hapus filter</button>
                 </div>
-
-                <div class="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-                    <label class="flex min-h-12 items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-xs font-semibold text-muted-foreground">
-                        <AdminSwitch v-model="form.supports_nickname_check" @update:model-value="syncNicknameSupportRules" />
-                        Bisa dicek nama panggilannya
-                    </label>
-                    <label class="flex min-h-12 items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-xs font-semibold text-muted-foreground">
-                        <AdminSwitch v-model="form.requires_server" :disabled="!form.supports_nickname_check || form.requires_region_check" />
-                        Wajib server / zona
-                    </label>
-                    <label class="flex min-h-12 items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-xs font-semibold text-muted-foreground">
-                        <AdminSwitch v-model="form.requires_region_check" :disabled="!form.supports_nickname_check" @update:model-value="form.requires_server = form.requires_server || form.requires_region_check" />
-                        Perlu cek region
-                    </label>
-                    <label class="flex min-h-12 items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-xs font-semibold text-muted-foreground">
-                        <AdminSwitch v-model="form.is_active" />
-                        Aktif
-                    </label>
-                </div>
-
-                <div class="mt-4 flex flex-wrap gap-2">
-                    <Button type="button" :disabled="editorBusy" class="h-9 bg-primary px-4 text-sm font-bold text-white disabled:opacity-50" @click="saveCode">
-                        {{ editorBusy ? 'Menyimpan…' : 'Simpan' }}
-                    </Button>
-                    <Button type="button" :disabled="editorBusy" variant="outline" class="h-9 px-4 text-sm font-bold" @click="editorOpen=false;resetEditor()">Batal</Button>
-                </div>
-                        </SheetContent>
-        </Sheet>
-
-            <div class="overflow-x-auto rounded-md border border-border" role="region" aria-label="Daftar aturan validasi game" tabindex="0">
-                <AdminResponsiveTable :mobile-columns="[1,3,6,8]" class="min-w-[980px] w-full text-left text-xs">
-                    <TableHeader class="bg-muted text-muted-foreground">
-                        <TableRow>
-                            <TableHead class="w-[92px] px-3 py-2.5">Urutan</TableHead>
-                            <TableHead class="px-3 py-2.5">Game</TableHead>
-                            <TableHead class="px-3 py-2.5">Kode game</TableHead>
-                            <TableHead class="px-3 py-2.5">Cek nama</TableHead>
-                            <TableHead class="px-3 py-2.5">Server / zona</TableHead>
-                            <TableHead class="px-3 py-2.5">Region</TableHead>
-                            <TableHead class="px-3 py-2.5">Status</TableHead>
-                            <TableHead class="px-3 py-2.5">Produk</TableHead>
-                            <TableHead class="px-3 py-2.5 text-right">Tindakan</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody class="divide-y divide-border">
-                        <TableRow v-for="item in filteredCodes" :key="item.id" :class="{ 'opacity-60': !item.is_active }">
-                            <TableCell class="px-3 py-2.5">
-                                <div class="flex gap-1">
-                                    <Button type="button" variant="outline" class="h-9 w-9 p-0 text-xs" :disabled="reorderBusy || codes[0]?.id===item.id || query.trim()!==''" aria-label="Pindahkan game ke atas" @click="moveCode(item,-1)">↑</Button>
-                                    <Button type="button" variant="outline" class="h-9 w-9 p-0 text-xs" :disabled="reorderBusy || codes[codes.length-1]?.id===item.id || query.trim()!==''" aria-label="Pindahkan game ke bawah" @click="moveCode(item,1)">↓</Button>
+            </form>
+            <p v-if="query.trim()" class="adm-toolbar">Kosongkan pencarian untuk mengubah urutan.</p>
+            <p v-if="editorError" class="adm-alert bad" style="margin:10px 14px">{{ editorError }}</p>
+            <div class="adm-scroll">
+                <table class="adm-table">
+                    <thead>
+                        <tr>
+                            <th>Urutan</th><th>Game</th><th>Kode game</th><th>Cek nama</th>
+                            <th>Server / zona</th><th>Region</th><th>Status</th><th>Produk</th><th>Tindakan</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="item in filteredCodes" :key="item.id">
+                            <td>
+                                <div style="display:flex;gap:4px">
+                                    <button type="button" class="adm-btn sm" :disabled="reorderBusy || codes[0]?.id === item.id || query.trim() !== ''"
+                                        aria-label="Pindahkan game ke atas" @click="moveCode(item, -1)">↑</button>
+                                    <button type="button" class="adm-btn sm" :disabled="reorderBusy || codes[codes.length - 1]?.id === item.id || query.trim() !== ''"
+                                        aria-label="Pindahkan game ke bawah" @click="moveCode(item, 1)">↓</button>
                                 </div>
-                            </TableCell>
-                            <TableCell class="px-3 py-2.5 font-semibold text-foreground">{{ item.name }}</TableCell>
-                            <TableCell class="px-3 py-2.5 font-mono text-primary">{{ item.code }}</TableCell>
-                            <TableCell class="px-3 py-2.5">
-                                <Badge :variant="item.supports_nickname_check ? 'secondary' : 'outline'">{{ item.supports_nickname_check ? 'Didukung' : 'Tidak didukung' }}</Badge>
-                            </TableCell>
-                            <TableCell class="px-3 py-2.5">
-                                <Badge :variant="item.requires_server ? 'outline' : 'secondary'">{{ item.requires_server ? 'Wajib' : 'Tidak' }}</Badge>
-                            </TableCell>
-                            <TableCell class="px-3 py-2.5">
-                                <Badge :variant="item.requires_region_check ? 'outline' : 'secondary'">{{ item.requires_region_check ? 'Dicek' : 'Tidak' }}</Badge>
-                            </TableCell>
-                            <TableCell class="px-3 py-2.5">
-                                <Badge :variant="item.is_active ? 'secondary' : 'outline'">{{ item.is_active ? 'Aktif' : 'Nonaktif' }}</Badge>
-                            </TableCell>
-                            <TableCell class="px-3 py-2.5 text-muted-foreground">{{ item.product_count }}</TableCell>
-                            <TableCell class="px-3 py-2.5">
-                                <div class="flex justify-end gap-1.5">
-                                    <Button type="button" variant="outline" class="h-8 px-2.5 text-xs font-bold" @click="copyCode(item.code)">{{ copied===item.code ? 'Tersalin' : 'Salin' }}</Button>
-                                    <Button type="button" variant="outline" class="h-8 px-2.5 text-xs font-bold" @click="editCode(item)">Ubah</Button>
-                                    <Button type="button" variant="outline" class="h-8 px-2.5 text-xs font-bold" :disabled="editorBusy || (item.is_active && item.product_count>0)" :title="item.is_active && item.product_count>0 ? 'Masih dipakai produk' : ''" @click="toggleCode(item)">{{ item.is_active ? 'Nonaktifkan' : 'Aktifkan' }}</Button>
-                                    <Button type="button" variant="outline" class="h-8 px-2.5 text-xs font-bold text-destructive" :disabled="editorBusy || item.product_count>0" :title="item.product_count>0 ? 'Masih dipakai produk' : 'Hapus kode game'" @click="deleteCode(item)">Hapus</Button>
+                            </td>
+                            <td><strong>{{ item.name }}</strong></td>
+                            <td class="mono">{{ item.code }}</td>
+                            <td><span class="adm-tag" :class="item.supports_nickname_check ? 'ok' : 'plain'">{{ item.supports_nickname_check ? 'Didukung' : 'Tidak didukung' }}</span></td>
+                            <td><span class="adm-tag" :class="item.requires_server ? 'warn' : 'plain'">{{ item.requires_server ? 'Wajib' : 'Tidak' }}</span></td>
+                            <td><span class="adm-tag" :class="item.requires_region_check ? 'warn' : 'plain'">{{ item.requires_region_check ? 'Dicek' : 'Tidak' }}</span></td>
+                            <td><span class="adm-tag" :class="item.is_active ? 'ok' : 'bad'">{{ item.is_active ? 'Aktif' : 'Nonaktif' }}</span></td>
+                            <td>{{ item.product_count }}</td>
+                            <td>
+                                <div style="display:flex;gap:4px;flex-wrap:wrap">
+                                    <button type="button" class="adm-btn sm" @click="copy(item.code)">{{ copied === item.code ? 'Tersalin' : 'Salin' }}</button>
+                                    <button type="button" class="adm-btn sm" @click="editCode(item)">Ubah</button>
+                                    <button type="button" class="adm-btn sm" :disabled="editorBusy || (item.is_active && item.product_count > 0)"
+                                        :title="item.is_active && item.product_count > 0 ? 'Masih dipakai produk' : ''" @click="toggleCode(item)">
+                                        {{ item.is_active ? 'Nonaktifkan' : 'Aktifkan' }}
+                                    </button>
+                                    <button v-if="item.product_count === 0" type="button" class="adm-btn sm danger" :disabled="editorBusy"
+                                        @click="pending = item">Hapus</button>
                                 </div>
-                            </TableCell>
-                        </TableRow>
-                        <TableRow v-if="filteredCodes.length===0">
-                            <TableCell colspan="9" class="px-4 py-10 text-center text-sm text-muted-foreground">Tidak ada kode game yang cocok.</TableCell>
-                        </TableRow>
-                    </TableBody>
-                </AdminResponsiveTable>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
-            <p v-if="query.trim()" class="mt-2 text-xs text-muted-foreground">Kosongkan pencarian untuk mengubah urutan.</p>
-        </div>
-    </section>
+            <p v-if="!filteredCodes.length" class="adm-empty">Tidak ada kode game yang cocok.</p>
+        </section>
 
-    <AdminConfirmDialog
-        :open="Boolean(pendingAction)"
-        :title="pendingAction?.title || ''"
-        :message="pendingAction?.message || ''"
-        :confirm-label="pendingAction?.confirmLabel || 'Lanjutkan'"
-        :destructive="Boolean(pendingAction?.destructive)"
-        @update:open="value => { if (!value) pendingAction = null; }"
-        @confirm="runPending"
-    />
-</div>
-</AdminShell>
+        <AdminModal v-model:open="editorOpen" :title="editingId ? 'Ubah kode game' : 'Tambah kode game'" description="Perubahan di sini langsung dipakai sistem saat memeriksa akun.">
+            <p v-if="editorError" class="adm-alert bad">{{ editorError }}</p>
+            <p v-if="editorNotice" class="adm-alert">{{ editorNotice }}</p>
+            <div class="adm-grid">
+                <label class="adm-field">
+                    <span>Nama game <b class="req">*</b></span>
+                    <input v-model="form.name" class="adm-input" maxlength="120" placeholder="Contoh: Mobile Legends">
+                </label>
+                <label class="adm-field">
+                    <span>Kode game <b class="req">*</b></span>
+                    <input v-model="form.code" class="adm-input mono" maxlength="100" placeholder="contoh-kode-game" @blur="normalizeCodeInput">
+                    <span class="hint">Huruf kecil, angka, dan tanda hubung. Jika kode yang sudah dipakai produk diubah, relasi produk ikut diperbarui.</span>
+                </label>
+            </div>
+            <div style="display:grid;gap:8px;margin-top:10px">
+                <label class="adm-switch-row">
+                    <button type="button" class="adm-switch" role="switch" :aria-checked="form.supports_nickname_check" @click="form.supports_nickname_check = !form.supports_nickname_check" />
+                    Bisa dicek nama panggilannya
+                </label>
+                <label class="adm-switch-row">
+                    <button type="button" class="adm-switch" role="switch" :aria-checked="form.requires_server"
+                        :disabled="!form.supports_nickname_check || form.requires_region_check"
+                        @click="form.requires_server = !form.requires_server" />
+                    Wajib server / zona
+                </label>
+                <label class="adm-switch-row">
+                    <button type="button" class="adm-switch" role="switch" :aria-checked="form.requires_region_check"
+                        :disabled="!form.supports_nickname_check"
+                        @click="form.requires_region_check = !form.requires_region_check; form.requires_server = form.requires_server || form.requires_region_check" />
+                    Perlu cek region
+                </label>
+                <label class="adm-switch-row">
+                    <button type="button" class="adm-switch" role="switch" :aria-checked="form.is_active" @click="form.is_active = !form.is_active" />
+                    Aktif
+                </label>
+            </div>
+            <template #footer>
+                <button type="button" class="adm-btn" @click="editorOpen = false; resetEditor()">Batal</button>
+                <button type="button" class="adm-btn primary" :disabled="editorBusy" @click="saveCode">{{ editorBusy ? 'Menyimpan…' : 'Simpan' }}</button>
+            </template>
+        </AdminModal>
+
+        <AdminModal :open="!!pending" title="Hapus kode game"
+            :description="pending ? 'Kode “' + pending.name + '” akan dihapus dan tidak bisa dikembalikan.' : ''"
+            @update:open="value => { if (!value) pending = null; }">
+            <p class="adm-note">Kode ini belum dipakai produk mana pun.</p>
+            <template #footer>
+                <button type="button" class="adm-btn" @click="pending = null">Batal</button>
+                <button type="button" class="adm-btn danger" @click="removeCode(pending)">Hapus kode</button>
+            </template>
+        </AdminModal>
+    </AdminLayout>
 </template>

@@ -71,7 +71,7 @@ const rowStatus = row => row.status_label || label(row.status);
         <header class="adm-head">
             <div>
                 <h1>Antrean Pesanan</h1>
-                <p>Setiap baris adalah proses pengiriman terakhir untuk satu pesanan. Waktu memakai WIB.</p>
+                <p>Setiap baris adalah proses pengiriman terakhir untuk satu pesanan.</p>
             </div>
             <div class="adm-head-actions">
                 <Link href="/admin/orders" class="adm-btn">Buka Pesanan</Link>

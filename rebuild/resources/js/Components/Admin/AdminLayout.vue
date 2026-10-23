@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
+import AdminSensitivePrompt from '../AdminSensitivePrompt.vue';
 
 const page = usePage();
 const panel = computed(() => page.props.adminPanel || {});
@@ -20,7 +21,10 @@ const MENU = [
         { label: 'Produk', href: '/admin/catalog' },
         { label: 'Kategori', href: '/admin/catalog/categories' },
     ] },
-    { group: 'Konten', items: [{ label: 'Banner & Konten', href: '/admin/content' }] },
+    { group: 'Konten', items: [
+        { label: 'Banner & Konten', href: '/admin/content' },
+        { label: 'Tampilan Toko', href: '/admin/content/presentation' },
+    ] },
     { group: 'Integrasi', items: [
         { label: 'Digiflazz', href: '/admin/digiflazz' },
         { label: 'Validasi Akun', href: '/admin/nickname-tools' },
@@ -30,13 +34,14 @@ const MENU = [
         { label: 'Pembayaran', href: '/admin/payments' },
         { label: 'Laporan', href: '/admin/reports' },
     ] },
-    { group: 'Pelanggan', items: [{ label: 'Pelanggan', href: '/admin/customers' }] },
-    { group: 'Layanan Pelanggan', items: [{ label: 'Layanan Pelanggan', href: '/admin/support' }] },
+    { group: 'Pelanggan', items: [
+        { label: 'Pelanggan', href: '/admin/customers' },
+        { label: 'Layanan Pelanggan', href: '/admin/support' },
+    ] },
     { group: 'Sistem', items: [
         { label: 'Integrasi', href: '/admin/integrations' },
-        { label: 'System Health', href: '/admin/health' },
-        { label: 'Audit Log', href: '/admin/audit' },
-        { label: 'Notifikasi', href: '/admin/notifications' },
+        { label: 'Kesehatan Sistem', href: '/admin/health' },
+        { label: 'Catatan Audit', href: '/admin/audit' },
     ] },
     { group: 'Pengaturan', items: [
         { label: 'Admin & Akses', href: '/admin/access' },
@@ -191,6 +196,7 @@ const logout = () => router.post(`${base.value}/logout`);
                 <p v-if="$page.props.status" class="adm-ok" role="status">{{ $page.props.status }}</p>
                 <slot />
             </main>
+            <AdminSensitivePrompt />
         </div>
     </div>
 </template>

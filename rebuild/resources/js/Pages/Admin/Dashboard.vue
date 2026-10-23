@@ -78,7 +78,7 @@ const markRead = async (row) => {
         <header class="adm-head">
             <div>
                 <h1>Dashboard</h1>
-                <p>Ringkasan operasional toko. Seluruh waktu memakai WIB.</p>
+                <p>Ringkasan operasional toko.</p>
             </div>
             <div class="adm-head-actions">
                 <div class="adm-clock">

@@ -383,6 +383,7 @@
     --a-side-muted: #8f9a8c;
     --a-accent: #65a30d;
     --a-accent-2: #a3e635;
+    --a-accent-soft: #f3f9e6;
     --a-danger: #b42318;
     --a-danger-bg: #fef3f2;
     --a-warn: #b54708;
@@ -629,9 +630,14 @@ body:has(.adm) { background: var(--a-bg); margin: 0; }
 
 .adm-stats {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     gap: 8px;
     margin-bottom: 12px;
+}
+
+/* Delapan kotak dibagi rata 4+4, bukan 6+2 yang menyisakan dua kotak yatim. */
+@media (min-width: 1100px) {
+    .adm-stats:has(> :nth-child(8):last-child) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
 .adm-stat {
@@ -750,18 +756,39 @@ body:has(.adm) { background: var(--a-bg); margin: 0; }
 
 .adm-toolbar .sp { margin-left: auto; }
 
+/* Satu baris ringkasan di bawah judul halaman. */
+.adm-summary { margin: 0 0 10px; font-size: 11px; color: var(--a-muted); }
+
 /* ---------- table ---------- */
+
+.adm-thumb {
+    width: 120px; height: 120px; object-fit: contain;
+    border: 1px solid var(--a-line); border-radius: 8px; background: var(--a-bg);
+}
+.adm-thumb.sm { width: 80px; height: 80px; border-radius: 7px; }
+
+/* Pemilih warna: kotak kecil sebaris dengan kolom isian. */
+.adm-color {
+    width: 38px; height: 32px; padding: 2px;
+    border: 1px solid var(--a-line); border-radius: 6px; background: var(--a-panel);
+}
+
+/* Sub-judul di dalam satu panel, di bawah judul panel. */
+.adm-subhead {
+    margin: 14px 0 8px; font-size: 12px; font-weight: 650; color: var(--a-muted);
+}
+.adm-card-body > .adm-subhead:first-child { margin-top: 0; }
+
+/* Baris daftar yang belum dibaca. */
+.adm-list-row.unread { background: var(--a-accent-soft); }
 
 .adm-scroll { overflow-x: auto; }
 
 .adm-table { width: 100%; border-collapse: collapse; font-size: 12px; }
 
 /* Di layar sempit tabel digeser mendatar, bukan dipepetkan sampai terpotong. */
-.adm-hint-sm { display: none; }
-
 @media (max-width: 900px) {
     .adm-table { min-width: 760px; }
-    .adm-hint-sm { display: block; padding: 6px 12px 0; font-size: 10.5px; color: var(--a-muted); }
 }
 
 .adm-table th {
@@ -857,6 +884,8 @@ body:has(.adm) { background: var(--a-bg); margin: 0; }
     border-bottom: 2px solid transparent;
 }
 .adm-tabs button[aria-selected="true"] { color: var(--a-ink); border-bottom-color: var(--a-accent); }
+/* Titik status di dalam tab: penanda sebaris, bukan badge menempel di sudut. */
+.adm-tabs .adm-dot { position: static; min-width: 6px; height: 6px; padding: 0; margin-left: 4px; vertical-align: middle; }
 
 /* ---------- switch ---------- */
 
@@ -891,6 +920,10 @@ body:has(.adm) { background: var(--a-bg); margin: 0; }
 .adm-alert { border: 1px solid #fecdca; background: var(--a-danger-bg); color: var(--a-danger); padding: 8px 11px; border-radius: 7px; font-size: 12px; margin-bottom: 10px; }
 .adm-alert p { margin: 0; }
 .adm-alert p + p { margin-top: 3px; }
+.adm-alert.ok { border-color: #abefc6; background: var(--a-ok-bg); color: var(--a-ok); }
+.adm-alert.bad { border-color: #fecdca; background: var(--a-danger-bg); color: var(--a-danger); }
+.adm-alert.warn { border-color: #fedf89; background: var(--a-warn-bg); color: var(--a-warn); }
+.adm-code { display:block; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; background:#f7f8f5; border:1px solid var(--a-line); border-radius:6px; padding:7px 9px; overflow-wrap:anywhere; }
 .adm-ok { border: 1px solid #abefc6; background: var(--a-ok-bg); color: var(--a-ok); padding: 8px 11px; border-radius: 7px; font-size: 12px; margin-bottom: 10px; }
 
 .adm-chart { display: flex; align-items: flex-end; gap: 3px; height: 120px; padding-top: 6px; }
@@ -937,3 +970,51 @@ body:has(.adm) { background: var(--a-bg); margin: 0; }
 @media (prefers-reduced-motion: reduce) {
     .adm * { transition: none !important; animation: none !important; }
 }
+
+/* ---------- media ---------- */
+
+.adm-media { display: grid; gap: 6px; }
+.adm-media-preview {
+    display: grid; place-items: center; min-height: 90px; padding: 8px;
+    border: 1px dashed var(--a-line); border-radius: 7px; background: #fafbf9;
+}
+.adm-media-preview.wide { min-height: 130px; }
+.adm-media-preview img { max-width: 100%; max-height: 190px; object-fit: contain; border-radius: 5px; }
+.adm-media .err { font-size: 11px; color: var(--a-danger); }
+
+/* ---------- blok bantu ---------- */
+
+.adm-logo {
+    display: inline-grid; place-items: center; flex: 0 0 auto;
+    width: 34px; height: 34px; overflow: hidden;
+    border: 1px solid var(--a-line); border-radius: 6px; background: var(--a-panel);
+}
+.adm-logo.big { width: 52px; height: 52px; }
+.adm-logo img { max-width: 100%; max-height: 100%; object-fit: contain; }
+
+.adm-block {
+    border: 1px solid var(--a-line); border-radius: 7px;
+    padding: 9px 11px; background: #fafbf9;
+    display: grid; gap: 6px; min-width: 0;
+}
+.adm-block > strong { font-size: 12px; }
+.adm-block.full { grid-column: 1 / -1; }
+
+.adm-route { border-top: 1px solid var(--a-line); margin-top: 8px; padding-top: 8px; display: grid; gap: 5px; }
+.adm-route:first-of-type { border-top: 0; margin-top: 6px; padding-top: 0; }
+
+.adm-copyrow {
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    width: 100%; text-align: left; cursor: pointer;
+    border: 1px solid var(--a-line); border-radius: 7px; background: #fff;
+    padding: 8px 10px; font: inherit;
+}
+.adm-copyrow:hover { background: var(--a-bg); }
+.adm-copyrow strong { font-size: 12px; min-width: 74px; }
+.adm-copyrow .mono { flex: 1 1 220px; min-width: 0; overflow-wrap: anywhere; font-size: 11px; color: var(--a-muted); }
+
+/* Baris daftar yang punya tombol di kanan. */
+.adm-list-row { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+
+.adm-meter { height: 6px; border-radius: 99px; background: var(--a-line-2); overflow: hidden; min-width: 60px; }
+.adm-meter > span { display: block; height: 100%; background: var(--a-danger); }

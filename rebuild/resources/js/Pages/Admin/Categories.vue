@@ -105,7 +105,7 @@ const remove = () => {
                             <p class="adm-note">{{ row.products_count }} produk · posisi {{ row.sort_order }}</p>
                             <p class="adm-note">{{ row.slug }}</p>
                         </div>
-                        <span class="adm-tag" :class="row.is_active ? 'ok' : 'plain'">{{ row.is_active ? 'Aktif' : 'Nonaktif' }}</span>
+                        <span class="adm-tag" :class="row.is_active ? 'ok' : 'bad'">{{ row.is_active ? 'Aktif' : 'Nonaktif' }}</span>
                     </div>
                     <div style="display:flex;gap:6px;margin-top:10px">
                         <button type="button" class="adm-btn sm" @click="openEdit(row)">Ubah</button>

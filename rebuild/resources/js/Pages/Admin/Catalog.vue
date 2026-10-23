@@ -437,8 +437,8 @@ const openEditorFull = (row) => {
                             <td>{{ row.fulfillment_mode === 'MANUAL' ? 'Manual' : 'Otomatis' }}</td>
                             <td>{{ activePackages(row) }} aktif dari {{ row.packages.length }}</td>
                             <td>{{ row.sort_order }}</td>
-                            <td><span class="adm-tag" :class="row.is_active ? 'ok' : 'plain'">{{ row.is_active ? 'Aktif' : 'Nonaktif' }}</span></td>
-                            <td><button type="button" class="adm-btn sm" @click="openEditorFull(row)">Edit</button></td>
+                            <td><span class="adm-tag" :class="row.is_active ? 'ok' : 'bad'">{{ row.is_active ? 'Aktif' : 'Nonaktif' }}</span></td>
+                            <td><button type="button" class="adm-btn sm" @click="openEditorFull(row)">Ubah</button></td>
                         </tr>
                         <tr v-if="!visible.length"><td colspan="7" class="adm-empty">Belum ada produk pada tab ini.</td></tr>
                     </tbody>
@@ -568,10 +568,10 @@ const openEditorFull = (row) => {
                                         <button type="button" class="adm-btn sm" aria-label="Turunkan" @click="move(index, 1)">↓</button>
                                     </div>
                                 </td>
-                                <td><span class="adm-tag" :class="row.is_active ? 'ok' : 'plain'">{{ row.is_active ? 'Aktif' : 'Nonaktif' }}</span></td>
+                                <td><span class="adm-tag" :class="row.is_active ? 'ok' : 'bad'">{{ row.is_active ? 'Aktif' : 'Nonaktif' }}</span></td>
                                 <td>
                                     <div style="display:flex;gap:4px">
-                                        <button type="button" class="adm-btn sm" @click="openNominal(row)">Edit</button>
+                                        <button type="button" class="adm-btn sm" @click="openNominal(row)">Ubah</button>
                                         <button type="button" class="adm-btn sm danger" @click="askRemove(row, 'package')">Hapus</button>
                                     </div>
                                 </td>
@@ -587,7 +587,7 @@ const openEditorFull = (row) => {
                     <div class="adm-field">
                         <span>Gambar produk</span>
                         <p class="hint">Rekomendasi 512×512 piksel, PNG atau WebP transparan.</p>
-                        <img v-if="product?.image_url" :src="product.image_url" :alt="product.name" style="width:120px;height:120px;object-fit:contain;border:1px solid var(--a-line);border-radius:8px;background:#fafbf9">
+                        <img v-if="product?.image_url" :src="product.image_url" :alt="product.name" class="adm-thumb">
                         <p v-else class="adm-note">Belum ada gambar.</p>
                         <input ref="imageInput" type="file" accept="image/png,image/webp,image/jpeg" class="adm-input" style="padding:5px" @change="uploadProduct('image', $event)">
                     </div>
@@ -660,7 +660,7 @@ const openEditorFull = (row) => {
                 <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">
                     <button type="button" class="adm-btn sm" @click="addField">Tambah kolom</button>
                 </div>
-                <div class="adm-note" style="margin-top:10px;padding:8px 10px;border:1px solid var(--a-line);border-radius:7px;background:#fafbf9">
+                <div class="adm-note adm-block">
                     Hasil kirim ke penyedia:
                     <strong class="mono" style="font-size:12.5px;color:var(--a-ink)">{{ preview || '—' }}</strong>
                     <p style="margin:4px 0 0">Contoh memakai isian contoh; data asli diambil dari pelanggan saat checkout.</p>
@@ -704,7 +704,7 @@ const openEditorFull = (row) => {
                 <div v-if="nominalEditing" class="adm-field full">
                     <span>Gambar nominal</span>
                     <p class="hint">Opsional. Bila tidak ada gambar, kartu nominal tampil tanpa gambar.</p>
-                    <img v-if="nominalEditing.image_url" :src="nominalEditing.image_url" alt="" style="width:80px;height:80px;object-fit:contain;border:1px solid var(--a-line);border-radius:7px;background:#fafbf9">
+                    <img v-if="nominalEditing.image_url" :src="nominalEditing.image_url" alt="" class="adm-thumb sm">
                     <input type="file" accept="image/png,image/webp,image/jpeg" class="adm-input" style="padding:5px" @change="event => { nominalImage = event.target; }">
                 </div>
                 <p v-else class="adm-note full">Simpan nominal dulu untuk menambahkan gambar.</p>

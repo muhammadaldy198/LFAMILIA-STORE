@@ -1,16 +1,10 @@
 <script setup>
-import AdminSwitch from '../../Components/AdminSwitch.vue';
-import AdminConfirmDialog from '../../Components/AdminConfirmDialog.vue';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../../Components/ui/sheet';
-import AdminResponsiveTable from '../../Components/AdminResponsiveTable.vue';
-import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import { computed, reactive, ref } from 'vue';
-import AdminShell from '../../Components/AdminShell.vue';
-import { Badge } from '../../Components/ui/badge';
-import { Button } from '../../Components/ui/button';
-import { Card } from '../../Components/ui/card';
-import { Input } from '../../Components/ui/input';
-import { TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../Components/ui/table';
+import { Head, Link, router } from '@inertiajs/vue3';
+import AdminLayout from '../../Components/Admin/AdminLayout.vue';
+import AdminModal from '../../Components/Admin/AdminModal.vue';
+import { num, wibDateTime } from '../../lib/adminFormat';
+import { withSensitive } from '../../lib/sensitivePrompt';
 
 const props = defineProps({
     admins: { type: Object, default: () => ({ data: [], links: [] }) },
@@ -18,382 +12,285 @@ const props = defineProps({
     filters: { type: Object, default: () => ({}) },
     summary: { type: Object, default: () => ({}) },
     recentActivities: { type: Array, default: () => [] },
-    currentAdminId: Number,
+    currentAdminId: { type: Number, default: 0 },
 });
 
-const filters = reactive({
+const filter = reactive({
     q: props.filters?.q || '',
     role: props.filters?.role || '',
     status: props.filters?.status || '',
     per_page: Number(props.filters?.per_page || 25),
 });
+const apply = () => router.get('/admin/access', Object.fromEntries(
+    Object.entries(filter).filter(([, value]) => value !== '' && value !== null)
+), { preserveState: true, preserveScroll: true });
+const reset = () => {
+    Object.assign(filter, { q: '', role: '', status: '', per_page: 25 });
+    apply();
+};
 
-const editorOpen = ref(false);
-const editingId = ref(null);
-const deleting = ref(null);
-const form = useForm({
-    name: '',
-    email: '',
-    password: '',
-    role: 'ADMIN',
-    permissions: ['dashboard.view'],
-    is_active: true,
-});
+const rows = computed(() => (Array.isArray(props.admins?.data) ? props.admins.data : []));
+const permissionList = computed(() => Object.entries(props.permissions || {}).map(([key, label]) => ({ key, label })));
 
-const permissionEntries = computed(() => Object.entries(props.permissions || {}));
-// Kelompokkan izin per menu: satu kontrol per menu, bukan satu centang per izin.
+const roleLabel = role => ({ SUPER_ADMIN: 'Super Admin', ADMIN: 'Admin' }[role] || role);
+const roleTone = role => role === 'SUPER_ADMIN' ? 'info' : 'plain';
 
-const isEditingSelf = computed(() => Number(editingId.value) === Number(props.currentAdminId));
-
-const date = (value) => value ? new Intl.DateTimeFormat('id-ID', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-    timeZone: 'Asia/Jakarta',
-}).format(new Date(value)) + ' WIB' : 'Belum pernah';
-
-const roleLabel = (role) => role === 'SUPER_ADMIN' ? 'Super Admin' : 'Admin';
-const actionLabel = (activity) => activity.action_label || ({
-    'admin.created': 'Menambah akun Admin',
-    'admin.updated': 'Mengubah akun / hak akses',
-    'admin.deleted': 'Menghapus akun Admin',
-}[activity.action] || 'Aktivitas akun Admin');
-
-function submitFilters() {
-    router.get('/admin/access', {
-        q: filters.q || undefined,
-        role: filters.role || undefined,
-        status: filters.status || undefined,
-        per_page: filters.per_page,
-    }, { preserveState: true, preserveScroll: true });
-}
-
-function resetFilters() {
-    Object.assign(filters, { q: '', role: '', status: '', per_page: 25 });
-    submitFilters();
-}
-
-function openCreate() {
-    editingId.value = null;
-    form.reset();
-    form.clearErrors();
-    Object.assign(form, {
-        name: '',
-        email: '',
-        password: '',
-        role: 'ADMIN',
+// ---------- pop-up akun ----------
+const editor = ref(null);
+const busy = ref(false);
+const errors = ref({});
+const openCreate = () => {
+    editor.value = {
+        id: null, name: '', email: '', role: 'ADMIN', is_active: true, password: '',
         permissions: ['dashboard.view'],
-        is_active: true,
-    });
-    editorOpen.value = true;
-}
-
-function openEdit(admin) {
-    editingId.value = admin.id;
-    form.clearErrors();
-    Object.assign(form, {
-        name: admin.name,
-        email: admin.email,
-        password: '',
-        role: admin.role,
-        permissions: admin.role === 'ADMIN' ? [...(admin.permissions || [])] : [],
-        is_active: Boolean(admin.is_active),
-    });
-    editorOpen.value = true;
-}
-
-function closeEditor() {
-    editorOpen.value = false;
-    editingId.value = null;
-    form.clearErrors();
-}
-
-function save() {
-    if (form.role === 'ADMIN' && !form.permissions.includes('dashboard.view')) {
-        form.permissions.push('dashboard.view');
-    }
-    if (form.role === 'SUPER_ADMIN') {
-        form.permissions = [];
-    }
-
-    const options = {
-        preserveScroll: true,
-        onSuccess: closeEditor,
     };
-
-    if (editingId.value) {
-        form.put('/admin/access/' + editingId.value, options);
-        return;
-    }
-    form.post('/admin/access', options);
-}
-
-function askRemove(admin) {
-    if (Number(admin.id) === Number(props.currentAdminId)) return;
-    deleting.value = admin;
-}
-
-function confirmRemove() {
-    const admin = deleting.value;
-    deleting.value = null;
-    if (admin) {
-        router.delete('/admin/access/' + admin.id, {
+    errors.value = {};
+};
+const openEdit = row => {
+    const permissions = row.role === 'ADMIN' ? [...(row.permissions || [])] : [];
+    editor.value = {
+        id: row.id, name: row.name, email: row.email, role: row.role,
+        is_active: row.is_active, password: '', permissions,
+        original: { role: row.role, is_active: row.is_active, permissions: [...permissions] },
+    };
+    errors.value = {};
+};
+const togglePermission = key => {
+    if (!editor.value || editor.value.role !== 'ADMIN' || key === 'dashboard.view') return;
+    const list = editor.value.permissions;
+    const index = list.indexOf(key);
+    if (index >= 0) list.splice(index, 1);
+    else list.push(key);
+};
+const sensitiveReason = () => {
+    const target = editor.value;
+    if (target.role !== 'SUPER_ADMIN' && !target.is_active) return 'Menonaktifkan akun admin memerlukan konfirmasi kata sandi.';
+    return 'Perubahan peran atau hak akses memerlukan konfirmasi kata sandi.';
+};
+const submit = () => {
+    const target = editor.value;
+    if (!target) return;
+    const payload = {
+        name: target.name, email: target.email, role: target.role,
+        is_active: Boolean(target.is_active),
+        permissions: target.role === 'ADMIN' ? target.permissions : [],
+        password: target.password || null,
+    };
+    const run = () => {
+        busy.value = true;
+        const options = {
             preserveScroll: true,
-            onSuccess: () => { if (Number(editingId.value) === Number(admin.id)) closeEditor(); },
+            onError: bag => { errors.value = bag; },
+            onSuccess: () => { editor.value = null; },
+            onFinish: () => { busy.value = false; },
+        };
+        if (target.id) router.put('/admin/access/' + target.id, payload, options);
+        else router.post('/admin/access', payload, options);
+    };
+    // Kata sandi ulang hanya untuk peran, status aktif, atau izin yang berubah.
+    const before = target.original;
+    const needsPassword = Boolean(target.id) && before && (
+        target.role !== before.role
+        || Boolean(target.is_active) !== before.is_active
+        || JSON.stringify([...target.permissions].sort()) !== JSON.stringify([...before.permissions].sort())
+    );
+    if (needsPassword) void withSensitive(sensitiveReason(), run);
+    else run();
+};
+
+// ---------- nonaktifkan ----------
+const pendingOff = ref(null);
+const deactivate = () => {
+    const row = pendingOff.value;
+    void withSensitive(`Menonaktifkan akun ${row.name} memerlukan konfirmasi kata sandi.`, () => {
+        router.put('/admin/access/' + row.id, {
+            name: row.name, email: row.email, role: row.role, is_active: false,
+            permissions: row.role === 'ADMIN' ? row.permissions : [], password: null,
+        }, {
+            preserveScroll: true,
+            onSuccess: () => { pendingOff.value = null; },
         });
-    }
-}
-
-function permissionChecked(key) {
-    return form.permissions.includes(key);
-}
-
-function togglePermission(key, checked) {
-    if (key === 'dashboard.view') return;
-    const values = new Set(form.permissions);
-    if (checked) values.add(key);
-    else values.delete(key);
-    values.add('dashboard.view');
-    form.permissions = [...values];
-}
+    });
+};
 </script>
 
 <template>
-<Head title="Admin & Akses" />
-<AdminShell>
-    <div class="space-y-5">
-        <header class="flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between">
-            <div class="min-w-0">
-                <h1 class="text-2xl font-semibold tracking-tight">Admin & Akses</h1>
-                <p class="mt-1 max-w-3xl text-sm text-muted-foreground">
-                    Kelola akun Super Admin dan Admin, status login, serta izin operasional tiap Admin.
-                </p>
+    <Head title="Admin & Akses" />
+    <AdminLayout>
+        <header class="adm-head">
+            <div>
+                <h1>Admin &amp; Akses</h1>
+                <p>Akun yang boleh masuk panel dan izin yang dimiliki. Hanya Super Admin yang bisa mengubah bagian ini.</p>
             </div>
-            <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                <Button class="w-full sm:w-auto" variant="outline" @click="router.reload({ preserveScroll: true })">Muat ulang</Button>
-                <Button class="w-full sm:w-auto" @click="openCreate">Tambah Admin</Button>
+            <div class="adm-head-actions">
+                <button type="button" class="adm-btn" @click="router.reload({ preserveScroll: true })">Muat ulang</button>
+                <button type="button" class="adm-btn primary" @click="openCreate">Tambah admin</button>
             </div>
         </header>
 
-        <div class="lf-admin-summary ">
-            <Card class="p-4"><p class="text-xs text-muted-foreground">Total akun</p><p class="mt-2 text-2xl font-semibold">{{ summary.total || 0 }}</p></Card>
-            <Card class="p-4"><p class="text-xs text-muted-foreground">Super Admin</p><p class="mt-2 text-2xl font-semibold">{{ summary.super_admins || 0 }}</p></Card>
-            <Card class="p-4"><p class="text-xs text-muted-foreground">Admin</p><p class="mt-2 text-2xl font-semibold">{{ summary.admins || 0 }}</p></Card>
-            <Card class="p-4"><p class="text-xs text-muted-foreground">Akun aktif</p><p class="mt-2 text-2xl font-semibold">{{ summary.active || 0 }}</p></Card>
-            <Card class="p-4"><p class="text-xs text-muted-foreground">Nonaktif</p><p class="mt-2 text-2xl font-semibold">{{ summary.inactive || 0 }}</p></Card>
-            <Card class="p-4"><p class="text-xs text-muted-foreground">Pemilik aktif</p><p class="mt-2 text-2xl font-semibold">{{ summary.active_super_admins || 0 }}</p></Card>
-        </div>
+        <section class="adm-stats" aria-label="Ringkasan akses">
+            <div class="adm-stat"><span class="lb">Total akun</span><strong class="vl">{{ num(summary.total) }}</strong></div>
+            <div class="adm-stat"><span class="lb">Super Admin</span><strong class="vl">{{ num(summary.super_admins) }}</strong></div>
+            <div class="adm-stat"><span class="lb">Super Admin aktif</span><strong class="vl">{{ num(summary.active_super_admins) }}</strong></div>
+            <div class="adm-stat"><span class="lb">Admin biasa</span><strong class="vl">{{ num(summary.admins) }}</strong></div>
+            <div class="adm-stat"><span class="lb">Aktif</span><strong class="vl">{{ num(summary.active) }}</strong></div>
+            <div class="adm-stat"><span class="lb">Nonaktif</span><strong class="vl" :style="{ color: Number(summary.inactive) ? 'var(--a-danger)' : 'inherit' }">{{ num(summary.inactive) }}</strong></div>
+        </section>
 
-        <Card class="min-w-0 p-4 sm:p-5">
-            <form class="grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-5" @submit.prevent="submitFilters">
-                <label class="space-y-1 md:col-span-2">
-                    <span class="text-sm font-medium">Cari akun</span>
-                    <Input v-model="filters.q" maxlength="100" placeholder="Nama atau email" />
+        <section class="adm-card">
+            <form class="adm-filters" @submit.prevent="apply">
+                <label class="adm-field search">
+                    <span>Cari admin</span>
+                    <input v-model="filter.q" class="adm-input" maxlength="100" placeholder="Nama atau email">
                 </label>
-                <label class="space-y-1">
-                    <span class="text-sm font-medium">Peran akun</span>
-                    <select v-model="filters.role" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
-                        <option value="">Semua role</option>
+                <label class="adm-field narrow">
+                    <span>Peran</span>
+                    <select v-model="filter.role" class="adm-select">
+                        <option value="">Semua peran</option>
                         <option value="SUPER_ADMIN">Super Admin</option>
                         <option value="ADMIN">Admin</option>
                     </select>
                 </label>
-                <label class="space-y-1">
-                    <span class="text-sm font-medium">Status</span>
-                    <select v-model="filters.status" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+                <label class="adm-field narrow">
+                    <span>Status</span>
+                    <select v-model="filter.status" class="adm-select">
                         <option value="">Semua status</option>
                         <option value="active">Aktif</option>
                         <option value="inactive">Nonaktif</option>
                     </select>
                 </label>
-                <label class="space-y-1">
-                    <span class="text-sm font-medium">Akun per halaman</span>
-                    <select v-model.number="filters.per_page" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
-                        <option :value="10">10</option><option :value="25">25</option><option :value="50">50</option><option :value="100">100</option>
+                <div class="adm-filter-actions">
+                    <button type="submit" class="adm-btn primary">Terapkan</button>
+                    <button type="button" class="adm-btn" @click="reset">Hapus filter</button>
+                </div>
+                <label class="adm-field narrow">
+                    <span>Akun per halaman</span>
+                    <select v-model.number="filter.per_page" class="adm-select">
+                        <option v-for="size in [10, 25, 50, 100]" :key="size" :value="size">{{ size }} akun</option>
                     </select>
                 </label>
-                <div class="flex flex-col gap-2 sm:flex-row md:col-span-2 xl:col-span-5">
-                    <Button class="w-full sm:w-auto">Terapkan filter</Button>
-                    <Button class="w-full sm:w-auto" type="button" variant="outline" @click="resetFilters">Hapus filter</Button>
-                </div>
             </form>
-        </Card>
 
-        <div class="grid items-start gap-4">
-            <Card class="min-w-0 p-4">
-                <div class="overflow-x-auto" role="region" aria-label="Daftar akun Admin" tabindex="0">
-                    <AdminResponsiveTable :mobile-columns="[0,1,2,6]">
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Akun</TableHead>
-                                <TableHead>Role</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead>Hak akses</TableHead>
-                                <TableHead>Login terakhir</TableHead>
-                                <TableHead>Diperbarui</TableHead>
-                                <TableHead class="text-right">Aksi</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            <TableRow v-for="admin in admins.data" :key="admin.id">
-                                <TableCell>
-                                    <button type="button" class="block text-left font-semibold underline-offset-4 hover:underline" @click="openEdit(admin)">{{ admin.name }}</button>
-                                    <div class="flex flex-col items-start gap-1">
-                                        <span class="text-xs text-muted-foreground">{{ admin.email }}</span>
-                                        <Badge v-if="Number(admin.id) === Number(currentAdminId)" variant="outline">Sedang digunakan</Badge>
-                                    </div>
-                                </TableCell>
-                                <TableCell><Badge :variant="admin.role === 'SUPER_ADMIN' ? 'secondary' : 'outline'">{{ roleLabel(admin.role) }}</Badge></TableCell>
-                                <TableCell><Badge :variant="admin.is_active ? 'secondary' : 'outline'">{{ admin.is_active ? 'Aktif' : 'Nonaktif' }}</Badge></TableCell>
-                                <TableCell>
-                                    <span v-if="admin.role === 'SUPER_ADMIN'" class="text-sm">Seluruh akses</span>
-                                    <span v-else class="text-sm">{{ (admin.permissions || []).length }} izin</span>
-                                </TableCell>
-                                <TableCell>{{ date(admin.last_login_at) }}</TableCell>
-                                <TableCell>{{ date(admin.updated_at) }}</TableCell>
-                                <TableCell class="text-right">
-                                    <div class="flex justify-end gap-1">
-                                        <Button size="sm" variant="outline" @click="openEdit(admin)">Ubah</Button>
-                                        <Button size="sm" variant="destructive" :disabled="Number(admin.id) === Number(currentAdminId)" @click="askRemove(admin)">Hapus</Button>
-                                    </div>
-                                </TableCell>
-                            </TableRow>
-                            <TableRow v-if="!admins.data?.length">
-                                <TableCell colspan="7" class="py-10 text-center text-muted-foreground">Tidak ada akun sesuai filter.</TableCell>
-                            </TableRow>
-                        </TableBody>
-                    </AdminResponsiveTable>
+            <div class="adm-scroll">
+                <table class="adm-table">
+                    <thead>
+                        <tr><th>Admin</th><th>Peran</th><th>Izin</th><th>Status</th><th>Login terakhir</th><th>Tindakan</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="row in rows" :key="row.id">
+                            <td>
+                                <strong>{{ row.name }}</strong>
+                                <span v-if="row.id === currentAdminId" class="adm-tag plain" style="margin-left:4px">Akun ini</span>
+                                <div class="adm-note">{{ row.email }}</div>
+                            </td>
+                            <td><span class="adm-tag" :class="roleTone(row.role)">{{ roleLabel(row.role) }}</span></td>
+                            <td class="adm-note">
+                                <template v-if="row.role === 'SUPER_ADMIN'">Semua izin</template>
+                                <template v-else>{{ row.permissions.length }} dari {{ permissionList.length }} izin</template>
+                            </td>
+                            <td><span class="adm-tag" :class="row.is_active ? 'ok' : 'bad'">{{ row.is_active ? 'Aktif' : 'Nonaktif' }}</span></td>
+                            <td class="adm-note">{{ wibDateTime(row.last_login_at) || 'Belum pernah' }}</td>
+                            <td>
+                                <div style="display:flex;gap:4px;flex-wrap:wrap">
+                                    <button type="button" class="adm-btn sm" @click="openEdit(row)">Ubah</button>
+                                    <button v-if="row.is_active && row.id !== currentAdminId" type="button" class="adm-btn sm danger" @click="pendingOff = row">Nonaktifkan</button>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p v-if="!rows.length" class="adm-empty">Tidak ada akun yang sesuai filter.</p>
+            <div class="adm-pager">
+                <span>{{ admins.from || 0 }}–{{ admins.to || 0 }} dari {{ num(admins.total) }} akun</span>
+                <span class="sp" />
+                <button type="button" class="adm-btn sm" :disabled="!admins.prev_page_url" @click="router.get(admins.prev_page_url, {}, { preserveState: true, preserveScroll: true })">Sebelumnya</button>
+                <button type="button" class="adm-btn sm" :disabled="!admins.next_page_url" @click="router.get(admins.next_page_url, {}, { preserveState: true, preserveScroll: true })">Berikutnya</button>
+            </div>
+        </section>
+
+        <section class="adm-card">
+            <div class="adm-card-head">
+                <div><h2>Aktivitas admin terbaru</h2></div>
+                <Link href="/admin/audit" class="adm-btn sm">Buka Catatan Audit</Link>
+            </div>
+            <div class="adm-card-body" style="display:grid;gap:0">
+                <div v-for="activity in recentActivities" :key="activity.id" class="adm-list-row">
+                    <div>
+                        <strong>{{ activity.action_label || activity.action }}</strong>
+                        <div class="adm-note">{{ activity.actor_name }} · {{ roleLabel(activity.actor_role) }}</div>
+                    </div>
+                    <span class="adm-note">{{ wibDateTime(activity.created_at) }}</span>
                 </div>
+                <p v-if="!recentActivities.length" class="adm-note">Belum ada aktivitas admin.</p>
+            </div>
+        </section>
 
-                <div v-if="admins.links?.length > 3" class="mt-4 flex flex-wrap gap-1">
-                    <Link
-                        v-for="link in admins.links"
-                        :key="link.label"
-                        :href="link.url || '#'"
-                        preserve-scroll
-                        :class="[
-                            'rounded-md border px-3 py-1.5 text-sm',
-                            link.active ? 'bg-primary text-primary-foreground' : 'bg-background',
-                            !link.url ? 'pointer-events-none opacity-40' : '',
-                            ]"
-                            >{{ link.label }}</Link>
-                </div>
-            </Card>
-
-        <Sheet :open="editorOpen" @update:open="(value) => { if (!value) closeEditor(); }">
-        <SheetContent side="right" class="w-full overflow-y-auto sm:max-w-xl">
-            <SheetHeader><SheetTitle>{{ editingId ? 'Ubah akun admin' : 'Tambah akun admin' }}</SheetTitle><SheetDescription>{{ isEditingSelf ? 'Akun yang sedang digunakan tidak dapat dinonaktifkan atau diturunkan.' : 'Perubahan role, status, password, dan permission dicatat ke Audit Log.' }}</SheetDescription></SheetHeader>
-
-
-            <form class="mt-4 space-y-4" @submit.prevent="save">
-                <div class="grid gap-3 sm:grid-cols-2">
-                    <label class="space-y-1">
-                        <span class="text-sm font-medium">Nama</span>
-                        <Input v-model="form.name" required minlength="2" maxlength="120" />
-                        <span v-if="form.errors.name" class="text-xs text-destructive">{{ form.errors.name }}</span>
-                    </label>
-                    <label class="space-y-1">
-                        <span class="text-sm font-medium">Email login</span>
-                        <Input v-model="form.email" required type="email" maxlength="255" />
-                        <span v-if="form.errors.email" class="text-xs text-destructive">{{ form.errors.email }}</span>
-                    </label>
-                    <label class="space-y-1">
-                        <span class="text-sm font-medium">Role</span>
-                        <select v-model="form.role" :disabled="isEditingSelf" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm disabled:opacity-60">
-                            <option value="ADMIN">Admin</option>
-                            <option value="SUPER_ADMIN">Super Admin</option>
-                        </select>
-                        <span v-if="form.errors.role" class="text-xs text-destructive">{{ form.errors.role }}</span>
-                    </label>
-                    <label class="space-y-1">
-                        <span class="text-sm font-medium">{{ editingId ? 'Password baru' : 'Password sementara' }}</span>
-                        <Input v-model="form.password" type="password" :required="!editingId" minlength="12" maxlength="128" :placeholder="editingId ? 'Kosongkan jika tidak diubah' : 'Minimal 12 karakter'" />
-                        <span v-if="form.errors.password" class="text-xs text-destructive">{{ form.errors.password }}</span>
-                    </label>
-                </div>
-
-                <label class="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
-                    <AdminSwitch v-model="form.is_active" :disabled="isEditingSelf" />
-                    Akun aktif
+        <AdminModal :open="!!editor" :title="editor?.id ? 'Ubah akun admin' : 'Tambah admin'"
+            description="Peran Super Admin memakai semua izin. Admin biasa hanya memakai izin yang dicentang."
+            @update:open="value => { if (!value) editor = null; }">
+            <div v-if="editor" class="adm-grid">
+                <label class="adm-field">
+                    <span>Nama</span>
+                    <input v-model="editor.name" class="adm-input" maxlength="120" required>
+                    <span v-if="errors.name" class="err">{{ errors.name }}</span>
+                </label>
+                <label class="adm-field">
+                    <span>Email</span>
+                    <input v-model="editor.email" type="email" class="adm-input" maxlength="255" required>
+                    <span v-if="errors.email" class="err">{{ errors.email }}</span>
+                </label>
+                <label class="adm-field">
+                    <span>Peran</span>
+                    <select v-model="editor.role" class="adm-select">
+                        <option value="ADMIN">Admin</option>
+                        <option value="SUPER_ADMIN">Super Admin</option>
+                    </select>
+                    <span v-if="errors.role" class="err">{{ errors.role }}</span>
+                </label>
+                <label class="adm-field">
+                    <span>{{ editor.id ? 'Kata sandi baru' : 'Kata sandi' }}</span>
+                    <input v-model="editor.password" type="password" class="adm-input" autocomplete="new-password"
+                        :placeholder="editor.id ? 'Kosongkan bila tidak diubah' : 'Minimal 12 karakter'">
+                    <span class="hint">Minimal 12 karakter. {{ editor.id ? 'Isi hanya bila ingin mengganti.' : 'Wajib diisi untuk akun baru.' }}</span>
+                    <span v-if="errors.password" class="err">{{ errors.password }}</span>
+                </label>
+                <label class="adm-switch-row full">
+                    <button type="button" class="adm-switch" role="switch" :aria-checked="editor.is_active"
+                        @click="editor.is_active = !editor.is_active" />
+                    Akun bisa masuk panel
                 </label>
 
-                <div v-if="form.role === 'ADMIN'" class="rounded-md border p-4">
-                    <div class="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                            <h3 class="font-medium">Hak Akses Admin</h3>
-                            <p class="mt-1 text-xs text-muted-foreground">Centang hanya menu/operasi yang memang diperlukan. Otorisasi tetap diperiksa di backend.</p>
-                        </div>
-                        <Badge variant="outline">{{ form.permissions.length }} izin dipilih</Badge>
-                    </div>
-                    <div class="mt-4 grid gap-2 sm:grid-cols-2">
-                        <label
-                            v-for="[key, label] in permissionEntries"
-                            :key="key"
-                            class="flex items-start gap-2 rounded-md border p-3 text-sm"
-                        >
-                            <input
-                                :checked="permissionChecked(key)"
-                                type="checkbox"
-                                class="mt-0.5 size-4"
-                                :disabled="key === 'dashboard.view'"
-                                @change="togglePermission(key, $event.target.checked)"
-                            >
-                            <span><strong class="block font-medium">{{ label }}</strong><small v-if="key === 'dashboard.view'" class="text-muted-foreground">Wajib</small></span>
+                <div v-if="editor.role === 'ADMIN'" class="adm-block full">
+                    <strong>Izin yang diberikan</strong>
+                    <p class="adm-note">Dashboard selalu aktif dan tidak bisa dilepas.</p>
+                    <div class="adm-grid" style="margin-top:6px">
+                        <label v-for="permission in permissionList" :key="permission.key" class="adm-switch-row">
+                            <button type="button" class="adm-switch" role="switch"
+                                :aria-checked="editor.permissions.includes(permission.key)"
+                                :disabled="permission.key === 'dashboard.view'"
+                                @click="togglePermission(permission.key)" />
+                            {{ permission.label }}
                         </label>
                     </div>
-                    <p v-if="form.errors.permissions" class="mt-2 text-xs text-destructive">{{ form.errors.permissions }}</p>
+                    <span v-if="errors.permissions" class="err">{{ errors.permissions }}</span>
                 </div>
-
-                <div v-else class="rounded-md border p-4 text-sm text-muted-foreground">
-                    Super Admin selalu memiliki seluruh permission. Daftar permission individual tidak digunakan untuk role ini.
-                </div>
-
-                <p v-if="form.errors.admin" class="text-sm text-destructive">{{ form.errors.admin }}</p>
-
-                <div class="sticky bottom-0 -mx-6 flex justify-end gap-2 border-t bg-background px-6 py-3">
-                    <Button type="button" variant="outline" @click="closeEditor">Batal</Button>
-                    <Button :disabled="form.processing">{{ form.processing ? 'Menyimpan…' : 'Simpan akun' }}</Button>
-                </div>
-            </form>
-        </SheetContent>
-        </Sheet>
-
-        </div>
-
-
-        <Card class="p-4">
-            <div class="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                    <h2 class="text-lg font-semibold">Aktivitas Admin Terbaru</h2>
-                    <p class="mt-1 text-sm text-muted-foreground">Ringkasan perubahan akun dan hak akses. Detail lengkap tetap tersedia di menu Audit Log.</p>
-                </div>
-                <Button variant="outline" size="sm" as-child><Link href="/admin/audit">Buka Audit Log</Link></Button>
+                <p v-else class="adm-note full">Super Admin memakai semua izin, termasuk Integrasi, Kesehatan Sistem, Catatan Audit, dan Admin &amp; Akses.</p>
             </div>
-            <div class="mt-4 overflow-x-auto" role="region" aria-label="Aktivitas Admin terbaru" tabindex="0">
-                <AdminResponsiveTable :mobile-columns="[3,1,0]">
-                    <TableHeader><TableRow><TableHead>Waktu</TableHead><TableHead>Pelaku</TableHead><TableHead>Role</TableHead><TableHead>Aktivitas</TableHead><TableHead>Target</TableHead></TableRow></TableHeader>
-                    <TableBody>
-                        <TableRow v-for="activity in recentActivities" :key="activity.id">
-                            <TableCell>{{ date(activity.created_at) }}</TableCell>
-                            <TableCell>{{ activity.actor_name }}</TableCell>
-                            <TableCell><Badge variant="outline">{{ roleLabel(activity.actor_role) }}</Badge></TableCell>
-                            <TableCell>{{ actionLabel(activity) }}</TableCell>
-                            <TableCell>{{ activity.target_id ? 'Admin #' + activity.target_id : '—' }}</TableCell>
-                        </TableRow>
-                        <TableRow v-if="!recentActivities.length"><TableCell colspan="5" class="py-10 text-center text-muted-foreground">Belum ada aktivitas pengelolaan Admin.</TableCell></TableRow>
-                    </TableBody>
-                </AdminResponsiveTable>
-            </div>
-        </Card>
-    </div>
+            <template #footer>
+                <button type="button" class="adm-btn" @click="editor = null">Batal</button>
+                <button type="button" class="adm-btn primary" :disabled="busy" @click="submit">Simpan akun</button>
+            </template>
+        </AdminModal>
 
-    <AdminConfirmDialog
-        :open="Boolean(deleting)"
-        title="Hapus akun Admin"
-        :message="deleting ? 'Akun ' + deleting.name + ' (' + deleting.email + ') akan dihapus permanen. Riwayat audit tetap tersimpan.' : ''"
-        confirm-label="Hapus akun"
-        destructive
-        @update:open="value => { if (!value) deleting = null; }"
-        @confirm="confirmRemove"
-    />
-</AdminShell>
+        <AdminModal :open="!!pendingOff" title="Nonaktifkan akun admin"
+            :description="pendingOff ? 'Akun ' + pendingOff.name + ' tidak akan bisa masuk panel.' : ''"
+            @update:open="value => { if (!value) pendingOff = null; }">
+            <p class="adm-note">Akun tidak dihapus, hanya dinonaktifkan. Riwayat dan catatan audit tetap tersimpan.</p>
+            <template #footer>
+                <button type="button" class="adm-btn" @click="pendingOff = null">Batal</button>
+                <button type="button" class="adm-btn danger" @click="deactivate">Nonaktifkan</button>
+            </template>
+        </AdminModal>
+    </AdminLayout>
 </template>

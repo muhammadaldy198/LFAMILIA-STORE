@@ -1,23 +1,18 @@
 <script setup>
-import AdminConfirmDialog from '../../Components/AdminConfirmDialog.vue';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../../Components/ui/sheet';
-import { Head, Link, router } from '@inertiajs/vue3';
 import { reactive, ref } from 'vue';
-import AdminShell from '../../Components/AdminShell.vue';
-import { Badge } from '../../Components/ui/badge';
-import { Button } from '../../Components/ui/button';
-import { Card } from '../../Components/ui/card';
-import { Input } from '../../Components/ui/input';
+import { Head, Link, router } from '@inertiajs/vue3';
+import AdminLayout from '../../Components/Admin/AdminLayout.vue';
+import AdminModal from '../../Components/Admin/AdminModal.vue';
+import { num, rupiah, wibDateTime, tone, label } from '../../lib/adminFormat';
 import { walletAdjustmentError } from '../../lib/adminWalletAdjustment';
 import { withSensitive } from '../../lib/sensitivePrompt';
-import { orderStatusInfo, paymentStatusLabel } from '../../lib/orderStatus';
 
 const props = defineProps({
     isSuperAdmin: Boolean,
-    customer: Object,
+    customer: { type: Object, required: true },
     membershipProfile: { type: Object, default: null },
     membershipTiers: { type: Array, default: () => [] },
-    balanceIdr: Number,
+    balanceIdr: { type: Number, default: 0 },
     orders: { type: Object, default: () => ({ data: [], links: [] }) },
     ledger: { type: Array, default: () => [] },
     topups: { type: Array, default: () => [] },
@@ -27,277 +22,260 @@ const props = defineProps({
     deletable: Boolean,
 });
 
+const managing = ref(false);
+const busy = ref('');
+const errors = ref({});
+const wallet = reactive({ amount_idr: '', reason: '', idempotency_key: crypto.randomUUID() });
 const membership = ref(props.customer?.membership_assignment || 'AUTO');
-const wallet = reactive({ amount_idr: '', reason: '' });
-const saving = ref('');
-const adjustError = ref('');
-const adjusting = ref(false);
-const pendingAction = ref(null);
-const ask = (title, message, confirmLabel, run, destructive = false) => {
-    pendingAction.value = { title, message, confirmLabel, run, destructive };
-};
-const runPending = () => {
-    const action = pendingAction.value;
-    pendingAction.value = null;
-    action?.run();
+
+const openManage = () => {
+    membership.value = props.customer?.membership_assignment || 'AUTO';
+    wallet.amount_idr = '';
+    wallet.reason = '';
+    wallet.idempotency_key = crypto.randomUUID();
+    errors.value = {};
+    managing.value = true;
 };
 
-const money = (value) => 'Rp' + Number(value || 0).toLocaleString('id-ID');
-const percent = (value) => (Number(value || 0) / 100).toLocaleString('id-ID', { maximumFractionDigits: 2 }) + '%';
-const date = (value) => value ? new Intl.DateTimeFormat('id-ID', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-    timeZone: 'Asia/Jakarta',
-}).format(new Date(value)) + ' WIB' : 'Belum ada';
-
-const ticketStatus = (value) => ({
-    OPEN: 'Terbuka',
-    IN_PROGRESS: 'Ditangani',
-    RESOLVED: 'Selesai',
-    CLOSED: 'Ditutup',
-}[String(value || '').toUpperCase()] || 'Status sedang diperbarui');
-
-const ledgerLabel = (value) => ({
-    CHECKOUT: 'Bayar pesanan dengan saldo',
-    REFUND: 'Pengembalian ke saldo',
-    TOPUP: 'Top up saldo',
-    ADMIN_ADJUSTMENT: 'Penyesuaian oleh admin',
-}[String(value || '').toUpperCase()] || 'Perubahan saldo');
-
-function saveMembership() {
-    if (saving.value) return;
-    saving.value = 'membership';
+const saveMembership = () => {
+    busy.value = 'membership';
     router.put('/admin/customers/' + props.customer.id + '/membership', {
         membership_tier_code: membership.value,
     }, {
         preserveScroll: true,
-        onFinish: () => { saving.value = ''; },
+        onError: bag => { errors.value = bag; },
+        onFinish: () => { busy.value = ''; },
     });
-}
+};
 
-function adjustWallet() {
-    if (saving.value) return;
+const adjustWallet = () => {
+    const problem = walletAdjustmentError(wallet.amount_idr, wallet.reason);
+    errors.value = problem ? { amount_idr: problem } : {};
+    if (problem) return;
     const amount = Number(wallet.amount_idr || 0);
-    const reason = String(wallet.reason || '').trim();
-    adjustError.value = walletAdjustmentError(wallet.amount_idr, reason);
-    if (adjustError.value) return;
     const direction = amount > 0 ? 'menambah' : 'mengurangi';
-    void withSensitive(`Konfirmasi ${direction} saldo pelanggan sebesar ${money(Math.abs(amount))}? Alasan: ${reason}`, () => saveWallet(amount, reason));
-}
-
-function saveWallet(amount, reason) {
-    saving.value = 'wallet';
-    router.post('/admin/customers/' + props.customer.id + '/wallet', {
-        amount_idr: amount,
-        reason,
-        idempotency_key: globalThis.crypto?.randomUUID?.()
-            || ('customer-wallet-' + Date.now() + '-' + props.customer.id),
-    }, {
-        preserveScroll: true,
-        onSuccess: () => {
-            wallet.amount_idr = '';
-            wallet.reason = '';
-            adjustError.value = '';
-            adjusting.value = false;
-        },
-        onError: (errors) => { adjustError.value = Object.values(errors || {})[0] || 'Penyesuaian saldo gagal. Periksa input kembali.'; },
-        onFinish: () => { saving.value = ''; },
+    void withSensitive(`Konfirmasi ${direction} saldo pelanggan sebesar ${rupiah(Math.abs(amount))}? Alasan: ${wallet.reason}`, () => {
+        busy.value = 'wallet';
+        router.post('/admin/customers/' + props.customer.id + '/wallet', {
+            amount_idr: amount, reason: wallet.reason, idempotency_key: wallet.idempotency_key,
+        }, {
+            preserveScroll: true,
+            onSuccess: () => {
+                wallet.amount_idr = '';
+                wallet.reason = '';
+                wallet.idempotency_key = crypto.randomUUID();
+            },
+            onError: bag => { errors.value = bag; },
+            onFinish: () => { busy.value = ''; },
+        });
     });
-}
+};
 
-function deleteEmpty() {
-    if (!props.deletable) return;
-    ask('Hapus akun kosong', 'Akun ini tidak memiliki saldo atau riwayat. Data akun dianonimkan sesuai aturan perlindungan riwayat.', 'Hapus akun', () => {
-        router.delete('/admin/customers/' + props.customer.id);
-    }, true);
-}
+const ledgerLabel = value => ({
+    CHECKOUT: 'Bayar pesanan dengan saldo', REFUND: 'Pengembalian ke saldo',
+    TOPUP: 'Top up saldo', ADMIN_ADJUSTMENT: 'Penyesuaian oleh admin',
+}[String(value || '').toUpperCase()] || 'Perubahan saldo');
+
+const ticketLabel = value => ({
+    OPEN: 'Terbuka', IN_PROGRESS: 'Ditangani', RESOLVED: 'Selesai', CLOSED: 'Ditutup',
+}[String(value || '').toUpperCase()] || 'Status sedang diperbarui');
 </script>
 
 <template>
-<Head :title="'Pelanggan · ' + customer.name" />
-<AdminShell>
-    <div class="space-y-6">
-        <header class="flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between">
-            <div class="min-w-0">
-                <Link href="/admin/customers" class="text-sm text-muted-foreground underline-offset-4 hover:underline">← Daftar pelanggan</Link>
-                <h1 class="mt-2 break-words text-2xl font-semibold tracking-tight">{{ customer.name }}</h1>
-                <p class="mt-1 text-sm text-muted-foreground">Pelanggan #{{ customer.id }} · terdaftar {{ date(customer.created_at) }}</p>
+    <Head :title="'Pelanggan · ' + customer.name" />
+    <AdminLayout>
+        <header class="adm-head">
+            <div>
+                <Link href="/admin/customers" class="adm-btn link">← Daftar pelanggan</Link>
+                <h1 style="margin-top:6px">{{ customer.name }}</h1>
+                <p>Pelanggan #{{ customer.id }} · terdaftar {{ wibDateTime(customer.created_at) }}</p>
             </div>
-            <div class="flex flex-wrap gap-2">
-                <Badge :variant="customer.email_verified_at ? 'secondary' : 'outline'">{{ customer.email_verified_at ? 'Email terverifikasi' : 'Email belum terverifikasi' }}</Badge>
-                <Badge v-if="customer.google_linked" variant="outline">Google terhubung</Badge>
-                <Button v-if="isSuperAdmin" variant="outline" @click="adjusting = true">Atur pelanggan</Button>
+            <div class="adm-head-actions">
+                <span class="adm-tag" :class="customer.email_verified_at ? 'ok' : 'warn'">{{ customer.email_verified_at ? 'Email terverifikasi' : 'Email belum terverifikasi' }}</span>
+                <span v-if="customer.google_linked" class="adm-tag info">Google terhubung</span>
+                <button v-if="isSuperAdmin" type="button" class="adm-btn primary" @click="openManage">Atur pelanggan</button>
             </div>
         </header>
 
-        <section class="lf-admin-summary" aria-label="Ringkasan pelanggan">
-            <Card class="p-4"><p class="text-xs text-muted-foreground">Saldo saat ini</p><p class="mt-2 text-2xl font-semibold">{{ money(balanceIdr) }}</p></Card>
-            <Card class="p-4"><p class="text-xs text-muted-foreground">Total belanja</p><p class="mt-2 text-2xl font-semibold">{{ money(summary.lifetime_spend_idr) }}</p></Card>
-            <Card class="p-4"><p class="text-xs text-muted-foreground">Pesanan</p><p class="mt-2 text-2xl font-semibold">{{ Number(summary.orders || 0).toLocaleString('id-ID') }}</p></Card>
-            <Card class="p-4"><p class="text-xs text-muted-foreground">Pesanan berhasil</p><p class="mt-2 text-2xl font-semibold">{{ Number(summary.successful_orders || 0).toLocaleString('id-ID') }}</p></Card>
-            <Card class="p-4"><p class="text-xs text-muted-foreground">Top up</p><p class="mt-2 text-2xl font-semibold">{{ Number(summary.topups || 0).toLocaleString('id-ID') }}</p></Card>
-            <Card class="p-4"><p class="text-xs text-muted-foreground">Tiket</p><p class="mt-2 text-2xl font-semibold">{{ Number(summary.tickets || 0).toLocaleString('id-ID') }}</p></Card>
+        <section class="adm-stats" aria-label="Ringkasan pelanggan">
+            <div class="adm-stat"><span class="lb">Saldo saat ini</span><strong class="vl" style="font-size:16px">{{ rupiah(balanceIdr) }}</strong></div>
+            <div class="adm-stat"><span class="lb">Total belanja</span><strong class="vl" style="font-size:16px">{{ rupiah(summary.lifetime_spend_idr) }}</strong></div>
+            <div class="adm-stat"><span class="lb">Pesanan</span><strong class="vl">{{ num(summary.orders) }}</strong></div>
+            <div class="adm-stat"><span class="lb">Pesanan berhasil</span><strong class="vl">{{ num(summary.successful_orders) }}</strong></div>
+            <div class="adm-stat"><span class="lb">Top up</span><strong class="vl">{{ num(summary.topups) }}</strong></div>
+            <div class="adm-stat"><span class="lb">Tiket</span><strong class="vl">{{ num(summary.tickets) }}</strong></div>
         </section>
 
-        <section aria-labelledby="customer-profile-heading" class="space-y-3">
-            <h2 id="customer-profile-heading" class="text-lg font-semibold">Profil</h2>
-            <dl class="grid gap-4 rounded-md border border-border p-4 sm:grid-cols-2 lg:grid-cols-3">
-                <div><dt class="text-xs text-muted-foreground">Nama</dt><dd class="mt-1 font-medium">{{ customer.name }}</dd></div>
-                <div><dt class="text-xs text-muted-foreground">Email</dt><dd class="mt-1 break-all">{{ customer.email || 'Belum diisi' }}</dd></div>
-                <div><dt class="text-xs text-muted-foreground">Nomor telepon</dt><dd class="mt-1">{{ customer.phone || 'Belum diisi' }}</dd></div>
-                <div><dt class="text-xs text-muted-foreground">Tingkat member</dt><dd class="mt-1">{{ customer.membership_tier_code }} · {{ customer.membership_mode === 'MANUAL' ? 'ditetapkan admin' : 'otomatis dari transaksi' }}</dd></div>
-                <div><dt class="text-xs text-muted-foreground">Papan peringkat</dt><dd class="mt-1">{{ customer.leaderboard_opt_in ? 'Ikut ditampilkan' : 'Tidak ikut' }}</dd></div>
-                <div><dt class="text-xs text-muted-foreground">Aktivitas terakhir</dt><dd class="mt-1">{{ date(customer.last_active_at || customer.created_at) }}</dd></div>
-            </dl>
-        </section>
-
-        <section aria-labelledby="customer-tier-heading" class="space-y-3">
-            <h2 id="customer-tier-heading" class="text-lg font-semibold">Tingkat member</h2>
-            <div v-if="membershipProfile" class="rounded-md border border-border">
-                <dl class="grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <div><dt class="text-xs text-muted-foreground">Tingkat aktif</dt><dd class="mt-1 font-medium">{{ membershipProfile.code }}</dd></div>
-                    <div><dt class="text-xs text-muted-foreground">Diskon member</dt><dd class="mt-1 font-medium">{{ percent(membershipProfile.discount_bps) }}</dd></div>
-                    <div><dt class="text-xs text-muted-foreground">Belanja tercatat</dt><dd class="mt-1 font-medium">{{ money(membershipProfile.lifetime_spend_idr) }}</dd></div>
-                    <div><dt class="text-xs text-muted-foreground">Progress</dt><dd class="mt-1 font-medium">{{ money(membershipProfile.progress_idr) }}</dd></div>
-                </dl>
-                <p class="border-t border-border px-4 py-2 text-sm text-muted-foreground">
-                    <template v-if="membershipProfile.next_code">Menuju {{ membershipProfile.next_code }}, kurang {{ money(membershipProfile.remaining_to_next_idr) }}.</template>
-                    <template v-else>Tidak ada tingkat berikutnya.</template>
-                </p>
-            </div>
-            <p v-else class="rounded-md border border-border px-4 py-3 text-sm text-muted-foreground">Data tingkat member belum tersedia.</p>
-        </section>
-
-        <section aria-labelledby="customer-orders-heading" class="space-y-3">
-            <h2 id="customer-orders-heading" class="text-lg font-semibold">Riwayat pesanan</h2>
-            <ul v-if="orders.data?.length" class="divide-y divide-border rounded-md border border-border">
-                <li v-for="order in orders.data" :key="order.id">
-                    <Link :href="'/admin/orders/' + order.id" class="flex flex-col gap-1 px-4 py-3 hover:bg-muted/40 sm:flex-row sm:items-center sm:gap-4">
-                        <span class="min-w-0 flex-1">
-                            <strong class="block">{{ order.order_number }}</strong>
-                            <small class="block text-muted-foreground">{{ order.product_name }} · {{ order.package_name }}</small>
-                        </span>
-                        <span class="text-xs text-muted-foreground sm:w-56">{{ date(order.created_at) }}</span>
-                        <Badge variant="outline">{{ orderStatusInfo(order.status).label }}</Badge>
-                        <strong class="tabular-nums sm:w-32 sm:text-right">{{ money(order.total_idr) }}</strong>
-                    </Link>
-                </li>
-            </ul>
-            <p v-else class="rounded-md border border-border px-4 py-8 text-center text-sm text-muted-foreground">Belum ada pesanan.</p>
-            <div v-if="orders.links?.length > 3" class="flex flex-wrap gap-1">
-                <Link v-for="link in orders.links" :key="link.label" :href="link.url || '#'" preserve-scroll :class="['rounded-md border px-3 py-1.5 text-sm', link.active ? 'bg-primary text-primary-foreground' : 'bg-background', !link.url ? 'pointer-events-none opacity-40' : '']">{{ link.label }}</Link>
-            </div>
-        </section>
-
-        <section aria-labelledby="customer-wallet-heading" class="space-y-3">
-            <h2 id="customer-wallet-heading" class="text-lg font-semibold">Saldo dan top up</h2>
-            <div class="rounded-md border border-border">
-                <h3 class="border-b border-border px-4 py-2 text-sm font-semibold">Perubahan saldo terakhir</h3>
-                <ul v-if="ledger.length" class="divide-y divide-border">
-                    <li v-for="entry in ledger" :key="entry.id" class="flex flex-wrap items-center gap-2 px-4 py-2 text-sm">
-                        <span class="w-44 text-xs text-muted-foreground">{{ date(entry.created_at) }}</span>
-                        <span class="min-w-0 flex-1">{{ ledgerLabel(entry.source) }}</span>
-                        <strong class="tabular-nums" :class="Number(entry.amount_idr) < 0 ? 'text-destructive' : ''">{{ money(entry.amount_idr) }}</strong>
-                        <span class="w-32 text-right text-xs text-muted-foreground">Saldo {{ money(entry.balance_after_idr) }}</span>
-                    </li>
-                </ul>
-                <p v-else class="px-4 py-6 text-center text-sm text-muted-foreground">Belum ada perubahan saldo.</p>
-            </div>
-            <div class="rounded-md border border-border">
-                <h3 class="border-b border-border px-4 py-2 text-sm font-semibold">Riwayat top up</h3>
-                <ul v-if="topups.length" class="divide-y divide-border">
-                    <li v-for="topup in topups" :key="topup.id" class="flex flex-wrap items-center gap-2 px-4 py-2 text-sm">
-                        <span class="w-44 text-xs text-muted-foreground">{{ date(topup.created_at) }}</span>
-                        <span class="min-w-0 flex-1">{{ topup.payment_channel_name || 'Metode pembayaran lama' }}</span>
-                        <Badge variant="outline">{{ paymentStatusLabel(topup.status) }}</Badge>
-                        <strong class="tabular-nums">{{ money(topup.amount_idr) }}</strong>
-                        <span class="w-32 text-right text-xs text-muted-foreground">Bayar {{ money(topup.total_idr) }}</span>
-                    </li>
-                </ul>
-                <p v-else class="px-4 py-6 text-center text-sm text-muted-foreground">Belum ada top up saldo.</p>
-            </div>
-        </section>
-
-        <section aria-labelledby="customer-support-heading" class="space-y-3">
-            <div class="flex flex-wrap items-end justify-between gap-3">
-                <div>
-                    <h2 id="customer-support-heading" class="text-lg font-semibold">Tiket bantuan</h2>
-                    <p class="mt-1 text-sm text-muted-foreground">Balasan dan perubahan status dilakukan dari menu Bantuan.</p>
+        <section class="adm-split">
+            <div class="adm-card">
+                <div class="adm-card-head"><div><h2>Profil</h2></div></div>
+                <div class="adm-card-body">
+                    <dl class="adm-kv">
+                        <dt>Nama</dt><dd>{{ customer.name }}</dd>
+                        <dt>Email</dt><dd>{{ customer.email || 'Belum diisi' }}</dd>
+                        <dt>Nomor telepon</dt><dd>{{ customer.phone || 'Belum diisi' }}</dd>
+                        <dt>Tingkat member</dt><dd>{{ customer.membership_tier_code }} · {{ customer.membership_mode === 'MANUAL' ? 'ditetapkan admin' : 'otomatis dari transaksi' }}</dd>
+                        <dt>Papan peringkat</dt><dd>{{ customer.leaderboard_opt_in ? 'Ikut ditampilkan' : 'Tidak ikut' }}</dd>
+                        <dt>Aktivitas terakhir</dt><dd>{{ wibDateTime(customer.last_active_at || customer.created_at) }}</dd>
+                    </dl>
                 </div>
-                <Button variant="outline" size="sm" as-child><Link href="/admin/support">Buka Bantuan</Link></Button>
             </div>
-            <ul v-if="tickets.length" class="divide-y divide-border rounded-md border border-border">
-                <li v-for="ticket in tickets" :key="ticket.id" class="flex flex-wrap items-center gap-2 px-4 py-3 text-sm">
-                    <span class="w-16 text-xs text-muted-foreground">#{{ ticket.id }}</span>
-                    <span class="min-w-0 flex-1">{{ ticket.subject }}</span>
-                    <Badge variant="outline">{{ ticketStatus(ticket.status) }}</Badge>
-                    <span class="w-44 text-right text-xs text-muted-foreground">{{ date(ticket.created_at) }}</span>
-                </li>
-            </ul>
-            <p v-else class="rounded-md border border-border px-4 py-8 text-center text-sm text-muted-foreground">Belum ada tiket.</p>
+
+            <div class="adm-card">
+                <div class="adm-card-head"><div><h2>Tingkat member</h2></div></div>
+                <div class="adm-card-body">
+                    <template v-if="membershipProfile">
+                        <dl class="adm-kv">
+                            <dt>Tingkat aktif</dt><dd><span class="adm-tag" :class="membershipProfile.code === 'MAFIA' ? 'info' : 'ok'">{{ membershipProfile.code }}</span></dd>
+                            <dt>Diskon member</dt><dd>{{ (Number(membershipProfile.discount_bps || 0) / 100).toLocaleString('id-ID', { maximumFractionDigits: 2 }) }}%</dd>
+                            <dt>Belanja tercatat</dt><dd>{{ rupiah(membershipProfile.lifetime_spend_idr) }}</dd>
+                            <dt>Progress</dt><dd>{{ rupiah(membershipProfile.progress_idr) }}</dd>
+                        </dl>
+                        <p class="adm-note" style="margin-top:8px">
+                            <template v-if="membershipProfile.next_code">Menuju {{ membershipProfile.next_code }}, kurang {{ rupiah(membershipProfile.remaining_to_next_idr) }}.</template>
+                            <template v-else>Tidak ada tingkat berikutnya.</template>
+                        </p>
+                    </template>
+                    <p v-else class="adm-note">Data tingkat member belum tersedia.</p>
+                </div>
+            </div>
         </section>
 
-        <section aria-labelledby="customer-accounts-heading" class="space-y-3">
-            <div>
-                <h2 id="customer-accounts-heading" class="text-lg font-semibold">Akun game tersimpan</h2>
-                <p class="mt-1 text-sm text-muted-foreground">Hanya label, produk, dan nama panggilan yang ditampilkan. Isi data akun tidak dibuka di halaman ini.</p>
+        <section class="adm-card">
+            <div class="adm-card-head"><div><h2>Riwayat pesanan</h2></div></div>
+            <div class="adm-scroll">
+                <table class="adm-table">
+                    <thead><tr><th>Pesanan</th><th>Produk</th><th>Waktu</th><th>Status</th><th style="text-align:right">Total</th></tr></thead>
+                    <tbody>
+                        <tr v-for="order in orders.data" :key="order.id">
+                            <td><Link :href="'/admin/orders/' + order.id" style="font-weight:600">{{ order.order_number }}</Link></td>
+                            <td>{{ order.product_name }}<div class="adm-note">{{ order.package_name }}</div></td>
+                            <td class="adm-note">{{ wibDateTime(order.created_at) }}</td>
+                            <td><span class="adm-tag" :class="tone(order.status)">{{ label(order.status) }}</span></td>
+                            <td style="text-align:right">{{ rupiah(order.total_idr) }}</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
-            <ul v-if="savedAccounts.length" class="divide-y divide-border rounded-md border border-border">
-                <li v-for="account in savedAccounts" :key="account.id" class="flex flex-wrap items-center gap-2 px-4 py-3 text-sm">
-                    <strong class="min-w-0 flex-1">{{ account.label }}</strong>
-                    <span class="text-muted-foreground">{{ account.product_name }}</span>
-                    <span class="w-32 text-right">{{ account.nickname || 'Tanpa nama panggilan' }}</span>
-                    <span class="w-44 text-right text-xs text-muted-foreground">{{ date(account.created_at) }}</span>
-                </li>
-            </ul>
-            <p v-else class="rounded-md border border-border px-4 py-8 text-center text-sm text-muted-foreground">Belum ada akun game tersimpan.</p>
+            <p v-if="!orders.data?.length" class="adm-empty">Belum ada pesanan.</p>
+            <div class="adm-pager">
+                <span>{{ orders.from || 0 }}–{{ orders.to || 0 }} dari {{ num(orders.total) }} pesanan</span>
+                <span class="sp" />
+                <button type="button" class="adm-btn sm" :disabled="!orders.prev_page_url" @click="router.get(orders.prev_page_url, {}, { preserveState: true, preserveScroll: true })">Sebelumnya</button>
+                <button type="button" class="adm-btn sm" :disabled="!orders.next_page_url" @click="router.get(orders.next_page_url, {}, { preserveState: true, preserveScroll: true })">Berikutnya</button>
+            </div>
         </section>
 
-        <Sheet :open="adjusting" @update:open="(value) => { if (!value) adjusting = false; }">
-            <SheetContent side="right" class="w-full overflow-y-auto sm:max-w-xl">
-                <SheetHeader><SheetTitle>Atur {{ customer.name }}</SheetTitle><SheetDescription>Tingkat member dan perubahan saldo hanya dapat dilakukan Super Admin. Setiap perubahan dicatat untuk pemeriksaan.</SheetDescription></SheetHeader>
-                <div class="mt-4 space-y-5">
-                    <div class="space-y-2">
-                        <h3 class="font-medium">Tingkat member</h3>
-                        <p class="text-xs text-muted-foreground">Otomatis mengikuti transaksi pelanggan. Pilih tingkat untuk menetapkannya secara manual.</p>
-                        <select v-model="membership" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
-                            <option value="AUTO">Otomatis berdasarkan transaksi</option>
-                            <option v-for="tier in membershipTiers" :key="tier.code" :value="tier.code">{{ tier.code }} · ditetapkan manual</option>
-                        </select>
-                        <Button size="sm" :disabled="Boolean(saving)" @click="saveMembership">{{ saving === 'membership' ? 'Menyimpan…' : 'Simpan tingkat' }}</Button>
-                    </div>
-
-                    <div class="space-y-2 border-t border-border pt-4">
-                        <h3 class="font-medium">Penyesuaian saldo</h3>
-                        <p class="text-xs text-muted-foreground">Saldo saat ini {{ money(balanceIdr) }}. Isi angka positif untuk menambah, negatif untuk mengurangi. Saldo tidak dapat menjadi negatif.</p>
-                        <div class="grid gap-3 sm:grid-cols-[150px_minmax(0,1fr)]">
-                            <label class="space-y-1"><span class="text-xs font-medium">Nominal (+/-)</span><Input v-model.number="wallet.amount_idr" type="number" /></label>
-                            <label class="space-y-1"><span class="text-xs font-medium">Alasan</span><Input v-model="wallet.reason" maxlength="500" placeholder="Alasan penyesuaian" /></label>
+        <section class="adm-split">
+            <div class="adm-card">
+                <div class="adm-card-head"><div><h2>Perubahan saldo</h2></div></div>
+                <div class="adm-card-body" style="display:grid;gap:0">
+                    <div v-for="entry in ledger" :key="entry.id" class="adm-list-row">
+                        <div>
+                            <strong>{{ ledgerLabel(entry.source) }}</strong>
+                            <div class="adm-note">{{ wibDateTime(entry.created_at) }} · saldo {{ rupiah(entry.balance_after_idr) }}</div>
                         </div>
-                        <p v-if="adjustError" role="alert" class="text-sm text-destructive">{{ adjustError }}</p>
-                        <Button size="sm" :disabled="Boolean(saving)" @click="adjustWallet">{{ saving === 'wallet' ? 'Memproses…' : 'Terapkan penyesuaian' }}</Button>
+                        <strong :style="{ color: Number(entry.amount_idr) < 0 ? 'var(--a-danger)' : 'var(--a-ok)' }">{{ rupiah(entry.amount_idr) }}</strong>
                     </div>
-
-                    <div v-if="deletable" class="space-y-2 border-t border-border pt-4">
-                        <h3 class="font-medium">Akun kosong</h3>
-                        <p class="text-xs text-muted-foreground">Akun ini tidak memiliki saldo, catatan saldo, pesanan, top up, atau tiket yang harus dipertahankan.</p>
-                        <Button size="sm" variant="destructive" @click="deleteEmpty">Hapus akun kosong</Button>
-                    </div>
-
-                    <div class="border-t border-border pt-4"><Button variant="outline" @click="adjusting = false">Tutup</Button></div>
+                    <p v-if="!ledger.length" class="adm-note">Belum ada perubahan saldo.</p>
                 </div>
-            </SheetContent>
-        </Sheet>
+            </div>
 
-        <AdminConfirmDialog
-            :open="Boolean(pendingAction)"
-            :title="pendingAction?.title || ''"
-            :message="pendingAction?.message || ''"
-            :confirm-label="pendingAction?.confirmLabel || 'Lanjutkan'"
-            :destructive="Boolean(pendingAction?.destructive)"
-            @update:open="(value) => { if (!value) pendingAction = null; }"
-            @confirm="runPending"
-        />
-    </div>
-</AdminShell>
+            <div class="adm-card">
+                <div class="adm-card-head"><div><h2>Riwayat top up</h2></div></div>
+                <div class="adm-card-body" style="display:grid;gap:0">
+                    <div v-for="topup in topups" :key="topup.id" class="adm-list-row">
+                        <div>
+                            <strong>{{ topup.payment_channel_name || 'Metode pembayaran lama' }}</strong>
+                            <div class="adm-note">{{ wibDateTime(topup.created_at) }} · bayar {{ rupiah(topup.total_idr) }}</div>
+                        </div>
+                        <div style="text-align:right">
+                            <span class="adm-tag" :class="tone(topup.status)">{{ label(topup.status) }}</span>
+                            <div class="adm-note">{{ rupiah(topup.amount_idr) }}</div>
+                        </div>
+                    </div>
+                    <p v-if="!topups.length" class="adm-note">Belum ada top up saldo.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="adm-split">
+            <div class="adm-card">
+                <div class="adm-card-head">
+                    <div><h2>Tiket bantuan</h2></div>
+                    <Link href="/admin/support" class="adm-btn sm">Buka Layanan Pelanggan</Link>
+                </div>
+                <div class="adm-card-body" style="display:grid;gap:0">
+                    <div v-for="ticket in tickets" :key="ticket.id" class="adm-list-row">
+                        <div>
+                            <strong>#{{ ticket.id }} · {{ ticket.subject }}</strong>
+                            <div class="adm-note">{{ wibDateTime(ticket.created_at) }}</div>
+                        </div>
+                        <span class="adm-tag" :class="tone(ticket.status)">{{ ticketLabel(ticket.status) }}</span>
+                    </div>
+                    <p v-if="!tickets.length" class="adm-note">Belum ada tiket.</p>
+                </div>
+            </div>
+
+            <div class="adm-card">
+                <div class="adm-card-head"><div><h2>Akun game tersimpan</h2><p>Hanya label, produk, dan nama panggilan. Isi data akun tidak dibuka di halaman ini.</p></div></div>
+                <div class="adm-card-body" style="display:grid;gap:0">
+                    <div v-for="account in savedAccounts" :key="account.id" class="adm-list-row">
+                        <div>
+                            <strong>{{ account.label }}</strong>
+                            <div class="adm-note">{{ account.product_name }} · {{ account.nickname || 'Tanpa nama panggilan' }}</div>
+                        </div>
+                        <span class="adm-note">{{ wibDateTime(account.created_at) }}</span>
+                    </div>
+                    <p v-if="!savedAccounts.length" class="adm-note">Belum ada akun game tersimpan.</p>
+                </div>
+            </div>
+        </section>
+
+        <AdminModal v-model:open="managing" :title="'Atur ' + customer.name"
+            description="Tingkat member dan penyesuaian saldo. Keduanya dicatat di Catatan Audit.">
+            <div class="adm-grid">
+                <div class="adm-block full">
+                    <strong>Tingkat member</strong>
+                    <div class="adm-grid">
+                        <label class="adm-field">
+                            <span>Tingkat</span>
+                            <select v-model="membership" class="adm-select">
+                                <option value="AUTO">Otomatis dari transaksi</option>
+                                <option v-for="tier in membershipTiers" :key="tier.code" :value="tier.code">{{ tier.code }}</option>
+                            </select>
+                            <span class="hint">MAFIA hanya bisa ditetapkan di sini, tidak pernah muncul ke pelanggan.</span>
+                        </label>
+                        <div class="adm-field" style="align-self:end">
+                            <button type="button" class="adm-btn primary" :disabled="busy === 'membership'" @click="saveMembership">Simpan tingkat</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="adm-block full">
+                    <strong>Penyesuaian saldo</strong>
+                    <p class="adm-note">Saldo saat ini: {{ rupiah(balanceIdr) }}</p>
+                    <div class="adm-grid">
+                        <label class="adm-field">
+                            <span>Jumlah (Rp)</span>
+                            <input v-model="wallet.amount_idr" type="number" class="adm-input" placeholder="Contoh: 10000 atau -5000">
+                            <span class="hint">Angka negatif mengurangi saldo.</span>
+                        </label>
+                        <label class="adm-field">
+                            <span>Alasan</span>
+                            <input v-model="wallet.reason" class="adm-input" maxlength="500" placeholder="Wajib diisi, minimal 3 huruf">
+                        </label>
+                    </div>
+                    <span v-if="errors.amount_idr" class="err">{{ errors.amount_idr }}</span>
+                    <span v-if="errors.reason" class="err">{{ errors.reason }}</span>
+                    <div style="display:flex;justify-content:flex-end;margin-top:6px">
+                        <button type="button" class="adm-btn primary" :disabled="busy === 'wallet' || !wallet.amount_idr" @click="adjustWallet">Simpan saldo</button>
+                    </div>
+                </div>
+            </div>
+            <template #footer>
+                <button type="button" class="adm-btn" @click="managing = false">Tutup</button>
+            </template>
+        </AdminModal>
+    </AdminLayout>
 </template>

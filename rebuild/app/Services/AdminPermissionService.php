@@ -58,6 +58,7 @@ class AdminPermissionService
             ['label' => 'Kategori', 'href' => '/admin/catalog/categories', 'permission' => 'catalog.manage'],
             ['label' => 'Manual', 'href' => '/admin/fulfillment', 'permission' => 'fulfillment.manage'],
             ['label' => 'Banner & Konten', 'href' => '/admin/content', 'permission' => 'content.manage'],
+            ['label' => 'Tampilan Toko', 'href' => '/admin/content/presentation', 'permission' => 'content.manage'],
             ['label' => 'Digiflazz', 'href' => '/admin/digiflazz', 'permission' => 'providers.manage'],
             ['label' => 'Validasi Akun', 'href' => '/admin/nickname-tools', 'permission' => null, 'super_only' => true],
             ['label' => 'Provider', 'href' => '/admin/providers', 'permission' => 'providers.manage'],

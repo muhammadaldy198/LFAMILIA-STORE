@@ -1,13 +1,9 @@
 <script setup>
-import AdminResponsiveTable from '../../Components/AdminResponsiveTable.vue';
-import { Head, Link, router } from '@inertiajs/vue3';
 import { computed, reactive, ref } from 'vue';
-import AdminShell from '../../Components/AdminShell.vue';
-import { Badge } from '../../Components/ui/badge';
-import { Button } from '../../Components/ui/button';
-import { Card } from '../../Components/ui/card';
-import { Input } from '../../Components/ui/input';
-import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../Components/ui/table';
+import { Head, router } from '@inertiajs/vue3';
+import AdminLayout from '../../Components/Admin/AdminLayout.vue';
+import AdminModal from '../../Components/Admin/AdminModal.vue';
+import { num, wibDateTime } from '../../lib/adminFormat';
 
 const props = defineProps({
     logs: { type: Object, default: () => ({ data: [], links: [] }) },
@@ -18,306 +14,185 @@ const props = defineProps({
     targetTypes: { type: Array, default: () => [] },
 });
 
-const form = reactive({
+const filter = reactive({
     q: props.filters?.q || '',
-    actor_id: props.filters?.actor_id ? String(props.filters.actor_id) : '',
+    actor_id: props.filters?.actor_id || '',
     role: props.filters?.role || '',
     action: props.filters?.action || '',
     target_type: props.filters?.target_type || '',
     date_from: props.filters?.date_from || '',
     date_to: props.filters?.date_to || '',
-    per_page: String(props.filters?.per_page || 50),
+    per_page: Number(props.filters?.per_page || 50),
 });
 
-const selectedId = ref(null);
-const rows = computed(() => props.logs?.data || []);
+const query = () => Object.fromEntries(Object.entries(filter)
+    .filter(([, value]) => value !== '' && value !== null && value !== undefined));
+const apply = () => router.get('/admin/audit', query(), { preserveState: true, preserveScroll: true });
+const reset = () => {
+    Object.assign(filter, { q: '', actor_id: '', role: '', action: '', target_type: '', date_from: '', date_to: '', per_page: 50 });
+    router.get('/admin/audit', {}, { preserveState: true, preserveScroll: true });
+};
 
-const roleLabel = (role) => ({
-    SUPER_ADMIN: 'Super Admin',
-    ADMIN: 'Admin',
-    SYSTEM: 'Sistem',
-}[role] || 'Tidak diketahui');
+const rows = computed(() => (Array.isArray(props.logs?.data) ? props.logs.data : []));
 
-const formatDate = (value) => {
+const roleLabel = role => ({ SUPER_ADMIN: 'Super Admin', ADMIN: 'Admin', SYSTEM: 'Sistem' }[role] || 'Sistem');
+
+// Alamat IP disamarkan: cukup blok pertama dan dua digit terakhir.
+const maskIp = value => {
     if (!value) return '—';
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return String(value);
-    return new Intl.DateTimeFormat('id-ID', {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-        timeZone: 'Asia/Jakarta',
-    }).format(date) + ' WIB';
-};
-
-const humanKey = (key) =>
-    String(key)
-        .replace(/_/g, ' ')
-        .replace(/^./, (c) => c.toUpperCase());
-
-const formatValue = (value) => {
-    if (value === null || value === undefined || value === '') return '—';
-    if (typeof value === 'boolean') return value ? 'Ya' : 'Tidak';
-    if (typeof value === 'object') {
-        try {
-            return JSON.stringify(value);
-        } catch {
-            return '—';
-        }
+    const parts = String(value).split('.');
+    if (parts.length === 4) {
+        return parts[0] + '.•••.••.' + parts[3].slice(-2);
     }
-    return String(value);
+    return String(value).slice(0, 4) + '••••';
 };
 
-const formatState = (value) => {
-    if (value === null || value === undefined || value === '') return 'Tidak ada data.';
-    if (typeof value === 'string') return value;
-    if (typeof value !== 'object') return String(value);
+const detail = ref(null);
+const hasState = value => value !== null && value !== undefined && !(typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0);
 
-    const entries = Object.entries(value);
-    if (entries.length === 0) return 'Tidak ada data.';
-
-    return entries.map(([key, val]) => `${humanKey(key)}: ${formatValue(val)}`).join('\n');
-};
-
-const applyFilters = () => {
-    const payload = {};
-    Object.entries(form).forEach(([key, value]) => {
-        if (String(value ?? '').trim() !== '') payload[key] = value;
-    });
-
-    router.get('/admin/audit', payload, {
-        preserveState: true,
-        replace: true,
-    });
-};
-
-const resetFilters = () => {
-    form.q = '';
-    form.actor_id = '';
-    form.role = '';
-    form.action = '';
-    form.target_type = '';
-    form.date_from = '';
-    form.date_to = '';
-    form.per_page = '50';
-    router.get('/admin/audit', {}, { preserveState: false, replace: true });
-};
-
-const toggleDetail = (id) => {
-    selectedId.value = selectedId.value === id ? null : id;
+const pretty = value => {
+    if (!hasState(value)) return 'Tidak ada detail perubahan';
+    return JSON.stringify(value, null, 2);
 };
 </script>
 
 <template>
     <Head title="Catatan Audit" />
-
-    <AdminShell>
-        <div class="space-y-5">
-            <header class="flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between">
-                <div class="min-w-0">
-                    <div class="flex flex-wrap items-center gap-2">
-                        <h1 class="text-2xl font-semibold tracking-tight">Catatan Audit</h1>
-                        <Badge variant="outline">Khusus Super Admin</Badge>
-                    </div>
-                    <p class="mt-1 max-w-3xl text-sm text-muted-foreground">
-                        Riwayat perubahan penting di panel Admin, urutan terbaru lebih dulu. Catatan tidak bisa diedit atau dihapus dari panel, dan nilai rahasia (kata sandi, token, kunci API) disensor saat dicatat lalu disanitasi lagi sebelum ditampilkan.
-                    </p>
-                </div>
-                <Button class="w-full sm:w-auto" variant="outline" as-child>
-                    <Link href="/admin/health">Kondisi Sistem</Link>
-                </Button>
-            </header>
-
-            <div class="lf-admin-summary">
-                <Card class="p-4"><p class="text-xs text-muted-foreground">Total catatan</p><p class="mt-2 text-2xl font-semibold">{{ Number(summary.total || 0).toLocaleString('id-ID') }}</p></Card>
-                <Card class="p-4"><p class="text-xs text-muted-foreground">Hari ini</p><p class="mt-2 text-2xl font-semibold">{{ Number(summary.today || 0).toLocaleString('id-ID') }}</p></Card>
-                <Card class="p-4"><p class="text-xs text-muted-foreground">7 hari terakhir</p><p class="mt-2 text-2xl font-semibold">{{ Number(summary.last_7_days || 0).toLocaleString('id-ID') }}</p></Card>
-                <Card class="p-4"><p class="text-xs text-muted-foreground">Admin tercatat</p><p class="mt-2 text-2xl font-semibold">{{ Number(summary.actors || 0).toLocaleString('id-ID') }}</p></Card>
+    <AdminLayout>
+        <header class="adm-head">
+            <div>
+                <h1>Catatan Audit</h1>
+                <p>Setiap perubahan penting di panel dicatat: siapa, kapan, dan apa yang berubah.</p>
             </div>
+            <div class="adm-head-actions">
+                <button type="button" class="adm-btn" @click="router.reload({ preserveScroll: true })">Muat ulang</button>
+            </div>
+        </header>
 
-            <Card class="p-4 md:p-5">
-                <div>
-                    <h2 class="text-lg font-semibold">Filter Aktivitas</h2>
-                    <p class="mt-1 text-sm text-muted-foreground">
-                        Cari berdasarkan aksi, sasaran, ID korelasi, alamat IP, nama Admin, atau email Admin.
-                    </p>
+        <section class="adm-stats" aria-label="Ringkasan catatan audit">
+            <div class="adm-stat"><span class="lb">Total catatan</span><strong class="vl">{{ num(summary.total) }}</strong></div>
+            <div class="adm-stat"><span class="lb">Hari ini</span><strong class="vl">{{ num(summary.today) }}</strong></div>
+            <div class="adm-stat"><span class="lb">7 hari terakhir</span><strong class="vl">{{ num(summary.last_7_days) }}</strong></div>
+            <div class="adm-stat"><span class="lb">Admin tercatat</span><strong class="vl">{{ num(summary.actors) }}</strong></div>
+        </section>
+
+        <section class="adm-card">
+            <form class="adm-filters" @submit.prevent="apply">
+                <label class="adm-field search">
+                    <span>Cari catatan</span>
+                    <input v-model="filter.q" class="adm-input" maxlength="100" placeholder="Aktivitas, sasaran, admin, atau IP">
+                </label>
+                <label class="adm-field narrow">
+                    <span>Admin</span>
+                    <select v-model="filter.actor_id" class="adm-select">
+                        <option value="">Semua admin</option>
+                        <option v-for="actor in actors" :key="actor.id" :value="actor.id">{{ actor.name }}</option>
+                    </select>
+                </label>
+                <label class="adm-field narrow">
+                    <span>Peran</span>
+                    <select v-model="filter.role" class="adm-select">
+                        <option value="">Semua peran</option>
+                        <option value="SUPER_ADMIN">Super Admin</option>
+                        <option value="ADMIN">Admin</option>
+                        <option value="SYSTEM">Sistem</option>
+                    </select>
+                </label>
+                <div class="adm-filter-actions">
+                    <button type="submit" class="adm-btn primary">Terapkan</button>
+                    <button type="button" class="adm-btn" @click="reset">Hapus filter</button>
                 </div>
+                <label class="adm-field narrow">
+                    <span>Aksi</span>
+                    <select v-model="filter.action" class="adm-select">
+                        <option value="">Semua aksi</option>
+                        <option v-for="item in actions" :key="item.value" :value="item.value">{{ item.label }}</option>
+                    </select>
+                </label>
+                <label class="adm-field narrow">
+                    <span>Sasaran</span>
+                    <select v-model="filter.target_type" class="adm-select">
+                        <option value="">Semua sasaran</option>
+                        <option v-for="item in targetTypes" :key="item.value" :value="item.value">{{ item.label }}</option>
+                    </select>
+                </label>
+                <label class="adm-field narrow">
+                    <span>Dari tanggal</span>
+                    <input v-model="filter.date_from" type="date" class="adm-input">
+                </label>
+                <label class="adm-field narrow">
+                    <span>Sampai tanggal</span>
+                    <input v-model="filter.date_to" type="date" class="adm-input">
+                </label>
+                <label class="adm-field narrow">
+                    <span>Catatan per halaman</span>
+                    <select v-model.number="filter.per_page" class="adm-select">
+                        <option v-for="size in [25, 50, 100]" :key="size" :value="size">{{ size }} catatan</option>
+                    </select>
+                </label>
+            </form>
 
-                <form class="mt-4 grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-4" @submit.prevent="applyFilters">
-                    <label class="space-y-1.5 text-sm xl:col-span-2">
-                        <span>Pencarian</span>
-                        <Input v-model="form.q" maxlength="100" placeholder="Contoh: pembayaran, pesanan, ID korelasi..." />
-                    </label>
+            <div class="adm-scroll">
+                <table class="adm-table">
+                    <thead>
+                        <tr><th>Waktu</th><th>Admin</th><th>Aktivitas</th><th>Sasaran</th><th>IP</th><th>Detail</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="row in rows" :key="row.id">
+                            <td class="adm-note">{{ wibDateTime(row.created_at) }}</td>
+                            <td>
+                                {{ row.actor?.name || 'Sistem' }}
+                                <div class="adm-note">{{ roleLabel(row.actor?.role) }}</div>
+                            </td>
+                            <td><strong>{{ row.action_label || row.action }}</strong><div class="adm-note">{{ row.action }}</div></td>
+                            <td>
+                                {{ row.target_label || row.target_type }}
+                                <div v-if="row.target_id" class="adm-note">#{{ row.target_id }}</div>
+                            </td>
+                            <td class="adm-note">{{ maskIp(row.ip_address) }}</td>
+                            <td>
+                                <button v-if="hasState(row.before_state) || hasState(row.after_state)" type="button" class="adm-btn sm" @click="detail = row">
+                                    Lihat
+                                </button>
+                                <span v-else class="adm-note">Tidak ada detail</span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p v-if="!rows.length" class="adm-empty">Tidak ada catatan yang sesuai filter.</p>
+            <div class="adm-pager">
+                <span>Menampilkan {{ logs.from || 0 }} dari {{ num(logs.total) }} catatan · Halaman {{ logs.current_page || 1 }} dari {{ logs.last_page || 1 }}</span>
+                <span class="sp" />
+                <button type="button" class="adm-btn sm" :disabled="!logs.prev_page_url" @click="router.get(logs.prev_page_url, {}, { preserveState: true, preserveScroll: true })">Sebelumnya</button>
+                <button type="button" class="adm-btn sm" :disabled="!logs.next_page_url" @click="router.get(logs.next_page_url, {}, { preserveState: true, preserveScroll: true })">Berikutnya</button>
+            </div>
+        </section>
 
-                    <label class="space-y-1.5 text-sm">
-                        <span>Admin</span>
-                        <select v-model="form.actor_id" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
-                            <option value="">Semua Admin</option>
-                            <option v-for="actor in actors" :key="actor.id" :value="String(actor.id)">
-                                {{ actor.name }} · {{ roleLabel(actor.role) }}{{ actor.is_active ? '' : ' · Nonaktif' }}
-                            </option>
-                        </select>
-                    </label>
-
-                    <label class="space-y-1.5 text-sm">
-                        <span>Peran pelaku</span>
-                        <select v-model="form.role" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
-                            <option value="">Semua peran</option>
-                            <option value="SUPER_ADMIN">Super Admin</option>
-                            <option value="ADMIN">Admin</option>
-                            <option value="SYSTEM">Sistem</option>
-                        </select>
-                    </label>
-
-                    <label class="space-y-1.5 text-sm">
-                        <span>Aksi</span>
-                        <select v-model="form.action" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
-                            <option value="">Semua aksi</option>
-                            <option v-for="item in actions" :key="item.value" :value="item.value">{{ item.label }}</option>
-                        </select>
-                    </label>
-
-                    <label class="space-y-1.5 text-sm">
-                        <span>Sasaran</span>
-                        <select v-model="form.target_type" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
-                            <option value="">Semua sasaran</option>
-                            <option v-for="item in targetTypes" :key="item.value" :value="item.value">{{ item.label }}</option>
-                        </select>
-                    </label>
-
-                    <label class="space-y-1.5 text-sm">
-                        <span>Dari tanggal</span>
-                        <Input v-model="form.date_from" type="date" />
-                    </label>
-
-                    <label class="space-y-1.5 text-sm">
-                        <span>Sampai tanggal</span>
-                        <Input v-model="form.date_to" type="date" />
-                    </label>
-
-                    <label class="space-y-1.5 text-sm">
-                        <span>Baris per halaman</span>
-                        <select v-model="form.per_page" class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
-                            <option value="25">25 baris</option>
-                            <option value="50">50 baris</option>
-                            <option value="100">100 baris</option>
-                        </select>
-                    </label>
-
-                    <div class="flex flex-col gap-2 sm:flex-row md:col-span-2 xl:col-span-3">
-                        <Button class="w-full sm:w-auto" type="submit">Terapkan filter</Button>
-                        <Button class="w-full sm:w-auto" type="button" variant="outline" @click="resetFilters">Hapus filter</Button>
-                    </div>
-                </form>
-            </Card>
-
-            <Card class="overflow-hidden">
-                <div class="flex flex-wrap items-start justify-between gap-3 border-b p-4 md:p-5">
-                    <div>
-                        <h2 class="text-lg font-semibold">Riwayat Aktivitas</h2>
-                        <p class="mt-1 text-sm text-muted-foreground">
-                            {{ Number(logs?.total || 0).toLocaleString('id-ID') }} hasil sesuai filter.
-                        </p>
-                    </div>
-                    <p class="text-xs text-muted-foreground">Urutan terbaru lebih dulu</p>
+        <AdminModal :open="!!detail" :title="detail ? (detail.action_label || detail.action) : ''"
+            :description="detail ? wibDateTime(detail.created_at) + ' · ' + (detail.actor?.name || 'Sistem') : ''"
+            @update:open="value => { if (!value) detail = null; }">
+            <div v-if="detail">
+                <dl class="adm-kv">
+                    <dt>Aktivitas</dt><dd>{{ detail.action_label || detail.action }}</dd>
+                    <dt>Sasaran</dt><dd>{{ detail.target_label || detail.target_type }}<template v-if="detail.target_id"> #{{ detail.target_id }}</template></dd>
+                    <dt>Admin</dt><dd>{{ detail.actor?.name || 'Sistem' }} · {{ roleLabel(detail.actor?.role) }}</dd>
+                    <dt>IP</dt><dd>{{ maskIp(detail.ip_address) }}</dd>
+                    <dt>Perangkat</dt><dd style="word-break:break-word">{{ detail.user_agent || 'Tidak tercatat' }}</dd>
+                    <dt>Kode korelasi</dt><dd><code class="adm-code">{{ detail.correlation_id || '—' }}</code></dd>
+                </dl>
+                <div class="adm-block full" style="margin-top:10px">
+                    <strong>Sebelum</strong>
+                    <pre class="adm-code" style="white-space:pre-wrap">{{ pretty(detail.before_state) }}</pre>
                 </div>
-
-                <div class="overflow-x-auto" role="region" aria-label="Riwayat aktivitas Admin" tabindex="0">
-                    <AdminResponsiveTable :mobile-columns="[2,3,0,5]" class="min-w-[1040px]">
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead class="w-[15%]">Waktu</TableHead>
-                                <TableHead class="w-[18%]">Admin</TableHead>
-                                <TableHead class="w-[24%]">Aktivitas</TableHead>
-                                <TableHead class="w-[18%]">Sasaran</TableHead>
-                                <TableHead class="w-[13%]">IP</TableHead>
-                                <TableHead class="w-[12%] text-right">Detail</TableHead>
-                            </TableRow>
-                        </TableHeader>
-
-                        <TableBody>
-                            <template v-for="row in rows" :key="row.id">
-                                <TableRow>
-                                    <TableCell class="align-top text-xs">
-                                        <strong class="block text-foreground">{{ formatDate(row.created_at) }}</strong>
-                                        <span class="mt-1 block text-muted-foreground">#{{ row.id }}</span>
-                                    </TableCell>
-
-                                    <TableCell class="align-top">
-                                        <strong class="block break-words text-sm">{{ row.actor?.name || 'Sistem' }}</strong>
-                                        <span v-if="row.actor?.email" class="mt-1 block break-all text-xs text-muted-foreground">{{ row.actor.email }}</span>
-                                        <Badge class="mt-1" variant="outline">{{ roleLabel(row.actor?.role) }}</Badge>
-                                    </TableCell>
-
-                                    <TableCell class="align-top">
-                                        <strong class="block break-words text-sm">{{ row.action_label }}</strong>
-                                        <span class="mt-1 block break-all font-mono text-[11px] text-muted-foreground">{{ row.action }}</span>
-                                    </TableCell>
-
-                                    <TableCell class="align-top">
-                                        <strong class="block text-sm">{{ row.target_label }}</strong>
-                                        <span class="mt-1 block break-all text-xs text-muted-foreground">
-                                            {{ row.target_id ? 'ID ' + row.target_id : 'Tanpa ID target' }}
-                                        </span>
-                                    </TableCell>
-
-                                    <TableCell class="align-top break-all text-xs">{{ row.ip_address || '—' }}</TableCell>
-
-                                    <TableCell class="align-top text-right">
-                                        <Button type="button" size="sm" variant="outline" @click="toggleDetail(row.id)">
-                                            {{ selectedId === row.id ? 'Tutup' : 'Lihat Detail' }}
-                                        </Button>
-                                    </TableCell>
-                                </TableRow>
-
-                                <TableRow v-if="selectedId === row.id">
-                                    <TableCell colspan="6" class="bg-muted/20 p-4">
-                                        <div class="grid gap-4 xl:grid-cols-2">
-                                            <section class="min-w-0 rounded-md border bg-background p-3">
-                                                <h3 class="text-sm font-semibold">Sebelum</h3>
-                                                <pre class="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-words text-xs text-muted-foreground">{{ formatState(row.before_state) }}</pre>
-                                            </section>
-                                            <section class="min-w-0 rounded-md border bg-background p-3">
-                                                <h3 class="text-sm font-semibold">Sesudah</h3>
-                                                <pre class="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-words text-xs text-muted-foreground">{{ formatState(row.after_state) }}</pre>
-                                            </section>
-                                        </div>
-
-                                        <dl class="mt-4 grid gap-3 text-xs md:grid-cols-2 xl:grid-cols-3">
-                                            <div class="min-w-0">
-                                                <dt class="text-muted-foreground">ID korelasi</dt>
-                                                <dd class="mt-1 break-all font-mono">{{ row.correlation_id || '—' }}</dd>
-                                            </div>
-                                            <div class="min-w-0">
-                                                <dt class="text-muted-foreground">Alamat IP</dt>
-                                                <dd class="mt-1 break-all">{{ row.ip_address || '—' }}</dd>
-                                            </div>
-                                            <div class="min-w-0 md:col-span-2 xl:col-span-1">
-                                                <dt class="text-muted-foreground">Perangkat / browser</dt>
-                                                <dd class="mt-1 break-words">{{ row.user_agent || '—' }}</dd>
-                                            </div>
-                                        </dl>
-                                    </TableCell>
-                                </TableRow>
-                            </template>
-
-                            <TableRow v-if="!rows.length">
-                                <TableCell colspan="6" class="py-10 text-center text-sm text-muted-foreground">
-                                    Tidak ada aktivitas yang sesuai dengan filter.
-                                </TableCell>
-                            </TableRow>
-                        </TableBody>
-                    </AdminResponsiveTable>
+                <div class="adm-block full" style="margin-top:8px">
+                    <strong>Sesudah</strong>
+                    <pre class="adm-code" style="white-space:pre-wrap">{{ pretty(detail.after_state) }}</pre>
                 </div>
-
-                <nav v-if="logs?.links?.length > 3" class="flex flex-wrap gap-2 border-t p-4" aria-label="Halaman catatan audit">
-                    <template v-for="link in logs.links" :key="link.label">
-                        <Button v-if="link.url" :variant="link.active ? 'default' : 'outline'" size="sm" as-child>
-                            <Link :href="link.url" preserve-state>{{ link.label }}</Link>
-                        </Button>
-                        <Button v-else variant="outline" size="sm" disabled>{{ link.label }}</Button>
-                    </template>
-                </nav>
-            </Card>
-        </div>
-    </AdminShell>
+            </div>
+            <template #footer>
+                <button type="button" class="adm-btn" @click="detail = null">Tutup</button>
+            </template>
+        </AdminModal>
+    </AdminLayout>
 </template>

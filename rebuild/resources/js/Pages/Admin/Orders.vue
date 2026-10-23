@@ -97,7 +97,7 @@ const submitManual = () => {
         <header class="adm-head">
             <div>
                 <h1>Pesanan</h1>
-                <p>Pesanan yang perlu perhatian tampil paling atas, lalu pesanan terbaru. Tanggal memakai WIB.</p>
+                <p>Pesanan yang perlu perhatian tampil paling atas, lalu pesanan terbaru.</p>
             </div>
             <div class="adm-head-actions">
                 <button v-if="canCreateManual" type="button" class="adm-btn primary" @click="openManual">Catat pesanan manual</button>
@@ -174,7 +174,6 @@ const submitManual = () => {
                 <a class="adm-btn sm" :href="exportUrl">{{ selected.length ? 'Unduh yang dipilih' : 'Unduh hasil filter' }}</a>
             </div>
 
-            <p class="adm-hint-sm">Geser tabel ke samping untuk melihat semua kolom.</p>
             <div class="adm-scroll">
                 <table class="adm-table">
                     <thead>

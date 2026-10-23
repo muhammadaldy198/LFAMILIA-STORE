@@ -43,8 +43,9 @@ const TONE = {
     PENDING: 'warn', PROCESSING: 'warn', PENDING_PAYMENT: 'warn', MANUAL_PENDING: 'warn',
     SENDING: 'warn', UNKNOWN: 'warn', SCHEDULED: 'warn', DEGRADED: 'warn', UNTESTED: 'plain',
     FAILED: 'bad', BLOCKED: 'bad', MANUAL_FAILED: 'bad', FAILED_CONFIRMED: 'bad', DOWN: 'bad',
-    EXPIRED: 'plain', CANCELLED: 'plain', INACTIVE: 'plain', NOT_CONFIGURED: 'plain', EXHAUSTED: 'plain',
-    REFUND: 'info', REFUNDED: 'info', CREATED: 'plain',
+    EXPIRED: 'bad', CANCELLED: 'plain', INACTIVE: 'bad', NOT_CONFIGURED: 'bad', EXHAUSTED: 'bad',
+    REFUND: 'info', REFUNDED: 'info', CREATED: 'plain', OPEN: 'warn', IN_PROGRESS: 'warn',
+    RESOLVED: 'ok', CLOSED: 'plain',
 };
 
 export const tone = (status) => TONE[String(status || '').toUpperCase()] || 'plain';
@@ -57,6 +58,7 @@ export const statusLabel = {
     UNKNOWN: 'Belum pasti', MANUAL_PENDING: 'Menunggu manual', MANUAL_FAILED: 'Manual gagal',
     FAILED_CONFIRMED: 'Gagal terkonfirmasi', SUCCESS_ATTEMPT: 'Berhasil',
     active: 'Aktif', scheduled: 'Terjadwal', expired: 'Berakhir', inactive: 'Nonaktif', exhausted: 'Kuota habis',
+    OPEN: 'Menunggu', IN_PROGRESS: 'Diproses', RESOLVED: 'Selesai', CLOSED: 'Ditutup',
 };
 
 export const label = (status) => statusLabel[status] || statusLabel[String(status || '').toUpperCase()] || status || '—';
