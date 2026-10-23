@@ -1109,7 +1109,7 @@ class CatalogTest extends TestCase
         foreach ($rows as $mode => $pricing) {
             $package = $product->packages()->create([
                 'code' => 'HT-'.$mode, 'name' => 'Nominal '.$mode, 'nominal_value' => 50,
-                'sort_order' => 1, 'is_active' => true,
+                'note' => 'Catatan toko', 'sort_order' => 1, 'is_active' => true,
                 'pricing_mode' => $pricing['mode'],
                 'margin_percent' => $pricing['margin_percent'],
                 'margin_fixed_idr' => $pricing['margin_fixed_idr'],
@@ -1146,6 +1146,7 @@ class CatalogTest extends TestCase
             $this->assertSame($before->margin_fixed_idr, $after->margin_fixed_idr, $mode.': margin tetap tidak boleh berubah');
             $this->assertSame($before->margin_percent, $after->margin_percent, $mode.': margin persen tidak boleh berubah');
             $this->assertSame(50, (int) $after->nominal_value, $mode.': nominal_value tidak boleh ditimpa null');
+            $this->assertSame('Catatan toko', $after->note, $mode.': catatan nominal tidak boleh terhapus');
         }
 
         // Bukti tes ini menangkap bug lama: payload versi lama selalu mengirim

@@ -319,7 +319,7 @@ test('editing a nominal keeps stored pricing and nominal_value', async () => {
     });
     for (const [mode, row] of Object.entries(rows)) {
         const payload = nominalPayload(row, form(row), 'generated');
-        for (const key of ['pricing_mode', 'sell_price_idr', 'sell_markup_percent', 'margin_percent', 'margin_fixed_idr', 'nominal_value']) {
+        for (const key of ['pricing_mode', 'sell_price_idr', 'sell_markup_percent', 'margin_percent', 'margin_fixed_idr', 'nominal_value', 'note']) {
             assert.equal(key in payload, false, `${mode}: ${key} tidak boleh ikut terkirim`);
         }
         assert.equal(payload.name, row.name + ' baru');

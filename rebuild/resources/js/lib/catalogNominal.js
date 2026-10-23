@@ -26,10 +26,10 @@ export function nominalPayload(row, form, code) {
         group_name: form.group_name || null,
         sort_order: Number(form.sort_order || 0),
         is_active: Boolean(form.is_active),
-        note: null,
     };
     if (!row) {
         // Nominal baru belum punya nilai tersimpan; server menurunkan sendiri.
+        payload.note = null;
         payload.nominal_value = null;
         Object.assign(payload, {
             pricing_mode: pricingOf(form).mode,
