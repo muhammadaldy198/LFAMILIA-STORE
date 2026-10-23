@@ -1150,35 +1150,50 @@ class AdminDigiflazzRestorationTest extends TestCase
 
     public function test_sync_never_deletes_manual_mappings(): void
     {
-        // A-06 diverifikasi: pembersihan sinkron selalu dibatasi
-        // where('provider_id', $providerId) dengan $providerId = DIGIFLAZZ,
-        // jadi mapping MANUAL tidak pernah masuk kandidat hapus.
+        // A-06 diverifikasi: pembersihan sinkron dibatasi where('provider_id',
+        // $providerId) dengan $providerId = DIGIFLAZZ, jadi mapping MANUAL tidak
+        // pernah masuk kandidat hapus. Tes ini harus benar-benar melewati jalur
+        // hapus: katalog tidak boleh kosong (kosong ditolak sebelum cleanup),
+        // dan satu mapping Digiflazz harus ADA lalu TERHAPUS.
         $this->login();
-        $this->fakeCatalog([$this->row(['buyer_sku_code' => 'manual-safe-sku'])]);
+        $this->fakeCatalog([
+            $this->row(['buyer_sku_code' => 'a06-gone-sku', 'product_name' => 'A06 Hilang']),
+            $this->row(['buyer_sku_code' => 'a06-stay-sku', 'product_name' => 'A06 Tetap']),
+        ]);
         $this->post('/admin/digiflazz/sync')->assertRedirect()->assertSessionHasNoErrors();
 
         $product = Product::create([
             'category_id' => Category::where('slug', 'game')->value('id'),
-            'name' => 'Produk Manual A06', 'slug' => 'produk-manual-a06',
-            'fulfillment_mode' => 'MANUAL', 'margin_percent' => 10, 'is_active' => true,
+            'name' => 'Produk A06', 'slug' => 'produk-a06',
+            'fulfillment_mode' => 'AUTO_PROVIDER', 'margin_percent' => 10, 'is_active' => true,
         ]);
         $package = $product->packages()->create([
-            'code' => 'MANUAL-10', 'name' => 'Manual 10', 'sort_order' => 1, 'is_active' => true,
+            'code' => 'A06-10', 'name' => 'A06 10', 'sort_order' => 1, 'is_active' => true,
+        ]);
+        $digiflazzId = DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
+        $doomed = ProviderMapping::create([
+            'product_package_id' => $package->id, 'provider_id' => $digiflazzId,
+            'external_sku' => 'a06-gone-sku', 'cost_idr' => 10000, 'store_cost_idr' => 10200,
+            'max_price_idr' => 10200, 'priority' => 0, 'is_active' => true,
         ]);
         $manualId = DB::table('providers')->where('code', 'MANUAL')->value('id');
-        $mapping = ProviderMapping::create([
+        $manual = ProviderMapping::create([
             'product_package_id' => $package->id, 'provider_id' => $manualId,
             'external_sku' => null, 'cost_idr' => 9000, 'store_cost_idr' => 9000,
-            'max_price_idr' => null, 'priority' => 0, 'is_active' => true,
+            'max_price_idr' => null, 'priority' => 1, 'is_active' => true,
         ]);
 
-        // Sinkron ulang dengan katalog kosong: SKU Digiflazz hilang, mapping
-        // Digiflazz boleh dibersihkan — mapping MANUAL harus tetap utuh.
-        $this->fakeCatalog([]);
-        $this->post('/admin/digiflazz/sync')->assertRedirect();
+        // SKU a06-gone-sku hilang dari katalog, a06-stay-sku tetap ada:
+        // katalog tidak kosong, jadi jalur pembersihan benar-benar berjalan.
+        $this->fakeCatalog([$this->row(['buyer_sku_code' => 'a06-stay-sku', 'product_name' => 'A06 Tetap'])]);
+        $this->post('/admin/digiflazz/sync')->assertRedirect()->assertSessionHasNoErrors();
 
-        $this->assertDatabaseHas('provider_mappings', ['id' => $mapping->id, 'provider_id' => $manualId]);
-        $this->assertSame(9000, (int) $mapping->fresh()->store_cost_idr);
+        // Bukti jalur hapus jalan: mapping Digiflazz yang hilang benar-benar hilang.
+        // (Bila baris ini gagal, tes A-06 tidak membuktikan apa pun.)
+        $this->assertDatabaseMissing('provider_mappings', ['id' => $doomed->id]);
+        // Bukti A-06: mapping MANUAL tidak ikut terhapus dan nilainya utuh.
+        $this->assertDatabaseHas('provider_mappings', ['id' => $manual->id, 'provider_id' => $manualId]);
+        $this->assertSame(9000, (int) $manual->fresh()->store_cost_idr);
     }
 
     public function test_import_uses_active_sell_markup_setting_not_legacy_default_margin(): void

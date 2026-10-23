@@ -338,6 +338,19 @@ test('editing a nominal keeps stored pricing and nominal_value', async () => {
     const changed = nominalPayload(rows.SELL_PRICE, { ...form(rows.SELL_PRICE), price_value: 25000 }, 'x');
     assert.equal(changed.pricing_mode, 'SELL_PRICE');
     assert.equal(changed.sell_price_idr, 25000);
+
+    // Nominal FIXED yang harganya diubah tetap FIXED: angkanya masuk ke
+    // margin_fixed_idr, bukan margin_percent (3.500% = 350.000%).
+    const fixedEdit = nominalPayload(rows.FIXED, { ...form(rows.FIXED), price_value: 4000 }, 'x');
+    assert.equal(fixedEdit.pricing_mode, 'FIXED');
+    assert.equal(fixedEdit.margin_fixed_idr, 4000);
+    assert.equal(fixedEdit.margin_percent, undefined);
+
+    // Nominal PERCENT yang harganya diubah tetap PERCENT.
+    const percentEdit = nominalPayload(rows.PERCENT, { ...form(rows.PERCENT), price_value: 15 }, 'x');
+    assert.equal(percentEdit.pricing_mode, 'PERCENT');
+    assert.equal(percentEdit.margin_percent, 15);
+    assert.equal(percentEdit.margin_fixed_idr, undefined);
     // Catalog.vue memakai helper itu, bukan payload lama yang menimpa null.
     const catalog = read('Catalog.vue');
     assert.match(catalog, /import \{ nominalMode, nominalPayload, nominalPriceValue \} from '\.\.\/\.\.\/lib\/catalogNominal'/);

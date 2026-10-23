@@ -16,12 +16,27 @@ const pricingOf = form => ({
     value: Number(form.price_value || 0),
 });
 
+// Nilai satu nominal diedit: mode tersimpan dipertahankan, angka ditulis ke
+// kolom milik mode itu. Tanpa ini, nominal FIXED 3.500 berubah jadi PERCENT
+// 3.500 (= 350.000%) hanya karena admin mengetik harga baru.
+const storedPricing = (row, value) => {
+    switch (row.pricing_mode) {
+        case 'SELL_PRICE': return { pricing_mode: 'SELL_PRICE', sell_price_idr: value };
+        case 'FIXED': return { pricing_mode: 'FIXED', margin_fixed_idr: value };
+        case 'PRODUCT_MARGIN':
+            // Mode ini tidak punya angka sendiri; harga eksplisit = markup persen.
+            return { pricing_mode: 'PERCENT', margin_percent: value };
+        default: return { pricing_mode: 'PERCENT', margin_percent: value };
+    }
+};
+
 // Bandingkan dengan nilai yang tersimpan: harga hanya dikirim bila admin
 // benar-benar mengubahnya di form.
 const pricingChanged = (row, form) => {
-    const next = pricingOf(form);
-    return next.mode !== (row.pricing_mode === 'SELL_PRICE' ? 'SELL_PRICE' : 'PERCENT')
-        || next.value !== Number(nominalPriceValue(row) || 0);
+    if (!row) return true;
+    const storedUiMode = row.pricing_mode === 'SELL_PRICE' ? 'FIXED' : 'MARKUP';
+    return form.price_mode !== storedUiMode
+        || Number(form.price_value || 0) !== Number(nominalPriceValue(row) || 0);
 };
 
 export function nominalPayload(row, form, code) {
@@ -47,11 +62,9 @@ export function nominalPayload(row, form, code) {
     // Edit: field yang tidak diubah tidak dikirim, jadi nilai tersimpan utuh
     // (termasuk nominal_value, PRODUCT_MARGIN, dan margin_fixed_idr).
     if (pricingChanged(row, form)) {
-        Object.assign(payload, {
-            pricing_mode: pricingOf(form).mode,
-            sell_price_idr: form.price_mode === 'FIXED' ? pricingOf(form).value : null,
-            sell_markup_percent: form.price_mode === 'MARKUP' ? pricingOf(form).value : null,
-            margin_percent: form.price_mode === 'MARKUP' ? pricingOf(form).value : null,
+        const value = Number(form.price_value || 0);
+        Object.assign(payload, storedPricing(row, value), {
+            sell_price_idr: row.pricing_mode === 'SELL_PRICE' ? value : null,
         });
     }
     return payload;
