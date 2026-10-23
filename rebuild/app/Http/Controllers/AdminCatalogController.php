@@ -756,6 +756,12 @@ class AdminCatalogController
         ]);
 
         $product = $package->product()->firstOrFail();
+        // Nominal tersimpan tidak boleh hilang karena klien mengirim null tanpa
+        // sengaja mengubahnya (form edit tidak punya input nominal_value).
+        if (array_key_exists('nominal_value', $data)
+            && $data['nominal_value'] === null && $package->nominal_value !== null) {
+            unset($data['nominal_value']);
+        }
         $newCost = array_key_exists('cost_idr', $data) && $data['cost_idr'] !== null
             ? (int) $data['cost_idr'] : null;
         if ($newCost !== null && $product->fulfillment_mode !== 'MANUAL') {

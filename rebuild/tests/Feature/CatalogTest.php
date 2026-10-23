@@ -1150,15 +1150,15 @@ class CatalogTest extends TestCase
             $this->assertSame('Catatan toko', $after->note, $mode.': catatan nominal tidak boleh terhapus');
         }
 
-        // Bukti tes ini menangkap bug lama: payload versi lama selalu mengirim
-        // nominal_value null + memaksa mode PERCENT/margin 0.
+        // Server ikut menjaga: request langsung yang mengirim nominal_value null
+        // tidak mengosongkan nominal yang sudah tersimpan.
         $broken = $packages['PRODUCT_MARGIN'];
         $this->put('/admin/catalog/packages/'.$broken->id, [
             'code' => $broken->code, 'name' => $broken->name, 'sort_order' => 1, 'is_active' => true,
             'nominal_value' => null, 'pricing_mode' => 'PERCENT', 'sell_price_idr' => null,
             'sell_markup_percent' => null, 'margin_percent' => 0,
         ])->assertRedirect();
-        $this->assertNull($broken->fresh()->nominal_value);
+        $this->assertSame(50, (int) $broken->fresh()->nominal_value);
         $this->assertSame('PERCENT', $broken->fresh()->pricing_mode);
     }
 
