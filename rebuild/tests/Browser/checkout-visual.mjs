@@ -75,7 +75,7 @@ try{
  await admin.goto(base+'/admin/content/presentation');
  const shell=admin.locator('.adm');
  const white=await shell.evaluate(e=>getComputedStyle(e).backgroundColor);
- await admin.getByRole('button',{name:'Warna Website',exact:true}).click();
+ await admin.getByRole('tab',{name:'Warna Website',exact:true}).click();
  const hex=(label,value)=>admin.locator('.adm-field').filter({hasText:label}).locator('input.adm-input').fill(value);
  await hex('Aksen biru / tombol utama','#75AAFF');
  await hex('Permukaan','#17243A');
@@ -98,8 +98,8 @@ try{
  await customer.locator('.lfx-voucher-browse').click();await customer.locator('.lfx-offer-modal').waitFor();
  const voucherBackground=await customer.locator('.lfx-offer-modal').evaluate(e=>getComputedStyle(e).backgroundImage);
  if(!voucherBackground.includes('38, 55, 87'))throw Error('Saved surface did not reach voucher modal: '+voucherBackground);
- await admin.getByRole('button',{name:'Kembalikan warna bawaan',exact:true}).click();
- await admin.getByRole('button',{name:'Simpan perubahan',exact:true}).click();
+ await admin.getByRole('button',{name:'Kembalikan bawaan',exact:true}).click();
+ await admin.getByRole('button',{name:'Simpan warna',exact:true}).click();
  await admin.waitForFunction(()=>document.documentElement.style.getPropertyValue('--lf-color-primary')==='#609CFF');
  await admin.close();await customer.close();
  await fs.writeFile(output+'/report.json',JSON.stringify({baseline:'a42f97d3a6d5a8a5cb59bd651ce9ffe1a8c928f2',report,quote,adminTheme:{persisted:true,cta:true,paymentCards:true,voucherSurface:true,reset:true,whiteAdmin:true},noFinancialActions:true},null,2));
