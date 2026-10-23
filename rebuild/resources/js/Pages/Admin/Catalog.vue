@@ -1,5 +1,5 @@
 <script setup>
-import { computed, reactive, ref, watch } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import AdminLayout from '../../Components/Admin/AdminLayout.vue';
 import AdminModal from '../../Components/Admin/AdminModal.vue';
@@ -12,6 +12,10 @@ const props = defineProps({
     categories: { type: Array, default: () => [] },
     nicknameGameCodes: { type: Array, default: () => [] },
     checkoutPreviews: { type: Object, default: () => ({}) },
+    digiflazzItems: { type: Array, default: () => [] },
+    autoProductOptions: { type: Array, default: () => [] },
+    pricingSettings: { type: Object, default: () => ({}) },
+    defaultMargin: { type: [Number, String], default: 0 },
 });
 
 // Saringan dikerjakan server supaya hasil tidak bohong saat produk banyak.
@@ -360,6 +364,63 @@ const openEditorFull = (row) => {
     loadInfo();
     loadFields();
 };
+/* ---------- impor nominal Digiflazz ---------- */
+const importOpen = ref(false);
+const importBusy = ref(false);
+const importErrors = ref({});
+const importProductId = ref('');
+const importBrand = ref('');
+const importSearch = ref('');
+const importPicked = ref([]);
+const importPublish = ref(true);
+
+const autoProducts = computed(() => props.autoProductOptions);
+const importProduct = computed(() => props.products.find(row => Number(row.id) === Number(importProductId.value))
+    || props.autoProductOptions.find(row => Number(row.id) === Number(importProductId.value)) || null);
+const importUplift = computed(() => Number(importProduct.value?.cost_uplift_percent ?? props.pricingSettings?.cost_uplift_percent ?? 2));
+const importMargin = ref(Number(props.defaultMargin || 0));
+const importBrands = computed(() => [...new Set(props.digiflazzItems.map(row => row.brand))].sort((a, b) => a.localeCompare(b, 'id-ID')));
+const importRows = computed(() => props.digiflazzItems.filter(row => {
+    if (row.mapped || !row.available) return false;
+    if (importBrand.value && row.brand !== importBrand.value) return false;
+    const term = importSearch.value.trim().toLowerCase();
+    return !term || `${row.product_name} ${row.buyer_sku_code}`.toLowerCase().includes(term);
+}).slice(0, 60));
+const storeCostOf = seller => Math.ceil(Number(seller || 0) * (100 + importUplift.value) / 100);
+const sellPriceOf = seller => Math.ceil(storeCostOf(seller) * (100 + Number(importMargin.value || 0)) / 100);
+
+const openImport = () => {
+    importErrors.value = {};
+    importPicked.value = [];
+    importSearch.value = '';
+    importBrand.value = '';
+    importPublish.value = true;
+    if (!importProductId.value && autoProducts.value.length) importProductId.value = String(autoProducts.value[0].id);
+    importMargin.value = Number(importProduct.value?.sell_markup_percent ?? props.defaultMargin ?? 0);
+    importOpen.value = true;
+};
+const toggleImportRow = id => {
+    importPicked.value = importPicked.value.includes(id) ? importPicked.value.filter(x => x !== id) : [...importPicked.value, id];
+};
+const submitImport = () => {
+    if (!importProduct.value || !importPicked.value.length) return;
+    importBusy.value = true;
+    importErrors.value = {};
+    router.post(`/admin/catalog/products/${importProduct.value.id}/import`, {
+        item_ids: importPicked.value,
+        margin_percent: Number(importMargin.value || 0),
+        publish: importPublish.value,
+    }, {
+        preserveScroll: true,
+        onError: bag => { importErrors.value = bag; },
+        onSuccess: () => { importOpen.value = false; importPicked.value = []; },
+        onFinish: () => { importBusy.value = false; },
+    });
+};
+
+onMounted(() => {
+    if (new URLSearchParams(window.location.search).get('import') === 'digiflazz') openImport();
+});
 </script>
 
 <template>
@@ -373,6 +434,7 @@ const openEditorFull = (row) => {
             <div class="adm-head-actions">
                 <Link href="/admin/catalog/categories" class="adm-btn">Kategori</Link>
                 <a href="/" target="_blank" rel="noopener" class="adm-btn">Lihat toko</a>
+                <button v-if="autoProducts.length" type="button" class="adm-btn" @click="openImport">Impor dari Digiflazz</button>
                 <button type="button" class="adm-btn primary" @click="openAdd">Tambah produk</button>
             </div>
         </header>
@@ -677,6 +739,64 @@ const openEditorFull = (row) => {
             </template>
         </AdminModal>
 
+
+        <AdminModal v-model:open="importOpen" title="Impor nominal dari Digiflazz" description="Nominal yang dipilih disalin ke produk dengan harga modal dan harga jual sesuai aturan toko." wide>
+            <div class="adm-grid two">
+                <label class="adm-field">
+                    <span>Produk tujuan <b class="req">*</b></span>
+                    <select v-model="importProductId" class="adm-select">
+                        <option v-for="row in autoProducts" :key="row.id" :value="String(row.id)">{{ row.name }}</option>
+                    </select>
+                </label>
+                <label class="adm-field">
+                    <span>Margin jual (%)</span>
+                    <input v-model="importMargin" type="number" min="0" max="1000" step="0.1" class="adm-input">
+                    <span class="hint">Dipakai bila produk belum punya margin sendiri.</span>
+                </label>
+                <label class="adm-field">
+                    <span>Merek</span>
+                    <select v-model="importBrand" class="adm-select">
+                        <option value="">Semua merek</option>
+                        <option v-for="brand in importBrands" :key="brand" :value="brand">{{ brand }}</option>
+                    </select>
+                </label>
+                <label class="adm-field">
+                    <span>Cari SKU</span>
+                    <input v-model="importSearch" class="adm-input" placeholder="Nama nominal atau kode SKU">
+                </label>
+                <label class="adm-switch-row full">
+                    <button type="button" class="adm-switch" role="switch" :aria-checked="importPublish" @click="importPublish = !importPublish" />
+                    Langsung aktif dijual
+                </label>
+            </div>
+
+            <p v-if="importErrors.item_ids" class="err">{{ importErrors.item_ids }}</p>
+            <p v-if="importErrors.publish" class="err">{{ importErrors.publish }}</p>
+
+            <div class="adm-scroll" style="margin-top:10px;max-height:46vh">
+                <table class="adm-table">
+                    <thead><tr><th></th><th>Nominal</th><th>SKU</th><th class="num">Harga seller</th><th class="num">Modal toko</th><th class="num">Harga jual</th></tr></thead>
+                    <tbody>
+                        <tr v-for="row in importRows" :key="row.id">
+                            <td><input type="checkbox" :checked="importPicked.includes(row.id)" @change="toggleImportRow(row.id)"></td>
+                            <td><strong>{{ row.product_name }}</strong><p class="dim">{{ row.brand }}</p></td>
+                            <td class="mono">{{ row.buyer_sku_code }}</td>
+                            <td class="num">{{ rupiah(row.price_idr) }}</td>
+                            <td class="num">{{ rupiah(storeCostOf(row.price_idr)) }}</td>
+                            <td class="num">{{ rupiah(sellPriceOf(row.price_idr)) }}</td>
+                        </tr>
+                        <tr v-if="!importRows.length"><td colspan="6" class="adm-empty">Tidak ada SKU tersedia untuk saringan ini. Sinkronkan daftar harga di menu Digiflazz lebih dulu.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="adm-note">{{ importPicked.length }} dipilih · modal toko memakai tambahan {{ importUplift }}% dari harga seller.</p>
+            <template #footer>
+                <button type="button" class="adm-btn" @click="importOpen = false">Batal</button>
+                <button type="button" class="adm-btn primary" :disabled="importBusy || !importPicked.length || !importProduct" @click="submitImport">
+                    {{ importBusy ? 'Mengimpor…' : `Impor ${importPicked.length} nominal` }}
+                </button>
+            </template>
+        </AdminModal>
         <AdminModal v-model:open="nominalOpen" :title="nominalEditing ? 'Ubah nominal' : 'Tambah nominal'" :description="product?.name || ''">
             <form id="nominal-form" class="adm-grid two" @submit.prevent="saveNominal">
                 <label class="adm-field"><span>Nama nominal <b class="req">*</b></span><input v-model="nominal.name" class="adm-input" maxlength="255" required><span v-if="nominalErrors.name" class="err">{{ nominalErrors.name }}</span></label>

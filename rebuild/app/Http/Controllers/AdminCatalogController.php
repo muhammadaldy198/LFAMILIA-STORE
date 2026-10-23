@@ -106,6 +106,9 @@ class AdminCatalogController
 
         return Inertia::render('Admin/Catalog', [
             'checkoutPreviews' => $checkoutPreviews,
+            'autoProductOptions' => Product::where('fulfillment_mode', 'AUTO_PROVIDER')
+                ->orderBy('name')->get(['id', 'name'])
+                ->map(fn (Product $product): array => ['id' => (int) $product->id, 'name' => $product->name]),
             'categories' => Category::with('media')->orderBy('sort_order')->get()->map(fn (Category $category): array => [
                 ...$category->only('id', 'name', 'slug', 'icon', 'sort_order', 'is_active'),
                 'image_url' => $category->getFirstMediaUrl('image'),

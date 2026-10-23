@@ -88,11 +88,14 @@ test('Digiflazz UI omits Harga Max controls and client requests while keeping SK
     assert.match(source, /healthLabel/);
     assert.match(source, /Sinkron daftar harga/);
 });
-test('password confirmation uses the admin dark theme', () => {
-    const source = read('PasswordConfirm.vue');
-    assert.match(source, /lf-admin lf-admin-auth/);
-    assert.match(source, /bg-slate-900/);
-    assert.match(source, /focus-visible:ring/);
+test('auth pages share the light admin shell', () => {
+    for (const file of ['Login.vue', 'ForgotPassword.vue', 'ResetPassword.vue', 'PasswordConfirm.vue']) {
+        const source = read(file);
+        assert.match(source, /class="auth-page"/, file);
+        assert.doesNotMatch(source, /lf-admin/, file);
+        assert.doesNotMatch(source, /bg-slate-900|text-slate-100/, file);
+    }
+    assert.match(read('PasswordConfirm.vue'), /class="adm-btn primary auth-submit"/);
 });
 test('reports separate sections and keep operations grouped', () => {
     const source = read('Reports.vue');

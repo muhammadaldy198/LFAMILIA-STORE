@@ -303,7 +303,7 @@ Format tiap halaman: **untuk apa · isi · aksi · catatan**. Nama berkas Vue ad
 | Atur ulang kata sandi | `/admin/reset-password/{token}` | `ResetPassword.vue` |
 | Konfirmasi kata sandi | `/admin/password/confirm` | `PasswordConfirm.vue` |
 
-**Catatan:** keempat halaman ini masih memakai gaya lama (`lf-admin-auth`, tema gelap kebiruan). Sisa gaya itu sengaja dipertahankan supaya halaman masuk tetap bisa dipakai; menyamakannya ke tema terang adalah pekerjaan terpisah.
+**Catatan:** keempatnya memakai kerangka terang yang sama (`.auth-page` / `.auth-card`): latar `#f4f5f3`, kartu putih, aksen hijau, lebar maksimal 400px, tanpa gaya gelap. Tidak ada lagi kelas `lf-admin-*` di seluruh panel.
 
 ---
 
@@ -379,12 +379,11 @@ Semua aksi di atas masuk audit log.
 ## 10. Batas yang diketahui
 
 1. **Aksi backend yang belum punya tombol** (sengaja ditunda, menunggu tahap backend): `max-prices/preview`, `max-prices/apply`, `check-process`, `lock-prices`, `packages/{id}/duplicate`, `packages/{id}/voucher-stock`, `mappings/{id}` + `mappings/{id}/sync`, `packages/{id}/sources/digiflazz`, `digiflazz/baseline/{id}`.
-2. **Impor Digiflazz belum punya layar.** Tombol "Impor ke produk" di menu Digiflazz membuka `/admin/catalog?import=digiflazz`, tetapi halaman Produk belum membaca parameter itu, dan `POST /admin/catalog/products/{id}/import` belum dipanggil dari UI. Jadi tombolnya ada, ujungnya belum.
-3. **Blok rekonsiliasi refund top up masih tampil** di Pembayaran (warisan mesin pembayaran: top up ganda ditahan sampai direkonsiliasi). Tombolnya memotong saldo pelanggan dan butuh kata sandi. Ini bertentangan dengan aturan "tidak ada alur refund"; keputusan menyembunyikan atau mempertahankannya belum diambil.
-4. **Halaman masuk masih gelap** (lihat §5).
-5. **DOKU** belum dipakai; tampil sebagai belum aktif.
-6. **Data lokal adalah data uji** — angka di layar lokal bukan angka produksi.
-7. **Konfirmasi kata sandi di Admin & Akses masih penjaga klien.** Kata sandi diperiksa server lewat `/admin/password/confirm`, tetapi route `admin/access` belum memakai middleware `RequireAdminPasswordConfirm`; permintaan langsung tanpa lewat panel tidak akan ditanya sandi. Perlu ditambahkan bila ingin setara dengan penyesuaian saldo.
+2. **Impor Digiflazz punya layar, tapi hanya dari tautan.** Menu Digiflazz → "Impor ke produk" membuka `/admin/catalog?import=digiflazz` dan pop-up impor langsung terbuka; tombol "Impor dari Digiflazz" juga ada di kepala halaman Produk. Yang belum: memilih SKU dari halaman detail Digiflazz satu per satu (`?import_sku=`).
+3. **Blok rekonsiliasi refund top up disembunyikan** dari Pembayaran (23 Okt 2026). Tombolnya tidak lagi dikirim ke peramban, tetapi `POST /admin/payments/refund-reviews/{topupId}/resolve` masih ada di server sebagai jalur pemeliharaan; pesanan dengan top up berstatus `REFUND_REVIEW` tetap ditahan mesin pembayaran sampai rekonsiliasi manual lewat basis data.
+4. **DOKU** belum dipakai; tampil sebagai belum aktif.
+5. **Data lokal adalah data uji** — angka di layar lokal bukan angka produksi.
+6. **Konfirmasi kata sandi di Admin & Akses masih penjaga klien.** Kata sandi diperiksa server lewat `/admin/password/confirm`, tetapi route `admin/access` belum memakai middleware `RequireAdminPasswordConfirm`; permintaan langsung tanpa lewat panel tidak akan ditanya sandi. Perlu ditambahkan bila ingin setara dengan penyesuaian saldo.
 
 ---
 

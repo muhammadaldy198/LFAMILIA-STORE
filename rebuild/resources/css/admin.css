@@ -1,80 +1,44 @@
-/* Sementara: gaya halaman admin yang belum dimigrasi ke AdminLayout. */
-/* LFAMILIA Admin: one operational design system, scoped away from storefront. */
-.lf-admin.lf-admin,.lf-admin-auth.lf-admin-auth,[data-slot=sheet-content][data-slot=sheet-content]{
- --background:#09090b;--foreground:#f4f4f5;--primary:#3b82f6;--primary-foreground:#fff;
- --secondary:#18181b;--secondary-foreground:#f4f4f5;--muted:#18181b;--muted-foreground:#a1a1aa;
- --accent:#27272a;--accent-foreground:#f4f4f5;--card:#121215;--card-foreground:#f4f4f5;
- --popover:#121215;--popover-foreground:#f4f4f5;--border:#27272a;--input:#27272a;--ring:#3b82f6;--destructive:#ef4444;
- --radius:6px;--lf-admin-control:36px;--lf-admin-page:24px;--lf-admin-heading:16px;--lf-admin-body:13px;--lf-admin-note:12px;
- color:var(--foreground);font-size:var(--lf-admin-body);line-height:1.5;
+/* Gaya bersama halaman masuk panel (terang, satu aksen). */
+.auth-page {
+    min-height: 100svh; display: grid; place-items: center; padding: 16px;
+    background: var(--a-bg); color: var(--a-ink);
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 13px; line-height: 1.45;
 }
-/* Specificity intentionally outranks the historical parity rules in app.css. */
-.lf-admin.lf-admin{background:var(--background)}
-.lf-admin .lf-admin-logo{width:36px;height:36px;flex-basis:36px;border-radius:6px;background:var(--primary);box-shadow:none}.lf-admin :is(a,button):focus-visible{outline:2px solid var(--ring);outline-offset:3px}
-[data-slot=sheet-content][data-slot=sheet-content]{z-index:100;max-height:100dvh;overflow-y:auto;background:#fff;color:var(--foreground);padding:24px;overscroll-behavior:contain}
-[data-slot=sheet-content] input:not([type=checkbox]),[data-slot=sheet-content] select{min-height:36px}
-[data-slot=sheet-content] [data-slot=sheet-title]{padding-right:32px}
-[data-slot=sheet-content] [data-slot=sheet-close]{width:36px;height:36px;display:grid;place-items:center}
-[data-slot=sheet-overlay][data-slot=sheet-overlay]{z-index:95;background:#15253b66}
-@media(min-width:768px){
- .lf-admin.lf-admin{--lf-admin-page:28px;--lf-admin-heading:18px;--lf-admin-body:14px;--lf-admin-control:40px}
+.auth-box { width: 100%; max-width: 400px; }
+.auth-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 22px; }
+.auth-mark {
+    width: 40px; height: 40px; flex: 0 0 40px; display: grid; place-items: center;
+    border-radius: 8px; background: var(--a-side); color: var(--a-accent-2);
 }
-@media(max-width:767px){
+.auth-brand b { display: block; font-size: 13px; letter-spacing: .08em; }
+.auth-brand small { display: block; font-size: 11px; color: var(--a-muted); margin-top: 2px; }
+.auth-card {
+    background: var(--a-panel); border: 1px solid var(--a-line);
+    border-radius: var(--a-radius); padding: 22px; display: grid; gap: 14px;
 }
-@media(prefers-reduced-motion:reduce){}
-#customer-editor,#access-editor,#promotions-editor{scroll-margin-top:72px}
-@media(min-width:768px){}
-.lf-admin{min-height:100vh;display:flex;background:#f4f7fb;color:#0f172a}.lf-admin-logo{width:42px;height:42px;display:grid;place-items:center;border-radius:50%;background:linear-gradient(135deg,#2483ff,#0b56c8);font-weight:950}.lf-metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:12px}.lf-metric{padding:12px;border:1px solid #e1e6ed;border-radius:8px;background:#fff}.lf-metric span{width:40px;height:40px;display:grid;place-items:center;border-radius:8px;background:#edf4ff;color:#1769e8;font-weight:950}.lf-metric small{display:block;margin-top:10px;color:#64738b;font-size:8px;font-weight:750}.lf-metric strong{display:block;margin-top:3px;color:#0f1e38;font-size:18px}
-@media(max-width:1100px){.lf-metrics{grid-template-columns:repeat(3,1fr)}}@media(max-width:900px){.lf-metrics{grid-template-columns:repeat(2,1fr)}}@media(max-width:640px){.lf-metrics{grid-template-columns:repeat(2,1fr)}}
-.lf-admin{--lf-admin-page:24px;--lf-admin-heading:16px;--lf-admin-body:13px;--lf-admin-note:11px;--lf-admin-control:36px;background:#f4f7fb;font-size:var(--lf-admin-body);line-height:1.6}
-.lf-admin-logo{width:42px;height:42px;flex:0 0 42px;box-shadow:0 8px 22px rgba(17,99,224,.35)}
-.lf-admin-logo svg{width:25px;height:25px}
-.lf-metric{display:flex;align-items:center;gap:12px;padding:14px;background:#fff;min-height:96px}
-.lf-metric span{flex:0 0 40px}
-.lf-metric small{margin:0;color:#607089}
-.lf-metric strong{font-size:20px!important;font-weight:700!important}
-@media(min-width:640px){.lf-admin{--lf-admin-page:28px;--lf-admin-heading:18px;--lf-admin-body:14px;--lf-admin-note:12px;--lf-admin-control:40px}}
-@media(min-width:1024px){}
-@media(max-width:1023px){
+.auth-card h1 { margin: 0; font-size: 17px; }
+.auth-lead { margin: 4px 0 0; font-size: 12px; color: var(--a-muted); }
+.auth-field { display: grid; gap: 5px; font-size: 12px; font-weight: 600; }
+.auth-field .adm-input { width: 100%; }
+.auth-err { color: var(--a-danger); font-size: 11px; font-weight: 400; }
+.auth-note {
+    margin: 0; padding: 9px 11px; border-radius: 6px; font-size: 12px;
+    background: var(--a-ok-bg); border: 1px solid #cdebd8; color: var(--a-ok);
 }
-@media(max-width:639px){
-}
-.lf-admin,.lf-admin-auth{
- --background:#f4f7fb;--foreground:#243653;--primary:#1769e8;--primary-foreground:#fff;
- --secondary:#edf4ff;--secondary-foreground:#243653;--muted:#f8fafc;--muted-foreground:#718198;
- --accent:#edf4ff;--accent-foreground:#1769e8;--card:#fff;--card-foreground:#243653;
- --popover:#fff;--popover-foreground:#243653;--border:#dfe5ed;--input:#dfe5ed;--ring:#1769e8;--destructive:#dc2626;
-}
-[data-slot=sheet-overlay]{z-index:95!important}
-.lf-admin-auth{font-size:13px;line-height:1.6}
-.lf-admin-auth label{font-size:12px!important;font-weight:600!important}
-.lf-admin-auth input{font-size:16px!important;height:36px!important}
-.lf-admin-auth button{font-size:12px!important;min-height:36px!important}
-.lf-admin-auth h1{font-size:24px!important;font-weight:700!important}
-@media(min-width:640px){.lf-admin-auth{font-size:14px}.lf-admin-auth input,.lf-admin-auth button{min-height:40px!important}.lf-admin-auth h1{font-size:28px!important}}
-@media(max-width:639px){
-}
-@media(max-width:639px){
-}
+.auth-submit { width: 100%; height: 38px; }
+.auth-alt { text-align: center; font-size: 12px; margin: 0; }
+.auth-alt a { color: var(--a-accent); text-decoration: none; }
+.auth-alt a:hover { text-decoration: underline; }
 
-/* Final overrides for the selected Data-Dense Enterprise admin system. */
-.lf-admin,.lf-admin-auth{--background:#0b1020;--foreground:#eef3ff;--primary:#5b8cff;--primary-foreground:#fff;--secondary:#18243a;--secondary-foreground:#eef3ff;--muted:#18243a;--muted-foreground:#a8b5ce;--accent:#1b2c47;--accent-foreground:#eaf2ff;--card:#111a2b;--card-foreground:#eef3ff;--popover:#111a2b;--popover-foreground:#eef3ff;--border:#283650;--input:#283650;--ring:#6ba9ff;--destructive:#f06b78;color:var(--foreground);background:var(--background)}
-@media(min-width:768px){}
-[data-slot=sheet-content][data-slot=sheet-content]{background:#09090b!important;color:#f4f4f5!important;border-color:#27272a!important}
-[data-slot=sheet-content] :is(input,textarea,select){background:#121215!important;color:#f4f4f5!important;border-color:#3f3f46!important}
-[data-slot=sheet-overlay][data-slot=sheet-overlay]{background:#0009}
-.lf-theme-preview{border-radius:6px;background:#09090b;color:#f4f4f5;border:1px solid #27272a}
-.lf-theme-preview>div{border-radius:6px;background:#121215;border-color:#27272a}
-.lf-theme-success{color:#4ade80}.lf-theme-warning{color:#facc15}.lf-theme-error{color:#f87171}.lf-admin :is(a,button):focus-visible{outline:2px solid #60a5fa;outline-offset:3px}
-@media(max-width:639px){}
-@media(max-width:639px){}
-@media(prefers-reduced-motion:reduce){.lf-admin *,.lf-admin *::before,.lf-admin *::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
-.lf-theme-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}.lf-theme-fields label{display:grid;gap:8px}.lf-theme-fields label>span{display:flex;gap:10px}.lf-theme-fields input[type=color]{width:50px;padding:2px}.lf-theme-preview p{color:#a1a1aa}.lf-theme-preview button{margin:14px 0;background:#3b82f6;color:#fff}.lf-theme-preview>span{margin-right:16px}
-
-/* Dashboard strip: aktivitas / integrasi / notifikasi as rows{display:grid;grid-template-columns:1fr;border:1px solid var(--border);border-radius:6px;background:var(--card);overflow:hidden}
-@media(min-width:1024px){
+/* Token shadcn untuk komponen bersama di dalam panel dan pop-up. */
+.adm, [data-slot=sheet-content][data-slot=sheet-content] {
+    --background: #f4f5f3; --foreground: #101410; --primary: #65a30d; --primary-foreground: #ffffff;
+    --secondary: #f1f3ef; --secondary-foreground: #101410; --muted: #f1f3ef; --muted-foreground: #6b736a;
+    --accent: #f3f9e6; --accent-foreground: #3d443c; --card: #ffffff; --card-foreground: #101410;
+    --popover: #ffffff; --popover-foreground: #101410; --border: #e2e5df; --input: #d8dcd4;
+    --ring: #65a30d; --destructive: #b42318; --radius: 8px;
 }
-
 
 /* ===== Sistem tampilan baru ===== */
 /* LFAMILIA Admin — sistem tampilan baru. Terang, padat, satu aksen. */

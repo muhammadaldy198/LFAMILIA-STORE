@@ -204,22 +204,6 @@ class AdminPaymentController
                 'is_active' => (bool) $manualAsset->is_active,
                 'image_url' => $manualAsset->getFirstMediaUrl('image'),
             ] : null,
-            'refundReviews' => DB::table('wallet_topups as topups')
-                ->join('wallets', 'wallets.id', '=', 'topups.wallet_id')
-                ->join('users', 'users.id', '=', 'topups.user_id')
-                ->where('topups.status', 'REFUND_REVIEW')
-                ->orderBy('topups.created_at')
-                ->limit(100)
-                ->get([
-                    'topups.id',
-                    'topups.amount_idr',
-                    'topups.total_idr',
-                    'topups.created_at',
-                    'users.id as user_id',
-                    'users.name as customer_name',
-                    'users.email as customer_email',
-                    'wallets.balance_idr',
-                ]),
             'manualPayments' => DB::table('payment_transactions as payments')
                 ->join('orders', 'orders.id', '=', 'payments.order_id')
                 ->where('payments.gateway_code', 'MANUAL_QRIS')

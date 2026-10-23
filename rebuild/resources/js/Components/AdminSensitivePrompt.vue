@@ -1,9 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
 import { usePage } from '@inertiajs/vue3';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from './ui/sheet';
+import AdminModal from './Admin/AdminModal.vue';
 import { useSensitivePrompt, setSensitiveReady } from '../lib/sensitivePrompt';
 
 // Konfirmasi kata sandi di tempat, supaya tombol sensitif tidak melempar
@@ -57,14 +55,17 @@ async function submit() {
 }
 </script>
 <template>
-    <Sheet :open="open" @update:open="(value) => { if (!value) finish(false); }">
-        <SheetContent side="right" class="w-full overflow-y-auto sm:max-w-sm">
-            <SheetHeader><SheetTitle>Konfirmasi kata sandi</SheetTitle><SheetDescription>{{ reason }}</SheetDescription></SheetHeader>
-            <form class="mt-4 space-y-3" @submit.prevent="submit">
-                <label class="block space-y-1"><span class="text-sm font-medium">Kata sandi admin</span><Input v-model="password" type="password" autocomplete="current-password" required /></label>
-                <p v-if="error" role="alert" class="text-sm text-destructive">{{ error }}</p>
-                <div class="flex justify-end gap-2"><Button type="button" variant="outline" :disabled="busy" @click="finish(false)">Batal</Button><Button type="submit" :disabled="busy || !password">{{ busy ? 'Memeriksa…' : 'Lanjutkan' }}</Button></div>
-            </form>
-        </SheetContent>
-    </Sheet>
+    <AdminModal :open="open" title="Konfirmasi kata sandi" :description="reason" @update:open="(value) => { if (!value) finish(false); }">
+        <form id="sensitive-confirm" class="adm-grid" @submit.prevent="submit">
+            <label class="adm-field full">
+                <span>Kata sandi admin</span>
+                <input v-model="password" type="password" autocomplete="current-password" required class="adm-input">
+            </label>
+            <p v-if="error" role="alert" class="err full">{{ error }}</p>
+        </form>
+        <template #footer>
+            <button type="button" class="adm-btn" :disabled="busy" @click="finish(false)">Batal</button>
+            <button type="submit" form="sensitive-confirm" class="adm-btn primary" :disabled="busy || !password">{{ busy ? 'Memeriksa…' : 'Lanjutkan' }}</button>
+        </template>
+    </AdminModal>
 </template>

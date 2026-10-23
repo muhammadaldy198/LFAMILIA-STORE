@@ -62,7 +62,7 @@ Bagian ini menyatakan **kode tersedia**, bukan "sudah dipakai pelanggan".
 - 141 route admin, 27 controller, 14 izin, dua peran (Super Admin dan Admin)
 - Semua penyuntingan lewat pop-up tengah; detail tiket tampil sebagai panel di halaman
 - Audit log, kesehatan sistem, laporan + ekspor CSV, notifikasi panel
-- Halaman masuk (masuk, lupa sandi, atur ulang, konfirmasi sandi) masih memakai gaya lama gelap — belum diseragamkan
+- Halaman masuk (masuk, lupa sandi, atur ulang, konfirmasi sandi) sudah memakai tema terang yang sama; sisa gaya lama `lf-admin-*` sudah nol
 
 **Pengujian**
 - Suite penuh: 530 tes, 5.296 asersi, 2 dilewati, 0 gagal
@@ -82,7 +82,7 @@ Bagian ini menyatakan **kode tersedia**, bukan "sudah dipakai pelanggan".
 | DOKU | belum dipasang |
 | Deploy panel baru ke server | belum — masih branch lokal |
 | Sebagian aksi backend tanpa tombol di panel | 9 endpoint (lihat `ADMIN-PANEL.md` §10) |
-| Keputusan blok rekonsiliasi refund top up di Pembayaran | belum diputuskan |
+| Blok rekonsiliasi refund top up di Pembayaran | disembunyikan dari panel; route server masih ada |
 
 ---
 

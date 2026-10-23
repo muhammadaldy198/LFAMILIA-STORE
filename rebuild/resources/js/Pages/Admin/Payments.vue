@@ -16,7 +16,6 @@ const props = defineProps({
     summary: { type: Object, default: () => ({}) },
     walletSettings: { type: Object, default: () => ({}) },
     manualQrisAsset: Object,
-    refundReviews: { type: Array, default: () => [] },
     manualPayments: { type: Array, default: () => [] },
     pageSettings: { type: Object, default: () => ({}) },
     callbackUrls: { type: Object, default: () => ({}) },
@@ -210,10 +209,6 @@ const saveWallet = () => {
 const confirmManual = async id => {
     if (!(await confirmSensitive('Konfirmasi bahwa pembayaran QRIS manual ini benar-benar sudah diterima?'))) return;
     router.post('/admin/payments/manual/' + id + '/confirm', {}, { preserveScroll: true });
-};
-const resolveRefund = async topup => {
-    if (!(await confirmSensitive('Rekonsiliasi refund ini dari saldo pelanggan? Dana hanya dipotong jika saldo mencukupi.'))) return;
-    router.post('/admin/payments/refund-reviews/' + topup.id + '/resolve', {}, { preserveScroll: true });
 };
 
 // ---------- transaksi ----------
@@ -507,26 +502,6 @@ const successRate = computed(() => {
                 </div>
             </section>
 
-            <section v-if="refundReviews.length" class="adm-card">
-                <div class="adm-card-head">
-                    <div>
-                        <h2>Refund top up perlu rekonsiliasi</h2>
-                        <p>Gateway sudah mengembalikan pembayaran, tetapi saldo yang pernah dikreditkan sudah terpakai. Belanja dengan saldo dibatasi sampai kewajiban ini selesai.</p>
-                    </div>
-                </div>
-                <div class="adm-card-body" style="display:grid;gap:6px">
-                    <div v-for="topup in refundReviews" :key="'refund-' + topup.id" class="adm-list-row">
-                        <div>
-                            <strong>{{ topup.customer_name }}</strong>
-                            <div class="adm-note">{{ topup.customer_email }} · Top up #{{ topup.id }}</div>
-                            <div class="adm-note">Refund: {{ rupiah(topup.amount_idr) }} · Saldo saat ini: {{ rupiah(topup.balance_idr) }}</div>
-                        </div>
-                        <button v-if="isSuperAdmin" type="button" class="adm-btn sm" :disabled="Number(topup.balance_idr) < Number(topup.amount_idr)" @click="resolveRefund(topup)">
-                            {{ Number(topup.balance_idr) >= Number(topup.amount_idr) ? 'Selesaikan refund' : 'Saldo belum cukup' }}
-                        </button>
-                    </div>
-                </div>
-            </section>
         </template>
 
         <!-- ============ TAB 3: HALAMAN PEMBAYARAN ============ -->

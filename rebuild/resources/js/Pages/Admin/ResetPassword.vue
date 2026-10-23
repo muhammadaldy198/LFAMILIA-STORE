@@ -1,7 +1,5 @@
 <script setup>
 import { Head, Link, useForm } from '@inertiajs/vue3';
-import { Button } from '../../Components/ui/button';
-import { Input } from '../../Components/ui/input';
 
 const props = defineProps({
     email: { type: String, default: '' },
@@ -25,45 +23,39 @@ const submit = () => {
 
 <template>
     <Head title="Kata sandi baru admin" />
-    <main class="lf-admin-auth lf-admin" style="min-height:100svh;display:grid;place-items:center;padding:16px;">
-        <div style="width:100%;max-width:400px;">
-            <form
-                style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:24px;display:grid;gap:16px;"
-                @submit.prevent="submit"
-            >
+    <main class="auth-page">
+        <div class="auth-box">
+            <form class="auth-card" @submit.prevent="submit">
                 <div>
-                    <div style="font-size:17px;font-weight:700;margin-bottom:4px;">Buat kata sandi baru</div>
-                    <div style="font-size:12px;color:var(--muted-foreground);">Gunakan minimal 12 karakter. Sandi yang panjang dan tidak dipakai di tempat lain paling aman.</div>
+                    <h1>Buat kata sandi baru</h1>
+                    <p class="auth-lead">Gunakan minimal 12 karakter. Sandi yang panjang dan tidak dipakai di tempat lain paling aman.</p>
                 </div>
 
-                <label style="display:grid;gap:6px;font-size:12px;font-weight:600;">
+                <label class="auth-field">
                     Email admin
-                    <Input v-model="form.email" name="email" type="email" autocomplete="username" required />
-                    <span v-if="form.errors.email" role="alert" style="color:var(--destructive);font-weight:400;font-size:11px;">{{ form.errors.email }}</span>
+                    <input v-model="form.email" name="email" type="email" autocomplete="username" required class="adm-input">
+                    <span v-if="form.errors.email" role="alert" class="auth-err">{{ form.errors.email }}</span>
                 </label>
 
-                <label style="display:grid;gap:6px;font-size:12px;font-weight:600;">
+                <label class="auth-field">
                     Kata sandi baru
-                    <Input v-model="form.password" name="password" type="password" autocomplete="new-password" required minlength="12" />
-                    <span v-if="form.errors.password" role="alert" style="color:var(--destructive);font-weight:400;font-size:11px;">{{ form.errors.password }}</span>
+                    <input v-model="form.password" name="password" type="password" autocomplete="new-password" required minlength="12" class="adm-input">
+                    <span v-if="form.errors.password" role="alert" class="auth-err">{{ form.errors.password }}</span>
                 </label>
 
-                <label style="display:grid;gap:6px;font-size:12px;font-weight:600;">
+                <label class="auth-field">
                     Ulangi kata sandi baru
-                    <Input v-model="form.password_confirmation" name="password_confirmation" type="password" autocomplete="new-password" required minlength="12" />
-                    <span v-if="form.errors.password_confirmation" role="alert" style="color:var(--destructive);font-weight:400;font-size:11px;">{{ form.errors.password_confirmation }}</span>
+                    <input v-model="form.password_confirmation" name="password_confirmation" type="password" autocomplete="new-password" required minlength="12" class="adm-input">
+                    <span v-if="form.errors.password_confirmation" role="alert" class="auth-err">{{ form.errors.password_confirmation }}</span>
                 </label>
 
-                <p v-for="(error, key) in form.errors" v-show="!['email','password','password_confirmation'].includes(key)" :key="key" role="alert" style="color:var(--destructive);font-size:12px;margin:0;">{{ error }}</p>
+                <p v-for="(error, key) in form.errors" v-show="!['email','password','password_confirmation'].includes(key)" :key="key" role="alert" class="auth-err">{{ error }}</p>
 
-                <Button type="submit" :disabled="form.processing" style="width:100%;font-weight:600;">
+                <button type="submit" class="adm-btn primary auth-submit" :disabled="form.processing">
                     {{ form.processing ? 'Menyimpan…' : 'Simpan kata sandi baru' }}
-                </Button>
+                </button>
 
-                <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;">
-                    <Link href="/admin/forgot-password" style="font-size:12px;color:var(--ring);text-decoration:none;">Minta tautan baru</Link>
-                    <Link href="/admin/login" style="font-size:12px;color:var(--ring);text-decoration:none;">Kembali ke halaman masuk</Link>
-                </div>
+                <p class="auth-alt"><Link href="/admin/forgot-password">Minta tautan baru</Link> · <Link href="/admin/login">Kembali ke halaman masuk</Link></p>
             </form>
         </div>
     </main>
