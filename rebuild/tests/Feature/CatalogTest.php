@@ -1091,6 +1091,75 @@ class CatalogTest extends TestCase
         $this->assertFalse($mapping->fresh()->is_active, 'Menonaktifkan nominal harus ikut menonaktifkan pemetaan.');
     }
 
+    public function test_editing_a_nominal_identity_keeps_stored_pricing_and_nominal_value(): void
+    {
+        $category = Category::where('slug', 'game')->firstOrFail();
+        $product = Product::create([
+            'category_id' => $category->id, 'name' => 'Harga Tersimpan', 'slug' => 'harga-tersimpan',
+            'margin_percent' => 10, 'fulfillment_mode' => 'AUTO_PROVIDER',
+        ]);
+        $provider = Provider::where('code', 'DIGIFLAZZ')->firstOrFail();
+        $rows = [
+            'PRODUCT_MARGIN' => ['mode' => 'PRODUCT_MARGIN', 'margin_percent' => null, 'margin_fixed_idr' => null, 'sell_price_idr' => null, 'sell_markup_percent' => null],
+            'PERCENT' => ['mode' => 'PERCENT', 'margin_percent' => 12.5, 'margin_fixed_idr' => null, 'sell_price_idr' => null, 'sell_markup_percent' => null],
+            'FIXED' => ['mode' => 'FIXED', 'margin_percent' => null, 'margin_fixed_idr' => 3500, 'sell_price_idr' => null, 'sell_markup_percent' => null],
+            'SELL_PRICE' => ['mode' => 'SELL_PRICE', 'margin_percent' => null, 'margin_fixed_idr' => null, 'sell_price_idr' => 21000, 'sell_markup_percent' => 18],
+        ];
+        $packages = [];
+        foreach ($rows as $mode => $pricing) {
+            $package = $product->packages()->create([
+                'code' => 'HT-'.$mode, 'name' => 'Nominal '.$mode, 'nominal_value' => 50,
+                'sort_order' => 1, 'is_active' => true,
+                'pricing_mode' => $pricing['mode'],
+                'margin_percent' => $pricing['margin_percent'],
+                'margin_fixed_idr' => $pricing['margin_fixed_idr'],
+                'sell_price_idr' => $pricing['sell_price_idr'],
+                'sell_markup_percent' => $pricing['sell_markup_percent'],
+            ]);
+            ProviderMapping::create([
+                'product_package_id' => $package->id, 'provider_id' => $provider->id,
+                'external_sku' => 'sku-'.$mode, 'cost_idr' => 10000, 'store_cost_idr' => 10000,
+                'max_price_idr' => 12000, 'priority' => 0, 'is_active' => true,
+            ]);
+            $packages[$mode] = $package->fresh();
+        }
+        $this->actingAs($this->admin(), 'admin');
+
+        foreach ($packages as $mode => $before) {
+            // Payload yang dikirim Catalog.vue setelah CR-01/CR-04: hanya field
+            // identitas yang berubah, field harga tidak ikut dikirim.
+            $this->put('/admin/catalog/packages/'.$before->id, [
+                'code' => $before->code,
+                'name' => $before->name.' baru',
+                'group_name' => 'Promo',
+                'sort_order' => 7,
+                'is_active' => true,
+            ])->assertRedirect()->assertSessionHasNoErrors();
+
+            $after = $before->fresh();
+            $this->assertSame('Nominal '.$mode.' baru', $after->name);
+            $this->assertSame('Promo', $after->group_name);
+            $this->assertSame(7, (int) $after->sort_order);
+            $this->assertSame($before->pricing_mode, $after->pricing_mode, $mode.': mode harga tidak boleh berubah');
+            $this->assertSame($before->sell_price_idr, $after->sell_price_idr, $mode.': harga tetap tidak boleh berubah');
+            $this->assertSame($before->sell_markup_percent, $after->sell_markup_percent, $mode.': markup tidak boleh berubah');
+            $this->assertSame($before->margin_fixed_idr, $after->margin_fixed_idr, $mode.': margin tetap tidak boleh berubah');
+            $this->assertSame($before->margin_percent, $after->margin_percent, $mode.': margin persen tidak boleh berubah');
+            $this->assertSame(50, (int) $after->nominal_value, $mode.': nominal_value tidak boleh ditimpa null');
+        }
+
+        // Bukti tes ini menangkap bug lama: payload versi lama selalu mengirim
+        // nominal_value null + memaksa mode PERCENT/margin 0.
+        $broken = $packages['PRODUCT_MARGIN'];
+        $this->put('/admin/catalog/packages/'.$broken->id, [
+            'code' => $broken->code, 'name' => $broken->name, 'sort_order' => 1, 'is_active' => true,
+            'nominal_value' => null, 'pricing_mode' => 'PERCENT', 'sell_price_idr' => null,
+            'sell_markup_percent' => null, 'margin_percent' => 0,
+        ])->assertRedirect();
+        $this->assertNull($broken->fresh()->nominal_value);
+        $this->assertSame('PERCENT', $broken->fresh()->pricing_mode);
+    }
+
     public function test_activating_an_automatic_nominal_requires_an_active_provider_mapping(): void
     {
         $category = Category::where('slug', 'game')->firstOrFail();

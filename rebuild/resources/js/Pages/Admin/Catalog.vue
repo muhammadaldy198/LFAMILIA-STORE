@@ -4,6 +4,7 @@ import { Head, Link, router } from '@inertiajs/vue3';
 import AdminLayout from '../../Components/Admin/AdminLayout.vue';
 import AdminModal from '../../Components/Admin/AdminModal.vue';
 import { rupiah } from '../../lib/adminFormat';
+import { nominalMode, nominalPayload, nominalPriceValue } from '../../lib/catalogNominal';
 
 const props = defineProps({
     products: { type: Array, default: () => [] },
@@ -176,8 +177,8 @@ const openNominal = (row = null) => {
         group_name: row?.group_name || '',
         sort_order: row?.sort_order ?? (product.value?.packages.length ?? 0),
         is_active: row ? Boolean(row.is_active) : true,
-        price_mode: row?.pricing_mode === 'SELL_PRICE' ? 'FIXED' : row ? 'MARKUP' : 'FIXED',
-        price_value: row?.pricing_mode === 'SELL_PRICE' ? row.sell_price_idr : (row?.sell_markup_percent ?? ''),
+        price_mode: nominalMode(row),
+        price_value: nominalPriceValue(row),
         cost_idr: row?.mappings?.[0]?.cost_idr ?? '',
     });
     nominalImage.value = null;
@@ -188,19 +189,7 @@ const openNominal = (row = null) => {
 const slugCode = (text) => String(text || 'nominal').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'nominal';
 
 const saveNominal = () => {
-    const payload = {
-        name: nominal.name,
-        code: nominalEditing.value?.code || `${slugCode(nominal.name)}-${Date.now().toString(36).slice(-4)}`,
-        group_name: nominal.group_name || null,
-        sort_order: Number(nominal.sort_order || 0),
-        is_active: Boolean(nominal.is_active),
-        note: null,
-        nominal_value: null,
-        pricing_mode: nominal.price_mode === 'FIXED' ? 'SELL_PRICE' : 'PERCENT',
-        sell_price_idr: nominal.price_mode === 'FIXED' ? Number(nominal.price_value || 0) : null,
-        sell_markup_percent: nominal.price_mode === 'MARKUP' ? Number(nominal.price_value || 0) : null,
-        margin_percent: 0,
-    };
+    const payload = nominalPayload(nominalEditing.value, nominal, nominalEditing.value?.code || `${slugCode(nominal.name)}-${Date.now().toString(36).slice(-4)}`);
     saveBusy.value = 'nominal';
     const finish = (bag) => { nominalErrors.value = bag; saveBusy.value = ''; };
     if (nominalEditing.value) {

@@ -302,3 +302,37 @@ test('round-two admin fixes keep their UI entry points', () => {
     const customer = read('CustomerDetail.vue');
     assert.match(customer, /deletable && isSuperAdmin/);
 });
+
+// CR-01 / CR-04: membuka lalu menyimpan nominal hanya untuk mengubah nama,
+// grup, urutan, atau status tidak boleh menyentuh harga yang tersimpan.
+test('editing a nominal keeps stored pricing and nominal_value', async () => {
+    const { nominalMode, nominalPayload, nominalPriceValue } = await import('../../resources/js/lib/catalogNominal.js');
+    const rows = {
+        PRODUCT_MARGIN: { id: 1, code: 'PM-1', name: 'Kode 10', group_name: 'Umum', sort_order: 1, is_active: true, nominal_value: 10, pricing_mode: 'PRODUCT_MARGIN', sell_price_idr: null, sell_markup_percent: null, margin_percent: null, margin_fixed_idr: null },
+        PERCENT: { id: 2, code: 'PC-1', name: 'Kode 20', group_name: 'Umum', sort_order: 2, is_active: true, nominal_value: 20, pricing_mode: 'PERCENT', sell_price_idr: null, sell_markup_percent: null, margin_percent: 12.5, margin_fixed_idr: null },
+        FIXED: { id: 3, code: 'FX-1', name: 'Kode 30', group_name: 'Umum', sort_order: 3, is_active: true, nominal_value: 30, pricing_mode: 'FIXED', sell_price_idr: null, sell_markup_percent: null, margin_percent: null, margin_fixed_idr: 3500 },
+        SELL_PRICE: { id: 4, code: 'SP-1', name: 'Kode 40', group_name: 'Umum', sort_order: 4, is_active: true, nominal_value: 40, pricing_mode: 'SELL_PRICE', sell_price_idr: 21000, sell_markup_percent: 18, margin_percent: null, margin_fixed_idr: null },
+    };
+    const form = row => ({
+        name: row.name + ' baru', group_name: 'Promo', sort_order: row.sort_order + 1, is_active: !row.is_active,
+        price_mode: nominalMode(row), price_value: nominalPriceValue(row), cost_idr: '',
+    });
+    for (const [mode, row] of Object.entries(rows)) {
+        const payload = nominalPayload(row, form(row), 'generated');
+        for (const key of ['pricing_mode', 'sell_price_idr', 'sell_markup_percent', 'margin_percent', 'margin_fixed_idr', 'nominal_value']) {
+            assert.equal(key in payload, false, `${mode}: ${key} tidak boleh ikut terkirim`);
+        }
+        assert.equal(payload.name, row.name + ' baru');
+        assert.equal(payload.sort_order, row.sort_order + 1);
+        assert.equal(payload.is_active, !row.is_active);
+    }
+    // Harga tetap terkirim saat admin memang mengubahnya.
+    const changed = nominalPayload(rows.SELL_PRICE, { ...form(rows.SELL_PRICE), price_value: 25000 }, 'x');
+    assert.equal(changed.pricing_mode, 'SELL_PRICE');
+    assert.equal(changed.sell_price_idr, 25000);
+    // Catalog.vue memakai helper itu, bukan payload lama yang menimpa null.
+    const catalog = read('Catalog.vue');
+    assert.match(catalog, /import \{ nominalMode, nominalPayload, nominalPriceValue \} from '\.\.\/\.\.\/lib\/catalogNominal'/);
+    assert.match(catalog, /const payload = nominalPayload\(nominalEditing\.value, nominal,/);
+    assert.doesNotMatch(catalog, /nominal_value: null,\s*\n\s*pricing_mode:/);
+});
