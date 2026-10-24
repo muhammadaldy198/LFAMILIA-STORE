@@ -27,18 +27,22 @@ const pricingOf = form => ({
 // nominal FIXED 3.500 tidak berubah jadi PERCENT 3.500 (= 350.000%).
 const storedPricing = (row, form) => {
     const value = Number(form.price_value || 0);
+    // sell_markup_percent menang atas margin_percent/margin_fixed_idr di
+    // CheckoutPricing, jadi nilai lama harus dikosongkan saat admin mengetik
+    // harga sendiri — kalau tidak, angka baru diam-diam diabaikan.
+    const cleared = { sell_markup_percent: null };
     const storedUiMode = nominalMode(row);
     if (form.price_mode !== storedUiMode) {
         return form.price_mode === 'FIXED'
-            ? { pricing_mode: 'SELL_PRICE', sell_price_idr: value, margin_percent: null, margin_fixed_idr: null }
-            : { pricing_mode: 'PERCENT', margin_percent: value, sell_price_idr: null, margin_fixed_idr: null };
+            ? { ...cleared, pricing_mode: 'SELL_PRICE', sell_price_idr: value, margin_percent: null, margin_fixed_idr: null }
+            : { ...cleared, pricing_mode: 'PERCENT', margin_percent: value, sell_price_idr: null, margin_fixed_idr: null };
     }
     switch (row.pricing_mode) {
-        case 'SELL_PRICE': return { pricing_mode: 'SELL_PRICE', sell_price_idr: value };
-        case 'FIXED': return { pricing_mode: 'FIXED', margin_fixed_idr: value };
+        case 'SELL_PRICE': return { ...cleared, pricing_mode: 'SELL_PRICE', sell_price_idr: value };
+        case 'FIXED': return { ...cleared, pricing_mode: 'FIXED', margin_fixed_idr: value };
         default:
             // PRODUCT_MARGIN tidak punya angka sendiri; angka eksplisit = markup.
-            return { pricing_mode: 'PERCENT', margin_percent: value };
+            return { ...cleared, pricing_mode: 'PERCENT', margin_percent: value };
     }
 };
 

@@ -366,6 +366,17 @@ test('editing a nominal keeps stored pricing and nominal_value', async () => {
     assert.equal(percentToFixed.margin_fixed_idr, null);
     assert.equal(fixedToMarkup.sell_price_idr, null);
     assert.equal(fixedToMarkup.margin_fixed_idr, null);
+    // Baris lama yang masih punya sell_markup_percent: kolom itu MENANG atas
+    // margin_percent/margin_fixed_idr di CheckoutPricing, jadi setiap simpan
+    // harga harus mengosongkannya — kalau tidak, angka baru diam-diam diabaikan.
+    for (const payload of [changed, fixedEdit, percentEdit, fixedToMarkup, percentToFixed]) {
+        assert.equal(payload.sell_markup_percent, null);
+    }
+    // Ganti mode dengan ANGKA yang sama juga harus tetap tercatat (bukan
+    // dianggap tidak berubah hanya karena nilainya kebetulan sama).
+    const sameNumberSwitch = nominalPayload(rows.SELL_PRICE, { ...form(rows.SELL_PRICE), price_mode: 'MARKUP', price_value: 21000 }, 'x');
+    assert.equal(sameNumberSwitch.pricing_mode, 'PERCENT');
+    assert.equal(sameNumberSwitch.margin_percent, 21000);
     // Catalog.vue memakai helper itu, bukan payload lama yang menimpa null.
     const catalog = read('Catalog.vue');
     assert.match(catalog, /import \{ nominalMode, nominalPayload, nominalPriceValue \} from '\.\.\/\.\.\/lib\/catalogNominal'/);
