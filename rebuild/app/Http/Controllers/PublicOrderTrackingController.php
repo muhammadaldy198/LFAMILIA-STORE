@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\PublicOrderStatusService;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -12,6 +13,8 @@ use Inertia\Response;
 
 class PublicOrderTrackingController
 {
+    public function __construct(private readonly PublicOrderStatusService $statuses) {}
+
     public function index(): Response
     {
         return Inertia::render('Guest/Track', [
@@ -58,7 +61,7 @@ class PublicOrderTrackingController
                 'productName' => $order->product_name,
                 'packageLabel' => $order->package_name,
                 'total' => (int) $order->total_idr,
-                'status' => $this->publicStatus((string) $order->status),
+                'status' => $this->statuses->slug((string) $order->status),
                 'createdAt' => $order->created_at,
             ])->values();
 
@@ -127,7 +130,7 @@ class PublicOrderTrackingController
             ->map(fn (object $event): array => [
                 'id' => (int) $event->id,
                 'source' => $this->eventSource((string) $event->event_type),
-                'status' => $event->to_status ? $this->publicStatus((string) $event->to_status) : null,
+                'status' => $event->to_status ? $this->statuses->slug((string) $event->to_status) : null,
                 'label' => $this->eventLabel((string) $event->event_type, $event->to_status),
                 'createdAt' => $event->created_at,
             ])->values()->all();
@@ -145,7 +148,7 @@ class PublicOrderTrackingController
             'paymentMethod' => $order->payment_channel_name ?: 'Pembayaran',
             'paymentStatus' => $this->paymentStatus((string) ($payment?->status ?? ''), (string) $order->status, $order->paid_at !== null),
             'wasPaid' => $order->paid_at !== null,
-            'fulfillmentStatus' => $this->publicStatus((string) $order->status),
+            'fulfillmentStatus' => $this->statuses->slug((string) $order->status),
             'events' => $events,
             'createdAt' => $order->created_at,
             'updatedAt' => $order->updated_at,
@@ -157,7 +160,6 @@ class PublicOrderTrackingController
         return DB::table('orders')
             ->join('products', 'products.id', '=', 'orders.product_id')
             ->join('product_packages', 'product_packages.id', '=', 'orders.product_package_id')
-            ->whereIn('orders.status', ['PENDING_PAYMENT', 'PAID', 'PROCESSING', 'SUCCESS', 'FAILED', 'BLOCKED', 'EXPIRED', 'CANCELLED', 'REFUND', 'REFUNDED'])
             ->orderByDesc('orders.id')->limit(20)
             ->get([
                 'orders.order_number', 'orders.status', 'orders.total_idr', 'orders.created_at',
@@ -168,7 +170,7 @@ class PublicOrderTrackingController
                 'productName' => $order->product_name,
                 'packageLabel' => $order->package_name,
                 'total' => (int) $order->total_idr,
-                'status' => $this->publicStatus((string) $order->status),
+                'status' => $this->statuses->slug((string) $order->status),
                 'createdAt' => $order->created_at,
             ])->values()->all();
     }
@@ -286,21 +288,6 @@ class PublicOrderTrackingController
         return $parts ? implode(' / ', $parts) : null;
     }
 
-    private function publicStatus(string $status): string
-    {
-        return match (strtoupper($status)) {
-            'PENDING_PAYMENT' => 'pending',
-            'PAID' => 'paid',
-            'PROCESSING' => 'processing',
-            'SUCCESS' => 'success',
-            'EXPIRED' => 'expired',
-            'CANCELLED' => 'cancelled',
-            'BLOCKED' => 'blocked',
-            'REFUND', 'REFUNDED' => 'refunded',
-            default => 'failed',
-        };
-    }
-
     private function paymentStatus(string $paymentStatus, string $orderStatus, bool $wasPaid): string
     {
         $payment = strtoupper($paymentStatus);
@@ -311,7 +298,7 @@ class PublicOrderTrackingController
             return 'paid';
         }
         // Keep the paid flag when a previously paid fulfillment fails.
-        if ($wasPaid && in_array(strtoupper($orderStatus), ['FAILED', 'BLOCKED'], true)) {
+        if ($wasPaid && $this->statuses->value($orderStatus) === 'FAILED') {
             return 'paid';
         }
         if (in_array($payment, ['EXPIRE', 'EXPIRED'], true) || strtoupper($orderStatus) === 'EXPIRED') {
@@ -349,18 +336,7 @@ class PublicOrderTrackingController
     private function eventLabel(string $eventType, mixed $toStatus): string
     {
         if (is_string($toStatus) && $toStatus !== '') {
-            return match (strtoupper($toStatus)) {
-                'PENDING_PAYMENT' => 'Menunggu pembayaran',
-                'PAID' => 'Pembayaran diterima',
-                'PROCESSING' => 'Pesanan sedang diproses',
-                'SUCCESS' => 'Pesanan berhasil',
-                'FAILED' => 'Transaksi gagal',
-                'EXPIRED' => 'Pembayaran kedaluwarsa',
-                'CANCELLED' => 'Transaksi dibatalkan',
-                'BLOCKED' => 'Gagal diproses; hubungi admin',
-                'REFUND', 'REFUNDED' => 'Perlu pemeriksaan admin',
-                default => 'Status pesanan diperbarui',
-            };
+            return $this->statuses->label($toStatus);
         }
 
         return match (strtoupper($eventType)) {

@@ -33,6 +33,7 @@ class CustomerEmailMomentsTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->withoutVite();
         $this->withoutMiddleware(ThrottleRequests::class);
         Queue::fake();
     }
@@ -681,6 +682,7 @@ class CustomerEmailMomentsTest extends TestCase
                 && str_contains($job->subject, 'gagal diproses')
                 && str_contains($job->text, $invoice)
                 && str_contains($job->text, 'bukti bayar')
+                && ! str_contains($lower, 'blocked')
                 && ! str_contains($lower, 'refund')
                 && ! str_contains($lower, 'pengembalian dana');
         });

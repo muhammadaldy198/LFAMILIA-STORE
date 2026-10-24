@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\PaymentPresentationService;
 use App\Services\PaymentRoutingService;
+use App\Services\PublicOrderStatusService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -13,6 +14,8 @@ use Inertia\Response;
 
 class CustomerOrderController
 {
+    public function __construct(private readonly PublicOrderStatusService $statuses) {}
+
     public function index(Request $request): Response
     {
         return Inertia::render('Customer/Orders', [
@@ -22,7 +25,12 @@ class CustomerOrderController
                 ->orderByDesc('orders.id')
                 ->select('orders.id', 'orders.order_number', 'orders.status', 'orders.total_idr',
                     'orders.created_at', 'products.name as product_name')
-                ->paginate(10),
+                ->paginate(10)
+                ->through(function (object $order): object {
+                    $order->status = $this->statuses->value((string) $order->status);
+
+                    return $order;
+                }),
         ]);
     }
 
@@ -113,6 +121,7 @@ class CustomerOrderController
         $record->delivery = $record->status === 'SUCCESS' && is_string($record->delivery_payload)
             ? (json_decode($record->delivery_payload, true) ?: null) : null;
         unset($record->delivery_payload);
+        $record->status = $this->statuses->value((string) $record->status);
 
         return Inertia::render('Customer/OrderDetail', [
             'order' => $record,

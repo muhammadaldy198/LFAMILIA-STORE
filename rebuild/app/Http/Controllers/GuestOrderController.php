@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\GuestOrderAccess;
 use App\Services\PaymentPresentationService;
+use App\Services\PublicOrderStatusService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -13,6 +14,8 @@ use Inertia\Response;
 
 class GuestOrderController
 {
+    public function __construct(private readonly PublicOrderStatusService $statuses) {}
+
     public function verify(Request $request, GuestOrderAccess $access): RedirectResponse
     {
         $data = $request->validate([
@@ -48,6 +51,7 @@ class GuestOrderController
         $order->delivery = $order->status === 'SUCCESS' && is_string($order->delivery_payload)
             ? (json_decode($order->delivery_payload, true) ?: null) : null;
         unset($order->delivery_payload);
+        $order->status = $this->statuses->value((string) $order->status);
 
         return Inertia::render('Guest/OrderStatus', [
             'order' => $order,
@@ -76,7 +80,7 @@ class GuestOrderController
         return response()->json([
             'order' => [
                 'order_number' => $order->order_number,
-                'status' => $order->status,
+                'status' => $this->statuses->value((string) $order->status),
                 'total_idr' => (int) $order->total_idr,
                 'created_at' => $order->created_at,
                 'product_name' => $order->product_name,
@@ -95,8 +99,8 @@ class GuestOrderController
             ->map(fn ($event): array => [
                 'id' => (int) $event->id,
                 'event_type' => $event->event_type,
-                'from_status' => $event->from_status,
-                'to_status' => $event->to_status,
+                'from_status' => $event->from_status ? $this->statuses->value((string) $event->from_status) : null,
+                'to_status' => $event->to_status ? $this->statuses->value((string) $event->to_status) : null,
                 'created_at' => $event->created_at,
             ])->all();
     }

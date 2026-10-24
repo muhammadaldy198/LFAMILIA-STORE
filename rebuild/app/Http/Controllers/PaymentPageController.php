@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Services\PaymentPageSettingsService;
 use App\Services\PaymentPresentationService;
 use App\Services\PaymentRoutingService;
+use App\Services\PublicOrderStatusService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -16,6 +17,8 @@ use Inertia\Response;
 
 class PaymentPageController
 {
+    public function __construct(private readonly PublicOrderStatusService $statuses) {}
+
     /**
      * Nama param hasil gateway yang diabaikan saat validasi
      * signature (hasValidSignatureWhileIgnoring): Midtrans
@@ -173,7 +176,7 @@ class PaymentPageController
         return Inertia::render('Payment/Show', [
             'order' => [
                 'order_number' => $order->order_number,
-                'status' => $order->status,
+                'status' => $this->statuses->value((string) $order->status),
                 'product_name' => $order->product_name,
                 'package_name' => $order->package_name,
                 'product_total_idr' => max(0, (int) $order->cost_idr + (int) $order->margin_idr - (int) $order->discount_idr),
