@@ -6,7 +6,7 @@ import {Head,Link} from '@inertiajs/vue3';
 import {computed,onMounted,onUnmounted,ref} from 'vue';
 import {rupiah} from '../../lib/money';
 import CustomerShell from '../../Components/CustomerShell.vue';
-import {isTerminalOrderStatus,orderStatusInfo} from '../../lib/orderStatus';
+import {isTerminalOrderStatus,orderStatusInfo,paymentStatusLabel} from '../../lib/orderStatus';
 
 const props=defineProps({order:Object,payment:Object,events:Array,review:Object});
 const orderState=ref({...props.order});
@@ -105,7 +105,7 @@ onUnmounted(()=>{disposed=true;if(timer)clearInterval(timer);});
 
                 <section v-if="orderState.status==='PENDING_PAYMENT'" class="lf-order-payment">
                     <h2>{{ customerText("pages.guest.orderstatus.3527df23", "Pembayaran") }}</h2>
-                    <p v-if="paymentState">{{ customerText("pages.guest.orderstatus.ca77496f", "Status:") }} <strong>{{statusLabel(paymentState.status)}}</strong></p>
+                    <p v-if="paymentState">{{ customerText("pages.guest.orderstatus.ca77496f", "Status:") }} <strong>{{paymentStatusLabel(paymentState.status)}}</strong></p>
                     <p v-if="paymentUncertain">{{ customerText("pages.guest.orderstatus.fc9d0f83", "Status pembayaran sedang dipastikan. Jangan membayar ulang.") }}</p>
                     <img v-if="!paymentUncertain&&paymentState?.instructions?.qr_url" :src="paymentState.instructions.qr_url" :alt="customerText('pages.guest.orderstatus.attribute.alt.dfd028b8', 'QRIS pembayaran')">
                     <p v-if="paymentState?.instructions?.va_number">{{ customerText("pages.guest.orderstatus.d5aec755", "Nomor VA:") }} <strong>{{paymentState.instructions.va_number}}</strong></p>

@@ -202,3 +202,24 @@ test('guest ticket status is translated instead of showing raw enum values', () 
     }
     assert.doesNotMatch(support, /PENDING: |ANSWERED: /);
 });
+
+test('payment statuses never borrow the six order-status labels', () => {
+    // Status pembayaran (UNKNOWN/REFUNDED/...) bukan status pesanan: kalau dinormalkan
+    // lewat orderStatusInfo, pembayaran belum pasti tampil "Gagal" dan pembeli membayar ulang.
+    for (const page of ['Pages/Guest/OrderStatus.vue', 'Pages/Guest/Track.vue', 'Pages/Customer/OrderDetail.vue']) {
+        const source = read(page);
+        assert.match(source, /paymentStatusLabel/, `${page} harus memakai paymentStatusLabel`);
+        assert.doesNotMatch(source, /statusLabel\(paymentState\.status\)/, `${page} masih menormalkan status pembayaran`);
+        assert.doesNotMatch(source, /statusMeta\(detail\.paymentStatus\)/, `${page} masih menormalkan status pembayaran`);
+    }
+});
+
+test('resend-verification control is not nested inside the login form', () => {
+    const login = read('Pages/Auth/Login.vue');
+    // Submit bersarang membuat klik "kirim ulang" ikut mengirim form login.
+    assert.doesNotMatch(login, /<form[^>]*@submit\.prevent="resendVerification"/);
+    assert.match(login, /type="button"[^>]*@click="resendVerification"/);
+    const loginFormEnd = login.indexOf('</form>');
+    assert.ok(loginFormEnd > -1, 'form login harus ada penutupnya');
+    assert.ok(login.indexOf('@click="resendVerification"') > loginFormEnd, 'tombol kirim ulang harus di luar form login');
+});

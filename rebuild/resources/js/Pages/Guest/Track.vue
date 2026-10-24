@@ -5,7 +5,7 @@ const { customerText } = useCustomerPresentation();
 import {Head,Link} from '@inertiajs/vue3';
 import {computed,onMounted,onUnmounted,ref} from 'vue';
 import CustomerShell from '../../Components/CustomerShell.vue';
-import { isTerminalOrderStatus, manualHelpMessage, nextOrderAction, orderStatusInfo } from '../../lib/orderStatus';
+import {isTerminalOrderStatus,manualHelpMessage,nextOrderAction,orderStatusInfo,paymentStatusLabel} from '../../lib/orderStatus';
 
 const props=defineProps({transactions:Array});
 const query=ref('');
@@ -135,7 +135,7 @@ onUnmounted(()=>{disposed=true;selectionVersion++;stopDetailPolling();if(feedTim
      <div><dt>{{ customerText("pages.guest.track.a2defbe3", "Nominal") }}</dt><dd>{{detail.packageLabel}}</dd></div>
      <div><dt>{{ customerText("pages.guest.track.65ca564", "Tujuan") }}</dt><dd>{{detail.destination||'Disembunyikan'}}</dd></div>
      <div><dt>{{ customerText("pages.guest.track.443c0671", "Metode Pembayaran") }}</dt><dd>{{detail.paymentMethod}}</dd></div>
-     <div><dt>{{ customerText("pages.guest.track.da472e8b", "Status Pembayaran") }}</dt><dd>{{statusMeta(detail.paymentStatus)[0]}}</dd></div>
+     <div><dt>{{ customerText("pages.guest.track.da472e8b", "Status Pembayaran") }}</dt><dd>{{paymentStatusLabel(detail.paymentStatus)}}</dd></div>
      <div><dt>{{ customerText("pages.guest.track.ad066d9d", "Total") }}</dt><dd class="money">{{money(detail.total)}}</dd></div>
      <div><dt>{{ customerText("pages.guest.track.e378eb96", "Dibuat") }}</dt><dd>{{date(detail.createdAt)}}</dd></div>
      <div><dt>{{ customerText("pages.guest.track.6e230e94", "Update") }}</dt><dd>{{date(detail.updatedAt)}}</dd></div>
