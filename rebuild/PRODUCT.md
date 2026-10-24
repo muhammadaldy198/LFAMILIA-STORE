@@ -25,7 +25,7 @@ Digiflazz SKU masuk melalui trusted catalog/import/sync flow. Customer tidak dap
 Harga jual katalog dihitung dari **modal toko**, bukan langsung dari harga seller provider:
 
 - **modal toko** = `provider_mappings.store_cost_idr` — dibentuk sekali saat impor/bootstrap dengan menambahkan **tambahan modal** (uplift, bawaan 2%) di atas harga seller, lalu boleh diedit admin. Sync provider memperbarui harga seller sebagai referensi (`seller_reference_price_idr`) tanpa menimpa modal toko dan tanpa menerapkan ulang uplift.
-- **harga jual** = modal toko × **markup jual** yang berlaku (bawaan 10%). Markup bisa diatur global, per game/produk, dan per nominal; yang lebih spesifik menang. Harga rupiah dibulatkan ke atas, tanpa pembulatan "cantik".
+- **harga jual** = modal toko × **markup jual** yang berlaku (bawaan 10%). Markup berlaku di tingkat **nominal** (mode persen; admin dapat menggantinya menjadi harga tetap per nominal). Produk/game **tidak punya markup sendiri** — markup tingkat produk dihapus (PR #302; keputusan pemilik 2026-10-24). Harga rupiah dibulatkan ke atas, tanpa pembulatan "cantik".
 
 Nominal manual memakai modal toko yang diketik admin apa adanya (tanpa uplift) dengan markup yang sama.
 

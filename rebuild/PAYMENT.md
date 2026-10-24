@@ -4,7 +4,9 @@
 
 ## Gateway/channel model
 
-Customer memilih **payment channel** publik. Gateway internal dipilih backend.
+Customer memilih **payment channel** publik. Route internal untuk channel itu diselesaikan backend **hanya dari route yang sudah diaktifkan admin**.
+
+**Model pemilik (keputusan 2026-10-24): tidak ada perpindahan gateway otomatis.** Midtrans adalah gateway utama; **DOKU adalah cadangan**. Gateway hidup/mati adalah keputusan manual admin di panel (**Admin > Pembayaran > Gateway**) atas keputusan pemilik — kode tidak pernah mengaktifkan, menonaktifkan, atau memindahkan gateway sendiri. `PaymentRoutingService` di bawah ini hanya menyelesaikan route di antara yang sudah aktif; itu bukan failover dan bukan pengalihan gateway.
 
 Implementasi mempunyai gateway registry untuk Midtrans, DOKU, Manual QRIS, dan LFAMILIA Wallet. Dukungan kode tidak berarti gateway eksternal sudah live-configured.
 
