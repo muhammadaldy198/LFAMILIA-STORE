@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Actions\Fortify\CreateNewUser;
 use App\Actions\Fortify\ResetUserPassword;
+use App\Http\Responses\RegisterResponse;
 use App\Models\User;
 use App\Services\LoginRiskService;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -12,11 +13,18 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
+use Laravel\Fortify\Contracts\RegisterResponse as RegisterResponseContract;
 use Laravel\Fortify\Fortify;
 
 class FortifyServiceProvider extends ServiceProvider
 {
+    public function register(): void
+    {
+        $this->app->singleton(RegisterResponseContract::class, RegisterResponse::class);
+    }
+
     public function boot(): void
     {
         Fortify::createUsersUsing(CreateNewUser::class);
@@ -45,6 +53,12 @@ class FortifyServiceProvider extends ServiceProvider
                 }
 
                 return null;
+            }
+
+            if (! $user->hasVerifiedEmail()) {
+                throw ValidationException::withMessages([
+                    'email' => 'Verifikasi email terlebih dahulu melalui tautan yang kami kirim sebelum masuk.',
+                ]);
             }
 
             $risk->clear('customer', $request->ip(), $identity);

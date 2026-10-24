@@ -30,6 +30,7 @@ use App\Http\Controllers\AdminSupportController;
 use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\CustomerAccountController;
+use App\Http\Controllers\CustomerEmailVerificationController;
 use App\Http\Controllers\CustomerOrderController;
 use App\Http\Controllers\CustomerPasswordConfirmController;
 use App\Http\Controllers\CustomerPhoneController;
@@ -127,6 +128,9 @@ Route::middleware('guest:web')->group(function (): void {
     Route::get('/auth/google/callback', [GoogleAuthController::class, 'callback'])
         ->middleware('throttle:google-oauth')->name('google.callback');
 });
+
+Route::get('/email/confirm/{id}/{hash}', CustomerEmailVerificationController::class)
+    ->middleware(['signed', 'throttle:6,1'])->name('customer.verification.verify');
 
 Route::middleware('auth:web')->group(function (): void {
     Route::get('/user/confirm-password', [CustomerPasswordConfirmController::class, 'show'])
