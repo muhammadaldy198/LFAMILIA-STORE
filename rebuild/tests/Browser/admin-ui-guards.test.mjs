@@ -320,7 +320,7 @@ test('editing a nominal keeps stored pricing and nominal_value', async () => {
     });
     for (const [mode, row] of Object.entries(rows)) {
         const payload = nominalPayload(row, form(row), 'generated');
-        for (const key of ['pricing_mode', 'sell_price_idr', 'sell_markup_percent', 'margin_percent', 'margin_fixed_idr', 'nominal_value', 'note']) {
+        for (const key of ['pricing_mode', 'sell_price_idr', 'margin_percent', 'margin_fixed_idr', 'nominal_value', 'note']) {
             assert.equal(key in payload, false, `${mode}: ${key} tidak boleh ikut terkirim`);
         }
         assert.equal(payload.name, row.name + ' baru');
@@ -366,11 +366,10 @@ test('editing a nominal keeps stored pricing and nominal_value', async () => {
     assert.equal(percentToFixed.margin_fixed_idr, null);
     assert.equal(fixedToMarkup.sell_price_idr, null);
     assert.equal(fixedToMarkup.margin_fixed_idr, null);
-    // Baris lama yang masih punya sell_markup_percent: kolom itu MENANG atas
-    // margin_percent/margin_fixed_idr di CheckoutPricing, jadi setiap simpan
-    // harga harus mengosongkannya — kalau tidak, angka baru diam-diam diabaikan.
+    // Panel tidak punya markup produk/nominal terpisah: payload harga tidak
+    // boleh membawa kolom sell_markup_percent sama sekali.
     for (const payload of [changed, fixedEdit, percentEdit, fixedToMarkup, percentToFixed]) {
-        assert.equal(payload.sell_markup_percent, null);
+        assert.equal('sell_markup_percent' in payload, false);
     }
     // Ganti mode dengan ANGKA yang sama juga harus tetap tercatat (bukan
     // dianggap tidak berubah hanya karena nilainya kebetulan sama).
@@ -389,7 +388,9 @@ test('editing a nominal keeps stored pricing and nominal_value', async () => {
 test('import margin reads the active pricing setting', () => {
     const catalog = read('Catalog.vue');
     assert.match(catalog, /importMargin = ref\(Number\(props\.pricingSettings\?\.sell_markup_percent/);
-    assert.match(catalog, /importMargin\.value = Number\(importProduct\.value\?\.sell_markup_percent \?\? props\.pricingSettings\?\.sell_markup_percent/);
+    // Angka impor selalu dari setting aktif, bukan markup produk yang tidak
+    // ada di panel.
+    assert.doesNotMatch(catalog, /importProduct\.value\?\.sell_markup_percent/);
     assert.doesNotMatch(catalog, /defaultMargin|props\.pricingSettings\?\.default_margin/);
     // Dua kolom global impor: harga modal (%) dan harga jual (%), keduanya
     // bisa diubah admin dan dikirim bersama impor untuk semua SKU terpilih.
@@ -407,7 +408,8 @@ test('source tab edits store cost and toggles whole-catalog auto sync', () => {
     assert.match(catalog, /saveMapping\(mapping, \{ store_cost_idr: Number\(\$event\.target\.value \|\| 0\) \}\)/);
     // Saklar sinkron otomatis seluruh katalog (bukan per produk).
     assert.match(catalog, /const toggleAutoSync = \(\) => \{/);
-    assert.match(catalog, /router\.put\('\/admin\/digiflazz\/settings'/);
+    // Saklar memakai route ber-izin katalog, bukan route integrasi provider.
+    assert.match(catalog, /router\.put\('\/admin\/catalog\/auto-sync'/);
     assert.doesNotMatch(catalog, /products\/\$\{product\.value\.id\}\/sync/);
 });
 
@@ -436,8 +438,8 @@ test('catalog source tab uses existing mapping and sync routes', () => {
     assert.match(catalog, /Sumber<\/button>/);
     assert.match(catalog, /\/admin\/catalog\/mappings\/\$\{mapping\.id\}/);
     assert.match(catalog, /\/admin\/catalog\/mappings\/\$\{mapping\.id\}\/sync/);
-    // Sinkron seluruh katalog milik menu Digiflazz, bukan tombol per produk:
-    // route products/{id}/sync tetap ada di server, tapi panel tidak memakainya.
+    // Sinkron seluruh katalog milik menu Digiflazz: tidak ada tombol maupun
+    // route sinkron per produk.
     assert.doesNotMatch(catalog, /products\/\$\{product\.value\.id\}\/sync/);
     // Daftar, prioritas, status, dan sinkron ada di panel.
     assert.match(catalog, /movePriority\(mapping, -1\)/);
@@ -445,9 +447,10 @@ test('catalog source tab uses existing mapping and sync routes', () => {
     assert.match(catalog, /mappingStatusLabel\(mapping\)/);
     // Nama route ditulis di dalam group ber-prefix, jadi yang dicek nama lokalnya.
     const routes = repo('routes/web.php');
-    for (const route of ['mappings.sync', 'mappings.update', 'products.sync']) {
+    for (const route of ['mappings.sync', 'mappings.update']) {
         assert.ok(routes.includes("'" + route + "'"), 'route ' + route + ' harus tetap ada');
     }
+    assert.ok(!routes.includes("'products.sync'"), 'route sinkron per produk harus dibuang');
 });
 
 

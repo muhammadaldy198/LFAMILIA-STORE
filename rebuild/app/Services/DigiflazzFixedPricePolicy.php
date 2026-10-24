@@ -48,11 +48,8 @@ class DigiflazzFixedPricePolicy
             $cost = (int) ($row->store_cost_idr ?? $row->cost_idr);
             if (! isset($suggestions[$id]) || $cost < $suggestions[$id]['cost_idr']) {
                 $legacyPricing = $row->store_cost_idr === null
-                    && $row->package_sell_markup_percent === null
-                    && $row->product_sell_markup_percent === null;
-                $markup = $legacyPricing ? null : ($row->package_sell_markup_percent
-                    ?? $row->product_sell_markup_percent
-                    ?? $globalMarkup);
+                    && $row->package_sell_markup_percent === null;
+                $markup = $legacyPricing ? null : ($row->package_sell_markup_percent ?? $globalMarkup);
                 $suggestions[$id] = [
                     'package_id' => $id,
                     'product_name' => (string) $row->product_name,
@@ -64,7 +61,7 @@ class DigiflazzFixedPricePolicy
                             ? $cost + (int) $row->margin_fixed_idr
                             : $this->fixedPriceFromCost(
                                 $cost,
-                                (string) ($row->pricing_mode === 'PERCENT' ? $row->package_margin_percent : $row->product_margin_percent)
+                                (string) ($row->package_margin_percent ?? $globalMarkup)
                             )),
                     'seller_sku' => (string) $row->external_sku,
                 ];
@@ -146,8 +143,6 @@ class DigiflazzFixedPricePolicy
                 'packages.margin_percent as package_margin_percent',
                 'packages.sell_markup_percent as package_sell_markup_percent',
                 'packages.margin_fixed_idr',
-                'products.margin_percent as product_margin_percent',
-                'products.sell_markup_percent as product_sell_markup_percent',
                 'products.name as product_name',
                 'mappings.external_sku',
                 'mappings.cost_idr',

@@ -116,10 +116,9 @@ class CheckoutTest extends TestCase
         $this->assertSame(10100, $quote['max_price_idr']);
     }
 
-    public function test_digiflazz_markup_uses_nominal_then_game_then_global_precedence(): void
+    public function test_digiflazz_markup_uses_nominal_then_global_precedence(): void
     {
         $catalog = $this->catalog(['margin_percent' => 12, 'sell_markup_percent' => 12]);
-        DB::table('products')->where('id', $catalog['product']->id)->update(['sell_markup_percent' => 12]);
         DB::table('system_settings')->updateOrInsert(
             ['key' => 'pricing.sell_markup_percent'],
             ['value' => json_encode(8), 'updated_at' => now(), 'created_at' => now()]
@@ -142,9 +141,9 @@ class CheckoutTest extends TestCase
             'sell_markup_percent' => null,
         ]);
         $quote = app(CheckoutPricing::class)->forPackage($catalog['package_id']);
-        $this->assertSame(1440, $quote['margin_idr']);
+        $this->assertSame(960, $quote['margin_idr']);
+        $this->assertSame(12960, $quote['subtotal_idr']);
 
-        DB::table('products')->where('id', $catalog['product']->id)->update(['sell_markup_percent' => null]);
         DB::table('product_packages')->where('id', $catalog['package_id'])
             ->update(['sell_markup_percent' => null]);
         $quote = app(CheckoutPricing::class)->forPackage($catalog['package_id']);

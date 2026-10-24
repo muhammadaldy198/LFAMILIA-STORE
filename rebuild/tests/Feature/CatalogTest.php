@@ -885,10 +885,9 @@ class CatalogTest extends TestCase
             'fulfillment_mode' => 'MANUAL',
             'manual_instructions' => 'Cek pesanan di panel admin',
             'margin_percent' => 10,
-            'sell_markup_percent' => 15,
             'sort_order' => 3,
             'packages' => [
-                ['name' => '100 Koin', 'nominal_value' => 100, 'cost_idr' => 10000, 'sell_markup_percent' => 12],
+                ['name' => '100 Koin', 'nominal_value' => 100, 'cost_idr' => 10000],
                 ['name' => '200 Koin', 'nominal_value' => 200, 'cost_idr' => 19000],
                 ['name' => 'Kartu Koleksi', 'nominal_value' => null, 'cost_idr' => 5000, 'note' => 'Bonus'],
             ],
@@ -921,21 +920,21 @@ class CatalogTest extends TestCase
         // Modal toko yang diketik admin tidak di-uplift: uplift hanya berlaku saat impor.
         $this->assertSame(10000, (int) $firstMapping->cost_idr);
         $this->assertSame(10000, (int) $firstMapping->store_cost_idr);
-        $this->assertSame('12.0000', (string) $first->sell_markup_percent);
+        // Harga jual nominal manual memakai margin persen, bukan markup legacy.
+        $this->assertSame('PERCENT', $first->pricing_mode);
+        $this->assertSame('10.0000', (string) $first->margin_percent);
 
         DB::table('products')->where('id', $product->id)->update(['is_active' => true]);
         DB::table('product_packages')->whereIn('id', $packages->pluck('id'))->update(['is_active' => true]);
         DB::table('provider_mappings')->whereIn('product_package_id', $packages->pluck('id'))->update(['is_active' => true]);
         $quotes = app(CheckoutPricing::class)->forPackages($packages->pluck('id')->all());
 
-        // Baris dengan markup sendiri memakai markup baris (10.000 × 12% = 11.200).
-        $this->assertSame(11200, $quotes[$first->id]['subtotal_idr']);
-        // Baris tanpa markup memakai markup produk dari formulir yang sama (19.000 × 15% = 21.850).
+        // Semua baris memakai margin persen produk (10%): 10.000 → 11.000.
+        $this->assertSame(11000, $quotes[$first->id]['subtotal_idr']);
         $second = $packages->firstWhere('name', '200 Koin');
-        $this->assertSame(21850, $quotes[$second->id]['subtotal_idr']);
-        // Tanpa markup baris, berlaku markup produk dari formulir yang sama (5.000 × 15% = 5.750).
+        $this->assertSame(20900, $quotes[$second->id]['subtotal_idr']);
         $third = $packages->firstWhere('name', 'Kartu Koleksi');
-        $this->assertSame(5750, $quotes[$third->id]['subtotal_idr']);
+        $this->assertSame(5500, $quotes[$third->id]['subtotal_idr']);
     }
 
     public function test_manual_nominal_rows_are_rejected_for_automatic_products(): void
@@ -1073,11 +1072,11 @@ class CatalogTest extends TestCase
         ]);
         $this->actingAs($this->admin(), 'admin');
 
-        // Nominal tanpa modal tidak boleh diaktifkan: CheckoutPricing tidak akan melihatnya.
+        // Nominal tanpa modal tidak bisa dijual: server mematikannya sendiri.
         $this->put('/admin/catalog/packages/'.$package->id, [
             'code' => 'MA-100', 'name' => '100 Koin', 'sort_order' => 0, 'is_active' => true, 'cost_idr' => 0,
-        ])->assertSessionHasErrors('cost_idr');
-        $this->assertFalse($package->fresh()->is_active);
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertFalse($package->fresh()->is_active, 'Nominal tanpa modal harus mati.');
         $this->assertFalse($mapping->fresh()->is_active);
 
         $this->put('/admin/catalog/packages/'.$package->id, [
@@ -1242,11 +1241,12 @@ class CatalogTest extends TestCase
         $this->assertTrue($mapping->fresh()->is_manual_price);
         $this->assertSame(2, (int) $mapping->fresh()->priority);
 
-        // Route sinkron per mapping dan per produk tetap ada (bukan 404/405).
+        // Sinkron per mapping tetap ada; sinkron per produk dibuang karena
+        // panel tidak punya tombolnya (sinkron = seluruh katalog).
         $this->assertSame(200, $this->get('/admin/catalog')->status());
         $this->assertTrue(Route::has('admin.catalog.mappings.update'));
         $this->assertTrue(Route::has('admin.catalog.mappings.sync'));
-        $this->assertTrue(Route::has('admin.catalog.products.sync'));
+        $this->assertFalse(Route::has('admin.catalog.products.sync'));
     }
 
     public function test_activating_an_automatic_nominal_requires_an_active_provider_mapping(): void

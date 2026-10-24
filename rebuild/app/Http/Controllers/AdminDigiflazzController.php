@@ -246,22 +246,6 @@ class AdminDigiflazzController
         return back()->with('status', 'Pengaturan monitor dan sinkron otomatis disimpan.');
     }
 
-    public function syncProduct(Request $request, Product $product, DigiflazzCatalogService $service, AdminAuditService $audit): RedirectResponse
-    {
-        abort_unless($product->fulfillment_mode === 'AUTO_PROVIDER', 422);
-        $skus = ProviderMapping::whereIn('product_package_id', $product->packages()->pluck('id'))
-            ->whereIn('provider_id', Provider::where('code', 'DIGIFLAZZ')->pluck('id'))
-            ->whereNotNull('external_sku')->pluck('external_sku')->unique();
-        if ($skus->isEmpty()) {
-            throw ValidationException::withMessages(['sync' => 'Produk belum memiliki mapping Digiflazz.']);
-        }
-        // One complete request also refreshes availability of removed SKUs atomically.
-        $count = $service->sync();
-        $audit->record($request, 'digiflazz.product.synced', 'product', $product->id, null, ['count' => $count, 'skus' => $skus->values()->all()]);
-
-        return back()->with('status', 'Harga dan ketersediaan nominal produk diperbarui.');
-    }
-
     public function sync(Request $request, DigiflazzCatalogService $service, AdminAuditService $audit): RedirectResponse
     {
         $data = $request->validate(['item_id' => ['nullable', 'integer', 'exists:digiflazz_catalog_items,id']]);
@@ -387,8 +371,8 @@ class AdminDigiflazzController
         $data = $request->validate([
             'item_ids' => ['required', 'array', 'min:1', 'max:2000'],
             'item_ids.*' => ['required', 'integer', 'distinct', 'exists:digiflazz_catalog_items,id'],
-            'margin_percent' => ['sometimes', 'numeric', 'min:0', 'max:1000'],
-            'cost_uplift_percent' => ['sometimes', 'numeric', 'min:0', 'max:1000'],
+            'margin_percent' => ['sometimes', 'numeric', 'min:0', 'max:1000', 'decimal:0,4'],
+            'cost_uplift_percent' => ['sometimes', 'numeric', 'min:0', 'max:1000', 'decimal:0,4'],
             'publish' => ['sometimes', 'boolean'],
             'auto_sources' => ['prohibited'],
         ]);

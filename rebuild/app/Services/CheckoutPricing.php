@@ -46,8 +46,6 @@ class CheckoutPricing
                 'products.name as product_name',
                 'products.slug as product_slug',
                 'products.category_id',
-                'products.margin_percent',
-                'products.sell_markup_percent as product_sell_markup_percent',
                 'products.fulfillment_mode',
                 'categories.name as category_name'
             );
@@ -156,8 +154,6 @@ class CheckoutPricing
                 'products.name as product_name',
                 'products.slug as product_slug',
                 'products.category_id',
-                'products.margin_percent',
-                'products.sell_markup_percent as product_sell_markup_percent',
                 'products.fulfillment_mode',
                 'categories.name as category_name'
             );
@@ -270,20 +266,20 @@ class CheckoutPricing
         $cost = (int) ($mapping->store_cost_idr ?? $mapping->cost_idr);
         $legacyDigiflazzPricing = $mapping->provider_code === 'DIGIFLAZZ'
             && $mapping->store_cost_idr === null
-            && $context->package_sell_markup_percent === null
-            && $context->product_sell_markup_percent === null;
+            && $context->package_sell_markup_percent === null;
         // Baris katalog lama (belum punya modal toko baru dan tanpa override markup)
         // tetap memakai margin lamanya. Semua baris lain — termasuk nominal manual
         // yang modal tokonya diisi admin — memakai harga jual modal toko × markup.
         $legacyPricing = $mapping->store_cost_idr === null
-            && $context->package_sell_markup_percent === null
-            && $context->product_sell_markup_percent === null;
-        $markupPercent = $context->pricing_mode === 'SELL_PRICE'
+            && $context->package_sell_markup_percent === null;
+        // Mode harga nominal yang dipilih admin (persen/patok) selalu menang atas
+        // markup. Markup hanya berlaku untuk mode PRODUCT_MARGIN.
+        $markupPercent = in_array($context->pricing_mode, ['SELL_PRICE', 'PERCENT', 'FIXED'], true)
             ? null
             : ($legacyPricing
                 ? null
-                : ($context->package_sell_markup_percent ?? $context->product_sell_markup_percent ?? $this->globalSellMarkupPercent()));
-        $percent = $context->pricing_mode === 'PERCENT' ? $context->package_margin_percent : $context->margin_percent;
+                : ($context->package_sell_markup_percent ?? $this->globalSellMarkupPercent()));
+        $percent = $context->package_margin_percent ?? $this->globalSellMarkupPercent();
         $margin = $markupPercent !== null
             ? $this->margin($cost, (string) $markupPercent)
             : match ($context->pricing_mode) {
@@ -312,7 +308,7 @@ class CheckoutPricing
             'category_id' => (int) $context->category_id,
             'category_name' => $context->category_name,
             'fulfillment_mode' => $context->fulfillment_mode,
-            'margin_percent' => (string) $context->margin_percent,
+            'margin_percent' => (string) ($context->package_margin_percent ?? $this->globalSellMarkupPercent()),
             'package_id' => (int) $context->package_id,
             'package_code' => $context->package_code,
             'package_name' => $context->package_name,

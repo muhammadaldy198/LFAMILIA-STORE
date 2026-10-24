@@ -10,11 +10,12 @@ export const nominalMode = row => {
 
 // Nilai yang ditampilkan harus mengikuti mode yang tersimpan, bukan kolom
 // lain: PERCENT hidup di margin_percent, FIXED di margin_fixed_idr.
+// PRODUCT_MARGIN tidak punya angka sendiri, jadi form mulai kosong.
 export const nominalPriceValue = row => {
     if (row?.pricing_mode === 'SELL_PRICE') return row.sell_price_idr;
     if (row?.pricing_mode === 'PERCENT') return row.margin_percent ?? '';
     if (row?.pricing_mode === 'FIXED') return row.margin_fixed_idr ?? '';
-    return row?.sell_markup_percent ?? '';
+    return '';
 };
 
 const pricingOf = form => ({
@@ -27,22 +28,18 @@ const pricingOf = form => ({
 // nominal FIXED 3.500 tidak berubah jadi PERCENT 3.500 (= 350.000%).
 const storedPricing = (row, form) => {
     const value = Number(form.price_value || 0);
-    // sell_markup_percent menang atas margin_percent/margin_fixed_idr di
-    // CheckoutPricing, jadi nilai lama harus dikosongkan saat admin mengetik
-    // harga sendiri — kalau tidak, angka baru diam-diam diabaikan.
-    const cleared = { sell_markup_percent: null };
     const storedUiMode = nominalMode(row);
     if (form.price_mode !== storedUiMode) {
         return form.price_mode === 'FIXED'
-            ? { ...cleared, pricing_mode: 'SELL_PRICE', sell_price_idr: value, margin_percent: null, margin_fixed_idr: null }
-            : { ...cleared, pricing_mode: 'PERCENT', margin_percent: value, sell_price_idr: null, margin_fixed_idr: null };
+            ? { pricing_mode: 'SELL_PRICE', sell_price_idr: value, margin_percent: null, margin_fixed_idr: null }
+            : { pricing_mode: 'PERCENT', margin_percent: value, sell_price_idr: null, margin_fixed_idr: null };
     }
     switch (row.pricing_mode) {
-        case 'SELL_PRICE': return { ...cleared, pricing_mode: 'SELL_PRICE', sell_price_idr: value };
-        case 'FIXED': return { ...cleared, pricing_mode: 'FIXED', margin_fixed_idr: value };
+        case 'SELL_PRICE': return { pricing_mode: 'SELL_PRICE', sell_price_idr: value };
+        case 'FIXED': return { pricing_mode: 'FIXED', margin_fixed_idr: value };
         default:
-            // PRODUCT_MARGIN tidak punya angka sendiri; angka eksplisit = markup.
-            return { ...cleared, pricing_mode: 'PERCENT', margin_percent: value };
+            // PRODUCT_MARGIN tidak punya angka sendiri; angka eksplisit = persen.
+            return { pricing_mode: 'PERCENT', margin_percent: value };
     }
 };
 
@@ -69,8 +66,7 @@ export function nominalPayload(row, form, code) {
         Object.assign(payload, {
             pricing_mode: pricingOf(form).mode,
             sell_price_idr: form.price_mode === 'FIXED' ? pricingOf(form).value : null,
-            sell_markup_percent: form.price_mode === 'MARKUP' ? pricingOf(form).value : null,
-            margin_percent: 0,
+            margin_percent: form.price_mode === 'MARKUP' ? pricingOf(form).value : 0,
         });
         return payload;
     }

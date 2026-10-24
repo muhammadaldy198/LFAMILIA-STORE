@@ -52,31 +52,27 @@ class DigiflazzAutoSources
             throw ValidationException::withMessages(['item_ids' => 'Tidak ada SKU Digiflazz yang aktif dan tersedia.']);
         }
         $nominal = app(CatalogNominalOrder::class)->value($first->product_name, $first->brand);
-        // Importing another nominal must not change the product-level markup.
-        // New products still initialize their fixed selling price from the
-        // reviewed import markup and the one-time-uplifted store cost.
+        // Kolom "Harga jual (%)" di pop-up impor disimpan sebagai margin nominal
+        // (mode persen), bukan markup produk, supaya bisa diubah atau diganti ke
+        // harga tetap langsung dari editor nominal.
         if (! $package) {
-            if ($product->sell_markup_percent === null) {
-                $product->update(['sell_markup_percent' => $margin]);
-            }
-            $storeCost = app(DigiflazzCatalogImport::class)->initialStoreCost(null, $product, (int) $first->price_idr, $costUplift);
-            // The initial selling price uses the effective markup on the store
-            // cost. Supplier sync must not rewrite this selling price.
-            $effectiveMarkup = $product->sell_markup_percent ?? $margin;
-            $fixedPrice = app(DigiflazzFixedPricePolicy::class)->fixedPriceFromCost(
-                $storeCost, $effectiveMarkup
-            );
             $package = $product->packages()->create([
                 'code' => 'DF_'.substr(hash('sha256', $first->buyer_sku_code), 0, 20),
                 'name' => $first->product_name, 'group_name' => $first->type ?: null,
                 'nominal_value' => $nominal, 'sort_order' => 0, 'is_active' => $publish,
-                'pricing_mode' => 'SELL_PRICE', 'sell_price_idr' => $fixedPrice,
-                'margin_percent' => null,
+                'pricing_mode' => 'PERCENT', 'margin_percent' => $margin,
+                'sell_price_idr' => null,
             ]);
             app(AdminAuditService::class)->record($request, 'catalog.package.imported', 'product_package', $package->id, null, $package->toArray());
         } else {
             $before = $package->toArray();
-            $package->update(['nominal_value' => $package->nominal_value ?? $nominal, 'is_active' => $publish ?: $package->is_active]);
+            $package->update([
+                'nominal_value' => $package->nominal_value ?? $nominal,
+                'is_active' => $publish ?: $package->is_active,
+                // Impor manual memakai angka yang baru diketik admin; impor
+                // otomatis tidak boleh menimpa harga yang sudah diatur.
+                ...($automatic ? [] : ['pricing_mode' => 'PERCENT', 'margin_percent' => $margin, 'sell_price_idr' => null]),
+            ]);
             app(AdminAuditService::class)->record($request, 'catalog.package.updated', 'product_package', $package->id, $before, $package->fresh()->toArray());
         }
         foreach ($items as $item) {

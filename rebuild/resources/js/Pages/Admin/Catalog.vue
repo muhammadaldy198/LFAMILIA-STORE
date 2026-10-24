@@ -107,10 +107,11 @@ const syncSettingsBusy = ref(false);
 const toggleAutoSync = () => {
     if (syncSettingsBusy.value) return;
     syncSettingsBusy.value = true;
-    router.put('/admin/digiflazz/settings', {
-        enabled: !props.autoSync,
-        sync_interval_minutes: props.syncIntervalMinutes || 15,
-    }, { preserveScroll: true, onFinish: () => { syncSettingsBusy.value = false; } });
+    router.put('/admin/catalog/auto-sync', { enabled: !props.autoSync }, {
+        preserveScroll: true,
+        onError: bag => { editErrors.value = bag; },
+        onFinish: () => { syncSettingsBusy.value = false; },
+    });
 };
 const editErrors = ref({});
 
@@ -136,7 +137,16 @@ const saveMapping = (mapping, changes) => {
     });
 };
 const toggleMapping = mapping => saveMapping(mapping, { is_active: !mapping.is_active });
-const movePriority = (mapping, direction) => saveMapping(mapping, { priority: Math.max(0, Number(mapping.priority || 0) + direction) });
+// Stok voucher tidak punya modal yang bisa diatur; server menolak angkanya.
+const canEditCost = mapping => mapping.provider_code !== 'VOUCHER_STOCK';
+const movePriority = (mapping, direction) => {
+    saveBusy.value = 'source-'+mapping.id;
+    router.put(`/admin/catalog/mappings/${mapping.id}`, { direction }, {
+        preserveScroll: true,
+        onError: bag => { editErrors.value = bag; },
+        onFinish: () => { saveBusy.value = ''; },
+    });
+};
 const syncMapping = mapping => {
     saveBusy.value = 'sync-'+mapping.id;
     router.post(`/admin/catalog/mappings/${mapping.id}/sync`, {}, {
@@ -215,7 +225,9 @@ const openNominal = (row = null) => {
         is_active: row ? Boolean(row.is_active) : true,
         price_mode: nominalMode(row),
         price_value: nominalPriceValue(row),
-        cost_idr: row?.mappings?.[0]?.cost_idr ?? '',
+        // Modal toko yang ditampilkan adalah store_cost_idr, bukan cost_idr
+        // (harga akuntansi lama yang bisa berbeda).
+        cost_idr: row?.mappings?.[0]?.store_cost_idr ?? row?.mappings?.[0]?.cost_idr ?? '',
     });
     nominalImage.value = null;
     nominalErrors.value = {};
@@ -230,7 +242,7 @@ const saveNominal = () => {
     const finish = (bag) => { nominalErrors.value = bag; saveBusy.value = ''; };
     if (nominalEditing.value) {
         // Modal nominal manual tersimpan di pemetaan provider, bukan di paket.
-        if (product.value.fulfillment_mode === 'MANUAL') payload.cost_idr = Number(nominal.cost_idr || 0);
+        if (product.value.fulfillment_mode === 'MANUAL') payload.store_cost_idr = Number(nominal.cost_idr || 0);
         router.put(`/admin/catalog/packages/${nominalEditing.value.id}`, payload, {
             preserveScroll: true, onError: finish, onSuccess: () => { nominalOpen.value = false; uploadNominalImage(); },
         });
@@ -523,7 +535,7 @@ const openImport = () => {
     importPublish.value = true;
     if (!importProductId.value && autoProducts.value.length) importProductId.value = String(autoProducts.value[0].id);
     importUplift.value = Number(importProduct.value?.cost_uplift_percent ?? props.pricingSettings?.cost_uplift_percent ?? 2);
-    importMargin.value = Number(importProduct.value?.sell_markup_percent ?? props.pricingSettings?.sell_markup_percent ?? 0);
+    importMargin.value = Number(props.pricingSettings?.sell_markup_percent ?? 0);
     importOpen.value = true;
 };
 const toggleImportRow = id => {
@@ -833,10 +845,11 @@ onMounted(() => {
                                         <p v-if="mapping.external_sku" class="dim">{{ mapping.external_sku }}</p>
                                     </td>
                                     <td class="num">
-                                        <input class="adm-input" style="max-width:130px;text-align:right" type="number" min="1" step="1"
+                                        <input v-if="canEditCost(mapping)" class="adm-input" style="max-width:130px;text-align:right" type="number" min="1" step="1"
                                             :value="mapping.store_cost_idr ?? mapping.cost_idr ?? 0"
                                             :disabled="saveBusy === 'source-'+mapping.id"
                                             @change="saveMapping(mapping, { store_cost_idr: Number($event.target.value || 0) })">
+                                        <template v-else>{{ mapping.store_cost_idr ?? mapping.cost_idr ?? 0 }}</template>
                                     </td>
                                     <td class="num">{{ mapping.priority }}</td>
                                     <td>{{ mappingStatusLabel(mapping) }}</td>

@@ -150,9 +150,9 @@ Format tiap halaman: **untuk apa · isi · aksi · catatan**. Nama berkas Vue ad
 
 **Untuk apa.** Mengelola katalog yang dijual.
 **Isi.** Dua tab: **Produk Otomatis** dan **Produk Manual**. Filter (kategori, status, pencarian), paginasi server; tabel produk (gambar, nama, kategori, jumlah nominal, status, penanda populer); pratinjau harga di kasir.
-**Aksi.** Tambah produk, ubah, hapus, sinkron per produk, atur tambahan modal + markup jual (dua angka bawaan impor), kelola nominal (tambah/ubah/salin/hapus/urutkan), kelola stok kode pada nominal produk voucher, kelola pemberitahuan produk, unggah/hapus media, atur kode kolom & field.
+**Aksi.** Tambah produk, ubah, hapus, atur tambahan modal + markup jual (dua angka bawaan impor), kelola nominal (tambah/ubah/salin/hapus/urutkan), kelola stok kode pada nominal produk voucher, kelola pemberitahuan produk, unggah/hapus media, atur kode kolom & field.
 **Harga.** Hanya tiga angka: **harga seller** (dari penyedia) → **modal toko** (seller + tambahan modal, bawaan 2%) → **harga jual** (modal + markup, bawaan 10%). Tidak ada margin global.
-**Catatan.** Editor produk 4 tab: Produk, Nominal, Sumber, Pemberitahuan. Produk yang sudah punya riwayat pesanan tidak bisa dihapus — nonaktifkan saja. Tombol "Impor ke produk" ada di menu Digiflazz dan mengarah ke halaman ini (`/admin/catalog?import=digiflazz`); layar pemilihan nominalnya belum dibuat — lihat §10.
+**Catatan.** Editor produk 5 tab: Informasi, Nominal & Harga, Sumber, Tampilan Produk, Data Pelanggan. Produk yang sudah punya riwayat pesanan tidak bisa dihapus — nonaktifkan saja. Tombol "Impor ke produk" ada di menu Digiflazz dan mengarah ke halaman ini (`/admin/catalog?import=digiflazz`); layar pemilihan nominalnya belum dibuat — lihat §10.
 
 ### 4.7 Kategori — `/admin/catalog/categories`
 `AdminCatalogController@categories` · `catalog.manage` · `Categories.vue`
@@ -380,7 +380,7 @@ Semua aksi di atas masuk audit log.
 ## 10. Batas yang diketahui
 
 1. **Dibuang karena tidak ada di rancangan panel:** margin global (`catalog/margin` + pratinjau), batas harga atas (`max-prices/*`, `digiflazz/baseline/{id}`), kunci harga massal (`lock-prices`), dan `orders/{id}/check-process` (digantikan tombol "Periksa status" di Antrean Manual). Pagar modal+1% tetap berjalan otomatis di server; yang dibuang hanya layar pengaturannya.
-2. **Kelola sumber per nominal ada di tab Sumber** editor produk: daftar mapping, aktif/nonaktif, prioritas, dan sinkron per mapping/produk memakai route `mappings/{id}`, `mappings/{id}/sync`, dan `products/{id}/sync`. Yang belum punya tombol: `packages/{id}/sources/digiflazz`.
+2. **Kelola sumber per nominal ada di tab Sumber** editor produk: daftar mapping, modal toko yang bisa diedit, aktif/nonaktif, prioritas (tukar naik/turun), dan sinkron per mapping lewat `mappings/{id}` dan `mappings/{id}/sync`. Sinkron per produk tidak ada: sinkron berarti seluruh katalog lewat menu Digiflazz. Yang belum punya tombol: `packages/{id}/sources/digiflazz`.
 3. **Impor Digiflazz punya layar, tapi hanya dari tautan.** Menu Digiflazz → "Impor ke produk" membuka `/admin/catalog?import=digiflazz` dan pop-up impor langsung terbuka; tombol "Impor dari Digiflazz" juga ada di kepala halaman Produk. Yang belum: memilih SKU dari halaman detail Digiflazz satu per satu (`?import_sku=`).
 4. **Blok rekonsiliasi refund top up disembunyikan** dari Pembayaran (23 Okt 2026). Tombolnya tidak lagi dikirim ke peramban, tetapi `POST /admin/payments/refund-reviews/{topupId}/resolve` masih ada di server sebagai jalur pemeliharaan; pesanan dengan top up berstatus `REFUND_REVIEW` tetap ditahan mesin pembayaran sampai rekonsiliasi manual lewat basis data.
 5. **DOKU** belum dipakai; tampil sebagai belum aktif.

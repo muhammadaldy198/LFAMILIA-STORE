@@ -149,12 +149,17 @@ class DigiflazzCatalogService
                             (clone $mappingQuery)->whereIn('id', $matchingIds)
                                 ->where('disabled_by_sync', true)->where('is_active', false)
                                 ->update(['is_active' => true, 'disabled_by_sync' => false, 'updated_at' => now()]);
-                            // Nominal yang dulu dimatikan sinkron ikut hidup lagi —
-                            // hanya yang penandanya nyala, jadi nominal yang admin
-                            // matikan sendiri tidak pernah disentuh.
+                            // Nominal yang dulu dimatikan sinkron ikut hidup lagi,
+                            // tapi hanya bila penandanya nyala dan sekarang benar-benar
+                            // punya sumber aktif. Nominal yang admin matikan sendiri
+                            // tidak pernah disentuh.
                             DB::table('product_packages')
                                 ->whereIn('id', $mappings->pluck('product_package_id')->unique()->all())
                                 ->where('disabled_by_sync', true)
+                                ->whereExists(fn ($query) => $query
+                                    ->selectRaw('1')->from('provider_mappings')
+                                    ->whereColumn('provider_mappings.product_package_id', 'product_packages.id')
+                                    ->where('provider_mappings.is_active', true))
                                 ->update(['is_active' => true, 'disabled_by_sync' => false, 'updated_at' => now()]);
                         }
                     }

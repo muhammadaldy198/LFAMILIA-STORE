@@ -1289,8 +1289,11 @@ class AdminDigiflazzRestorationTest extends TestCase
         // Modal toko = seller + uplift 2%; batas harga = modal, bukan markup 35%.
         $this->assertSame(10200, (int) $mapping->store_cost_idr);
         $this->assertSame(10200, (int) $mapping->max_price_idr);
-        // Margin tersimpan = setting aktif, bukan 35 yang dikirim klien.
-        $this->assertSame(12, (int) round((float) $product->fresh()->sell_markup_percent));
+        // Margin tersimpan di nominalnya = angka yang dipakai, dan markup
+        // produk tidak lagi disentuh impor.
+        $this->assertSame(12, (int) round((float) $package->fresh()->margin_percent));
+        $this->assertSame('PERCENT', $package->fresh()->pricing_mode);
+        $this->assertNull($product->fresh()->sell_markup_percent);
     }
 
     public function test_import_uses_the_global_cost_and_sell_percent_columns(): void
@@ -1314,8 +1317,14 @@ class AdminDigiflazzRestorationTest extends TestCase
         $package = $product->packages()->firstOrFail();
         // Modal = 10.000 + 2% = 10.200; harga jual = modal + 10% = 11.220.
         $this->assertSame(10200, (int) $mapping->store_cost_idr);
-        $this->assertSame(11220, (int) $package->sell_price_idr);
-        $this->assertSame('SELL_PRICE', $package->pricing_mode);
+        $this->assertSame('PERCENT', $package->pricing_mode);
+        $this->assertSame(10, (int) round((float) $package->margin_percent));
+        // Harga yang benar-benar ditagih dihitung dari modal × margin nominal.
+        Category::where('slug', 'game')->update(['is_active' => true]);
+        Provider::where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
+        $package->update(['is_active' => true]);
+        $package->mappings()->update(['is_active' => true]);
+        $this->assertSame(11220, (int) app(CheckoutPricing::class)->previewForPackage($package->id)['subtotal_idr']);
     }
 
     public function test_import_honours_a_different_cost_column_for_every_selected_sku(): void
@@ -1339,7 +1348,11 @@ class AdminDigiflazzRestorationTest extends TestCase
         $package = $product->packages()->firstOrFail();
         // Modal = 20.000 + 5% = 21.000; jual = 21.000 + 10% = 23.100.
         $this->assertSame(21000, (int) $package->mappings()->firstOrFail()->store_cost_idr);
-        $this->assertSame(23100, (int) $package->sell_price_idr);
+        Category::where('slug', 'game')->update(['is_active' => true]);
+        Provider::where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
+        $package->update(['is_active' => true]);
+        $package->mappings()->update(['is_active' => true]);
+        $this->assertSame(23100, (int) app(CheckoutPricing::class)->previewForPackage($package->id)['subtotal_idr']);
     }
 
     public function test_full_sync_never_touches_manual_or_voucher_sources(): void

@@ -111,14 +111,13 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertSame(1, $product->packages()->count());
     }
 
-    public function test_importing_another_nominal_preserves_existing_product_sell_markup(): void
+    public function test_importing_another_nominal_preserves_existing_nominal_margin(): void
     {
         $this->login();
         $this->fakeCatalog([$this->row()]);
         app(DigiflazzCatalogService::class)->sync();
         $product = $this->product();
         $product->category->update(['is_active' => true]);
-        $product->update(['sell_markup_percent' => 17]);
         $provider = Provider::where('code', 'DIGIFLAZZ')->firstOrFail();
         $provider->forceFill(['is_active' => true])->save();
         $itemId = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'restore-sku')->value('id');
@@ -126,12 +125,26 @@ class AdminPanelRestorationTest extends TestCase
         $this->post('/admin/catalog/products/'.$product->id.'/import', [
             'item_ids' => [$itemId], 'margin_percent' => 12,
         ])->assertRedirect()->assertSessionHasNoErrors();
-
         $package = $product->packages()->firstOrFail();
         $package->update(['is_active' => true]);
         $package->mappings()->update(['is_active' => true]);
-        $this->assertSame('17.0000', (string) $product->fresh()->sell_markup_percent);
-        $this->assertSame(11934, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
+        $this->assertSame('12.0000', (string) $package->fresh()->margin_percent);
+
+        // Impor SKU lain tidak boleh menimpa margin nominal yang sudah diatur.
+        $otherId = DB::table('digiflazz_catalog_items')->insertGetId([
+            'buyer_sku_code' => 'restore-sku-2', 'product_name' => 'Restore 20', 'category' => 'Games',
+            'brand' => 'Restore', 'type' => 'Umum', 'seller_name' => 'Seller A', 'price_idr' => 20000,
+            'baseline_price_idr' => 20000, 'buyer_active' => true, 'seller_active' => true,
+            'unlimited_stock' => true, 'stock' => 0, 'is_present' => true,
+            'start_cut_off' => '00:00', 'end_cut_off' => '00:00', 'synced_at' => now(),
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $this->post('/admin/catalog/products/'.$product->id.'/import', [
+            'item_ids' => [$otherId], 'margin_percent' => 25,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertSame('12.0000', (string) $package->fresh()->margin_percent);
+        $this->assertSame(11424, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
     }
 
     public function test_activating_automatic_product_validates_existing_destination_template(): void
@@ -225,8 +238,10 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertTrue($package->is_active);
         $this->assertTrue($mapping->is_active);
         $this->assertSame('{{user_id}}{{zone_id}}', $product->fresh()->customer_no_template);
-        // Redesign: the reviewed import margin becomes the game-level sell markup.
-        $this->assertEqualsWithDelta(12, (float) $product->fresh()->sell_markup_percent, 0.0001);
+        // Margin impor tersimpan di nominal, bukan di produk.
+        $this->assertEqualsWithDelta(12, (float) $package->fresh()->margin_percent, 0.0001);
+        $this->assertSame('PERCENT', $package->fresh()->pricing_mode);
+        $this->assertNull($product->fresh()->sell_markup_percent);
         // Redesign: store cost (10000 + 2%) × import margin 12% = 11424.
         $this->assertSame(11424, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
         $response = $this->get('/catalog/'.$product->slug);
@@ -332,12 +347,13 @@ class AdminPanelRestorationTest extends TestCase
             $this->assertSame(1, $package->mappings()->count());
             $this->assertSame(1, $package->mappings()->where('is_active', true)->count());
             $this->assertSame([0], $package->mappings()->orderBy('priority')->pluck('priority')->map(fn ($value): int => (int) $value)->all());
-            // Imported price is fixed once from effective store cost and markup.
+            // Harga jual = modal toko × margin nominal (bukan harga tetap).
             $quote = app(CheckoutPricing::class)->forPackage($package->id);
-            $this->assertSame('SELL_PRICE', $package->pricing_mode);
-            $this->assertSame((int) $package->sell_price_idr, $quote['subtotal_idr']);
+            $storeCost = (int) $package->mappings()->firstOrFail()->store_cost_idr;
+            $this->assertSame('PERCENT', $package->pricing_mode);
+            $this->assertSame(10, (int) $package->margin_percent);
+            $this->assertSame(intdiv(($storeCost * 110) + 99, 100), $quote['subtotal_idr']);
             $this->assertSame(1, $package->mappings()->count());
-            $this->assertGreaterThan(0, (int) $package->sell_price_idr);
         }
         $response = $this->get('/catalog/'.$product->slug);
         $response->assertOk();
@@ -1026,9 +1042,8 @@ class AdminPanelRestorationTest extends TestCase
         ])->assertSessionHasNoErrors();
 
         $package = $product->packages()->firstOrFail();
-        $this->assertSame('SELL_PRICE', $package->pricing_mode);
-        // Imported display price uses the effective markup on store cost.
-        $this->assertSame(11220, (int) $package->sell_price_idr);
+        $this->assertSame('PERCENT', $package->pricing_mode);
+        $this->assertSame(11220, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
         $this->assertSame(10200, app(CheckoutPricing::class)->forPackage($package->id)['max_price_idr']);
 
         $this->fakeCatalog([
@@ -1045,7 +1060,7 @@ class AdminPanelRestorationTest extends TestCase
         ]);
         app(DigiflazzCatalogService::class)->sync();
         $this->assertArrayNotHasKey($package->id, app(CheckoutPricing::class)->forPackages([$package->id]));
-        $this->assertSame('SELL_PRICE', $package->fresh()->pricing_mode);
+        $this->assertSame('PERCENT', $package->fresh()->pricing_mode);
     }
 
     public function test_fixed_price_recommendation_uses_store_cost_and_checkout_price_matches_admin_preview(): void
@@ -1249,21 +1264,12 @@ class AdminPanelRestorationTest extends TestCase
         $this->login();
         $product = $this->product();
 
+        // Produk tidak punya markup sendiri: angkanya hidup di nominal.
         $this->put('/admin/catalog/products/'.$product->id, [
             'category_id' => $product->category_id, 'name' => $product->name, 'slug' => $product->slug,
             'fulfillment_mode' => 'AUTO_PROVIDER', 'margin_percent' => 10, 'sort_order' => 0, 'is_active' => false,
-            'sell_markup_percent' => 12.5, 'cost_uplift_percent' => 3,
-        ])->assertRedirect()->assertSessionHasNoErrors();
-        $this->assertSame(12.5, (float) $product->fresh()->sell_markup_percent);
-        $this->assertSame(3.0, (float) $product->fresh()->cost_uplift_percent);
-
-        $this->put('/admin/catalog/products/'.$product->id, [
-            'category_id' => $product->category_id, 'name' => $product->name, 'slug' => $product->slug,
-            'fulfillment_mode' => 'AUTO_PROVIDER', 'margin_percent' => 10, 'sort_order' => 0, 'is_active' => false,
-            'sell_markup_percent' => null, 'cost_uplift_percent' => null,
         ])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertNull($product->fresh()->sell_markup_percent);
-        $this->assertNull($product->fresh()->cost_uplift_percent);
 
         $package = ProductPackage::create([
             'product_id' => $product->id, 'code' => 'OVR10', 'name' => 'Override 10',
@@ -1288,7 +1294,7 @@ class AdminPanelRestorationTest extends TestCase
     {
         $this->login();
         $product = $this->product();
-        $product->update(['sell_markup_percent' => 11, 'cost_uplift_percent' => 2]);
+        $product->update(['cost_uplift_percent' => 2]);
         $package = ProductPackage::create([
             'product_id' => $product->id, 'code' => 'VIEW10', 'name' => 'View 10',
             'sort_order' => 0, 'is_active' => false, 'pricing_mode' => 'PRODUCT_MARGIN',
@@ -1310,8 +1316,7 @@ class AdminPanelRestorationTest extends TestCase
                 $nominal = collect($row['packages'])->firstWhere('id', $package->id);
                 $mapping = $nominal['mappings'][0];
 
-                return (float) $row['sell_markup_percent'] === 11.0
-                    && (float) $row['cost_uplift_percent'] === 2.0
+                return ! array_key_exists('sell_markup_percent', $row)
                     && (float) $nominal['sell_markup_percent'] === 9.0
                     && array_key_exists('cost_uplift_percent', $nominal)
                     && (int) $mapping['store_cost_idr'] === 10200
