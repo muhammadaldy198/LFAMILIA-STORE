@@ -121,6 +121,17 @@ Tidak semua tugas sampai DEPLOY. Pekerjaan dokumen boleh berhenti setelah merge.
 - Daftar harga (`cmd=prepaid`, `sign = md5(username+apiKey+"pricelist")`) **disimpan sendiri**, tidak ditanyakan saat pengunjung membuka toko.
 - Satu SKU per nominal. Konsep `_A`/`_B` sudah mati.
 
+### Harga, konfigurasi & template
+
+- **Harga warisan (inheritance)**: harga khusus produk yang tidak diisi harus tetap `null` dan ikut harga global. UI yang diam-diam mengirim tarif global akan membekukan harga produk itu selamanya. Uji dua kasus: kosong (warisan) dan diisi (khusus).
+- **Backfill konfigurasi bersama** hanya boleh bila **seluruh** record anak sepakat pada satu nilai tidak kosong. Kesepakatan dari sebagian record saja tidak sah — record kosong atau bertentangan membuat nilai itu berbahaya.
+- **Memindahkan konfigurasi dari record anak ke record induk** wajib ditelusuri dulu: semua jalur baca, tulis, impor/sync, simpan admin, urutan request UI, dan fixture test. Input induk dan anak yang saling bergantung harus satu request + satu transaksi.
+- **Endpoint update sebagian** harus bisa membedakan nilai yang dikirim eksplisit dari nilai lama yang tidak ikut dikirim. Jangan menolak edit yang tidak berhubungan hanya karena konfigurasi lain tidak ada di request.
+- **Template fulfillment**: setiap input wajib penyedia harus punya rujukan di template, dan template tidak kosong harus punya minimal satu placeholder sah. Placeholder harus berbeda dari field lain (mis. validasi nickname).
+- **Impor**: bila nilai untuk record lama memang tidak boleh diubah, kontrolnya dinonaktifkan dan nilai tersimpan ditampilkan. Pratinjau memakai markup efektif dari backend, bukan field margin lama.
+- **Duplikasi record** dengan override harga `null` wajib menyalin override itu; uji keduanya tetap utuh.
+- **Migrasi** diuji di database tes khusus, lalu jalur payload service dan suite admin/impor ikut diverifikasi. Migrasi sukses saja bukan bukti semua jalur sudah memakai sumber kebenaran baru.
+
 ### Data & rahasia
 
 - **Jangan commit rahasia** (`.env`, API key, token, password, private key). Jangan taruh di Markdown, tangkapan layar, fixture, log, komentar PR, atau output CI.
