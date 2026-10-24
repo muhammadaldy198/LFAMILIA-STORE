@@ -17,14 +17,21 @@ class AdminOrderCancellationController
         AdminAuditService $audit
     ): RedirectResponse {
         $data = $request->validate([
-            'reason' => ['required', 'string', 'min:10', 'max:2000'],
+            'reason' => ['nullable', 'string', 'max:2000'],
             'confirmed' => ['required', 'accepted'],
         ]);
+        $admin = $request->user('admin');
+        // Alasan tidak diminta ke admin; jejak audit tetap ada lewat teks otomatis.
+        $reason = trim((string) ($data['reason'] ?? ''));
+        if ($reason === '') {
+            $who = $admin ? trim($admin->name.' <'.$admin->email.'>') : '';
+            $reason = 'Dibatalkan admin'.($who === '' ? '' : ': '.$who);
+        }
         $before = DB::table('orders')->where('id', $id)->firstOrFail();
-        $cancellation->cancel($id, (int) $request->user('admin')->id, trim($data['reason']));
+        $cancellation->cancel($id, (int) $admin->id, $reason);
         $audit->record($request, 'order.cancelled', 'order', $id,
             ['status' => $before->status],
-            ['status' => 'CANCELLED', 'reason' => $data['reason'], 'refund' => 'MANUAL_ONLY']
+            ['status' => 'CANCELLED', 'reason' => $reason, 'refund' => 'MANUAL_ONLY']
         );
 
         return back()->with('status', 'Pesanan dibatalkan. Penyelesaian dana tetap manual.');

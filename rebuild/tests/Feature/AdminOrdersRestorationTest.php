@@ -87,6 +87,37 @@ class AdminOrdersRestorationTest extends TestCase
             ])->assertSessionHasErrors('order');
     }
 
+    public function test_cancellation_without_reason_succeeds_and_audit_log_has_automatic_reason(): void
+    {
+        $admin = $this->login();
+        Queue::fake();
+        $orderId = $this->order($admin);
+
+        DB::table('fulfillment_attempts')->where('order_id', $orderId)->update([
+            'status' => 'MANUAL_FAILED', 'updated_at' => now(),
+        ]);
+        DB::table('orders')->where('id', $orderId)->update(['status' => 'FAILED']);
+
+        // Tombol "Batalkan pesanan" hanya mengirim konfirmasi, tanpa alasan.
+        $this->withSession(['admin.password_confirmed_at' => time()])
+            ->post('/admin/orders/'.$orderId.'/cancel', ['confirmed' => true])
+            ->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertSame('CANCELLED', DB::table('orders')->where('id', $orderId)->value('status'));
+
+        $after = json_decode((string) DB::table('audit_logs')
+            ->where('action', 'order.cancelled')->where('target_id', (string) $orderId)->value('after'), true);
+        $this->assertIsArray($after);
+        $this->assertStringStartsWith('Dibatalkan admin', (string) $after['reason']);
+        $this->assertStringContainsString((string) $admin->email, (string) $after['reason']);
+        $this->assertSame('MANUAL_ONLY', $after['refund']);
+
+        $eventMeta = json_decode((string) DB::table('order_events')
+            ->where('order_id', $orderId)->where('event_type', 'ADMIN_ORDER_CANCELLED')->value('metadata'), true);
+        $this->assertStringStartsWith('Dibatalkan admin', (string) $eventMeta['reason']);
+        $this->assertSame('MANUAL_ONLY', $eventMeta['refund']);
+    }
+
     public function test_admin_retry_hides_exhausted_blocked_but_allows_retriable_blocked(): void
     {
         $admin = $this->login();
