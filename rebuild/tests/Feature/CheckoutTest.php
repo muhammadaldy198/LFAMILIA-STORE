@@ -113,7 +113,7 @@ class CheckoutTest extends TestCase
         $quote = app(CheckoutPricing::class)->forPackage($catalog['package_id']);
 
         $this->assertSame(11000, $quote['subtotal_idr']);
-        $this->assertSame(10100, $quote['max_price_idr']);
+        $this->assertSame(10000, $quote['max_price_idr']);
     }
 
     public function test_digiflazz_markup_uses_nominal_then_global_precedence(): void
@@ -181,7 +181,7 @@ class CheckoutTest extends TestCase
             ->where('event_type', 'ORDER_CREATED')->count());
     }
 
-    public function test_single_digiflazz_sku_uses_its_cost_plus_one_percent_as_max_price(): void
+    public function test_single_digiflazz_sku_uses_its_cost_exactly_as_max_price(): void
     {
         $catalog = $this->catalog();
         $key = 'checkout-single-digiflazz-maxprice';
@@ -194,8 +194,8 @@ class CheckoutTest extends TestCase
         $snapshot = json_decode($order->snapshot, true, 512, JSON_THROW_ON_ERROR);
 
         // The mapping's legacy max_price_idr is 12,000. The Digiflazz API
-        // transaction ceiling instead uses the only current seller cost +1%.
-        $this->assertSame(10100, $snapshot['provider']['max_price_idr']);
+        // transaction ceiling instead uses the only current seller cost exactly.
+        $this->assertSame(10000, $snapshot['provider']['max_price_idr']);
         $this->assertSame(10000, (int) $order->cost_idr);
         $this->assertSame(11000, (int) $order->total_idr);
     }
@@ -272,7 +272,7 @@ class CheckoutTest extends TestCase
         $this->assertSame($snapshot, $snapshotAfterEdit);
     }
 
-    public function test_digiflazz_max_price_uses_highest_active_backup_plus_one_percent_even_above_sell_price(): void
+    public function test_digiflazz_max_price_uses_highest_active_mapping_cost_exactly_even_above_sell_price(): void
     {
         $catalog = $this->catalog();
         $providerId = DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
@@ -325,10 +325,10 @@ class CheckoutTest extends TestCase
         $order = DB::table('orders')->where('idempotency_key', $key)->firstOrFail();
         $snapshot = json_decode($order->snapshot, true, 512, JSON_THROW_ON_ERROR);
 
-        // ceil(12,001 * 1.01) = 12,122, excluding the disabled 99,999 SKU.
+        // The ceiling is the exact active maximum, excluding the disabled 99,999 SKU.
         // The order still uses the main SKU for its price. Loss on an eventual
         // fallback is an explicit merchant policy, not a checkout rejection.
-        $this->assertSame(12122, $snapshot['provider']['max_price_idr']);
+        $this->assertSame(12001, $snapshot['provider']['max_price_idr']);
         $this->assertSame($catalog['mapping_id'], $snapshot['provider']['mapping_id']);
         $this->assertSame(10000, (int) $order->cost_idr);
         $this->assertSame(11000, (int) $order->total_idr);
@@ -340,7 +340,7 @@ class CheckoutTest extends TestCase
             DB::table('orders')->where('id', $order->id)->value('snapshot'),
             true, 512, JSON_THROW_ON_ERROR
         );
-        $this->assertSame(12122, $snapshotAfterSync['provider']['max_price_idr']);
+        $this->assertSame(12001, $snapshotAfterSync['provider']['max_price_idr']);
     }
 
     public function test_client_price_provider_and_sku_are_rejected(): void
