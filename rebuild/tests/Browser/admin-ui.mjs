@@ -176,9 +176,14 @@ try {
     if (imported) {
         await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
         await navigate('/admin/catalog');
-        const stored = await evaluate(`JSON.parse(document.getElementById('app').dataset.page).props.products
-            .flatMap(p => (p.packages || []).map(k => ({ sku: (k.mappings || []).map(m => m.external_sku).join(','), price: k.sell_price_idr, active: k.is_active })))
-            .filter(k => k.sku === ${JSON.stringify(importedSku)})`);
+        // Harga jual impor disimpan sebagai margin nominal (mode persen), jadi
+        // yang dibandingkan adalah harga efektif dari pratinjau checkout.
+        const stored = await evaluate(`(() => {
+            const props = JSON.parse(document.getElementById('app').dataset.page).props;
+            return props.products
+                .flatMap(p => (p.packages || []).map(k => ({ sku: (k.mappings || []).map(m => m.external_sku).join(','), price: (props.checkoutPreviews || {})[k.id] ?? null, active: k.is_active })))
+                .filter(k => k.sku === ${JSON.stringify(importedSku)});
+        })()`);
         if (!stored.length || String(stored[0].price) !== importedPrice) throw Error('Imported nominal not stored with the shown price: ' + JSON.stringify({ stored, importedPrice }));
         console.log('PASS imported nominal stored (' + stored[0].sku + ' = ' + stored[0].price + ')');
     }
