@@ -397,6 +397,10 @@ test('import margin reads the active pricing setting', () => {
 // sandi di UI, bukan hanya perubahan peran/izin.
 test('creating an admin account asks for password confirmation', () => {
     const access = read('Access.vue');
+    // Akun yang sudah nonaktif lalu diganti namanya bukan "menonaktifkan":
+    // alasan khusus hanya untuk transisi aktif -> nonaktif.
+    assert.match(access, /wasActive: row\.is_active/);
+    assert.match(access, /target\.is_active === false && target\.wasActive/);
     // Server menjaga semua mutasi, jadi UI selalu bertanya (bukan bersyarat).
     assert.match(access, /void withSensitive\(sensitiveReason\(\), run\);/);
     assert.doesNotMatch(access, /if \(needsPassword\)/);

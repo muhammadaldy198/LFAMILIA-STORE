@@ -66,7 +66,7 @@ const openEdit = row => {
     const permissions = row.role === 'ADMIN' ? [...(row.permissions || [])] : [];
     editor.value = {
         id: row.id, name: row.name, email: row.email, role: row.role,
-        is_active: row.is_active, password: '', permissions,
+        is_active: row.is_active, wasActive: row.is_active, password: '', permissions,
     };
     errors.value = {};
 };
@@ -80,7 +80,11 @@ const togglePermission = key => {
 const sensitiveReason = () => {
     const target = editor.value;
     if (!target.id) return 'Membuat akun admin baru memerlukan konfirmasi kata sandi.';
-    if (target.role !== 'SUPER_ADMIN' && !target.is_active) return 'Menonaktifkan akun admin memerlukan konfirmasi kata sandi.';
+    // Hanya transisi aktif -> nonaktif yang perlu alasan khusus; akun yang
+    // memang sudah nonaktif lalu diganti namanya bukan "menonaktifkan".
+    if (target.role !== 'SUPER_ADMIN' && target.is_active === false && target.wasActive) {
+        return 'Menonaktifkan akun admin memerlukan konfirmasi kata sandi.';
+    }
     return 'Menyimpan perubahan akun admin memerlukan konfirmasi kata sandi.';
 };
 const submit = () => {
