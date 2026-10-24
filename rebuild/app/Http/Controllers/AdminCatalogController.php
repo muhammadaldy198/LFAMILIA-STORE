@@ -812,6 +812,11 @@ class AdminCatalogController
         DB::transaction(function () use ($request, $package, $product, $isActive, $data, $audit, $newCost): void {
             $before = $package->toArray();
             $package->update(collect($data)->except('cost_idr')->all());
+            // Admin menyalakan sendiri: penanda "dimatikan sinkron" dilepas supaya
+            // sinkron berikutnya tidak menganggapnya miliknya.
+            if ($isActive && $package->disabled_by_sync) {
+                $package->update(['disabled_by_sync' => false]);
+            }
             if ($product->fulfillment_mode === 'MANUAL') {
                 // Modal nominal manual hidup di pemetaan provider, bukan di paket,
                 // dan status aktif nominal harus ikut supaya CheckoutPricing melihatnya.

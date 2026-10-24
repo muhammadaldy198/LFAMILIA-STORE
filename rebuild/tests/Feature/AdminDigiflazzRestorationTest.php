@@ -559,7 +559,9 @@ class AdminDigiflazzRestorationTest extends TestCase
         $this->assertDatabaseHas('provider_mappings', ['external_sku' => 'removed-historical', 'is_active' => false, 'disabled_by_sync' => true]);
         $this->assertDatabaseMissing('digiflazz_catalog_items', ['buyer_sku_code' => 'removed-orphan']);
         $this->assertDatabaseMissing('provider_mappings', ['external_sku' => 'removed-orphan']);
-        $this->assertDatabaseHas('product_packages', ['id' => $historical['package']->id, 'is_active' => true]);
+        // Nominal yang kehabisan sumber aktif ikut dimatikan, dengan penanda
+        // sinkron supaya bisa hidup lagi saat SKU-nya kembali.
+        $this->assertDatabaseHas('product_packages', ['id' => $historical['package']->id, 'is_active' => false, 'disabled_by_sync' => true]);
         $this->assertDatabaseHas('provider_mappings', ['external_sku' => 'retained', 'is_active' => true, 'cost_idr' => 9500]);
         $this->assertSame(2, DB::table('digiflazz_catalog_items')->count());
         $sync = json_decode((string) DB::table('system_settings')->where('key', 'digiflazz.last_catalog_sync')->value('value'), true);
@@ -570,6 +572,59 @@ class AdminDigiflazzRestorationTest extends TestCase
         app(DigiflazzCatalogService::class)->sync();
         $this->assertDatabaseHas('digiflazz_catalog_items', ['buyer_sku_code' => 'removed-historical', 'is_present' => true]);
         $this->assertDatabaseHas('provider_mappings', ['external_sku' => 'removed-historical', 'is_active' => true, 'disabled_by_sync' => false]);
+    }
+
+    public function test_package_is_deactivated_when_its_last_supplier_sku_disappears(): void
+    {
+        $this->login();
+        $catalog = $this->mappedItem('nominal-hilang-sku');
+        $packageId = $catalog['package']->id;
+        $this->assertTrue((bool) DB::table('product_packages')->where('id', $packageId)->value('is_active'));
+
+        // SKU hilang dari Digiflazz: nominalnya ikut dimatikan, dengan penanda.
+        $this->fakeCatalog([$this->row(['buyer_sku_code' => 'sku-lain'])]);
+        app(DigiflazzCatalogService::class)->sync();
+
+        $this->assertSame(false, (bool) DB::table('product_packages')->where('id', $packageId)->value('is_active'));
+        $this->assertSame(true, (bool) DB::table('product_packages')->where('id', $packageId)->value('disabled_by_sync'));
+    }
+
+    public function test_package_disabled_by_sync_is_reactivated_when_the_sku_returns(): void
+    {
+        $this->login();
+        $catalog = $this->mappedItem('nominal-kembali-sku');
+        $packageId = $catalog['package']->id;
+        // Riwayat pesanan membuat mapping-nya disimpan (bukan dihapus) saat SKU
+        // hilang, sehingga bisa dihidupkan lagi persis saat SKU-nya kembali.
+        $mapping = ProviderMapping::where('external_sku', 'nominal-kembali-sku')->firstOrFail();
+        $this->createHistoricalOrder($catalog, $mapping);
+
+        $this->fakeCatalog([$this->row(['buyer_sku_code' => 'sku-lain'])]);
+        app(DigiflazzCatalogService::class)->sync();
+        $this->assertFalse((bool) DB::table('product_packages')->where('id', $packageId)->value('is_active'));
+
+        $this->fakeCatalog([$this->row(['buyer_sku_code' => 'nominal-kembali-sku'])]);
+        app(DigiflazzCatalogService::class)->sync();
+
+        $this->assertTrue((bool) DB::table('product_packages')->where('id', $packageId)->value('is_active'));
+        $this->assertFalse((bool) DB::table('product_packages')->where('id', $packageId)->value('disabled_by_sync'));
+    }
+
+    public function test_package_disabled_by_admin_is_never_reenabled_by_sync(): void
+    {
+        $this->login();
+        $catalog = $this->mappedItem('nominal-admin-mati');
+        $packageId = $catalog['package']->id;
+        DB::table('product_packages')->where('id', $packageId)->update(['is_active' => false]);
+
+        $this->fakeCatalog([$this->row(['buyer_sku_code' => 'sku-lain'])]);
+        app(DigiflazzCatalogService::class)->sync();
+        $this->fakeCatalog([$this->row(['buyer_sku_code' => 'nominal-admin-mati'])]);
+        app(DigiflazzCatalogService::class)->sync();
+
+        // Admin mematikannya sendiri: tetap mati, tanpa penanda sinkron.
+        $this->assertFalse((bool) DB::table('product_packages')->where('id', $packageId)->value('is_active'));
+        $this->assertFalse((bool) DB::table('product_packages')->where('id', $packageId)->value('disabled_by_sync'));
     }
 
     public function test_removed_sku_with_historical_mapping_is_not_sellable_or_listed_to_customers(): void
