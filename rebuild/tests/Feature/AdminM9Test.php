@@ -229,14 +229,16 @@ class AdminM9Test extends TestCase
         $super = $this->superAdmin();
         $this->actingAs($super, 'admin');
 
-        $this->put('/admin/access/'.$super->id, [
-            'name' => $super->name,
-            'email' => $super->email,
-            'password' => null,
-            'role' => 'ADMIN',
-            'permissions' => ['dashboard.view'],
-            'is_active' => false,
-        ])->assertSessionHasErrors('role');
+        // Aturan bisnis diuji, bukan gerbang konfirmasi kata sandi (CR-03).
+        $this->withSession(['admin.password_confirmed_at' => time()])
+            ->put('/admin/access/'.$super->id, [
+                'name' => $super->name,
+                'email' => $super->email,
+                'password' => null,
+                'role' => 'ADMIN',
+                'permissions' => ['dashboard.view'],
+                'is_active' => false,
+            ])->assertSessionHasErrors('role');
 
         $super->refresh();
         $this->assertSame('SUPER_ADMIN', $super->role);

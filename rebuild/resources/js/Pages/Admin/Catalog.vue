@@ -4,10 +4,14 @@ import { Head, Link, router } from '@inertiajs/vue3';
 import AdminLayout from '../../Components/Admin/AdminLayout.vue';
 import AdminModal from '../../Components/Admin/AdminModal.vue';
 import { rupiah } from '../../lib/adminFormat';
+import { nominalMode, nominalPayload, nominalPriceValue } from '../../lib/catalogNominal';
+import { canSyncMapping, mappingPayload, mappingStatusLabel, sortMappings } from '../../lib/catalogSources';
 
 const props = defineProps({
     products: { type: Array, default: () => [] },
-    productPage: { type: Object, default: () => ({ data: [], total: 0, current_page: 1, last_page: 1 }) },
+    productPage: { type: Object, default: () => ({ total: 0, current_page: 1, last_page: 1, per_page: 25 }) },
+    autoSync: { type: Boolean, default: true },
+    syncIntervalMinutes: { type: Number, default: 15 },
     productFilters: { type: Object, default: () => ({}) },
     categories: { type: Array, default: () => [] },
     nicknameGameCodes: { type: Array, default: () => [] },
@@ -15,7 +19,6 @@ const props = defineProps({
     digiflazzItems: { type: Array, default: () => [] },
     autoProductOptions: { type: Array, default: () => [] },
     pricingSettings: { type: Object, default: () => ({}) },
-    defaultMargin: { type: [Number, String], default: 0 },
 });
 
 // Saringan dikerjakan server supaya hasil tidak bohong saat produk banyak.
@@ -98,6 +101,18 @@ const editorOpen = ref(false);
 const product = ref(null);
 const editTab = ref('info');
 const saveBusy = ref('');
+const syncSettingsBusy = ref(false);
+// Sinkron otomatis berlaku untuk seluruh katalog Digiflazz (semua produk
+// otomatis), bukan per produk. Produk manual/stok voucher tidak disentuh.
+const toggleAutoSync = () => {
+    if (syncSettingsBusy.value) return;
+    syncSettingsBusy.value = true;
+    router.put('/admin/catalog/auto-sync', { enabled: !props.autoSync }, {
+        preserveScroll: true,
+        onError: bag => { editErrors.value = bag; },
+        onFinish: () => { syncSettingsBusy.value = false; },
+    });
+};
 const editErrors = ref({});
 
 const openEditor = (row) => {
@@ -105,6 +120,38 @@ const openEditor = (row) => {
     editTab.value = 'info';
     editErrors.value = {};
     editorOpen.value = true;
+};
+
+/* ---------- sumber nominal ---------- */
+const sourceRows = computed(() => (product.value?.packages || []).map(row => ({
+    ...row,
+    mappings: sortMappings(row.mappings),
+})));
+
+const saveMapping = (mapping, changes) => {
+    saveBusy.value = 'source-'+mapping.id;
+    router.put(`/admin/catalog/mappings/${mapping.id}`, mappingPayload(mapping, changes), {
+        preserveScroll: true,
+        onError: bag => { editErrors.value = bag; },
+        onFinish: () => { saveBusy.value = ''; },
+    });
+};
+const toggleMapping = mapping => saveMapping(mapping, { is_active: !mapping.is_active });
+// Stok voucher tidak punya modal yang bisa diatur; server menolak angkanya.
+const canEditCost = mapping => mapping.provider_code !== 'VOUCHER_STOCK';
+const movePriority = (mapping, direction) => {
+    saveBusy.value = 'source-'+mapping.id;
+    router.put(`/admin/catalog/mappings/${mapping.id}`, { direction }, {
+        preserveScroll: true,
+        onError: bag => { editErrors.value = bag; },
+        onFinish: () => { saveBusy.value = ''; },
+    });
+};
+const syncMapping = mapping => {
+    saveBusy.value = 'sync-'+mapping.id;
+    router.post(`/admin/catalog/mappings/${mapping.id}/sync`, {}, {
+        preserveScroll: true, onFinish: () => { saveBusy.value = ''; },
+    });
 };
 
 const info = reactive({
@@ -176,9 +223,11 @@ const openNominal = (row = null) => {
         group_name: row?.group_name || '',
         sort_order: row?.sort_order ?? (product.value?.packages.length ?? 0),
         is_active: row ? Boolean(row.is_active) : true,
-        price_mode: row?.pricing_mode === 'SELL_PRICE' ? 'FIXED' : row ? 'MARKUP' : 'FIXED',
-        price_value: row?.pricing_mode === 'SELL_PRICE' ? row.sell_price_idr : (row?.sell_markup_percent ?? ''),
-        cost_idr: row?.mappings?.[0]?.cost_idr ?? '',
+        price_mode: nominalMode(row),
+        price_value: nominalPriceValue(row),
+        // Modal toko yang ditampilkan adalah store_cost_idr, bukan cost_idr
+        // (harga akuntansi lama yang bisa berbeda).
+        cost_idr: row?.mappings?.[0]?.store_cost_idr ?? row?.mappings?.[0]?.cost_idr ?? '',
     });
     nominalImage.value = null;
     nominalErrors.value = {};
@@ -188,24 +237,12 @@ const openNominal = (row = null) => {
 const slugCode = (text) => String(text || 'nominal').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'nominal';
 
 const saveNominal = () => {
-    const payload = {
-        name: nominal.name,
-        code: nominalEditing.value?.code || `${slugCode(nominal.name)}-${Date.now().toString(36).slice(-4)}`,
-        group_name: nominal.group_name || null,
-        sort_order: Number(nominal.sort_order || 0),
-        is_active: Boolean(nominal.is_active),
-        note: null,
-        nominal_value: null,
-        pricing_mode: nominal.price_mode === 'FIXED' ? 'SELL_PRICE' : 'PERCENT',
-        sell_price_idr: nominal.price_mode === 'FIXED' ? Number(nominal.price_value || 0) : null,
-        sell_markup_percent: nominal.price_mode === 'MARKUP' ? Number(nominal.price_value || 0) : null,
-        margin_percent: 0,
-    };
+    const payload = nominalPayload(nominalEditing.value, nominal, nominalEditing.value?.code || `${slugCode(nominal.name)}-${Date.now().toString(36).slice(-4)}`);
     saveBusy.value = 'nominal';
     const finish = (bag) => { nominalErrors.value = bag; saveBusy.value = ''; };
     if (nominalEditing.value) {
         // Modal nominal manual tersimpan di pemetaan provider, bukan di paket.
-        if (product.value.fulfillment_mode === 'MANUAL') payload.cost_idr = Number(nominal.cost_idr || 0);
+        if (product.value.fulfillment_mode === 'MANUAL') payload.store_cost_idr = Number(nominal.cost_idr || 0);
         router.put(`/admin/catalog/packages/${nominalEditing.value.id}`, payload, {
             preserveScroll: true, onError: finish, onSuccess: () => { nominalOpen.value = false; uploadNominalImage(); },
         });
@@ -476,8 +513,10 @@ const importPublish = ref(true);
 const autoProducts = computed(() => props.autoProductOptions);
 const importProduct = computed(() => props.products.find(row => Number(row.id) === Number(importProductId.value))
     || props.autoProductOptions.find(row => Number(row.id) === Number(importProductId.value)) || null);
-const importUplift = computed(() => Number(importProduct.value?.cost_uplift_percent ?? props.pricingSettings?.cost_uplift_percent ?? 2));
-const importMargin = ref(Number(props.defaultMargin || 0));
+// Dua kolom global untuk SEMUA SKU yang dipilih, bukan per SKU:
+// harga modal = seller + uplift (default 2%), harga jual = modal + margin (default 10%).
+const importUplift = ref(Number(props.pricingSettings?.cost_uplift_percent ?? 2));
+const importMargin = ref(Number(props.pricingSettings?.sell_markup_percent ?? 0));
 const importBrands = computed(() => [...new Set(props.digiflazzItems.map(row => row.brand))].sort((a, b) => a.localeCompare(b, 'id-ID')));
 const importRows = computed(() => props.digiflazzItems.filter(row => {
     if (row.mapped || !row.available) return false;
@@ -495,7 +534,8 @@ const openImport = () => {
     importBrand.value = '';
     importPublish.value = true;
     if (!importProductId.value && autoProducts.value.length) importProductId.value = String(autoProducts.value[0].id);
-    importMargin.value = Number(importProduct.value?.sell_markup_percent ?? props.defaultMargin ?? 0);
+    importUplift.value = Number(importProduct.value?.cost_uplift_percent ?? props.pricingSettings?.cost_uplift_percent ?? 2);
+    importMargin.value = Number(props.pricingSettings?.sell_markup_percent ?? 0);
     importOpen.value = true;
 };
 const toggleImportRow = id => {
@@ -507,6 +547,7 @@ const submitImport = () => {
     importErrors.value = {};
     router.post(`/admin/catalog/products/${importProduct.value.id}/import`, {
         item_ids: importPicked.value,
+        cost_uplift_percent: Number(importUplift.value || 0),
         margin_percent: Number(importMargin.value || 0),
         publish: importPublish.value,
     }, {
@@ -668,6 +709,7 @@ onMounted(() => {
             <div class="adm-tabs" role="tablist">
                 <button type="button" role="tab" :aria-selected="editTab === 'info'" @click="editTab = 'info'">Informasi</button>
                 <button type="button" role="tab" :aria-selected="editTab === 'price'" @click="editTab = 'price'">Nominal &amp; Harga</button>
+                <button type="button" role="tab" :aria-selected="editTab === 'sources'" @click="editTab = 'sources'">Sumber</button>
                 <button type="button" role="tab" :aria-selected="editTab === 'look'" @click="editTab = 'look'">Tampilan Produk</button>
                 <button type="button" role="tab" :aria-selected="editTab === 'fields'" @click="editTab = 'fields'">Data Pelanggan</button>
             </div>
@@ -770,6 +812,61 @@ onMounted(() => {
                                 </td>
                             </tr>
                             <tr v-if="!product?.packages?.length"><td colspan="7" class="adm-empty">Belum ada nominal. Tambahkan nominal pertama.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div v-if="editTab === 'sources'" style="padding-top:12px">
+                <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:8px">
+                    <div class="adm-note" style="display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap">
+                        <span>
+                            Sumber pemenuhan per nominal. Prioritas kecil dipakai lebih dulu. Harga modal bisa diubah langsung di kolom Modal.
+                            Produk manual dan stok voucher tidak pernah disentuh sinkron Digiflazz.
+                        </span>
+                        <label class="adm-switch-row" style="margin:0">
+                            <button type="button" class="adm-switch" role="switch" :aria-checked="autoSync"
+                                :disabled="syncSettingsBusy"
+                                @click="toggleAutoSync" />
+                            Sinkron otomatis semua produk{{ autoSync ? ' (' + (syncIntervalMinutes || 15) + ' menit)' : '' }}
+                        </label>
+                    </div>
+                </div>
+                <p v-for="(message, key) in editErrors" :key="'src-'+key" class="err">{{ message }}</p>
+                <div class="adm-scroll">
+                    <table class="adm-table">
+                        <thead><tr><th>Nominal</th><th>Sumber</th><th class="num">Modal</th><th class="num">Prioritas</th><th>Status</th><th>Aksi</th></tr></thead>
+                        <tbody>
+                            <template v-for="row in sourceRows" :key="row.id">
+                                <tr v-for="mapping in row.mappings" :key="mapping.id">
+                                    <td><strong>{{ row.name }}</strong><p class="dim">{{ row.group_name || 'Umum' }}</p></td>
+                                    <td>
+                                        {{ mapping.provider_name || mapping.provider_code }}
+                                        <p v-if="mapping.external_sku" class="dim">{{ mapping.external_sku }}</p>
+                                    </td>
+                                    <td class="num">
+                                        <input v-if="canEditCost(mapping)" class="adm-input" style="max-width:130px;text-align:right" type="number" min="1" step="1"
+                                            :value="mapping.store_cost_idr ?? mapping.cost_idr ?? 0"
+                                            :disabled="saveBusy === 'source-'+mapping.id"
+                                            @change="saveMapping(mapping, { store_cost_idr: Number($event.target.value || 0) })">
+                                        <template v-else>{{ mapping.store_cost_idr ?? mapping.cost_idr ?? 0 }}</template>
+                                    </td>
+                                    <td class="num">{{ mapping.priority }}</td>
+                                    <td>{{ mappingStatusLabel(mapping) }}</td>
+                                    <td>
+                                        <button type="button" class="adm-btn sm" :disabled="saveBusy === 'source-'+mapping.id" @click="movePriority(mapping, -1)">Naik</button>
+                                        <button type="button" class="adm-btn sm" :disabled="saveBusy === 'source-'+mapping.id" @click="movePriority(mapping, 1)">Turun</button>
+                                        <button type="button" class="adm-btn sm" :disabled="saveBusy === 'source-'+mapping.id" @click="toggleMapping(mapping)">
+                                            {{ mapping.is_active ? 'Nonaktifkan' : 'Aktifkan' }}
+                                        </button>
+                                        <button v-if="canSyncMapping(mapping)" type="button" class="adm-btn sm" :disabled="saveBusy === 'sync-'+mapping.id" @click="syncMapping(mapping)">
+                                            {{ saveBusy === 'sync-'+mapping.id ? 'Sinkron…' : 'Sinkron' }}
+                                        </button>
+                                    </td>
+                                </tr>
+                                <tr v-if="!row.mappings.length"><td><strong>{{ row.name }}</strong></td><td colspan="5" class="adm-empty">Belum ada sumber. Tambahkan lewat Impor nominal Digiflazz.</td></tr>
+                            </template>
+                            <tr v-if="!sourceRows.length"><td colspan="6" class="adm-empty">Belum ada nominal pada produk ini.</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -880,9 +977,14 @@ onMounted(() => {
                     </select>
                 </label>
                 <label class="adm-field">
-                    <span>Margin jual (%)</span>
+                    <span>Harga modal (%)</span>
+                    <input v-model="importUplift" type="number" min="0" max="1000" step="0.1" class="adm-input">
+                    <span class="hint">Tambahan dari harga seller Digiflazz, berlaku untuk semua SKU terpilih.</span>
+                </label>
+                <label class="adm-field">
+                    <span>Harga jual (%)</span>
                     <input v-model="importMargin" type="number" min="0" max="1000" step="0.1" class="adm-input">
-                    <span class="hint">Dipakai bila produk belum punya margin sendiri.</span>
+                    <span class="hint">Dihitung dari harga modal, berlaku untuk semua SKU terpilih.</span>
                 </label>
                 <label class="adm-field">
                     <span>Merek</span>

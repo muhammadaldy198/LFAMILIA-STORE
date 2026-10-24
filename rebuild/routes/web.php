@@ -292,8 +292,9 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
         ->name('admin.catalog.')->group(function (): void {
             Route::put('/pricing', [AdminCatalogController::class, 'pricing'])
                 ->middleware('throttle:admin-sensitive')->name('pricing.update');
+            Route::put('/auto-sync', [AdminCatalogController::class, 'autoSync'])
+                ->middleware('throttle:admin-mutation')->name('auto-sync.update');
             Route::put('/products/{product}/packages/reorder', [AdminCatalogController::class, 'reorderPackages'])->middleware('throttle:admin-mutation')->name('packages.reorder');
-            Route::post('/products/{product}/sync', [AdminDigiflazzController::class, 'syncProduct'])->middleware('throttle:admin-sensitive')->name('products.sync');
             Route::post('/products/{product}/import', [AdminDigiflazzController::class, 'import'])->name('products.import');
             Route::post('/packages/{package}/sources/digiflazz', [AdminDigiflazzController::class, 'attachSource'])->middleware('throttle:admin-sensitive')->name('packages.sources.attach');
             Route::post('/mappings/{mapping}/sync', [AdminDigiflazzController::class, 'syncMapping'])->middleware('throttle:admin-sensitive')->name('mappings.sync');
@@ -433,12 +434,14 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
 
     Route::middleware('admin.super')->group(function (): void {
         Route::get('/admin/access', [AdminAccessController::class, 'index'])->name('admin.access');
+        // Membuat/mengubah/menghapus admin adalah aksi sensitif: ditegakkan di
+        // server, bukan hanya pop-up di UI.
         Route::post('/admin/access', [AdminAccessController::class, 'store'])
-            ->middleware('throttle:admin-sensitive')->name('admin.access.store');
+            ->middleware(['throttle:admin-sensitive', 'admin.password.confirm'])->name('admin.access.store');
         Route::put('/admin/access/{admin}', [AdminAccessController::class, 'update'])
-            ->middleware('throttle:admin-sensitive')->name('admin.access.update');
+            ->middleware(['throttle:admin-sensitive', 'admin.password.confirm'])->name('admin.access.update');
         Route::delete('/admin/access/{admin}', [AdminAccessController::class, 'destroy'])
-            ->middleware('throttle:admin-sensitive')->name('admin.access.destroy');
+            ->middleware(['throttle:admin-sensitive', 'admin.password.confirm'])->name('admin.access.destroy');
 
         Route::get('/admin/integrations', [AdminIntegrationController::class, 'index'])->name('admin.integrations');
         Route::put('/admin/integrations/{code}', [AdminIntegrationController::class, 'update'])

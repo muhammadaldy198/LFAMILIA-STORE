@@ -149,6 +149,18 @@ class DigiflazzCatalogService
                             (clone $mappingQuery)->whereIn('id', $matchingIds)
                                 ->where('disabled_by_sync', true)->where('is_active', false)
                                 ->update(['is_active' => true, 'disabled_by_sync' => false, 'updated_at' => now()]);
+                            // Nominal yang dulu dimatikan sinkron ikut hidup lagi,
+                            // tapi hanya bila penandanya nyala dan sekarang benar-benar
+                            // punya sumber aktif. Nominal yang admin matikan sendiri
+                            // tidak pernah disentuh.
+                            DB::table('product_packages')
+                                ->whereIn('id', $mappings->pluck('product_package_id')->unique()->all())
+                                ->where('disabled_by_sync', true)
+                                ->whereExists(fn ($query) => $query
+                                    ->selectRaw('1')->from('provider_mappings')
+                                    ->whereColumn('provider_mappings.product_package_id', 'product_packages.id')
+                                    ->where('provider_mappings.is_active', true))
+                                ->update(['is_active' => true, 'disabled_by_sync' => false, 'updated_at' => now()]);
                         }
                     }
                 }
@@ -179,7 +191,7 @@ class DigiflazzCatalogService
                         ->whereIn('external_sku', $missingSkus)
                         ->orderBy('id')
                         ->lockForUpdate()
-                        ->get(['id', 'external_sku']);
+                        ->get(['id', 'external_sku', 'product_package_id']);
                     $candidateIds = $candidateMappings->pluck('id');
 
                     // Locking reads are current reads under InnoDB REPEATABLE READ,
@@ -209,6 +221,18 @@ class DigiflazzCatalogService
                         ->whereIn('external_sku', $missingSkus)
                         ->whereNotIn('id', $historicalMappingIds)
                         ->delete();
+
+                    // Nominal tanpa satu pun sumber aktif tidak bisa dijual. Matikan
+                    // nominalnya supaya panel jujur, dengan penanda agar bisa
+                    // dibedakan dari nominal yang dimatikan admin sendiri.
+                    DB::table('product_packages')
+                        ->whereIn('id', $candidateMappings->pluck('product_package_id')->unique()->all())
+                        ->where('is_active', true)
+                        ->whereNotExists(fn ($query) => $query
+                            ->selectRaw('1')->from('provider_mappings')
+                            ->whereColumn('provider_mappings.product_package_id', 'product_packages.id')
+                            ->where('provider_mappings.is_active', true))
+                        ->update(['is_active' => false, 'disabled_by_sync' => true, 'updated_at' => now()]);
                     $missingItems->whereNotIn('buyer_sku_code', $historicalSkus)->delete();
                     if ($sku === null) {
                         DB::table('system_settings')->updateOrInsert(['key' => 'digiflazz.last_catalog_sync'], [

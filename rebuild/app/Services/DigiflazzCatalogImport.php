@@ -17,9 +17,12 @@ class DigiflazzCatalogImport
      * (nominal → game → global). Applied only when a mapping has no store
      * cost yet, so repeated sync/import never compounds the uplift.
      */
-    public function initialStoreCost(?ProductPackage $package, Product $product, int $sellerPrice): int
+    public function initialStoreCost(?ProductPackage $package, Product $product, int $sellerPrice, ?string $override = null): int
     {
-        $markup = $package?->cost_uplift_percent
+        // Override = kolom "Harga modal (%)" di pop-up impor, berlaku untuk
+        // semua SKU dalam satu impor.
+        $markup = $override
+            ?? $package?->cost_uplift_percent
             ?? $product->cost_uplift_percent
             ?? $this->globalCostUpliftPercent();
         if (! preg_match('/^(\d+)(?:\.(\d{1,4}))?$/', (string) $markup, $matches)) {
@@ -47,7 +50,7 @@ class DigiflazzCatalogImport
     /**
      * Called only by a trusted provider sync in M8/M9; no customer or admin text field supplies the SKU.
      */
-    public function upsert(ProductPackage $package, string $buyerSkuCode, int $costIdr, ?int $maxPriceIdr = null): ProviderMapping
+    public function upsert(ProductPackage $package, string $buyerSkuCode, int $costIdr, ?int $maxPriceIdr = null, ?string $costUplift = null): ProviderMapping
     {
         if ($package->product->fulfillment_mode !== 'AUTO_PROVIDER'
             || ! preg_match('/^[A-Za-z0-9._-]{1,120}$/', $buyerSkuCode)
@@ -56,7 +59,7 @@ class DigiflazzCatalogImport
             throw new InvalidArgumentException('Mapping Digiflazz tidak valid.');
         }
 
-        return DB::transaction(function () use ($package, $buyerSkuCode, $costIdr): ProviderMapping {
+        return DB::transaction(function () use ($package, $buyerSkuCode, $costIdr, $costUplift): ProviderMapping {
             $provider = Provider::where('code', 'DIGIFLAZZ')->firstOrFail();
             $mapping = ProviderMapping::where('provider_id', $provider->id)
                 ->where('external_sku', $buyerSkuCode)->lockForUpdate()->first();
@@ -82,7 +85,7 @@ class DigiflazzCatalogImport
                 $mapping->cost_idr = $costIdr;
                 $mapping->seller_reference_price_idr = $costIdr;
                 if ($mapping->store_cost_idr === null) {
-                    $mapping->store_cost_idr = $this->initialStoreCost($package, $package->product, $costIdr);
+                    $mapping->store_cost_idr = $this->initialStoreCost($package, $package->product, $costIdr, $costUplift);
                 }
                 $mapping->max_price_idr = $mapping->store_cost_idr;
             }

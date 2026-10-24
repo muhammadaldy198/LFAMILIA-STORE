@@ -66,8 +66,7 @@ const openEdit = row => {
     const permissions = row.role === 'ADMIN' ? [...(row.permissions || [])] : [];
     editor.value = {
         id: row.id, name: row.name, email: row.email, role: row.role,
-        is_active: row.is_active, password: '', permissions,
-        original: { role: row.role, is_active: row.is_active, permissions: [...permissions] },
+        is_active: row.is_active, wasActive: row.is_active, password: '', permissions,
     };
     errors.value = {};
 };
@@ -80,8 +79,13 @@ const togglePermission = key => {
 };
 const sensitiveReason = () => {
     const target = editor.value;
-    if (target.role !== 'SUPER_ADMIN' && !target.is_active) return 'Menonaktifkan akun admin memerlukan konfirmasi kata sandi.';
-    return 'Perubahan peran atau hak akses memerlukan konfirmasi kata sandi.';
+    if (!target.id) return 'Membuat akun admin baru memerlukan konfirmasi kata sandi.';
+    // Hanya transisi aktif -> nonaktif yang perlu alasan khusus; akun yang
+    // memang sudah nonaktif lalu diganti namanya bukan "menonaktifkan".
+    if (target.role !== 'SUPER_ADMIN' && target.is_active === false && target.wasActive) {
+        return 'Menonaktifkan akun admin memerlukan konfirmasi kata sandi.';
+    }
+    return 'Menyimpan perubahan akun admin memerlukan konfirmasi kata sandi.';
 };
 const submit = () => {
     const target = editor.value;
@@ -103,15 +107,9 @@ const submit = () => {
         if (target.id) router.put('/admin/access/' + target.id, payload, options);
         else router.post('/admin/access', payload, options);
     };
-    // Kata sandi ulang hanya untuk peran, status aktif, atau izin yang berubah.
-    const before = target.original;
-    const needsPassword = Boolean(target.id) && before && (
-        target.role !== before.role
-        || Boolean(target.is_active) !== before.is_active
-        || JSON.stringify([...target.permissions].sort()) !== JSON.stringify([...before.permissions].sort())
-    );
-    if (needsPassword) void withSensitive(sensitiveReason(), run);
-    else run();
+    // Server menjaga SEMUA mutasi /admin/access, jadi UI harus selalu bertanya —
+    // kalau tidak, ubah nama/email saja akan ditolak middleware dan form hilang.
+    void withSensitive(sensitiveReason(), run);
 };
 
 // ---------- nonaktifkan ----------

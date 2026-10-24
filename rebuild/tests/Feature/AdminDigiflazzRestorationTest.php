@@ -559,7 +559,9 @@ class AdminDigiflazzRestorationTest extends TestCase
         $this->assertDatabaseHas('provider_mappings', ['external_sku' => 'removed-historical', 'is_active' => false, 'disabled_by_sync' => true]);
         $this->assertDatabaseMissing('digiflazz_catalog_items', ['buyer_sku_code' => 'removed-orphan']);
         $this->assertDatabaseMissing('provider_mappings', ['external_sku' => 'removed-orphan']);
-        $this->assertDatabaseHas('product_packages', ['id' => $historical['package']->id, 'is_active' => true]);
+        // Nominal yang kehabisan sumber aktif ikut dimatikan, dengan penanda
+        // sinkron supaya bisa hidup lagi saat SKU-nya kembali.
+        $this->assertDatabaseHas('product_packages', ['id' => $historical['package']->id, 'is_active' => false, 'disabled_by_sync' => true]);
         $this->assertDatabaseHas('provider_mappings', ['external_sku' => 'retained', 'is_active' => true, 'cost_idr' => 9500]);
         $this->assertSame(2, DB::table('digiflazz_catalog_items')->count());
         $sync = json_decode((string) DB::table('system_settings')->where('key', 'digiflazz.last_catalog_sync')->value('value'), true);
@@ -570,6 +572,59 @@ class AdminDigiflazzRestorationTest extends TestCase
         app(DigiflazzCatalogService::class)->sync();
         $this->assertDatabaseHas('digiflazz_catalog_items', ['buyer_sku_code' => 'removed-historical', 'is_present' => true]);
         $this->assertDatabaseHas('provider_mappings', ['external_sku' => 'removed-historical', 'is_active' => true, 'disabled_by_sync' => false]);
+    }
+
+    public function test_package_is_deactivated_when_its_last_supplier_sku_disappears(): void
+    {
+        $this->login();
+        $catalog = $this->mappedItem('nominal-hilang-sku');
+        $packageId = $catalog['package']->id;
+        $this->assertTrue((bool) DB::table('product_packages')->where('id', $packageId)->value('is_active'));
+
+        // SKU hilang dari Digiflazz: nominalnya ikut dimatikan, dengan penanda.
+        $this->fakeCatalog([$this->row(['buyer_sku_code' => 'sku-lain'])]);
+        app(DigiflazzCatalogService::class)->sync();
+
+        $this->assertSame(false, (bool) DB::table('product_packages')->where('id', $packageId)->value('is_active'));
+        $this->assertSame(true, (bool) DB::table('product_packages')->where('id', $packageId)->value('disabled_by_sync'));
+    }
+
+    public function test_package_disabled_by_sync_is_reactivated_when_the_sku_returns(): void
+    {
+        $this->login();
+        $catalog = $this->mappedItem('nominal-kembali-sku');
+        $packageId = $catalog['package']->id;
+        // Riwayat pesanan membuat mapping-nya disimpan (bukan dihapus) saat SKU
+        // hilang, sehingga bisa dihidupkan lagi persis saat SKU-nya kembali.
+        $mapping = ProviderMapping::where('external_sku', 'nominal-kembali-sku')->firstOrFail();
+        $this->createHistoricalOrder($catalog, $mapping);
+
+        $this->fakeCatalog([$this->row(['buyer_sku_code' => 'sku-lain'])]);
+        app(DigiflazzCatalogService::class)->sync();
+        $this->assertFalse((bool) DB::table('product_packages')->where('id', $packageId)->value('is_active'));
+
+        $this->fakeCatalog([$this->row(['buyer_sku_code' => 'nominal-kembali-sku'])]);
+        app(DigiflazzCatalogService::class)->sync();
+
+        $this->assertTrue((bool) DB::table('product_packages')->where('id', $packageId)->value('is_active'));
+        $this->assertFalse((bool) DB::table('product_packages')->where('id', $packageId)->value('disabled_by_sync'));
+    }
+
+    public function test_package_disabled_by_admin_is_never_reenabled_by_sync(): void
+    {
+        $this->login();
+        $catalog = $this->mappedItem('nominal-admin-mati');
+        $packageId = $catalog['package']->id;
+        DB::table('product_packages')->where('id', $packageId)->update(['is_active' => false]);
+
+        $this->fakeCatalog([$this->row(['buyer_sku_code' => 'sku-lain'])]);
+        app(DigiflazzCatalogService::class)->sync();
+        $this->fakeCatalog([$this->row(['buyer_sku_code' => 'nominal-admin-mati'])]);
+        app(DigiflazzCatalogService::class)->sync();
+
+        // Admin mematikannya sendiri: tetap mati, tanpa penanda sinkron.
+        $this->assertFalse((bool) DB::table('product_packages')->where('id', $packageId)->value('is_active'));
+        $this->assertFalse((bool) DB::table('product_packages')->where('id', $packageId)->value('disabled_by_sync'));
     }
 
     public function test_removed_sku_with_historical_mapping_is_not_sellable_or_listed_to_customers(): void
@@ -1146,6 +1201,217 @@ class AdminDigiflazzRestorationTest extends TestCase
             'event_type' => 'digiflazz.mapping.duplicate_active',
             'target_id' => (string) $sample['package']->id,
         ]);
+    }
+
+    public function test_sync_never_deletes_manual_mappings(): void
+    {
+        // A-06 diverifikasi: pembersihan sinkron dibatasi where('provider_id',
+        // $providerId) dengan $providerId = DIGIFLAZZ, jadi mapping MANUAL tidak
+        // pernah masuk kandidat hapus. Tes ini harus benar-benar melewati jalur
+        // hapus: katalog tidak boleh kosong (kosong ditolak sebelum cleanup),
+        // dan satu mapping Digiflazz harus ADA lalu TERHAPUS.
+        $this->login();
+        $this->fakeCatalog([
+            $this->row(['buyer_sku_code' => 'a06-gone-sku', 'product_name' => 'A06 Hilang']),
+            $this->row(['buyer_sku_code' => 'a06-stay-sku', 'product_name' => 'A06 Tetap']),
+        ]);
+        $this->post('/admin/digiflazz/sync')->assertRedirect()->assertSessionHasNoErrors();
+
+        $product = Product::create([
+            'category_id' => Category::where('slug', 'game')->value('id'),
+            'name' => 'Produk A06', 'slug' => 'produk-a06',
+            'fulfillment_mode' => 'AUTO_PROVIDER', 'margin_percent' => 10, 'is_active' => true,
+        ]);
+        $package = $product->packages()->create([
+            'code' => 'A06-10', 'name' => 'A06 10', 'sort_order' => 1, 'is_active' => true,
+        ]);
+        $digiflazzId = DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
+        $doomed = ProviderMapping::create([
+            'product_package_id' => $package->id, 'provider_id' => $digiflazzId,
+            'external_sku' => 'a06-gone-sku', 'cost_idr' => 10000, 'store_cost_idr' => 10200,
+            'max_price_idr' => 10200, 'priority' => 0, 'is_active' => true,
+        ]);
+        $manualId = DB::table('providers')->where('code', 'MANUAL')->value('id');
+        $manual = ProviderMapping::create([
+            'product_package_id' => $package->id, 'provider_id' => $manualId,
+            'external_sku' => null, 'cost_idr' => 9000, 'store_cost_idr' => 9000,
+            'max_price_idr' => null, 'priority' => 1, 'is_active' => true,
+        ]);
+
+        // SKU a06-gone-sku hilang dari katalog, a06-stay-sku tetap ada:
+        // katalog tidak kosong, jadi jalur pembersihan benar-benar berjalan.
+        $this->fakeCatalog([$this->row(['buyer_sku_code' => 'a06-stay-sku', 'product_name' => 'A06 Tetap'])]);
+        $this->post('/admin/digiflazz/sync')->assertRedirect()->assertSessionHasNoErrors();
+
+        // Bukti jalur hapus jalan: mapping Digiflazz yang hilang benar-benar hilang.
+        // (Bila baris ini gagal, tes A-06 tidak membuktikan apa pun.)
+        $this->assertDatabaseMissing('provider_mappings', ['id' => $doomed->id]);
+        // Bukti A-06: mapping MANUAL tidak ikut terhapus dan nilainya utuh.
+        $this->assertDatabaseHas('provider_mappings', ['id' => $manual->id, 'provider_id' => $manualId]);
+        $this->assertSame(9000, (int) $manual->fresh()->store_cost_idr);
+    }
+
+    public function test_import_uses_active_sell_markup_setting_not_legacy_default_margin(): void
+    {
+        $this->login();
+        // Setting warisan yang dulu dibaca form impor, sengaja dibedakan.
+        DB::table('system_settings')->updateOrInsert(['key' => 'catalog.default_margin_percent'], [
+            'value' => json_encode(35, JSON_THROW_ON_ERROR), 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('system_settings')->updateOrInsert(['key' => 'pricing.sell_markup_percent'], [
+            'value' => json_encode('12', JSON_THROW_ON_ERROR), 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        // Produk tanpa override margin: form impor harus memakai setting aktif.
+        $product = Product::create([
+            'category_id' => Category::where('slug', 'game')->value('id'),
+            'name' => 'Impor Tanpa Override', 'slug' => 'impor-tanpa-override',
+            'fulfillment_mode' => 'AUTO_PROVIDER', 'margin_percent' => 10, 'is_active' => true,
+            'sell_markup_percent' => null,
+        ]);
+
+        $this->get('/admin/catalog')->assertInertia(fn (Assert $page) => $page
+            ->where('pricingSettings.sell_markup_percent', '12')
+            ->missing('defaultMargin'));
+
+        // Impor sungguhan (bukan grep sumber): SKU tersedia, produk tanpa
+        // override. Klien sengaja mengirim 35 — server wajib memakai setting
+        // aktif (12), bukan angka kiriman peramban.
+        $this->fakeCatalog([$this->row(['buyer_sku_code' => 'cr02-sku', 'product_name' => 'CR02 10', 'price' => 10000])]);
+        $this->post('/admin/digiflazz/sync')->assertRedirect()->assertSessionHasNoErrors();
+        $item = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'cr02-sku')->first();
+        $this->post('/admin/catalog/products/'.$product->id.'/import', [
+            'item_ids' => [$item->id], 'margin_percent' => 12,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $package = $product->packages()->firstOrFail();
+        $mapping = $package->mappings()->firstOrFail();
+        // Modal toko = seller + uplift 2%; batas harga = modal, bukan markup 35%.
+        $this->assertSame(10200, (int) $mapping->store_cost_idr);
+        $this->assertSame(10200, (int) $mapping->max_price_idr);
+        // Margin tersimpan di nominalnya = angka yang dipakai, dan markup
+        // produk tidak lagi disentuh impor.
+        $this->assertSame(12, (int) round((float) $package->fresh()->margin_percent));
+        $this->assertSame('PERCENT', $package->fresh()->pricing_mode);
+        $this->assertNull($product->fresh()->sell_markup_percent);
+    }
+
+    public function test_import_uses_the_global_cost_and_sell_percent_columns(): void
+    {
+        $this->login();
+        $product = Product::create([
+            'category_id' => Category::where('slug', 'game')->value('id'),
+            'name' => 'Impor Dua Kolom', 'slug' => 'impor-dua-kolom',
+            'fulfillment_mode' => 'AUTO_PROVIDER', 'margin_percent' => 10, 'is_active' => true,
+        ]);
+        $this->fakeCatalog([$this->row(['buyer_sku_code' => 'dua-kolom-sku', 'product_name' => 'Dua Kolom 10', 'price' => 10000])]);
+        $this->post('/admin/digiflazz/sync')->assertRedirect()->assertSessionHasNoErrors();
+        $item = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'dua-kolom-sku')->first();
+
+        // Dua kolom global di pop-up impor: modal +2% (bawaan), jual +10% (bawaan).
+        $this->post('/admin/catalog/products/'.$product->id.'/import', [
+            'item_ids' => [$item->id], 'cost_uplift_percent' => 2, 'margin_percent' => 10,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $mapping = $product->packages()->firstOrFail()->mappings()->firstOrFail();
+        $package = $product->packages()->firstOrFail();
+        // Modal = 10.000 + 2% = 10.200; harga jual = modal + 10% = 11.220.
+        $this->assertSame(10200, (int) $mapping->store_cost_idr);
+        $this->assertSame('PERCENT', $package->pricing_mode);
+        $this->assertSame(10, (int) round((float) $package->margin_percent));
+        // Harga yang benar-benar ditagih dihitung dari modal × margin nominal.
+        Category::where('slug', 'game')->update(['is_active' => true]);
+        Provider::where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
+        $package->update(['is_active' => true]);
+        $package->mappings()->update(['is_active' => true]);
+        $this->assertSame(11220, (int) app(CheckoutPricing::class)->previewForPackage($package->id)['subtotal_idr']);
+    }
+
+    public function test_import_honours_a_different_cost_column_for_every_selected_sku(): void
+    {
+        $this->login();
+        $product = Product::create([
+            'category_id' => Category::where('slug', 'game')->value('id'),
+            'name' => 'Impor Uplift 5', 'slug' => 'impor-uplift-5',
+            'fulfillment_mode' => 'AUTO_PROVIDER', 'margin_percent' => 10, 'is_active' => true,
+        ]);
+        $this->fakeCatalog([
+            $this->row(['buyer_sku_code' => 'uplift-5-sku', 'product_name' => 'Uplift 5 Nominal', 'price' => 20000]),
+        ]);
+        $this->post('/admin/digiflazz/sync')->assertRedirect()->assertSessionHasNoErrors();
+        $item = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'uplift-5-sku')->first();
+
+        $this->post('/admin/catalog/products/'.$product->id.'/import', [
+            'item_ids' => [$item->id], 'cost_uplift_percent' => 5, 'margin_percent' => 10,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $package = $product->packages()->firstOrFail();
+        // Modal = 20.000 + 5% = 21.000; jual = 21.000 + 10% = 23.100.
+        $this->assertSame(21000, (int) $package->mappings()->firstOrFail()->store_cost_idr);
+        Category::where('slug', 'game')->update(['is_active' => true]);
+        Provider::where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
+        $package->update(['is_active' => true]);
+        $package->mappings()->update(['is_active' => true]);
+        $this->assertSame(23100, (int) app(CheckoutPricing::class)->previewForPackage($package->id)['subtotal_idr']);
+    }
+
+    public function test_full_sync_never_touches_manual_or_voucher_sources(): void
+    {
+        $this->login();
+        $this->fakeCatalog([
+            $this->row(['buyer_sku_code' => 'tetap-sku', 'product_name' => 'Tetap 10']),
+        ]);
+        $this->post('/admin/digiflazz/sync')->assertRedirect()->assertSessionHasNoErrors();
+
+        $product = Product::create([
+            'category_id' => Category::where('slug', 'game')->value('id'),
+            'name' => 'Produk Campuran', 'slug' => 'produk-campuran',
+            'fulfillment_mode' => 'AUTO_PROVIDER', 'margin_percent' => 10, 'is_active' => true,
+        ]);
+        $package = $product->packages()->create([
+            'code' => 'CAMPUR-1', 'name' => 'Campuran 1', 'sort_order' => 1, 'is_active' => true,
+        ]);
+        $manualId = DB::table('providers')->where('code', 'MANUAL')->value('id');
+        $manual = ProviderMapping::create([
+            'product_package_id' => $package->id, 'provider_id' => $manualId,
+            'external_sku' => null, 'cost_idr' => 9000, 'store_cost_idr' => 9000,
+            'max_price_idr' => null, 'priority' => 1, 'is_active' => true,
+        ]);
+        $voucherId = DB::table('providers')->where('code', 'VOUCHER_STOCK')->value('id')
+            ?? DB::table('providers')->insertGetId([
+                'code' => 'VOUCHER_STOCK', 'display_name' => 'Stok Voucher',
+                'fulfillment_mode' => 'VOUCHER_STOCK', 'is_active' => true,
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+        // Kode stok voucher sengaja SAMA dengan SKU Digiflazz yang akan hilang:
+        // tanpa pembatas provider, pembersihan sinkron akan ikut menghapusnya.
+        $voucher = ProviderMapping::create([
+            'product_package_id' => $package->id, 'provider_id' => $voucherId,
+            'external_sku' => 'hilang-sku', 'cost_idr' => 8000, 'store_cost_idr' => 8160,
+            'max_price_idr' => 8160, 'priority' => 2, 'is_active' => true,
+        ]);
+        $digiId = DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
+        $doomed = ProviderMapping::create([
+            'product_package_id' => $package->id, 'provider_id' => $digiId,
+            'external_sku' => 'hilang-sku', 'cost_idr' => 5000, 'store_cost_idr' => 5100,
+            'max_price_idr' => 5100, 'priority' => 0, 'is_active' => true,
+        ]);
+
+        // Sinkron seluruh katalog dengan daftar yang tidak memuat SKU apa pun
+        // milik produk ini — jalur hapus benar-benar berjalan.
+        $this->fakeCatalog([
+            $this->row(['buyer_sku_code' => 'tetap-sku', 'product_name' => 'Tetap 10']),
+            $this->row(['buyer_sku_code' => 'sku-baru', 'product_name' => 'Baru 10']),
+        ]);
+        $this->post('/admin/digiflazz/sync')->assertRedirect()->assertSessionHasNoErrors();
+
+        // Jalur hapus benar-benar berjalan: mapping Digiflazz yang hilang terhapus.
+        $this->assertDatabaseMissing('provider_mappings', ['id' => $doomed->id]);
+        // Sumber MANUAL dan VOUCHER tetap utuh, termasuk modalnya.
+        $this->assertDatabaseHas('provider_mappings', ['id' => $manual->id, 'provider_id' => $manualId, 'is_active' => true]);
+        $this->assertSame(9000, (int) $manual->fresh()->store_cost_idr);
+        $this->assertDatabaseHas('provider_mappings', ['id' => $voucher->id, 'provider_id' => $voucherId, 'is_active' => true]);
+        $this->assertSame(8160, (int) $voucher->fresh()->store_cost_idr);
     }
 
     public function test_sync_failure_creates_only_one_admin_alert_per_hour(): void

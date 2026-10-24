@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { walletAdjustmentError } from '../../resources/js/lib/adminWalletAdjustment.js';
+import { mappingPayload, sortMappings, mappingStatusLabel } from '../../resources/js/lib/catalogSources.js';
 const path = filename => new URL('../../resources/js/Pages/Admin/' + filename, import.meta.url);
 const read = filename => readFileSync(path(filename), 'utf8');
 const repo = relative => readFileSync(new URL('../../' + relative, import.meta.url), 'utf8');
@@ -301,4 +302,174 @@ test('round-two admin fixes keep their UI entry points', () => {
     assert.match(access, /withSensitive\('Menghapus akun admin/);
     const customer = read('CustomerDetail.vue');
     assert.match(customer, /deletable && isSuperAdmin/);
+});
+
+// CR-01 / CR-04: membuka lalu menyimpan nominal hanya untuk mengubah nama,
+// grup, urutan, atau status tidak boleh menyentuh harga yang tersimpan.
+test('editing a nominal keeps stored pricing and nominal_value', async () => {
+    const { nominalMode, nominalPayload, nominalPriceValue } = await import('../../resources/js/lib/catalogNominal.js');
+    const rows = {
+        PRODUCT_MARGIN: { id: 1, code: 'PM-1', name: 'Kode 10', group_name: 'Umum', sort_order: 1, is_active: true, nominal_value: 10, pricing_mode: 'PRODUCT_MARGIN', sell_price_idr: null, sell_markup_percent: null, margin_percent: null, margin_fixed_idr: null },
+        PERCENT: { id: 2, code: 'PC-1', name: 'Kode 20', group_name: 'Umum', sort_order: 2, is_active: true, nominal_value: 20, pricing_mode: 'PERCENT', sell_price_idr: null, sell_markup_percent: null, margin_percent: 12.5, margin_fixed_idr: null },
+        FIXED: { id: 3, code: 'FX-1', name: 'Kode 30', group_name: 'Umum', sort_order: 3, is_active: true, nominal_value: 30, pricing_mode: 'FIXED', sell_price_idr: null, sell_markup_percent: null, margin_percent: null, margin_fixed_idr: 3500 },
+        SELL_PRICE: { id: 4, code: 'SP-1', name: 'Kode 40', group_name: 'Umum', sort_order: 4, is_active: true, nominal_value: 40, pricing_mode: 'SELL_PRICE', sell_price_idr: 21000, sell_markup_percent: 18, margin_percent: null, margin_fixed_idr: null },
+    };
+    const form = row => ({
+        name: row.name + ' baru', group_name: 'Promo', sort_order: row.sort_order + 1, is_active: !row.is_active,
+        price_mode: nominalMode(row), price_value: nominalPriceValue(row), cost_idr: '',
+    });
+    for (const [mode, row] of Object.entries(rows)) {
+        const payload = nominalPayload(row, form(row), 'generated');
+        for (const key of ['pricing_mode', 'sell_price_idr', 'margin_percent', 'margin_fixed_idr', 'nominal_value', 'note']) {
+            assert.equal(key in payload, false, `${mode}: ${key} tidak boleh ikut terkirim`);
+        }
+        assert.equal(payload.name, row.name + ' baru');
+        assert.equal(payload.sort_order, row.sort_order + 1);
+        assert.equal(payload.is_active, !row.is_active);
+    }
+    // Nilai yang tampil harus mengikuti mode tersimpan: PERCENT dari
+    // margin_percent, FIXED dari margin_fixed_idr — bukan kolom lain.
+    assert.equal(nominalMode(rows.PERCENT), 'MARKUP');
+    assert.equal(nominalPriceValue(rows.PERCENT), 12.5);
+    assert.equal(nominalMode(rows.FIXED), 'FIXED');
+    assert.equal(nominalPriceValue(rows.FIXED), 3500);
+    assert.equal(nominalPriceValue(rows.PRODUCT_MARGIN), '');
+    // Harga tetap terkirim saat admin memang mengubahnya.
+    const changed = nominalPayload(rows.SELL_PRICE, { ...form(rows.SELL_PRICE), price_value: 25000 }, 'x');
+    assert.equal(changed.pricing_mode, 'SELL_PRICE');
+    assert.equal(changed.sell_price_idr, 25000);
+
+    // Nominal FIXED yang harganya diubah tetap FIXED: angkanya masuk ke
+    // margin_fixed_idr, bukan margin_percent (3.500% = 350.000%).
+    const fixedEdit = nominalPayload(rows.FIXED, { ...form(rows.FIXED), price_value: 4000 }, 'x');
+    assert.equal(fixedEdit.pricing_mode, 'FIXED');
+    assert.equal(fixedEdit.margin_fixed_idr, 4000);
+    assert.equal(fixedEdit.margin_percent, undefined);
+
+    // Nominal PERCENT yang harganya diubah tetap PERCENT.
+    const percentEdit = nominalPayload(rows.PERCENT, { ...form(rows.PERCENT), price_value: 15 }, 'x');
+    assert.equal(percentEdit.pricing_mode, 'PERCENT');
+    assert.equal(percentEdit.margin_percent, 15);
+    assert.equal(percentEdit.margin_fixed_idr, undefined);
+
+    // Admin MENGGANTI mode di form tetap dihormati (bukan dikunci ke mode lama).
+    const fixedToMarkup = nominalPayload(rows.FIXED, { ...form(rows.FIXED), price_mode: 'MARKUP', price_value: 15 }, 'x');
+    assert.equal(fixedToMarkup.pricing_mode, 'PERCENT');
+    assert.equal(fixedToMarkup.margin_percent, 15);
+    const percentToFixed = nominalPayload(rows.PERCENT, { ...form(rows.PERCENT), price_mode: 'FIXED', price_value: 20000 }, 'x');
+    assert.equal(percentToFixed.pricing_mode, 'SELL_PRICE');
+    assert.equal(percentToFixed.sell_price_idr, 20000);
+    // Ganti mode tidak boleh meninggalkan angka mode lama: kolom harga yang
+    // bukan milik mode baru dikirim null, supaya tidak ada sisa 3.500 di
+    // margin_fixed_idr saat nominal sudah jadi markup.
+    assert.equal(percentToFixed.margin_percent, null);
+    assert.equal(percentToFixed.margin_fixed_idr, null);
+    assert.equal(fixedToMarkup.sell_price_idr, null);
+    assert.equal(fixedToMarkup.margin_fixed_idr, null);
+    // Panel tidak punya markup produk/nominal terpisah: payload harga tidak
+    // boleh membawa kolom sell_markup_percent sama sekali.
+    for (const payload of [changed, fixedEdit, percentEdit, fixedToMarkup, percentToFixed]) {
+        assert.equal('sell_markup_percent' in payload, false);
+    }
+    // Ganti mode dengan ANGKA yang sama juga harus tetap tercatat (bukan
+    // dianggap tidak berubah hanya karena nilainya kebetulan sama).
+    const sameNumberSwitch = nominalPayload(rows.SELL_PRICE, { ...form(rows.SELL_PRICE), price_mode: 'MARKUP', price_value: 21000 }, 'x');
+    assert.equal(sameNumberSwitch.pricing_mode, 'PERCENT');
+    assert.equal(sameNumberSwitch.margin_percent, 21000);
+    // Catalog.vue memakai helper itu, bukan payload lama yang menimpa null.
+    const catalog = read('Catalog.vue');
+    assert.match(catalog, /import \{ nominalMode, nominalPayload, nominalPriceValue \} from '\.\.\/\.\.\/lib\/catalogNominal'/);
+    assert.match(catalog, /const payload = nominalPayload\(nominalEditing\.value, nominal,/);
+    assert.doesNotMatch(catalog, /nominal_value: null,\s*\n\s*pricing_mode:/);
+});
+
+// CR-02: margin impor dibaca dari setting harga yang aktif, bukan prop warisan.
+// Penjagaan di server saja tidak cukup: form yang masih mengirim 35 akan lolos.
+test('import margin reads the active pricing setting', () => {
+    const catalog = read('Catalog.vue');
+    assert.match(catalog, /importMargin = ref\(Number\(props\.pricingSettings\?\.sell_markup_percent/);
+    // Angka impor selalu dari setting aktif, bukan markup produk yang tidak
+    // ada di panel.
+    assert.doesNotMatch(catalog, /importProduct\.value\?\.sell_markup_percent/);
+    assert.doesNotMatch(catalog, /defaultMargin|props\.pricingSettings\?\.default_margin/);
+    // Dua kolom global impor: harga modal (%) dan harga jual (%), keduanya
+    // bisa diubah admin dan dikirim bersama impor untuk semua SKU terpilih.
+    assert.match(catalog, /v-model="importUplift"/);
+    assert.match(catalog, /v-model="importMargin"/);
+    assert.match(catalog, /cost_uplift_percent: Number\(importUplift\.value \|\| 0\)/);
+    assert.match(catalog, /margin_percent: Number\(importMargin\.value \|\| 0\)/);
+});
+
+// Tab Sumber: dua kolom impor global + modal bisa diedit di tabel + saklar
+// sinkron otomatis semua produk.
+test('source tab edits store cost and toggles whole-catalog auto sync', () => {
+    const catalog = read('Catalog.vue');
+    // Harga modal per sumber bisa diubah langsung dari tabel Sumber.
+    assert.match(catalog, /saveMapping\(mapping, \{ store_cost_idr: Number\(\$event\.target\.value \|\| 0\) \}\)/);
+    // Saklar sinkron otomatis seluruh katalog (bukan per produk).
+    assert.match(catalog, /const toggleAutoSync = \(\) => \{/);
+    // Saklar memakai route ber-izin katalog, bukan route integrasi provider.
+    assert.match(catalog, /router\.put\('\/admin\/catalog\/auto-sync'/);
+    assert.doesNotMatch(catalog, /products\/\$\{product\.value\.id\}\/sync/);
+});
+
+// CR-03: membuat akun admin baru (termasuk Super Admin) juga menanyakan kata
+// sandi di UI, bukan hanya perubahan peran/izin.
+test('creating an admin account asks for password confirmation', () => {
+    const access = read('Access.vue');
+    // Akun yang sudah nonaktif lalu diganti namanya bukan "menonaktifkan":
+    // alasan khusus hanya untuk transisi aktif -> nonaktif.
+    assert.match(access, /wasActive: row\.is_active/);
+    assert.match(access, /target\.is_active === false && target\.wasActive/);
+    // Server menjaga semua mutasi, jadi UI selalu bertanya (bukan bersyarat).
+    assert.match(access, /void withSensitive\(sensitiveReason\(\), run\);/);
+    assert.doesNotMatch(access, /if \(needsPassword\)/);
+    assert.match(access, /if \(!target\.id\) return 'Membuat akun admin baru memerlukan konfirmasi kata sandi\.'/);
+    assert.match(repo('routes/web.php'), /Route::post\('\/admin\/access'[\s\S]{0,160}admin\.password\.confirm/);
+    assert.match(repo('routes/web.php'), /Route::put\('\/admin\/access\/\{admin\}'[\s\S]{0,160}admin\.password\.confirm/);
+    assert.match(repo('routes/web.php'), /Route::delete\('\/admin\/access\/\{admin\}'[\s\S]{0,160}admin\.password\.confirm/);
+});
+
+// CR-05: tab Sumber pulih memakai route yang sudah ada, tanpa menghapus route
+// sumber/sync/gateway.
+test('catalog source tab uses existing mapping and sync routes', () => {
+    const catalog = read('Catalog.vue');
+    assert.match(catalog, /editTab === 'sources'/);
+    assert.match(catalog, /Sumber<\/button>/);
+    assert.match(catalog, /\/admin\/catalog\/mappings\/\$\{mapping\.id\}/);
+    assert.match(catalog, /\/admin\/catalog\/mappings\/\$\{mapping\.id\}\/sync/);
+    // Sinkron seluruh katalog milik menu Digiflazz: tidak ada tombol maupun
+    // route sinkron per produk.
+    assert.doesNotMatch(catalog, /products\/\$\{product\.value\.id\}\/sync/);
+    // Daftar, prioritas, status, dan sinkron ada di panel.
+    assert.match(catalog, /movePriority\(mapping, -1\)/);
+    assert.match(catalog, /toggleMapping\(mapping\)/);
+    assert.match(catalog, /mappingStatusLabel\(mapping\)/);
+    // Nama route ditulis di dalam group ber-prefix, jadi yang dicek nama lokalnya.
+    const routes = repo('routes/web.php');
+    for (const route of ['mappings.sync', 'mappings.update']) {
+        assert.ok(routes.includes("'" + route + "'"), 'route ' + route + ' harus tetap ada');
+    }
+    assert.ok(!routes.includes("'products.sync'"), 'route sinkron per produk harus dibuang');
+});
+
+
+// CR-05: payload panel Sumber tidak boleh mengubah modal atau melepas kunci harga.
+test('catalog source payload keeps stored cost and manual price lock', () => {
+    const manual = { id: 1, provider_code: 'MANUAL', cost_idr: 9000, store_cost_idr: 9500, priority: 4, is_active: true };
+    assert.equal(mappingPayload(manual, { priority: 2 }).cost_idr, 9000);
+    assert.equal(mappingPayload(manual, { priority: 2 }).priority, 2);
+
+    const locked = { id: 2, provider_code: 'DIGIFLAZZ', is_manual_price: true, cost_idr: 8000, priority: 1, is_active: true };
+    assert.equal(mappingPayload(locked, { is_active: false }).is_manual_price, true);
+
+    // Mapping biasa tidak mengirim field harga sama sekali.
+    const plain = { id: 3, provider_code: 'DIGIFLAZZ', is_manual_price: false, cost_idr: 8000, priority: 1, is_active: true };
+    assert.deepEqual(Object.keys(mappingPayload(plain, { priority: 0 })).sort(), ['is_active', 'priority']);
+
+    assert.deepEqual(sortMappings([{ id: 1, priority: 5, is_active: false }, { id: 2, priority: 9, is_active: true }]).map(m => m.id), [2, 1]);
+    assert.equal(mappingStatusLabel({ provider_code: 'VOUCHER_STOCK', is_active: true, stock_counts: { available: 3 } }), '3 kode siap');
+    // Mapping nonaktif harus terbaca nonaktif, bukan "3 kode siap".
+    assert.equal(mappingStatusLabel({ provider_code: 'VOUCHER_STOCK', is_active: false, stock_counts: { available: 3 } }), 'Nonaktif');
+    assert.equal(mappingStatusLabel({ is_active: false, disabled_by_sync: true }), 'Nonaktif (sinkron)');
 });

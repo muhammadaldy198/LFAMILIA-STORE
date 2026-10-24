@@ -36,7 +36,7 @@ class AdminCatalogController
             ...$product->only('id', 'category_id', 'name', 'publisher', 'slug', 'description', 'fulfillment_mode',
                 'initials', 'accent_color', 'instant', 'package_tabs_enabled', 'package_tabs',
                 'customer_no_template', 'manual_instructions', 'manual_open_time', 'manual_close_time', 'manual_timezone', 'margin_percent', 'sort_order', 'is_active', 'popular',
-                'sell_markup_percent', 'cost_uplift_percent',
+                'cost_uplift_percent',
                 'nickname_check_enabled', 'nickname_game_code', 'nickname_user_field_key',
                 'nickname_server_field_key'),
             'image_url' => $product->getFirstMediaUrl('image'),
@@ -120,12 +120,19 @@ class AdminCatalogController
                 'status' => $filters['status'] ?? '', 'sort' => $filters['sort'] ?? 'order', 'per_page' => (int) ($filters['per_page'] ?? 25),
             ],
             'products' => $products->getCollection()->map(fn (Product $product): array => $this->productRow($product, $providers, $stockCounts))->all(),
-            'productPage' => $products->toArray(),
-            'defaultMargin' => json_decode((string) DB::table('system_settings')->where('key', 'catalog.default_margin_percent')->value('value'), true) ?? 0,
+            'productPage' => [
+                'current_page' => $products->currentPage(),
+                'last_page' => $products->lastPage(),
+                'per_page' => $products->perPage(),
+                'total' => $products->total(),
+            ],
             'pricingSettings' => [
                 'cost_uplift_percent' => app(CatalogPricingSettings::class)->costUpliftPercent(),
                 'sell_markup_percent' => app(CatalogPricingSettings::class)->sellMarkupPercent(),
             ],
+            // Status sinkron otomatis, supaya tab Sumber tidak menampilkan tombol
+            // sinkron yang tidak pernah jalan.
+            ...$this->autoSyncSettings(),
             'digiflazzItems' => (function () {
                 // N+1 fix: preload mapped SKUs sekali, bukan per item
                 $digiflazzIds = Provider::where('code', 'DIGIFLAZZ')->pluck('id');
@@ -149,6 +156,39 @@ class AdminCatalogController
                     'image_url' => $category->getFirstMediaUrl('image'),
                 ]),
         ]);
+    }
+
+    /**
+     * Saklar sinkron otomatis dipakai di tab Sumber (izin katalog), jadi tidak
+     * boleh menuntut izin integrasi provider seperti halaman Digiflazz.
+     */
+    public function autoSync(Request $request, CatalogAudit $audit): RedirectResponse
+    {
+        $data = $request->validate(['enabled' => ['required', 'boolean']]);
+        $before = $this->autoSyncSettings();
+        DB::table('system_settings')->updateOrInsert(['key' => 'digiflazz.auto_sync'], [
+            'value' => json_encode((bool) $data['enabled'], JSON_THROW_ON_ERROR),
+            'updated_by_admin_id' => $request->user('admin')->id,
+            'updated_at' => now(),
+            'created_at' => now(),
+        ]);
+        $audit->record($request, 'digiflazz.auto_sync.updated', 'system_setting', 'digiflazz.auto_sync',
+            $before, ['enabled' => (bool) $data['enabled']]);
+
+        return back()->with('status', $data['enabled'] ? 'Sinkron otomatis dinyalakan.' : 'Sinkron otomatis dimatikan.');
+    }
+
+    /** @return array{autoSync: bool, syncIntervalMinutes: int} */
+    private function autoSyncSettings(): array
+    {
+        $stored = DB::table('system_settings')
+            ->whereIn('key', ['digiflazz.auto_sync', 'digiflazz.auto_sync_interval_minutes'])
+            ->pluck('value', 'key');
+
+        return [
+            'autoSync' => (bool) (json_decode((string) $stored->get('digiflazz.auto_sync'), true) ?? true),
+            'syncIntervalMinutes' => max(5, (int) (json_decode((string) $stored->get('digiflazz.auto_sync_interval_minutes'), true) ?? 15)),
+        ];
     }
 
     public function category(Request $request, CatalogAudit $audit): RedirectResponse
@@ -230,8 +270,7 @@ class AdminCatalogController
             'manual_open_time' => ['nullable', 'regex:/^([01]\\d|2[0-3]):[0-5]\\d$/'],
             'manual_close_time' => ['nullable', 'regex:/^([01]\\d|2[0-3]):[0-5]\\d$/'],
             'manual_timezone' => ['nullable', Rule::in(['Asia/Jakarta', 'Asia/Makassar', 'Asia/Jayapura'])],
-            'margin_percent' => ['required', 'numeric', 'min:0', 'max:1000'],
-            'sell_markup_percent' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:1000'],
+            'margin_percent' => ['required', 'numeric', 'min:0', 'max:1000', 'decimal:0,4'],
             'sort_order' => ['required', 'integer', 'min:0'],
             // Satu formulir boleh membawa banyak baris nominal untuk produk manual.
             'packages' => ['sometimes', 'array', 'max:100'],
@@ -242,7 +281,6 @@ class AdminCatalogController
             'packages.*.nominal_value' => ['nullable', 'integer', 'min:0'],
             'packages.*.sort_order' => ['nullable', 'integer', 'min:0'],
             'packages.*.cost_idr' => ['required', 'integer', 'min:0', 'max:1000000000'],
-            'packages.*.sell_markup_percent' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:1000'],
         ]);
         $rows = collect($data['packages'] ?? [])->values();
         unset($data['packages']);
@@ -308,7 +346,9 @@ class AdminCatalogController
                     'group_name' => $row['group_name'] ?? null,
                     'nominal_value' => $row['nominal_value'] ?? null,
                     'sort_order' => $row['sort_order'] ?? $index,
-                    'sell_markup_percent' => $row['sell_markup_percent'] ?? null,
+                    // Nominal manual memakai margin persen produk; harga jual
+                    // dihitung dari modal toko, bukan kolom markup legacy.
+                    'pricing_mode' => 'PERCENT', 'margin_percent' => $data['margin_percent'],
                     'is_active' => false,
                 ]);
                 // Modal toko tidak di-uplift: uplift hanya berlaku saat impor provider.
@@ -351,11 +391,10 @@ class AdminCatalogController
             'manual_open_time' => ['nullable', 'regex:/^([01]\\d|2[0-3]):[0-5]\\d$/'],
             'manual_close_time' => ['nullable', 'regex:/^([01]\\d|2[0-3]):[0-5]\\d$/'],
             'manual_timezone' => ['nullable', Rule::in(['Asia/Jakarta', 'Asia/Makassar', 'Asia/Jayapura'])],
-            'margin_percent' => ['required', 'numeric', 'min:0', 'max:1000'],
+            'margin_percent' => ['required', 'numeric', 'min:0', 'max:1000', 'decimal:0,4'],
             'sort_order' => ['required', 'integer', 'min:0'],
             'is_active' => ['required', 'boolean'],
-            'sell_markup_percent' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:1000'],
-            'cost_uplift_percent' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:1000'],
+            'cost_uplift_percent' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:1000', 'decimal:0,4'],
             'nickname_check_enabled' => ['sometimes', 'boolean'],
             'nickname_game_code' => ['nullable', 'string', 'max:80', 'regex:/^[a-z0-9][a-z0-9-]*$/'],
             'nickname_user_field_key' => ['nullable', 'string', 'max:80', 'regex:/^[a-z][a-z0-9_]*$/'],
@@ -666,10 +705,10 @@ class AdminCatalogController
                 'integer', 'min:0', 'max:1000000000'],
             'is_active' => ['sometimes', 'boolean'],
             'pricing_mode' => ['sometimes', Rule::in(['PRODUCT_MARGIN', 'PERCENT', 'FIXED', 'SELL_PRICE'])],
-            'margin_percent' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:1000', 'required_if:pricing_mode,PERCENT'],
+            'margin_percent' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:1000', 'decimal:0,4', 'required_if:pricing_mode,PERCENT'],
             'margin_fixed_idr' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:1000000000', 'required_if:pricing_mode,FIXED'],
             'sell_price_idr' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:1000000000', 'required_if:pricing_mode,SELL_PRICE'],
-            'sell_markup_percent' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:1000'],
+            'sell_markup_percent' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:1000', 'decimal:0,4'],
         ]);
 
         // Nominal otomatis hanya bisa dijual setelah punya sumber Digiflazz aktif.
@@ -743,17 +782,27 @@ class AdminCatalogController
             'sort_order' => ['required', 'integer', 'min:0'],
             'is_active' => ['required', 'boolean'],
             'pricing_mode' => ['sometimes', Rule::in(['PRODUCT_MARGIN', 'PERCENT', 'FIXED', 'SELL_PRICE'])],
-            'margin_percent' => ['nullable', 'numeric', 'min:0', 'max:1000', 'required_if:pricing_mode,PERCENT'],
+            'margin_percent' => ['nullable', 'numeric', 'min:0', 'max:1000', 'decimal:0,4', 'required_if:pricing_mode,PERCENT'],
             'margin_fixed_idr' => ['nullable', 'integer', 'min:0', 'max:1000000000', 'required_if:pricing_mode,FIXED'],
             'sell_price_idr' => ['nullable', 'integer', 'min:1', 'max:1000000000', 'required_if:pricing_mode,SELL_PRICE'],
-            'sell_markup_percent' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:1000'],
-            'cost_uplift_percent' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:1000'],
+            'sell_markup_percent' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:1000', 'decimal:0,4'],
+            'cost_uplift_percent' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:1000', 'decimal:0,4'],
             'cost_idr' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:1000000000'],
+            'store_cost_idr' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:1000000000'],
         ]);
 
         $product = $package->product()->firstOrFail();
-        $newCost = array_key_exists('cost_idr', $data) && $data['cost_idr'] !== null
-            ? (int) $data['cost_idr'] : null;
+        // Nominal tersimpan tidak boleh hilang karena klien mengirim null tanpa
+        // sengaja mengubahnya (form edit tidak punya input nominal_value).
+        if (array_key_exists('nominal_value', $data)
+            && $data['nominal_value'] === null && $package->nominal_value !== null) {
+            unset($data['nominal_value']);
+        }
+        // Modal toko hidup di store_cost_idr. cost_idr hanya dibaca sebagai
+        // fallback supaya form lama tetap jalan, tapi tidak pernah menimpanya.
+        $newCost = array_key_exists('store_cost_idr', $data) && $data['store_cost_idr'] !== null
+            ? (int) $data['store_cost_idr']
+            : (array_key_exists('cost_idr', $data) && $data['cost_idr'] !== null ? (int) $data['cost_idr'] : null);
         if ($newCost !== null && $product->fulfillment_mode !== 'MANUAL') {
             throw ValidationException::withMessages([
                 'cost_idr' => 'Modal hanya bisa diisi pada produk dengan penanganan manual.',
@@ -766,9 +815,10 @@ class AdminCatalogController
             : null;
         $effectiveCost = $newCost ?? (int) ($manualMapping?->store_cost_idr ?? $manualMapping?->cost_idr ?? 0);
         if ($isActive && $product->fulfillment_mode === 'MANUAL' && $effectiveCost < 1) {
-            throw ValidationException::withMessages([
-                'cost_idr' => 'Nominal aktif harus punya modal lebih dari Rp 0.',
-            ]);
+            // Modal nol tidak bisa dijual: nominalnya dimatikan, tapi modal lama
+            // tidak ikut dihapus supaya bisa dinyalakan lagi tanpa isi ulang.
+            $isActive = false;
+            $newCost = null;
         }
         // Nominal otomatis hanya bisa dijual lewat sumber penyedia yang aktif.
         if ($isActive && $product->fulfillment_mode !== 'MANUAL'
@@ -793,9 +843,20 @@ class AdminCatalogController
             && (int) ($data['sell_price_idr'] ?? $package->sell_price_idr) < (int) ($newCost ?? $highestActiveCost)) {
             throw ValidationException::withMessages(['sell_price_idr' => 'Harga jual tidak boleh di bawah modal.']);
         }
-        DB::transaction(function () use ($request, $package, $product, $isActive, $data, $audit, $newCost): void {
+        $wasActive = (bool) $package->is_active;
+        DB::transaction(function () use ($request, $package, $product, $isActive, $data, $audit, $newCost, $wasActive): void {
             $before = $package->toArray();
-            $package->update(collect($data)->except('cost_idr')->all());
+            // is_active memakai hasil hitungan server: nominal tanpa modal
+            // dimatikan walau klien mengirim true.
+            $package->update([
+                ...collect($data)->except(['cost_idr', 'store_cost_idr', 'is_active'])->all(),
+                'is_active' => $isActive,
+            ]);
+            // Admin menyalakan sendiri: penanda "dimatikan sinkron" dilepas supaya
+            // sinkron berikutnya tidak menganggapnya miliknya.
+            if ($isActive && $package->disabled_by_sync) {
+                $package->update(['disabled_by_sync' => false]);
+            }
             if ($product->fulfillment_mode === 'MANUAL') {
                 // Modal nominal manual hidup di pemetaan provider, bukan di paket,
                 // dan status aktif nominal harus ikut supaya CheckoutPricing melihatnya.
@@ -815,7 +876,10 @@ class AdminCatalogController
                 $mapping->update([
                     'cost_idr' => $newCost ?? $mapping->cost_idr,
                     'store_cost_idr' => $newCost ?? $mapping->store_cost_idr,
-                    'is_active' => $isActive,
+                    // Status sumber hanya ikut berubah kalau status nominalnya
+                    // sendiri berubah; ganti nama nominal tidak boleh
+                    // menghidupkan sumber yang sudah dimatikan admin.
+                    ...($wasActive === $isActive ? [] : ['is_active' => $isActive]),
                 ]);
                 $audit->record($request, 'catalog.mapping.updated', 'provider_mapping', $mapping->id, $mappingBefore, $mapping->fresh()->toArray());
             }
@@ -1013,6 +1077,29 @@ class AdminCatalogController
 
     public function mapping(Request $request, ProviderMapping $mapping, CatalogAudit $audit): RedirectResponse
     {
+        // Naik/turun menukar prioritas dengan sumber tetangga, bukan menambah
+        // angka: dua sumber berprioritas sama tidak akan pernah bergeser.
+        if ($request->filled('direction')) {
+            $direction = (int) $request->validate(['direction' => ['required', Rule::in(['-1', '1'])]])['direction'];
+            DB::transaction(function () use ($request, $mapping, $audit, $direction): void {
+                $siblings = ProviderMapping::where('product_package_id', $mapping->product_package_id)
+                    ->orderBy('priority')->orderBy('id')->lockForUpdate()->get()->values();
+                $index = $siblings->search(fn (ProviderMapping $row): bool => $row->id === $mapping->id);
+                $neighbor = $siblings->get($index + $direction);
+                if ($neighbor === null) {
+                    return;
+                }
+                $before = ['a' => $mapping->toArray(), 'b' => $neighbor->toArray()];
+                $a = $mapping->priority;
+                $mapping->update(['priority' => $neighbor->priority]);
+                $neighbor->update(['priority' => $a]);
+                $audit->record($request, 'catalog.mapping.reordered', 'provider_mapping', $mapping->id,
+                    $before, ['a' => $mapping->toArray(), 'b' => $neighbor->toArray()]);
+            });
+
+            return back();
+        }
+
         $provider = Provider::findOrFail($mapping->provider_id);
         $data = $request->validate([
             'priority' => ['required', 'integer', 'min:0', 'max:1000'],
@@ -1092,9 +1179,21 @@ class AdminCatalogController
             $data['disabled_by_sync'] = false;
         }
 
-        DB::transaction(function () use ($request, $mapping, $data, $audit): void {
+        // Sumber manual tanpa modal tidak bisa dijual. Matikan nominalnya
+        // sekalian supaya tidak tampil aktif tapi selalu gagal di checkout.
+        $manualCostZero = $provider->code === 'MANUAL'
+            && (int) ($data['store_cost_idr'] ?? $mapping->store_cost_idr ?? $mapping->cost_idr ?? 0) < 1;
+        if ($manualCostZero) {
+            $data['is_active'] = false;
+        }
+
+        DB::transaction(function () use ($request, $mapping, $data, $audit, $manualCostZero): void {
             $before = $mapping->toArray();
             $mapping->update($data);
+            if ($manualCostZero) {
+                DB::table('product_packages')->where('id', $mapping->product_package_id)
+                    ->update(['is_active' => false, 'updated_at' => now()]);
+            }
             $audit->record($request, 'catalog.mapping.updated', 'provider_mapping', $mapping->id,
                 $before, $mapping->toArray());
         });
@@ -1136,8 +1235,8 @@ class AdminCatalogController
     public function pricing(Request $request, AdminAuditService $audit, CatalogPricingSettings $settings): RedirectResponse
     {
         $data = $request->validate([
-            'cost_uplift_percent' => ['required', 'numeric', 'min:0', 'max:1000'],
-            'sell_markup_percent' => ['required', 'numeric', 'min:0', 'max:1000'],
+            'cost_uplift_percent' => ['required', 'numeric', 'min:0', 'max:1000', 'decimal:0,4'],
+            'sell_markup_percent' => ['required', 'numeric', 'min:0', 'max:1000', 'decimal:0,4'],
         ]);
 
         DB::transaction(function () use ($request, $data, $audit, $settings): void {

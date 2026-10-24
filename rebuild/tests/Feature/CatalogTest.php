@@ -16,6 +16,7 @@ use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 use InvalidArgumentException;
@@ -884,10 +885,9 @@ class CatalogTest extends TestCase
             'fulfillment_mode' => 'MANUAL',
             'manual_instructions' => 'Cek pesanan di panel admin',
             'margin_percent' => 10,
-            'sell_markup_percent' => 15,
             'sort_order' => 3,
             'packages' => [
-                ['name' => '100 Koin', 'nominal_value' => 100, 'cost_idr' => 10000, 'sell_markup_percent' => 12],
+                ['name' => '100 Koin', 'nominal_value' => 100, 'cost_idr' => 10000],
                 ['name' => '200 Koin', 'nominal_value' => 200, 'cost_idr' => 19000],
                 ['name' => 'Kartu Koleksi', 'nominal_value' => null, 'cost_idr' => 5000, 'note' => 'Bonus'],
             ],
@@ -920,21 +920,21 @@ class CatalogTest extends TestCase
         // Modal toko yang diketik admin tidak di-uplift: uplift hanya berlaku saat impor.
         $this->assertSame(10000, (int) $firstMapping->cost_idr);
         $this->assertSame(10000, (int) $firstMapping->store_cost_idr);
-        $this->assertSame('12.0000', (string) $first->sell_markup_percent);
+        // Harga jual nominal manual memakai margin persen, bukan markup legacy.
+        $this->assertSame('PERCENT', $first->pricing_mode);
+        $this->assertSame('10.0000', (string) $first->margin_percent);
 
         DB::table('products')->where('id', $product->id)->update(['is_active' => true]);
         DB::table('product_packages')->whereIn('id', $packages->pluck('id'))->update(['is_active' => true]);
         DB::table('provider_mappings')->whereIn('product_package_id', $packages->pluck('id'))->update(['is_active' => true]);
         $quotes = app(CheckoutPricing::class)->forPackages($packages->pluck('id')->all());
 
-        // Baris dengan markup sendiri memakai markup baris (10.000 × 12% = 11.200).
-        $this->assertSame(11200, $quotes[$first->id]['subtotal_idr']);
-        // Baris tanpa markup memakai markup produk dari formulir yang sama (19.000 × 15% = 21.850).
+        // Semua baris memakai margin persen produk (10%): 10.000 → 11.000.
+        $this->assertSame(11000, $quotes[$first->id]['subtotal_idr']);
         $second = $packages->firstWhere('name', '200 Koin');
-        $this->assertSame(21850, $quotes[$second->id]['subtotal_idr']);
-        // Tanpa markup baris, berlaku markup produk dari formulir yang sama (5.000 × 15% = 5.750).
+        $this->assertSame(20900, $quotes[$second->id]['subtotal_idr']);
         $third = $packages->firstWhere('name', 'Kartu Koleksi');
-        $this->assertSame(5750, $quotes[$third->id]['subtotal_idr']);
+        $this->assertSame(5500, $quotes[$third->id]['subtotal_idr']);
     }
 
     public function test_manual_nominal_rows_are_rejected_for_automatic_products(): void
@@ -1072,11 +1072,11 @@ class CatalogTest extends TestCase
         ]);
         $this->actingAs($this->admin(), 'admin');
 
-        // Nominal tanpa modal tidak boleh diaktifkan: CheckoutPricing tidak akan melihatnya.
+        // Nominal tanpa modal tidak bisa dijual: server mematikannya sendiri.
         $this->put('/admin/catalog/packages/'.$package->id, [
             'code' => 'MA-100', 'name' => '100 Koin', 'sort_order' => 0, 'is_active' => true, 'cost_idr' => 0,
-        ])->assertSessionHasErrors('cost_idr');
-        $this->assertFalse($package->fresh()->is_active);
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertFalse($package->fresh()->is_active, 'Nominal tanpa modal harus mati.');
         $this->assertFalse($mapping->fresh()->is_active);
 
         $this->put('/admin/catalog/packages/'.$package->id, [
@@ -1089,6 +1089,164 @@ class CatalogTest extends TestCase
             'code' => 'MA-100', 'name' => '100 Koin', 'sort_order' => 0, 'is_active' => false,
         ])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertFalse($mapping->fresh()->is_active, 'Menonaktifkan nominal harus ikut menonaktifkan pemetaan.');
+    }
+
+    public function test_editing_a_nominal_identity_keeps_stored_pricing_and_nominal_value(): void
+    {
+        $category = Category::where('slug', 'game')->firstOrFail();
+        $product = Product::create([
+            'category_id' => $category->id, 'name' => 'Harga Tersimpan', 'slug' => 'harga-tersimpan',
+            'margin_percent' => 10, 'fulfillment_mode' => 'AUTO_PROVIDER',
+        ]);
+        $provider = Provider::where('code', 'DIGIFLAZZ')->firstOrFail();
+        $rows = [
+            'PRODUCT_MARGIN' => ['mode' => 'PRODUCT_MARGIN', 'margin_percent' => null, 'margin_fixed_idr' => null, 'sell_price_idr' => null, 'sell_markup_percent' => null],
+            'PERCENT' => ['mode' => 'PERCENT', 'margin_percent' => 12.5, 'margin_fixed_idr' => null, 'sell_price_idr' => null, 'sell_markup_percent' => null],
+            'FIXED' => ['mode' => 'FIXED', 'margin_percent' => null, 'margin_fixed_idr' => 3500, 'sell_price_idr' => null, 'sell_markup_percent' => null],
+            'SELL_PRICE' => ['mode' => 'SELL_PRICE', 'margin_percent' => null, 'margin_fixed_idr' => null, 'sell_price_idr' => 21000, 'sell_markup_percent' => 18],
+        ];
+        $packages = [];
+        foreach ($rows as $mode => $pricing) {
+            $package = $product->packages()->create([
+                'code' => 'HT-'.$mode, 'name' => 'Nominal '.$mode, 'nominal_value' => 50,
+                'note' => 'Catatan toko', 'sort_order' => 1, 'is_active' => true,
+                'pricing_mode' => $pricing['mode'],
+                'margin_percent' => $pricing['margin_percent'],
+                'margin_fixed_idr' => $pricing['margin_fixed_idr'],
+                'sell_price_idr' => $pricing['sell_price_idr'],
+                'sell_markup_percent' => $pricing['sell_markup_percent'],
+            ]);
+            ProviderMapping::create([
+                'product_package_id' => $package->id, 'provider_id' => $provider->id,
+                'external_sku' => 'sku-'.$mode, 'cost_idr' => 10000, 'store_cost_idr' => 10000,
+                'max_price_idr' => 12000, 'priority' => 0, 'is_active' => true,
+            ]);
+            $packages[$mode] = $package->fresh();
+        }
+        $this->actingAs($this->admin(), 'admin');
+
+        foreach ($packages as $mode => $before) {
+            // Payload yang dikirim Catalog.vue setelah CR-01/CR-04: hanya field
+            // identitas yang berubah, field harga tidak ikut dikirim.
+            $this->put('/admin/catalog/packages/'.$before->id, [
+                'code' => $before->code,
+                'name' => $before->name.' baru',
+                'group_name' => 'Promo',
+                'sort_order' => 7,
+                'is_active' => true,
+            ])->assertRedirect()->assertSessionHasNoErrors();
+
+            $after = $before->fresh();
+            $this->assertSame('Nominal '.$mode.' baru', $after->name);
+            $this->assertSame('Promo', $after->group_name);
+            $this->assertSame(7, (int) $after->sort_order);
+            $this->assertSame($before->pricing_mode, $after->pricing_mode, $mode.': mode harga tidak boleh berubah');
+            $this->assertSame($before->sell_price_idr, $after->sell_price_idr, $mode.': harga tetap tidak boleh berubah');
+            $this->assertSame($before->sell_markup_percent, $after->sell_markup_percent, $mode.': markup tidak boleh berubah');
+            $this->assertSame($before->margin_fixed_idr, $after->margin_fixed_idr, $mode.': margin tetap tidak boleh berubah');
+            $this->assertSame($before->margin_percent, $after->margin_percent, $mode.': margin persen tidak boleh berubah');
+            $this->assertSame(50, (int) $after->nominal_value, $mode.': nominal_value tidak boleh ditimpa null');
+            $this->assertSame('Catatan toko', $after->note, $mode.': catatan nominal tidak boleh terhapus');
+        }
+
+        // Server ikut menjaga: request langsung yang mengirim nominal_value null
+        // tidak mengosongkan nominal yang sudah tersimpan.
+        $broken = $packages['PRODUCT_MARGIN'];
+        $this->put('/admin/catalog/packages/'.$broken->id, [
+            'code' => $broken->code, 'name' => $broken->name, 'sort_order' => 1, 'is_active' => true,
+            'nominal_value' => null, 'pricing_mode' => 'PERCENT', 'sell_price_idr' => null,
+            'sell_markup_percent' => null, 'margin_percent' => 0,
+        ])->assertRedirect();
+        $this->assertSame(50, (int) $broken->fresh()->nominal_value);
+        $this->assertSame('PERCENT', $broken->fresh()->pricing_mode);
+    }
+
+    public function test_product_paginator_sends_only_pagination_metadata(): void
+    {
+        $this->actingAs($this->admin(), 'admin');
+
+        $category = Category::where('slug', 'game')->firstOrFail();
+        foreach (range(1, 3) as $n) {
+            Product::create([
+                'category_id' => $category->id, 'name' => 'A07 Produk '.$n, 'slug' => 'a07-produk-'.$n,
+                'fulfillment_mode' => 'AUTO_PROVIDER', 'margin_percent' => 10, 'is_active' => true,
+                'sort_order' => $n,
+            ]);
+        }
+
+        // Metadata saja: baris produk tetap datang lewat products, bukan
+        // disalin ulang di productPage.
+        $this->get('/admin/catalog?per_page=10&page=1&q=A07+Produk')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('productPage.current_page', 1)
+                ->where('productPage.per_page', 10)
+                ->where('productPage.total', 3)
+                ->where('products', fn ($rows): bool => count($rows) === 3)
+                ->missing('productPage.data')
+                ->missing('productPage.first_page_url')
+                ->missing('productPage.links'));
+
+        // Urutan: sort_order sengaja dibalik dari urutan nama, jadi tes ini
+        // gagal bila sort=name diabaikan.
+        Product::where('slug', 'a07-produk-1')->update(['sort_order' => 30]);
+        Product::where('slug', 'a07-produk-3')->update(['sort_order' => 1]);
+        $this->get('/admin/catalog?per_page=10&sort=name&q=A07+Produk')
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('products', fn ($rows): bool => collect($rows)->pluck('name')->all() === ['A07 Produk 1', 'A07 Produk 2', 'A07 Produk 3']));
+        $this->get('/admin/catalog?per_page=10&sort=order&q=A07+Produk')
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('products', fn ($rows): bool => collect($rows)->pluck('name')->all() === ['A07 Produk 3', 'A07 Produk 2', 'A07 Produk 1']));
+
+        // Halaman 2 kosong tapi metadata tetap benar (tidak ada data mentah).
+        $this->get('/admin/catalog?per_page=10&page=2&q=A07+Produk')
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('productPage.current_page', 2)
+                ->where('productPage.total', 3)
+                ->where('products', [])
+                ->missing('productPage.data'));
+    }
+
+    public function test_catalog_source_tab_routes_stay_available_for_the_panel(): void
+    {
+        $this->actingAs($this->admin(), 'admin');
+        $category = Category::where('slug', 'game')->firstOrFail();
+        $product = Product::create([
+            'category_id' => $category->id, 'name' => 'Sumber Panel', 'slug' => 'sumber-panel',
+            'margin_percent' => 10, 'fulfillment_mode' => 'AUTO_PROVIDER', 'is_active' => true,
+        ]);
+        $package = $product->packages()->create(['code' => 'SP-10', 'name' => '10 Koin', 'is_active' => true]);
+        $mapping = ProviderMapping::create([
+            'product_package_id' => $package->id,
+            'provider_id' => Provider::where('code', 'DIGIFLAZZ')->value('id'),
+            'external_sku' => 'sumber-panel-sku', 'cost_idr' => 9000, 'store_cost_idr' => 9000,
+            'max_price_idr' => 9500, 'priority' => 3, 'is_active' => true,
+        ]);
+
+        // Panel memakai route yang sudah ada: prioritas, aktif/nonaktif, sinkron.
+        $this->put('/admin/catalog/mappings/'.$mapping->id, ['priority' => 1, 'is_active' => true])
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame(1, (int) $mapping->fresh()->priority);
+
+        $this->put('/admin/catalog/mappings/'.$mapping->id, ['priority' => 1, 'is_active' => false])
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertFalse($mapping->fresh()->is_active);
+
+        // Kunci harga manual tidak boleh terlepas hanya karena panel mengirim
+        // prioritas/status.
+        $mapping->update(['is_manual_price' => true, 'max_price_idr' => 9000, 'is_active' => true]);
+        $this->put('/admin/catalog/mappings/'.$mapping->id, [
+            'priority' => 2, 'is_active' => true, 'is_manual_price' => true,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertTrue($mapping->fresh()->is_manual_price);
+        $this->assertSame(2, (int) $mapping->fresh()->priority);
+
+        // Sinkron per mapping tetap ada; sinkron per produk dibuang karena
+        // panel tidak punya tombolnya (sinkron = seluruh katalog).
+        $this->assertSame(200, $this->get('/admin/catalog')->status());
+        $this->assertTrue(Route::has('admin.catalog.mappings.update'));
+        $this->assertTrue(Route::has('admin.catalog.mappings.sync'));
+        $this->assertFalse(Route::has('admin.catalog.products.sync'));
     }
 
     public function test_activating_an_automatic_nominal_requires_an_active_provider_mapping(): void
