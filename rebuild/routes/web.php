@@ -42,6 +42,7 @@ use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PaymentPageController;
 use App\Http\Controllers\ProductReviewController;
 use App\Http\Controllers\PublicContentController;
+use App\Http\Controllers\PublicEmailVerificationResendController;
 use App\Http\Controllers\PublicOrderTrackingController;
 use App\Http\Controllers\SavedGameAccountController;
 use App\Http\Controllers\SeoController;
@@ -128,6 +129,9 @@ Route::middleware('guest:web')->group(function (): void {
     Route::get('/auth/google/callback', [GoogleAuthController::class, 'callback'])
         ->middleware('throttle:google-oauth')->name('google.callback');
 });
+
+Route::post('/email/verification-resend', PublicEmailVerificationResendController::class)
+    ->middleware('throttle:6,1')->name('customer.verification.resend');
 
 Route::get('/email/confirm/{id}/{hash}', CustomerEmailVerificationController::class)
     ->middleware(['signed', 'throttle:6,1'])->name('customer.verification.verify');

@@ -216,4 +216,26 @@ class StrictCustomerLoginTest extends TestCase
         $this->post('/admin/logout')->assertRedirect();
         $this->assertGuest('admin');
     }
+
+    public function test_unverified_customer_can_request_a_new_verification_link_before_login(): void
+    {
+        $user = $this->unverified();
+
+        $this->from('/login')
+            ->post('/email/verification-resend', ['email' => $user->email])
+            ->assertRedirect('/login')
+            ->assertSessionHas('status');
+
+        $this->assertSame(1, Queue::pushed(SendTransactionalEmailJob::class)
+            ->filter(fn (SendTransactionalEmailJob $job): bool => $job->recipient === $user->email
+                && str_contains((string) $job->text, '/email/confirm/'.$user->id.'/'))->count());
+    }
+
+    public function test_resend_does_not_reveal_whether_an_email_is_registered(): void
+    {
+        $this->from('/login')
+            ->post('/email/verification-resend', ['email' => 'tidak-terdaftar@example.test'])
+            ->assertRedirect('/login')
+            ->assertSessionHas('status');
+    }
 }

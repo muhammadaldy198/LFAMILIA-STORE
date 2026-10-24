@@ -249,7 +249,9 @@ Artisan::command('lfamilia:sync-digiflazz-catalog', function (DigiflazzCatalogSe
     }
 })->purpose('Refresh supplier costs and availability while preserving customer margin settings');
 
-Schedule::command('lfamilia:sync-digiflazz-catalog')->everyFifteenMinutes()->withoutOverlapping();
+// Tick tiap menit; command sendiri menahan sampai interval tersimpan terpenuhi,
+// sehingga pilihan 15/20/25/... menit benar-benar dihormati.
+Schedule::command('lfamilia:sync-digiflazz-catalog')->everyMinute()->withoutOverlapping();
 
 // D8: healthcheck (deploy/healthcheck.sh) memanggil command ini saat
 // gagal (down) dan saat pulih (up). Alert down di-dedupe 30 menit agar
