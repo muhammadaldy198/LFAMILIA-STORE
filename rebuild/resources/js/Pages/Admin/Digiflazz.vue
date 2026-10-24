@@ -135,8 +135,8 @@ const reload = () => router.reload({ preserveScroll: true });
                 <div class="adm-grid">
                     <label class="adm-field">
                         <span>Interval sinkron (menit)</span>
-                        <input v-model.number="settings.sync_interval_minutes" type="number" min="5" max="1440" step="5" class="adm-input">
-                        <span class="hint">Antara 5 sampai 1440 menit.</span>
+                        <input v-model.number="settings.sync_interval_minutes" type="number" min="15" max="1440" step="5" class="adm-input">
+                        <span class="hint">Antara 15 sampai 1440 menit.</span>
                     </label>
                     <label class="adm-field">
                         <span>Peringatan stok menipis</span>

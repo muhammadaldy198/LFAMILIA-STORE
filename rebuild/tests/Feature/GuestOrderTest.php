@@ -11,6 +11,12 @@ class GuestOrderTest extends TestCase
 {
     use DatabaseTransactions;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->withoutVite();
+    }
+
     private function guestOrder(string $number): int
     {
         $category = DB::table('categories')->insertGetId([
@@ -61,18 +67,47 @@ class GuestOrderTest extends TestCase
         $this->assertFalse(app(GuestOrderAccess::class)->matches($second, $code));
     }
 
-    public function test_public_tracking_preserves_blocked_state_and_paid_payment(): void
+    public function test_blocked_order_is_failed_on_public_customer_surfaces(): void
     {
-        $orderId = $this->guestOrder('LFTRACK-BLOCKED-100');
+        $orderId = $this->guestOrder('LFTRACK-STATUS-100');
         DB::table('orders')->where('id', $orderId)->update([
             'status' => 'BLOCKED',
             'paid_at' => now(),
         ]);
-        $this->post('/orders/track/search', ['query' => 'LFTRACK-BLOCKED-100'])
+        DB::table('order_events')->insert([
+            'order_id' => $orderId,
+            'event_type' => 'fulfillment.updated',
+            'correlation_id' => 'guest-status-'.bin2hex(random_bytes(8)),
+            'from_status' => 'PROCESSING',
+            'to_status' => 'BLOCKED',
+            'created_at' => now(),
+        ]);
+
+        $tracking = $this->post('/orders/track/search', ['query' => 'LFTRACK-STATUS-100'])
             ->assertOk()
-            ->assertJsonPath('order.fulfillmentStatus', 'blocked')
+            ->assertJsonPath('order.fulfillmentStatus', 'failed')
             ->assertJsonPath('order.paymentStatus', 'paid')
             ->assertJsonPath('order.wasPaid', true);
+
+        $guestPage = $this->withSession(['guest_order_id' => $orderId])
+            ->get('/orders/guest/LFTRACK-STATUS-100')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('order.status', 'FAILED')
+                ->where('events.0.from_status', 'PROCESSING')
+                ->where('events.0.to_status', 'FAILED'));
+        $guestEvents = $this->get('/orders/guest/LFTRACK-STATUS-100/events')
+            ->assertOk()
+            ->assertJsonPath('order.status', 'FAILED')
+            ->assertJsonPath('events.0.to_status', 'FAILED');
+        $paymentPage = $this->get('/payment?invoice=LFTRACK-STATUS-100')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('order.status', 'FAILED'));
+
+        foreach ([$tracking, $guestPage, $guestEvents, $paymentPage] as $response) {
+            $content = $response->getContent();
+            $this->assertStringNotContainsString('blocked', strtolower($content));
+        }
     }
 
     public function test_reissuing_code_invalidates_old_code(): void

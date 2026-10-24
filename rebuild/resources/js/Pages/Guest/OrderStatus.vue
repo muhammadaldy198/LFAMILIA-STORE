@@ -6,6 +6,7 @@ import {Head,Link} from '@inertiajs/vue3';
 import {computed,onMounted,onUnmounted,ref} from 'vue';
 import {rupiah} from '../../lib/money';
 import CustomerShell from '../../Components/CustomerShell.vue';
+import {isTerminalOrderStatus,orderStatusInfo,paymentStatusLabel} from '../../lib/orderStatus';
 
 const props=defineProps({order:Object,payment:Object,events:Array,review:Object});
 const orderState=ref({...props.order});
@@ -22,16 +23,11 @@ const reviewDone=ref(Boolean(props.review));
 const reviewMessage=ref('');
 let timer=null;
 
-const terminal=computed(()=>['SUCCESS','FAILED','BLOCKED','CANCELLED','EXPIRED','REFUND','REFUNDED'].includes(orderState.value.status));
+const terminal=computed(()=>isTerminalOrderStatus(orderState.value.status));
 const manualQris=computed(()=>paymentState.value?.instructions?.kind==='manual_qris'
     || String(paymentState.value?.channel_code||'').toLowerCase().includes('manual'));
 const paymentUncertain=computed(()=>['UNKNOWN','CREATING'].includes(paymentState.value?.status));
-const statusLabel=s=>({
-    PENDING_PAYMENT:'Menunggu Pembayaran',PENDING:'Menunggu Pembayaran',CREATING:'Menyiapkan Pembayaran',
-    PAID:'Pembayaran Diterima',PROCESSING:'Sedang Diproses',SUCCESS:'Berhasil',FAILED:'Gagal',BLOCKED:'Menunggu Penanganan Admin',
-    CANCELLED:'Dibatalkan',EXPIRED:'Kedaluwarsa',REFUNDED:'Refund',REFUND:'Refund',
-    REJECTED:'Ditolak',UNKNOWN:'Status Belum Pasti',
-}[String(s||'').toUpperCase()]||String(s||'-').replaceAll('_',' '));
+const statusLabel=s=>orderStatusInfo(s).label;
 const eventLabel=e=>{
     if(e.to_status) return statusLabel(e.to_status);
     const map={
@@ -109,7 +105,7 @@ onUnmounted(()=>{disposed=true;if(timer)clearInterval(timer);});
 
                 <section v-if="orderState.status==='PENDING_PAYMENT'" class="lf-order-payment">
                     <h2>{{ customerText("pages.guest.orderstatus.3527df23", "Pembayaran") }}</h2>
-                    <p v-if="paymentState">{{ customerText("pages.guest.orderstatus.ca77496f", "Status:") }} <strong>{{statusLabel(paymentState.status)}}</strong></p>
+                    <p v-if="paymentState">{{ customerText("pages.guest.orderstatus.ca77496f", "Status:") }} <strong>{{paymentStatusLabel(paymentState.status)}}</strong></p>
                     <p v-if="paymentUncertain">{{ customerText("pages.guest.orderstatus.fc9d0f83", "Status pembayaran sedang dipastikan. Jangan membayar ulang.") }}</p>
                     <img v-if="!paymentUncertain&&paymentState?.instructions?.qr_url" :src="paymentState.instructions.qr_url" :alt="customerText('pages.guest.orderstatus.attribute.alt.dfd028b8', 'QRIS pembayaran')">
                     <p v-if="paymentState?.instructions?.va_number">{{ customerText("pages.guest.orderstatus.d5aec755", "Nomor VA:") }} <strong>{{paymentState.instructions.va_number}}</strong></p>

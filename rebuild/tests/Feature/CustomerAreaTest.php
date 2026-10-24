@@ -6,6 +6,7 @@ use App\Actions\Fortify\CreateNewUser;
 use App\Jobs\SendTransactionalEmailJob;
 use App\Models\SupportTicket;
 use App\Models\User;
+use App\Services\PublicOrderStatusService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -19,6 +20,7 @@ class CustomerAreaTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->withoutVite();
         Queue::fake();
     }
 
@@ -114,6 +116,25 @@ class CustomerAreaTest extends TestCase
         $this->get('/account/orders/'.$otherOrder)->assertNotFound();
         $this->assertSame(0, (int) DB::table('wallets')->where('user_id', $owner->id)->value('balance_idr'));
         $this->assertSame(2, DB::table('wallets')->count());
+    }
+
+    public function test_internal_order_statuses_are_failed_in_customer_order_history_and_detail(): void
+    {
+        $user = $this->customer('status-owner@example.test');
+        $orderId = $this->order($user, 'STATUS-100');
+        DB::table('orders')->where('id', $orderId)->update(['status' => 'BLOCKED']);
+
+        $this->actingAs($user, 'web')->get('/account/orders')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('orders.data.0.status', 'FAILED'));
+        $this->get('/account/orders/'.$orderId)
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('order.status', 'FAILED'));
+
+        $statuses = app(PublicOrderStatusService::class);
+        foreach (['MANUAL_PENDING', 'FAILED_CONFIRMED', 'UNKNOWN', 'status-baru'] as $internalStatus) {
+            $this->assertSame('FAILED', $statuses->value($internalStatus));
+        }
     }
 
     public function test_passwordless_customer_can_set_first_password(): void

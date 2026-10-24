@@ -48,6 +48,8 @@ DB::transaction(function (): void {
         'password' => Hash::make('Browser-test-password-123'),
         'membership_tier_code' => 'BASIC',
     ]);
+    // Login pelanggan menolak akun belum terverifikasi: fixture wajib terverifikasi.
+    User::where('email', 'browser-account@example.test')->first()?->forceFill(['email_verified_at' => now()])->save();
 
     $category = Category::where('slug', 'game')->firstOrFail();
 

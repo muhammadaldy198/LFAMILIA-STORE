@@ -218,7 +218,7 @@ class AdminDigiflazzController
     ): RedirectResponse {
         $data = $request->validate([
             'enabled' => ['required', 'boolean'],
-            'sync_interval_minutes' => ['sometimes', 'integer', 'min:5', 'max:1440', 'multiple_of:5'],
+            'sync_interval_minutes' => ['sometimes', 'integer', 'min:15', 'max:1440', 'multiple_of:5'],
             'low_stock_threshold' => ['sometimes', 'integer', 'min:1', 'max:1000000'],
             'price_warning_percent' => ['sometimes', 'numeric', 'min:0.1', 'max:100'],
         ]);

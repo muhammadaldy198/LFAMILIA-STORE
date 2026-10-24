@@ -162,7 +162,8 @@ test('modal summary payment button is disabled during busy checkout', () => {
 
 test('customer payment page never promises an automatic refund', () => {
     const source = read('Pages/Payment/Show.vue');
-    assert.match(source, /if \(refunded\.value \|\| blocked\.value\)/);
+    // BLOCKED tidak lagi status publik (butir 4): kondisi setara = refunded atau perlu dukungan admin.
+    assert.match(source, /if \(refunded\.value \|\| requiresSupport\.value\)/);
     assert.doesNotMatch(source, /Pesanan masuk proses pengembalian dana/);
 });
 
@@ -200,4 +201,25 @@ test('guest ticket status is translated instead of showing raw enum values', () 
         assert.ok(support.includes(status + ':'), `status ${status} belum diterjemahkan`);
     }
     assert.doesNotMatch(support, /PENDING: |ANSWERED: /);
+});
+
+test('payment statuses never borrow the six order-status labels', () => {
+    // Status pembayaran (UNKNOWN/REFUNDED/...) bukan status pesanan: kalau dinormalkan
+    // lewat orderStatusInfo, pembayaran belum pasti tampil "Gagal" dan pembeli membayar ulang.
+    for (const page of ['Pages/Guest/OrderStatus.vue', 'Pages/Guest/Track.vue', 'Pages/Customer/OrderDetail.vue']) {
+        const source = read(page);
+        assert.match(source, /paymentStatusLabel/, `${page} harus memakai paymentStatusLabel`);
+        assert.doesNotMatch(source, /statusLabel\(paymentState\.status\)/, `${page} masih menormalkan status pembayaran`);
+        assert.doesNotMatch(source, /statusMeta\(detail\.paymentStatus\)/, `${page} masih menormalkan status pembayaran`);
+    }
+});
+
+test('resend-verification control is not nested inside the login form', () => {
+    const login = read('Pages/Auth/Login.vue');
+    // Submit bersarang membuat klik "kirim ulang" ikut mengirim form login.
+    assert.doesNotMatch(login, /<form[^>]*@submit\.prevent="resendVerification"/);
+    assert.match(login, /type="button"[^>]*@click="resendVerification"/);
+    const loginFormEnd = login.indexOf('</form>');
+    assert.ok(loginFormEnd > -1, 'form login harus ada penutupnya');
+    assert.ok(login.indexOf('@click="resendVerification"') > loginFormEnd, 'tombol kirim ulang harus di luar form login');
 });

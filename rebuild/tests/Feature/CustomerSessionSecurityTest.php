@@ -22,12 +22,15 @@ class CustomerSessionSecurityTest extends TestCase
 
     private function customer(): User
     {
-        return User::create([
+        $user = User::create([
             'name' => 'Session Security Customer',
             'email' => 'session-security@example.test',
             'phone' => '081234567890',
             'password' => Hash::make('old-password-123'),
         ]);
+        $user->forceFill(['email_verified_at' => now()])->save();
+
+        return $user;
     }
 
     private function logIn(): void

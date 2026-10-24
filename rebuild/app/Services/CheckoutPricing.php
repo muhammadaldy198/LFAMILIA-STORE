@@ -297,7 +297,7 @@ class CheckoutPricing
             $maxPrice = $mapping->is_manual_price
                 ? (int) $mapping->max_price_idr
                 : ($legacyDigiflazzPricing
-                    ? $this->digiflazzMaxPrice((int) $eligibleMappings->where('provider_code', 'DIGIFLAZZ')->max('cost_idr'))
+                    ? (int) $eligibleMappings->where('provider_code', 'DIGIFLAZZ')->max('cost_idr')
                     : $cost);
         }
 
@@ -342,16 +342,6 @@ class CheckoutPricing
         $key = trim((string) ($config['stock_key'] ?? ''));
 
         return $key === '' ? null : $key;
-    }
-
-    private function digiflazzMaxPrice(int $highestEligibleCost): int
-    {
-        // Integer ceil(cost * 1.01): avoid floating-point rounding and overflow.
-        if ($highestEligibleCost <= 0 || $highestEligibleCost > intdiv(PHP_INT_MAX - 99, 101)) {
-            throw ValidationException::withMessages(['package_id' => 'Batas harga Digiflazz tidak valid.']);
-        }
-
-        return intdiv(($highestEligibleCost * 101) + 99, 100);
     }
 
     private function globalSellMarkupPercent(): string

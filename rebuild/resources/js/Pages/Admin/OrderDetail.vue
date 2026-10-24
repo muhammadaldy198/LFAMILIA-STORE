@@ -63,7 +63,7 @@ const resend = () => {
 };
 const cancelOpen = ref(false);
 const cancel = () => {
-    post(`/admin/orders/${props.order.id}/cancel`, {}, 'cancel');
+    post(`/admin/orders/${props.order.id}/cancel`, { confirmed: true }, 'cancel');
     cancelOpen.value = false;
 };
 

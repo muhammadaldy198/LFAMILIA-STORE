@@ -42,7 +42,7 @@ class User extends Authenticatable implements MustVerifyEmailContract
         }
 
         $url = URL::temporarySignedRoute(
-            'verification.verify',
+            'customer.verification.verify',
             now()->addMinutes(60),
             ['id' => $this->getKey(), 'hash' => sha1($this->getEmailForVerification())]
         );

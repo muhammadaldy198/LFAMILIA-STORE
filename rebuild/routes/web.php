@@ -30,6 +30,7 @@ use App\Http\Controllers\AdminSupportController;
 use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\CustomerAccountController;
+use App\Http\Controllers\CustomerEmailVerificationController;
 use App\Http\Controllers\CustomerOrderController;
 use App\Http\Controllers\CustomerPasswordConfirmController;
 use App\Http\Controllers\CustomerPhoneController;
@@ -41,6 +42,7 @@ use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PaymentPageController;
 use App\Http\Controllers\ProductReviewController;
 use App\Http\Controllers\PublicContentController;
+use App\Http\Controllers\PublicEmailVerificationResendController;
 use App\Http\Controllers\PublicOrderTrackingController;
 use App\Http\Controllers\SavedGameAccountController;
 use App\Http\Controllers\SeoController;
@@ -127,6 +129,12 @@ Route::middleware('guest:web')->group(function (): void {
     Route::get('/auth/google/callback', [GoogleAuthController::class, 'callback'])
         ->middleware('throttle:google-oauth')->name('google.callback');
 });
+
+Route::post('/email/verification-resend', PublicEmailVerificationResendController::class)
+    ->middleware('throttle:6,1')->name('customer.verification.resend');
+
+Route::get('/email/confirm/{id}/{hash}', CustomerEmailVerificationController::class)
+    ->middleware(['signed', 'throttle:6,1'])->name('customer.verification.verify');
 
 Route::middleware('auth:web')->group(function (): void {
     Route::get('/user/confirm-password', [CustomerPasswordConfirmController::class, 'show'])
@@ -264,8 +272,6 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
                 ->middleware('throttle:admin-sensitive')->name('gateways.update');
             Route::put('/routes/{id}', [AdminPaymentController::class, 'updateRoute'])
                 ->middleware('throttle:admin-sensitive')->name('routes.update');
-            Route::post('/refund-reviews/{topupId}/resolve', [AdminPaymentController::class, 'resolveTopupRefund'])
-                ->middleware(['throttle:admin-sensitive', 'admin.password.confirm'])->name('refund-reviews.resolve');
             Route::put('/settings', [AdminPaymentController::class, 'settings'])
                 ->middleware('throttle:admin-sensitive')->name('settings.update');
         });

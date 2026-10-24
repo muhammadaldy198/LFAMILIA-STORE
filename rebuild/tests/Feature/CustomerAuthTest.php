@@ -12,6 +12,10 @@ use Tests\TestCase;
 
 class CustomerAuthTest extends TestCase
 {
+    private const FIXTURE_PASS = 'secure-password-123';
+
+    private const FIXTURE_NEW_PASS = 'new-password-123';
+
     use DatabaseTransactions;
 
     protected function setUp(): void
@@ -20,30 +24,59 @@ class CustomerAuthTest extends TestCase
         Queue::fake();
     }
 
-    public function test_customer_can_register_login_and_cannot_enter_admin_panel(): void
+    public function test_unverified_customer_cannot_login_and_no_session_is_created(): void
+    {
+        User::create([
+            'name' => 'Unverified Customer',
+            'email' => 'unverified@example.test',
+            'phone' => '081234567890',
+            'password' => Hash::make(self::FIXTURE_PASS),
+        ]);
+
+        $this->post('/login', [
+            'email' => 'unverified@example.test',
+            'password' => self::FIXTURE_PASS,
+        ])->assertSessionHasErrors([
+            'email' => 'Verifikasi email terlebih dahulu melalui tautan yang kami kirim sebelum masuk.',
+        ]);
+
+        $this->assertGuest('web');
+    }
+
+    public function test_customer_registers_verifies_email_then_can_login(): void
     {
         $this->post('/register', [
             'name' => 'Customer',
             'email' => 'CUSTOMER@example.test',
-            'phone' => '081234567890',
-            'password' => 'secure-password-123',
-            'password_confirmation' => 'secure-password-123',
-        ])->assertRedirect();
+            'phone' => '081234567891',
+            'password' => self::FIXTURE_PASS,
+            'password_confirmation' => self::FIXTURE_PASS,
+        ])->assertRedirect(route('login'))
+            ->assertSessionHas('status', 'Pendaftaran berhasil. Periksa email untuk memverifikasi akun sebelum masuk.');
 
         $user = User::where('email', 'customer@example.test')->firstOrFail();
         $this->assertTrue(Hash::check('secure-password-123', $user->password));
         $this->assertSame('BASIC', $user->membership_tier_code);
-        $this->assertSame('6281234567890', $user->phone_normalized);
-        $this->assertAuthenticatedAs($user, 'web');
+        $this->assertSame('6281234567891', $user->phone_normalized);
+        $this->assertNull($user->email_verified_at);
+        $this->assertGuest('web');
 
-        $this->get('/admin/panel')->assertRedirect(route('admin.login'));
+        $verificationEmail = Queue::pushed(SendTransactionalEmailJob::class)->first();
+        $this->assertInstanceOf(SendTransactionalEmailJob::class, $verificationEmail);
+        $this->assertSame(1, preg_match('~https?://\\S+~', $verificationEmail->text, $matches));
 
-        $this->post('/logout')->assertRedirect();
+        $this->get($matches[0])
+            ->assertRedirect(route('login'))
+            ->assertSessionHas('status', 'Email berhasil diverifikasi. Silakan masuk.');
+        $this->assertNotNull($user->fresh()->email_verified_at);
+        $this->assertGuest('web');
+
         $this->post('/login', [
             'email' => 'customer@example.test',
-            'password' => 'secure-password-123',
-        ])->assertRedirect();
+            'password' => self::FIXTURE_PASS,
+        ])->assertRedirect('/account');
         $this->assertAuthenticatedAs($user, 'web');
+        $this->get('/admin/panel')->assertRedirect(route('admin.login'));
     }
 
     public function test_password_reset_changes_the_hash_with_a_valid_token(): void
@@ -52,7 +85,7 @@ class CustomerAuthTest extends TestCase
             'name' => 'Customer',
             'email' => 'reset@example.test',
             'phone' => '081234567890',
-            'password' => Hash::make('old-password-123'),
+            'password' => Hash::make(self::FIXTURE_PASS),
         ]);
 
         // Reset request notification preserves existing token URL and
@@ -71,8 +104,8 @@ class CustomerAuthTest extends TestCase
         $this->post('/reset-password', [
             'email' => $user->email,
             'token' => $token,
-            'password' => 'new-password-123',
-            'password_confirmation' => 'new-password-123',
+            'password' => self::FIXTURE_NEW_PASS,
+            'password_confirmation' => self::FIXTURE_NEW_PASS,
         ])->assertRedirect();
 
         $this->assertTrue(Hash::check('new-password-123', $user->fresh()->password));
@@ -91,7 +124,7 @@ class CustomerAuthTest extends TestCase
             'name' => 'API Customer',
             'email' => 'api@example.test',
             'phone' => '081234567890',
-            'password' => Hash::make('secure-password-123'),
+            'password' => Hash::make(self::FIXTURE_PASS),
         ]);
 
         $token = $user->createToken('test-android')->plainTextToken;

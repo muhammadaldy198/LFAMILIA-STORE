@@ -6,6 +6,7 @@ use App\Models\Product;
 use App\Models\ProductPackage;
 use App\Models\Provider;
 use App\Models\ProviderMapping;
+use App\Support\GameNamePrefix;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -58,7 +59,8 @@ class DigiflazzAutoSources
         if (! $package) {
             $package = $product->packages()->create([
                 'code' => 'DF_'.substr(hash('sha256', $first->buyer_sku_code), 0, 20),
-                'name' => $first->product_name, 'group_name' => $first->type ?: null,
+                'name' => GameNamePrefix::strip($first->product_name, $first->brand, $product->name),
+                'group_name' => $first->type ?: null,
                 'nominal_value' => $nominal, 'sort_order' => 0, 'is_active' => $publish,
                 'pricing_mode' => 'PERCENT', 'margin_percent' => $margin,
                 'sell_price_idr' => null,

@@ -189,11 +189,11 @@ Artisan::command('lfamilia:sync-digiflazz-catalog', function (DigiflazzCatalogSe
         return 0;
     }
 
-    $interval = max(5, min(1440, (int) (json_decode(
+    $interval = max(15, min(1440, (int) (json_decode(
         (string) DB::table('system_settings')->where('key', 'digiflazz.auto_sync_interval_minutes')->value('value'),
         true
     ) ?? 15)));
-    // Respect the interval after failures as well as successes, avoiding a retry every five minutes.
+    // Respect the interval after failures as well as successes, avoiding a retry every scheduler tick.
     foreach (['digiflazz.last_auto_sync', 'digiflazz.last_auto_sync_attempt'] as $setting) {
         $last = json_decode((string) DB::table('system_settings')->where('key', $setting)->value('value'), true);
         if (is_array($last) && ! empty($last['at'])) {
@@ -249,7 +249,9 @@ Artisan::command('lfamilia:sync-digiflazz-catalog', function (DigiflazzCatalogSe
     }
 })->purpose('Refresh supplier costs and availability while preserving customer margin settings');
 
-Schedule::command('lfamilia:sync-digiflazz-catalog')->everyFiveMinutes()->withoutOverlapping();
+// Tick tiap menit; command sendiri menahan sampai interval tersimpan terpenuhi,
+// sehingga pilihan 15/20/25/... menit benar-benar dihormati.
+Schedule::command('lfamilia:sync-digiflazz-catalog')->everyMinute()->withoutOverlapping();
 
 // D8: healthcheck (deploy/healthcheck.sh) memanggil command ini saat
 // gagal (down) dan saat pulih (up). Alert down di-dedupe 30 menit agar

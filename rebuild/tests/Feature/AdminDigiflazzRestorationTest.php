@@ -808,10 +808,27 @@ class AdminDigiflazzRestorationTest extends TestCase
 
         $this->put('/admin/digiflazz/settings', [
             'enabled' => true,
-            'sync_interval_minutes' => 7,
+            'sync_interval_minutes' => 10,
             'low_stock_threshold' => 9,
             'price_warning_percent' => 4.5,
         ])->assertSessionHasErrors('sync_interval_minutes');
+    }
+
+    public function test_legacy_five_minute_auto_sync_interval_is_normalized_to_fifteen_minutes(): void
+    {
+        $this->fakeCatalog([$this->row()]);
+        DB::table('system_settings')->updateOrInsert(
+            ['key' => 'digiflazz.auto_sync_interval_minutes'],
+            ['value' => json_encode(5), 'created_at' => now(), 'updated_at' => now()]
+        );
+        DB::table('system_settings')->updateOrInsert(
+            ['key' => 'digiflazz.last_auto_sync'],
+            ['value' => json_encode(['at' => now()->subMinutes(10)->toIso8601String(), 'count' => 1]), 'created_at' => now(), 'updated_at' => now()]
+        );
+
+        $this->assertSame(15, app(AdminDigiflazzMonitorService::class)->settings()['sync_interval_minutes']);
+        $this->artisan('lfamilia:sync-digiflazz-catalog')->assertExitCode(0);
+        Http::assertNothingSent();
     }
 
     public function test_auto_sync_respects_configured_interval_without_calling_provider_early(): void

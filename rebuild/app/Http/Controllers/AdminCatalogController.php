@@ -187,7 +187,7 @@ class AdminCatalogController
 
         return [
             'autoSync' => (bool) (json_decode((string) $stored->get('digiflazz.auto_sync'), true) ?? true),
-            'syncIntervalMinutes' => max(5, (int) (json_decode((string) $stored->get('digiflazz.auto_sync_interval_minutes'), true) ?? 15)),
+            'syncIntervalMinutes' => max(15, (int) (json_decode((string) $stored->get('digiflazz.auto_sync_interval_minutes'), true) ?? 15)),
         ];
     }
 

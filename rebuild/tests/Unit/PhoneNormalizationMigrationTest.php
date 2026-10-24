@@ -4,6 +4,7 @@ namespace Tests\Unit;
 
 use App\Actions\Fortify\CreateNewUser;
 use App\Http\Controllers\PublicOrderTrackingController;
+use App\Services\PublicOrderStatusService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -68,7 +69,7 @@ class PhoneNormalizationMigrationTest extends TestCase
 
         // Tracking lookup phone variants for Indonesian number must NOT expand to bare local 8...
         // to prevent collision with international namespaces like Japan (+81)
-        $controller = new PublicOrderTrackingController;
+        $controller = new PublicOrderTrackingController(app(PublicOrderStatusService::class));
         $reflection = new \ReflectionClass($controller);
         $method = $reflection->getMethod('phoneVariants');
         $method->setAccessible(true);
