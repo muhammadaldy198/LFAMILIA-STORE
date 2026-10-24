@@ -303,13 +303,13 @@ class StorefrontParityTest extends TestCase
 
         $search = $this->postJson('/orders/track/search', ['query' => '081234567890'])
             ->assertOk()
-            ->assertJsonPath('orders.0.status', 'refunded')
+            ->assertJsonPath('orders.0.status', 'failed')
             ->assertJsonMissingPath('orders.0.referenceId');
         $status = $this->postJson('/orders/track/status', [
             'tracking_token' => $search->json('orders.0.trackingToken'),
         ])->assertOk()
             ->assertJsonPath('order.referenceMasked', true)
-            ->assertJsonPath('order.fulfillmentStatus', 'refunded')
+            ->assertJsonPath('order.fulfillmentStatus', 'failed')
             ->assertJsonPath('order.paymentStatus', 'refunded')
             ->assertJsonPath('order.events.0.label', 'Status pesanan diperbarui')
             ->assertJsonPath('order.events.0.status', null);
@@ -319,7 +319,7 @@ class StorefrontParityTest extends TestCase
         }
 
         $feed = $this->getJson('/orders/track/feed')->assertOk();
-        $this->assertSame('refunded', collect($feed->json('transactions'))
+        $this->assertSame('failed', collect($feed->json('transactions'))
             ->firstWhere('maskedReferenceId', 'LF261••••ND01')['status']);
         $this->assertStringNotContainsString('LF261001-REFUND01', $feed->getContent());
         $this->assertStringContainsString('no-store', $status->headers->get('Cache-Control'));

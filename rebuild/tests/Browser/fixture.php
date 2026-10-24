@@ -47,6 +47,7 @@ DB::transaction(function (): void {
         'phone' => '081200000001',
         'password' => Hash::make('Browser-test-password-123'),
         'membership_tier_code' => 'BASIC',
+        'email_verified_at' => now(),
     ]);
 
     $category = Category::where('slug', 'game')->firstOrFail();
