@@ -105,7 +105,7 @@ try {
     const sizes = process.env.ADMIN_UI_SIZES
         ? process.env.ADMIN_UI_SIZES.split(',').map(pair => pair.split('x').map(Number))
         : group === 'all' ? [[360, 800], [390, 844], [412, 915], [430, 932], [1024, 768], [1280, 800], [1440, 900], [1920, 1080]] : [[390, 844], [1440, 900]];
-    let imported = false, importedPrice = '', importedSku = '';
+    let imported = false, importedPrice = '', importedCost = '', importedSku = '';
     for (const [width, height] of sizes) {
         await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width < 768 });
         for (const path of [...paths, ...detailPaths]) {
@@ -147,7 +147,8 @@ try {
                         const tr = [...document.querySelectorAll('[role=dialog] tbody tr')].find(r => r.querySelector('input[type=checkbox]'));
                         if (!tr) return null;
                         const cells = [...tr.cells].map(c => c.innerText.trim());
-                        return { sku: cells[2], seller: cells[3], sell: cells[4] };
+                        // Kolom: SKU, harga seller, modal toko, harga jual.
+                        return { sku: cells[2], seller: cells[3], modal: cells[4], sell: cells[5] };
                     })()`);
                     if (!row) throw Error('Import picker has no available SKU to import');
                     await evaluate(`document.querySelector('[role=dialog] tbody tr input[type=checkbox]').click()`);
@@ -163,6 +164,7 @@ try {
                     imported = true;
                     importedSku = row.sku;
                     importedPrice = row.sell.replace(/[^0-9]/g, '');
+                    importedCost = row.modal.replace(/[^0-9]/g, '');
                     console.log('PASS import digiflazz (' + row.sku + ': ' + row.seller + ' -> ' + row.sell + ')');
                 }
             }
@@ -176,11 +178,29 @@ try {
     if (imported) {
         await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
         await navigate('/admin/catalog');
+        // Harga jual impor disimpan sebagai margin nominal (mode persen), bukan
+        // kolom harga tetap. Modal toko dan harga jual hasil hitungan server
+        // harus sama dengan dua kolom yang ditampilkan di pop-up impor.
         const stored = await evaluate(`JSON.parse(document.getElementById('app').dataset.page).props.products
-            .flatMap(p => (p.packages || []).map(k => ({ sku: (k.mappings || []).map(m => m.external_sku).join(','), price: k.sell_price_idr, active: k.is_active })))
+            .flatMap(p => (p.packages || []).map(k => ({
+                sku: (k.mappings || []).map(m => m.external_sku).join(','),
+                mode: k.pricing_mode,
+                margin: Number(k.margin_percent ?? 0),
+                cost: Number((k.mappings || [])[0]?.store_cost_idr ?? 0),
+                active: k.is_active,
+            })))
             .filter(k => k.sku === ${JSON.stringify(importedSku)})`);
-        if (!stored.length || String(stored[0].price) !== importedPrice) throw Error('Imported nominal not stored with the shown price: ' + JSON.stringify({ stored, importedPrice }));
-        console.log('PASS imported nominal stored (' + stored[0].sku + ' = ' + stored[0].price + ')');
+        const nominal = stored[0];
+        // Rumus yang sama dengan server: persen disimpan 4 desimal, dibulatkan ke atas.
+        const units = Math.round(nominal.margin * 10000);
+        const expectedSell = Math.ceil((nominal.cost * (1000000 + units)) / 1000000);
+        if (!nominal || nominal.mode !== 'PERCENT'
+            || String(nominal.cost) !== importedCost
+            || String(expectedSell) !== importedPrice) {
+            throw Error('Imported nominal not stored with the shown price: '
+                + JSON.stringify({ stored, importedCost, importedPrice }));
+        }
+        console.log('PASS imported nominal stored (' + nominal.sku + ': modal ' + nominal.cost + ' + ' + nominal.margin + '% = ' + expectedSell + ')');
     }
     console.log('Admin UI smoke passed (' + paths.length + ' menu + ' + detailPaths.length + ' detail, ' + sizes.length + ' viewports).');
 } finally {
