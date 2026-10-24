@@ -31,6 +31,11 @@ export const mappingPayload = (mapping, changes) => {
         // store_cost_idr, yang bisa berbeda dan akan menimpa modal akuntansi.
         payload.cost_idr = Number(changes?.cost_idr ?? mapping.cost_idr ?? 0);
     }
+    // Harga modal (store_cost_idr) boleh diubah dari tabel Sumber; server
+    // memakai nilai ini untuk checkout dan batas harga.
+    if (changes && Object.prototype.hasOwnProperty.call(changes, 'store_cost_idr')) {
+        payload.store_cost_idr = Number(changes.store_cost_idr || 0);
+    }
     if (mapping.provider_code === 'DIGIFLAZZ' && mappingIsLocked(mapping)) {
         // Kunci harga harus tetap menyala supaya cost_idr manual tidak dilepas.
         payload.is_manual_price = true;

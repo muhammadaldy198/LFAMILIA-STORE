@@ -391,10 +391,24 @@ test('import margin reads the active pricing setting', () => {
     assert.match(catalog, /importMargin = ref\(Number\(props\.pricingSettings\?\.sell_markup_percent/);
     assert.match(catalog, /importMargin\.value = Number\(importProduct\.value\?\.sell_markup_percent \?\? props\.pricingSettings\?\.sell_markup_percent/);
     assert.doesNotMatch(catalog, /defaultMargin|props\.pricingSettings\?\.default_margin/);
-    // Margin impor hanya DIBACA: tidak ada input yang bisa diketik admin dan
-    // tidak dikirim ke server, supaya panel tidak menampilkan kontrol palsu.
-    assert.doesNotMatch(catalog, /v-model="importMargin"/);
-    assert.doesNotMatch(catalog, /margin_percent: Number\(importMargin/);
+    // Dua kolom global impor: harga modal (%) dan harga jual (%), keduanya
+    // bisa diubah admin dan dikirim bersama impor untuk semua SKU terpilih.
+    assert.match(catalog, /v-model="importUplift"/);
+    assert.match(catalog, /v-model="importMargin"/);
+    assert.match(catalog, /cost_uplift_percent: Number\(importUplift\.value \|\| 0\)/);
+    assert.match(catalog, /margin_percent: Number\(importMargin\.value \|\| 0\)/);
+});
+
+// Tab Sumber: dua kolom impor global + modal bisa diedit di tabel + saklar
+// sinkron otomatis semua produk.
+test('source tab edits store cost and toggles whole-catalog auto sync', () => {
+    const catalog = read('Catalog.vue');
+    // Harga modal per sumber bisa diubah langsung dari tabel Sumber.
+    assert.match(catalog, /saveMapping\(mapping, \{ store_cost_idr: Number\(\$event\.target\.value \|\| 0\) \}\)/);
+    // Saklar sinkron otomatis seluruh katalog (bukan per produk).
+    assert.match(catalog, /const toggleAutoSync = \(\) => \{/);
+    assert.match(catalog, /router\.put\('\/admin\/digiflazz\/settings'/);
+    assert.doesNotMatch(catalog, /products\/\$\{product\.value\.id\}\/sync/);
 });
 
 // CR-03: membuat akun admin baru (termasuk Super Admin) juga menanyakan kata

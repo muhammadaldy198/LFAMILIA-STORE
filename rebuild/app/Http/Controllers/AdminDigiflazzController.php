@@ -387,8 +387,8 @@ class AdminDigiflazzController
         $data = $request->validate([
             'item_ids' => ['required', 'array', 'min:1', 'max:2000'],
             'item_ids.*' => ['required', 'integer', 'distinct', 'exists:digiflazz_catalog_items,id'],
-            // margin_percent dari klien sengaja TIDAK divalidasi/dipakai: margin
-            // impor selalu dari setting harga aktif, bukan angka kiriman peramban.
+            'margin_percent' => ['sometimes', 'numeric', 'min:0', 'max:1000'],
+            'cost_uplift_percent' => ['sometimes', 'numeric', 'min:0', 'max:1000'],
             'publish' => ['sometimes', 'boolean'],
             'auto_sources' => ['prohibited'],
         ]);
@@ -419,7 +419,16 @@ class AdminDigiflazzController
             }
             $sources = app(DigiflazzAutoSources::class);
             foreach ($selected as $item) {
-                $sources->importGroup($product, collect([$item]), $template, $publish, app(CatalogPricingSettings::class)->sellMarkupPercent(), false, $request);
+                $sources->importGroup(
+                    $product,
+                    collect([$item]),
+                    $template,
+                    $publish,
+                    (string) ($data['margin_percent'] ?? app(CatalogPricingSettings::class)->sellMarkupPercent()),
+                    false,
+                    $request,
+                    isset($data['cost_uplift_percent']) ? (string) $data['cost_uplift_percent'] : null,
+                );
             }
             $sources->orderProduct($product);
             if ($publish && ! $product->is_active) {

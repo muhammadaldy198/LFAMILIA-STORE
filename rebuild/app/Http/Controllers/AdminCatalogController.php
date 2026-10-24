@@ -130,6 +130,12 @@ class AdminCatalogController
                 'cost_uplift_percent' => app(CatalogPricingSettings::class)->costUpliftPercent(),
                 'sell_markup_percent' => app(CatalogPricingSettings::class)->sellMarkupPercent(),
             ],
+            // Status sinkron otomatis, supaya tab Sumber tidak menampilkan tombol
+            // sinkron yang tidak pernah jalan.
+            'autoSync' => (bool) (json_decode((string) DB::table('system_settings')
+                ->where('key', 'digiflazz.auto_sync')->value('value'), true) ?? true),
+            'syncIntervalMinutes' => (int) (json_decode((string) DB::table('system_settings')
+                ->where('key', 'digiflazz.auto_sync_interval_minutes')->value('value'), true) ?? 15),
             'digiflazzItems' => (function () {
                 // N+1 fix: preload mapped SKUs sekali, bukan per item
                 $digiflazzIds = Provider::where('code', 'DIGIFLAZZ')->pluck('id');

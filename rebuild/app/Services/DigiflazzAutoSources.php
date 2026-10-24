@@ -30,7 +30,7 @@ class DigiflazzAutoSources
         return DB::table('digiflazz_catalog_items')->where('is_present', true)->get()->groupBy(fn (object $item): string => $this->key($item));
     }
 
-    public function importGroup(Product $product, Collection $items, ?string $template, bool $publish, string $margin, bool $automatic, Request $request): ProductPackage
+    public function importGroup(Product $product, Collection $items, ?string $template, bool $publish, string $margin, bool $automatic, Request $request, ?string $costUplift = null): ProductPackage
     {
         $provider = Provider::where('code', 'DIGIFLAZZ')->firstOrFail();
         $existing = ProviderMapping::where('provider_id', $provider->id)
@@ -59,7 +59,7 @@ class DigiflazzAutoSources
             if ($product->sell_markup_percent === null) {
                 $product->update(['sell_markup_percent' => $margin]);
             }
-            $storeCost = app(DigiflazzCatalogImport::class)->initialStoreCost(null, $product, (int) $first->price_idr);
+            $storeCost = app(DigiflazzCatalogImport::class)->initialStoreCost(null, $product, (int) $first->price_idr, $costUplift);
             // The initial selling price uses the effective markup on the store
             // cost. Supplier sync must not rewrite this selling price.
             $effectiveMarkup = $product->sell_markup_percent ?? $margin;
@@ -88,7 +88,7 @@ class DigiflazzAutoSources
             if (! app(DigiflazzCatalogService::class)->sellable($item)) {
                 continue;
             }
-            $mapping = app(DigiflazzCatalogImport::class)->upsert($package, $item->buyer_sku_code, (int) $item->price_idr, (int) $item->price_idr);
+            $mapping = app(DigiflazzCatalogImport::class)->upsert($package, $item->buyer_sku_code, (int) $item->price_idr, (int) $item->price_idr, $costUplift);
             $before = $mapping->toArray();
             $config = $mapping->fulfillment_config ?? [];
             if ($automatic) {
