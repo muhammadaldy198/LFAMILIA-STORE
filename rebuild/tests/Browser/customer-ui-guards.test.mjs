@@ -162,7 +162,8 @@ test('modal summary payment button is disabled during busy checkout', () => {
 
 test('customer payment page never promises an automatic refund', () => {
     const source = read('Pages/Payment/Show.vue');
-    assert.match(source, /if \(refunded\.value \|\| blocked\.value\)/);
+    // BLOCKED tidak lagi status publik (butir 4): kondisi setara = refunded atau perlu dukungan admin.
+    assert.match(source, /if \(refunded\.value \|\| requiresSupport\.value\)/);
     assert.doesNotMatch(source, /Pesanan masuk proses pengembalian dana/);
 });
 
