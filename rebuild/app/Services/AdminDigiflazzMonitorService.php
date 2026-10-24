@@ -21,7 +21,7 @@ class AdminDigiflazzMonitorService
             ->pluck('value', 'key');
 
         return [
-            'sync_interval_minutes' => max(5, min(1440, (int) (json_decode((string) $stored->get('digiflazz.auto_sync_interval_minutes'), true) ?? 15))),
+            'sync_interval_minutes' => max(15, min(1440, (int) (json_decode((string) $stored->get('digiflazz.auto_sync_interval_minutes'), true) ?? 15))),
             'low_stock_threshold' => max(1, min(1000000, (int) (json_decode((string) $stored->get('digiflazz.low_stock_threshold'), true) ?? 5))),
             'price_warning_percent' => max(0.1, min(100, (float) (json_decode((string) $stored->get('digiflazz.price_warning_percent'), true) ?? 3))),
         ];
