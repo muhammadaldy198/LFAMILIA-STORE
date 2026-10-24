@@ -391,6 +391,10 @@ test('import margin reads the active pricing setting', () => {
     assert.match(catalog, /importMargin = ref\(Number\(props\.pricingSettings\?\.sell_markup_percent/);
     assert.match(catalog, /importMargin\.value = Number\(importProduct\.value\?\.sell_markup_percent \?\? props\.pricingSettings\?\.sell_markup_percent/);
     assert.doesNotMatch(catalog, /defaultMargin|props\.pricingSettings\?\.default_margin/);
+    // Margin impor hanya DIBACA: tidak ada input yang bisa diketik admin dan
+    // tidak dikirim ke server, supaya panel tidak menampilkan kontrol palsu.
+    assert.doesNotMatch(catalog, /v-model="importMargin"/);
+    assert.doesNotMatch(catalog, /margin_percent: Number\(importMargin/);
 });
 
 // CR-03: membuat akun admin baru (termasuk Super Admin) juga menanyakan kata

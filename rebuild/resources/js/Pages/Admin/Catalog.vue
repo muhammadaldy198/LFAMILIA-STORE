@@ -519,7 +519,6 @@ const submitImport = () => {
     importErrors.value = {};
     router.post(`/admin/catalog/products/${importProduct.value.id}/import`, {
         item_ids: importPicked.value,
-        margin_percent: Number(importMargin.value || 0),
         publish: importPublish.value,
     }, {
         preserveScroll: true,
@@ -930,11 +929,11 @@ onMounted(() => {
                         <option v-for="row in autoProducts" :key="row.id" :value="String(row.id)">{{ row.name }}</option>
                     </select>
                 </label>
-                <label class="adm-field">
+                <div class="adm-field">
                     <span>Margin jual (%)</span>
-                    <input v-model="importMargin" type="number" min="0" max="1000" step="0.1" class="adm-input">
-                    <span class="hint">Dipakai bila produk belum punya margin sendiri.</span>
-                </label>
+                    <p class="adm-input" style="margin:0">{{ importMargin }}%</p>
+                    <span class="hint">Dari setting harga aktif (atau margin produk bila sudah diisi). Diubah di Pengaturan Harga.</span>
+                </div>
                 <label class="adm-field">
                     <span>Merek</span>
                     <select v-model="importBrand" class="adm-select">
