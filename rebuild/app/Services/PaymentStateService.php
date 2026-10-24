@@ -145,374 +145,58 @@ class PaymentStateService
     }
 
     /**
-     * Complete an internal wallet reversal after a refunded top-up entered REFUND_REVIEW.
+     * Tutup top up berstatus REFUND_REVIEW TANPA menggerakkan uang.
+     *
+     * Gateway sudah membalik dananya di luar sistem. Saldo pelanggan dibiarkan
+     * apa adanya; penyelesaian uang yang sebenarnya dilakukan lewat penyesuaian
+     * saldo manual yang sudah ada. Method ini hanya membuka kunci pembayaran
+     * saldo dengan menandai tinjauan selesai.
      *
      * @return array<string, mixed>
      */
-    public function resolveTopupRefundReview(int $topupId, int $adminId): array
+    public function closeTopupRefundReview(int $topupId, string $reason): array
     {
-        return DB::transaction(function () use ($topupId, $adminId): array {
+        return DB::transaction(function () use ($topupId, $reason): array {
             $topup = DB::table('wallet_topups')->where('id', $topupId)
                 ->lockForUpdate()->first();
             if (! $topup) {
-                throw ValidationException::withMessages(['refund' => 'Top up tidak ditemukan.']);
-            }
-            if ($topup->status === 'REFUNDED') {
-                return ['result' => 'ALREADY_REFUNDED', 'status' => 'REFUNDED'];
+                throw ValidationException::withMessages(['topup' => 'Top up tidak ditemukan.']);
             }
             if ($topup->status !== 'REFUND_REVIEW') {
                 throw ValidationException::withMessages([
-                    'refund' => 'Top up ini tidak sedang menunggu penyelesaian refund.',
+                    'topup' => 'Top up ini tidak sedang menunggu tinjauan.',
                 ]);
             }
 
-            $payment = DB::table('payment_transactions')
-                ->where('wallet_topup_id', $topup->id)
-                ->where('status', 'REFUNDED')
-                ->orderByDesc('id')
-                ->lockForUpdate()
-                ->first();
-            if (! $payment) {
-                throw ValidationException::withMessages([
-                    'refund' => 'Pembayaran refund terverifikasi tidak ditemukan.',
-                ]);
-            }
-
-            $wallet = DB::table('wallets')->where('id', $topup->wallet_id)
-                ->lockForUpdate()->first();
-            if (! $wallet) {
-                throw ValidationException::withMessages(['refund' => 'Wallet tidak ditemukan.']);
-            }
-
-            $refundKey = 'wallet-topup-refund:'.$payment->id;
-            if (DB::table('wallet_ledger')->where('idempotency_key', $refundKey)->exists()) {
-                DB::table('wallet_topups')->where('id', $topup->id)->update([
+            $closed = DB::table('wallet_topups')
+                ->where('id', $topup->id)
+                ->where('status', 'REFUND_REVIEW')
+                ->update([
                     'status' => 'REFUNDED',
                     'updated_at' => now(),
                 ]);
-
-                return ['result' => 'ALREADY_REVERSED', 'status' => 'REFUNDED'];
-            }
-
-            $amount = (int) $topup->amount_idr;
-            $before = (int) $wallet->balance_idr;
-            if ($before < $amount) {
+            if ($closed !== 1) {
                 throw ValidationException::withMessages([
-                    'refund' => 'Saldo pelanggan belum cukup untuk menyelesaikan pengembalian dana.',
+                    'topup' => 'Top up ini sudah ditutup sebelumnya.',
                 ]);
             }
 
-            $after = $before - $amount;
-            DB::table('wallets')->where('id', $wallet->id)->update([
-                'balance_idr' => $after,
-                'version' => DB::raw('version + 1'),
-                'updated_at' => now(),
-            ]);
-            DB::table('wallet_ledger')->insert([
-                'wallet_id' => $wallet->id,
-                'amount_idr' => -$amount,
-                'balance_before_idr' => $before,
-                'balance_after_idr' => $after,
-                'source' => 'REFUND',
-                'reference_type' => 'WALLET_TOPUP',
-                'reference_id' => (string) $topup->id,
-                'actor_type' => 'admin_user',
-                'actor_id' => (string) $adminId,
-                'idempotency_key' => $refundKey,
-                'created_at' => now(),
-            ]);
-            DB::table('wallet_topups')->where('id', $topup->id)->update([
-                'status' => 'REFUNDED',
-                'updated_at' => now(),
-            ]);
-
             $this->notifications->record(
-                'wallet.topup_refund_resolved',
-                'Refund top up terselesaikan',
-                'Refund top up #'.$topup->id.' sudah direkonsiliasi dengan saldo pelanggan.',
+                'wallet.topup_refund_review_closed',
+                'Tinjauan refund top up ditutup',
+                'Tinjauan top up #'.$topup->id.' ditutup dengan alasan: '.$reason.'. Saldo pelanggan tidak diubah.',
                 'INFO',
                 'wallet_topup',
                 $topup->id
             );
 
             return [
-                'result' => 'REFUNDED',
+                'result' => 'CLOSED',
                 'status' => 'REFUNDED',
-                'balance_before_idr' => $before,
-                'balance_after_idr' => $after,
+                'balance_idr' => (int) DB::table('wallets')->where('id', $topup->wallet_id)->value('balance_idr'),
+                'reason' => $reason,
             ];
         }, 3);
-    }
-
-    private function applyOrder(object $payment, string $incomingStatus, array $metadata): array
-    {
-        $order = DB::table('orders')->where('id', $payment->order_id)->lockForUpdate()->first();
-        if (! $order) {
-            throw ValidationException::withMessages(['payment' => 'Pesanan pembayaran tidak ditemukan.']);
-        }
-        if ((int) $order->total_idr !== (int) $payment->amount_idr) {
-            throw ValidationException::withMessages(['payment' => 'Nominal callback tidak cocok.']);
-        }
-
-        if ($incomingStatus === 'PAID') {
-            if (in_array($order->status, ['EXPIRED', 'FAILED', 'CANCELLED'], true)) {
-                DB::table('payment_transactions')->where('id', $payment->id)->update([
-                    'status' => 'PAID',
-                    'verified_at' => now(),
-                    'last_callback_at' => now(),
-                    'updated_at' => now(),
-                ]);
-                $this->orderEvent($order->id, 'PAYMENT_LATE_VERIFIED', $order->status, $order->status, $metadata);
-                $this->notifications->record(
-                    'payment.late_verified',
-                    'Pembayaran terlambat terverifikasi',
-                    'Pembayaran pesanan '.$order->order_number.' masuk setelah pesanan berstatus '.(AdminOrderPresentation::STATUSES[$order->status] ?? $order->status).'. Perlu diperiksa.',
-                    'WARNING',
-                    'order',
-                    $order->id
-                );
-
-                return ['result' => 'LATE_PAID_REVIEW', 'status' => $order->status];
-            }
-
-            return $this->markOrderPaid($payment, $order, $metadata);
-        }
-
-        if ($incomingStatus === 'REFUNDED') {
-            DB::table('payment_transactions')->where('id', $payment->id)->update([
-                'status' => 'REFUNDED',
-                'last_callback_at' => now(),
-                'updated_at' => now(),
-            ]);
-            // This is only a gateway status report, not authorization to refund locally.
-            $this->orderEvent((int) $order->id, 'PAYMENT_REFUND_REVIEW', $order->status, $order->status, $metadata);
-            $this->notifications->record(
-                'payment.refund_review',
-                'Gerbang pembayaran melaporkan pengembalian dana - perlu pemeriksaan',
-                'Pembayaran pesanan '.$order->order_number.' dikembalikan oleh gerbang pembayaran. Hubungi pelanggan dan periksa manual; saldo tidak berubah otomatis.',
-                'WARNING',
-                'order',
-                $order->id
-            );
-
-            return ['result' => 'REFUND_REVIEW', 'status' => $order->status];
-        }
-
-        DB::table('payment_transactions')->where('id', $payment->id)->update([
-            'status' => $incomingStatus,
-            'last_callback_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        if ($incomingStatus === 'EXPIRED' && $order->status === 'PENDING_PAYMENT') {
-            $this->expireOrder($order);
-
-            return ['result' => 'EXPIRED', 'status' => 'EXPIRED'];
-        }
-
-        if (in_array($incomingStatus, ['FAILED', 'CANCELLED'], true) && $order->status === 'PENDING_PAYMENT') {
-            DB::table('orders')->where('id', $order->id)->update([
-                'status' => $incomingStatus,
-                'updated_at' => now(),
-            ]);
-            $this->releaseVoucher((int) $order->id);
-            $eventType = $incomingStatus === 'CANCELLED' ? 'PAYMENT_CANCELLED' : 'PAYMENT_FAILED';
-            $this->orderEvent($order->id, $eventType, 'PENDING_PAYMENT', $incomingStatus, $metadata);
-
-            return ['result' => $incomingStatus, 'status' => $incomingStatus];
-        }
-
-        return ['result' => 'PAYMENT_UPDATED', 'status' => $incomingStatus];
-    }
-
-    private function applyTopup(object $payment, string $incomingStatus): array
-    {
-        $topup = DB::table('wallet_topups')->where('id', $payment->wallet_topup_id)
-            ->lockForUpdate()->first();
-        if (! $topup) {
-            throw ValidationException::withMessages(['payment' => 'Top up tidak ditemukan.']);
-        }
-        if ((int) $topup->total_idr !== (int) $payment->amount_idr) {
-            throw ValidationException::withMessages(['payment' => 'Nominal callback tidak cocok.']);
-        }
-
-        if ($incomingStatus === 'PAID') {
-            if ($topup->status === 'PAID') {
-                return ['result' => 'ALREADY_PAID', 'status' => 'PAID'];
-            }
-
-            $wallet = DB::table('wallets')->where('id', $topup->wallet_id)->lockForUpdate()->first();
-            if (! $wallet) {
-                throw ValidationException::withMessages(['payment' => 'Wallet tidak ditemukan.']);
-            }
-            $before = (int) $wallet->balance_idr;
-            $after = $before + (int) $topup->amount_idr;
-
-            $inserted = DB::table('wallet_ledger')->insertOrIgnore([
-                'wallet_id' => $wallet->id,
-                'amount_idr' => (int) $topup->amount_idr,
-                'balance_before_idr' => $before,
-                'balance_after_idr' => $after,
-                'source' => 'TOPUP',
-                'reference_type' => 'WALLET_TOPUP',
-                'reference_id' => (string) $topup->id,
-                'actor_type' => 'payment_gateway',
-                'actor_id' => null,
-                'idempotency_key' => 'wallet-topup-credit:'.$payment->id,
-                'created_at' => now(),
-            ]);
-
-            if ($inserted === 1) {
-                DB::table('wallets')->where('id', $wallet->id)->update([
-                    'balance_idr' => $after,
-                    'version' => DB::raw('version + 1'),
-                    'updated_at' => now(),
-                ]);
-            }
-
-            DB::table('wallet_topups')->where('id', $topup->id)->update([
-                'status' => 'PAID',
-                'paid_at' => now(),
-                'updated_at' => now(),
-            ]);
-            DB::table('payment_transactions')->where('id', $payment->id)->update([
-                'status' => 'PAID',
-                'verified_at' => now(),
-                'last_callback_at' => now(),
-                'updated_at' => now(),
-            ]);
-
-            return ['result' => 'PAID', 'status' => 'PAID'];
-        }
-
-        if ($incomingStatus === 'REFUNDED') {
-            DB::table('payment_transactions')->where('id', $payment->id)->update([
-                'status' => 'REFUNDED',
-                'last_callback_at' => now(),
-                'updated_at' => now(),
-            ]);
-            // No automatic reversal of a customer's existing wallet balance.
-            $review = $topup->status === 'PAID';
-            DB::table('wallet_topups')->where('id', $topup->id)->update([
-                'status' => $review ? 'REFUND_REVIEW' : 'REFUNDED',
-                'updated_at' => now(),
-            ]);
-            if ($review) {
-                $this->notifications->record(
-                    'wallet.topup_refund_review',
-                    'Refund top up memerlukan tindakan admin',
-                    'Gateway melaporkan refund top up #'.$topup->id.'. Saldo tidak diubah otomatis; periksa dan selesaikan melalui panel admin.',
-                    'WARNING',
-                    'wallet_topup',
-                    $topup->id
-                );
-            }
-
-            return ['result' => $review ? 'REFUND_REVIEW' : 'REFUNDED',
-                'status' => $review ? 'REFUND_REVIEW' : 'REFUNDED'];
-        }
-
-        if (in_array($incomingStatus, ['FAILED', 'CANCELLED', 'EXPIRED'], true)) {
-            DB::table('wallet_topups')->where('id', $topup->id)
-                ->where('status', 'PENDING_PAYMENT')->update([
-                    'status' => $incomingStatus,
-                    'updated_at' => now(),
-                ]);
-        }
-        DB::table('payment_transactions')->where('id', $payment->id)->update([
-            'status' => $incomingStatus,
-            'last_callback_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        return ['result' => 'PAYMENT_UPDATED', 'status' => $incomingStatus];
-    }
-
-    private function markOrderPaid(object $payment, object $order, array $metadata): array
-    {
-        if ($order->status === 'REFUND') {
-            return ['result' => 'IGNORED_ORDER_STATE', 'status' => 'REFUND'];
-        }
-        if (in_array($order->status, ['PAID', 'PROCESSING', 'SUCCESS'], true)) {
-            DB::table('payment_transactions')->where('id', $payment->id)->update([
-                'status' => 'PAID',
-                'verified_at' => $payment->verified_at ?: now(),
-                'last_callback_at' => now(),
-                'updated_at' => now(),
-            ]);
-
-            return ['result' => 'ALREADY_PAID', 'status' => $order->status];
-        }
-        if ($order->status !== 'PENDING_PAYMENT') {
-            return ['result' => 'IGNORED_ORDER_STATE', 'status' => $order->status];
-        }
-
-        DB::table('payment_transactions')->where('id', $payment->id)->update([
-            'status' => 'PAID',
-            'verified_at' => now(),
-            'last_callback_at' => now(),
-            'updated_at' => now(),
-        ]);
-        DB::table('orders')->where('id', $order->id)->update([
-            'status' => 'PAID',
-            'paid_at' => now(),
-            'updated_at' => now(),
-        ]);
-        if ($order->user_id !== null) {
-            $user = User::find((int) $order->user_id);
-            if ($user) {
-                $this->membership->sync($user);
-            }
-        }
-        DB::table('voucher_redemptions')->where('order_id', $order->id)
-            ->where('status', 'RESERVED')->update([
-                'status' => 'REDEEMED',
-                'redeemed_at' => now(),
-                'updated_at' => now(),
-            ]);
-        $this->orderEvent($order->id, 'PAYMENT_VERIFIED', 'PENDING_PAYMENT', 'PAID', $metadata);
-        $this->notifications->record(
-            'payment.paid',
-            'Pembayaran berhasil',
-            'Pembayaran pesanan '.$order->order_number.' sudah terverifikasi.',
-            'INFO',
-            'order',
-            $order->id
-        );
-        $this->emails->queuePaymentConfirmed((int) $order->id);
-        StartFulfillmentJob::dispatch((int) $order->id)->afterCommit();
-
-        return ['result' => 'PAID', 'status' => 'PAID'];
-    }
-
-    public function expireOrder(object $order): void
-    {
-        if ($order->status !== 'PENDING_PAYMENT') {
-            return;
-        }
-
-        DB::table('orders')->where('id', $order->id)->update([
-            'status' => 'EXPIRED',
-            'updated_at' => now(),
-        ]);
-        $this->releaseVoucher((int) $order->id);
-        $this->orderEvent($order->id, 'ORDER_EXPIRED', 'PENDING_PAYMENT', 'EXPIRED', []);
-    }
-
-    private function releaseVoucher(int $orderId): void
-    {
-        DB::table('voucher_redemptions')->where('order_id', $orderId)
-            ->where('status', 'RESERVED')->update([
-                'status' => 'RELEASED',
-                'reserved_until' => now(),
-                'updated_at' => now(),
-            ]);
-
-        // Kode stok digital yang belum terkirim kembali ke stok.
-        $released = app(VoucherStockService::class)->release($orderId);
-        if ($released > 0) {
-            $this->orderEvent($orderId, 'VOUCHER_STOCK_RELEASED', null, null, ['codes' => $released]);
-        }
     }
 
     private function correlationId(int $orderId): string

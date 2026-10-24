@@ -7,9 +7,18 @@ use App\Services\AdminOrderCancellationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class AdminOrderCancellationController
 {
+    /** Alasan pembatalan yang boleh dipilih admin. */
+    private const REASONS = [
+        'stok_habis' => 'Stok habis',
+        'salah_harga' => 'Salah harga',
+        'permintaan_pelanggan' => 'Permintaan pelanggan',
+        'lainnya' => 'Lainnya',
+    ];
+
     public function __invoke(
         Request $request,
         int $id,
@@ -17,16 +26,16 @@ class AdminOrderCancellationController
         AdminAuditService $audit
     ): RedirectResponse {
         $data = $request->validate([
-            'reason' => ['nullable', 'string', 'max:2000'],
+            'reason_code' => ['required', 'string', Rule::in(array_keys(self::REASONS))],
+            'reason_note' => ['nullable', 'string', 'max:500', 'required_if:reason_code,lainnya'],
             'confirmed' => ['required', 'accepted'],
         ]);
         $admin = $request->user('admin');
-        // Alasan tidak diminta ke admin; jejak audit tetap ada lewat teks otomatis.
-        $reason = trim((string) ($data['reason'] ?? ''));
-        if ($reason === '') {
-            $who = $admin ? trim($admin->name.' <'.$admin->email.'>') : '';
-            $reason = 'Dibatalkan admin'.($who === '' ? '' : ': '.$who);
-        }
+        // Alasan cepat satu ketuk; "lainnya" wajib dijelaskan. Teks inilah yang
+        // tercatat di riwayat pesanan dan audit.
+        $reason = $data['reason_code'] === 'lainnya'
+            ? trim((string) $data['reason_note'])
+            : self::REASONS[$data['reason_code']];
         $before = DB::table('orders')->where('id', $id)->firstOrFail();
         $cancellation->cancel($id, (int) $admin->id, $reason);
         $audit->record($request, 'order.cancelled', 'order', $id,

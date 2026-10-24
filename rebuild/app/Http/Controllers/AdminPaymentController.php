@@ -214,6 +214,15 @@ class AdminPaymentController
                     'payments.id', 'payments.status', 'payments.amount_idr',
                     'payments.created_at', 'orders.order_number',
                 ]),
+            'refundReviews' => DB::table('wallet_topups as topups')
+                ->join('users', 'users.id', '=', 'topups.user_id')
+                ->where('topups.status', 'REFUND_REVIEW')
+                ->orderBy('topups.id')
+                ->limit(50)
+                ->get([
+                    'topups.id', 'topups.amount_idr', 'topups.created_at',
+                    'users.name as customer_name', 'users.email as customer_email',
+                ]),
             'callbackUrls' => [
                 'midtrans' => rtrim((string) config('app.url'), '/').'/api/payments/midtrans/notification',
                 'doku' => rtrim((string) config('app.url'), '/').'/api/payments/doku/notification',
@@ -595,6 +604,19 @@ class AdminPaymentController
         $this->audit($request, 'payment.manual.confirmed', 'payment_transaction', $paymentId, $before, $result);
 
         return back()->with('status', 'Pembayaran manual dikonfirmasi.');
+    }
+
+    public function closeRefundReview(Request $request, int $topupId, PaymentStateService $states): RedirectResponse
+    {
+        $data = $request->validate([
+            'reason' => ['required', 'string', 'min:3', 'max:500'],
+        ]);
+
+        $before = DB::table('wallet_topups')->where('id', $topupId)->firstOrFail();
+        $result = $states->closeTopupRefundReview($topupId, trim((string) $data['reason']));
+        $this->audit($request, 'wallet.topup.refund_review_closed', 'wallet_topup', $topupId, (array) $before, $result);
+
+        return back()->with('status', 'Tinjauan top up ditutup. Saldo pelanggan tidak diubah.');
     }
 
     private function channelData(Request $request, ?int $ignoreId = null): array

@@ -668,6 +668,13 @@ class FulfillmentService
 
     public function completeManual(int $attemptId, ?string $deliveryCode, ?string $note, int $adminId): void
     {
+        // Tidak boleh ada pesanan "sukses" tanpa bukti serah-terima.
+        if (trim((string) $deliveryCode) === '' && trim((string) $note) === '') {
+            throw ValidationException::withMessages([
+                'delivery_code' => 'Isi minimal kode pengiriman atau catatan sebelum menandai sukses.',
+            ]);
+        }
+
         DB::transaction(function () use ($attemptId, $deliveryCode, $note, $adminId): void {
             $attempt = DB::table('fulfillment_attempts')->where('id', $attemptId)
                 ->lockForUpdate()->first();

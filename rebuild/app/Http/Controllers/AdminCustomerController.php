@@ -358,12 +358,26 @@ class AdminCustomerController
             'idempotency_key' => ['required', 'string', 'min:16', 'max:120', 'regex:/^[A-Za-z0-9:_-]+$/'],
         ]);
 
-        DB::transaction(function () use ($request, $userId, $data, $audit): void {
+        $applied = true;
+        DB::transaction(function () use ($request, $userId, $data, $audit, &$applied): void {
             User::query()->whereNull('deleted_at')->lockForUpdate()->findOrFail($userId);
             $wallet = DB::table('wallets')->where('user_id', $userId)->lockForUpdate()->first();
             abort_unless($wallet, 404);
 
-            if (DB::table('wallet_ledger')->where('idempotency_key', $data['idempotency_key'])->exists()) {
+            // Kunci idempotensi berlaku PER PELANGGAN. Kunci yang sudah dipakai
+            // pelanggan lain harus ditolak dengan jelas, bukan dilewati diam-diam.
+            $existing = DB::table('wallet_ledger')
+                ->where('idempotency_key', $data['idempotency_key'])
+                ->first(['wallet_id', 'amount_idr']);
+            if ($existing) {
+                if ((int) $existing->wallet_id !== (int) $wallet->id) {
+                    throw ValidationException::withMessages([
+                        'idempotency_key' => 'Kunci ini sudah dipakai untuk penyesuaian pelanggan lain. Pakai kunci baru.',
+                    ]);
+                }
+
+                $applied = false;
+
                 return;
             }
 
@@ -407,7 +421,9 @@ class AdminCustomerController
             );
         }, 3);
 
-        return back()->with('status', 'Saldo pelanggan berhasil disesuaikan.');
+        return back()->with('status', $applied
+            ? 'Saldo pelanggan berhasil disesuaikan.'
+            : 'Kunci ini sudah pernah diproses untuk pelanggan ini; saldo tidak ditambah lagi.');
     }
 
     public function updateMembership(

@@ -136,9 +136,10 @@ class DigiflazzCatalogService
                                 'updated_at' => now(),
                             ];
                             if ($mapping->store_cost_idr === null) {
-                                // Legacy mapping: the provider price is also the cap.
-                                // A redesigned mapping keeps its admin store cost as the cap.
-                                $updates['max_price_idr'] = $row['price_idr'];
+                                // Baris lama yang belum punya modal toko: kunci sekali
+                                // (harga referensi + 2%). Harga jual tidak boleh ikut
+                                // bergerak setiap sinkronisasi.
+                                $updates['store_cost_idr'] = (int) ceil(((int) $row['price_idr']) * 102 / 100);
                             }
                             DB::table('provider_mappings')->where('id', $mapping->id)->update($updates);
                         }

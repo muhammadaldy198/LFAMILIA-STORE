@@ -41,6 +41,27 @@ class AdminOrderCancellationService
                 ], JSON_THROW_ON_ERROR),
                 'created_at' => now(),
             ]);
+            // Kuota voucher kembali ke pelanggan: pesanan batal tidak boleh
+            // menghabiskan jatah voucher (termasuk yang sudah REDEEMED).
+            $voucherReleased = DB::table('voucher_redemptions')->where('order_id', $orderId)
+                ->where('status', '!=', 'RELEASED')
+                ->update([
+                    'status' => 'RELEASED',
+                    'reserved_until' => now(),
+                    'updated_at' => now(),
+                ]);
+            if ($voucherReleased > 0) {
+                DB::table('order_events')->insert([
+                    'order_id' => $orderId,
+                    'event_type' => 'VOUCHER_QUOTA_RELEASED',
+                    'from_status' => 'CANCELLED',
+                    'to_status' => 'CANCELLED',
+                    'correlation_id' => (string) Str::uuid(),
+                    'metadata' => json_encode(['redemptions' => $voucherReleased], JSON_THROW_ON_ERROR),
+                    'created_at' => now(),
+                ]);
+            }
+
             // Never initiate gateway refunds or wallet balance changes.
             // Kode stok yang belum terkirim kembali ke stok.
             $released = app(VoucherStockService::class)->release($orderId);

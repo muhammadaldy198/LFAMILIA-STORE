@@ -62,9 +62,26 @@ const resend = () => {
     resendOpen.value = false;
 };
 const cancelOpen = ref(false);
+const cancelReasons = [
+    { code: 'stok_habis', label: 'Stok habis' },
+    { code: 'salah_harga', label: 'Salah harga' },
+    { code: 'permintaan_pelanggan', label: 'Permintaan pelanggan' },
+    { code: 'lainnya', label: 'Lainnya' },
+];
+const cancelReason = ref('');
+const cancelNote = ref('');
 const cancel = () => {
-    post(`/admin/orders/${props.order.id}/cancel`, { confirmed: true }, 'cancel');
+    const reasonCode = cancelReason.value;
+    if (!reasonCode) return;
+    if (reasonCode === 'lainnya' && cancelNote.value.trim().length < 3) return;
+    post(`/admin/orders/${props.order.id}/cancel`, {
+        confirmed: true,
+        reason_code: reasonCode,
+        reason_note: reasonCode === 'lainnya' ? cancelNote.value.trim() : undefined,
+    }, 'cancel');
     cancelOpen.value = false;
+    cancelReason.value = '';
+    cancelNote.value = '';
 };
 
 const whatsapp = computed(() => {
@@ -246,7 +263,7 @@ const whatsapp = computed(() => {
             </div>
             <template #footer>
                 <button type="button" class="adm-btn" @click="modal = ''">Batal</button>
-                <button v-if="modal === 'complete'" type="button" class="adm-btn primary" :disabled="busy === 'complete'" @click="finish">Selesaikan pesanan</button>
+                <button v-if="modal === 'complete'" type="button" class="adm-btn primary" :disabled="busy === 'complete' || (!form.delivery_code.trim() && !form.note.trim())" @click="finish">Selesaikan pesanan</button>
                 <button v-else type="button" class="adm-btn danger" :disabled="busy === 'fail' || !form.reason.trim()" @click="fail">Nyatakan gagal</button>
             </template>
         </AdminModal>
@@ -261,9 +278,21 @@ const whatsapp = computed(() => {
 
         <AdminModal v-model:open="cancelOpen" title="Batalkan pesanan" description="Pembatalan hanya untuk pesanan yang seluruh prosesnya gagal.">
             <p class="adm-note">Pesanan {{ order.order_number }} akan dibatalkan dan tidak diproses lagi.</p>
+            <div class="adm-field full">
+                <span>Alasan pembatalan (wajib, tercatat di riwayat)</span>
+                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">
+                    <button v-for="r in cancelReasons" :key="r.code" type="button"
+                            class="adm-btn sm" :class="{ primary: cancelReason === r.code }"
+                            @click="cancelReason = r.code">{{ r.label }}</button>
+                </div>
+            </div>
+            <label v-if="cancelReason === 'lainnya'" class="adm-field full"><span>Jelaskan alasan (wajib)</span>
+                <textarea v-model="cancelNote" class="adm-textarea" maxlength="500" /></label>
             <template #footer>
                 <button type="button" class="adm-btn" @click="cancelOpen = false">Batal</button>
-                <button type="button" class="adm-btn danger" :disabled="busy === 'cancel'" @click="cancel">Batalkan pesanan</button>
+                <button type="button" class="adm-btn danger"
+                        :disabled="busy === 'cancel' || !cancelReason || (cancelReason === 'lainnya' && cancelNote.trim().length < 3)"
+                        @click="cancel">Batalkan pesanan</button>
             </template>
         </AdminModal>
     </AdminLayout>

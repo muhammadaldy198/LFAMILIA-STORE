@@ -249,6 +249,37 @@ Artisan::command('lfamilia:sync-digiflazz-catalog', function (DigiflazzCatalogSe
     }
 })->purpose('Refresh supplier costs and availability while preserving customer margin settings');
 
+Artisan::command('lfamilia:purge-guest-data', function (): int {
+    $days = 30;
+    $cutoff = now()->subDays($days);
+
+    $purged = 0;
+    DB::table('orders')
+        ->whereNull('user_id')
+        ->where('created_at', '<', $cutoff)
+        ->where(function ($query): void {
+            $query->whereNotNull('guest_email')
+                ->orWhereNotNull('guest_phone')
+                ->orWhereNotNull('guest_phone_normalized');
+        })
+        ->orderBy('id')
+        ->chunkById(500, function ($orders) use (&$purged): void {
+            $ids = $orders->pluck('id')->all();
+            $purged += DB::table('orders')->whereIn('id', $ids)->update([
+                'guest_email' => null,
+                'guest_phone' => null,
+                'guest_phone_normalized' => null,
+                'updated_at' => now(),
+            ]);
+        });
+
+    $this->info('Data pribadi pesanan tamu dibersihkan: '.$purged.' pesanan (lebih dari '.$days.' hari). Catatan transaksi tetap disimpan.');
+
+    return 0;
+})->purpose('Hapus email dan nomor HP pesanan tamu yang lebih tua dari 30 hari, tanpa menghapus catatan transaksi');
+
+Schedule::command('lfamilia:purge-guest-data')->dailyAt('03:45');
+
 // Tick tiap menit; command sendiri menahan sampai interval tersimpan terpenuhi,
 // sehingga pilihan 15/20/25/... menit benar-benar dihormati.
 Schedule::command('lfamilia:sync-digiflazz-catalog')->everyMinute()->withoutOverlapping();

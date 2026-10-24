@@ -91,6 +91,13 @@ const markRead = async (row) => {
             </div>
         </header>
 
+        <section v-if="Number(m.manual_overdue || 0) > 0" class="adm-card" style="border-left:4px solid #b3261e">
+            <div class="adm-card-body">
+                <strong>{{ num(m.manual_overdue) }} pesanan manual lewat 60 menit jam layanan.</strong>
+                <p class="adm-note">Lewat batas waktu pelayanan. <a href="/admin/fulfillment">Buka antrean pemenuhan</a>.</p>
+            </div>
+        </section>
+
         <section class="adm-stats" aria-label="Angka utama">
             <div v-for="box in boxes" :key="box.key" class="adm-stat">
                 <span class="lb">{{ box.label }}</span>

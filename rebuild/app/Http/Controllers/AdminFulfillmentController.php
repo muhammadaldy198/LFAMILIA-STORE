@@ -6,6 +6,7 @@ use App\Jobs\ReconcileFulfillmentJob;
 use App\Services\AdminAuditService;
 use App\Services\AdminOrderPresentation;
 use App\Services\FulfillmentService;
+use App\Support\ServiceHours;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -88,7 +89,8 @@ class AdminFulfillmentController
                 'orders.order_number', 'orders.status as order_status', 'orders.customer_input',
                 'orders.snapshot', 'orders.delivery_payload', 'orders.guest_email', 'orders.guest_phone',
                 'orders.user_id', 'products.id as product_id', 'products.name as product_name',
-                'products.manual_instructions', 'product_packages.name as package_name',
+                'products.manual_instructions', 'products.manual_open_time', 'products.manual_close_time',
+                'products.manual_timezone', 'product_packages.name as package_name',
                 'providers.code as provider_code', 'users.name as user_name',
                 'users.email as user_email', 'users.phone as user_phone',
             ])
@@ -132,6 +134,12 @@ class AdminFulfillmentController
                 default => $attempt->provider_code ?: 'Belum ditentukan',
             };
             $terminal = ! in_array($attempt->order_status, ['PAID', 'PROCESSING'], true);
+            $manualAge = $attempt->status === 'MANUAL_PENDING'
+                ? ServiceHours::elapsedMinutes(
+                    $attempt->created_at, now(),
+                    $attempt->manual_open_time, $attempt->manual_close_time, $attempt->manual_timezone
+                )
+                : 0;
 
             return [
                 'id' => (int) $attempt->id,
@@ -160,6 +168,8 @@ class AdminFulfillmentController
                 'destinations' => $destinations,
                 'manual_instructions' => $attempt->manual_instructions,
                 'delivery' => $delivery,
+                'manual_age_minutes' => $manualAge,
+                'is_overdue' => $attempt->status === 'MANUAL_PENDING' && $manualAge > 60,
                 'can_complete' => ! $terminal && $attempt->status === 'MANUAL_PENDING'
                     && in_array($attempt->order_status, ['PAID', 'PROCESSING'], true),
                 'can_fail' => ! $terminal && $attempt->status === 'MANUAL_PENDING',
@@ -194,6 +204,13 @@ class AdminFulfillmentController
             'note' => ['nullable', 'string', 'max:4000'],
         ]);
         $admin = $request->user('admin');
+
+        // Sukses manual wajib punya bukti serah-terima: kode atau catatan.
+        if (trim((string) ($data['delivery_code'] ?? '')) === '' && trim((string) ($data['note'] ?? '')) === '') {
+            throw ValidationException::withMessages([
+                'delivery_code' => 'Isi minimal kode pengiriman atau catatan sebelum menandai sukses.',
+            ]);
+        }
 
         $before = DB::table('fulfillment_attempts')->where('id', $attemptId)->firstOrFail();
         $fulfillment->completeManual(
