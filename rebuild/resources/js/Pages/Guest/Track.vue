@@ -5,7 +5,7 @@ const { customerText } = useCustomerPresentation();
 import {Head,Link} from '@inertiajs/vue3';
 import {computed,onMounted,onUnmounted,ref} from 'vue';
 import CustomerShell from '../../Components/CustomerShell.vue';
-import { manualHelpMessage, nextOrderAction } from '../../lib/orderStatus';
+import { isTerminalOrderStatus, manualHelpMessage, nextOrderAction, orderStatusInfo } from '../../lib/orderStatus';
 
 const props=defineProps({transactions:Array});
 const query=ref('');
@@ -22,20 +22,10 @@ let disposed=false;
 let selectionVersion=0;
 
 const money=v=>'Rp '+Number(v||0).toLocaleString('id-ID');
-const statusMeta=s=>({
- pending:['Menunggu Pembayaran','Selesaikan pembayaran sebelum waktu habis.','amber'],
- paid:['Pembayaran Diterima','Pembayaran sudah terverifikasi.','blue'],
- processing:['Sedang Diproses','Pesanan sedang diproses sistem.','blue'],
- success:['Berhasil','Pesanan selesai diproses.','green'],
- failed:['Gagal','Pesanan tidak berhasil diproses.','red'],
-  blocked:['Gagal Diproses','Pesanan gagal diproses. Silakan hubungi admin LFAMILIA untuk penanganan manual.','red'],
- cancelled:['Dibatalkan','Transaksi dibatalkan dan tidak akan diproses.','red'],
- expired:['Kedaluwarsa','Waktu pembayaran telah berakhir.','gray'],
- refunded:['Perlu Pemeriksaan Admin','Hubungi admin untuk memeriksa status dana dan pesanan.','amber'],
-}[s]||['Diproses','Status sedang diperbarui.','blue']);
+const statusMeta=s=>{const {label,description,tone}=orderStatusInfo(s);return [label,description,tone];};
 const sourceLabel=s=>({payment:'Pembayaran',processing:'Proses Pesanan',delivery:'Pengiriman',admin:'Admin',system:'Sistem'}[s]||'Sistem');
 const date=v=>v?new Date(v).toLocaleString('id-ID',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'}):'-';
-const terminal=computed(()=>detail.value&&['success','failed','blocked','cancelled','expired','refunded'].includes(detail.value.fulfillmentStatus));
+const terminal=computed(()=>detail.value&&isTerminalOrderStatus(detail.value.fulfillmentStatus));
 const nextAction=computed(()=>detail.value?nextOrderAction(detail.value.fulfillmentStatus,detail.value.paymentStatus,detail.value.wasPaid):null);
 
 async function json(url,options={}){
