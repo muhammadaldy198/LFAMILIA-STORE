@@ -264,8 +264,6 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
                 ->middleware('throttle:admin-sensitive')->name('gateways.update');
             Route::put('/routes/{id}', [AdminPaymentController::class, 'updateRoute'])
                 ->middleware('throttle:admin-sensitive')->name('routes.update');
-            Route::post('/refund-reviews/{topupId}/resolve', [AdminPaymentController::class, 'resolveTopupRefund'])
-                ->middleware(['throttle:admin-sensitive', 'admin.password.confirm'])->name('refund-reviews.resolve');
             Route::put('/settings', [AdminPaymentController::class, 'settings'])
                 ->middleware('throttle:admin-sensitive')->name('settings.update');
         });
