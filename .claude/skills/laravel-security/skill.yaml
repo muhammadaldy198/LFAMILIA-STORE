@@ -1,0 +1,10 @@
+name: local_laravel_security
+title: Local laravel security
+description: 'Security patterns for Laravel applications. Use this skill when implementing authentication, authorization, input validation, or any security-related feature. Triggers on: auth, login, permissions, policies, gates, CSRF, XSS, SQL injection, rate limiting, Sanctum, tokens, passwords, middleware, "is this secure", "security review", or any code that handles user input, file uploads, or sensitive data.'
+include_in_prompt: true
+availability:
+  confidential_vm: true
+  needs_speech: false
+skill_improvement:
+  managed: true
+  needs_review: true

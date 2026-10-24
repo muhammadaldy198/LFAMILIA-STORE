@@ -44,17 +44,32 @@ Skill ada di `.claude/skills/`.
 
 | Tugas | Skill wajib |
 |---|---|
-| Menulis/mengubah PHP Laravel | laravel-best-practices + karpathy-coder + zero-hallucination-coder + strict-api |
-| Menulis/mengubah Vue/Inertia | inertia-vue-development + tailwindcss-development (+ frontend-design untuk arah desain) |
+| **Semua tugas** | verification-before-completion — sebelum menyatakan selesai/lulus, tunjukkan buktinya |
+| Menulis/mengubah PHP Laravel | laravel-best-practices + karpathy-coder + zero-hallucination-coder + strict-api + laravel-verification |
+| Debug / bug sulit | systematic-debugging (+ debug-using-debugbar untuk lambat/N+1) |
+| Nomor HP / kode negara | phone-internationalization-guard |
+| Menulis/mengubah Vue/Inertia | inertia-vue-development + vue-best-practices + tailwindcss-development (+ frontend-design untuk arah desain) |
+| Mockup → kode | ui-to-vue |
 | Menyambung frontend ke route | wayfinder-development |
-| Menulis/mengubah test | pest-testing (+ webapp-testing untuk uji browser) |
-| Audit/review kode | data-fetch-analysis + karpathy-coder + skill-security-auditor (untuk keamanan) |
+| Bukti tampilan HP + desktop | playwright |
+| Aksesibilitas UI | accessibility + web-design-guidelines |
+| Menulis/mengubah test | pest-testing + laravel-verification (+ webapp-testing untuk uji browser) |
+| Matriks skenario sebelum push | scenario-review |
+| Menelusuri alur tombol → DB | click-path-audit |
+| QA eksploratif | dogfood |
+| Audit/review kode | code-review + differential-review + karpathy-coder + data-fetch-analysis + skill-security-auditor |
+| Review lawan PRD/rancangan | spec-to-code-compliance + audit-context-building |
+| Cari bug di area berubah | find-bugs |
+| Review keamanan & uang | security-review + laravel-security + gha-security-review + supply-chain-risk-auditor + sharp-edges |
 | Payment/Midtrans | integrate-midtrans-payments — **hanya** bagian Snap/webhook/verifikasi/status. Bagian refund di skill itu **tidak berlaku** (lihat §5) |
+| Digiflazz (harga, sync, produk, nominal) | lfamilia-digiflazz-specialist |
+| Uang/ledger/saldo | lfamilia-payment-guardian |
 | Fitur/modul baru | code-scaffolding + skill stack di atas |
 | Deploy/CI | cicd-deployment |
 | Review PR besar | code-tour |
-| Rencana sebelum koding | grill-me |
-| Debug lambat / N+1 | debug-using-debugbar |
+| Rencana sebelum koding | grill-me + grilling + writing-plans |
+| Spesifikasi / dokumen keputusan | to-spec + technical-documentation + lfamilia-product-spec |
+| Desain UI/UX | frontend-design + ui-ux-pro-max + popular-web-designs + design-md |
 | Media/upload | medialibrary-development |
 | Auth (login/2FA/passkey) | fortify-development |
 
