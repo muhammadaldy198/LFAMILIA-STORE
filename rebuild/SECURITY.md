@@ -39,14 +39,14 @@ Webhook/provider result menggunakan signature/source/reference validation yang d
 
 Redirect frontend tidak pernah menjadi bukti paid.
 
-## Server security — diverifikasi 2026-10-04
+## Server security — diverifikasi 2026-10-04, dikoreksi 2026-10-24
 
-Pada VPS production saat audit Tahap 4:
+Pada VPS production saat audit Tahap 4 (2026-10-04), SSH tercatat key-only. **Keadaan itu sudah berubah atas keputusan pemilik (2026-10-06):**
 
-- SSH password authentication: **disabled**;
-- keyboard-interactive auth: **disabled**;
+- SSH password authentication: **ENABLED** (keputusan pemilik — pemilik menyadari keamanan lebih rendah dan memilih begitu untuk sementara);
+- keyboard-interactive auth: mengikuti pengaturan SSH aktif;
 - public-key auth: **enabled**;
-- root login: **key-only** (`without-password`);
+- root login: **password diizinkan** (`PermitRootLogin yes`);
 - Fail2ban: **active + enabled**;
 - UFW: **active**;
 - public HTTP/HTTPS rules dibatasi ke Cloudflare networks;

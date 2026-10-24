@@ -1,7 +1,7 @@
 # PRD — LFAMILIA STORE
 
-**Versi:** 2.0 (tulis ulang dari nol)
-**Tanggal:** 22 Oktober 2026
+**Versi:** 2.1 (penyelarasan dengan Buku Keputusan pemilik, 24 Oktober 2026 — rincian perubahan di §23)
+**Tanggal:** 22 Oktober 2026, direvisi 24 Oktober 2026
 **Menggantikan:** `PRD-LFAMILIA-STORE-v1.md` dan `PRD-TRACEABILITY-2026-10.md` (keduanya diarsipkan di `docs/archive/2026-10-22-pra-redesign/`)
 **Sifat dokumen:** aturan produk. Tidak berisi laporan kemajuan, tidak berisi centang status, tidak berisi prosedur server.
 
@@ -14,9 +14,9 @@ Dokumen ini menjawab satu pertanyaan: **toko ini bekerja dengan aturan apa.**
 - Yang **sudah jalan** ditulis sebagai aturan berlaku.
 - Yang **belum dipakai** ditulis apa adanya sebagai "belum dipakai", bukan sebagai rencana.
 - Yang **tidak boleh ada** ditulis di §19 dengan tegas.
-- Yang **belum diputuskan** dikumpulkan di §21, tidak diselipkan di tengah aturan.
+- Yang **belum diputuskan** dikumpulkan di §22, tidak diselipkan di tengah aturan.
 
-Kalau dokumen ini berbeda dengan kode yang berjalan, kode yang berjalan adalah kenyataan dan dokumen ini yang harus diperbaiki — kecuali pada §19, di mana dokumen ini yang menang.
+Kalau dokumen ini berbeda dengan kode yang berjalan, **tidak ada yang otomatis menang**: perbedaan itu dicatat dan diputuskan pemilik kasus per kasus berdasarkan keputusan pemilik terakhir. Kalau kode menyimpang dari maksud pemilik, kode yang diperbaiki; kalau dokumen ini tertinggal dari keputusan yang lebih baru, dokumen ini yang diperbarui. Pengecualian: pada §19, dokumen ini yang selalu menang. (Keputusan pemilik 2026-10-24.)
 
 ---
 
@@ -88,35 +88,43 @@ Kategori → Produk → Nominal → Sumber (SKU penyedia)
 ```
 
 - **Kategori** punya nama, slug, ikon, urutan, status aktif.
-- **Produk** punya kategori, nama, slug, margin sendiri, urutan, status aktif, dan penanda "populer".
-- **Nominal** punya kode, nama, nilai nominal (opsional), urutan, status aktif. Nominal nonaktif tidak muncul di toko.
-- **Sumber** menghubungkan nominal ke SKU penyedia, punya harga modal, status aktif, dan penanda "harga manual".
+- **Produk** punya kategori, nama, slug, urutan, status aktif, penanda "populer", dan gambar/ikon (media produk). Produk **tidak** punya margin/markup sendiri (lihat §4.3).
+- **Nominal** punya kode, nama, nilai nominal (opsional), urutan, status aktif. Nominal nonaktif tidak muncul di toko. **Nama nominal hasil impor dari penyedia tidak memuat nama game/produk** — fokus ke nominalnya (mis. "5 Diamond", bukan "Free Fire 5 Diamond"); berlaku untuk semua produk.
+- **Sumber** menghubungkan nominal ke SKU penyedia, punya harga modal, status aktif, dan penanda "harga manual". Satu nominal dilayani **satu SKU penyedia terpilih**; pembeli tidak bisa memilih SKU dan tidak melihat pemetaan internal.
 
 ### 4.2 Aturan tampil
 
 - Yang tidak aktif tidak pernah tampil ke pembeli, tapi tidak dihapus — hanya disembunyikan.
 - Produk tanpa nominal aktif tidak bisa dibeli.
 - Nominal tanpa sumber aktif **tidak boleh** bisa dibeli; kalau dipaksa, checkout menolak dengan alasan yang jelas.
-- Urutan tampil mengikuti urutan yang diatur admin, bukan abjad.
+- Nominal yang tidak tersedia — sumbernya nonaktif/hilang, harga seller melewati modal toko, atau data katalognya basi lebih dari 24 jam — **hilang total dari tampilan pembeli** (tombolnya nonaktif/hilang sendiri), bukan tampil dengan label "tidak bisa dibeli".
+- Urutan tampil produk mengikuti urutan yang diatur admin, bukan abjad.
+- **Urutan nominal produk** tampil dari nilai kecil ke besar.
 
 ### 4.3 Harga
 
-Harga jual dihitung dari **harga modal + margin**, dengan margin bisa ditetapkan di tingkat produk (persen). Hasil akhir disimpan sebagai angka bulat rupiah.
+Harga berjalan dengan **sistem tiga harga**: **harga seller** (harga dari penyedia) → **harga modal toko** → **harga jual**.
 
 Aturan:
 
-- **Harga modal berasal dari penyedia**, disimpan di database sendiri, diperbarui berkala. Harga tidak pernah ditanyakan ke penyedia saat ada pengunjung.
+- **Harga modal toko dibentuk sekali** saat impor/mapping: harga seller + **tambahan modal (bawaan 2%)**. Sesudah dibentuk, modal toko **tidak berubah mengikuti harga seller**; sinkronisasi berikutnya hanya memperbarui harga seller sebagai referensi — tidak menimpa modal toko dan tidak menerapkan ulang tambahan modal. Modal toko boleh diedit admin, tetapi **tidak boleh di bawah harga referensi seller saat itu**.
+- **Harga jual = modal toko × markup (bawaan 10%).** Hasilnya disimpan di tingkat **nominal** sebagai margin mode persen; admin dapat mengubah persennya per nominal atau menggantinya menjadi harga tetap. **Tidak ada markup di tingkat produk.**
+- Impor memakai **dua kolom persen global** untuk semua SKU terpilih (modal bawaan 2% di atas harga seller, jual bawaan 10% di atas modal toko), dengan pratinjau seller → modal toko → harga jual sebelum diterapkan.
+- Harga rupiah **dibulatkan ke atas**; tidak ada pembulatan "cantik".
+- **Harga jual tidak boleh lebih murah dari modal toko** — server menolaknya.
+- **Nominal disembunyikan otomatis** bila harga seller naik di atas modal toko, dan tampil lagi otomatis bila harga seller turun kembali ke dalam batas (lihat §4.2).
+- **Batas harga kirim ke penyedia per pesanan = modal toko tertinggi di antara SKU aktif pada nominal itu — persis sama, tanpa tambahan.** Batas ini dihitung saat checkout dan menempel sebagai snapshot pesanan; pesanan yang harga penyedianya melewati batas tidak dikirim otomatis.
 - **Harga yang dibayar pembeli adalah harga saat pesanan dibuat** (snapshot). Kalau harga katalog berubah setelah itu, pesanan lama tidak berubah.
-- **Harga tidak boleh lebih murah dari modal.** Kalau terjadi (mis. harga penyedia naik tapi katalog belum disinkronkan), pesanan ditolak sebelum dikirim, bukan dikirim dengan rugi.
-- **Batas harga atas (max price)** boleh ditetapkan per sumber; pesanan di atas batas tidak dikirim otomatis.
-- Perubahan margin dan harga hanya lewat panel admin, tercatat di audit log.
+- Harga modal dan harga seller **disimpan di database sendiri**; harga tidak pernah ditanyakan ke penyedia saat ada pengunjung.
+- Perubahan harga dan margin hanya lewat panel admin, tercatat di audit log.
 
 ### 4.4 Sinkronisasi katalog dari penyedia
 
-- Sinkronisasi bersifat **menarik data**, bukan mendorong. Admin yang memicu, atau penjadwal yang menjalankan.
-- Sinkronisasi **tidak pernah menghapus** produk atau nominal yang sudah ada. Yang hilang dari penyedia ditandai tidak tersedia.
-- Perubahan harga dari penyedia **tidak otomatis mengubah harga jual** kecuali admin menyetujui aturan margin yang berlaku.
-- Setiap sinkronisasi mencatat: kapan, oleh siapa, berapa baris berubah.
+- Sinkronisasi bersifat **menarik data**, bukan mendorong. Admin yang memicu, atau penjadwal yang menjalankan **tiap 15 menit** untuk seluruh katalog (ada saklar di panel; tidak ada sinkronisasi per produk). Daftar harga penyedia disimpan di database sendiri dan diperbarui berkala — dokumentasi Digiflazz menyatakan ada limitasi pengecekan daftar harga, jadi gunakan secara bijak.
+- Yang hilang dari penyedia: **pemetaan yang belum pernah dipakai pesanan dihapus**; **pemetaan yang pernah dipakai dipertahankan tetapi dinonaktifkan**. Nominal yang tidak lagi punya sumber aktif **dinonaktifkan otomatis oleh sinkronisasi** (penanda dinonaktifkan-oleh-sinkronisasi) dan aktif lagi hanya bila SKU-nya kembali. Produk dan nominal buatan admin sendiri tidak dihapus sinkronisasi.
+- Sinkronisasi juga **membuat pemetaan sumber awal** untuk nominal aktif yang belum terpetakan.
+- Perubahan harga seller dari sinkronisasi **tidak mengubah modal toko dan tidak mengubah harga jual** (lihat §4.3).
+- Setiap sinkronisasi mencatat: kapan, oleh siapa/sistem, berapa baris berubah.
 
 ---
 
@@ -167,6 +175,7 @@ Aturan:
 - **Idempotensi wajib.** Klik ganda atau refresh tidak boleh membuat dua pesanan.
 - **Masa berlaku pesanan** ditetapkan saat dibuat; lewat waktu → kedaluwarsa, tidak bisa dibayar.
 - **Biaya kanal** dihitung server dan ditampilkan **sebelum** pesanan dibuat. Tidak boleh muncul tiba-tiba setelah bayar.
+- Biaya kanal **ditanggung pembeli di atas harga** (dihitung gross-up agar jumlah bersih yang diterima toko utuh). **Saldo LFAMILIA dan QRIS manual tanpa biaya kanal.** Angka biaya per kanal diatur di dokumen pembayaran, bukan di dokumen ini. Top up saldo dikenai biaya yang sama seperti pesanan, tetapi yang dikreditkan ke saldo hanya nominal top up-nya.
 - **Voucher divalidasi di server** saat checkout dan sekali lagi saat pesanan dibuat.
 - **Stok voucher (kode) direservasi** saat pesanan dibuat, dilepas kalau pesanan gagal/kedaluwarsa.
 - Guest wajib memberi kontak (email atau telepon) yang bisa dihubungi; tanpa itu, keluhan tidak bisa ditangani.
@@ -183,9 +192,11 @@ Aturan:
 | **Midtrans** (QRIS, Virtual Account, E-Wallet) | Aktif | Gateway utama. |
 | **QRIS manual** | Ada, dipakai sesuai kebutuhan | Konfirmasi oleh admin setelah dana masuk. |
 | **Saldo LFAMILIA** | Aktif untuk member | Guest tidak punya saldo. |
-| **DOKU** | **Belum dipakai** | Kode tersedia dan akan dipasang kemudian. Tidak tampil di toko selama belum aktif. |
+| **DOKU** | **Belum dipakai — cadangan** | Kode tersedia. Tidak tampil di toko selama belum aktif. Diaktifkan/dipindah **admin secara manual** lewat pengaturan kanal di panel, atas keputusan pemilik (lihat §19 butir 12). |
 
 Kanal yang tampil ke pembeli hanya kanal yang aktif. Kanal dalam perawatan tidak tampil dan tidak bisa dipilih.
+
+**Tidak ada perpindahan gateway otomatis.** Midtrans adalah gateway utama; DOKU hanya cadangan. Di panel memang ada pilihan kanal/gateway, dan admin bebas menggantinya sendiri — yang memilih manusia, bukan sistem secara otomatis.
 
 ### 7.2 Aturan "lunas"
 
@@ -205,6 +216,7 @@ Aturan tambahan:
 - **Notifikasi berulang aman.** Notifikasi yang sama datang dua kali tidak boleh menambah saldo atau mengirim produk dua kali.
 - **Pembayaran terlambat** (dana masuk setelah pesanan kedaluwarsa) **tidak otomatis diproses**. Ditandai untuk diperiksa admin.
 - **Nominal tidak cocok** → ditandai untuk diperiksa, tidak diproses.
+- **Pembayaran yang hasilnya belum pasti** (permintaan terkirim tetapi jawaban gateway tidak kembali) ditandai **UNKNOWN** untuk diperiksa admin. Admin dapat mengecek statusnya langsung ke gateway dari panel — invoice dan nominal diverifikasi dulu, hasilnya tercatat di audit. Selama statusnya belum pasti, sistem **tidak membuat pembayaran kedua** untuk pesanan yang sama, dan pembeli diberi **peringatan tertulis** di halaman status/lacak pesanan agar tidak membayar ulang sebelum statusnya jelas dan diarahkan menghubungi admin. (Ini peringatan, bukan larangan membeli lagi — toko tidak menghentikan pembelian siapa pun.)
 
 ### 7.3 QRIS manual
 
@@ -300,6 +312,7 @@ Aturan:
 - Satu status pelanggan bisa berasal dari beberapa status internal.
 - Status pelanggan **tidak pernah mundur** (Berhasil tidak bisa kembali ke Sedang Diproses).
 - Setiap perubahan status dicatat dengan waktu dan alasan.
+- Status internal **BLOCKED** (pengiriman gagal terkonfirmasi, perlu tindakan superadmin) dipetakan ke **Gagal** untuk pelanggan. Istilah BLOCKED **tidak pernah tampil** ke pelanggan — daftar di §9.1 adalah satu-satunya status yang dilihat pelanggan.
 
 ---
 
@@ -371,8 +384,12 @@ Kebijakan lengkap ada di halaman publik `/refund` dan **dokumen itu yang berlaku
 ### 11.2 Member
 
 - Daftar dengan email atau Google.
-- Punya: profil, nomor telepon terverifikasi (opsional tapi diminta untuk hal sensitif), riwayat pesanan, saldo, tiket, akun game tersimpan, notifikasi.
+- **Verifikasi email memakai link (standar).** Selesai mendaftar, pengguna **tidak otomatis masuk** ke akun — dikembalikan ke halaman login, dan **belum verifikasi berarti tidak bisa login**. Akun Google otomatis terverifikasi.
+- **Sesudah login, member wajib melengkapi nomor WhatsApp dulu** sebelum memakai toko — termasuk yang masuk lewat Google.
+- **Satu nomor WhatsApp hanya untuk satu akun**; nomor minimal 10 digit dan dinormalisasi ke format Indonesia. (Nomor WhatsApp adalah data akun, bukan kredensial masuk; mengganti nomor tidak memakai OTP.)
+- Punya: profil, riwayat pesanan, saldo, tiket, akun game tersimpan, notifikasi.
 - Bisa menghapus akun. Penghapusan tidak menghapus catatan transaksi yang wajib disimpan untuk pembukuan.
+- **Ganti email dan ganti kata sandi wajib memasukkan kata sandi saat ini** (bagi akun yang punya kata sandi). Ganti email mereset status verifikasi dan mengirim link verifikasi baru ke email baru. Akun Google tidak punya kata sandi: ganti email tidak dimintai kata sandi, dan pemilik akun dapat membuat kata sandi pertama kali dari halaman akun.
 
 ### 11.3 Tingkatan member
 
@@ -392,7 +409,7 @@ Aturan:
 - **MAFIA adalah tingkat internal.** Hanya untuk akun uji/akun internal pemilik toko di sisi pelanggan. Tidak pernah tampil di halaman tingkatan, tidak pernah muncul sebagai target berikutnya, dan tidak bisa dicapai lewat belanja.
 - Angka di atas dapat diubah admin per tingkat (ambang belanja dan besar diskon), tetapi **urutan tingkat tidak berubah**.
 - Tingkat bisa dipaksa manual oleh admin untuk satu pelanggan; pemaksaan itu tercatat di audit log.
-- Tingkat memberi keuntungan yang dapat diatur (mis. diskon persen).
+- **Besar diskon per tingkat tidak ditetapkan di dokumen ini** — diatur dan diisi admin lewat panel; bawaannya kosong (tanpa diskon) sampai admin mengisi.
 - **Tingkat bukan hak akses admin.** Akun admin di panel dan akun pelanggan adalah dua sistem terpisah dan tidak boleh dicampur, walau memakai email yang sama.
 
 ### 11.4 Saldo
@@ -427,6 +444,12 @@ Aturan:
 - Kode yang sudah terkirim tidak bisa ditarik kembali.
 - Kalau stok habis, nominal otomatis tidak bisa dibeli.
 
+### 12.2 Ulasan pembeli
+
+- Ulasan hanya bisa dibuat dari **pesanan yang memenuhi syarat** (kelayakan berasal dari pesanan), bukan dibuat oleh sistem.
+- Ulasan **terbit langsung** tanpa moderasi di depan.
+- Admin dapat **menghapus permanen** ulasan dari panel.
+
 ---
 
 ## 13. Halaman publik
@@ -437,7 +460,7 @@ Daftar halaman yang harus ada dan berfungsi:
 |---|---|---|
 | Beranda | `/` | Produk populer, kategori, cara top up, promo |
 | Katalog | `/catalog` | Semua produk, filter kategori, pencarian |
-| Detail produk | `/catalog/{slug}` | Nominal, input tujuan, deskripsi, catatan |
+| Detail produk | `/catalog/{slug}` | Nominal, input tujuan, deskripsi, catatan, ulasan pembeli |
 | Checkout | `/checkout` | Ringkasan, data tujuan, pembayaran |
 | Lacak pesanan | `/track` | Nomor pesanan + kode akses |
 | Berita | `/news` | Artikel dan pengumuman |
@@ -454,6 +477,7 @@ Daftar halaman yang harus ada dan berfungsi:
 
 Aturan:
 
+- **Banner dan pop-up adalah konten yang dikelola dari panel**, di samping berita, FAQ, dan halaman hukum.
 - **Footer wajib memuat empat kanal resmi:** Instagram, WhatsApp, Email, Discord. Keempatnya sudah terpasang dan tidak boleh hilang saat desain ulang.
 - Halaman hukum **tidak boleh hilang** saat desain ulang.
 - Halaman publik harus bisa dibuka tanpa login.
@@ -480,6 +504,7 @@ Aturan:
 
 - Notifikasi **tidak boleh** memuat data sensitif (password, PIN, kode OTP, kredensial).
 - Notifikasi penting: pesanan baru, pembayaran diterima, pengiriman gagal, tiket baru, saldo penyedia rendah, integrasi mati.
+- Notifikasi kejadian penting untuk admin dikirim ke **Telegram dan Discord (keduanya)**; peringatan kegagalan pemeriksaan kesehatan juga masuk ke email admin.
 - Notifikasi yang gagal kirim tidak boleh menggagalkan pesanan.
 - Admin bisa mengatur ke mana notifikasi diarahkan per jenis kejadian.
 
@@ -506,6 +531,7 @@ Detail ada di dokumen terpisah (`ADMIN-PANEL.md`). Yang mengikat di PRD:
 - **Semua tindakan yang mengubah data tercatat di audit log**: siapa, kapan, apa, sebelum/sesudah.
 - Panel tidak pernah menampilkan kredensial integrasi dalam bentuk terbuka.
 - Panel harus bisa dipakai di HP.
+- Pengaturan kanal/gateway yang aktif ada di panel dan diganti **admin secara manual**; perpindahan gateway tidak pernah dilakukan sistem secara otomatis (lihat §7.1).
 
 ---
 
@@ -536,7 +562,7 @@ Detail ada di dokumen terpisah (`ADMIN-PANEL.md`). Yang mengikat di PRD:
 9. **Menghapus audit log atau ledger.**
 10. **Mengubah harga pesanan yang sudah dibuat.**
 11. **Menampilkan status internal teknis ke pelanggan.**
-12. **Mengaktifkan DOKU** tanpa keputusan baru yang tertulis.
+12. **Mengaktifkan DOKU** tanpa keputusan pemilik yang tertulis. Perpindahan gateway juga tidak pernah otomatis — selalu tindakan manual admin atas keputusan pemilik.
 
 ---
 
@@ -564,8 +590,10 @@ Konsekuensi yang mengikat:
 
 ## 22. Keputusan yang masih terbuka
 
-1. **Kanal notifikasi webhook** (Discord/Telegram untuk admin) — belum diisi. Ini berbeda dari tautan Discord di footer yang sudah terpasang.
-2. **Diskon per tingkatan member** — ambang belanja sudah ditetapkan, besar diskon tiap tingkat belum.
+Tidak ada saat ini. Dua butir terakhir ditutup pada 2026-10-24:
+
+1. **Kanal notifikasi admin** — diputuskan **Telegram dan Discord** (lihat §15). Ini berbeda dari tautan Discord di footer yang sudah terpasang.
+2. **Diskon per tingkatan member** — bukan angka tetap; **diatur dan diisi admin lewat panel** (lihat §11.3).
 
 ---
 
@@ -573,6 +601,7 @@ Konsekuensi yang mengikat:
 
 | Tanggal | Keputusan |
 |---|---|
+| 2026-10-24 | Penyelarasan dengan Buku Keputusan pemilik (PRD v2.1). Harga: sistem tiga harga (seller → modal toko → harga jual); modal dibentuk sekali saat impor (+2%), jual bawaan +10% disimpan sebagai margin nominal; **markup tingkat produk dihapus**; aturan khusus ML ×1,06 (2026-10-12) **dicabut** — semua produk ikut bawaan impor, persen bisa diubah per nominal sesudahnya. Pembulatan ke atas. Batas harga kirim = **persis modal toko tertinggi** SKU aktif (tambahan +1% dihapus). Sinkronisasi: tiap **15 menit**, seluruh katalog; nominal tanpa sumber aktif dinonaktifkan sinkronisasi; pemetaan belum pernah dipakai dihapus, yang pernah dipakai dinonaktifkan; nominal tidak tersedia **disembunyikan total** dari pembeli (termasuk data basi > 24 jam). Nama nominal impor **tanpa nama game** untuk semua produk. DOKU = **cadangan**, diaktifkan/dipindah admin manual lewat panel; tidak ada perpindahan gateway otomatis. Biaya kanal: prinsip gross-up ditanggung pembeli; saldo & QRIS manual nol; angka per kanal di dokumen pembayaran. Pembayaran belum pasti: ditandai UNKNOWN, dicek admin ke gateway, pembeli diberi peringatan tertulis (bukan larangan). Status BLOCKED **tidak tampil** ke pelanggan (dipetakan ke Gagal). Verifikasi email: **link ketat** — belum verifikasi tidak bisa login; sesudah login wajib nomor WhatsApp; satu nomor satu akun. Diskon tingkatan member diatur admin. Notifikasi admin: Telegram **dan** Discord. Ulasan pembeli: terbit langsung, admin bisa hapus permanen. Perbedaan PRD vs kode diputuskan **kasus per kasus** oleh pemilik (§0); §19 tetap mutlak. |
 | 2026-10-22 | PRD ditulis ulang. Status pelanggan dikunci 6. DOKU ditandai belum dipakai. Pengembalian dana: manual, member lewat penyesuaian saldo, guest lewat transfer. |
 | 2026-10-22 | Tingkatan member: BASIC/SILVER 500rb/GOLD 5jt/DIAMOND 20jt/PLATINUM 50jt; MAFIA internal, tidak tampil. Data guest disimpan 30 hari. DOKU dibiarkan ada (akan dipasang). Footer 4 kanal termasuk Discord. |
 | 2026-10-22 | Penyesuaian saldo: Super Admin saja, tanpa batas nominal. Pesanan manual: peringatan setelah 1 jam jam-layanan. Refund lewat 7 hari hanya bila kesalahan sistem terbukti. Batas hari laporan 00:00–23:59 WIB. Ambang saldo penyedia tetap 5 transaksi. Situs belum produksi. |

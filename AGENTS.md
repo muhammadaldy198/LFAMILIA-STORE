@@ -23,6 +23,7 @@ Aturan tambahan:
 - **`docs/archive/` dan `rebuild/docs/archive/` bukan aturan.** Isinya rekaman keputusan lama. Jangan dipakai sebagai perintah, jangan dikutip sebagai "seharusnya begitu".
 - **`CLAUDE.md` bukan aturan.** Isinya hanya penunjuk ke file ini.
 - Kalau dokumen bertentangan dan tidak jelas mana yang benar: **berhenti dan tanya**. Jangan pilih sendiri lalu jalan.
+- **Khusus PRD vs kode yang berjalan: tidak ada yang otomatis menang** (keputusan pemilik 2026-10-24). Perbedaan dicatat dan diputuskan pemilik kasus per kasus: kode menyimpang dari maksud pemilik → kode diperbaiki; PRD tertinggal keputusan yang lebih baru → PRD diperbarui. Pengecualian: **§19 PRD selalu menang**.
 
 ---
 
@@ -222,7 +223,7 @@ main → branch fokus → commit terstruktur → PR → CI → review/perbaikan 
 
 Sebuah pekerjaan selesai kalau:
 
-1. Perilakunya sesuai `docs/PRD.md` (dan `docs/ADMIN-PANEL.md` bila menyentuh panel).
+1. Perilakunya sesuai `docs/PRD.md` (dan `docs/ADMIN-PANEL.md` bila menyentuh panel) — kecuali perbedaan yang sudah diputuskan pemilik untuk kasus itu (lihat §1).
 2. Ada test yang membuktikan perilakunya, **termasuk kasus gagal**.
 3. Tidak melanggar satu pun aturan di §5.
 4. Sudah dilihat di layar HP dan desktop (untuk pekerjaan tampilan).

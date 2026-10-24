@@ -2,20 +2,28 @@
 
 Catatan apa yang **sudah jalan** dan apa yang **belum**. Aturan produk ada di [`PRD.md`](PRD.md), spesifikasi panel ada di [`ADMIN-PANEL.md`](ADMIN-PANEL.md).
 
-**Terakhir diperbarui:** 23 Oktober 2026
-**Keadaan situs:** ada di alamat publik `lfamiliastore.my.id`, **belum beroperasi produksi**. Belum ada pelanggan nyata, belum ada transaksi nyata.
+**Terakhir diperbarui:** 24 Oktober 2026
+**Keadaan situs:** ada di alamat publik `lfamiliastore.my.id`. **Produksi menjalankan PR #295** (panel admin hasil desain ulang sudah termasuk). Toko **belum grand opening**: belum ada pelanggan nyata, belum ada transaksi nyata. Digiflazz masih mode test dan Midtrans masih sandbox sampai pemilik memerintahkan sebaliknya.
 
 ---
 
-## Sedang dikerjakan
+## Di `main`, belum deploy
 
-| Pekerjaan | Status |
+| Isi | Keterangan |
 |---|---|
-| Panel admin baru (21 menu + 2 halaman detail, tema terang) | selesai di branch lokal `admin-panel-redesign`, belum digabung, belum deploy |
-| Pembuangan lapisan tampilan admin lama | selesai (7 komponen, 1 berkas bantu, 338 aturan CSS) |
-| Isolasi database tes | selesai — lokal `lfamilia_admin_redesign_test`, CI tetap `lfamilia_ci` |
-| Spesifikasi panel (`docs/ADMIN-PANEL.md`) | selesai, disusun ulang dari route/controller/props |
-| Penggabungan ke branch rilis `admin-panel-v2` | belum dimulai |
+| PR #297 — isi panel admin | merge 2026-10-24 (66bfb15a) |
+| PR #302 — katalog tiga harga + sinkronisasi otomatis | merge 2026-10-24 |
+| PR #303 — perbaikan tes browser harga impor | merge 2026-10-24 |
+| `main` terakhir | e00b5458 — deploy adalah perintah terpisah dari pemilik, belum diberikan |
+
+## Antrean perubahan kode (keputusan pemilik 2026-10-24)
+
+1. Batas harga kirim Digiflazz: persis modal toko tertinggi (buang tambahan +1%).
+2. Jadwal sinkronisasi Digiflazz: 5 menit → 15 menit.
+3. Login ketat: belum verifikasi email = tidak bisa login; selesai daftar tidak otomatis masuk.
+4. Status BLOCKED tidak tampil ke pelanggan (dipetakan ke "Gagal").
+5. Buang blok rekonsiliasi refund top up + route-nya (method peninjauan internal `resolveTopupRefundReview` TIDAK ikut dibuang).
+6. Nama nominal hasil impor: buang nama game untuk semua produk + bersihkan nama nominal yang sudah ada.
 
 ---
 
@@ -24,9 +32,10 @@ Catatan apa yang **sudah jalan** dan apa yang **belum**. Aturan produk ada di [`
 Bagian ini menyatakan **kode tersedia**, bukan "sudah dipakai pelanggan".
 
 **Katalog & produk**
-- Kategori → produk → nominal → sumber penyedia
-- Harga dari modal + margin, tersimpan di database, snapshot per pesanan
-- Impor & sinkron katalog Digiflazz (manual dan terjadwal tiap 5 menit)
+- Kategori → produk → nominal → sumber penyedia (satu SKU terpilih per nominal)
+- Harga sistem tiga harga: harga seller → modal toko → harga jual (margin di tingkat nominal); snapshot per pesanan
+- Impor & sinkron katalog Digiflazz (manual dan terjadwal; interval berjalan 5 menit, keputusan pemilik 2026-10-24: menjadi 15 menit — antrean kode nomor 2)
+- Sinkronisasi otomatis menonaktifkan nominal tanpa sumber aktif
 - Media produk (gambar, ikon)
 
 **Checkout & pembayaran**
@@ -36,37 +45,35 @@ Bagian ini menyatakan **kode tersedia**, bukan "sudah dipakai pelanggan".
 - Midtrans Snap: pembuatan pembayaran, webhook `sha512` terverifikasi
 - QRIS manual: konfirmasi oleh admin
 - Saldo LFAMILIA: ledger, top up, bayar pesanan (fitur aktif, **belum pernah dipakai pelanggan**)
-- DOKU: kode ada, **tidak aktif**
+- DOKU: kode ada, **tidak aktif** (cadangan; pengaktifan manual oleh admin atas keputusan pemilik)
 
 **Pengiriman**
 - Digiflazz: `ref_id` unik, `sign` md5, cek ulang otomatis 3× jeda 2 menit, webhook `sha1`
 - Antrean manual + jam operasional produk manual
-- Failover otomatis dimatikan; gagal terkonfirmasi → pesanan `BLOCKED`
+- Failover otomatis dimatikan; gagal terkonfirmasi → pesanan `BLOCKED` (status internal; di sisi pelanggan tampil sebagai "Gagal")
 - Peringatan saldo penyedia (ambang 5 transaksi)
 
 **Pelanggan**
 - Guest: belanja, lacak pesanan dengan kode akses, tiket bantuan
-- Member: profil, nomor telepon, riwayat, saldo, tiket, akun game tersimpan, notifikasi
-- Tingkatan member 6 (BASIC…MAFIA), naik dari total belanja
+- Member: profil, nomor WhatsApp, riwayat, saldo, tiket, akun game tersimpan, notifikasi
+- Ulasan pembeli: terbit langsung, admin dapat menghapus permanen
+- Tingkatan member 6 (BASIC…MAFIA), naik dari total belanja; diskon per tingkat diatur admin
 - Leaderboard anonim (opt-in)
-- Login email + Google
+- Login email (verifikasi link) + Google
 
 **Konten & komunikasi**
 - Banner, pop-up, berita, FAQ, halaman hukum (`/terms`, `/privacy`, `/refund`)
 - Alat bantu: win rate, zodiac, magic wheel
-- Notifikasi: email (Resend), Telegram, Discord, dalam panel
+- Notifikasi: email (Resend), Telegram, Discord, dalam panel — notifikasi admin berjalan di Telegram **dan** Discord (routing per jenis kejadian)
 - Tiket bantuan + balasan cepat
 
 **Panel admin**
-- **21 menu + 2 halaman detail** (23 halaman) dengan tema terang, sidebar hitam, aksen hijau
-- 141 route admin, 27 controller, 14 izin, dua peran (Super Admin dan Admin)
-- Semua penyuntingan lewat pop-up tengah; detail tiket tampil sebagai panel di halaman
+- Panel hasil desain ulang (PR #295) **sudah produksi**; tema terang, dua peran (Super Admin dan Admin) dengan izin granular
 - Audit log, kesehatan sistem, laporan + ekspor CSV, notifikasi panel
-- Halaman masuk (masuk, lupa sandi, atur ulang, konfirmasi sandi) sudah memakai tema terang yang sama; sisa gaya lama `lf-admin-*` sudah nol
+- Hitungan menu final panel diselesaikan pada audit `ADMIN-PANEL.md` (ditunda sampai pekerjaan panel dimulai — keputusan pemilik 2026-10-24)
 
 **Pengujian**
-- Suite penuh: 530 tes, 5.296 asersi, 2 dilewati, 0 gagal
-- Penjaga panel (Node): 46 tes lulus
+- Suite penuh berjalan di CI dengan MySQL 8 + Redis asli; PR tidak digabung bila pemeriksaan wajib CI gagal
 - Database tes terpisah dari database pengembangan; CI memakai database sendiri
 
 ---
@@ -78,11 +85,10 @@ Bagian ini menyatakan **kode tersedia**, bukan "sudah dipakai pelanggan".
 | Pelanggan nyata | belum ada |
 | Transaksi nyata | belum ada |
 | Top up saldo oleh pelanggan | belum pernah |
-| Discord webhook untuk notifikasi admin | belum diisi |
-| DOKU | belum dipasang |
-| Deploy panel baru ke server | belum — masih branch lokal |
+| DOKU | belum dipasang (cadangan) |
+| Deploy isi `main` terbaru ke produksi | belum — menunggu perintah pemilik |
 | Sebagian aksi backend tanpa tombol di panel | 9 endpoint (lihat `ADMIN-PANEL.md` §10) |
-| Blok rekonsiliasi refund top up di Pembayaran | disembunyikan dari panel; route server masih ada |
+| Blok rekonsiliasi refund top up di Pembayaran | disembunyikan dari panel; route masih ada — **diputuskan dibuang** (antrean kode nomor 5) |
 
 ---
 
@@ -91,4 +97,4 @@ Bagian ini menyatakan **kode tersedia**, bukan "sudah dipakai pelanggan".
 - **Data di lingkungan lokal adalah data uji**, bukan data produksi.
 - **Refund tidak otomatis.** Member lewat penyesuaian saldo (Super Admin), guest lewat transfer manual.
 - Semua status di atas berarti "kode tersedia", bukan "sudah terbukti dipakai orang".
-- Perubahan panel belum di-push dan belum di-PR; penggabungan butuh persetujuan pemilik.
+- Keputusan produk terakhir: PRD §23 (penyelarasan Buku Keputusan pemilik, 2026-10-24).
