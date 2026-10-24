@@ -67,7 +67,6 @@ const openEdit = row => {
     editor.value = {
         id: row.id, name: row.name, email: row.email, role: row.role,
         is_active: row.is_active, password: '', permissions,
-        original: { role: row.role, is_active: row.is_active, permissions: [...permissions] },
     };
     errors.value = {};
 };
@@ -82,7 +81,7 @@ const sensitiveReason = () => {
     const target = editor.value;
     if (!target.id) return 'Membuat akun admin baru memerlukan konfirmasi kata sandi.';
     if (target.role !== 'SUPER_ADMIN' && !target.is_active) return 'Menonaktifkan akun admin memerlukan konfirmasi kata sandi.';
-    return 'Perubahan peran atau hak akses memerlukan konfirmasi kata sandi.';
+    return 'Menyimpan perubahan akun admin memerlukan konfirmasi kata sandi.';
 };
 const submit = () => {
     const target = editor.value;

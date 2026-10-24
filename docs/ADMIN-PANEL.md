@@ -380,12 +380,12 @@ Semua aksi di atas masuk audit log.
 ## 10. Batas yang diketahui
 
 1. **Dibuang karena tidak ada di rancangan panel:** margin global (`catalog/margin` + pratinjau), batas harga atas (`max-prices/*`, `digiflazz/baseline/{id}`), kunci harga massal (`lock-prices`), dan `orders/{id}/check-process` (digantikan tombol "Periksa status" di Antrean Manual). Pagar modal+1% tetap berjalan otomatis di server; yang dibuang hanya layar pengaturannya.
-2. **Aksi backend yang belum punya tombol:** `mappings/{id}` + `mappings/{id}/sync`, `packages/{id}/sources/digiflazz` (kelola sumber harga per nominal).
+2. **Kelola sumber per nominal ada di tab Sumber** editor produk: daftar mapping, aktif/nonaktif, prioritas, dan sinkron per mapping/produk memakai route `mappings/{id}`, `mappings/{id}/sync`, dan `products/{id}/sync`. Yang belum punya tombol: `packages/{id}/sources/digiflazz`.
 3. **Impor Digiflazz punya layar, tapi hanya dari tautan.** Menu Digiflazz → "Impor ke produk" membuka `/admin/catalog?import=digiflazz` dan pop-up impor langsung terbuka; tombol "Impor dari Digiflazz" juga ada di kepala halaman Produk. Yang belum: memilih SKU dari halaman detail Digiflazz satu per satu (`?import_sku=`).
 4. **Blok rekonsiliasi refund top up disembunyikan** dari Pembayaran (23 Okt 2026). Tombolnya tidak lagi dikirim ke peramban, tetapi `POST /admin/payments/refund-reviews/{topupId}/resolve` masih ada di server sebagai jalur pemeliharaan; pesanan dengan top up berstatus `REFUND_REVIEW` tetap ditahan mesin pembayaran sampai rekonsiliasi manual lewat basis data.
 5. **DOKU** belum dipakai; tampil sebagai belum aktif.
 6. **Data lokal adalah data uji** — angka di layar lokal bukan angka produksi.
-7. **Konfirmasi kata sandi di Admin & Akses masih penjaga klien.** Kata sandi diperiksa server lewat `/admin/password/confirm`, tetapi route `admin/access` belum memakai middleware `RequireAdminPasswordConfirm`; permintaan langsung tanpa lewat panel tidak akan ditanya sandi. Perlu ditambahkan bila ingin setara dengan penyesuaian saldo.
+7. **Konfirmasi kata sandi di Admin & Akses ditegakkan server.** Route `POST/PUT/DELETE admin/access` memakai middleware `RequireAdminPasswordConfirm`, jadi permintaan langsung tanpa konfirmasi dialihkan ke `/admin/password/confirm` dan data tidak berubah. Panel menanyakan sandi setiap kali akun admin disimpan.
 
 ---
 

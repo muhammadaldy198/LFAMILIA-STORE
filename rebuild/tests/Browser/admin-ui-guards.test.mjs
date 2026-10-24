@@ -366,6 +366,15 @@ test('editing a nominal keeps stored pricing and nominal_value', async () => {
     assert.doesNotMatch(catalog, /nominal_value: null,\s*\n\s*pricing_mode:/);
 });
 
+// CR-02: margin impor dibaca dari setting harga yang aktif, bukan prop warisan.
+// Penjagaan di server saja tidak cukup: form yang masih mengirim 35 akan lolos.
+test('import margin reads the active pricing setting', () => {
+    const catalog = read('Catalog.vue');
+    assert.match(catalog, /importMargin = ref\(Number\(props\.pricingSettings\?\.sell_markup_percent/);
+    assert.match(catalog, /importMargin\.value = Number\(importProduct\.value\?\.sell_markup_percent \?\? props\.pricingSettings\?\.sell_markup_percent/);
+    assert.doesNotMatch(catalog, /defaultMargin|props\.pricingSettings\?\.default_margin/);
+});
+
 // CR-03: membuat akun admin baru (termasuk Super Admin) juga menanyakan kata
 // sandi di UI, bukan hanya perubahan peran/izin.
 test('creating an admin account asks for password confirmation', () => {

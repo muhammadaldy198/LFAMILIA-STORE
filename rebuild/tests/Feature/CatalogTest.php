@@ -1188,16 +1188,23 @@ class CatalogTest extends TestCase
                 ->missing('productPage.first_page_url')
                 ->missing('productPage.links'));
 
-        // Urutan nama menurun tetap berlaku dan ikut ke halaman berikutnya.
+        // Urutan: sort_order sengaja dibalik dari urutan nama, jadi tes ini
+        // gagal bila sort=name diabaikan.
+        Product::where('slug', 'a07-produk-1')->update(['sort_order' => 30]);
+        Product::where('slug', 'a07-produk-3')->update(['sort_order' => 1]);
         $this->get('/admin/catalog?per_page=10&sort=name&q=A07+Produk')
             ->assertInertia(fn (Assert $page) => $page
                 ->where('products', fn ($rows): bool => collect($rows)->pluck('name')->all() === ['A07 Produk 1', 'A07 Produk 2', 'A07 Produk 3']));
+        $this->get('/admin/catalog?per_page=10&sort=order&q=A07+Produk')
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('products', fn ($rows): bool => collect($rows)->pluck('name')->all() === ['A07 Produk 3', 'A07 Produk 2', 'A07 Produk 1']));
 
         // Halaman 2 kosong tapi metadata tetap benar (tidak ada data mentah).
         $this->get('/admin/catalog?per_page=10&page=2&q=A07+Produk')
             ->assertInertia(fn (Assert $page) => $page
                 ->where('productPage.current_page', 2)
                 ->where('productPage.total', 3)
+                ->where('products', [])
                 ->missing('productPage.data'));
     }
 
