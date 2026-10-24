@@ -1220,12 +1220,13 @@ class AdminDigiflazzRestorationTest extends TestCase
             ->missing('defaultMargin'));
 
         // Impor sungguhan (bukan grep sumber): SKU tersedia, produk tanpa
-        // override, margin yang dikirim form = setting aktif (12), bukan 35.
+        // override. Klien sengaja mengirim 35 — server wajib memakai setting
+        // aktif (12), bukan angka kiriman peramban.
         $this->fakeCatalog([$this->row(['buyer_sku_code' => 'cr02-sku', 'product_name' => 'CR02 10', 'price' => 10000])]);
         $this->post('/admin/digiflazz/sync')->assertRedirect()->assertSessionHasNoErrors();
         $item = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'cr02-sku')->first();
         $this->post('/admin/catalog/products/'.$product->id.'/import', [
-            'item_ids' => [$item->id], 'margin_percent' => 12,
+            'item_ids' => [$item->id], 'margin_percent' => 35,
         ])->assertRedirect()->assertSessionHasNoErrors();
 
         $package = $product->packages()->firstOrFail();
@@ -1233,8 +1234,8 @@ class AdminDigiflazzRestorationTest extends TestCase
         // Modal toko = seller + uplift 2%; batas harga = modal, bukan markup 35%.
         $this->assertSame(10200, (int) $mapping->store_cost_idr);
         $this->assertSame(10200, (int) $mapping->max_price_idr);
+        // Margin tersimpan = setting aktif, bukan 35 yang dikirim klien.
         $this->assertSame(12, (int) round((float) $product->fresh()->sell_markup_percent));
-        $this->assertNotSame(35, (int) round((float) $product->fresh()->sell_markup_percent));
     }
 
     public function test_sync_failure_creates_only_one_admin_alert_per_hour(): void

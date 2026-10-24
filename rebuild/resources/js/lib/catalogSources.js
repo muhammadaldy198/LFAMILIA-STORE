@@ -5,11 +5,11 @@
 export const mappingIsLocked = mapping => Boolean(mapping?.is_manual_price);
 
 export const mappingStatusLabel = mapping => {
+    if (!mapping?.is_active) return mapping?.disabled_by_sync ? 'Nonaktif (sinkron)' : 'Nonaktif';
     if (mapping?.provider_code === 'VOUCHER_STOCK') {
         const counts = mapping.stock_counts || {};
         return `${Number(counts.available || 0)} kode siap`;
     }
-    if (!mapping?.is_active) return mapping?.disabled_by_sync ? 'Nonaktif (sinkron)' : 'Nonaktif';
     return 'Aktif';
 };
 

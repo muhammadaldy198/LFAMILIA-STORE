@@ -9,7 +9,7 @@ import { canSyncMapping, mappingPayload, mappingStatusLabel, sortMappings } from
 
 const props = defineProps({
     products: { type: Array, default: () => [] },
-    productPage: { type: Object, default: () => ({ data: [], total: 0, current_page: 1, last_page: 1 }) },
+    productPage: { type: Object, default: () => ({ total: 0, current_page: 1, last_page: 1, per_page: 25 }) },
     productFilters: { type: Object, default: () => ({}) },
     categories: { type: Array, default: () => [] },
     nicknameGameCodes: { type: Array, default: () => [] },
@@ -130,13 +130,6 @@ const syncMapping = mapping => {
         preserveScroll: true, onFinish: () => { saveBusy.value = ''; },
     });
 };
-const syncProductSources = () => {
-    saveBusy.value = 'sync-product';
-    router.post(`/admin/catalog/products/${product.value.id}/sync`, {}, {
-        preserveScroll: true, onFinish: () => { saveBusy.value = ''; },
-    });
-};
-const hasSyncableSource = computed(() => sourceRows.value.some(row => row.mappings.some(canSyncMapping)));
 
 const info = reactive({
     name: '', slug: '', publisher: '', category_id: '', fulfillment_mode: 'AUTO_PROVIDER',
@@ -797,11 +790,9 @@ onMounted(() => {
 
             <div v-if="editTab === 'sources'" style="padding-top:12px">
                 <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:8px">
-                    <p class="adm-note">Sumber pemenuhan per nominal. Prioritas kecil dipakai lebih dulu. Sinkron hanya untuk sumber Digiflazz.</p>
-                    <button type="button" class="adm-btn sm" :disabled="!hasSyncableSource || saveBusy === 'sync-product'" @click="syncProductSources">
-                        {{ saveBusy === 'sync-product' ? 'Menyinkronkan…' : 'Sinkron produk' }}
-                    </button>
+                    <p class="adm-note">Sumber pemenuhan per nominal. Prioritas kecil dipakai lebih dulu. Tombol Sinkron memperbarui satu SKU Digiflazz; sinkron seluruh katalog ada di menu Digiflazz.</p>
                 </div>
+                <p v-for="(message, key) in editErrors" :key="'src-'+key" class="err">{{ message }}</p>
                 <div class="adm-scroll">
                     <table class="adm-table">
                         <thead><tr><th>Nominal</th><th>Sumber</th><th class="num">Modal</th><th class="num">Prioritas</th><th>Status</th><th>Aksi</th></tr></thead>

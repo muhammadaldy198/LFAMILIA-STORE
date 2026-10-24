@@ -10,6 +10,7 @@ use App\Services\AdminAuditService;
 use App\Services\AdminDigiflazzMonitorService;
 use App\Services\AdminPermissionService;
 use App\Services\CatalogNominalOrder;
+use App\Services\CatalogPricingSettings;
 use App\Services\DigiflazzAutoSources;
 use App\Services\DigiflazzCatalogImport;
 use App\Services\DigiflazzCatalogService;
@@ -386,8 +387,8 @@ class AdminDigiflazzController
         $data = $request->validate([
             'item_ids' => ['required', 'array', 'min:1', 'max:2000'],
             'item_ids.*' => ['required', 'integer', 'distinct', 'exists:digiflazz_catalog_items,id'],
-            // Kept for old admin forms, but fixed Digiflazz import no longer needs this field.
-            'margin_percent' => ['sometimes', 'numeric', 'min:0', 'max:1000'],
+            // margin_percent dari klien sengaja TIDAK divalidasi/dipakai: margin
+            // impor selalu dari setting harga aktif, bukan angka kiriman peramban.
             'publish' => ['sometimes', 'boolean'],
             'auto_sources' => ['prohibited'],
         ]);
@@ -418,7 +419,7 @@ class AdminDigiflazzController
             }
             $sources = app(DigiflazzAutoSources::class);
             foreach ($selected as $item) {
-                $sources->importGroup($product, collect([$item]), $template, $publish, (string) ($data['margin_percent'] ?? $product->margin_percent), false, $request);
+                $sources->importGroup($product, collect([$item]), $template, $publish, app(CatalogPricingSettings::class)->sellMarkupPercent(), false, $request);
             }
             $sources->orderProduct($product);
             if ($publish && ! $product->is_active) {

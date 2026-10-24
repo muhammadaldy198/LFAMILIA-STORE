@@ -136,7 +136,7 @@ try {
                 await click('Impor dari Digiflazz'); await inspectDialog(width + '-catalog-import'); await escape();
                 await evaluate(`(() => { const b = [...document.querySelectorAll('tbody tr button')].find(b => b.getBoundingClientRect().height > 0); b?.click(); })()`);
                 await pause(600);
-                for (const tab of ['Informasi', 'Nominal & Harga', 'Tampilan Produk', 'Data Pelanggan']) {
+                for (const tab of ['Informasi', 'Nominal & Harga', 'Sumber', 'Tampilan Produk', 'Data Pelanggan']) {
                     await click(tab); await inspectDialog(width + '-product-' + tab);
                 }
                 await escape();

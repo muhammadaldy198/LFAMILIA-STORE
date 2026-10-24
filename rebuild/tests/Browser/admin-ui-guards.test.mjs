@@ -418,7 +418,9 @@ test('catalog source tab uses existing mapping and sync routes', () => {
     assert.match(catalog, /Sumber<\/button>/);
     assert.match(catalog, /\/admin\/catalog\/mappings\/\$\{mapping\.id\}/);
     assert.match(catalog, /\/admin\/catalog\/mappings\/\$\{mapping\.id\}\/sync/);
-    assert.match(catalog, /\/admin\/catalog\/products\/\$\{product\.value\.id\}\/sync/);
+    // Sinkron seluruh katalog milik menu Digiflazz, bukan tombol per produk:
+    // route products/{id}/sync tetap ada di server, tapi panel tidak memakainya.
+    assert.doesNotMatch(catalog, /products\/\$\{product\.value\.id\}\/sync/);
     // Daftar, prioritas, status, dan sinkron ada di panel.
     assert.match(catalog, /movePriority\(mapping, -1\)/);
     assert.match(catalog, /toggleMapping\(mapping\)/);
@@ -445,6 +447,8 @@ test('catalog source payload keeps stored cost and manual price lock', () => {
     assert.deepEqual(Object.keys(mappingPayload(plain, { priority: 0 })).sort(), ['is_active', 'priority']);
 
     assert.deepEqual(sortMappings([{ id: 1, priority: 5, is_active: false }, { id: 2, priority: 9, is_active: true }]).map(m => m.id), [2, 1]);
-    assert.equal(mappingStatusLabel({ provider_code: 'VOUCHER_STOCK', stock_counts: { available: 3 } }), '3 kode siap');
+    assert.equal(mappingStatusLabel({ provider_code: 'VOUCHER_STOCK', is_active: true, stock_counts: { available: 3 } }), '3 kode siap');
+    // Mapping nonaktif harus terbaca nonaktif, bukan "3 kode siap".
+    assert.equal(mappingStatusLabel({ provider_code: 'VOUCHER_STOCK', is_active: false, stock_counts: { available: 3 } }), 'Nonaktif');
     assert.equal(mappingStatusLabel({ is_active: false, disabled_by_sync: true }), 'Nonaktif (sinkron)');
 });
