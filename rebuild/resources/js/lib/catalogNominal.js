@@ -30,8 +30,8 @@ const storedPricing = (row, form) => {
     const storedUiMode = nominalMode(row);
     if (form.price_mode !== storedUiMode) {
         return form.price_mode === 'FIXED'
-            ? { pricing_mode: 'SELL_PRICE', sell_price_idr: value }
-            : { pricing_mode: 'PERCENT', margin_percent: value };
+            ? { pricing_mode: 'SELL_PRICE', sell_price_idr: value, margin_percent: null, margin_fixed_idr: null }
+            : { pricing_mode: 'PERCENT', margin_percent: value, sell_price_idr: null, margin_fixed_idr: null };
     }
     switch (row.pricing_mode) {
         case 'SELL_PRICE': return { pricing_mode: 'SELL_PRICE', sell_price_idr: value };
