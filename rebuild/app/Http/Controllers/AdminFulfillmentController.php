@@ -6,6 +6,7 @@ use App\Jobs\ReconcileFulfillmentJob;
 use App\Services\AdminAuditService;
 use App\Services\AdminOrderPresentation;
 use App\Services\FulfillmentService;
+use App\Services\OperationalSettings;
 use App\Support\ServiceHours;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -173,7 +174,7 @@ class AdminFulfillmentController
                 'delivery' => $delivery,
                 'manual_age_minutes' => $manualAge,
                 'is_overdue' => $attempt->status === 'MANUAL_PENDING'
-                    && $manualAge > app(\App\Services\OperationalSettings::class)->value('manual_overdue_minutes'),
+                    && $manualAge > app(OperationalSettings::class)->value('manual_overdue_minutes'),
                 'can_complete' => ! $terminal && $attempt->status === 'MANUAL_PENDING'
                     && in_array($attempt->order_status, ['PAID', 'PROCESSING'], true),
                 'can_fail' => ! $terminal && $attempt->status === 'MANUAL_PENDING',

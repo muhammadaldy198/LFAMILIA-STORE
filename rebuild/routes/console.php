@@ -10,6 +10,7 @@ use App\Services\AdminNotificationService;
 use App\Services\CustomerCleanupService;
 use App\Services\DigiflazzCatalogService;
 use App\Services\ExternalNotificationService;
+use App\Services\OperationalSettings;
 use App\Services\PaymentStateService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
@@ -154,7 +155,7 @@ Schedule::call(function (): void {
 
 Schedule::call(function (): void {
     $notifications = app(AdminNotificationService::class);
-    $staleMinutes = app(\App\Services\OperationalSettings::class)->value('stale_fulfillment_minutes');
+    $staleMinutes = app(OperationalSettings::class)->value('stale_fulfillment_minutes');
 
     DB::table('fulfillment_attempts')
         ->whereIn('status', ['PENDING', 'UNKNOWN', 'SENDING'])
@@ -251,7 +252,7 @@ Artisan::command('lfamilia:sync-digiflazz-catalog', function (DigiflazzCatalogSe
 })->purpose('Refresh supplier costs and availability while preserving customer margin settings');
 
 Artisan::command('lfamilia:purge-guest-data', function (): int {
-    $days = app(\App\Services\OperationalSettings::class)->value('guest_pii_days');
+    $days = app(OperationalSettings::class)->value('guest_pii_days');
     $cutoff = now()->subDays($days);
 
     $purged = 0;

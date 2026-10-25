@@ -3,12 +3,13 @@
 namespace App\Jobs;
 
 use App\Models\IntegrationCredential;
-use App\Services\StorefrontContentService;
 use App\Services\EditableMessageTemplateService;
+use App\Services\StorefrontContentService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
+use Throwable;
 
 class SendTransactionalEmailJob implements ShouldQueue
 {
@@ -58,7 +59,7 @@ class SendTransactionalEmailJob implements ShouldQueue
         try {
             $identity = app(StorefrontContentService::class)->settings();
             $siteUrl = (string) config('app.url', 'https://lfamiliastore.my.id');
-        } catch (\Throwable) {
+        } catch (Throwable) {
             // Plain PHPUnit tests and maintenance pages may have no Laravel DB.
             $identity = [];
             $siteUrl = 'https://lfamiliastore.my.id';

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Actions\Fortify\CreateNewUser;
 use App\Jobs\SendTransactionalEmailJob;
+use App\Services\StorefrontContentService;
 use Illuminate\Auth\MustVerifyEmail;
 use Illuminate\Contracts\Auth\MustVerifyEmail as MustVerifyEmailContract;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -76,7 +77,7 @@ class User extends Authenticatable implements MustVerifyEmailContract
                 '',
                 'Jika kamu tidak meminta ini, abaikan email ini dan jangan bagikan tautan kepada siapa pun.',
                 '',
-                'Butuh bantuan? Hubungi CS: '.(app(\App\Services\StorefrontContentService::class)->settings()['store.email'] ?: 'support@lfamiliastore.my.id'),
+                'Butuh bantuan? Hubungi CS: '.((app(StorefrontContentService::class)->settings()['store.email'] ?? '') ?: 'support@lfamiliastore.my.id'),
             ]),
             'password_reset'
         )->afterCommit();

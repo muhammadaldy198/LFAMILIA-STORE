@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\SendTransactionalEmailJob;
 use App\Services\AdminAuditService;
 use App\Services\EditableMessageTemplateService;
-use App\Jobs\SendTransactionalEmailJob;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -97,7 +97,7 @@ class AdminMessageTemplatesController
         SendTransactionalEmailJob::dispatch(
             $admin->email,
             'Tes template email LFAMILIA STORE',
-            "Ini email uji dari panel admin. Tidak berisi data pesanan atau tautan sensitif.",
+            'Ini email uji dari panel admin. Tidak berisi data pesanan atau tautan sensitif.',
             'generic'
         )->afterCommit();
 

@@ -266,7 +266,7 @@ class TransactionalEmailService
             '',
             'Pembayaranmu sudah kami terima sebelumnya, jadi jangan membuat order baru dulu. Untuk tindak lanjut soal pembayaranmu, hubungi CS kami dan sebutkan nomor invoice '.$details['invoice'].' — tim kami akan membantu menyelesaikannya. Sertakan bukti bayar saat menghubungi CS.',
             '',
-             $this->csLine(),
+            $this->csLine(),
             (string) (app(StorefrontContentService::class)->settings()['store.business_hours'] ?? 'Setiap hari 08.00–23.00 WIB'),
         ];
 
@@ -445,9 +445,9 @@ class TransactionalEmailService
 
     private function csLine(): string
     {
-        return 'Butuh bantuan? Hubungi CS: '.
-            ((app(StorefrontContentService::class)->settings()['store.email'] ?? '') ?: 'support@lfamiliastore.my.id').
-            ' / '.$this->contactUrl();
+        $supportEmail = (string) ((app(StorefrontContentService::class)->settings()['store.email'] ?? '') ?: 'support@lfamiliastore.my.id');
+
+        return 'Butuh bantuan? Hubungi CS: '.$supportEmail.' / '.$this->contactUrl();
     }
 
     private function rupiah(int $amount): string
