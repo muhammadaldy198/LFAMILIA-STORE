@@ -60,12 +60,19 @@ class DigiflazzCatalogImport
         }
 
         return DB::transaction(function () use ($package, $buyerSkuCode, $costIdr, $costUplift): ProviderMapping {
+            // Serialize importer/attach operations on this nominal. A second
+            // Digiflazz mapping must never be created by an alternate caller.
+            ProductPackage::whereKey($package->id)->lockForUpdate()->firstOrFail();
             $provider = Provider::where('code', 'DIGIFLAZZ')->firstOrFail();
             $mapping = ProviderMapping::where('provider_id', $provider->id)
                 ->where('external_sku', $buyerSkuCode)->lockForUpdate()->first();
 
             if ($mapping && $mapping->product_package_id !== $package->id) {
                 throw new InvalidArgumentException('SKU sudah digunakan oleh nominal lain.');
+            }
+            if (! $mapping && ProviderMapping::where('product_package_id', $package->id)
+                ->where('provider_id', $provider->id)->exists()) {
+                throw new InvalidArgumentException('Nominal Digiflazz hanya boleh memiliki satu SKU. Lepas mapping lama terlebih dahulu.');
             }
 
             if (! $mapping) {

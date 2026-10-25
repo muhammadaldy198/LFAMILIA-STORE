@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\AdminUser;
+use InvalidArgumentException;
 use App\Models\Category;
 use App\Models\IntegrationCredential;
 use App\Models\Product;
@@ -16,6 +17,7 @@ use App\Services\DigiflazzAutoSources;
 use App\Services\DigiflazzCatalogImport;
 use App\Services\DigiflazzCatalogService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Http\Request;
 use Illuminate\Http\Client\Factory;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -241,11 +243,25 @@ class AdminDigiflazzRestorationTest extends TestCase
         try {
             app(DigiflazzAutoSources::class)->importGroup(
                 $catalog['product'], $items, null, false, '10', false,
-                \Illuminate\Http\Request::create('/admin/catalog/import', 'POST')
+                Request::create('/admin/catalog/import', 'POST')
             );
             $this->fail('Importer accepted two Digiflazz SKUs for one nominal.');
         } catch (ValidationException $error) {
             $this->assertArrayHasKey('item_ids', $error->errors());
+        }
+        $this->assertSame(1, $catalog['package']->mappings()->count());
+    }
+
+    public function test_direct_catalog_upsert_cannot_attach_a_second_sku_to_existing_nominal(): void
+    {
+        $catalog = $this->mappedItem('upsert-one-selected');
+        try {
+            app(DigiflazzCatalogImport::class)->upsert(
+                $catalog['package'], 'upsert-attempted-secondary', 12000, 12000
+            );
+            $this->fail('Direct catalog upsert created a backup Digiflazz mapping.');
+        } catch (InvalidArgumentException $error) {
+            $this->assertStringContainsString('satu SKU', $error->getMessage());
         }
         $this->assertSame(1, $catalog['package']->mappings()->count());
     }
