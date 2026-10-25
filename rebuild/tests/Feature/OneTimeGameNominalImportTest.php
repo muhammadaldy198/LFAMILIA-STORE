@@ -46,6 +46,10 @@ class OneTimeGameNominalImportTest extends TestCase
             'product_name' => '5 Diamond',
             'brand' => $product->name,
             'type' => 'Umum', 'price_idr' => 900,
+            'buyer_active' => true, 'seller_active' => true,
+            'unlimited_stock' => true, 'stock' => 0,
+            'start_cut_off' => '00:00', 'end_cut_off' => '00:00',
+            'synced_at' => now(),
         ];
         // The importer should be idempotent even if old inactive rows remain.
         app(\App\Services\DigiflazzAutoSources::class)->importGroup(

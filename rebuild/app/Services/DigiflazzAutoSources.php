@@ -40,14 +40,26 @@ class DigiflazzAutoSources
             ]);
         }
         $provider = Provider::where('code', 'DIGIFLAZZ')->firstOrFail();
-        $existing = ProviderMapping::where('provider_id', $provider->id)
-            ->whereIn('external_sku', $items->pluck('buyer_sku_code'))->lockForUpdate()->get();
-        $existingBySku = $existing->keyBy('external_sku');
-        $packageIds = $existing->pluck('product_package_id')->unique();
-        if ($packageIds->count() > 1) {
+        // Resolve the package without taking a mapping lock. Both sync and
+        // catalog importer lock the PACKAGE before the MAPPING; reversing
+        // that order here can deadlock a historical import during sync.
+        $mappingQuery = ProviderMapping::where('provider_id', $provider->id)
+            ->whereIn('external_sku', $items->pluck('buyer_sku_code'));
+        $initialPackageIds = (clone $mappingQuery)->pluck('product_package_id')->unique();
+        if ($initialPackageIds->count() > 1) {
             throw ValidationException::withMessages(['item_ids' => 'Sumber nominal yang sama sudah terpisah di beberapa nominal. Tidak ada sumber yang dipindahkan.']);
         }
-        $package = $packageIds->isNotEmpty() ? ProductPackage::whereKey($packageIds->first())->lockForUpdate()->firstOrFail() : null;
+        $package = $initialPackageIds->isNotEmpty()
+            ? ProductPackage::whereKey($initialPackageIds->first())->lockForUpdate()->firstOrFail()
+            : null;
+        $existing = (clone $mappingQuery)->lockForUpdate()->get();
+        $existingBySku = $existing->keyBy('external_sku');
+        $packageIds = $existing->pluck('product_package_id')->unique();
+        if ($packageIds->count() > 1
+            || ($package !== null && $packageIds->isNotEmpty()
+                && (int) $packageIds->first() !== (int) $package->id)) {
+            throw ValidationException::withMessages(['item_ids' => 'Mapping berubah saat impor. Coba ulangi setelah sinkronisasi selesai.']);
+        }
         if ($package && (int) $package->product_id !== (int) $product->id) {
             throw ValidationException::withMessages(['item_ids' => 'SKU sudah dipakai produk lain. Tidak ada sumber yang dipindahkan.']);
         }
