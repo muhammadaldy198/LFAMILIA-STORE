@@ -14,6 +14,7 @@ use App\Http\Controllers\AdminHealthController;
 use App\Http\Controllers\AdminIntegrationController;
 use App\Http\Controllers\AdminNicknameController;
 use App\Http\Controllers\AdminNotificationController;
+use App\Http\Controllers\AdminMessageTemplatesController;
 use App\Http\Controllers\AdminOrderCancellationController;
 use App\Http\Controllers\AdminOrderDetailController;
 use App\Http\Controllers\AdminOrdersController;
@@ -436,6 +437,11 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
 
     Route::middleware('admin.permission:settings.manage')->group(function (): void {
         Route::get('/admin/settings', [AdminSettingsController::class, 'index'])->name('admin.settings');
+        Route::get('/admin/message-templates', [AdminMessageTemplatesController::class, 'index'])->name('admin.message-templates');
+        Route::put('/admin/message-templates', [AdminMessageTemplatesController::class, 'update'])
+            ->middleware('throttle:admin-sensitive')->name('admin.message-templates.update');
+        Route::post('/admin/message-templates/test-email', [AdminMessageTemplatesController::class, 'testEmail'])
+            ->middleware('throttle:admin-sensitive')->name('admin.message-templates.test');
         Route::put('/admin/settings', [AdminSettingsController::class, 'updateStore'])
             ->middleware('throttle:admin-sensitive')->name('admin.settings.update');
         Route::put('/admin/settings/membership/{code}', [AdminSettingsController::class, 'updateTier'])

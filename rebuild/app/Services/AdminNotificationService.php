@@ -56,11 +56,13 @@ class AdminNotificationService
         // langsung oleh pemanggil (deliver sinkron).
         bool $dispatchJob = true,
     ): int {
+        $copy = app(EditableMessageTemplateService::class)
+            ->renderNotification($eventType, $title, $message);
         $id = DB::table('admin_notifications')->insertGetId([
             'event_type' => $eventType,
             'severity' => strtoupper($severity),
-            'title' => $title,
-            'message' => $message,
+            'title' => $copy['title'],
+            'message' => $copy['message'],
             'target_type' => $targetType,
             'target_id' => $targetId === null ? null : (string) $targetId,
             'data' => $data === [] ? null : json_encode($data, JSON_THROW_ON_ERROR),

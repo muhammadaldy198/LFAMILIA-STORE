@@ -49,7 +49,8 @@ class User extends Authenticatable implements MustVerifyEmailContract
         SendTransactionalEmailJob::dispatch(
             $this->email,
             'Verifikasi email LFAMILIA STORE',
-            "Verifikasi email akun LFAMILIA STORE melalui tautan berikut:\n".$url
+            "Verifikasi email akun LFAMILIA STORE melalui tautan berikut:\n".$url,
+            'verification'
         )->afterCommit();
     }
 
@@ -75,8 +76,9 @@ class User extends Authenticatable implements MustVerifyEmailContract
                 '',
                 'Jika kamu tidak meminta ini, abaikan email ini dan jangan bagikan tautan kepada siapa pun.',
                 '',
-                'Butuh bantuan? Hubungi CS: support@lfamiliastore.my.id',
-            ])
+                'Butuh bantuan? Hubungi CS: '.(app(\App\Services\StorefrontContentService::class)->settings()['store.email'] ?: 'support@lfamiliastore.my.id'),
+            ]),
+            'password_reset'
         )->afterCommit();
     }
 

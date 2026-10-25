@@ -58,6 +58,7 @@ const save = () => {
                 <p>Identitas toko dan kontak yang tampil di halaman pelanggan.</p>
             </div>
             <div class="adm-head-actions">
+                <a href="/admin/message-templates" class="adm-btn">Template Email &amp; Notifikasi</a>
                 <button type="button" class="adm-btn" @click="router.reload({ preserveScroll: true })">Muat ulang</button>
             </div>
         </header>

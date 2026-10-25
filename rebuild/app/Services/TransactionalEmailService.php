@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\URL;
 
 class TransactionalEmailService
 {
-    public function queue(string $email, string $subject, string $text): void
+    public function queue(string $email, string $subject, string $text, string $event = 'generic'): void
     {
         if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
             return;
@@ -19,7 +19,7 @@ class TransactionalEmailService
         // Enqueue is best-effort for customer events; direct job dispatch
         // (verification and admin test-email) must still propagate failures.
         try {
-            SendTransactionalEmailJob::dispatch(strtolower($email), $subject, $text)->afterCommit();
+            SendTransactionalEmailJob::dispatch(strtolower($email), $subject, $text, $event)->afterCommit();
         } catch (\Throwable $exception) {
             Log::warning('Could not queue customer transactional email.', [
                 'exception' => get_class($exception),
@@ -27,7 +27,7 @@ class TransactionalEmailService
         }
     }
 
-    public function queueForOrder(int $orderId, string $subject, string $text): void
+    public function queueForOrder(int $orderId, string $subject, string $text, string $event = 'generic'): void
     {
         $order = DB::table('orders')->where('id', $orderId)->first(['user_id', 'guest_email']);
         if (! $order) {
@@ -39,7 +39,7 @@ class TransactionalEmailService
             : $order->guest_email;
 
         if (is_string($email)) {
-            $this->queue($email, $subject, $text);
+            $this->queue($email, $subject, $text, $event);
         }
     }
 
@@ -103,7 +103,7 @@ class TransactionalEmailService
             $this->csLine(),
         ];
 
-        $this->queueForOrder($orderId, $subject, implode("\n", $lines));
+        $this->queueForOrder($orderId, $subject, implode("\n", $lines), 'order_created');
     }
 
     /**
@@ -143,7 +143,8 @@ class TransactionalEmailService
         $this->queueForOrder(
             $orderId,
             'Pembayaran diterima — pesanan '.$details['invoice'].' sedang diproses',
-            implode("\n", $lines)
+            implode("\n", $lines),
+            'order_paid'
         );
     }
 
@@ -231,7 +232,8 @@ class TransactionalEmailService
                 : ($isManual
                     ? 'Pesanan selesai — '.$details['package'].' sudah dikirim'
                     : 'Pesanan selesai — '.$details['package'].' sudah masuk ke akunmu'),
-            implode("\n", $lines)
+            implode("\n", $lines),
+            'order_completed'
         );
     }
 
@@ -264,14 +266,15 @@ class TransactionalEmailService
             '',
             'Pembayaranmu sudah kami terima sebelumnya, jadi jangan membuat order baru dulu. Untuk tindak lanjut soal pembayaranmu, hubungi CS kami dan sebutkan nomor invoice '.$details['invoice'].' — tim kami akan membantu menyelesaikannya. Sertakan bukti bayar saat menghubungi CS.',
             '',
-            'Hubungi CS: support@lfamiliastore.my.id / '.$this->contactUrl(),
-            'CS tersedia setiap hari pukul 08.00–23.00 WIB.',
+             $this->csLine(),
+            (string) (app(StorefrontContentService::class)->settings()['store.business_hours'] ?? 'Setiap hari 08.00–23.00 WIB'),
         ];
 
         $this->queueForOrder(
             $orderId,
             'Pesanan '.$details['invoice'].' gagal diproses — ini langkah berikutnya',
-            implode("\n", $lines)
+            implode("\n", $lines),
+            'order_failed'
         );
     }
 
@@ -442,7 +445,9 @@ class TransactionalEmailService
 
     private function csLine(): string
     {
-        return 'Butuh bantuan? Hubungi CS: support@lfamiliastore.my.id / '.$this->contactUrl();
+        return 'Butuh bantuan? Hubungi CS: '.
+            (app(StorefrontContentService::class)->settings()['store.email'] ?: 'support@lfamiliastore.my.id').
+            ' / '.$this->contactUrl();
     }
 
     private function rupiah(int $amount): string
