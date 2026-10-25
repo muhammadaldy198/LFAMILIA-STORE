@@ -122,6 +122,13 @@ class CatalogSyncDeactivationTest extends TestCase
         $package = $this->package($this->product('AUTO_PROVIDER'), 'BACKFILL');
         $filledId = $this->mapping($package, 'DIGIFLAZZ', 'backfill-with-price')->id;
         $skippedId = $this->mapping($package, 'DIGIFLAZZ', 'backfill-no-price')->id;
+        $manualPackage = $this->package($this->product('MANUAL'), 'MANUAL_BACKFILL');
+        $manualId = $this->mapping($manualPackage, 'MANUAL', null)->id;
+        $voucherId = $this->mapping($package, 'VOUCHER_STOCK', 'voucher-backfill')->id;
+        DB::table('provider_mappings')->whereIn('id', [$manualId, $voucherId])->update([
+            'cost_idr' => 10000, 'seller_reference_price_idr' => 10000,
+            'store_cost_idr' => null, 'max_price_idr' => 12000,
+        ]);
         DB::table('provider_mappings')->where('id', $filledId)->update([
             'cost_idr' => 10001, 'seller_reference_price_idr' => 10001,
             'store_cost_idr' => null, 'max_price_idr' => 12000,
@@ -135,6 +142,12 @@ class CatalogSyncDeactivationTest extends TestCase
         $migration->up();
         $this->assertSame(10202, (int) DB::table('provider_mappings')->where('id', $filledId)->value('store_cost_idr'));
         $this->assertNull(DB::table('provider_mappings')->where('id', $skippedId)->value('store_cost_idr'));
+        foreach ([$manualId, $voucherId] as $untouchedId) {
+            $this->assertDatabaseHas('provider_mappings', [
+                'id' => $untouchedId, 'store_cost_idr' => null,
+                'cost_idr' => 10000, 'max_price_idr' => 12000,
+            ]);
+        }
         $migration->up();
         $this->assertSame(10202, (int) DB::table('provider_mappings')->where('id', $filledId)->value('store_cost_idr'));
     }

@@ -364,18 +364,17 @@ class AdminCustomerController
             $wallet = DB::table('wallets')->where('user_id', $userId)->lockForUpdate()->first();
             abort_unless($wallet, 404);
 
-            // Kunci idempotensi berlaku PER PELANGGAN. Kunci yang sudah dipakai
-            // pelanggan lain harus ditolak dengan jelas, bukan dilewati diam-diam.
-            $existing = DB::table('wallet_ledger')
-                ->where('idempotency_key', $data['idempotency_key'])
-                ->first(['wallet_id', 'amount_idr']);
-            if ($existing) {
-                if ((int) $existing->wallet_id !== (int) $wallet->id) {
-                    throw ValidationException::withMessages([
-                        'idempotency_key' => 'Kunci ini sudah dipakai untuk penyesuaian pelanggan lain. Pakai kunci baru.',
-                    ]);
-                }
-
+            // Scope the adjustment key to this customer while preserving the
+            // global uniqueness of wallet_ledger keys used by payment flows.
+            // Also recognize legacy unscoped adjustment keys for THIS wallet,
+            // so replaying an adjustment made before this fix never credits twice.
+            $ledgerKey = 'customer-wallet:'.hash('sha256', $userId.':'.$data['idempotency_key']);
+            $alreadyApplied = DB::table('wallet_ledger')
+                ->where('wallet_id', $wallet->id)
+                ->where('source', 'ADMIN_ADJUSTMENT')
+                ->whereIn('idempotency_key', [$ledgerKey, $data['idempotency_key']])
+                ->exists();
+            if ($alreadyApplied) {
                 $applied = false;
 
                 return;
@@ -404,7 +403,7 @@ class AdminCustomerController
                 'reference_id' => substr($userId.':'.$data['idempotency_key'], 0, 100),
                 'actor_type' => 'admin_user',
                 'actor_id' => (string) $request->user('admin')->id,
-                'idempotency_key' => $data['idempotency_key'],
+                'idempotency_key' => $ledgerKey,
                 'created_at' => now(),
             ]);
             $audit->record(

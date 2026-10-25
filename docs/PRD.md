@@ -29,7 +29,7 @@ LFAMILIA STORE adalah toko digital Indonesia yang menjual:
 3. **Pulsa, paket data, PLN, dan entertainment** — produk digital dengan input nomor tujuan.
 4. **Alat bantu gratis** — kalkulator win rate, zodiac, magic wheel. Bukan produk berbayar; berfungsi menarik pengunjung.
 
-Pembeli bisa **tanpa akun (guest)** atau **dengan akun (member)**. Guest bisa membeli dan melacak pesanan lewat nomor pesanan + kode akses. Member mendapat saldo, riwayat, tiket, dan tingkatan member.
+Pembeli bisa **tanpa akun (guest)** atau **dengan akun (member)**. Guest bisa membeli dan melacak pesanan cukup lewat nomor HP/WhatsApp yang dipakai ketika memesan; akun, nomor pesanan, dan kode akses tidak wajib. Member mendapat saldo, riwayat, tiket, dan tingkatan member.
 
 **Model bisnis:** jual produk pihak ketiga dengan selisih harga (margin). Toko tidak memproduksi produk; toko mengatur harga jual, menerima pembayaran, meneruskan pesanan ke penyedia, dan menanggung selisih kalau terjadi kegagalan.
 
@@ -179,7 +179,7 @@ Aturan:
 - **Voucher divalidasi di server** saat checkout dan sekali lagi saat pesanan dibuat.
 - **Stok voucher (kode) direservasi** saat pesanan dibuat, dilepas kalau pesanan gagal/kedaluwarsa.
 - Guest wajib memberi kontak (email atau telepon) yang bisa dihubungi; tanpa itu, keluhan tidak bisa ditangani.
-- Setelah checkout, guest menerima **kode akses** untuk melacak pesanan. Kode ini tidak boleh bisa ditebak.
+- Guest melacak pesanan cukup dengan **nomor HP/WhatsApp**. Sistem boleh menyediakan tautan/kode akses tambahan, tetapi **tidak wajib** untuk menggunakan fitur lacak.
 
 ---
 
@@ -373,6 +373,7 @@ Kebijakan lengkap ada di halaman publik `/refund` dan **dokumen itu yang berlaku
 - Tidak ada batas nominal per tindakan; pengamannya adalah peran, alasan wajib, dan jejak audit.
 - Saldo tidak boleh minus.
 - Tercatat di ledger dan audit log, tidak bisa dihapus.
+- Kunci idempotensi **berlaku per pelanggan**: permintaan yang sama untuk pelanggan yang sama tidak boleh menambah saldo dua kali, tetapi pelanggan lain boleh memakai nilai kunci permintaan yang sama. Entri lama tetap terlindungi dari pemrosesan ulang.
 
 ---
 
@@ -381,10 +382,10 @@ Kebijakan lengkap ada di halaman publik `/refund` dan **dokumen itu yang berlaku
 ### 11.1 Guest
 
 - Bisa belanja tanpa mendaftar.
-- Melacak pesanan dengan **nomor pesanan + kode akses**.
+- Melacak pesanan cukup memakai **nomor HP/WhatsApp**, tanpa akun atau kode akses wajib. Nomor pesanan dapat digunakan sebagai alternatif.
 - Bisa menghubungi bantuan (tiket guest didukung).
 - **Tidak punya saldo, tidak punya riwayat permanen, tidak punya tingkatan member.**
-- **Data guest disimpan 30 hari** sejak aktivitas terakhir, lalu dibersihkan otomatis. Pembersihan tidak menghapus catatan transaksi yang wajib disimpan untuk pembukuan.
+- **Email dan nomor HP guest pada pesanan dibersihkan setelah pesanan berumur lebih dari 30 hari** (dihitung sejak pembuatan pesanan). Catatan transaksi tetap disimpan; data member tidak dihapus oleh job ini.
 
 ### 11.2 Member
 
@@ -463,11 +464,11 @@ Daftar halaman yang harus ada dan berfungsi:
 
 | Halaman | Alamat | Isi |
 |---|---|---|
-| Beranda | `/` | Produk populer, kategori, cara top up, promo. **Juga tempat `/catalog`, `/checkout`, dan `/track` bermuara** — ketiganya bukan halaman sendiri, hanya pengalihan. |
-| Katalog | `/catalog` | **Pengalihan, bukan halaman sendiri.** Daftar produk, filter kategori, dan pencarian ada di beranda. |
+| Beranda | `/` | Produk populer, kategori, cara top up, promo. Katalog produk tersedia pada bagian `/#produk`. |
+| Katalog | `/catalog` | **Redirect 302 ke `/#produk`**, bukan halaman katalog tersendiri. Filter dan pencarian produk ada di beranda. |
 | Detail produk | `/catalog/{slug}` | Nominal, input tujuan, deskripsi, catatan, ulasan pembeli |
-| Checkout | `/checkout` | **Pengalihan, bukan halaman sendiri.** Checkout berjalan di halaman detail produk. |
-| Lacak pesanan | `/track` | **Pengalihan, bukan halaman sendiri.** Lacak pesanan cukup dengan **nomor HP** — tanpa akun, tanpa nomor pesanan, tanpa kode akses. |
+| Checkout | `/checkout` | **Redirect 302 ke `/#produk`** jika tanpa produk. Jika parameter `?product=<slug>` menunjuk produk aktif, redirect ke `/catalog/{slug}` dan teruskan parameter `package` bila ada. Checkout berlangsung di detail produk. |
+| Lacak pesanan | `/track` | **Redirect 302 ke `/orders/check`**, bukan ke beranda. Lacak cukup menggunakan nomor HP/WhatsApp tanpa akun, nomor pesanan, atau kode akses wajib. Nomor pesanan juga diterima sebagai alternatif. |
 | Berita | `/news` | Artikel dan pengumuman |
 | FAQ | `/faq` | Pertanyaan umum |
 | Hubungi kami | `/contact` | Kanal resmi |

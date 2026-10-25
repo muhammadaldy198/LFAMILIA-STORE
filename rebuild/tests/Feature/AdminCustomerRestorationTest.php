@@ -268,8 +268,10 @@ class AdminCustomerRestorationTest extends TestCase
             ->assertRedirect()->assertSessionHasNoErrors()->assertSessionHas('status', 'Kunci ini sudah pernah diproses untuk pelanggan ini; saldo tidak ditambah lagi.');
 
         $this->assertSame(15000, (int) DB::table('wallets')->where('user_id', $user->id)->value('balance_idr'));
+        $scopedKey = 'customer-wallet:'.hash('sha256', $user->id.':'.$payload['idempotency_key']);
         $this->assertSame(1, DB::table('wallet_ledger')
-            ->where('idempotency_key', 'customer-wallet-idempotent-0001')->count());
+            ->where('wallet_id', $user->wallet->id)
+            ->where('idempotency_key', $scopedKey)->count());
         $this->assertDatabaseHas('audit_logs', [
             'actor_type' => 'admin_user',
             'actor_id' => (string) $admin->id,
@@ -285,13 +287,55 @@ class AdminCustomerRestorationTest extends TestCase
 
         $this->assertSame(15000, (int) DB::table('wallets')->where('user_id', $user->id)->value('balance_idr'));
 
+        // The same request key must be reusable by ANOTHER customer.
         $other = $this->customer();
-        $this->withSession(['admin.password_confirmed_at' => time()])->post('/admin/customers/'.$other->id.'/wallet', [
+        $otherPayload = [
             'amount_idr' => 5000,
-            'reason' => 'Kunci milik pelanggan lain',
-            'idempotency_key' => 'customer-wallet-idempotent-0001',
-        ])->assertSessionHasErrors('idempotency_key');
-        $this->assertSame(0, (int) DB::table('wallets')->where('user_id', $other->id)->value('balance_idr'));
+            'reason' => 'Penyesuaian pelanggan berbeda',
+            'idempotency_key' => $payload['idempotency_key'],
+        ];
+        $this->withSession(['admin.password_confirmed_at' => time()])
+            ->post('/admin/customers/'.$other->id.'/wallet', $otherPayload)
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $this->withSession(['admin.password_confirmed_at' => time()])
+            ->post('/admin/customers/'.$other->id.'/wallet', $otherPayload)
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame(5000, (int) DB::table('wallets')->where('user_id', $other->id)->value('balance_idr'));
+        $this->assertSame(15000, (int) DB::table('wallets')->where('user_id', $user->id)->value('balance_idr'));
+        $this->assertSame(2, DB::table('wallet_ledger')->where('source', 'ADMIN_ADJUSTMENT')
+            ->whereIn('wallet_id', [$user->wallet->id, $other->wallet->id])->count());
+    }
+
+    public function test_legacy_admin_wallet_adjustment_key_remains_idempotent(): void
+    {
+        $this->login('SUPER_ADMIN');
+        $user = $this->customer();
+        $legacyKey = 'customer-wallet-legacy-0001';
+        DB::table('wallet_ledger')->insert([
+            'wallet_id' => $user->wallet->id,
+            'amount_idr' => 1000,
+            'balance_before_idr' => 0,
+            'balance_after_idr' => 1000,
+            'source' => 'ADMIN_ADJUSTMENT',
+            'reference_type' => 'CUSTOMER',
+            'reference_id' => $user->id.':'.$legacyKey,
+            'actor_type' => 'admin_user',
+            'actor_id' => (string) auth('admin')->id(),
+            'idempotency_key' => $legacyKey,
+            'created_at' => now(),
+        ]);
+        DB::table('wallets')->where('id', $user->wallet->id)->update(['balance_idr' => 1000]);
+
+        $this->withSession(['admin.password_confirmed_at' => time()])
+            ->post('/admin/customers/'.$user->id.'/wallet', [
+                'amount_idr' => 1000,
+                'reason' => 'Ulang permintaan saldo lama',
+                'idempotency_key' => $legacyKey,
+            ])->assertRedirect()->assertSessionHasNoErrors()
+            ->assertSessionHas('status', 'Kunci ini sudah pernah diproses untuk pelanggan ini; saldo tidak ditambah lagi.');
+
+        $this->assertSame(1000, (int) DB::table('wallets')->where('id', $user->wallet->id)->value('balance_idr'));
+        $this->assertSame(1, DB::table('wallet_ledger')->where('wallet_id', $user->wallet->id)->count());
     }
 
     public function test_super_admin_membership_can_switch_manual_and_back_to_automatic(): void

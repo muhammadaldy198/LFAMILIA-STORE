@@ -22,6 +22,7 @@ Gerbang wajib skill `local-skenario-lanjutan`. Tiap butir: jalur bahagia, jalur 
 | `seller_reference_price_idr` NULL tapi `cost_idr` ada | pakai `cost_idr` × 1,02 |
 | Dua-duanya NULL | dilewati, tidak error, dihitung terpisah di laporan |
 | Baris yang sudah punya `store_cost_idr` | **tidak disentuh** |
+| Mapping MANUAL dan VOUCHER_STOCK tanpa `store_cost_idr` | **tidak disentuh**; backfill hanya berlaku untuk provider DIGIFLAZZ |
 | Dijalankan dua kali | kedua kali 0 baris (idempoten karena syarat `whereNull`) |
 | Setelah backfill, sync jalan | `max_price_idr` **tidak lagi** ditimpa (`$mapping->store_cost_idr === null` tidak terpenuhi) |
 | Harga jual sebelum vs sesudah backfill | tidak berubah untuk baris yang modalnya = harga seller (uji) |
@@ -55,6 +56,8 @@ Gerbang wajib skill `local-skenario-lanjutan`. Tiap butir: jalur bahagia, jalur 
 | Produk tanpa jam layanan | dihitung 24 jam |
 | Zona waktu WITA/WIT | jam dihitung di zona produk |
 | Status bukan MANUAL_PENDING | tidak dihitung |
+| Lebih dari 1.000 antrean manual | semua antrean dihitung lewat batch terbatas, tanpa batas hasil 1.000 |
+| Pesanan sudah CANCELLED | tidak dihitung |
 
 ## 6. S-05 — bersihkan data guest 30 hari
 | Skenario | Harapan |
@@ -70,7 +73,9 @@ Gerbang wajib skill `local-skenario-lanjutan`. Tiap butir: jalur bahagia, jalur 
 | Skenario | Harapan |
 |---|---|
 | Kunci sama, pelanggan sama, dua kali | kedua kali tidak menambah saldo, pesan "sudah pernah diproses" |
-| Kunci sama, pelanggan **berbeda** | **error jelas** (422), saldo B tidak berubah |
+| Kunci sama, pelanggan **berbeda** | **diizinkan**, saldo B bertambah tepat satu kali; ledger tetap unik lewat kunci yang diberi lingkup pelanggan |
+| Kunci raw lama, pelanggan sama | replay tidak menggerakkan saldo; tidak mencatat transaksi baru |
+| Kunci beda, pelanggan sama | diproses sebagai penyesuaian baru |
 | Kunci baru | normal |
 | Nominal 0 | 422 (tetap) |
 
