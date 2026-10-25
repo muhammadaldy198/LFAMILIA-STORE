@@ -23,10 +23,21 @@ class OperationalSettings
         $stored = DB::table('system_settings')->where('key', $field['key'])->value('value');
         $number = $stored === null ? null : json_decode((string) $stored, true);
         if (! is_int($number) && ! (is_string($number) && ctype_digit($number))) {
-            return $field['default'];
+            return $this->defaultValue($name, $field);
         }
 
         return max($field['min'], min($field['max'], (int) $number));
+    }
+
+    private function defaultValue(string $name, array $field): int
+    {
+        // Existing installations may rely on CHECKOUT_RESERVATION_MINUTES.
+        // Honour that configuration until an admin saves an explicit override.
+        $value = $name === 'checkout_reservation_minutes'
+            ? (int) config('lfamilia.checkout_reservation_minutes', $field['default'])
+            : $field['default'];
+
+        return max($field['min'], min($field['max'], $value));
     }
 
     public function all(): array

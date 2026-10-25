@@ -35,7 +35,7 @@ class AdminMessageTemplatesController
             'emails' => ['required', 'array'],
             'emails.*.subject' => ['nullable', 'string', 'max:255'],
             'emails.*.body' => ['nullable', 'string', 'max:10000'],
-            'notifications' => ['required', 'array', 'max:100'],
+            'notifications' => ['present', 'array', 'max:100'],
             'notifications.*.title' => ['nullable', 'string', 'max:255'],
             'notifications.*.body' => ['nullable', 'string', 'max:10000'],
         ]);

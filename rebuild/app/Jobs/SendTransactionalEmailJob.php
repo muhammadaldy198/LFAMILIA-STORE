@@ -35,7 +35,7 @@ class SendTransactionalEmailJob implements ShouldQueue
         }
 
         $rendered = app(EditableMessageTemplateService::class)
-            ->renderEmail($this->templateKey, $this->subject, $this->text);
+            ->renderEmail($this->emailTemplateKey(), $this->subject, $this->text);
 
         $response = Http::withToken((string) $config['api_key'])
             ->acceptJson()->timeout(10)->post('https://api.resend.com/emails', [
@@ -49,6 +49,12 @@ class SendTransactionalEmailJob implements ShouldQueue
         if (! $response->successful()) {
             throw new RuntimeException('RESEND_SEND_FAILED_'.$response->status());
         }
+    }
+
+    /** Old serialized queue jobs have no templateKey property. */
+    private function emailTemplateKey(): string
+    {
+        return isset($this->templateKey) ? $this->templateKey : 'generic';
     }
 
     private function htmlBody(array $assets = [], ?string $mailSubject = null, ?string $mailText = null): string
@@ -67,9 +73,14 @@ class SendTransactionalEmailJob implements ShouldQueue
         $storeName = $escape((string) ($identity['store.name'] ?? 'LFAMILIA STORE'));
         $supportEmail = (string) (($identity['store.email'] ?? '') ?: 'support@lfamiliastore.my.id');
         $safeEmail = $escape($supportEmail);
-        $url = $escape(rtrim($siteUrl, '/'));
-        $contact = $escape((string) (($identity['store.support_url'] ?? '') ?: $url.'/contact'));
-        $footer = $escape((string) ($assets['footer_banner_desktop']['url'] ?? $url.'/brand/lfamilia-footer-desktop-wordmark.jpg'));
+        $baseUrl = rtrim($siteUrl, '/');
+        $configuredContact = (string) (($identity['store.support_url'] ?? '') ?: '/contact');
+        $contactUrl = str_starts_with($configuredContact, '/') && ! str_starts_with($configuredContact, '//')
+            ? $baseUrl.$configuredContact
+            : $configuredContact;
+        $url = $escape($baseUrl);
+        $contact = $escape($contactUrl);
+        $footer = $escape((string) ($assets['footer_banner_desktop']['url'] ?? $baseUrl.'/brand/lfamilia-footer-desktop-wordmark.jpg'));
 
         return '<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
             .'<title>'.$subject.'</title></head>'
