@@ -127,11 +127,27 @@ class OneTimeGameNominalImport
                 $beforeMappingCount = ProviderMapping::query()->where('provider_id', $provider->id)
                     ->whereIn('product_package_id', $product->packages()->pluck('id'))->count();
 
-                DB::transaction(function () use ($product, $selected, $template, $sources, $request): void {
-                    $sources->importGroup(
+                DB::transaction(function () use ($product, $selected, $template, $sources, $request, $catalogImporter, $provider, $audit): void {
+                    $package = $sources->importGroup(
                         $product, collect([$selected]), $template, true,
                         (string) $product->margin_percent, false, $request
                     );
+                    // The chosen SKU can be in a temporary cut-off (or old
+                    // fixture timestamp). Preserve ONE mapping for it, while
+                    // runtime sellability checks keep it hidden until safe.
+                    if (! $package->mappings()->where('provider_id', $provider->id)
+                        ->where('external_sku', $selected->buyer_sku_code)->exists()) {
+                        $mapping = $catalogImporter->upsert(
+                            $package, (string) $selected->buyer_sku_code,
+                            (int) $selected->price_idr, (int) $selected->price_idr
+                        );
+                        $mapping->update([
+                            'is_active' => true,
+                            'fulfillment_config' => ['customer_no_template' => $template],
+                        ]);
+                        $audit->record($request, 'catalog.manual_source_cutoff_attached',
+                            'provider_mapping', $mapping->id, null, $mapping->fresh()->toArray());
+                    }
                 }, 2);
 
                 $result['packages_created'] += $product->packages()->count() - $beforePackageCount;

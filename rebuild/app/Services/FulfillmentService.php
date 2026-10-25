@@ -920,6 +920,19 @@ class FulfillmentService
             'attempt_id' => $attempt->id,
         ]);
 
+        // A voucher code reserved at checkout is not delivered when its
+        // selected stock source is blocked. Release that reservation now,
+        // without switching providers or erasing the blocked attempt.
+        if ($mapping->provider_code === 'VOUCHER_STOCK') {
+            $released = $this->voucherStock->release((int) $order->id);
+            if ($released > 0) {
+                $this->event((int) $order->id, 'VOUCHER_STOCK_RELEASED', $order->status, $order->status, [
+                    'attempt_id' => $attempt->id,
+                    'codes' => $released,
+                ]);
+            }
+        }
+
         return $attempt;
     }
 
