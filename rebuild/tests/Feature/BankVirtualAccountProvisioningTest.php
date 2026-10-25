@@ -204,7 +204,7 @@ class BankVirtualAccountProvisioningTest extends TestCase
             'customer_email' => 'customer@example.test',
             'customer_phone' => '08123456789',
         ]);
-        $this->assertSame('Pemilik Nama Panjang ', $permata['customer']['name']);
+        $this->assertSame('Pemilik Nama Panjang', $permata['customer']['name']);
         $this->assertSame(20, mb_strlen($permata['customer']['name']));
 
     }
