@@ -3,8 +3,8 @@
 namespace Tests\Feature;
 
 use App\Jobs\SendTransactionalEmailJob;
-use App\Services\OperationalSettings;
 use App\Models\AdminUser;
+use App\Services\OperationalSettings;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
