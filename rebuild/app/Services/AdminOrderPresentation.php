@@ -38,6 +38,7 @@ class AdminOrderPresentation
         'FULFILLMENT_FAILOVER_QUEUED' => 'Dialihkan ke penyedia berikutnya',
         'FULFILLMENT_EXHAUSTED' => 'Kedua SKU gagal; menunggu superadmin',
         'ADMIN_ORDER_CANCELLED' => 'Dibatalkan superadmin; penyelesaian dana manual',
+        'FULFILLMENT_CLOSED_BY_CANCELLATION' => 'Proses pengiriman ditutup karena pesanan dibatalkan',
         'PAYMENT_REFUND_REVIEW' => 'Laporan refund gateway perlu ditinjau',
         'FULFILLMENT_CONFLICT_IGNORED' => 'Hasil berbeda diterima; status akhir dipertahankan',
         'FULFILLMENT_PRICE_GUARD_BREACH' => 'Harga penyedia melebihi batas',
@@ -129,6 +130,7 @@ class AdminOrderPresentation
         $provider = data_get($snapshot, 'provider.code') ?: ($row->provider_code ?? null);
         $channel = data_get($snapshot, 'payment.channel_name') ?: ($row->channel_name ?? null);
         $channelCode = data_get($snapshot, 'payment.channel_code');
+        $fulfillmentStatus = $row->status === 'CANCELLED' ? 'CANCELLED' : ($row->fulfillment_status ?? null);
 
         return [
             'id' => (int) $row->id, 'order_number' => $row->order_number,
@@ -147,9 +149,10 @@ class AdminOrderPresentation
                 'WALLET' => 'Saldo akun', 'ADMIN_MANUAL' => 'Pembayaran dicatat admin',
                 default => 'Belum dipilih',
             },
-            'needs_attention' => (bool) ($row->needs_attention ?? false),
-            'fulfillment_status' => $row->fulfillment_status ?? null,
-            'fulfillment_label' => isset($row->fulfillment_status) ? self::STATUSES[$row->fulfillment_status] ?? null : null,
+            'needs_attention' => $row->status === 'CANCELLED' ? false : (bool) ($row->needs_attention ?? false),
+            // Pesanan batal selalu tampil "Dibatalkan", apa pun status percobaan lama.
+            'fulfillment_status' => $fulfillmentStatus,
+            'fulfillment_label' => $fulfillmentStatus ? self::STATUSES[$fulfillmentStatus] ?? null : null,
             'delivery' => $this->json($row->delivery_payload ?? null),
             'manual_note' => $snapshot['manual_note'] ?? null,
             'manual_instructions' => $row->manual_instructions ?? null,

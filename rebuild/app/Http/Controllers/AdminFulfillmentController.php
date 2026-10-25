@@ -19,7 +19,7 @@ class AdminFulfillmentController
 {
     private const STATUSES = [
         'CREATED', 'SENDING', 'PENDING', 'UNKNOWN', 'SUCCESS',
-        'FAILED_CONFIRMED', 'BLOCKED', 'MANUAL_PENDING', 'MANUAL_FAILED',
+        'FAILED_CONFIRMED', 'BLOCKED', 'MANUAL_PENDING', 'MANUAL_FAILED', 'CANCELLED',
     ];
 
     public function index(Request $request, AdminOrderPresentation $presentation): Response
@@ -62,16 +62,19 @@ class AdminFulfillmentController
                 });
             });
 
+        // Metrik antrean tidak menghitung pesanan yang sudah dibatalkan.
+        $open = (clone $base)->where('orders.status', '<>', 'CANCELLED');
         $metrics = [
-            ['label' => 'Menunggu manual', 'value' => (clone $base)->where('attempts.status', 'MANUAL_PENDING')->count()],
-            ['label' => 'Perlu perhatian', 'value' => (clone $base)->whereIn('attempts.status', ['MANUAL_FAILED', 'BLOCKED', 'UNKNOWN'])->count()],
-            ['label' => 'Menunggu kepastian', 'value' => (clone $base)->whereIn('attempts.status', ['SENDING', 'PENDING'])->count()],
+            ['label' => 'Menunggu manual', 'value' => (clone $open)->where('attempts.status', 'MANUAL_PENDING')->count()],
+            ['label' => 'Perlu perhatian', 'value' => (clone $open)->whereIn('attempts.status', ['MANUAL_FAILED', 'BLOCKED', 'UNKNOWN'])->count()],
+            ['label' => 'Menunggu kepastian', 'value' => (clone $open)->whereIn('attempts.status', ['SENDING', 'PENDING'])->count()],
             ['label' => 'Berhasil', 'value' => (clone $base)->where('attempts.status', 'SUCCESS')->count()],
         ];
 
         $query = clone $base;
         if ($filters['scope'] === 'action') {
-            $query->whereIn('attempts.status', ['MANUAL_PENDING', 'MANUAL_FAILED', 'BLOCKED', 'UNKNOWN', 'PENDING', 'SENDING']);
+            $query->where('orders.status', '<>', 'CANCELLED')
+                ->whereIn('attempts.status', ['MANUAL_PENDING', 'MANUAL_FAILED', 'BLOCKED', 'UNKNOWN', 'PENDING', 'SENDING']);
         } elseif ($filters['scope'] === 'manual') {
             $query->where('providers.code', 'MANUAL');
         }
