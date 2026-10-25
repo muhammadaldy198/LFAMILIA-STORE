@@ -13,6 +13,49 @@ class OneTimeGameNominalImportTest extends TestCase
 {
     use DatabaseTransactions;
 
+    public function test_importer_refreshes_selected_sku_with_inactive_historical_sibling(): void
+    {
+        $gameId = DB::table('categories')->where('slug', 'game')->value('id');
+        $this->assertNotNull($gameId);
+        $providerId = DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
+        $this->assertNotNull($providerId);
+        $product = Product::create([
+            'category_id' => $gameId,
+            'name' => 'Historical refresh '.bin2hex(random_bytes(4)),
+            'slug' => 'historical-refresh-'.bin2hex(random_bytes(4)),
+            'fulfillment_mode' => 'AUTO_PROVIDER', 'margin_percent' => 10,
+            'is_active' => true,
+        ]);
+        $package = $product->packages()->create([
+            'code' => 'HISTORICAL_ONE', 'name' => '5 Diamond',
+            'group_name' => 'Umum', 'nominal_value' => 5,
+            'is_active' => true, 'sort_order' => 0,
+        ]);
+        DB::table('provider_mappings')->insert([
+            ['product_package_id' => $package->id, 'provider_id' => $providerId,
+                'external_sku' => 'historical-refresh-A', 'cost_idr' => 900,
+                'store_cost_idr' => 918, 'max_price_idr' => 918,
+                'is_active' => true, 'priority' => 0, 'created_at' => now(), 'updated_at' => now()],
+            ['product_package_id' => $package->id, 'provider_id' => $providerId,
+                'external_sku' => 'historical-refresh-B', 'cost_idr' => 950,
+                'store_cost_idr' => 969, 'max_price_idr' => 969,
+                'is_active' => false, 'priority' => 1, 'created_at' => now(), 'updated_at' => now()],
+        ]);
+        $item = (object) [
+            'buyer_sku_code' => 'historical-refresh-A',
+            'product_name' => '5 Diamond',
+            'brand' => $product->name,
+            'type' => 'Umum', 'price_idr' => 900,
+        ];
+        // The importer should be idempotent even if old inactive rows remain.
+        app(\App\Services\DigiflazzAutoSources::class)->importGroup(
+            $product, collect([$item]), null, true, '10', false,
+            \Illuminate\Http\Request::create('/internal/legacy-refresh', 'POST')
+        );
+        $this->assertSame(1, $package->mappings()->where('is_active', true)->count());
+        $this->assertFalse((bool) $package->mappings()->where('external_sku', 'historical-refresh-B')->value('is_active'));
+    }
+
     public function test_imports_one_selected_sku_per_nominal_and_never_touches_non_games(): void
     {
         $now = now();

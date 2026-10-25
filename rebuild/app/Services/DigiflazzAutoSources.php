@@ -70,7 +70,10 @@ class DigiflazzAutoSources
         }
         if ($package !== null && $package->mappings()
             ->where('provider_id', $provider->id)
-            ->where('external_sku', '<>', $first->buyer_sku_code)->exists()) {
+            ->where('external_sku', '<>', $first->buyer_sku_code)
+            ->where('is_active', true)->exists()) {
+            // Historical inactive mappings must not block an idempotent
+            // refresh of the selected SKU. Never reactivate the old ones.
             throw ValidationException::withMessages([
                 'item_ids' => 'Nominal ini sudah memiliki SKU Digiflazz lain.',
             ]);

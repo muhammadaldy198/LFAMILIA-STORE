@@ -107,6 +107,18 @@ class DigiflazzCatalogService
                     } else {
                         DB::table('digiflazz_catalog_items')->insert([...$row, 'baseline_price_idr' => $row['price_idr'], 'created_at' => now()]);
                     }
+                    // Lock packages BEFORE mapping rows, matching admin
+                    // activation and catalog imports. Otherwise a catalog
+                    // sync can hold a mapping and wait for its package while
+                    // admin holds that package and waits for the mapping.
+                    $packageIds = DB::table('provider_mappings')
+                        ->where('provider_id', $providerId)
+                        ->where('external_sku', $row['buyer_sku_code'])
+                        ->pluck('product_package_id')->unique()->sort()->values()->all();
+                    if ($packageIds !== []) {
+                        DB::table('product_packages')->whereIn('id', $packageIds)
+                            ->orderBy('id')->lockForUpdate()->get(['id']);
+                    }
                     $mappingQuery = DB::table('provider_mappings')->where('provider_id', $providerId)
                         ->where('external_sku', $row['buyer_sku_code']);
                     // Never overwrite the price of a mapping whose pinned supplier
