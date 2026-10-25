@@ -103,6 +103,46 @@ class BankVirtualAccountProvisioningTest extends TestCase
         $this->assertSame(['enabled_payments' => ['bca_va']], json_decode($route->configuration, true));
     }
 
+    public function test_doku_direct_migration_disables_unsupported_legacy_bank_checkout_routes(): void
+    {
+        $gatewayId = DB::table('payment_gateways')->where('code', 'DOKU')->value('id');
+        DB::table('payment_gateways')->where('id', $gatewayId)->update(['is_active' => true]);
+
+        foreach (['va_bri', 'va_bca', 'va_mandiri', 'va_cimb'] as $code) {
+            $channelId = DB::table('payment_channels')->where('code', $code)->value('id');
+            DB::table('payment_routes')->updateOrInsert(
+                ['payment_channel_id' => $channelId, 'payment_gateway_id' => $gatewayId],
+                [
+                    'provider_channel' => 'DOKU_CHECKOUT',
+                    'configuration' => json_encode(['api_path' => '/checkout/v1/payment'], JSON_THROW_ON_ERROR),
+                    'is_active' => true,
+                    'supports_order' => true,
+                    'supports_wallet_topup' => true,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]
+            );
+        }
+
+        $migration = require database_path('migrations/2026_10_25_000001_replace_doku_checkout_routes_with_direct_api.php');
+        $migration->up();
+
+        foreach (['va_bri', 'va_bca', 'va_mandiri', 'va_cimb'] as $code) {
+            $channelId = DB::table('payment_channels')->where('code', $code)->value('id');
+            $route = DB::table('payment_routes')
+                ->where('payment_channel_id', $channelId)
+                ->where('payment_gateway_id', $gatewayId)
+                ->firstOrFail();
+
+            $this->assertSame(0, (int) $route->is_active);
+            $this->assertNull($route->provider_channel);
+            $this->assertSame(
+                ['disabled_reason' => 'REQUIRES_SNAP_DIRECT_API'],
+                json_decode((string) $route->configuration, true, 512, JSON_THROW_ON_ERROR)
+            );
+        }
+    }
+
     public function test_midtrans_generic_routes_only_expose_merchant_active_methods(): void
     {
         $routes = collect(config('payment_routes'));
