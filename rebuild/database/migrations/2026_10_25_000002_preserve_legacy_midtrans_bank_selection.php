@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Arr;
 
 return new class extends Migration
 {
@@ -51,11 +52,14 @@ return new class extends Migration
                 continue;
             }
 
+            // MySQL JSON columns normalize object-key order; compare normalized
+            // structures so untouched defaults are not mistaken for overrides.
             // Do not rewrite operator-controlled gateway assignments.
             if ((int) $midtrans->priority !== (int) ($midtransDefault['priority'] ?? 100)
                 || (int) $doku->priority !== (int) ($dokuDefault['priority'] ?? 100)
                 || (string) $doku->provider_channel !== (string) ($dokuDefault['provider_channel'] ?? '')
-                || json_decode((string) $doku->configuration, true) !== $dokuDefault['configuration']
+                || Arr::sortRecursive((array) json_decode((string) $doku->configuration, true))
+                    !== Arr::sortRecursive($dokuDefault['configuration'])
                 || (bool) $doku->supports_order !== (bool) ($dokuDefault['supports_order'] ?? true)
                 || (bool) $doku->supports_wallet_topup !== (bool) ($dokuDefault['supports_wallet_topup'] ?? false)) {
                 continue;
