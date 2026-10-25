@@ -85,7 +85,7 @@ class DokuDirectGateway
         $route = $context['route_configuration'];
         $path = (string) ($route['api_path'] ?? '');
         // Reject legacy hosted Checkout paths and unreviewed provider endpoints.
-        if (! preg_match('~^/(?:doku|bca|bni|mandiri|permata|cimb)-virtual-account/v2/payment-code$~', $path)) {
+        if (! preg_match('~^/(?:doku|bni|permata)-virtual-account/v2/payment-code$~', $path)) {
             throw ValidationException::withMessages(['payment' => 'Metode DOKU Direct API belum didukung.']);
         }
 
