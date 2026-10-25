@@ -205,10 +205,11 @@ class DokuDirectGateway
             }
 
             $customerEmail = $context['customer_email'] ?? null;
-            // BNI accepts at most 64 email characters. Since this field is optional,
-            // omit overlong addresses instead of changing the recipient address.
-            if ($apiPath === '/bni-virtual-account/v2/payment-code'
-                && is_string($customerEmail) && strlen($customerEmail) > 64) {
+            // Each Direct VA bank enforces an email length: BNI 64,
+            // Permata and DOKU VA 128. Omit optional overlong addresses
+            // instead of truncating and changing the email recipient.
+            $emailLimit = $apiPath === '/bni-virtual-account/v2/payment-code' ? 64 : 128;
+            if (is_string($customerEmail) && strlen($customerEmail) > $emailLimit) {
                 $customerEmail = null;
             }
 
