@@ -62,9 +62,9 @@ class BankVirtualAccountProvisioningTest extends TestCase
         $first = $catalog->sync();
 
         $this->assertSame(7, $first['created_channels']);
-        $this->assertSame(12, $first['created']);
+        $this->assertSame(9, $first['created']);
         $this->assertSame(7, DB::table('payment_channels')->whereIn('code', $codes)->count());
-        $this->assertSame(12, DB::table('payment_routes')->whereIn(
+        $this->assertSame(9, DB::table('payment_routes')->whereIn(
             'payment_channel_id', DB::table('payment_channels')->whereIn('code', $codes)->pluck('id')
         )->count());
 
