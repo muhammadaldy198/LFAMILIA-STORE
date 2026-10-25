@@ -195,6 +195,18 @@ class BankVirtualAccountProvisioningTest extends TestCase
             $bni['virtual_account_info']['merchant_unique_reference']
         );
 
+        $bniLongEmail = $method->invoke($gateway, [
+            'route_configuration' => ['api_path' => '/bni-virtual-account/v2/payment-code'],
+            'merchant_reference' => 'PAY-125',
+            'amount_idr' => 10000,
+            'expires_minutes' => 60,
+            'customer_name' => 'Test Customer',
+            'customer_email' => str_repeat('a', 64).'@example.test',
+            'customer_phone' => '08123456789',
+        ]);
+        $this->assertArrayNotHasKey('email', $bniLongEmail['customer']);
+        $this->assertSame('customer@example.test', $bni['customer']['email']);
+
         $permata = $method->invoke($gateway, [
             'route_configuration' => ['api_path' => '/permata-virtual-account/v2/payment-code'],
             'merchant_reference' => 'PAY-124',
