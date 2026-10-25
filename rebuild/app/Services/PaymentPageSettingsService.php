@@ -14,7 +14,7 @@ class PaymentPageSettingsService
     public function defaults(): array
     {
         return [
-            'accentColor' => '#b9ff35',
+            'accentColor' => app(StoreThemeService::class)->saved()['primary'],
             'headerImageUrl' => '',
             'eyebrow' => 'LFAMILIA PAYMENT',
             'pendingTitle' => 'Selesaikan pembayaran',
@@ -30,7 +30,7 @@ class PaymentPageSettingsService
             'checkStatusButtonText' => 'Cek status',
             'checkInvoiceButtonText' => 'Cek invoice',
             'supportText' => 'Butuh bantuan pembayaran?',
-            'supportUrl' => '/contact',
+            'supportUrl' => (app(StorefrontContentService::class)->settings()['store.support_url'] ?? '') ?: '/contact',
             'showStoreBrand' => true,
             'showInvoiceNotice' => true,
             'showOrderSummary' => true,
