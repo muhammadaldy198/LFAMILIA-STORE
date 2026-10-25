@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Jobs\SendTransactionalEmailJob;
 use App\Models\AdminUser;
+use App\Services\AdminNotificationService;
+use App\Services\EditableMessageTemplateService;
 use App\Services\OperationalSettings;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
@@ -51,6 +53,29 @@ class AdminEditableControlsTest extends TestCase
 
         $this->assertSame("Pesanan LFAMILIA:\n{{default_body}}", $stored['emails']['order_created']['body']);
         $this->assertSame([], $stored['notifications']);
+    }
+
+    public function test_long_custom_notification_title_is_safe_for_database_and_payment_events(): void
+    {
+        DB::table('system_settings')->updateOrInsert(['key' => 'store.message_templates'], [
+            'value' => json_encode(['notifications' => [
+                'payment.paid' => [
+                    'title' => str_repeat('X', 185).'{{default_title}}',
+                    'body' => '{{default_body}}',
+                ],
+            ]], JSON_THROW_ON_ERROR),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $rendered = app(EditableMessageTemplateService::class)->renderNotification(
+            'payment.paid', 'Pembayaran diterima', 'Invoice lunas'
+        );
+        $this->assertSame(180, mb_strlen($rendered['title']));
+        $id = app(AdminNotificationService::class)->record(
+            'payment.paid', 'Pembayaran diterima', 'Invoice lunas',
+            'INFO', null, null, [], false
+        );
+        $this->assertSame(180, mb_strlen((string) DB::table('admin_notifications')->where('id', $id)->value('title')));
     }
 
     public function test_checkout_duration_falls_back_to_existing_config_until_overridden(): void

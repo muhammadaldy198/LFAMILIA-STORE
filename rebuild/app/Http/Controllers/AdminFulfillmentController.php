@@ -116,7 +116,8 @@ class AdminFulfillmentController
             'account_id' => 'ID akun', 'meter_number' => 'Nomor meter', 'email' => 'Email',
         ];
 
-        $attempts->through(function (object $attempt) use ($presentation, $fieldLabels, $knownLabels): array {
+        $manualOverdueMinutes = app(OperationalSettings::class)->value('manual_overdue_minutes');
+        $attempts->through(function (object $attempt) use ($presentation, $fieldLabels, $knownLabels, $manualOverdueMinutes): array {
             $input = $presentation->json($attempt->customer_input);
             $snapshot = $presentation->json($attempt->snapshot);
             $delivery = $presentation->json($attempt->delivery_payload);
@@ -174,7 +175,7 @@ class AdminFulfillmentController
                 'delivery' => $delivery,
                 'manual_age_minutes' => $manualAge,
                 'is_overdue' => $attempt->status === 'MANUAL_PENDING'
-                    && $manualAge > app(OperationalSettings::class)->value('manual_overdue_minutes'),
+                    && $manualAge > $manualOverdueMinutes,
                 'can_complete' => ! $terminal && $attempt->status === 'MANUAL_PENDING'
                     && in_array($attempt->order_status, ['PAID', 'PROCESSING'], true),
                 'can_fail' => ! $terminal && $attempt->status === 'MANUAL_PENDING',
@@ -192,7 +193,7 @@ class AdminFulfillmentController
             'attempts' => $attempts,
             'filters' => $filters,
             'metrics' => $metrics,
-            'manualOverdueMinutes' => app(OperationalSettings::class)->value('manual_overdue_minutes'),
+            'manualOverdueMinutes' => $manualOverdueMinutes,
             'statuses' => collect(self::STATUSES)->mapWithKeys(
                 fn (string $status): array => [$status => $presentation->status($status)]
             )->all(),

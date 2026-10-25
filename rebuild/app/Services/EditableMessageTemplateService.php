@@ -56,18 +56,21 @@ class EditableMessageTemplateService
     public function renderNotification(string $event, string $title, string $message): array
     {
         if (! preg_match('/^[a-zA-Z0-9._-]{1,120}$/', $event)) {
-            return ['title' => $title, 'message' => $message];
+            return ['title' => mb_substr($title, 0, 180), 'message' => $message];
         }
         $entry = $this->saved()['notifications'][$event] ?? null;
         if (! is_array($entry)) {
-            return ['title' => $title, 'message' => $message];
+            return ['title' => mb_substr($title, 0, 180), 'message' => $message];
         }
         $heading = (string) ($entry['title'] ?? '');
         $body = (string) ($entry['body'] ?? '');
 
         return [
-            'title' => $heading !== '' && str_contains($heading, '{{default_title}}')
-                ? mb_substr(str_replace('{{default_title}}', $title, $heading), 0, 255) : $title,
+            'title' => mb_substr(
+                $heading !== '' && str_contains($heading, '{{default_title}}')
+                    ? str_replace('{{default_title}}', $title, $heading) : $title,
+                0, 180
+            ),
             'message' => $body !== '' && str_contains($body, '{{default_body}}')
                 ? str_replace('{{default_body}}', $message, $body) : $message,
         ];
