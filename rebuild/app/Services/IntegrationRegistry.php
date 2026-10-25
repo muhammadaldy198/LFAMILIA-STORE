@@ -133,9 +133,9 @@ class IntegrationRegistry
                 ],
             ],
             'doku' => [
-                'name' => 'DOKU Checkout',
+                'name' => 'DOKU Direct API',
                 'group' => 'Pembayaran',
-                'description' => 'Kredensial DOKU Checkout untuk halaman pembayaran yang dihosting DOKU.',
+                'description' => 'Kredensial DOKU Direct API Non-SNAP untuk pembayaran VA langsung di LFAMILIA.',
                 'default_environment' => 'sandbox',
                 'credential_scope' => 'per_environment',
                 'environments' => [
