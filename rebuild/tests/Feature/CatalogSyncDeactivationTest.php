@@ -116,6 +116,37 @@ class CatalogSyncDeactivationTest extends TestCase
         return ['active' => (bool) $fresh->is_active, 'marker' => (bool) $fresh->disabled_by_sync];
     }
 
+    public function test_sync_restores_only_one_sku_when_historic_nominal_has_two_mappings(): void
+    {
+        $this->login();
+        $package = $this->package($this->product('AUTO_PROVIDER'), 'RESTORE_ONE');
+        $selected = $this->mapping($package, 'DIGIFLAZZ', 'restore-one-selected', false, 0);
+        $oldBackup = $this->mapping($package, 'DIGIFLAZZ', 'restore-one-backup', false, 1);
+        DB::table('provider_mappings')->whereIn('id', [$selected->id, $oldBackup->id])
+            ->update(['disabled_by_sync' => true]);
+        DB::table('product_packages')->where('id', $package->id)
+            ->update(['is_active' => false, 'disabled_by_sync' => true]);
+
+        // Send the historical secondary row FIRST. Supplier response order
+        // must not change the selected SKU or reactivate both mappings.
+        $this->fakeCatalog([$this->row('restore-one-backup'), $this->row('restore-one-selected')]);
+        app(DigiflazzCatalogService::class)->sync();
+
+        $this->assertDatabaseHas('provider_mappings', [
+            'id' => $selected->id, 'is_active' => true, 'disabled_by_sync' => false,
+        ]);
+        $this->assertDatabaseHas('provider_mappings', [
+            'id' => $oldBackup->id, 'is_active' => false, 'disabled_by_sync' => true,
+        ]);
+        $this->assertSame(['active' => true, 'marker' => false], $this->state($package));
+        $this->assertSame(1, DB::table('provider_mappings')
+            ->where('product_package_id', $package->id)->where('is_active', true)->count());
+
+        // Subsequent scheduled sync cannot re-enable the historic backup.
+        app(DigiflazzCatalogService::class)->sync();
+        $this->assertFalse((bool) $oldBackup->fresh()->is_active);
+    }
+
     public function test_store_cost_backfill_is_idempotent_and_skips_rows_without_a_reference(): void
     {
         $this->login();

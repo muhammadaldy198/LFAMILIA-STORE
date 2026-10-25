@@ -147,9 +147,29 @@ class DigiflazzCatalogService
                         // only if their verified supplier identity still matches.
                         if ($row['buyer_active'] && $row['seller_active']
                             && ($row['unlimited_stock'] || $row['stock'] > 0)) {
-                            (clone $mappingQuery)->whereIn('id', $matchingIds)
+                            // Historic installations can have multiple Digiflazz
+                            // mappings for one nominal. Sync may restore ONLY
+                            // the explicitly earliest mapping, and never when
+                            // another sibling is already active. Supplier row
+                            // order must not pick a hidden backup by accident.
+                            $restoreCandidates = (clone $mappingQuery)->whereIn('id', $matchingIds)
                                 ->where('disabled_by_sync', true)->where('is_active', false)
-                                ->update(['is_active' => true, 'disabled_by_sync' => false, 'updated_at' => now()]);
+                                ->get(['id', 'product_package_id']);
+                            foreach ($restoreCandidates as $candidate) {
+                                $siblings = DB::table('provider_mappings')
+                                    ->where('product_package_id', $candidate->product_package_id)
+                                    ->where('provider_id', $providerId)
+                                    ->orderBy('priority')->orderBy('id')
+                                    ->lockForUpdate()->get(['id', 'is_active']);
+                                if (! $siblings->first()
+                                    || (int) $siblings->first()->id !== (int) $candidate->id
+                                    || $siblings->contains(fn (object $sibling): bool => (bool) $sibling->is_active)) {
+                                    continue;
+                                }
+                                DB::table('provider_mappings')->where('id', $candidate->id)
+                                    ->where('disabled_by_sync', true)->where('is_active', false)
+                                    ->update(['is_active' => true, 'disabled_by_sync' => false, 'updated_at' => now()]);
+                            }
                             // Nominal yang dulu dimatikan sinkron ikut hidup lagi,
                             // tapi hanya bila penandanya nyala dan sekarang benar-benar
                             // punya sumber aktif. Nominal yang admin matikan sendiri
