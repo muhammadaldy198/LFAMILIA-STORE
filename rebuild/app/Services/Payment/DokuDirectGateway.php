@@ -196,12 +196,17 @@ class DokuDirectGateway
             ];
             // BNI Non-SNAP uses "biling_type" (provider spelling) and requires
             // a short, unique merchant reference in addition to the invoice.
-            if (($context['route_configuration']['api_path'] ?? '') === '/bni-virtual-account/v2/payment-code') {
-                $vaInfo['biling_type'] = 'FIXED';
+            $apiPath = (string) ($context['route_configuration']['api_path'] ?? '');
+            if ($apiPath === '/bni-virtual-account/v2/payment-code') {
+                $vaInfo['billing_type'] = 'FIXED';
                 $vaInfo['merchant_unique_reference'] = strtoupper(substr(
                     hash('sha256', (string) $context['merchant_reference']), 0, 12
                 ));
             }
+
+            $customerName = (string) ($context['customer_name'] ?: 'Customer LFAMILIA');
+            // Each acquiring bank enforces its own customer-name length.
+            $customerName = mb_substr($customerName, 0, $apiPath === '/permata-virtual-account/v2/payment-code' ? 20 : 64);
 
             return [
                 'order' => [
@@ -210,7 +215,7 @@ class DokuDirectGateway
                 ],
                 'virtual_account_info' => $vaInfo,
                 'customer' => array_filter([
-                    'name' => $context['customer_name'] ?: 'Customer LFAMILIA',
+                    'name' => $customerName,
                     'email' => $context['customer_email'],
                     'phone' => $context['customer_phone'],
                 ]),
