@@ -179,5 +179,20 @@ class BankVirtualAccountProvisioningTest extends TestCase
         $this->assertSame(60, $payload['virtual_account_info']['expired_time']);
         $this->assertArrayNotHasKey('payment', $payload);
         $this->assertSame(10000, $payload['order']['amount']);
+
+        $bni = $method->invoke($gateway, [
+            'route_configuration' => ['api_path' => '/bni-virtual-account/v2/payment-code'],
+            'merchant_reference' => 'PAY-123',
+            'amount_idr' => 10000,
+            'expires_minutes' => 60,
+            'customer_name' => 'Test Customer',
+            'customer_email' => 'customer@example.test',
+            'customer_phone' => '08123456789',
+        ]);
+        $this->assertSame('FIXED', $bni['virtual_account_info']['biling_type']);
+        $this->assertMatchesRegularExpression(
+            '/^[A-F0-9]{12}$/',
+            $bni['virtual_account_info']['merchant_unique_reference']
+        );
     }
 }
