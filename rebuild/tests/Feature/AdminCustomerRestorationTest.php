@@ -306,6 +306,30 @@ class AdminCustomerRestorationTest extends TestCase
             ->whereIn('wallet_id', [$user->wallet->id, $other->wallet->id])->count());
     }
 
+    public function test_distinct_long_wallet_request_keys_remain_distinct(): void
+    {
+        $this->login('SUPER_ADMIN');
+        $user = $this->customer();
+
+        // These keys share their first 100 chars: reference_id truncation
+        // must not collapse two separate adjustments into a single ledger key.
+        $prefix = str_repeat('K', 100);
+        foreach ([$prefix.'first-0001', $prefix.'second-0002'] as $key) {
+            $this->withSession(['admin.password_confirmed_at' => time()])
+                ->post('/admin/customers/'.$user->id.'/wallet', [
+                    'amount_idr' => 1000,
+                    'reason' => 'Kunci panjang berbeda',
+                    'idempotency_key' => $key,
+                ])->assertRedirect()->assertSessionHasNoErrors();
+        }
+
+        $this->assertSame(2000, (int) DB::table('wallets')
+            ->where('user_id', $user->id)->value('balance_idr'));
+        $this->assertSame(2, DB::table('wallet_ledger')
+            ->where('wallet_id', $user->wallet->id)
+            ->where('source', 'ADMIN_ADJUSTMENT')->distinct()->count('reference_id'));
+    }
+
     public function test_legacy_admin_wallet_adjustment_key_remains_idempotent(): void
     {
         $this->login('SUPER_ADMIN');

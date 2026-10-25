@@ -400,7 +400,9 @@ class AdminCustomerController
                 'balance_after_idr' => $afterBalance,
                 'source' => 'ADMIN_ADJUSTMENT',
                 'reference_type' => 'CUSTOMER',
-                'reference_id' => substr($userId.':'.$data['idempotency_key'], 0, 100),
+                // Hash long request keys instead of truncating their suffix:
+                // two distinct keys must never share a ledger reference.
+                'reference_id' => 'customer:'.$userId.':'.hash('sha256', $data['idempotency_key']),
                 'actor_type' => 'admin_user',
                 'actor_id' => (string) $request->user('admin')->id,
                 'idempotency_key' => $ledgerKey,
