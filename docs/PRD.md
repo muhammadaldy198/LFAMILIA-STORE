@@ -189,14 +189,14 @@ Aturan:
 
 | Kanal | Status | Catatan |
 |---|---|---|
-| **Midtrans** (QRIS, Virtual Account, E-Wallet) | Aktif | Gateway utama. |
+| **Midtrans** (QRIS, Virtual Account, E-Wallet) | Aktif | Gateway independen; dipilih Admin/Superadmin per metode. |
 | **QRIS manual** | Ada, dipakai sesuai kebutuhan | Konfirmasi oleh admin setelah dana masuk. |
 | **Saldo LFAMILIA** | Aktif untuk member | Guest tidak punya saldo. |
-| **DOKU** | **Belum dipakai — cadangan** | Kode tersedia. Tidak tampil di toko selama belum aktif. Diaktifkan/dipindah **admin secara manual** lewat pengaturan kanal di panel, atas keputusan pemilik (lihat §19 butir 12). |
+| **DOKU Direct API** | **Belum dipakai** | Gateway independen setara Midtrans. Pembayaran VA Direct API ditampilkan di halaman LFAMILIA; Admin/Superadmin memilih secara manual per metode. Kanal belum siap tidak ditampilkan. |
 
 Kanal yang tampil ke pembeli hanya kanal yang aktif. Kanal dalam perawatan tidak tampil dan tidak bisa dipilih.
 
-**Tidak ada perpindahan gateway otomatis.** Midtrans adalah gateway utama; DOKU hanya cadangan. Di panel memang ada pilihan kanal/gateway, dan admin bebas menggantinya sendiri — yang memilih manusia, bukan sistem secara otomatis.
+**Tidak ada perpindahan gateway otomatis.** Midtrans dan DOKU berdiri sendiri, setara, dan tidak saling menjadi cadangan. Admin/Superadmin memilih provider secara manual untuk masing-masing metode; provider lain tidak mengambil alih ketika pilihan tidak tersedia.
 
 ### 7.2 Aturan "lunas"
 
@@ -568,7 +568,7 @@ Detail ada di dokumen terpisah (`ADMIN-PANEL.md`). Yang mengikat di PRD:
 9. **Menghapus audit log atau ledger.**
 10. **Mengubah harga pesanan yang sudah dibuat.**
 11. **Menampilkan status internal teknis ke pelanggan.**
-12. **Mengaktifkan DOKU** tanpa keputusan pemilik yang tertulis. Perpindahan gateway juga tidak pernah otomatis — selalu tindakan manual admin atas keputusan pemilik.
+12. **Mengaktifkan kanal DOKU tanpa konfigurasi dan validasi sandbox yang diperlukan.** Admin/Superadmin memilih provider per metode secara manual; tidak ada konsep gateway cadangan atau pengalihan otomatis.
 
 ---
 
@@ -608,7 +608,7 @@ Tidak ada saat ini. Dua butir terakhir ditutup pada 2026-10-24:
 | Tanggal | Keputusan |
 |---|---|
 | 2026-10-25 | Penegasan model **tepat satu SKU Digiflazz terpilih per nominal**, tanpa SKU cadangan otomatis termasuk sebelum request, dan `max_price` selalu sama persis dengan harga modal toko SKU tersebut. Jalur impor/migrasi lama, pemeriksaan admin, dan dokumentasi agen diselaraskan. Status Midtrans settlement/capture memerlukan verifikasi hasil sukses; status Digiflazz dan response code (termasuk timeout yang telah membentuk transaksi) harus konsisten sebelum penyelesaian pesanan. |
-| 2026-10-24 | Penyelarasan dengan Buku Keputusan pemilik (PRD v2.1). Harga: sistem tiga harga (seller → modal toko → harga jual); modal dibentuk sekali saat impor (+2%), jual bawaan +10% disimpan sebagai margin nominal; **markup tingkat produk dihapus**; aturan khusus ML ×1,06 (2026-10-12) **dicabut** — semua produk ikut bawaan impor, persen bisa diubah per nominal sesudahnya. Pembulatan ke atas. Batas harga kirim = **persis modal toko tertinggi** SKU aktif (tambahan +1% dihapus). Sinkronisasi: tiap **15 menit**, seluruh katalog; nominal tanpa sumber aktif dinonaktifkan sinkronisasi; pemetaan belum pernah dipakai dihapus, yang pernah dipakai dinonaktifkan; nominal tidak tersedia **disembunyikan total** dari pembeli (termasuk data basi > 24 jam). Nama nominal impor **tanpa nama game** untuk semua produk. DOKU = **cadangan**, diaktifkan/dipindah admin manual lewat panel; tidak ada perpindahan gateway otomatis. Biaya kanal: prinsip gross-up ditanggung pembeli; saldo & QRIS manual nol; angka per kanal di dokumen pembayaran. Pembayaran belum pasti: ditandai UNKNOWN, dicek admin ke gateway, pembeli diberi peringatan tertulis (bukan larangan). Status BLOCKED **tidak tampil** ke pelanggan (dipetakan ke Gagal). Verifikasi email: **link ketat** — belum verifikasi tidak bisa login; sesudah login wajib nomor WhatsApp; satu nomor satu akun. Diskon tingkatan member diatur admin. Notifikasi admin: Telegram **dan** Discord. Ulasan pembeli: terbit langsung, admin bisa hapus permanen. Perbedaan PRD vs kode diputuskan **kasus per kasus** oleh pemilik (§0); §19 tetap mutlak. |
+| 2026-10-24 | Penyelarasan dengan Buku Keputusan pemilik (PRD v2.1). Harga: sistem tiga harga (seller → modal toko → harga jual); modal dibentuk sekali saat impor (+2%), jual bawaan +10% disimpan sebagai margin nominal; **markup tingkat produk dihapus**; aturan khusus ML ×1,06 (2026-10-12) **dicabut** — semua produk ikut bawaan impor, persen bisa diubah per nominal sesudahnya. Pembulatan ke atas. Batas harga kirim = **persis modal toko tertinggi** SKU aktif (tambahan +1% dihapus). Sinkronisasi: tiap **15 menit**, seluruh katalog; nominal tanpa sumber aktif dinonaktifkan sinkronisasi; pemetaan belum pernah dipakai dihapus, yang pernah dipakai dinonaktifkan; nominal tidak tersedia **disembunyikan total** dari pembeli (termasuk data basi > 24 jam). Nama nominal impor **tanpa nama game** untuk semua produk. DOKU sekarang gateway independen setara Midtrans sesuai keputusan 2026-10-25; tidak ada perpindahan gateway otomatis. Biaya kanal: prinsip gross-up ditanggung pembeli; saldo & QRIS manual nol; angka per kanal di dokumen pembayaran. Pembayaran belum pasti: ditandai UNKNOWN, dicek admin ke gateway, pembeli diberi peringatan tertulis (bukan larangan). Status BLOCKED **tidak tampil** ke pelanggan (dipetakan ke Gagal). Verifikasi email: **link ketat** — belum verifikasi tidak bisa login; sesudah login wajib nomor WhatsApp; satu nomor satu akun. Diskon tingkatan member diatur admin. Notifikasi admin: Telegram **dan** Discord. Ulasan pembeli: terbit langsung, admin bisa hapus permanen. Perbedaan PRD vs kode diputuskan **kasus per kasus** oleh pemilik (§0); §19 tetap mutlak. |
 | 2026-10-22 | PRD ditulis ulang. Status pelanggan dikunci 6. DOKU ditandai belum dipakai. Pengembalian dana: manual, member lewat penyesuaian saldo, guest lewat transfer. |
 | 2026-10-22 | Tingkatan member: BASIC/SILVER 500rb/GOLD 5jt/DIAMOND 20jt/PLATINUM 50jt; MAFIA internal, tidak tampil. Data guest disimpan 30 hari. DOKU dibiarkan ada (akan dipasang). Footer 4 kanal termasuk Discord. |
 | 2026-10-22 | Penyesuaian saldo: Super Admin saja, tanpa batas nominal. Pesanan manual: peringatan setelah 1 jam jam-layanan. Refund lewat 7 hari hanya bila kesalahan sistem terbukti. Batas hari laporan 00:00–23:59 WIB. Ambang saldo penyedia tetap 5 transaksi. Situs belum produksi. |
