@@ -61,7 +61,8 @@ class PaymentRouteCatalogService
                 'supports_wallet_topup' => (bool) ($definition['supports_wallet_topup'] ?? false),
                 // Bank VA routes are pre-wired automatically. Gateway credentials,
                 // maintenance state and the channel toggle still gate visibility.
-                'is_active' => in_array((string) ($definition['channel'] ?? ''), array_column((array) config('payment_bank_channels', []), 'code'), true),
+                'is_active' => ($definition['gateway'] ?? '') === 'MIDTRANS'
+                    && in_array((string) ($definition['channel'] ?? ''), array_column((array) config('payment_bank_channels', []), 'code'), true),
                 'created_at' => now(),
             ]);
             $result['created']++;
