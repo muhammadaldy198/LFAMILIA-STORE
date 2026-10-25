@@ -242,6 +242,8 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
     Route::middleware('admin.permission:payments.manage')->prefix('admin/payments')
         ->name('admin.payments.')->group(function (): void {
             Route::get('/', [AdminPaymentController::class, 'index'])->name('index');
+            Route::post('/channels/{channelId}/select-gateway', [AdminPaymentController::class, 'selectGateway'])
+                ->middleware('throttle:admin-sensitive')->name('channels.select-gateway');
             Route::post('/manual/{paymentId}/confirm', [AdminPaymentController::class, 'confirmManual'])
                 ->middleware(['throttle:admin-sensitive', 'admin.password.confirm'])->name('manual.confirm');
             Route::post('/topups/{topupId}/close-review', [AdminPaymentController::class, 'closeRefundReview'])
