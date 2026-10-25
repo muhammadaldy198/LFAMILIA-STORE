@@ -75,8 +75,8 @@ class AdminChoiceSettingsTest extends TestCase
             for ($i = 0; $i < 40; $i++) {
                 $this->assertNotSame('', $status->label('SUCCESS'));
             }
-            $settingsReads = array_filter(DB::getQueryLog(), fn (array $query): bool =>
-                str_contains(strtolower((string) $query['query']), 'system_settings'));
+            $settingsReads = array_filter(DB::getQueryLog(),
+                fn (array $query): bool => str_contains(strtolower((string) $query['query']), 'system_settings'));
             $this->assertCount(1, $settingsReads);
         } finally {
             DB::disableQueryLog();
