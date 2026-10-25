@@ -190,15 +190,25 @@ class DokuDirectGateway
     {
         $template = $context['route_configuration']['request_template'] ?? null;
         if (! is_array($template)) {
+            $vaInfo = [
+                'expired_time' => $context['expires_minutes'],
+                'reusable_status' => false,
+            ];
+            // BNI Non-SNAP uses "biling_type" (provider spelling) and requires
+            // a short, unique merchant reference in addition to the invoice.
+            if (($context['route_configuration']['api_path'] ?? '') === '/bni-virtual-account/v2/payment-code') {
+                $vaInfo['biling_type'] = 'FIXED';
+                $vaInfo['merchant_unique_reference'] = strtoupper(substr(
+                    hash('sha256', (string) $context['merchant_reference']), 0, 12
+                ));
+            }
+
             return [
                 'order' => [
                     'invoice_number' => $context['merchant_reference'],
                     'amount' => $context['amount_idr'],
                 ],
-                'virtual_account_info' => [
-                    'expired_time' => $context['expires_minutes'],
-                    'reusable_status' => false,
-                ],
+                'virtual_account_info' => $vaInfo,
                 'customer' => array_filter([
                     'name' => $context['customer_name'] ?: 'Customer LFAMILIA',
                     'email' => $context['customer_email'],
