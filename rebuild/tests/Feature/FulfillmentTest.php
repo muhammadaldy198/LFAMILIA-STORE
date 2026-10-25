@@ -212,6 +212,56 @@ class FulfillmentTest extends TestCase
         Http::assertSentCount(1);
     }
 
+    public function test_digiflazz_conflicting_codes_and_timeout_do_not_complete_or_fail_a_paid_order(): void
+    {
+        Queue::fake();
+        $this->credentials();
+        $service = app(FulfillmentService::class);
+
+        foreach ([
+            ['status' => 'Sukses', 'rc' => '03'],
+            ['status' => 'Sukses', 'rc' => ''],
+            ['status' => 'Gagal', 'rc' => '01'],
+            ['status' => 'Gagal', 'rc' => '70'],
+            ['status' => 'Gagal', 'rc' => '00'],
+            ['status' => 'Pending', 'rc' => '00'],
+        ] as $responseState) {
+            $catalog = $this->automaticCatalog();
+            $orderId = $this->paidOrder($catalog);
+
+            // Open a real fulfillment attempt without sending to the provider.
+            $service->startOrder($orderId);
+            $attempt = DB::table('fulfillment_attempts')->where('order_id', $orderId)->firstOrFail();
+            $ref = 'FUL-'.DB::table('orders')->where('id', $orderId)->value('order_number').'-1';
+            DB::table('fulfillment_attempts')->where('id', $attempt->id)->update([
+                'status' => 'PENDING',
+                'request_payload' => json_encode([
+                    'ref_id' => $ref,
+                    'buyer_sku_code' => 'DF-PRIMARY',
+                    'customer_no' => '1234567890',
+                    'max_price' => 12000,
+                ], JSON_THROW_ON_ERROR),
+            ]);
+
+            $service->applyProviderResult((int) $attempt->id, [
+                'ref_id' => $ref,
+                'buyer_sku_code' => 'DF-PRIMARY',
+                'customer_no' => '1234567890',
+                'status' => $responseState['status'],
+                'rc' => $responseState['rc'],
+                'sn' => 'SHOULD-NOT-DELIVER',
+                'price' => 10000,
+            ], 'provider_response');
+
+            $this->assertSame('UNKNOWN', DB::table('fulfillment_attempts')
+                ->where('id', $attempt->id)->value('status'), json_encode($responseState));
+            $this->assertSame('PROCESSING', DB::table('orders')
+                ->where('id', $orderId)->value('status'), json_encode($responseState));
+            $this->assertNull(DB::table('orders')->where('id', $orderId)->value('delivery_payload'));
+            $this->assertSame(1, DB::table('fulfillment_attempts')->where('order_id', $orderId)->count());
+        }
+    }
+
     public function test_removed_supplier_sku_blocks_paid_order_and_queued_send(): void
     {
         Queue::fake();

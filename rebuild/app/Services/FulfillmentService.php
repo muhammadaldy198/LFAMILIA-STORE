@@ -385,6 +385,18 @@ class FulfillmentService
             }
 
             $incoming = $this->providerStatus((string) $response['status']);
+            $responseCode = isset($response['rc']) && is_scalar($response['rc'])
+                ? trim((string) $response['rc']) : '';
+            // Digiflazz buyer API uses rc=00 only for a successful delivery.
+            // Timeout (01/70) and router-pending (99/03) can represent an
+            // already-created transaction: never confirm a failure or issue a
+            // replacement order while the original reference is uncertain.
+            if (($incoming === 'SUCCESS' && $responseCode !== '00')
+                || ($incoming === 'FAILED_CONFIRMED'
+                    && in_array($responseCode, ['00', '01', '03', '70', '99'], true))
+                || ($incoming === 'PENDING' && $responseCode === '00')) {
+                $incoming = 'UNKNOWN';
+            }
             if ($attempt->status === 'SUCCESS') {
                 return false;
             }
