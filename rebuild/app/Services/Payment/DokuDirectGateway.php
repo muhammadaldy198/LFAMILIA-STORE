@@ -84,8 +84,9 @@ class DokuDirectGateway
 
         $route = $context['route_configuration'];
         $path = (string) ($route['api_path'] ?? '');
-        if (! str_starts_with($path, '/') || str_contains($path, '..')) {
-            throw ValidationException::withMessages(['payment' => 'Konfigurasi metode pembayaran belum lengkap.']);
+        // Reject legacy hosted Checkout paths and unreviewed provider endpoints.
+        if (! preg_match('~^/(?:doku|bca|bni|mandiri|permata|cimb)-virtual-account/v2/payment-code$~', $path)) {
+            throw ValidationException::withMessages(['payment' => 'Metode DOKU Direct API belum didukung.']);
         }
 
         $baseUrl = $this->runtime->dokuApiBase($environment, $config);
@@ -143,7 +144,7 @@ class DokuDirectGateway
             throw new RuntimeException('DOKU_CREATE_UNCERTAIN');
         }
 
-        $public = ['kind' => $path === '/checkout/v1/payment' ? 'doku_checkout' : 'instructions'];
+        $public = ['kind' => 'instructions'];
         foreach ((array) ($route['public_paths'] ?? []) as $name => $dataPath) {
             if (! is_string($name) || ! is_string($dataPath)
                 || ! in_array($name, ['payment_code', 'payment_url', 'qr_string', 'va_number'], true)) {
@@ -153,6 +154,14 @@ class DokuDirectGateway
             if (is_string($value) || is_numeric($value)) {
                 $public[$name] = (string) $value;
             }
+        }
+
+        if (! isset($public['va_number']) || trim((string) $public['va_number']) === '') {
+            throw new RuntimeException('DOKU_DIRECT_VA_MISSING');
+        }
+        $returnedInvoice = data_get($data, 'order.invoice_number');
+        if (is_string($returnedInvoice) && ! hash_equals((string) $context['merchant_reference'], $returnedInvoice)) {
+            throw new RuntimeException('DOKU_DIRECT_INVOICE_MISMATCH');
         }
 
         return [
@@ -179,31 +188,6 @@ class DokuDirectGateway
      */
     private function payload(array $context): array
     {
-        if (($context['route_configuration']['api_path'] ?? '') === '/checkout/v1/payment') {
-            $payment = ['payment_due_date' => $context['expires_minutes']];
-            $methods = $context['route_configuration']['payment_method_types'] ?? null;
-            if (is_array($methods) && $methods !== []) {
-                $payment['payment_method_types'] = array_values(array_filter(
-                    $methods, fn ($method): bool => is_string($method) && str_starts_with($method, 'VIRTUAL_ACCOUNT_')
-                ));
-            }
-
-            return [
-                'order' => [
-                    'invoice_number' => $context['merchant_reference'],
-                    'amount' => $context['amount_idr'],
-                    'auto_redirect' => ! empty($context['return_url']),
-                    'callback_url_result' => $context['return_url'] ?? null,
-                ],
-                'payment' => $payment,
-                'customer' => array_filter([
-                    'name' => $context['customer_name'] ?: 'Customer LFAMILIA',
-                    'email' => $context['customer_email'],
-                    'phone' => $context['customer_phone'],
-                ]),
-            ];
-        }
-
         $template = $context['route_configuration']['request_template'] ?? null;
         if (! is_array($template)) {
             return [
