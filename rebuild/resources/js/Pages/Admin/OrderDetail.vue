@@ -14,6 +14,7 @@ const props = defineProps({
     canResendDelivery: Boolean,
     canCancel: Boolean,
     canCheckFulfillment: Boolean,
+    cancelReasons: { type: Array, default: () => [] },
 });
 
 const busy = ref('');
@@ -62,12 +63,6 @@ const resend = () => {
     resendOpen.value = false;
 };
 const cancelOpen = ref(false);
-const cancelReasons = [
-    { code: 'stok_habis', label: 'Stok habis' },
-    { code: 'salah_harga', label: 'Salah harga' },
-    { code: 'permintaan_pelanggan', label: 'Permintaan pelanggan' },
-    { code: 'lainnya', label: 'Lainnya' },
-];
 const cancelReason = ref('');
 const cancelNote = ref('');
 const cancel = () => {
@@ -281,7 +276,7 @@ const whatsapp = computed(() => {
             <div class="adm-field full">
                 <span>Alasan pembatalan (wajib, tercatat di riwayat)</span>
                 <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">
-                    <button v-for="r in cancelReasons" :key="r.code" type="button"
+                    <button v-for="r in props.cancelReasons" :key="r.code" type="button"
                             class="adm-btn sm" :class="{ primary: cancelReason === r.code }"
                             @click="cancelReason = r.code">{{ r.label }}</button>
                 </div>

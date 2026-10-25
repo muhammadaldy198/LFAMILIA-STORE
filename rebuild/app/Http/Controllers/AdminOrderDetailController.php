@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\AdminOrderPresentation;
 use App\Services\AdminPermissionService;
+use App\Services\AdminChoiceSettings;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -51,6 +52,7 @@ class AdminOrderDetailController
 
         return Inertia::render('Admin/OrderDetail', [
             'order' => $order, 'attempts' => $attempts,
+            'cancelReasons' => app(AdminChoiceSettings::class)->active('cancellations'),
             'canViewCustomer' => $permissions->allows($request->user('admin'), 'customers.view'),
             'canResendDelivery' => $canResendDelivery,
             'canCancel' => strtoupper((string) $request->user('admin')?->role) === 'SUPER_ADMIN'

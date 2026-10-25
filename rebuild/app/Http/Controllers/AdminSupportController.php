@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\AdminAuditService;
+use App\Services\AdminChoiceSettings;
 use App\Services\TransactionalEmailService;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -17,22 +18,12 @@ class AdminSupportController
 {
     private const STATUSES = ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'];
 
-    private const KINDS = [
-        'GENERAL' => 'Umum',
-        'ORDER' => 'Pesanan',
-        'PAYMENT' => 'Pembayaran',
-        'REFUND' => 'Pengembalian Dana',
-        'COMPLAINT' => 'Komplain',
-        'ACCOUNT' => 'Akun pelanggan',
-        'OTHER' => 'Lainnya',
-    ];
-
-    public function index(Request $request): Response
+    public function index(Request $request, AdminChoiceSettings $choices): Response
     {
         $filters = $request->validate([
             'q' => ['nullable', 'string', 'max:100'],
             'status' => ['nullable', Rule::in(self::STATUSES)],
-            'kind' => ['nullable', Rule::in(array_keys(self::KINDS))],
+            'kind' => ['nullable', Rule::in(array_keys($choices->labels('support')))],
             'source' => ['nullable', Rule::in(['ACCOUNT', 'GUEST'])],
             'per_page' => ['nullable', 'integer', Rule::in([10, 25, 50, 100])],
             'ticket' => ['nullable', 'integer', 'min:1'],
@@ -122,9 +113,7 @@ class AdminSupportController
                 array_map(fn ($reply): string => trim((string) $reply), $quickReplies),
                 fn (string $reply): bool => $reply !== ''
             )),
-            'kinds' => collect(self::KINDS)
-                ->map(fn (string $label, string $code): array => ['code' => $code, 'label' => $label])
-                ->values(),
+            'kinds' => $choices->all()['support'],
             'summary' => [
                 'total' => (int) $statusCounts->sum(),
                 'open' => (int) ($statusCounts['OPEN'] ?? 0),
@@ -185,10 +174,11 @@ class AdminSupportController
         int $id,
         AdminAuditService $audit,
         TransactionalEmailService $emails,
+        AdminChoiceSettings $choices,
     ): RedirectResponse {
         $data = $request->validate([
             'status' => ['required', Rule::in(self::STATUSES)],
-            'kind' => ['nullable', Rule::in(array_keys(self::KINDS))],
+            'kind' => ['nullable', Rule::in(array_keys($choices->labels('support')))],
             'reply' => ['nullable', 'string', 'max:5000'],
         ]);
         $reply = trim((string) ($data['reply'] ?? ''));

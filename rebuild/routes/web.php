@@ -3,6 +3,7 @@
 use App\Http\Controllers\AdminAccessController;
 use App\Http\Controllers\AdminAuditController;
 use App\Http\Controllers\AdminAuthController;
+use App\Http\Controllers\AdminChoiceSettingsController;
 use App\Http\Controllers\AdminCatalogController;
 use App\Http\Controllers\AdminCatalogMediaController;
 use App\Http\Controllers\AdminContentController;
@@ -438,6 +439,10 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
 
     Route::middleware('admin.permission:settings.manage')->group(function (): void {
         Route::get('/admin/settings', [AdminSettingsController::class, 'index'])->name('admin.settings');
+        Route::get('/admin/choice-settings', [AdminChoiceSettingsController::class, 'index'])
+            ->middleware('admin.super')->name('admin.choice-settings');
+        Route::put('/admin/choice-settings', [AdminChoiceSettingsController::class, 'update'])
+            ->middleware(['admin.super', 'throttle:admin-sensitive'])->name('admin.choice-settings.update');
         Route::get('/admin/operational-settings', [AdminOperationalSettingsController::class, 'index'])
             ->middleware('admin.super')->name('admin.operational-settings');
         Route::put('/admin/operational-settings', [AdminOperationalSettingsController::class, 'update'])
