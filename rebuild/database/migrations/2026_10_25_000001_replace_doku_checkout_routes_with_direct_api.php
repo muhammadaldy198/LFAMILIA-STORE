@@ -44,13 +44,15 @@ return new class extends Migration
                 ->update(['is_active' => false, 'updated_at' => now()]);
         }
 
-        // The DOKU BRI channel requires a separate SNAP integration. It must
-        // never keep its historical hosted-checkout endpoint enabled.
-        $briId = DB::table('payment_channels')->where('code', 'va_bri')->value('id');
-        if ($briId) {
+        // Routes without a supported Non-SNAP adapter must never retain
+        // historical hosted-checkout payment configuration.
+        $unsupportedIds = DB::table('payment_channels')
+            ->whereIn('code', ['va_bri', 'va_bca', 'va_mandiri', 'va_cimb'])
+            ->pluck('id');
+        if ($unsupportedIds->isNotEmpty()) {
             DB::table('payment_routes')
                 ->where('payment_gateway_id', $dokuId)
-                ->where('payment_channel_id', $briId)
+                ->whereIn('payment_channel_id', $unsupportedIds)
                 ->update([
                     'is_active' => false,
                     'provider_channel' => null,
