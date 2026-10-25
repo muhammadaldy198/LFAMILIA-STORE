@@ -11,6 +11,7 @@ const props = defineProps({
     metrics: { type: Array, default: () => [] },
     statuses: { type: Object, default: () => ({}) },
     updatedAt: String,
+    manualOverdueMinutes: { type: Number, default: 60 },
 });
 
 const rows = computed(() => (Array.isArray(props.attempts?.data) ? props.attempts.data : []));
@@ -157,7 +158,7 @@ const runOn = (action, row) => {
                             </td>
                             <td>
                                 <span class="adm-tag" :class="tone(row.status)">{{ rowStatus(row) }}</span>
-                                <span v-if="row.is_overdue" class="adm-tag danger">Lewat 60 menit</span>
+                                <span v-if="row.is_overdue" class="adm-tag danger">Lewat {{ manualOverdueMinutes }} menit</span>
                                 <p class="dim">Pesanan: {{ row.order_status_label }}</p>
                                 <p v-if="row.manual_age_minutes" class="dim">Menunggu {{ row.manual_age_minutes }} menit jam layanan</p>
                                 <p v-if="row.note" class="dim">{{ row.note }}</p>

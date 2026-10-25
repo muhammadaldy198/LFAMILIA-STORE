@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\AdminAuditService;
+use App\Services\AdminChoiceSettings;
 use App\Services\TransactionalEmailService;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -10,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -17,22 +19,12 @@ class AdminSupportController
 {
     private const STATUSES = ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'];
 
-    private const KINDS = [
-        'GENERAL' => 'Umum',
-        'ORDER' => 'Pesanan',
-        'PAYMENT' => 'Pembayaran',
-        'REFUND' => 'Pengembalian Dana',
-        'COMPLAINT' => 'Komplain',
-        'ACCOUNT' => 'Akun pelanggan',
-        'OTHER' => 'Lainnya',
-    ];
-
-    public function index(Request $request): Response
+    public function index(Request $request, AdminChoiceSettings $choices): Response
     {
         $filters = $request->validate([
             'q' => ['nullable', 'string', 'max:100'],
             'status' => ['nullable', Rule::in(self::STATUSES)],
-            'kind' => ['nullable', Rule::in(array_keys(self::KINDS))],
+            'kind' => ['nullable', Rule::in(array_keys($choices->labels('support')))],
             'source' => ['nullable', Rule::in(['ACCOUNT', 'GUEST'])],
             'per_page' => ['nullable', 'integer', Rule::in([10, 25, 50, 100])],
             'ticket' => ['nullable', 'integer', 'min:1'],
@@ -122,9 +114,7 @@ class AdminSupportController
                 array_map(fn ($reply): string => trim((string) $reply), $quickReplies),
                 fn (string $reply): bool => $reply !== ''
             )),
-            'kinds' => collect(self::KINDS)
-                ->map(fn (string $label, string $code): array => ['code' => $code, 'label' => $label])
-                ->values(),
+            'kinds' => $choices->all()['support'],
             'summary' => [
                 'total' => (int) $statusCounts->sum(),
                 'open' => (int) ($statusCounts['OPEN'] ?? 0),
@@ -185,21 +175,26 @@ class AdminSupportController
         int $id,
         AdminAuditService $audit,
         TransactionalEmailService $emails,
+        AdminChoiceSettings $choices,
     ): RedirectResponse {
         $data = $request->validate([
             'status' => ['required', Rule::in(self::STATUSES)],
-            'kind' => ['nullable', Rule::in(array_keys(self::KINDS))],
+            'kind' => ['nullable', Rule::in(array_keys($choices->labels('support')))],
             'reply' => ['nullable', 'string', 'max:5000'],
         ]);
         $reply = trim((string) ($data['reply'] ?? ''));
         $adminId = (int) $request->user('admin')->id;
+        $activeKinds = array_column($choices->active('support'), 'code');
 
-        [$before, $after] = DB::transaction(function () use ($id, $data, $reply, $adminId): array {
+        [$before, $after] = DB::transaction(function () use ($id, $data, $reply, $adminId, $activeKinds): array {
             $ticket = DB::table('support_tickets')->where('id', $id)->lockForUpdate()->first();
             abort_unless($ticket, 404);
 
             $before = (array) $ticket;
             $kind = (string) ($data['kind'] ?? $ticket->kind ?? 'GENERAL');
+            if ($kind !== $ticket->kind && ! in_array($kind, $activeKinds, true)) {
+                throw ValidationException::withMessages(['kind' => 'Kategori tiket ini sudah nonaktif. Pilih kategori aktif.']);
+            }
             DB::table('support_tickets')->where('id', $id)->update([
                 'status' => $data['status'],
                 'kind' => $kind,

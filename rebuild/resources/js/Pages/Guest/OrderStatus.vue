@@ -1,12 +1,13 @@
 <script setup>
 import { useCustomerPresentation } from '../../Composables/customerPresentation';
 const { customerText } = useCustomerPresentation();
+const visibleOrderStatus = status => customerOrderStatusInfo(status, customerText);
 
 import {Head,Link} from '@inertiajs/vue3';
 import {computed,onMounted,onUnmounted,ref} from 'vue';
 import {rupiah} from '../../lib/money';
 import CustomerShell from '../../Components/CustomerShell.vue';
-import {isTerminalOrderStatus,orderStatusInfo,paymentStatusLabel} from '../../lib/orderStatus';
+import {isTerminalOrderStatus,customerOrderStatusInfo,paymentStatusLabel} from '../../lib/orderStatus';
 
 const props=defineProps({order:Object,payment:Object,events:Array,review:Object});
 const orderState=ref({...props.order});
@@ -27,7 +28,7 @@ const terminal=computed(()=>isTerminalOrderStatus(orderState.value.status));
 const manualQris=computed(()=>paymentState.value?.instructions?.kind==='manual_qris'
     || String(paymentState.value?.channel_code||'').toLowerCase().includes('manual'));
 const paymentUncertain=computed(()=>['UNKNOWN','CREATING'].includes(paymentState.value?.status));
-const statusLabel=s=>orderStatusInfo(s).label;
+const statusLabel=s=>visibleOrderStatus(s).label;
 const eventLabel=e=>{
     if(e.to_status) return statusLabel(e.to_status);
     const map={

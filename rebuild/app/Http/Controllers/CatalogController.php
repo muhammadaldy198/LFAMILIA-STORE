@@ -11,6 +11,7 @@ use App\Models\SavedGameAccount;
 use App\Models\StoreAsset;
 use App\Services\CatalogNominalOrder;
 use App\Services\CheckoutPricing;
+use App\Services\OperationalSettings;
 use App\Services\PaymentRoutingService;
 use App\Services\StorefrontContentService;
 use Illuminate\Database\Eloquent\Builder;
@@ -308,7 +309,7 @@ class CatalogController
                 'balance_idr' => (int) ($user->wallet?->balance_idr ?? 0),
             ] : null,
             'paymentChannels' => $paymentRouting->publicOrderChannels($user),
-            'checkoutReservationMinutes' => max(5, min(120, (int) config('lfamilia.checkout_reservation_minutes', 30))),
+            'checkoutReservationMinutes' => app(OperationalSettings::class)->value('checkout_reservation_minutes'),
             'notices' => $product->notices()->where('is_active', true)->orderBy('sort_order')
                 ->get(['id', 'title', 'body'])
                 ->map(function ($notice) use ($product): array {

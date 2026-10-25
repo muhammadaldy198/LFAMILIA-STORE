@@ -1,11 +1,12 @@
 <script setup>
 import { useCustomerPresentation } from '../../Composables/customerPresentation';
 const { customerText } = useCustomerPresentation();
+const visibleOrderStatus = status => customerOrderStatusInfo(status, customerText);
 
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import CustomerShell from '../../Components/CustomerShell.vue';
-import { orderStatusInfo } from '../../lib/orderStatus';
+import { customerOrderStatusInfo } from '../../lib/orderStatus';
 
 const props = defineProps({
     order: { type: Object, required: true },
@@ -25,7 +26,7 @@ const page = usePage();
 const storefront = computed(() => page.props.storefront || {});
 const storeLogo = computed(() => storefront.value.assets?.logo?.url || '');
 const settings = computed(() => props.pageSettings || {});
-const accent = computed(() => settings.value.accentColor || '#b9ff35');
+const accent = computed(() => settings.value.accentColor || page.props.theme?.primary || '#609CFF');
 
 const paidStatuses = ['PAID', 'SETTLEMENT', 'CAPTURE', 'SUCCESS'];
 const expiredStatuses = ['EXPIRE', 'EXPIRED'];
@@ -66,13 +67,13 @@ const expiryWib = computed(() => Number.isFinite(expiryTimestamp.value)
     : null);
 const canResume = computed(() => !terminal.value && (!props.payment || retryRejected.value));
 const title = computed(() => {
-    if (refunded.value || latePaid.value || failed.value) return orderStatusInfo('FAILED').label;
-    if (expired.value) return orderStatusInfo('EXPIRED').label;
-    if (cancelled.value) return orderStatusInfo('CANCELLED').label;
-    if (paid.value) return orderStatusInfo(orderStatus.value === 'SUCCESS' ? 'SUCCESS' : 'PROCESSING').label;
+    if (refunded.value || latePaid.value || failed.value) return visibleOrderStatus('FAILED').label;
+    if (expired.value) return visibleOrderStatus('EXPIRED').label;
+    if (cancelled.value) return visibleOrderStatus('CANCELLED').label;
+    if (paid.value) return visibleOrderStatus(orderStatus.value === 'SUCCESS' ? 'SUCCESS' : 'PROCESSING').label;
     if (uncertain.value) return 'Memastikan status pembayaran';
     if (retryRejected.value) return 'Pembayaran belum tersedia';
-    return orderStatusInfo(orderStatus.value).label;
+    return visibleOrderStatus(orderStatus.value).label;
 });
 
 const instructions = computed(() => props.payment?.instructions || {});
@@ -263,7 +264,7 @@ onBeforeUnmount(() => {
                 </div>
                 <button type="button" class="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-right" @click="copyValue(order.order_number,'invoice')">
                     <span class="block text-[8px] font-bold uppercase tracking-[0.16em] text-white/35">{{ customerText("pages.payment.show.71ec87b0", "Invoice") }}</span>
-                    <span class="mt-0.5 block max-w-40 truncate font-mono text-[10px] font-black text-[#b9ff35]">{{order.order_number}}</span>
+                    <span class="mt-0.5 block max-w-40 truncate font-mono text-[10px] font-black " :style="{color:accent}">{{order.order_number}}</span>
                 </button>
             </div>
 
@@ -288,7 +289,7 @@ onBeforeUnmount(() => {
                 <p class="mt-1 text-[9px] leading-4 text-white/42">{{settings.invoiceNoticeText || 'Invoice diperlukan untuk mengecek transaksi jika halaman pembayaran tertutup atau terjadi kendala.'}}</p>
                 <div class="mt-3 flex items-center justify-between gap-3 rounded-lg bg-black/20 px-3 py-2.5">
                     <code class="break-all text-sm font-black tracking-wider text-white">{{order.order_number}}</code>
-                    <button type="button" class="shrink-0 text-[10px] font-bold text-[#b9ff35]" @click="copyValue(order.order_number,'invoice')">{{copiedInvoice ? 'Tersalin' : 'Salin Invoice'}}</button>
+                    <button type="button" class="shrink-0 text-[10px] font-bold " :style="{color:accent}" @click="copyValue(order.order_number,'invoice')">{{copiedInvoice ? 'Tersalin' : 'Salin Invoice'}}</button>
                 </div>
             </div>
 
@@ -299,7 +300,7 @@ onBeforeUnmount(() => {
                 <div class="h-px bg-white/[0.08]"></div>
                 <div class="flex items-start justify-between gap-4"><dt class="text-white/35">{{ customerText("pages.payment.show.8269538b", "Harga setelah promo") }}</dt><dd class="font-bold">{{formatIdr(order.product_total_idr)}}</dd></div>
                 <div class="flex items-start justify-between gap-4"><dt class="text-white/35">{{ customerText("pages.payment.show.eae2b0b6", "Biaya pembayaran") }}</dt><dd class="font-bold">{{formatIdr(order.fee_idr)}}</dd></div>
-                <div class="flex items-start justify-between gap-4"><dt class="text-white/35">{{ customerText("pages.payment.show.87378529", "Total pembayaran") }}</dt><dd class="text-lg font-black text-[#b9ff35]">{{formatIdr(order.total_idr)}}</dd></div>
+                <div class="flex items-start justify-between gap-4"><dt class="text-white/35">{{ customerText("pages.payment.show.87378529", "Total pembayaran") }}</dt><dd class="text-lg font-black " :style="{color:accent}">{{formatIdr(order.total_idr)}}</dd></div>
             </dl>
 
             <div v-if="!terminal && !uncertain && qrUrl" class="mt-5 rounded-xl border border-white/10 bg-white p-4 text-center">
@@ -317,7 +318,7 @@ onBeforeUnmount(() => {
                 <p class="text-[9px] font-bold uppercase tracking-[0.14em] text-white/35">{{ customerText("pages.payment.show.6f239bfe", "QRIS") }}</p>
                 <div class="mt-2 flex items-center justify-between gap-3 rounded-lg bg-black/25 px-3 py-3">
                     <code class="break-all text-[10px] font-bold text-white">{{qrString}}</code>
-                    <button type="button" class="shrink-0 text-[10px] font-bold text-[#b9ff35]" @click="copyValue(qrString,'payment')">{{copiedPayment ? 'Tersalin' : 'Salin'}}</button>
+                    <button type="button" class="shrink-0 text-[10px] font-bold " :style="{color:accent}" @click="copyValue(qrString,'payment')">{{copiedPayment ? 'Tersalin' : 'Salin'}}</button>
                 </div>
             </div>
 
@@ -325,7 +326,7 @@ onBeforeUnmount(() => {
                 <p class="text-[9px] font-bold uppercase tracking-[0.14em] text-white/35">{{payment?.channel_name || 'Nomor pembayaran'}}</p>
                 <div class="mt-2 flex items-center justify-between gap-3 rounded-lg bg-black/25 px-3 py-3">
                     <code class="break-all text-base font-black tracking-wider text-white">{{paymentNumber}}</code>
-                    <button type="button" class="shrink-0 text-[10px] font-bold text-[#b9ff35]" @click="copyValue(paymentNumber,'payment')">{{copiedPayment ? 'Tersalin' : 'Salin'}}</button>
+                    <button type="button" class="shrink-0 text-[10px] font-bold " :style="{color:accent}" @click="copyValue(paymentNumber,'payment')">{{copiedPayment ? 'Tersalin' : 'Salin'}}</button>
                 </div>
             </div>
 
@@ -342,10 +343,10 @@ onBeforeUnmount(() => {
             </div>
             <p v-if="paymentError" role="alert" class="mt-3 text-center text-[10px] font-semibold text-rose-300">{{paymentError}}</p>
 
-            <button v-if="canResume" type="button" :disabled="startingPayment || refreshingStatus" class="lf-payment-primary mt-5 flex h-12 w-full items-center justify-center rounded-xl bg-[#b9ff35] font-black text-[#091006] disabled:opacity-50" @click="resumePayment">{{startingPayment ? 'Menyiapkan…' : 'Siapkan pembayaran'}}</button>
-            <button v-if="!terminal && !uncertain && paymentUrl" type="button" :disabled="openingPayment" class="lf-payment-primary mt-5 flex h-12 w-full items-center justify-center rounded-xl bg-[#b9ff35] font-black text-[#091006] disabled:opacity-50" @click="openPayment">{{openingPayment ? 'Memproses…' : (settings.payButtonText || 'Bayar Sekarang')}}</button>
-            <Link v-if="paid || latePaid || refunded || requiresSupport" :href="statusUrl" class="lf-payment-primary mt-5 flex h-12 w-full items-center justify-center rounded-xl bg-[#b9ff35] font-black text-[#091006]">{{ customerText("pages.payment.show.2fdc5653", "Lihat status pesanan") }}</Link>
-            <Link v-if="canOrderAgain" href="/" class="lf-payment-primary mt-5 flex h-12 w-full items-center justify-center rounded-xl bg-[#b9ff35] font-black text-[#091006]">Buat pesanan baru</Link>
+            <button v-if="canResume" type="button" :disabled="startingPayment || refreshingStatus" class="lf-payment-primary mt-5 flex h-12 w-full items-center justify-center rounded-xl  font-black text-[#091006] disabled:opacity-50" :style="{backgroundColor:accent}" @click="resumePayment">{{startingPayment ? 'Menyiapkan…' : 'Siapkan pembayaran'}}</button>
+            <button v-if="!terminal && !uncertain && paymentUrl" type="button" :disabled="openingPayment" class="lf-payment-primary mt-5 flex h-12 w-full items-center justify-center rounded-xl  font-black text-[#091006] disabled:opacity-50" :style="{backgroundColor:accent}" @click="openPayment">{{openingPayment ? 'Memproses…' : (settings.payButtonText || 'Bayar Sekarang')}}</button>
+            <Link v-if="paid || latePaid || refunded || requiresSupport" :href="statusUrl" class="lf-payment-primary mt-5 flex h-12 w-full items-center justify-center rounded-xl  font-black text-[#091006]" :style="{backgroundColor:accent}">{{ customerText("pages.payment.show.2fdc5653", "Lihat status pesanan") }}</Link>
+            <Link v-if="canOrderAgain" href="/" class="lf-payment-primary mt-5 flex h-12 w-full items-center justify-center rounded-xl  font-black text-[#091006]" :style="{backgroundColor:accent}">Buat pesanan baru</Link>
 
             <div class="lf-payment-actions mt-3 grid grid-cols-2 gap-2">
                 <button type="button" class="h-10 rounded-lg border border-white/10 bg-white/[0.03] text-[10px] font-bold text-white" :disabled="refreshingStatus || startingPayment" @click="refreshStatus">{{settings.checkStatusButtonText || 'Cek status'}}</button>

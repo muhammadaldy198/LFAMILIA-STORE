@@ -6,6 +6,7 @@ use App\Jobs\ReconcileFulfillmentJob;
 use App\Services\AdminAuditService;
 use App\Services\AdminOrderPresentation;
 use App\Services\FulfillmentService;
+use App\Services\OperationalSettings;
 use App\Support\ServiceHours;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -115,7 +116,8 @@ class AdminFulfillmentController
             'account_id' => 'ID akun', 'meter_number' => 'Nomor meter', 'email' => 'Email',
         ];
 
-        $attempts->through(function (object $attempt) use ($presentation, $fieldLabels, $knownLabels): array {
+        $manualOverdueMinutes = app(OperationalSettings::class)->value('manual_overdue_minutes');
+        $attempts->through(function (object $attempt) use ($presentation, $fieldLabels, $knownLabels, $manualOverdueMinutes): array {
             $input = $presentation->json($attempt->customer_input);
             $snapshot = $presentation->json($attempt->snapshot);
             $delivery = $presentation->json($attempt->delivery_payload);
@@ -172,7 +174,8 @@ class AdminFulfillmentController
                 'manual_instructions' => $attempt->manual_instructions,
                 'delivery' => $delivery,
                 'manual_age_minutes' => $manualAge,
-                'is_overdue' => $attempt->status === 'MANUAL_PENDING' && $manualAge > 60,
+                'is_overdue' => $attempt->status === 'MANUAL_PENDING'
+                    && $manualAge > $manualOverdueMinutes,
                 'can_complete' => ! $terminal && $attempt->status === 'MANUAL_PENDING'
                     && in_array($attempt->order_status, ['PAID', 'PROCESSING'], true),
                 'can_fail' => ! $terminal && $attempt->status === 'MANUAL_PENDING',
@@ -190,6 +193,7 @@ class AdminFulfillmentController
             'attempts' => $attempts,
             'filters' => $filters,
             'metrics' => $metrics,
+            'manualOverdueMinutes' => $manualOverdueMinutes,
             'statuses' => collect(self::STATUSES)->mapWithKeys(
                 fn (string $status): array => [$status => $presentation->status($status)]
             )->all(),

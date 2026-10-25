@@ -10,6 +10,7 @@ use App\Services\AdminNotificationService;
 use App\Services\CustomerCleanupService;
 use App\Services\DigiflazzCatalogService;
 use App\Services\ExternalNotificationService;
+use App\Services\OperationalSettings;
 use App\Services\PaymentStateService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
@@ -154,14 +155,15 @@ Schedule::call(function (): void {
 
 Schedule::call(function (): void {
     $notifications = app(AdminNotificationService::class);
+    $staleMinutes = app(OperationalSettings::class)->value('stale_fulfillment_minutes');
 
     DB::table('fulfillment_attempts')
         ->whereIn('status', ['PENDING', 'UNKNOWN', 'SENDING'])
-        ->where('updated_at', '<=', now()->subMinutes(15))
+        ->where('updated_at', '<=', now()->subMinutes($staleMinutes))
         ->orderBy('id')
         ->limit(100)
         ->get(['id', 'order_id', 'status'])
-        ->each(function (object $attempt) use ($notifications): void {
+        ->each(function (object $attempt) use ($notifications, $staleMinutes): void {
             $already = DB::table('admin_notifications')
                 ->where('event_type', 'fulfillment.pending.stale')
                 ->where('target_type', 'fulfillment_attempt')
@@ -171,7 +173,7 @@ Schedule::call(function (): void {
                 $notifications->record(
                     'fulfillment.pending.stale',
                     'Fulfillment perlu reconciliation',
-                    'Attempt #'.$attempt->id.' berstatus '.$attempt->status.' lebih dari 15 menit.',
+                    'Attempt #'.$attempt->id.' berstatus '.$attempt->status.' lebih dari '.$staleMinutes.' menit.',
                     'WARNING',
                     'fulfillment_attempt',
                     $attempt->id,
@@ -250,7 +252,7 @@ Artisan::command('lfamilia:sync-digiflazz-catalog', function (DigiflazzCatalogSe
 })->purpose('Refresh supplier costs and availability while preserving customer margin settings');
 
 Artisan::command('lfamilia:purge-guest-data', function (): int {
-    $days = 30;
+    $days = app(OperationalSettings::class)->value('guest_pii_days');
     $cutoff = now()->subDays($days);
 
     $purged = 0;

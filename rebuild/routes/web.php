@@ -5,6 +5,7 @@ use App\Http\Controllers\AdminAuditController;
 use App\Http\Controllers\AdminAuthController;
 use App\Http\Controllers\AdminCatalogController;
 use App\Http\Controllers\AdminCatalogMediaController;
+use App\Http\Controllers\AdminChoiceSettingsController;
 use App\Http\Controllers\AdminContentController;
 use App\Http\Controllers\AdminCustomerController;
 use App\Http\Controllers\AdminDashboardController;
@@ -12,8 +13,10 @@ use App\Http\Controllers\AdminDigiflazzController;
 use App\Http\Controllers\AdminFulfillmentController;
 use App\Http\Controllers\AdminHealthController;
 use App\Http\Controllers\AdminIntegrationController;
+use App\Http\Controllers\AdminMessageTemplatesController;
 use App\Http\Controllers\AdminNicknameController;
 use App\Http\Controllers\AdminNotificationController;
+use App\Http\Controllers\AdminOperationalSettingsController;
 use App\Http\Controllers\AdminOrderCancellationController;
 use App\Http\Controllers\AdminOrderDetailController;
 use App\Http\Controllers\AdminOrdersController;
@@ -436,6 +439,19 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
 
     Route::middleware('admin.permission:settings.manage')->group(function (): void {
         Route::get('/admin/settings', [AdminSettingsController::class, 'index'])->name('admin.settings');
+        Route::get('/admin/choice-settings', [AdminChoiceSettingsController::class, 'index'])
+            ->middleware('admin.super')->name('admin.choice-settings');
+        Route::put('/admin/choice-settings', [AdminChoiceSettingsController::class, 'update'])
+            ->middleware(['admin.super', 'throttle:admin-sensitive'])->name('admin.choice-settings.update');
+        Route::get('/admin/operational-settings', [AdminOperationalSettingsController::class, 'index'])
+            ->middleware('admin.super')->name('admin.operational-settings');
+        Route::put('/admin/operational-settings', [AdminOperationalSettingsController::class, 'update'])
+            ->middleware(['admin.super', 'throttle:admin-sensitive'])->name('admin.operational-settings.update');
+        Route::get('/admin/message-templates', [AdminMessageTemplatesController::class, 'index'])->name('admin.message-templates');
+        Route::put('/admin/message-templates', [AdminMessageTemplatesController::class, 'update'])
+            ->middleware('throttle:admin-sensitive')->name('admin.message-templates.update');
+        Route::post('/admin/message-templates/test-email', [AdminMessageTemplatesController::class, 'testEmail'])
+            ->middleware('throttle:admin-sensitive')->name('admin.message-templates.test');
         Route::put('/admin/settings', [AdminSettingsController::class, 'updateStore'])
             ->middleware('throttle:admin-sensitive')->name('admin.settings.update');
         Route::put('/admin/settings/membership/{code}', [AdminSettingsController::class, 'updateTier'])

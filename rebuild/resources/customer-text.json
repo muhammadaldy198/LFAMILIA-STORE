@@ -3088,5 +3088,70 @@
     "label": "Checkout: Detail Kontak",
     "default": "Detail Kontak",
     "group": "Pages/Catalog/Show"
+  },
+  "order.status.PENDING_PAYMENT.label": {
+    "group": "Status Pesanan",
+    "label": "Teks status PENDING_PAYMENT",
+    "default": "Menunggu Pembayaran"
+  },
+  "order.status.PENDING_PAYMENT.description": {
+    "group": "Status Pesanan",
+    "label": "Penjelasan PENDING_PAYMENT",
+    "default": "Selesaikan pembayaran sesuai petunjuk invoice."
+  },
+  "order.status.PROCESSING.label": {
+    "group": "Status Pesanan",
+    "label": "Teks status PROCESSING",
+    "default": "Sedang Diproses"
+  },
+  "order.status.PROCESSING.description": {
+    "group": "Status Pesanan",
+    "label": "Penjelasan PROCESSING",
+    "default": "Pesanan sedang diproses. Periksa akun game secara berkala."
+  },
+  "order.status.SUCCESS.label": {
+    "group": "Status Pesanan",
+    "label": "Teks status SUCCESS",
+    "default": "Berhasil"
+  },
+  "order.status.SUCCESS.description": {
+    "group": "Status Pesanan",
+    "label": "Penjelasan SUCCESS",
+    "default": "Pesanan selesai. Periksa akun game untuk hasilnya."
+  },
+  "order.status.FAILED.label": {
+    "group": "Status Pesanan",
+    "label": "Teks status FAILED",
+    "default": "Gagal"
+  },
+  "order.status.FAILED.description": {
+    "group": "Status Pesanan",
+    "label": "Penjelasan FAILED",
+    "default": "Pesanan tidak berhasil diproses. Hubungi admin jika pembayaran sudah dilakukan."
+  },
+  "order.status.EXPIRED.label": {
+    "group": "Status Pesanan",
+    "label": "Teks status EXPIRED",
+    "default": "Kedaluwarsa"
+  },
+  "order.status.EXPIRED.description": {
+    "group": "Status Pesanan",
+    "label": "Penjelasan EXPIRED",
+    "default": "Waktu pembayaran telah berakhir."
+  },
+  "order.status.CANCELLED.label": {
+    "group": "Status Pesanan",
+    "label": "Teks status CANCELLED",
+    "default": "Dibatalkan"
+  },
+  "order.status.CANCELLED.description": {
+    "group": "Status Pesanan",
+    "label": "Penjelasan CANCELLED",
+    "default": "Pesanan dibatalkan dan tidak akan diproses lagi."
+  },
+  "order.status.manualHelp": {
+    "group": "Status Pesanan",
+    "label": "Panduan bantuan pesanan bermasalah",
+    "default": "Sudah bayar tapi barang belum masuk? Hubungi admin, pesanan diselesaikan manual. Sertakan ID order dan bukti bayar."
   }
 }

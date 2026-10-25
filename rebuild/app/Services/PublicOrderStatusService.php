@@ -4,6 +4,9 @@ namespace App\Services;
 
 final class PublicOrderStatusService
 {
+    /** Per-request cache: the service is scoped in AppServiceProvider. */
+    private ?array $customLabels = null;
+
     public function value(string $status): string
     {
         return match (strtoupper($status)) {
@@ -30,7 +33,8 @@ final class PublicOrderStatusService
 
     public function label(string $status): string
     {
-        return match ($this->value($status)) {
+        $code = $this->value($status);
+        $default = match ($code) {
             'PENDING_PAYMENT' => 'Menunggu Pembayaran',
             'PROCESSING' => 'Sedang Diproses',
             'SUCCESS' => 'Berhasil',
@@ -38,5 +42,10 @@ final class PublicOrderStatusService
             'CANCELLED' => 'Dibatalkan',
             default => 'Gagal',
         };
+
+        $this->customLabels ??= app(CustomerPresentationService::class)->saved()['text'];
+        $custom = $this->customLabels['order.status.'.$code.'.label'] ?? null;
+
+        return is_string($custom) && trim($custom) !== '' ? $custom : $default;
     }
 }

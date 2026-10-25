@@ -17,6 +17,8 @@ class AdminSettingsController
     private const STORE_KEYS = [
         'store.name',
         'store.tagline',
+        'store.seo_title',
+        'store.seo_description',
         'store.support_whatsapp',
         'store.instagram_url',
         'store.email',
@@ -85,6 +87,8 @@ class AdminSettingsController
                 'regex:/^(\/(?!\/)|https?:\/\/)/i',
             ],
             'business_hours' => ['required', 'string', 'min:3', 'max:160'],
+            'seo_title' => ['nullable', 'string', 'max:100'],
+            'seo_description' => ['nullable', 'string', 'max:160'],
             'legal_name' => ['nullable', 'string', 'max:255'],
             'registration_id' => ['nullable', 'string', 'max:120'],
             'address' => ['nullable', 'string', 'max:1000'],
@@ -96,6 +100,8 @@ class AdminSettingsController
         $mapping = [
             'store.name' => trim($data['store_name']),
             'store.tagline' => trim($data['tagline']),
+            'store.seo_title' => trim((string) ($data['seo_title'] ?? '')),
+            'store.seo_description' => trim((string) ($data['seo_description'] ?? '')),
             'store.support_whatsapp' => trim((string) ($data['support_whatsapp'] ?? '')),
             'store.instagram_url' => trim((string) ($data['instagram_url'] ?? '')),
             'store.email' => strtolower(trim((string) ($data['email'] ?? ''))),

@@ -6,6 +6,7 @@ use App\Actions\Fortify\CreateNewUser;
 use App\Models\AdminUser;
 use App\Models\SupportTicket;
 use App\Models\User;
+use App\Services\AdminChoiceSettings;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -215,6 +216,45 @@ class AdminSupportRestorationTest extends TestCase
             'target_type' => 'support_ticket',
             'target_id' => (string) $ticket->id,
         ]);
+    }
+
+    public function test_inactive_support_category_is_retained_on_existing_ticket_but_cannot_be_assigned_to_another(): void
+    {
+        $this->login();
+        $choices = AdminChoiceSettings::DEFAULTS;
+        foreach ($choices['support'] as &$item) {
+            if ($item['code'] === 'PAYMENT') {
+                $item['active'] = false;
+            }
+        }
+        unset($item);
+        DB::table('system_settings')->updateOrInsert(['key' => 'store.admin_choices'], [
+            'value' => json_encode($choices, JSON_THROW_ON_ERROR),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $old = SupportTicket::create([
+            'user_id' => $this->user()->id,
+            'subject' => 'Kasus pembayaran lama',
+            'message' => 'Periksa pembayaran.',
+            'kind' => 'PAYMENT',
+        ]);
+        $new = SupportTicket::create([
+            'user_id' => $this->user()->id,
+            'subject' => 'Kasus baru',
+            'message' => 'Pertanyaan umum.',
+            'kind' => 'GENERAL',
+        ]);
+
+        $this->put('/admin/support/'.$old->id, [
+            'status' => 'IN_PROGRESS', 'kind' => 'PAYMENT', 'reply' => '',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->put('/admin/support/'.$new->id, [
+            'status' => 'IN_PROGRESS', 'kind' => 'PAYMENT', 'reply' => '',
+        ])->assertSessionHasErrors('kind');
+
+        $this->assertDatabaseHas('support_tickets', ['id' => $new->id, 'kind' => 'GENERAL']);
     }
 
     public function test_support_routes_remain_permission_gated(): void

@@ -86,7 +86,7 @@ class WalletTopupService
                 'status' => 'PENDING_PAYMENT',
                 'idempotency_key' => $idempotencyKey,
                 'request_fingerprint' => $fingerprint,
-                'expires_at' => now()->addMinutes(30),
+                'expires_at' => now()->addMinutes(app(OperationalSettings::class)->value('wallet_topup_minutes')),
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);

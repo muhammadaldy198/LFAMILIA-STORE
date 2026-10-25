@@ -34,6 +34,8 @@ const openTicket = ticket => router.get('/admin/support', query({ ticket: ticket
 const closeTicket = () => router.get('/admin/support', query({}), { preserveState: true, preserveScroll: true });
 
 const kindLabel = code => props.kinds.find(kind => kind.code === code)?.label || 'Umum';
+const editableKinds = computed(() => props.kinds.filter(kind => kind.active || kind.code === props.selectedTicket?.kind));
+const filterKinds = computed(() => props.kinds.filter(kind => kind.active || kind.code === filter.kind));
 const sourceLabel = code => code === 'GUEST' ? 'Tanpa akun' : 'Akun pelanggan';
 
 // ---------- balasan cepat ----------
@@ -176,7 +178,7 @@ const rows = computed(() => (Array.isArray(props.tickets?.data) ? props.tickets.
                                 <label class="adm-field">
                                     <span>Kategori</span>
                                     <select v-model="form.kind" class="adm-select">
-                                        <option v-for="kind in kinds" :key="kind.code" :value="kind.code">{{ kind.label }}</option>
+                                        <option v-for="kind in editableKinds" :key="kind.code" :value="kind.code">{{ kind.label }}{{ kind.active ? '' : ' (nonaktif, riwayat)' }}</option>
                                     </select>
                                 </label>
                             </div>
@@ -218,7 +220,7 @@ const rows = computed(() => (Array.isArray(props.tickets?.data) ? props.tickets.
                     <span>Kategori</span>
                     <select v-model="filter.kind" class="adm-select">
                         <option value="">Semua kategori</option>
-                        <option v-for="kind in kinds" :key="kind.code" :value="kind.code">{{ kind.label }}</option>
+                        <option v-for="kind in filterKinds" :key="kind.code" :value="kind.code">{{ kind.label }}{{ kind.active ? '' : ' (nonaktif)' }}</option>
                     </select>
                 </label>
                 <div class="adm-filter-actions">

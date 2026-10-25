@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\ProductPackage;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -152,10 +153,16 @@ class DigiflazzCatalogService
                                 'updated_at' => now(),
                             ];
                             if ($mapping->store_cost_idr === null) {
-                                // Baris lama yang belum punya modal toko: kunci sekali
-                                // (harga referensi + 2%). Harga jual tidak boleh ikut
-                                // bergerak setiap sinkronisasi.
-                                $updates['store_cost_idr'] = (int) ceil(((int) $row['price_idr']) * 102 / 100);
+                                // Backfill sekali dari aturan impor yang sama (nominal -> game -> global).
+                                // Jangan sentuh store_cost_idr yang sudah disetel admin.
+                                $package = ProductPackage::with('product')
+                                    ->find($mapping->product_package_id);
+                                $updates['store_cost_idr'] = $package && $package->product
+                                    ? app(DigiflazzCatalogImport::class)->initialStoreCost($package, $package->product, (int) $row['price_idr'])
+                                    : app(CatalogPricingSettings::class)->applyPercent(
+                                        (int) $row['price_idr'],
+                                        app(CatalogPricingSettings::class)->costUpliftPercent()
+                                    );
                             }
                             DB::table('provider_mappings')->where('id', $mapping->id)->update($updates);
                         }

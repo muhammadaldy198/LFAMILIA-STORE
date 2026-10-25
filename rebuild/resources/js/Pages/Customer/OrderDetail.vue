@@ -1,17 +1,18 @@
 <script setup>
 import { useCustomerPresentation } from '../../Composables/customerPresentation';
 const { customerText } = useCustomerPresentation();
+const visibleOrderStatus = status => customerOrderStatusInfo(status, customerText);
 
 import { Head, Link } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import AccountShell from '../../Components/AccountShell.vue';
 import { rupiah } from '../../lib/money';
-import { manualHelpMessage, nextOrderAction, orderStatusInfo, paymentStatusLabel } from '../../lib/orderStatus';
+import { manualHelpMessage, nextOrderAction, customerOrderStatusInfo, paymentStatusLabel } from '../../lib/orderStatus';
 
 const props = defineProps({ order: Object, payment: Object, review: Object });
 
 const paymentState = ref(props.payment);
-const statusInfo = computed(() => orderStatusInfo(props.order.status));
+const statusInfo = computed(() => visibleOrderStatus(props.order.status));
 const nextAction = computed(() => nextOrderAction(props.order.status, paymentState.value?.status, props.order.paid_at));
 const paymentIssue = computed(() => {
     const status = String(paymentState.value?.status || '').toUpperCase();
@@ -74,7 +75,7 @@ async function submitReview() {
         </section>
 
         <section v-if="nextAction" class="space-y-3 rounded-xl border border-slate-800 bg-slate-900 p-5">
-            <p v-if="nextAction === 'support'" class="text-sm text-slate-300">{{ manualHelpMessage }}</p>
+            <p v-if="nextAction === 'support'" class="text-sm text-slate-300">{{ customerText('order.status.manualHelp', manualHelpMessage) }}</p>
             <Link v-if="nextAction === 'support'" href="/account/tickets" class="lf-primary">Hubungi admin</Link>
             <Link v-else href="/" class="lf-primary">Buat pesanan baru</Link>
         </section>

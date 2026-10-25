@@ -11,6 +11,7 @@ const props = defineProps({
     canOrders: Boolean,
     canNotifications: Boolean,
     metrics: { type: Object, default: () => ({}) },
+    manualOverdueMinutes: { type: Number, default: 60 },
     chart: { type: Array, default: () => [] },
     recentOrders: { type: Array, default: () => [] },
     activities: { type: Array, default: () => [] },
@@ -93,7 +94,7 @@ const markRead = async (row) => {
 
         <section v-if="Number(m.manual_overdue || 0) > 0" class="adm-card" style="border-left:4px solid #b3261e">
             <div class="adm-card-body">
-                <strong>{{ num(m.manual_overdue) }} pesanan manual lewat 60 menit jam layanan.</strong>
+                <strong>{{ num(m.manual_overdue) }} pesanan manual lewat {{ manualOverdueMinutes }} menit jam layanan.</strong>
                 <p class="adm-note">Lewat batas waktu pelayanan. <a href="/admin/fulfillment">Buka antrean pemenuhan</a>.</p>
             </div>
         </section>

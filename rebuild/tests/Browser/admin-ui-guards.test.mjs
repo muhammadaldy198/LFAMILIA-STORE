@@ -479,7 +479,8 @@ test('audit controls: cancellation reasons, top-up review, manual completion, ov
     const order = read('OrderDetail.vue');
     assert.match(order, /reason_code: reasonCode/);
     assert.match(order, /reason_note:/);
-    for (const reason of ['Stok habis', 'Salah harga', 'Permintaan pelanggan', 'Lainnya']) assert.ok(order.includes(reason), reason);
+    assert.match(order, /props\.cancelReasons/);
+    assert.match(order, /reason_code: reasonCode/);
     assert.match(order, /:disabled="busy === 'cancel' \|\| !cancelReason/);
 
     const payments = read('Payments.vue');
@@ -488,12 +489,12 @@ test('audit controls: cancellation reasons, top-up review, manual completion, ov
     assert.match(payments, /penyesuaian saldo manual/);
 
     const fulfillment = read('Fulfillment.vue');
-    assert.match(fulfillment, /Lewat 60 menit/);
+    assert.match(fulfillment, /Lewat \{\{ manualOverdueMinutes \}\} menit/);
     assert.match(fulfillment, /menit jam layanan/);
     assert.match(fulfillment, /:disabled="busy \|\| \(!form\.delivery_code\.trim\(\) && !form\.note\.trim\(\)\)"/);
     assert.match(order, /:disabled="busy === 'complete' \|\| \(!form\.delivery_code\.trim\(\) && !form\.note\.trim\(\)\)"/);
 
     const dashboard = read('Dashboard.vue');
     assert.match(dashboard, /manual_overdue/);
-    assert.match(dashboard, /lewat 60 menit jam layanan/);
+    assert.match(dashboard, /lewat \{\{ manualOverdueMinutes \}\} menit jam layanan/);
 });

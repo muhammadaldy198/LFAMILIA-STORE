@@ -1,11 +1,12 @@
 <script setup>
 import { useCustomerPresentation } from '../../Composables/customerPresentation';
 const { customerText } = useCustomerPresentation();
+const visibleOrderStatus = status => customerOrderStatusInfo(status, customerText);
 
 import {Head,Link} from '@inertiajs/vue3';
 import {computed,onMounted,onUnmounted,ref} from 'vue';
 import CustomerShell from '../../Components/CustomerShell.vue';
-import {isTerminalOrderStatus,manualHelpMessage,nextOrderAction,orderStatusInfo,paymentStatusLabel} from '../../lib/orderStatus';
+import {isTerminalOrderStatus,manualHelpMessage,nextOrderAction,customerOrderStatusInfo,paymentStatusLabel} from '../../lib/orderStatus';
 
 const props=defineProps({transactions:Array});
 const query=ref('');
@@ -22,7 +23,7 @@ let disposed=false;
 let selectionVersion=0;
 
 const money=v=>'Rp '+Number(v||0).toLocaleString('id-ID');
-const statusMeta=s=>{const {label,description,tone}=orderStatusInfo(s);return [label,description,tone];};
+const statusMeta=s=>{const {label,description,tone}=visibleOrderStatus(s);return [label,description,tone];};
 const sourceLabel=s=>({payment:'Pembayaran',processing:'Proses Pesanan',delivery:'Pengiriman',admin:'Admin',system:'Sistem'}[s]||'Sistem');
 const date=v=>v?new Date(v).toLocaleString('id-ID',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'}):'-';
 const terminal=computed(()=>detail.value&&isTerminalOrderStatus(detail.value.fulfillmentStatus));
@@ -141,7 +142,7 @@ onUnmounted(()=>{disposed=true;selectionVersion++;stopDetailPolling();if(feedTim
      <div><dt>{{ customerText("pages.guest.track.6e230e94", "Update") }}</dt><dd>{{date(detail.updatedAt)}}</dd></div>
     </dl>
     <div v-if="nextAction" class="mb-4 space-y-3 rounded-xl border border-white/10 p-4">
-      <p v-if="nextAction==='support'" class="text-sm">{{manualHelpMessage}}</p>
+      <p v-if="nextAction==='support'" class="text-sm">{{ customerText('order.status.manualHelp', manualHelpMessage) }}</p>
       <Link v-if="nextAction==='support'" href="/contact" class="lf-primary">Hubungi admin</Link>
       <Link v-else href="/" class="lf-primary">Buat pesanan baru</Link>
      </div>
