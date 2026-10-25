@@ -7,6 +7,7 @@ use App\Services\PaymentRoutingService;
 use App\Services\WalletTopupService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 class PaymentFeePolicyTest extends TestCase
@@ -47,7 +48,7 @@ class PaymentFeePolicyTest extends TestCase
                 [
                     'priority' => $priority, 'fee_flat_idr' => $fee, 'fee_percent_bps' => 0,
                     'supports_order' => true, 'supports_wallet_topup' => true,
-                    'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+                    'is_active' => $code === 'MIDTRANS', 'created_at' => now(), 'updated_at' => now(),
                 ]
             );
         }
@@ -64,9 +65,25 @@ class PaymentFeePolicyTest extends TestCase
         DB::table('payment_gateways')->where('code', 'MIDTRANS')
             ->update(['is_maintenance' => true]);
 
-        $fallback = $routing->resolve('virtual_account', false, 'order');
-        $this->assertSame('DOKU', $fallback['gateway_code']);
-        $this->assertSame(3500, $routing->fee(20000, $fallback));
+        // An unavailable selected gateway cannot silently fall back to DOKU.
+        try {
+            $routing->resolve('virtual_account', false, 'order');
+            $this->fail('An unavailable selected gateway must not fail over.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('payment_channel_code', $exception->errors());
+        }
+
+        // The operator explicitly chooses DOKU (only then its fee applies).
+        $midtransId = DB::table('payment_gateways')->where('code', 'MIDTRANS')->value('id');
+        $dokuId = DB::table('payment_gateways')->where('code', 'DOKU')->value('id');
+        DB::table('payment_routes')->where('payment_channel_id', $channel->id)
+            ->where('payment_gateway_id', $midtransId)->update(['is_active' => false]);
+        DB::table('payment_routes')->where('payment_channel_id', $channel->id)
+            ->where('payment_gateway_id', $dokuId)->update(['is_active' => true]);
+
+        $selectedDoku = $routing->resolve('virtual_account', false, 'order');
+        $this->assertSame('DOKU', $selectedDoku['gateway_code']);
+        $this->assertSame(3500, $routing->fee(20000, $selectedDoku));
         $this->assertArrayNotHasKey('fee_flat_idr', collect($routing->publicOrderChannels(null))
             ->firstWhere('code', 'virtual_account'));
 
