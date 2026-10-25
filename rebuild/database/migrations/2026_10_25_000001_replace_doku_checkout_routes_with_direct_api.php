@@ -36,6 +36,14 @@ return new class extends Migration
                 ]);
         }
 
+        // The existing DOKU gateway was historically unconfigured/disabled.
+        // Do not let legacy staged routes shadow working Midtrans channels.
+        $dokuActive = DB::table('payment_gateways')->where('id', $dokuId)->value('is_active');
+        if (! $dokuActive) {
+            DB::table('payment_routes')->where('payment_gateway_id', $dokuId)
+                ->update(['is_active' => false, 'updated_at' => now()]);
+        }
+
         // The DOKU BRI channel requires a separate SNAP integration. It must
         // never keep its historical hosted-checkout endpoint enabled.
         $briId = DB::table('payment_channels')->where('code', 'va_bri')->value('id');
