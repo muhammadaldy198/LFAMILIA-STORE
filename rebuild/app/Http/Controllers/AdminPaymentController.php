@@ -467,11 +467,18 @@ class AdminPaymentController
 
             foreach ($routes as $route) {
                 $chosen = (int) $route->id === (int) $selected->id;
-                DB::table('payment_routes')->where('id', $route->id)->update([
+                $update = [
                     $field => $chosen,
                     'is_active' => $chosen || ((bool) $route->is_active && (bool) $route->{$otherField}),
                     'updated_at' => now(),
-                ]);
+                ];
+                // A dormant route may be configured for both purposes. When
+                // activating it for one purpose, never silently activate the
+                // other purpose as well.
+                if ($chosen && ! $route->is_active) {
+                    $update[$otherField] = false;
+                }
+                DB::table('payment_routes')->where('id', $route->id)->update($update);
             }
 
             return (string) $selected->gateway_code;
