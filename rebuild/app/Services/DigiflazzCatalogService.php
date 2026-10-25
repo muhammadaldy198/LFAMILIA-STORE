@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\ProductPackage;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -154,7 +155,7 @@ class DigiflazzCatalogService
                             if ($mapping->store_cost_idr === null) {
                                 // Backfill sekali dari aturan impor yang sama (nominal -> game -> global).
                                 // Jangan sentuh store_cost_idr yang sudah disetel admin.
-                                $package = \App\Models\ProductPackage::with('product')
+                                $package = ProductPackage::with('product')
                                     ->find($mapping->product_package_id);
                                 $updates['store_cost_idr'] = $package && $package->product
                                     ? app(DigiflazzCatalogImport::class)->initialStoreCost($package, $package->product, (int) $row['price_idr'])

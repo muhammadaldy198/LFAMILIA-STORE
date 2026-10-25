@@ -9,6 +9,9 @@ const props = defineProps({
     templates: { type: Object, default: () => ({}) },
 });
 const currentTab = ref('emails');
+const emailHint = '{{default_subject}} dan {{default_body}}';
+const notificationHint = '{{default_title}} dan {{default_body}}';
+const storeNameToken = '{{store_name}}';
 const busy = ref(false);
 const emails = reactive(Object.fromEntries(Object.keys(props.emailEvents).map(key => [
     key, {
@@ -50,8 +53,8 @@ const reset = (obj, key) => { obj[key] = { ...Object.fromEntries(Object.keys(obj
             <button type="button" role="tab" :aria-selected="currentTab === 'emails'" @click="currentTab = 'emails'">Email pelanggan</button>
             <button type="button" role="tab" :aria-selected="currentTab === 'notifications'" @click="currentTab = 'notifications'">Notifikasi admin</button>
         </div>
-        <p class="adm-note">Gunakan <code class="adm-code">{{ currentTab === 'emails' ? '{{default_subject}} dan {{default_body}}' : '{{default_title}} dan {{default_body}}' }}</code>
-            untuk mempertahankan teks bawaan. Variabel <code class="adm-code">{{ '{{store_name}}' }}</code> tersedia untuk email.
+        <p class="adm-note">Gunakan <code class="adm-code" v-text="currentTab === 'emails' ? emailHint : notificationHint" />
+            untuk mempertahankan teks bawaan. Variabel <code class="adm-code" v-text="storeNameToken" /> tersedia untuk email.
             Kosongkan kolom untuk kembali ke teks bawaan. Perubahan dicatat di log audit.</p>
         <template v-if="currentTab === 'emails'">
             <section v-for="(label, key) in emailEvents" :key="key" class="adm-card">
