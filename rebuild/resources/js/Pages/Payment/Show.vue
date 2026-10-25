@@ -1,11 +1,12 @@
 <script setup>
 import { useCustomerPresentation } from '../../Composables/customerPresentation';
 const { customerText } = useCustomerPresentation();
+const visibleOrderStatus = status => customerOrderStatusInfo(status, customerText);
 
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import CustomerShell from '../../Components/CustomerShell.vue';
-import { orderStatusInfo } from '../../lib/orderStatus';
+import { customerOrderStatusInfo } from '../../lib/orderStatus';
 
 const props = defineProps({
     order: { type: Object, required: true },
@@ -66,13 +67,13 @@ const expiryWib = computed(() => Number.isFinite(expiryTimestamp.value)
     : null);
 const canResume = computed(() => !terminal.value && (!props.payment || retryRejected.value));
 const title = computed(() => {
-    if (refunded.value || latePaid.value || failed.value) return orderStatusInfo('FAILED').label;
-    if (expired.value) return orderStatusInfo('EXPIRED').label;
-    if (cancelled.value) return orderStatusInfo('CANCELLED').label;
-    if (paid.value) return orderStatusInfo(orderStatus.value === 'SUCCESS' ? 'SUCCESS' : 'PROCESSING').label;
+    if (refunded.value || latePaid.value || failed.value) return visibleOrderStatus('FAILED').label;
+    if (expired.value) return visibleOrderStatus('EXPIRED').label;
+    if (cancelled.value) return visibleOrderStatus('CANCELLED').label;
+    if (paid.value) return visibleOrderStatus(orderStatus.value === 'SUCCESS' ? 'SUCCESS' : 'PROCESSING').label;
     if (uncertain.value) return 'Memastikan status pembayaran';
     if (retryRejected.value) return 'Pembayaran belum tersedia';
-    return orderStatusInfo(orderStatus.value).label;
+    return visibleOrderStatus(orderStatus.value).label;
 });
 
 const instructions = computed(() => props.payment?.instructions || {});

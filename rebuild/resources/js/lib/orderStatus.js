@@ -19,6 +19,17 @@ export function orderStatusInfo(status) {
     const [label, description, tone, terminal] = publicStatuses[key];
     return { key, label, description, tone, terminal };
 }
+
+// Only display copy is editable. Terminal flags and status mapping stay code-owned.
+export function customerOrderStatusInfo(status, customerText) {
+    const info = orderStatusInfo(status);
+    if (typeof customerText !== 'function') return info;
+    return {
+        ...info,
+        label: customerText('order.status.' + info.key + '.label', info.label),
+        description: customerText('order.status.' + info.key + '.description', info.description),
+    };
+}
 const paymentLabels = {
     PENDING: 'Menunggu pembayaran', PENDING_PAYMENT: 'Menunggu pembayaran',
     CREATING: 'Menyiapkan pembayaran', UNKNOWN: 'Status belum dapat dipastikan',

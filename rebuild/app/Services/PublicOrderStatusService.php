@@ -30,7 +30,8 @@ final class PublicOrderStatusService
 
     public function label(string $status): string
     {
-        return match ($this->value($status)) {
+        $code = $this->value($status);
+        $default = match ($code) {
             'PENDING_PAYMENT' => 'Menunggu Pembayaran',
             'PROCESSING' => 'Sedang Diproses',
             'SUCCESS' => 'Berhasil',
@@ -38,5 +39,10 @@ final class PublicOrderStatusService
             'CANCELLED' => 'Dibatalkan',
             default => 'Gagal',
         };
+
+        $saved = app(CustomerPresentationService::class)->saved();
+        $custom = $saved['text']['order.status.'.$code.'.label'] ?? null;
+
+        return is_string($custom) && trim($custom) !== '' ? $custom : $default;
     }
 }

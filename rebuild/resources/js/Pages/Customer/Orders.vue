@@ -1,15 +1,16 @@
 <script setup>
 import { useCustomerPresentation } from '../../Composables/customerPresentation';
 const { customerText } = useCustomerPresentation();
+const visibleOrderStatus = status => customerOrderStatusInfo(status, customerText);
 
 import { Head, Link } from '@inertiajs/vue3';
 import AccountShell from '../../Components/AccountShell.vue';
 import CustomerPagination from '../../Components/CustomerPagination.vue';
 import { rupiah } from '../../lib/money';
-import { orderStatusInfo } from '../../lib/orderStatus';
+import { customerOrderStatusInfo } from '../../lib/orderStatus';
 
 defineProps({ orders: Object });
-const statusLabel = status => orderStatusInfo(status).label;
+const statusLabel = status => visibleOrderStatus(status).label;
 </script>
 
 <template>

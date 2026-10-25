@@ -276,7 +276,7 @@ class CustomerAccountController
                 'key' => 'order-'.$event->id,
                 'title' => 'Pesanan '.$event->order_number,
                 'detail' => $event->to_status
-                    ? 'Status berubah menjadi '.str_replace('_', ' ', (string) $event->to_status)
+                    ? 'Status berubah menjadi '.app(\App\Services\PublicOrderStatusService::class)->label((string) $event->to_status)
                     : str_replace(['_', '.'], ' ', (string) $event->event_type),
                 'type' => 'ORDER',
                 'at' => $event->created_at,
