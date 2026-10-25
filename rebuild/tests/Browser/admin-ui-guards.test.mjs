@@ -473,3 +473,27 @@ test('catalog source payload keeps stored cost and manual price lock', () => {
     assert.equal(mappingStatusLabel({ provider_code: 'VOUCHER_STOCK', is_active: false, stock_counts: { available: 3 } }), 'Nonaktif');
     assert.equal(mappingStatusLabel({ is_active: false, disabled_by_sync: true }), 'Nonaktif (sinkron)');
 });
+
+
+test('audit controls: cancellation reasons, top-up review, manual completion, overdue queue', () => {
+    const order = read('OrderDetail.vue');
+    assert.match(order, /reason_code: reasonCode/);
+    assert.match(order, /reason_note:/);
+    for (const reason of ['Stok habis', 'Salah harga', 'Permintaan pelanggan', 'Lainnya']) assert.ok(order.includes(reason), reason);
+    assert.match(order, /:disabled="busy === 'cancel' \|\| !cancelReason/);
+
+    const payments = read('Payments.vue');
+    assert.match(payments, /<h2>Top up perlu ditinjau<\/h2>/);
+    assert.match(payments, /TIDAK mengubah saldo pelanggan/);
+    assert.match(payments, /penyesuaian saldo manual/);
+
+    const fulfillment = read('Fulfillment.vue');
+    assert.match(fulfillment, /Lewat 60 menit/);
+    assert.match(fulfillment, /menit jam layanan/);
+    assert.match(fulfillment, /:disabled="busy \|\| \(!form\.delivery_code\.trim\(\) && !form\.note\.trim\(\)\)"/);
+    assert.match(order, /:disabled="busy === 'complete' \|\| \(!form\.delivery_code\.trim\(\) && !form\.note\.trim\(\)\)"/);
+
+    const dashboard = read('Dashboard.vue');
+    assert.match(dashboard, /manual_overdue/);
+    assert.match(dashboard, /lewat 60 menit jam layanan/);
+});
