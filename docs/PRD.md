@@ -259,9 +259,9 @@ Aturan turunan:
 - **Cek ulang dibatasi** supaya tidak melanggar aturan 1 menit.
 - **Webhook diverifikasi tanda tangannya.** Tanpa verifikasi, payload diabaikan.
 - **Webhook hanya mempercepat**, bukan satu-satunya sumber. Cek ulang tetap dijalankan untuk pesanan yang belum pasti.
-- **Saldo penyedia dipantau.** Saldo rendah harus terlihat di panel sebelum menyebabkan kegagalan.
+- **Saldo penyedia hanya ditampilkan sebagai angka pantau.** Panel boleh menampilkan saldo Digiflazz apa adanya untuk dilihat admin. **Tidak ada alarm, peringatan otomatis, atau ambang saldo** — tidak ada notifikasi "saldo menipis" ke Telegram/Discord/email.
 - **Batas cek ulang otomatis: 3 kali**, dengan jeda minimal 2 menit antar percobaan. Setelah itu pesanan tidak dicek otomatis lagi dan naik ke pemeriksaan manusia. Artinya kegagalan penyedia biasanya diketahui dalam hitungan menit, bukan hari — jadi klaim "penyedia baru konfirmasi gagal berhari-hari kemudian" tidak dipakai sebagai alasan pengecualian refund.
-- **Ambang peringatan saldo: 5 transaksi.** Di bawah itu panel menampilkan peringatan.
+- **Tidak ada ambang peringatan saldo.** Saldo penyedia tidak punya alarm otomatis; admin melihat angkanya sendiri di panel.
 
 ### 8.2 Manual
 
@@ -275,7 +275,7 @@ Aturan turunan:
 
 - Pesanan hanya bisa dibatalkan pada status yang memungkinkan: sudah dibayar tapi belum terkirim, gagal, atau terblokir.
 - **Pesanan yang sudah berhasil dikirim tidak bisa dibatalkan.**
-- Pembatalan wajib beralasan dan tercatat di riwayat pesanan.
+- Alasan pembatalan dipilih **cepat, satu ketuk** dari daftar: **stok habis**, **salah harga**, **permintaan pelanggan**, atau **lainnya**. Pilihan **lainnya** wajib disertai catatan tertulis. Alasan yang dipilih (atau catatan untuk "lainnya") tercatat di riwayat pesanan dan audit log.
 - Membatalkan pesanan tidak otomatis mengembalikan uang — penyelesaian uang mengikuti §10.
 
 ### 8.4 Larangan
@@ -361,6 +361,11 @@ Kebijakan lengkap ada di halaman publik `/refund` dan **dokumen itu yang berlaku
 - Penyelesaian dilakukan dengan **transfer manual di luar sistem**.
 - Di panel, admin hanya menandai: sudah diselesaikan + catatan + bukti.
 
+**Top up saldo yang dibalik gateway:**
+- Kalau gateway membatalkan dan mengembalikan dana sebuah top up, dana itu **sudah kembali ke pelanggan di luar sistem**. Sistem tidak memindahkan uang apa pun.
+- Admin hanya **menutup tinjauan** top up itu dengan alasan tertulis. Penutupan ini **tidak mengubah saldo** pelanggan sama sekali — ia hanya membuka kembali pemakaian saldo oleh pelanggan.
+- Kalau saldo pelanggan ternyata masih memuat dana yang sudah dibalik gateway, penyelesaiannya lewat **penyesuaian saldo manual** oleh Super Admin (§10.6) — bukan lewat tombol refund.
+
 ### 10.6 Pengaman penyesuaian saldo
 
 - **Hanya Super Admin.** Admin biasa tidak punya akses, walau diberi izin lain.
@@ -433,7 +438,7 @@ Aturan:
 - Voucher punya: kode, tipe diskon (nominal/persen), nilai, minimum belanja, kuota total, batas per pelanggan, masa berlaku, cakupan produk/kategori.
 - Voucher **divalidasi di server**; kode yang tidak valid tidak pernah diterapkan.
 - Satu pesanan memakai satu voucher.
-- Kuota berkurang saat pesanan dibuat; kembali kalau pesanan gagal/kedaluwarsa.
+- Kuota berkurang saat pesanan dibuat; **kembali kalau pesanan gagal, kedaluwarsa, atau dibatalkan admin** — termasuk kuota yang sudah tercatat terpakai sebelum pembatalan.
 - Voucher tidak bisa dipakai bersamaan dengan harga yang sudah didiskon manual, kecuali aturannya mengizinkan.
 - Promo di halaman publik (`/promo`) menampilkan voucher yang sedang aktif — bukan arsip.
 
@@ -458,11 +463,11 @@ Daftar halaman yang harus ada dan berfungsi:
 
 | Halaman | Alamat | Isi |
 |---|---|---|
-| Beranda | `/` | Produk populer, kategori, cara top up, promo |
-| Katalog | `/catalog` | Semua produk, filter kategori, pencarian |
+| Beranda | `/` | Produk populer, kategori, cara top up, promo. **Juga tempat `/catalog`, `/checkout`, dan `/track` bermuara** — ketiganya bukan halaman sendiri, hanya pengalihan. |
+| Katalog | `/catalog` | **Pengalihan, bukan halaman sendiri.** Daftar produk, filter kategori, dan pencarian ada di beranda. |
 | Detail produk | `/catalog/{slug}` | Nominal, input tujuan, deskripsi, catatan, ulasan pembeli |
-| Checkout | `/checkout` | Ringkasan, data tujuan, pembayaran |
-| Lacak pesanan | `/track` | Nomor pesanan + kode akses |
+| Checkout | `/checkout` | **Pengalihan, bukan halaman sendiri.** Checkout berjalan di halaman detail produk. |
+| Lacak pesanan | `/track` | **Pengalihan, bukan halaman sendiri.** Lacak pesanan cukup dengan **nomor HP** — tanpa akun, tanpa nomor pesanan, tanpa kode akses. |
 | Berita | `/news` | Artikel dan pengumuman |
 | FAQ | `/faq` | Pertanyaan umum |
 | Hubungi kami | `/contact` | Kanal resmi |
@@ -503,7 +508,7 @@ Kanal yang tersedia: **email (Resend), Telegram, Discord**, plus notifikasi di d
 Aturan:
 
 - Notifikasi **tidak boleh** memuat data sensitif (password, PIN, kode OTP, kredensial).
-- Notifikasi penting: pesanan baru, pembayaran diterima, pengiriman gagal, tiket baru, saldo penyedia rendah, integrasi mati.
+- Notifikasi penting: pesanan baru, pembayaran diterima, pengiriman gagal, tiket baru, integrasi mati. **Saldo penyedia tidak termasuk** — tidak ada alarm saldo (lihat §8.1).
 - Notifikasi kejadian penting untuk admin dikirim ke **Telegram dan Discord (keduanya)**; peringatan kegagalan pemeriksaan kesehatan juga masuk ke email admin.
 - Notifikasi yang gagal kirim tidak boleh menggagalkan pesanan.
 - Admin bisa mengatur ke mana notifikasi diarahkan per jenis kejadian.
