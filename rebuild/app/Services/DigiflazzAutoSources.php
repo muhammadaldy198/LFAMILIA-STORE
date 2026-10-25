@@ -59,6 +59,22 @@ class DigiflazzAutoSources
             throw ValidationException::withMessages(['item_ids' => 'Tidak ada SKU Digiflazz yang aktif dan tersedia.']);
         }
         $nominal = app(CatalogNominalOrder::class)->value($first->product_name, $first->brand);
+        // Do not silently create a duplicate storefront nominal when a
+        // different Digiflazz SKU was imported for the same game and group.
+        if ($package === null && $nominal !== null && $product->packages()
+            ->where('nominal_value', $nominal)
+            ->where('group_name', $first->type ?: null)->exists()) {
+            throw ValidationException::withMessages([
+                'item_ids' => 'Nominal ini sudah terdaftar. Lepas SKU lama sebelum menggantinya.',
+            ]);
+        }
+        if ($package !== null && $package->mappings()
+            ->where('provider_id', $provider->id)
+            ->where('external_sku', '<>', $first->buyer_sku_code)->exists()) {
+            throw ValidationException::withMessages([
+                'item_ids' => 'Nominal ini sudah memiliki SKU Digiflazz lain.',
+            ]);
+        }
         // Kolom "Harga jual (%)" di pop-up impor disimpan sebagai margin nominal
         // (mode persen), bukan markup produk, supaya bisa diubah atau diganti ke
         // harga tetap langsung dari editor nominal.

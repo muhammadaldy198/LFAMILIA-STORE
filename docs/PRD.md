@@ -41,7 +41,7 @@ Pembeli bisa **tanpa akun (guest)** atau **dengan akun (member)**. Guest bisa me
 |---|---|
 | **Produk** | Barang yang dijual, mis. "Mobile Legends". |
 | **Nominal / paket** | Pilihan di dalam produk, mis. "86 Diamond". |
-| **Sumber** | Pemetaan nominal ke SKU penyedia, mis. `MLBB-86` di Digiflazz. Satu nominal boleh punya beberapa sumber. |
+| **Sumber** | Pemetaan nominal ke SKU penyedia, mis. `MLBB-86` di Digiflazz. Untuk Digiflazz, setiap nominal hanya memakai satu SKU terpilih; tidak ada SKU cadangan. |
 | **Pesanan** | Satu transaksi beli. Punya nomor pesanan, isi, dan status. |
 | **Pembayaran** | Catatan uang masuk untuk satu pesanan. Satu pesanan bisa punya lebih dari satu percobaan pembayaran. |
 | **Pengiriman (fulfillment)** | Tindakan mengirim produk ke tujuan pembeli. Otomatis (penyedia) atau manual (admin). |
@@ -113,7 +113,7 @@ Aturan:
 - Harga rupiah **dibulatkan ke atas**; tidak ada pembulatan "cantik".
 - **Harga jual tidak boleh lebih murah dari modal toko** — server menolaknya.
 - **Nominal disembunyikan otomatis** bila harga seller naik di atas modal toko, dan tampil lagi otomatis bila harga seller turun kembali ke dalam batas (lihat §4.2).
-- **Batas harga kirim ke penyedia per pesanan = modal toko tertinggi di antara SKU aktif pada nominal itu — persis sama, tanpa tambahan.** Batas ini dihitung saat checkout dan menempel sebagai snapshot pesanan; pesanan yang harga penyedianya melewati batas tidak dikirim otomatis.
+- **Batas `max_price` per pesanan Digiflazz = harga modal toko dari satu SKU yang dipilih untuk nominal itu, persis tanpa tambahan 1% dan tanpa perhitungan harga SKU cadangan.** Batas ini dihitung saat checkout dan disimpan pada snapshot pesanan; transaksi tidak dikirim otomatis jika harga seller melewati modal toko.
 - **Harga yang dibayar pembeli adalah harga saat pesanan dibuat** (snapshot). Kalau harga katalog berubah setelah itu, pesanan lama tidak berubah.
 - Harga modal dan harga seller **disimpan di database sendiri**; harga tidak pernah ditanyakan ke penyedia saat ada pengunjung.
 - Perubahan harga dan margin hanya lewat panel admin, tercatat di audit log.
