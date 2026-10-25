@@ -1,7 +1,7 @@
 # PRD — LFAMILIA STORE
 
 **Versi:** 2.1 (penyelarasan dengan Buku Keputusan pemilik, 24 Oktober 2026 — rincian perubahan di §23)
-**Tanggal:** 22 Oktober 2026, direvisi 24 Oktober 2026
+**Tanggal:** 22 Oktober 2026, direvisi 25 Oktober 2026
 **Menggantikan:** `PRD-LFAMILIA-STORE-v1.md` dan `PRD-TRACEABILITY-2026-10.md` (keduanya diarsipkan di `docs/archive/2026-10-22-pra-redesign/`)
 **Sifat dokumen:** aturan produk. Tidak berisi laporan kemajuan, tidak berisi centang status, tidak berisi prosedur server.
 
@@ -41,7 +41,7 @@ Pembeli bisa **tanpa akun (guest)** atau **dengan akun (member)**. Guest bisa me
 |---|---|
 | **Produk** | Barang yang dijual, mis. "Mobile Legends". |
 | **Nominal / paket** | Pilihan di dalam produk, mis. "86 Diamond". |
-| **Sumber** | Pemetaan nominal ke SKU penyedia, mis. `MLBB-86` di Digiflazz. Satu nominal boleh punya beberapa sumber. |
+| **Sumber** | Pemetaan nominal ke SKU penyedia, mis. `MLBB-86` di Digiflazz. Untuk Digiflazz, setiap nominal hanya memakai satu SKU terpilih; tidak ada SKU cadangan. |
 | **Pesanan** | Satu transaksi beli. Punya nomor pesanan, isi, dan status. |
 | **Pembayaran** | Catatan uang masuk untuk satu pesanan. Satu pesanan bisa punya lebih dari satu percobaan pembayaran. |
 | **Pengiriman (fulfillment)** | Tindakan mengirim produk ke tujuan pembeli. Otomatis (penyedia) atau manual (admin). |
@@ -113,7 +113,7 @@ Aturan:
 - Harga rupiah **dibulatkan ke atas**; tidak ada pembulatan "cantik".
 - **Harga jual tidak boleh lebih murah dari modal toko** — server menolaknya.
 - **Nominal disembunyikan otomatis** bila harga seller naik di atas modal toko, dan tampil lagi otomatis bila harga seller turun kembali ke dalam batas (lihat §4.2).
-- **Batas harga kirim ke penyedia per pesanan = modal toko tertinggi di antara SKU aktif pada nominal itu — persis sama, tanpa tambahan.** Batas ini dihitung saat checkout dan menempel sebagai snapshot pesanan; pesanan yang harga penyedianya melewati batas tidak dikirim otomatis.
+- **Batas `max_price` per pesanan Digiflazz = harga modal toko dari satu SKU yang dipilih untuk nominal itu, persis tanpa tambahan 1% dan tanpa perhitungan harga SKU cadangan.** Batas ini dihitung saat checkout dan disimpan pada snapshot pesanan; transaksi tidak dikirim otomatis jika harga seller melewati modal toko.
 - **Harga yang dibayar pembeli adalah harga saat pesanan dibuat** (snapshot). Kalau harga katalog berubah setelah itu, pesanan lama tidak berubah.
 - Harga modal dan harga seller **disimpan di database sendiri**; harga tidak pernah ditanyakan ke penyedia saat ada pengunjung.
 - Perubahan harga dan margin hanya lewat panel admin, tercatat di audit log.
@@ -607,6 +607,7 @@ Tidak ada saat ini. Dua butir terakhir ditutup pada 2026-10-24:
 
 | Tanggal | Keputusan |
 |---|---|
+| 2026-10-25 | Penegasan model **tepat satu SKU Digiflazz terpilih per nominal**, tanpa SKU cadangan otomatis termasuk sebelum request, dan `max_price` selalu sama persis dengan harga modal toko SKU tersebut. Jalur impor/migrasi lama, pemeriksaan admin, dan dokumentasi agen diselaraskan. Status Midtrans settlement/capture memerlukan verifikasi hasil sukses; status Digiflazz dan response code (termasuk timeout yang telah membentuk transaksi) harus konsisten sebelum penyelesaian pesanan. |
 | 2026-10-24 | Penyelarasan dengan Buku Keputusan pemilik (PRD v2.1). Harga: sistem tiga harga (seller → modal toko → harga jual); modal dibentuk sekali saat impor (+2%), jual bawaan +10% disimpan sebagai margin nominal; **markup tingkat produk dihapus**; aturan khusus ML ×1,06 (2026-10-12) **dicabut** — semua produk ikut bawaan impor, persen bisa diubah per nominal sesudahnya. Pembulatan ke atas. Batas harga kirim = **persis modal toko tertinggi** SKU aktif (tambahan +1% dihapus). Sinkronisasi: tiap **15 menit**, seluruh katalog; nominal tanpa sumber aktif dinonaktifkan sinkronisasi; pemetaan belum pernah dipakai dihapus, yang pernah dipakai dinonaktifkan; nominal tidak tersedia **disembunyikan total** dari pembeli (termasuk data basi > 24 jam). Nama nominal impor **tanpa nama game** untuk semua produk. DOKU = **cadangan**, diaktifkan/dipindah admin manual lewat panel; tidak ada perpindahan gateway otomatis. Biaya kanal: prinsip gross-up ditanggung pembeli; saldo & QRIS manual nol; angka per kanal di dokumen pembayaran. Pembayaran belum pasti: ditandai UNKNOWN, dicek admin ke gateway, pembeli diberi peringatan tertulis (bukan larangan). Status BLOCKED **tidak tampil** ke pelanggan (dipetakan ke Gagal). Verifikasi email: **link ketat** — belum verifikasi tidak bisa login; sesudah login wajib nomor WhatsApp; satu nomor satu akun. Diskon tingkatan member diatur admin. Notifikasi admin: Telegram **dan** Discord. Ulasan pembeli: terbit langsung, admin bisa hapus permanen. Perbedaan PRD vs kode diputuskan **kasus per kasus** oleh pemilik (§0); §19 tetap mutlak. |
 | 2026-10-22 | PRD ditulis ulang. Status pelanggan dikunci 6. DOKU ditandai belum dipakai. Pengembalian dana: manual, member lewat penyesuaian saldo, guest lewat transfer. |
 | 2026-10-22 | Tingkatan member: BASIC/SILVER 500rb/GOLD 5jt/DIAMOND 20jt/PLATINUM 50jt; MAFIA internal, tidak tampil. Data guest disimpan 30 hari. DOKU dibiarkan ada (akan dipasang). Footer 4 kanal termasuk Discord. |

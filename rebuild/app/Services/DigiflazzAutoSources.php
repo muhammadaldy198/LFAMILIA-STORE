@@ -33,15 +33,33 @@ class DigiflazzAutoSources
 
     public function importGroup(Product $product, Collection $items, ?string $template, bool $publish, string $margin, bool $automatic, Request $request, ?string $costUplift = null): ProductPackage
     {
+        // Enforce one SKU per nominal for all import callers, not only UI.
+        if ($items->count() !== 1) {
+            throw ValidationException::withMessages([
+                'item_ids' => 'Satu nominal hanya boleh memiliki satu SKU Digiflazz terpilih.',
+            ]);
+        }
         $provider = Provider::where('code', 'DIGIFLAZZ')->firstOrFail();
-        $existing = ProviderMapping::where('provider_id', $provider->id)
-            ->whereIn('external_sku', $items->pluck('buyer_sku_code'))->lockForUpdate()->get();
-        $existingBySku = $existing->keyBy('external_sku');
-        $packageIds = $existing->pluck('product_package_id')->unique();
-        if ($packageIds->count() > 1) {
+        // Resolve the package without taking a mapping lock. Both sync and
+        // catalog importer lock the PACKAGE before the MAPPING; reversing
+        // that order here can deadlock a historical import during sync.
+        $mappingQuery = ProviderMapping::where('provider_id', $provider->id)
+            ->whereIn('external_sku', $items->pluck('buyer_sku_code'));
+        $initialPackageIds = (clone $mappingQuery)->pluck('product_package_id')->unique();
+        if ($initialPackageIds->count() > 1) {
             throw ValidationException::withMessages(['item_ids' => 'Sumber nominal yang sama sudah terpisah di beberapa nominal. Tidak ada sumber yang dipindahkan.']);
         }
-        $package = $packageIds->isNotEmpty() ? ProductPackage::whereKey($packageIds->first())->lockForUpdate()->firstOrFail() : null;
+        $package = $initialPackageIds->isNotEmpty()
+            ? ProductPackage::whereKey($initialPackageIds->first())->lockForUpdate()->firstOrFail()
+            : null;
+        $existing = (clone $mappingQuery)->lockForUpdate()->get();
+        $existingBySku = $existing->keyBy('external_sku');
+        $packageIds = $existing->pluck('product_package_id')->unique();
+        if ($packageIds->count() > 1
+            || ($package !== null && $packageIds->isNotEmpty()
+                && (int) $packageIds->first() !== (int) $package->id)) {
+            throw ValidationException::withMessages(['item_ids' => 'Mapping berubah saat impor. Coba ulangi setelah sinkronisasi selesai.']);
+        }
         if ($package && (int) $package->product_id !== (int) $product->id) {
             throw ValidationException::withMessages(['item_ids' => 'SKU sudah dipakai produk lain. Tidak ada sumber yang dipindahkan.']);
         }
@@ -53,6 +71,25 @@ class DigiflazzAutoSources
             throw ValidationException::withMessages(['item_ids' => 'Tidak ada SKU Digiflazz yang aktif dan tersedia.']);
         }
         $nominal = app(CatalogNominalOrder::class)->value($first->product_name, $first->brand);
+        // Do not silently create a duplicate storefront nominal when a
+        // different Digiflazz SKU was imported for the same game and group.
+        if ($package === null && $nominal !== null && $product->packages()
+            ->where('nominal_value', $nominal)
+            ->where('group_name', $first->type ?: null)->exists()) {
+            throw ValidationException::withMessages([
+                'item_ids' => 'Nominal ini sudah terdaftar. Lepas SKU lama sebelum menggantinya.',
+            ]);
+        }
+        if ($package !== null && $package->mappings()
+            ->where('provider_id', $provider->id)
+            ->where('external_sku', '<>', $first->buyer_sku_code)
+            ->where('is_active', true)->exists()) {
+            // Historical inactive mappings must not block an idempotent
+            // refresh of the selected SKU. Never reactivate the old ones.
+            throw ValidationException::withMessages([
+                'item_ids' => 'Nominal ini sudah memiliki SKU Digiflazz lain.',
+            ]);
+        }
         // Kolom "Harga jual (%)" di pop-up impor disimpan sebagai margin nominal
         // (mode persen), bukan markup produk, supaya bisa diubah atau diganti ke
         // harga tetap langsung dari editor nominal.
@@ -94,7 +131,7 @@ class DigiflazzAutoSources
             }
             $mapping->update([
                 // Do not silently reactivate an existing disabled SKU when
-                // the owner enables or refreshes auto-managed backups.
+                // the historical automatic import grouping is refreshed.
                 'is_active' => $automatic && $existingBySku->has($item->buyer_sku_code)
                     ? (bool) $existingBySku->get($item->buyer_sku_code)->is_active
                     : ($publish ?: $mapping->is_active),
@@ -142,9 +179,15 @@ class DigiflazzAutoSources
 
     public function orderProduct(Product $product): void
     {
-        foreach (app(CatalogNominalOrder::class)->sort($product->packages()->get()) as $order => $package) {
-            $package->update(['sort_order' => $order]);
-        }
+        DB::transaction(function () use ($product): void {
+            // Sync acquires package locks ascending by ID. Lock the entire
+            // product's set in the same order BEFORE sorting by nominal,
+            // which may otherwise update rows in the reverse order.
+            $packages = $product->packages()->orderBy('id')->lockForUpdate()->get();
+            foreach (app(CatalogNominalOrder::class)->sort($packages) as $order => $package) {
+                $package->update(['sort_order' => $order]);
+            }
+        }, 3);
     }
 
     public function enableProduct(Product $product, Request $request): int

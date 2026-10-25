@@ -186,13 +186,14 @@ class VoucherStockReservationTest extends TestCase
         $this->assertSame('DELIVERED', DB::table('voucher_stock_codes')->value('status'));
     }
 
-    public function test_reserved_code_is_released_when_fulfillment_switches_source(): void
+    public function test_blocked_selected_stock_source_releases_reserved_code_without_auto_switch(): void
     {
         $this->importCodes(1);
         $order = app(CheckoutService::class)->create($this->payload('skip'), null)['order'];
         $this->assertSame('RESERVED', DB::table('voucher_stock_codes')->value('status'));
 
-        // Admin menonaktifkan sumber stok kode dan menyiapkan sumber Digiflazz.
+        // Admin disables the selected stock source; a historic Digiflazz
+        // mapping must not be used as automatic replacement.
         DB::table('provider_mappings')
             ->where('product_package_id', $this->ctx['package'])
             ->update(['is_active' => false]);
@@ -221,15 +222,15 @@ class VoucherStockReservationTest extends TestCase
 
         app(FulfillmentService::class)->startOrder((int) $order->id);
 
-        // Order dialihkan ke Digiflazz, dan kode yang tak akan terkirim kembali dijual.
+        // Code returns to stock, but order is not switched or sent to Digiflazz.
         $code = DB::table('voucher_stock_codes')->first();
         $this->assertSame('AVAILABLE', $code->status, 'Kode harus dilepas saat sumber stok ditinggalkan.');
         $this->assertNull($code->order_id);
-        $this->assertSame(
-            'DIGIFLAZZ',
-            DB::table('providers')->where('id', DB::table('fulfillment_attempts')
-                ->where('order_id', $order->id)->orderByDesc('id')->value('provider_id'))->value('code')
-        );
+        $attempts = DB::table('fulfillment_attempts')->where('order_id', $order->id)->get();
+        $this->assertCount(1, $attempts);
+        $this->assertSame('BLOCKED', $attempts[0]->status);
+        $this->assertSame('VOUCHER_STOCK', DB::table('providers')
+            ->where('id', $attempts[0]->provider_id)->value('code'));
     }
 
     public function test_delivered_code_is_never_released(): void

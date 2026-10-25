@@ -96,6 +96,22 @@ class DigiflazzCatalogService
 
             return DB::transaction(function () use ($clean, $sku): int {
                 $providerId = DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
+
+                // Lock ALL affected packages in stable ID order before any
+                // catalog/mapping writes. The same locks cover present rows
+                // and the missing-SKU cleanup below. A per-SKU lock order is
+                // unsafe when Digiflazz returns SKUs in arbitrary order.
+                $packageQuery = DB::table('provider_mappings')
+                    ->where('provider_id', $providerId);
+                if ($sku !== null) {
+                    $packageQuery->where('external_sku', $sku);
+                }
+                $packageIds = $packageQuery->pluck('product_package_id')->unique()->sort()->values()->all();
+                if ($packageIds !== []) {
+                    DB::table('product_packages')->whereIn('id', $packageIds)
+                        ->orderBy('id')->lockForUpdate()->get(['id']);
+                }
+
                 foreach ($clean as $row) {
                     $existing = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', $row['buyer_sku_code'])->lockForUpdate()->first();
                     if ($existing) {
@@ -147,9 +163,32 @@ class DigiflazzCatalogService
                         // only if their verified supplier identity still matches.
                         if ($row['buyer_active'] && $row['seller_active']
                             && ($row['unlimited_stock'] || $row['stock'] > 0)) {
-                            (clone $mappingQuery)->whereIn('id', $matchingIds)
+                            // Only a mapping previously disabled BY SYNC may
+                            // return. Old manually-disabled SKU rows do not
+                            // supersede the admin's chosen replacement; among
+                            // multiple sync-disabled legacy rows, choose one
+                            // deterministically. Never activate a second SKU.
+                            $restoreCandidates = (clone $mappingQuery)->whereIn('id', $matchingIds)
                                 ->where('disabled_by_sync', true)->where('is_active', false)
-                                ->update(['is_active' => true, 'disabled_by_sync' => false, 'updated_at' => now()]);
+                                ->get(['id', 'product_package_id']);
+                            foreach ($restoreCandidates as $candidate) {
+                                $siblings = DB::table('provider_mappings')
+                                    ->where('product_package_id', $candidate->product_package_id)
+                                    ->where('provider_id', $providerId)
+                                    ->orderBy('priority')->orderBy('id')
+                                    ->lockForUpdate()->get(['id', 'is_active', 'disabled_by_sync']);
+                                $chosen = $siblings->first(
+                                    fn (object $sibling): bool => (bool) $sibling->disabled_by_sync
+                                );
+                                if ($chosen === null
+                                    || (int) $chosen->id !== (int) $candidate->id
+                                    || $siblings->contains(fn (object $sibling): bool => (bool) $sibling->is_active)) {
+                                    continue;
+                                }
+                                DB::table('provider_mappings')->where('id', $candidate->id)
+                                    ->where('disabled_by_sync', true)->where('is_active', false)
+                                    ->update(['is_active' => true, 'disabled_by_sync' => false, 'updated_at' => now()]);
+                            }
                             // Nominal yang dulu dimatikan sinkron ikut hidup lagi,
                             // tapi hanya bila penandanya nyala dan sekarang benar-benar
                             // punya sumber aktif. Nominal yang admin matikan sendiri

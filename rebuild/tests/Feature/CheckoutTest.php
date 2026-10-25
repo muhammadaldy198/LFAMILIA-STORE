@@ -272,7 +272,7 @@ class CheckoutTest extends TestCase
         $this->assertSame($snapshot, $snapshotAfterEdit);
     }
 
-    public function test_digiflazz_max_price_uses_highest_active_mapping_cost_exactly_even_above_sell_price(): void
+    public function test_digiflazz_max_price_is_exact_selected_sku_cost_even_with_historic_other_mappings(): void
     {
         $catalog = $this->catalog();
         $providerId = DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
@@ -314,7 +314,7 @@ class CheckoutTest extends TestCase
             ],
         ]);
 
-        // Backups also need current supplier rows under the new sellable() rule.
+        // Historic extra mapping rows must not inflate this order's cap.
         $this->seedCheckoutDigiflazzCatalog($catalog['package_id']);
 
         $key = 'checkout-multiple-digiflazz-maxprice';
@@ -325,10 +325,8 @@ class CheckoutTest extends TestCase
         $order = DB::table('orders')->where('idempotency_key', $key)->firstOrFail();
         $snapshot = json_decode($order->snapshot, true, 512, JSON_THROW_ON_ERROR);
 
-        // The ceiling is the exact active maximum, excluding the disabled 99,999 SKU.
-        // The order still uses the main SKU for its price. Loss on an eventual
-        // fallback is an explicit merchant policy, not a checkout rejection.
-        $this->assertSame(12001, $snapshot['provider']['max_price_idr']);
+        // No secondary mapping can inflate the selected SKU's exact cap.
+        $this->assertSame(10000, $snapshot['provider']['max_price_idr']);
         $this->assertSame($catalog['mapping_id'], $snapshot['provider']['mapping_id']);
         $this->assertSame(10000, (int) $order->cost_idr);
         $this->assertSame(11000, (int) $order->total_idr);
@@ -340,7 +338,7 @@ class CheckoutTest extends TestCase
             DB::table('orders')->where('id', $order->id)->value('snapshot'),
             true, 512, JSON_THROW_ON_ERROR
         );
-        $this->assertSame(12001, $snapshotAfterSync['provider']['max_price_idr']);
+        $this->assertSame(10000, $snapshotAfterSync['provider']['max_price_idr']);
     }
 
     public function test_client_price_provider_and_sku_are_rejected(): void

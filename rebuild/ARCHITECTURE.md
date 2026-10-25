@@ -64,7 +64,7 @@ Implementasi yang ditemukan di kode:
 
 ## Fulfillment
 
-Satu `ProductPackage` dapat mempunyai beberapa `provider_mappings`. Khusus Digiflazz, toko menerapkan kebijakan 1 SKU aktif per nominal (model `_A`, tanpa backup SKU `_B`) sesuai PRD v1.1 §47.
+Tabel dapat menyimpan beberapa `provider_mappings` historis, tetapi **aturan katalog sekarang hanya mengizinkan satu SKU Digiflazz aktif terpilih per nominal**, tanpa otomatis memilih SKU cadangan.
 
 Candidate dipilih dengan priority kecil lebih dahulu, lalu cost dan ID. Mapping nonaktif, provider nonaktif, SKU yang tidak usable, stok/cut-off bermasalah, adapter yang tidak didukung, atau cost di atas `max_price` dapat dilewati **sebelum request**.
 

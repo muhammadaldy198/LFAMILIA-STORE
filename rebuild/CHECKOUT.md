@@ -27,7 +27,7 @@ Unique constraint MySQL menjadi proteksi tambahan terhadap race.
 
 Di dalam transaction, backend mengunci/revalidasi package/provider mapping, customer input, membership, voucher, dan payment route lalu menghitung:
 
-- modal toko (mapping terpilih);
+- modal toko (satu mapping/SKU terpilih untuk nominal Digiflazz);
 - markup jual yang berlaku (nominal → game → global; harga rupiah dibulatkan ke atas);
 - membership discount;
 - voucher discount;

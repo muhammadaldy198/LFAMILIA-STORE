@@ -212,6 +212,57 @@ class FulfillmentTest extends TestCase
         Http::assertSentCount(1);
     }
 
+    public function test_digiflazz_conflicting_codes_and_timeout_do_not_complete_or_fail_a_paid_order(): void
+    {
+        Queue::fake();
+        $this->credentials();
+        $service = app(FulfillmentService::class);
+
+        foreach ([
+            ['status' => 'Sukses', 'rc' => '03'],
+            ['status' => 'Sukses', 'rc' => ''],
+            ['status' => 'Gagal', 'rc' => '01'],
+            ['status' => 'Gagal', 'rc' => '70'],
+            ['status' => 'Gagal', 'rc' => '00'],
+            ['status' => 'Pending', 'rc' => '00'],
+        ] as $case => $responseState) {
+            $sku = 'DF-CONFLICT-'.$case;
+            $catalog = $this->automaticCatalog(sku: $sku);
+            $orderId = $this->paidOrder($catalog);
+
+            // Open a real fulfillment attempt without sending to the provider.
+            $service->startOrder($orderId);
+            $attempt = DB::table('fulfillment_attempts')->where('order_id', $orderId)->firstOrFail();
+            $ref = 'FUL-'.DB::table('orders')->where('id', $orderId)->value('order_number').'-1';
+            DB::table('fulfillment_attempts')->where('id', $attempt->id)->update([
+                'status' => 'PENDING',
+                'request_payload' => json_encode([
+                    'ref_id' => $ref,
+                    'buyer_sku_code' => $sku,
+                    'customer_no' => '1234567890',
+                    'max_price' => 12000,
+                ], JSON_THROW_ON_ERROR),
+            ]);
+
+            $service->applyProviderResult((int) $attempt->id, [
+                'ref_id' => $ref,
+                'buyer_sku_code' => $sku,
+                'customer_no' => '1234567890',
+                'status' => $responseState['status'],
+                'rc' => $responseState['rc'],
+                'sn' => 'SHOULD-NOT-DELIVER',
+                'price' => 10000,
+            ], 'provider_response');
+
+            $this->assertSame('UNKNOWN', DB::table('fulfillment_attempts')
+                ->where('id', $attempt->id)->value('status'), json_encode($responseState));
+            $this->assertSame('PROCESSING', DB::table('orders')
+                ->where('id', $orderId)->value('status'), json_encode($responseState));
+            $this->assertNull(DB::table('orders')->where('id', $orderId)->value('delivery_payload'));
+            $this->assertSame(1, DB::table('fulfillment_attempts')->where('order_id', $orderId)->count());
+        }
+    }
+
     public function test_removed_supplier_sku_blocks_paid_order_and_queued_send(): void
     {
         Queue::fake();
@@ -532,7 +583,7 @@ class FulfillmentTest extends TestCase
         $this->markTestSkipped('Per PRD §47, automatic failover to another SKU is disabled.');
     }
 
-    public function test_unusable_primary_source_is_skipped_before_any_provider_send(): void
+    public function test_unusable_selected_source_blocks_without_switching_to_another_sku(): void
     {
         Queue::fake();
         $this->credentials();
@@ -557,10 +608,11 @@ class FulfillmentTest extends TestCase
 
         $attempts = DB::table('fulfillment_attempts')->where('order_id', $orderId)
             ->orderBy('attempt_no')->get();
-        $this->assertCount(2, $attempts);
+        // A historic second mapping must never be chosen automatically.
+        $this->assertCount(1, $attempts);
         $this->assertSame('BLOCKED', $attempts[0]->status);
-        $this->assertSame($secondId, (int) $attempts[1]->provider_mapping_id);
-        $this->assertSame('CREATED', $attempts[1]->status);
+        $this->assertSame((int) $catalog['mapping_id'], (int) $attempts[0]->provider_mapping_id);
+        $this->assertNotSame($secondId, (int) $attempts[0]->provider_mapping_id);
         Http::assertNothingSent();
     }
 

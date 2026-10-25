@@ -74,9 +74,11 @@ class FulfillmentService
 
             $blockReason = $this->mappingBlockReason($mapping, $snapshot, (int) $order->id);
             if ($blockReason !== null) {
-                $blocked = $this->blockedWithoutSend($order, $mapping, $blockReason);
+                // The order is locked to its selected SKU. No automatic
+                // switch is allowed, even before the first provider request.
+                $this->blockedWithoutSend($order, $mapping, $blockReason);
 
-                return $this->nextUnsentAttempt($order, $blocked, $snapshot);
+                return null;
             }
 
             $attempt = $this->createAttempt($order, $mapping, 'CREATED');
@@ -385,6 +387,18 @@ class FulfillmentService
             }
 
             $incoming = $this->providerStatus((string) $response['status']);
+            $responseCode = isset($response['rc']) && is_scalar($response['rc'])
+                ? trim((string) $response['rc']) : '';
+            // Digiflazz buyer API uses rc=00 only for a successful delivery.
+            // Timeout (01/70) and router-pending (99/03) can represent an
+            // already-created transaction: never confirm a failure or issue a
+            // replacement order while the original reference is uncertain.
+            if (($incoming === 'SUCCESS' && $responseCode !== '00')
+                || ($incoming === 'FAILED_CONFIRMED'
+                    && in_array($responseCode, ['00', '01', '03', '70', '99'], true))
+                || ($incoming === 'PENDING' && $responseCode === '00')) {
+                $incoming = 'UNKNOWN';
+            }
             if ($attempt->status === 'SUCCESS') {
                 return false;
             }
@@ -906,54 +920,20 @@ class FulfillmentService
             'attempt_id' => $attempt->id,
         ]);
 
-        return $attempt;
-    }
-
-    private function nextUnsentAttempt(object $order, object $blockedAttempt, array $snapshot): ?int
-    {
-        $maxPrice = $this->maxPrice($snapshot);
-        $attemptedMappings = DB::table('fulfillment_attempts')
-            ->where('order_id', $order->id)
-            ->pluck('provider_mapping_id');
-
-        $mapping = $this->nextSafeDigiflazzMapping(
-            (int) $order->product_package_id,
-            $attemptedMappings->map(fn ($id): int => (int) $id)->all(),
-            $snapshot,
-            $maxPrice,
-        );
-
-        if (! $mapping) {
-            return null;
-        }
-
-        $next = $this->createAttempt($order, $mapping, 'CREATED');
-
-        // Sumber stok kode ditinggalkan: kode yang sudah dipesan tidak akan
-        // pernah terkirim, jadi kembalikan ke stok sekarang. Kalau tidak, kode
-        // itu menggantung RESERVED selamanya dan hilang dari stok yang dijual.
-        $blockedMapping = $this->mapping((int) $blockedAttempt->provider_mapping_id);
-        if ($blockedMapping?->provider_code === 'VOUCHER_STOCK') {
+        // A voucher code reserved at checkout is not delivered when its
+        // selected stock source is blocked. Release that reservation now,
+        // without switching providers or erasing the blocked attempt.
+        if ($mapping->provider_code === 'VOUCHER_STOCK') {
             $released = $this->voucherStock->release((int) $order->id);
             if ($released > 0) {
                 $this->event((int) $order->id, 'VOUCHER_STOCK_RELEASED', $order->status, $order->status, [
-                    'attempt_id' => $blockedAttempt->id,
+                    'attempt_id' => $attempt->id,
                     'codes' => $released,
                 ]);
             }
         }
 
-        DB::table('orders')->where('id', $order->id)->update([
-            'status' => 'PROCESSING',
-            'updated_at' => now(),
-        ]);
-        $this->event((int) $order->id, 'FULFILLMENT_SOURCE_SKIPPED', $order->status, 'PROCESSING', [
-            'from_attempt_id' => $blockedAttempt->id,
-            'attempt_id' => $next->id,
-            'reason' => $blockedAttempt->last_error,
-        ]);
-
-        return (int) $next->id;
+        return $attempt;
     }
 
     private function createAttempt(object $order, object $mapping, string $status, ?string $error = null): object
@@ -989,40 +969,6 @@ class FulfillmentService
                 'providers.fulfillment_mode as provider_mode',
                 'providers.is_active as provider_active'
             )->first();
-    }
-
-    /**
-     * @param  array<int, int>  $attemptedMappingIds
-     * @param  array<string, mixed>  $snapshot
-     */
-    private function nextSafeDigiflazzMapping(
-        int $packageId,
-        array $attemptedMappingIds,
-        array $snapshot,
-        int $maxPrice,
-    ): ?object {
-        $candidates = DB::table('provider_mappings as mappings')
-            ->join('providers', 'providers.id', '=', 'mappings.provider_id')
-            ->where('mappings.product_package_id', $packageId)
-            ->where('mappings.is_active', true)
-            ->where('providers.is_active', true)
-            ->where('providers.fulfillment_mode', 'AUTO_PROVIDER')
-            ->where('providers.code', 'DIGIFLAZZ')
-            ->whereNotNull('mappings.external_sku')
-            ->whereNotNull('mappings.cost_idr')
-            ->where('mappings.cost_idr', '>', 0)
-            ->where('mappings.cost_idr', '<=', $maxPrice)
-            ->when($attemptedMappingIds !== [], fn ($query) => $query->whereNotIn('mappings.id', $attemptedMappingIds))
-            ->orderBy('mappings.priority')
-            ->orderBy('mappings.cost_idr')
-            ->orderBy('mappings.id')
-            ->select('mappings.*', 'providers.code as provider_code', 'providers.is_active as provider_active')
-            ->lockForUpdate()
-            ->get();
-
-        return $candidates->first(
-            fn (object $candidate): bool => $this->mappingBlockReason($candidate, $snapshot) === null
-        );
     }
 
     /**

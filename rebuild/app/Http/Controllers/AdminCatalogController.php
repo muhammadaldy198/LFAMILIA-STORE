@@ -1187,7 +1187,21 @@ class AdminCatalogController
             $data['is_active'] = false;
         }
 
-        DB::transaction(function () use ($request, $mapping, $data, $audit, $manualCostZero): void {
+        DB::transaction(function () use ($request, $mapping, $data, $audit, $manualCostZero, $provider): void {
+            if ($provider->code === 'DIGIFLAZZ' && $data['is_active']) {
+                // Serialize concurrent activations for the same package.
+                DB::table('product_packages')->where('id', $mapping->product_package_id)
+                    ->lockForUpdate()->first();
+                if (DB::table('provider_mappings')
+                    ->where('product_package_id', $mapping->product_package_id)
+                    ->where('provider_id', $provider->id)
+                    ->where('id', '<>', $mapping->id)
+                    ->where('is_active', true)->exists()) {
+                    throw ValidationException::withMessages([
+                        'is_active' => 'Nominal ini sudah memiliki SKU Digiflazz aktif. Nonaktifkan SKU lama terlebih dahulu.',
+                    ]);
+                }
+            }
             $before = $mapping->toArray();
             $mapping->update($data);
             if ($manualCostZero) {

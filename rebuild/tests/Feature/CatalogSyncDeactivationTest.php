@@ -116,6 +116,78 @@ class CatalogSyncDeactivationTest extends TestCase
         return ['active' => (bool) $fresh->is_active, 'marker' => (bool) $fresh->disabled_by_sync];
     }
 
+    public function test_sync_restores_only_one_sku_when_historic_nominal_has_two_mappings(): void
+    {
+        $this->login();
+        $package = $this->package($this->product('AUTO_PROVIDER'), 'RESTORE_ONE');
+        $selected = $this->mapping($package, 'DIGIFLAZZ', 'restore-one-selected', false, 0);
+        $oldBackup = $this->mapping($package, 'DIGIFLAZZ', 'restore-one-backup', false, 1);
+        DB::table('provider_mappings')->whereIn('id', [$selected->id, $oldBackup->id])
+            ->update(['disabled_by_sync' => true]);
+        DB::table('product_packages')->where('id', $package->id)
+            ->update(['is_active' => false, 'disabled_by_sync' => true]);
+
+        // Send the historical secondary row FIRST. Supplier response order
+        // must not change the selected SKU or reactivate both mappings.
+        $this->fakeCatalog([$this->row('restore-one-backup'), $this->row('restore-one-selected')]);
+        app(DigiflazzCatalogService::class)->sync();
+
+        $this->assertDatabaseHas('provider_mappings', [
+            'id' => $selected->id, 'is_active' => true, 'disabled_by_sync' => false,
+        ]);
+        $this->assertDatabaseHas('provider_mappings', [
+            'id' => $oldBackup->id, 'is_active' => false, 'disabled_by_sync' => true,
+        ]);
+        $this->assertSame(['active' => true, 'marker' => false], $this->state($package));
+        $this->assertSame(1, DB::table('provider_mappings')
+            ->where('product_package_id', $package->id)->where('is_active', true)->count());
+
+        // Subsequent scheduled sync cannot re-enable the historic backup.
+        app(DigiflazzCatalogService::class)->sync();
+        $this->assertFalse((bool) $oldBackup->fresh()->is_active);
+    }
+
+    public function test_sync_restores_admin_selected_sku_even_if_disabled_old_sku_has_higher_priority(): void
+    {
+        $this->login();
+        $package = $this->package($this->product('AUTO_PROVIDER'), 'CHOSEN');
+        $old = $this->mapping($package, 'DIGIFLAZZ', 'chosen-old-priority-zero', false, 0);
+        $chosen = $this->mapping($package, 'DIGIFLAZZ', 'chosen-new-priority-one', true, 1);
+        // The admin deliberately replaced the old SKU without reordering
+        // historical priorities. Keep the new SKU in DB during absence.
+        DB::table('orders')->insert([
+            'order_number' => 'CHOICE-'.bin2hex(random_bytes(5)), 'user_id' => null,
+            'product_id' => $package->product_id, 'product_package_id' => $package->id,
+            'provider_mapping_id' => $chosen->id, 'status' => 'PENDING_PAYMENT',
+            'currency' => 'IDR',
+            'customer_input' => json_encode(['player_id' => '1'], JSON_THROW_ON_ERROR),
+            'snapshot' => json_encode([], JSON_THROW_ON_ERROR),
+            'cost_idr' => 10000, 'margin_idr' => 0, 'discount_idr' => 0,
+            'fee_idr' => 0, 'total_idr' => 10000,
+            'idempotency_key' => 'chosen-'.bin2hex(random_bytes(8)),
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        // B temporarily disappears; A remains known but disabled by admin.
+        $this->fakeCatalog([$this->row('chosen-old-priority-zero')]);
+        app(DigiflazzCatalogService::class)->sync();
+        $this->assertDatabaseHas('provider_mappings', [
+            'id' => $chosen->id, 'is_active' => false, 'disabled_by_sync' => true,
+        ]);
+        $this->assertSame(['active' => false, 'marker' => true], $this->state($package));
+
+        // Return B first; only B is allowed to recover, never old A.
+        $this->fakeCatalog([$this->row('chosen-new-priority-one'), $this->row('chosen-old-priority-zero')]);
+        app(DigiflazzCatalogService::class)->sync();
+        $this->assertDatabaseHas('provider_mappings', [
+            'id' => $chosen->id, 'is_active' => true, 'disabled_by_sync' => false,
+        ]);
+        $this->assertDatabaseHas('provider_mappings', [
+            'id' => $old->id, 'is_active' => false, 'disabled_by_sync' => false,
+        ]);
+        $this->assertSame(['active' => true, 'marker' => false], $this->state($package));
+    }
+
     public function test_store_cost_backfill_is_idempotent_and_skips_rows_without_a_reference(): void
     {
         $this->login();

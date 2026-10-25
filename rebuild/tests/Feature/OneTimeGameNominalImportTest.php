@@ -3,8 +3,10 @@
 namespace Tests\Feature;
 
 use App\Models\Product;
+use App\Services\DigiflazzAutoSources;
 use App\Services\OneTimeGameNominalImport;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -13,7 +15,113 @@ class OneTimeGameNominalImportTest extends TestCase
 {
     use DatabaseTransactions;
 
-    public function test_imports_two_suppliers_as_one_manual_game_nominal_and_never_touches_non_games(): void
+    public function test_importer_refreshes_selected_sku_with_inactive_historical_sibling(): void
+    {
+        $gameId = DB::table('categories')->where('slug', 'game')->value('id');
+        $this->assertNotNull($gameId);
+        $providerId = DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
+        $this->assertNotNull($providerId);
+        $product = Product::create([
+            'category_id' => $gameId,
+            'name' => 'Historical refresh '.bin2hex(random_bytes(4)),
+            'slug' => 'historical-refresh-'.bin2hex(random_bytes(4)),
+            'fulfillment_mode' => 'AUTO_PROVIDER', 'margin_percent' => 10,
+            'is_active' => true,
+        ]);
+        $package = $product->packages()->create([
+            'code' => 'HISTORICAL_ONE', 'name' => '5 Diamond',
+            'group_name' => 'Umum', 'nominal_value' => 5,
+            'is_active' => true, 'sort_order' => 0,
+        ]);
+        DB::table('provider_mappings')->insert([
+            ['product_package_id' => $package->id, 'provider_id' => $providerId,
+                'external_sku' => 'historical-refresh-A', 'cost_idr' => 900,
+                'store_cost_idr' => 918, 'max_price_idr' => 918,
+                'is_active' => true, 'priority' => 0, 'created_at' => now(), 'updated_at' => now()],
+            ['product_package_id' => $package->id, 'provider_id' => $providerId,
+                'external_sku' => 'historical-refresh-B', 'cost_idr' => 950,
+                'store_cost_idr' => 969, 'max_price_idr' => 969,
+                'is_active' => false, 'priority' => 1, 'created_at' => now(), 'updated_at' => now()],
+        ]);
+        $item = (object) [
+            'buyer_sku_code' => 'historical-refresh-A',
+            'product_name' => '5 Diamond',
+            'brand' => $product->name,
+            'type' => 'Umum', 'price_idr' => 900,
+            'buyer_active' => true, 'seller_active' => true,
+            'unlimited_stock' => true, 'stock' => 0,
+            'start_cut_off' => '00:00', 'end_cut_off' => '00:00',
+            'synced_at' => now(),
+        ];
+        // The importer should be idempotent even if old inactive rows remain.
+        app(DigiflazzAutoSources::class)->importGroup(
+            $product, collect([$item]), null, true, '10', false,
+            Request::create('/internal/legacy-refresh', 'POST')
+        );
+        $this->assertSame(1, $package->mappings()->where('is_active', true)->count());
+        $this->assertFalse((bool) $package->mappings()->where('external_sku', 'historical-refresh-B')->value('is_active'));
+    }
+
+    public function test_historical_import_skips_ambiguous_active_legacy_skus_without_data_loss(): void
+    {
+        $now = now();
+        $gameId = DB::table('categories')->where('slug', 'game')->value('id');
+        if (! $gameId) {
+            $gameId = DB::table('categories')->insertGetId([
+                'name' => 'Top Up Game', 'slug' => 'game', 'is_active' => true,
+                'created_at' => $now, 'updated_at' => $now,
+            ]);
+        }
+        $providerId = DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
+        $this->assertNotNull($providerId);
+        DB::table('providers')->where('id', $providerId)->update(['is_active' => true]);
+
+        $game = Product::create([
+            'category_id' => $gameId, 'name' => 'Free Fire',
+            'slug' => 'legacy-two-active-'.bin2hex(random_bytes(5)),
+            'fulfillment_mode' => 'AUTO_PROVIDER', 'margin_percent' => 10,
+            'is_active' => false,
+        ]);
+        $game->fields()->create([
+            'field_key' => 'destination', 'label' => 'Player ID', 'type' => 'text',
+            'is_required' => true, 'sort_order' => 0,
+        ]);
+        $package = $game->packages()->create([
+            'code' => 'LEGACY_TWO_ACTIVE', 'name' => '5 Diamond',
+            'group_name' => 'Umum', 'nominal_value' => 5,
+            'sort_order' => 0, 'is_active' => true,
+        ]);
+        foreach (['LEGACY_TWOSKU_A' => 900, 'LEGACY_TWOSKU_B' => 950] as $sku => $price) {
+            DB::table('provider_mappings')->insert([
+                'product_package_id' => $package->id, 'provider_id' => $providerId,
+                'external_sku' => $sku, 'cost_idr' => $price,
+                'store_cost_idr' => (int) ceil($price * 1.02),
+                'max_price_idr' => (int) ceil($price * 1.02),
+                'priority' => $price === 900 ? 0 : 1,
+                'is_active' => true, 'created_at' => $now, 'updated_at' => $now,
+            ]);
+            DB::table('digiflazz_catalog_items')->insert([
+                'buyer_sku_code' => $sku, 'product_name' => 'Free Fire 5 Diamond',
+                'category' => 'Games', 'brand' => 'FREE FIRE', 'type' => 'Umum',
+                'seller_name' => 'Legacy supplier', 'price_idr' => $price,
+                'baseline_price_idr' => $price,
+                'buyer_active' => true, 'seller_active' => true,
+                'unlimited_stock' => true, 'stock' => 0, 'multi' => false,
+                'start_cut_off' => '00:00', 'end_cut_off' => '00:00',
+                'synced_at' => $now, 'created_at' => $now, 'updated_at' => $now,
+            ]);
+        }
+
+        $result = app(OneTimeGameNominalImport::class)->run();
+        $this->assertGreaterThanOrEqual(1, $result['groups_skipped']);
+        $this->assertSame(0, $result['mappings_created']);
+        $this->assertSame(0, $result['packages_created']);
+        $this->assertSame(2, $package->mappings()->count());
+        $this->assertSame(2, $package->mappings()->where('is_active', true)->count());
+        $this->assertFalse($game->fresh()->is_active);
+    }
+
+    public function test_imports_one_selected_sku_per_nominal_and_never_touches_non_games(): void
     {
         $now = now();
         $gameId = DB::table('categories')->where('slug', 'game')->value('id');
@@ -60,7 +168,7 @@ class OneTimeGameNominalImportTest extends TestCase
                 'price_idr' => $price, 'baseline_price_idr' => $price,
                 'buyer_active' => true, 'seller_active' => true,
                 'unlimited_stock' => true, 'stock' => 0, 'multi' => false,
-                // One backup source currently in cutoff must still be attached.
+                // The second seller SKU is not imported as a backup.
                 'start_cut_off' => $sku === 'ONCE_TEST_FF5_B' ? '23:45' : '00:00',
                 'end_cut_off' => '00:00',
                 'synced_at' => $now, 'created_at' => $now, 'updated_at' => $now,
@@ -72,16 +180,16 @@ class OneTimeGameNominalImportTest extends TestCase
         $first = app(OneTimeGameNominalImport::class)->run();
         $this->assertSame(1, $first['games_activated']);
         $this->assertSame(1, $first['packages_created']);
-        $this->assertSame(2, $first['mappings_created']);
+        $this->assertSame(1, $first['mappings_created']);
 
         $package = $game->packages()->firstOrFail();
         $this->assertTrue($game->fresh()->is_active);
         $this->assertTrue($package->is_active);
         $this->assertSame(5, (int) $package->nominal_value);
         $mappings = $package->mappings()->orderBy('priority')->get();
-        $this->assertCount(2, $mappings);
-        $this->assertSame(['ONCE_TEST_FF5_A', 'ONCE_TEST_FF5_B'], $mappings->pluck('external_sku')->all());
-        $this->assertSame([0, 1], $mappings->pluck('priority')->all());
+        $this->assertCount(1, $mappings);
+        $this->assertSame(['ONCE_TEST_FF5_A'], $mappings->pluck('external_sku')->all());
+        $this->assertSame([0], $mappings->pluck('priority')->all());
         foreach ($mappings as $mapping) {
             $this->assertTrue($mapping->is_active);
             $this->assertSame('{{destination}}', $mapping->fulfillment_config['customer_no_template']);

@@ -14,7 +14,7 @@ Produk menggunakan fulfillment mode otomatis atau manual. Manual product tidak d
 
 ## Provider mapping
 
-Satu package dapat mempunyai beberapa provider mappings. Mapping menyimpan antara lain provider, external SKU, cost, max price, priority, active state, dan fulfillment configuration. Untuk katalog baru, toko memakai **satu SKU provider terpilih per nominal** yang dijual; tidak ada failover otomatis antar mapping di sisi toko.
+Tabel dapat menyimpan provider mappings historis, tetapi setiap nominal Digiflazz baru hanya boleh memiliki **satu SKU terpilih** tanpa cadangan atau perpindahan otomatis. Mapping menyimpan provider, external SKU, cost, max price, prioritas, status aktif, dan konfigurasi fulfillment.
 
 Untuk selection, angka `priority` lebih kecil didahulukan. Provider/mapping internal, cost, external SKU, dan ranking tidak menjadi input customer.
 

@@ -104,6 +104,19 @@ class OneTimeGameNominalImport
                     continue;
                 }
 
+                // A legacy migration can run on installations that still
+                // contain multiple ACTIVE SKUs per nominal. Do not silently
+                // choose which existing provider mapping remains selected:
+                // skip the ambiguous group and retain all historical rows.
+                if ($existing->where('is_active', true)->count() > 1) {
+                    $result['groups_skipped']++;
+                    Log::warning('One-time game import skipped: multiple active legacy SKUs.', [
+                        'product_id' => $product->id,
+                    ]);
+
+                    continue;
+                }
+
                 // Never re-enable a SKU intentionally disabled by the merchant.
                 $disabled = $existing->filter(fn (ProviderMapping $mapping): bool => ! $mapping->is_active)
                     ->pluck('external_sku')->all();
@@ -115,27 +128,31 @@ class OneTimeGameNominalImport
                     continue;
                 }
 
+                // Historical migration runs on fresh installs too. Pick one
+                // selected SKU, never create an automatic backup mapping.
+                $owned = $safe->first(fn (object $item): bool => $existing->contains(
+                    fn (ProviderMapping $mapping): bool => $mapping->is_active
+                        && $mapping->external_sku === $item->buyer_sku_code
+                ));
+                $selected = $owned ?? $safe->sortBy('price_idr')->first();
+
                 $beforePackageCount = $product->packages()->count();
                 $beforeMappingCount = ProviderMapping::query()->where('provider_id', $provider->id)
                     ->whereIn('product_package_id', $product->packages()->pluck('id'))->count();
 
-                DB::transaction(function () use ($product, $safe, $template, $sources, $provider, $catalogImporter, $audit, $request): void {
-                    // Manual mode: no auto_source_group tag; future catalogue sync
-                    // will update prices, but will not import new denominations.
+                DB::transaction(function () use ($product, $selected, $template, $sources, $request, $catalogImporter, $provider, $audit): void {
                     $package = $sources->importGroup(
-                        $product, $safe, $template, true,
+                        $product, collect([$selected]), $template, true,
                         (string) $product->margin_percent, false, $request
                     );
-
-                    // Fill sources that importGroup safely omits at supplier cutoff.
-                    foreach ($safe as $item) {
-                        if ($package->mappings()->where('provider_id', $provider->id)
-                            ->where('external_sku', $item->buyer_sku_code)->exists()) {
-                            continue;
-                        }
+                    // The chosen SKU can be in a temporary cut-off (or old
+                    // fixture timestamp). Preserve ONE mapping for it, while
+                    // runtime sellability checks keep it hidden until safe.
+                    if (! $package->mappings()->where('provider_id', $provider->id)
+                        ->where('external_sku', $selected->buyer_sku_code)->exists()) {
                         $mapping = $catalogImporter->upsert(
-                            $package, (string) $item->buyer_sku_code,
-                            (int) $item->price_idr, (int) $item->price_idr
+                            $package, (string) $selected->buyer_sku_code,
+                            (int) $selected->price_idr, (int) $selected->price_idr
                         );
                         $mapping->update([
                             'is_active' => true,
@@ -143,20 +160,6 @@ class OneTimeGameNominalImport
                         ]);
                         $audit->record($request, 'catalog.manual_source_cutoff_attached',
                             'provider_mapping', $mapping->id, null, $mapping->fresh()->toArray());
-                    }
-
-                    // Deterministic cheapest-first fallback, not arbitrary all-zero priority.
-                    $ranked = $package->mappings()->where('provider_id', $provider->id)
-                        ->where('is_active', true)
-                        ->orderBy('cost_idr')->orderBy('external_sku')->orderBy('id')->get();
-                    foreach ($ranked as $position => $mapping) {
-                        if ((int) $mapping->priority === $position) {
-                            continue;
-                        }
-                        $before = $mapping->toArray();
-                        $mapping->update(['priority' => $position]);
-                        $audit->record($request, 'catalog.manual_source_ranked',
-                            'provider_mapping', $mapping->id, $before, $mapping->fresh()->toArray());
                     }
                 }, 2);
 

@@ -6,7 +6,7 @@ Fulfillment dimulai setelah order berada pada state yang diizinkan oleh payment 
 
 ## Provider mappings
 
-Satu `ProductPackage` dapat mempunyai beberapa `provider_mappings`. Namun khusus untuk Digiflazz, toko menerapkan **kebijakan 1 SKU per nominal (model `_A`, tanpa backup SKU `_B`)** sesuai PRD v1.1 §47.
+Tabel `provider_mappings` dapat tetap menyimpan baris historis, tetapi untuk Digiflazz yang dijual sekarang **setiap nominal hanya memakai satu SKU terpilih**, tanpa SKU cadangan (`_B`) maupun pergantian otomatis ke SKU lain (PRD v2.1 §4).
 
 Jika ada multiple mapping terkonfigurasi, candidate diurutkan:
 
@@ -18,9 +18,9 @@ Customer tetap membeli satu nominal. Provider mapping dan SKU internal tidak men
 
 ## Digiflazz max_price snapshot
 
-Saat checkout, `provider.max_price_idr` untuk Digiflazz dihitung dari **harga modal tertinggi di antara SKU Digiflazz aktif dan tersedia dalam nominal tersebut — persis sama, tanpa tambahan** (keputusan pemilik 2026-10-24; rumus lama "modal tertinggi + 1%" dicabut) (`rebuild/app/Services/CheckoutPricing.php`, blok perhitungan `maxPrice`). Jika hanya satu mapping yang aktif (sesuai target kebijakan 1 SKU per nominal), batasnya adalah harga modal SKU tersebut sendiri. Untuk nominal dengan **modal toko** (`store_cost_idr`), batas kelayakannya adalah modal toko itu sendiri — harga seller di atas modal toko membuat nominal sementara tidak tersedia di checkout dan hilang dari storefront sampai harganya turun kembali. Batas ini disimpan sebagai snapshot order dan dikirim sebagai `max_price` pada setiap attempt Digiflazz serta reconciliation.
+Saat checkout, `provider.max_price_idr` untuk Digiflazz = **harga modal toko SKU terpilih**, persis tanpa tambahan. Tidak ada perhitungan harga tertinggi SKU lain atau markup 1%. Harga seller yang melampaui modal toko membuat nominal sementara tidak tersedia sampai harga seller turun kembali. Snapshot `max_price` disimpan bersama order dan dikirim ke Digiflazz pada attempt maupun reconciliation.
 
-Harga jual tetap dihitung dari SKU utama; SKU dengan modal melebihi batas snapshot tidak boleh dipilih bila terjadi kenaikan harga supplier melebihi toleransi.
+Harga jual dihitung dari modal toko SKU terpilih. Kenaikan harga seller tidak otomatis menaikkan modal atau mengubah pesanan yang sudah dibuat.
 
 Jangan membingungkan `provider_mappings.max_price_idr` (batas administratif per sumber saat sinkron) dengan `order.snapshot.provider.max_price_idr` (batas transaksi Digiflazz hasil perhitungan saat checkout).
 
@@ -36,7 +36,7 @@ Sebelum provider request, mapping dapat dinyatakan unusable bila misalnya:
 - provider cost invalid;
 - cost melewati `max_price` snapshot order.
 
-Mapping seperti ini dapat dilewati **sebelum external request**, karena belum ada risiko provider pertama sudah memproses transaksi.
+Mapping terpilih yang tidak dapat digunakan berubah menjadi attempt **BLOCKED** tanpa request Digiflazz. Tidak ada pemilihan SKU lain secara otomatis, sekalipun provider belum dihubungi.
 
 ## Attempt state
 

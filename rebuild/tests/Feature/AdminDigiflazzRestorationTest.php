@@ -17,12 +17,14 @@ use App\Services\DigiflazzCatalogImport;
 use App\Services\DigiflazzCatalogService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\Client\Factory;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
+use InvalidArgumentException;
 use Tests\TestCase;
 
 class AdminDigiflazzRestorationTest extends TestCase
@@ -193,6 +195,75 @@ class AdminDigiflazzRestorationTest extends TestCase
             'action' => 'digiflazz.mapping.synced',
             'target_id' => (string) $mapping->id,
         ]);
+    }
+
+    public function test_only_one_digiflazz_sku_can_be_active_per_nominal(): void
+    {
+        $this->login();
+        $catalog = $this->mappedItem('single-selected-sku');
+        $provider = $catalog['provider'];
+        $primary = $catalog['package']->mappings()->firstOrFail();
+        $secondary = ProviderMapping::create([
+            'product_package_id' => $catalog['package']->id,
+            'provider_id' => $provider->id,
+            'external_sku' => 'single-unselected-sku',
+            'cost_idr' => 10500,
+            'store_cost_idr' => 10710,
+            'max_price_idr' => 10710,
+            'priority' => 1,
+            'is_active' => false,
+        ]);
+
+        // Existing historical backups cannot be enabled in parallel.
+        $this->put('/admin/catalog/mappings/'.$secondary->id, [
+            'priority' => 1, 'is_active' => true,
+        ])->assertSessionHasErrors('is_active');
+        $this->assertFalse((bool) $secondary->fresh()->is_active);
+
+        // An owner can deliberately replace the SKU AFTER disabling old one.
+        $this->put('/admin/catalog/mappings/'.$primary->id, [
+            'priority' => 0, 'is_active' => false,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->put('/admin/catalog/mappings/'.$secondary->id, [
+            'priority' => 1, 'is_active' => true,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertTrue((bool) $secondary->fresh()->is_active);
+        $this->assertFalse((bool) $primary->fresh()->is_active);
+    }
+
+    public function test_direct_catalog_import_rejects_two_skus_in_one_nominal(): void
+    {
+        $catalog = $this->mappedItem('source-import-guard');
+        $items = collect([
+            (object) ['buyer_sku_code' => 'source-import-guard'],
+            (object) ['buyer_sku_code' => 'source-import-guard-secondary'],
+        ]);
+
+        try {
+            app(DigiflazzAutoSources::class)->importGroup(
+                $catalog['product'], $items, null, false, '10', false,
+                Request::create('/admin/catalog/import', 'POST')
+            );
+            $this->fail('Importer accepted two Digiflazz SKUs for one nominal.');
+        } catch (ValidationException $error) {
+            $this->assertArrayHasKey('item_ids', $error->errors());
+        }
+        $this->assertSame(1, $catalog['package']->mappings()->count());
+    }
+
+    public function test_direct_catalog_upsert_cannot_attach_a_second_sku_to_existing_nominal(): void
+    {
+        $catalog = $this->mappedItem('upsert-one-selected');
+        try {
+            app(DigiflazzCatalogImport::class)->upsert(
+                $catalog['package'], 'upsert-attempted-secondary', 12000, 12000
+            );
+            $this->fail('Direct catalog upsert created a backup Digiflazz mapping.');
+        } catch (InvalidArgumentException $error) {
+            $this->assertStringContainsString('satu SKU', $error->getMessage());
+        }
+        $this->assertSame(1, $catalog['package']->mappings()->count());
     }
 
     public function test_admin_manual_price_lock_survives_sync_and_source_import_until_unlocked(): void
