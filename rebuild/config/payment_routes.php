@@ -37,11 +37,11 @@ $routes = [
     [
         'channel' => 'virtual_account',
         'gateway' => 'DOKU',
-        'provider_channel' => 'DOKU_VIRTUAL_ACCOUNT',
+        'provider_channel' => 'DOKU_CHECKOUT',
         'configuration' => [
-            'api_path' => '/doku-virtual-account/v2/payment-code',
+            'api_path' => '/checkout/v1/payment',
             'public_paths' => [
-                'va_number' => 'virtual_account_info.virtual_account_number',
+                'payment_url' => 'response.payment.url',
             ],
         ],
         'priority' => 20,
@@ -62,16 +62,17 @@ foreach (require __DIR__.'/payment_bank_channels.php' as $bank) {
         'supports_order' => true,
         'supports_wallet_topup' => true,
     ];
-    if (empty($bank['doku_direct_path'])) {
-        continue; // Do not invent a Non-SNAP Direct API protocol for BRI/BSI.
+    if (empty($bank['doku'])) {
+        continue; // BSI is currently enabled on Midtrans only; do not invent a DOKU protocol.
     }
     $routes[] = [
         'channel' => $bank['code'],
         'gateway' => 'DOKU',
-        'provider_channel' => $bank['doku'],
+        'provider_channel' => 'DOKU_CHECKOUT',
         'configuration' => [
-            'api_path' => $bank['doku_direct_path'],
-            'public_paths' => ['va_number' => 'virtual_account_info.virtual_account_number'],
+            'api_path' => '/checkout/v1/payment',
+            'payment_method_types' => [$bank['doku']],
+            'public_paths' => ['payment_url' => 'response.payment.url'],
         ],
         'priority' => 20,
         'supports_order' => true,

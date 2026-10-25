@@ -146,11 +146,8 @@ class AdminPaymentController
                 'supports_order' => (bool) $route->supports_order,
                 'supports_wallet_topup' => (bool) $route->supports_wallet_topup,
                 'is_active' => (bool) $route->is_active,
-                // DOKU channels without a verified Non-SNAP Direct adapter are not selectable.
-                'selectable' => $route->gateway_code !== 'DOKU'
-                    || in_array($route->channel_code, [
-                        'virtual_account', 'va_bni', 'va_permata',
-                    ], true),
+                // Admin selects only supported external payment providers.
+                'selectable' => in_array($route->gateway_code, ['MIDTRANS', 'DOKU'], true),
             ]);
 
         $transactions = $this->transactionQuery($filters)
@@ -458,9 +455,9 @@ class AdminPaymentController
             if ($selected->gateway_code === 'DOKU') {
                 $configuration = json_decode((string) $selected->configuration, true);
                 $path = is_array($configuration) ? (string) ($configuration['api_path'] ?? '') : '';
-                if (! preg_match('~^/(?:doku|bni|permata)-virtual-account/v2/payment-code$~', $path)) {
+                if ($path !== '/checkout/v1/payment') {
                     throw ValidationException::withMessages([
-                        'route_id' => 'Kanal DOKU ini belum memiliki adapter Direct API yang didukung.',
+                        'route_id' => 'Kanal DOKU harus menggunakan DOKU Checkout yang didukung.',
                     ]);
                 }
             }

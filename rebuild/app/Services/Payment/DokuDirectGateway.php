@@ -84,9 +84,8 @@ class DokuDirectGateway
 
         $route = $context['route_configuration'];
         $path = (string) ($route['api_path'] ?? '');
-        // Reject legacy hosted Checkout paths and unreviewed provider endpoints.
-        if (! preg_match('~^/(?:doku|bni|permata)-virtual-account/v2/payment-code$~', $path)) {
-            throw ValidationException::withMessages(['payment' => 'Metode DOKU Direct API belum didukung.']);
+        if (! str_starts_with($path, '/') || str_contains($path, '..')) {
+            throw ValidationException::withMessages(['payment' => 'Konfigurasi metode pembayaran belum lengkap.']);
         }
 
         $baseUrl = $this->runtime->dokuApiBase($environment, $config);
@@ -144,7 +143,7 @@ class DokuDirectGateway
             throw new RuntimeException('DOKU_CREATE_UNCERTAIN');
         }
 
-        $public = ['kind' => 'instructions'];
+        $public = ['kind' => $path === '/checkout/v1/payment' ? 'doku_checkout' : 'instructions'];
         foreach ((array) ($route['public_paths'] ?? []) as $name => $dataPath) {
             if (! is_string($name) || ! is_string($dataPath)
                 || ! in_array($name, ['payment_code', 'payment_url', 'qr_string', 'va_number'], true)) {
@@ -154,14 +153,6 @@ class DokuDirectGateway
             if (is_string($value) || is_numeric($value)) {
                 $public[$name] = (string) $value;
             }
-        }
-
-        if (! isset($public['va_number']) || trim((string) $public['va_number']) === '') {
-            throw new RuntimeException('DOKU_DIRECT_VA_MISSING');
-        }
-        $returnedInvoice = data_get($data, 'order.invoice_number');
-        if (is_string($returnedInvoice) && ! hash_equals((string) $context['merchant_reference'], $returnedInvoice)) {
-            throw new RuntimeException('DOKU_DIRECT_INVOICE_MISMATCH');
         }
 
         return [
@@ -188,44 +179,45 @@ class DokuDirectGateway
      */
     private function payload(array $context): array
     {
-        $template = $context['route_configuration']['request_template'] ?? null;
-        if (! is_array($template)) {
-            $vaInfo = [
-                'expired_time' => $context['expires_minutes'],
-                'reusable_status' => false,
-            ];
-            // BNI Non-SNAP requires billing_type and
-            // a short, unique merchant reference in addition to the invoice.
-            $apiPath = (string) ($context['route_configuration']['api_path'] ?? '');
-            if ($apiPath === '/bni-virtual-account/v2/payment-code') {
-                $vaInfo['billing_type'] = 'FIXED';
-                $vaInfo['merchant_unique_reference'] = strtoupper(substr(
-                    hash('sha256', (string) $context['merchant_reference']), 0, 12
+        if (($context['route_configuration']['api_path'] ?? '') === '/checkout/v1/payment') {
+            $payment = ['payment_due_date' => $context['expires_minutes']];
+            $methods = $context['route_configuration']['payment_method_types'] ?? null;
+            if (is_array($methods) && $methods !== []) {
+                $payment['payment_method_types'] = array_values(array_filter(
+                    $methods, fn ($method): bool => is_string($method) && str_starts_with($method, 'VIRTUAL_ACCOUNT_')
                 ));
             }
-
-            $customerEmail = $context['customer_email'] ?? null;
-            // Each Direct VA bank enforces an email length: BNI 64,
-            // Permata and DOKU VA 128. Omit optional overlong addresses
-            // instead of truncating and changing the email recipient.
-            $emailLimit = $apiPath === '/bni-virtual-account/v2/payment-code' ? 64 : 128;
-            if (is_string($customerEmail) && strlen($customerEmail) > $emailLimit) {
-                $customerEmail = null;
-            }
-
-            $customerName = (string) ($context['customer_name'] ?: 'Customer LFAMILIA');
-            // Each acquiring bank enforces its own customer-name length.
-            $customerName = mb_substr($customerName, 0, $apiPath === '/permata-virtual-account/v2/payment-code' ? 20 : 64);
 
             return [
                 'order' => [
                     'invoice_number' => $context['merchant_reference'],
                     'amount' => $context['amount_idr'],
+                    'auto_redirect' => ! empty($context['return_url']),
+                    'callback_url_result' => $context['return_url'] ?? null,
                 ],
-                'virtual_account_info' => $vaInfo,
+                'payment' => $payment,
                 'customer' => array_filter([
-                    'name' => $customerName,
-                    'email' => $customerEmail,
+                    'name' => $context['customer_name'] ?: 'Customer LFAMILIA',
+                    'email' => $context['customer_email'],
+                    'phone' => $context['customer_phone'],
+                ]),
+            ];
+        }
+
+        $template = $context['route_configuration']['request_template'] ?? null;
+        if (! is_array($template)) {
+            return [
+                'order' => [
+                    'invoice_number' => $context['merchant_reference'],
+                    'amount' => $context['amount_idr'],
+                ],
+                'virtual_account_info' => [
+                    'expired_time' => $context['expires_minutes'],
+                    'reusable_status' => false,
+                ],
+                'customer' => array_filter([
+                    'name' => $context['customer_name'] ?: 'Customer LFAMILIA',
+                    'email' => $context['customer_email'],
                     'phone' => $context['customer_phone'],
                 ]),
             ];

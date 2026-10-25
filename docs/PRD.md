@@ -192,7 +192,7 @@ Aturan:
 | **Midtrans** (QRIS, Virtual Account, E-Wallet) | Aktif | Gateway independen; dipilih Admin/Superadmin per metode. |
 | **QRIS manual** | Ada, dipakai sesuai kebutuhan | Konfirmasi oleh admin setelah dana masuk. |
 | **Saldo LFAMILIA** | Aktif untuk member | Guest tidak punya saldo. |
-| **DOKU Direct API** | **Belum dipakai** | Gateway independen setara Midtrans. Pembayaran VA Direct API ditampilkan di halaman LFAMILIA; Admin/Superadmin memilih secara manual per metode. Kanal belum siap tidak ditampilkan. |
+| **DOKU Checkout** | **Belum dipakai** | Gateway independen setara Midtrans. Pembayaran menggunakan halaman yang dihosting DOKU Checkout; Admin/Superadmin memilih gateway secara manual per metode dan tujuan. Kanal belum siap tidak ditampilkan. |
 
 Kanal yang tampil ke pembeli hanya kanal yang aktif. Kanal dalam perawatan tidak tampil dan tidak bisa dipilih.
 

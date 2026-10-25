@@ -211,7 +211,7 @@ Format tiap halaman: **untuk apa · isi · aksi · catatan**. Nama berkas Vue ad
 **Untuk apa.** Mengatur cara pelanggan membayar.
 **Isi.** Tiga tab: **Metode Pembayaran**, **Transaksi Pembayaran**, **Halaman Pembayaran**. Bagian: gateway & kanal, QRIS manual, top up LFAMILIA Coin, alamat notifikasi gateway, pengaturan halaman pembayaran (warna aksen, banner, teks, sakelar).
 **Aksi.** Tambah/ubah/hapus kanal, sinkron kanal, unggah logo & gambar QRIS, aktifkan QRIS manual, konfirmasi pembayaran QRIS manual, simpan top up, ubah route gateway, simpan pengaturan halaman + unggah banner, pulihkan metode bawaan.
-**Catatan.** Konfirmasi QRIS manual memakai konfirmasi kata sandi. DOKU Direct API tampil mandiri, tanpa hubungan utama/cadangan dengan Midtrans.
+**Catatan.** Konfirmasi QRIS manual memakai konfirmasi kata sandi. DOKU Checkout dan Midtrans berdiri sendiri; pemilihan gateway ditentukan manual per metode dan tujuan, bukan utama/cadangan.
 
 ### 4.14 Laporan — `/admin/reports`
 `AdminReportController` · `reports.view` (+ `reports.finance`) · `Reports.vue`
@@ -257,7 +257,7 @@ Format tiap halaman: **untuk apa · isi · aksi · catatan**. Nama berkas Vue ad
 `AdminIntegrationController` · Super Admin · `Integrations.vue`
 
 **Untuk apa.** Memasang kunci sambungan layanan.
-**Isi.** Sembilan tab: Digiflazz, Validasi Akun, Midtrans Snap, DOKU Direct API, Resend Email, Google OAuth, Notifikasi Telegram, Notifikasi Discord, Cloudflare Turnstile. Tiap tab: status, tiga kotak keadaan, kolom kredensial, alamat callback untuk disalin, petunjuk lipatan alamat otomatis.
+**Isi.** Sembilan tab: Digiflazz, Validasi Akun, Midtrans Snap, DOKU Checkout, Resend Email, Google OAuth, Notifikasi Telegram, Notifikasi Discord, Cloudflare Turnstile. Tiap tab: status, tiga kotak keadaan, kolom kredensial, alamat callback untuk disalin, petunjuk lipatan alamat otomatis.
 **Aksi.** Simpan integrasi (`PUT /admin/integrations/{code}`), tes koneksi (`POST /admin/integrations/{code}/test`), kirim email uji (Resend), salin alamat callback, hapus data akses.
 **Catatan.** Kredensial tidak pernah ditampilkan; kosong = pertahankan, isi = ganti. Tes koneksi tidak memakai transaksi nyata. DOKU tidak bisa diaktifkan tanpa keputusan tertulis.
 

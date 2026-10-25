@@ -307,8 +307,8 @@ class AdminPaymentRestorationTest extends TestCase
             ->where('id', $routes['DOKU'])->update([
                 'is_active' => false, 'supports_order' => true, 'supports_wallet_topup' => true,
                 'configuration' => json_encode([
-                    'api_path' => '/doku-virtual-account/v2/payment-code',
-                    'public_paths' => ['va_number' => 'virtual_account_info.virtual_account_number'],
+                    'api_path' => '/checkout/v1/payment',
+                    'public_paths' => ['payment_url' => 'response.payment.url'],
                 ], JSON_THROW_ON_ERROR),
             ]);
 
@@ -332,7 +332,7 @@ class AdminPaymentRestorationTest extends TestCase
         $this->assertSame('MIDTRANS', $routing->resolve('virtual_account', false, 'topup')['gateway_code']);
     }
 
-    public function test_admin_cannot_select_a_legacy_doku_checkout_route(): void
+    public function test_admin_can_select_hosted_doku_checkout_route(): void
     {
         $this->login('ADMIN');
         $channelId = DB::table('payment_channels')->where('code', 'virtual_account')->value('id');
@@ -356,7 +356,8 @@ class AdminPaymentRestorationTest extends TestCase
 
         $this->post('/admin/payments/channels/'.$channelId.'/select-gateway', [
             'route_id' => $routeId, 'purpose' => 'order',
-        ])->assertSessionHasErrors(['route_id']);
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame('DOKU', app(PaymentRoutingService::class)->resolve('virtual_account', false, 'order')['gateway_code']);
         $this->assertSame(
             '/checkout/v1/payment',
             json_decode(DB::table('payment_routes')->where('id', $routeId)->value('configuration'), true)['api_path']

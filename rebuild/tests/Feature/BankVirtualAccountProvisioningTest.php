@@ -31,17 +31,13 @@ class BankVirtualAccountProvisioningTest extends TestCase
                 && $route['gateway'] === 'DOKU');
 
             $this->assertSame([$bank['midtrans']], $midtrans['configuration']['enabled_payments']);
-            if (empty($bank['doku_direct_path'])) {
-                $this->assertNull($doku, 'DOKU Direct route must have a verified channel protocol.');
+            if ($bank['doku'] === null) {
+                $this->assertNull($doku, 'DOKU BSI route must not be guessed.');
 
                 continue;
             }
-            $this->assertSame($bank['doku'], $doku['provider_channel']);
-            $this->assertSame($bank['doku_direct_path'], $doku['configuration']['api_path']);
-            $this->assertSame(
-                ['va_number' => 'virtual_account_info.virtual_account_number'],
-                $doku['configuration']['public_paths']
-            );
+            $this->assertSame([$bank['doku']], $doku['configuration']['payment_method_types']);
+            $this->assertSame('/checkout/v1/payment', $doku['configuration']['api_path']);
         }
     }
 
@@ -62,9 +58,9 @@ class BankVirtualAccountProvisioningTest extends TestCase
         $first = $catalog->sync();
 
         $this->assertSame(7, $first['created_channels']);
-        $this->assertSame(9, $first['created']);
+        $this->assertSame(13, $first['created']);
         $this->assertSame(7, DB::table('payment_channels')->whereIn('code', $codes)->count());
-        $this->assertSame(9, DB::table('payment_routes')->whereIn(
+        $this->assertSame(13, DB::table('payment_routes')->whereIn(
             'payment_channel_id', DB::table('payment_channels')->whereIn('code', $codes)->pluck('id')
         )->count());
 
@@ -101,46 +97,6 @@ class BankVirtualAccountProvisioningTest extends TestCase
         $this->assertSame(0, (int) $route->is_active);
         $this->assertSame(73, (int) $route->priority);
         $this->assertSame(['enabled_payments' => ['bca_va']], json_decode($route->configuration, true));
-    }
-
-    public function test_doku_direct_migration_disables_unsupported_legacy_bank_checkout_routes(): void
-    {
-        $gatewayId = DB::table('payment_gateways')->where('code', 'DOKU')->value('id');
-        DB::table('payment_gateways')->where('id', $gatewayId)->update(['is_active' => true]);
-
-        foreach (['va_bri', 'va_bca', 'va_mandiri', 'va_cimb'] as $code) {
-            $channelId = DB::table('payment_channels')->where('code', $code)->value('id');
-            DB::table('payment_routes')->updateOrInsert(
-                ['payment_channel_id' => $channelId, 'payment_gateway_id' => $gatewayId],
-                [
-                    'provider_channel' => 'DOKU_CHECKOUT',
-                    'configuration' => json_encode(['api_path' => '/checkout/v1/payment'], JSON_THROW_ON_ERROR),
-                    'is_active' => true,
-                    'supports_order' => true,
-                    'supports_wallet_topup' => true,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]
-            );
-        }
-
-        $migration = require database_path('migrations/2026_10_25_000001_replace_doku_checkout_routes_with_direct_api.php');
-        $migration->up();
-
-        foreach (['va_bri', 'va_bca', 'va_mandiri', 'va_cimb'] as $code) {
-            $channelId = DB::table('payment_channels')->where('code', $code)->value('id');
-            $route = DB::table('payment_routes')
-                ->where('payment_channel_id', $channelId)
-                ->where('payment_gateway_id', $gatewayId)
-                ->firstOrFail();
-
-            $this->assertSame(0, (int) $route->is_active);
-            $this->assertNull($route->provider_channel);
-            $this->assertSame(
-                ['disabled_reason' => 'REQUIRES_SNAP_DIRECT_API'],
-                json_decode((string) $route->configuration, true, 512, JSON_THROW_ON_ERROR)
-            );
-        }
     }
 
     public function test_midtrans_generic_routes_only_expose_merchant_active_methods(): void
@@ -194,7 +150,7 @@ class BankVirtualAccountProvisioningTest extends TestCase
             && $request['enabled_payments'] === ['bca_va']);
     }
 
-    public function test_doku_direct_api_receives_only_selected_bank(): void
+    public function test_doku_checkout_receives_only_selected_bank(): void
     {
         $gateway = new DokuDirectGateway(
             Mockery::mock(DokuSignature::class),
@@ -204,7 +160,8 @@ class BankVirtualAccountProvisioningTest extends TestCase
 
         $payload = $method->invoke($gateway, [
             'route_configuration' => [
-                'api_path' => '/bca-virtual-account/v2/payment-code',
+                'api_path' => '/checkout/v1/payment',
+                'payment_method_types' => ['VIRTUAL_ACCOUNT_BCA'],
             ],
             'merchant_reference' => 'PAY-123',
             'amount_idr' => 10000,
@@ -215,65 +172,7 @@ class BankVirtualAccountProvisioningTest extends TestCase
             'customer_phone' => '08123456789',
         ]);
 
-        $this->assertSame(false, $payload['virtual_account_info']['reusable_status']);
-        $this->assertSame(60, $payload['virtual_account_info']['expired_time']);
-        $this->assertArrayNotHasKey('payment', $payload);
+        $this->assertSame(['VIRTUAL_ACCOUNT_BCA'], $payload['payment']['payment_method_types']);
         $this->assertSame(10000, $payload['order']['amount']);
-
-        $bni = $method->invoke($gateway, [
-            'route_configuration' => ['api_path' => '/bni-virtual-account/v2/payment-code'],
-            'merchant_reference' => 'PAY-123',
-            'amount_idr' => 10000,
-            'expires_minutes' => 60,
-            'customer_name' => 'Test Customer',
-            'customer_email' => 'customer@example.test',
-            'customer_phone' => '08123456789',
-        ]);
-        $this->assertSame('FIXED', $bni['virtual_account_info']['billing_type']);
-        $this->assertMatchesRegularExpression(
-            '/^[A-F0-9]{12}$/',
-            $bni['virtual_account_info']['merchant_unique_reference']
-        );
-
-        $bniLongEmail = $method->invoke($gateway, [
-            'route_configuration' => ['api_path' => '/bni-virtual-account/v2/payment-code'],
-            'merchant_reference' => 'PAY-125',
-            'amount_idr' => 10000,
-            'expires_minutes' => 60,
-            'customer_name' => 'Test Customer',
-            'customer_email' => str_repeat('a', 64).'@example.test',
-            'customer_phone' => '08123456789',
-        ]);
-        $this->assertArrayNotHasKey('email', $bniLongEmail['customer']);
-        $this->assertSame('customer@example.test', $bni['customer']['email']);
-
-        foreach ([
-            '/permata-virtual-account/v2/payment-code',
-            '/doku-virtual-account/v2/payment-code',
-        ] as $apiPath) {
-            $overlongEmail = $method->invoke($gateway, [
-                'route_configuration' => ['api_path' => $apiPath],
-                'merchant_reference' => 'PAY-126',
-                'amount_idr' => 10000,
-                'expires_minutes' => 60,
-                'customer_name' => 'Test Customer',
-                'customer_email' => str_repeat('a', 128).'@example.test',
-                'customer_phone' => '08123456789',
-            ]);
-            $this->assertArrayNotHasKey('email', $overlongEmail['customer']);
-        }
-
-        $permata = $method->invoke($gateway, [
-            'route_configuration' => ['api_path' => '/permata-virtual-account/v2/payment-code'],
-            'merchant_reference' => 'PAY-124',
-            'amount_idr' => 10000,
-            'expires_minutes' => 60,
-            'customer_name' => 'Pemilik Nama Panjang Sekali Hingga Lebih Dari Dua Puluh Huruf',
-            'customer_email' => 'customer@example.test',
-            'customer_phone' => '08123456789',
-        ]);
-        $this->assertSame('Pemilik Nama Panjang', $permata['customer']['name']);
-        $this->assertSame(20, mb_strlen($permata['customer']['name']));
-
     }
 }

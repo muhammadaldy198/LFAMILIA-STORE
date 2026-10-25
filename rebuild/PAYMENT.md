@@ -6,7 +6,7 @@
 
 Customer memilih **payment channel** publik. Route internal untuk channel itu diselesaikan backend **hanya dari route yang sudah diaktifkan admin**.
 
-**Keputusan pemilik 2026-10-25:** Midtrans dan DOKU adalah gateway mandiri dan setara, tanpa istilah utama/cadangan maupun failover. Admin/Superadmin menetapkan gateway secara eksplisit per metode dan tujuan pembayaran (pesanan atau top up saldo). Jika pilihan ganda/tidak tersedia, metode tidak dapat digunakan; sistem tidak mengalihkan ke provider lainnya. DOKU memakai Non-SNAP Direct API VA dan tampilan pembayaran LFAMILIA sendiri.
+**Keputusan pemilik 2026-10-25:** Midtrans dan DOKU adalah gateway mandiri dan setara, tanpa istilah utama/cadangan maupun failover. Admin/Superadmin menetapkan gateway secara eksplisit per metode dan tujuan pembayaran (pesanan atau top up saldo). Jika pilihan ganda/tidak tersedia, metode tidak dapat digunakan; sistem tidak mengalihkan ke provider lainnya. DOKU memakai hosted DOKU Checkout (`/checkout/v1/payment`) dan halaman pembayaran DOKU, tanpa perubahan ke Direct API.
 
 Implementasi mempunyai gateway registry untuk Midtrans, DOKU, Manual QRIS, dan LFAMILIA Wallet. Dukungan kode tidak berarti gateway eksternal sudah live-configured.
 
