@@ -4,9 +4,9 @@ namespace Tests\Feature;
 
 use App\Actions\Fortify\CreateNewUser;
 use App\Models\AdminUser;
-use App\Services\AdminChoiceSettings;
 use App\Models\SupportTicket;
 use App\Models\User;
+use App\Services\AdminChoiceSettings;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
