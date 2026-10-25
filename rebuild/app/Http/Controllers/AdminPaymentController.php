@@ -146,6 +146,11 @@ class AdminPaymentController
                 'supports_order' => (bool) $route->supports_order,
                 'supports_wallet_topup' => (bool) $route->supports_wallet_topup,
                 'is_active' => (bool) $route->is_active,
+                // DOKU channels without a verified Non-SNAP Direct adapter are not selectable.
+                'selectable' => $route->gateway_code !== 'DOKU'
+                    || in_array($route->channel_code, [
+                        'virtual_account', 'va_bca', 'va_bni', 'va_mandiri', 'va_permata', 'va_cimb',
+                    ], true),
             ]);
 
         $transactions = $this->transactionQuery($filters)
