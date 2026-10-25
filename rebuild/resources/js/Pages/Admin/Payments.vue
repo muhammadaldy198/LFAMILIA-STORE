@@ -676,7 +676,7 @@ const successRate = computed(() => {
                     <span v-if="errors.code" class="err">{{ errors.code }}</span>
                 </label>
                 <label class="adm-field">
-                    <span>Jenis</span>
+                    <span>Kategori pembayaran</span>
                     <select v-model="editor.method" class="adm-select">
                         <option value="QRIS">QRIS</option><option value="VIRTUAL_ACCOUNT">Virtual Account</option>
                         <option value="EWALLET">E-Wallet</option><option value="RETAIL">Gerai Retail</option>
@@ -689,7 +689,7 @@ const successRate = computed(() => {
                 </label>
 
                 <div class="adm-block full">
-                    <strong>Biaya bawaan metode</strong>
+                    <strong>Biaya untuk pilihan pembayaran ini</strong>
                     <div class="adm-grid" style="margin-top:8px">
                         <label class="adm-field">
                             <span>Biaya persen (%)</span>
@@ -700,11 +700,11 @@ const successRate = computed(() => {
                             <input v-model.number="editor.fee_flat_idr" type="number" min="0" max="100000000" class="adm-input" :disabled="freeMethod(editor.method, editor.code)">
                         </label>
                     </div>
-                    <p class="adm-note" style="margin-top:6px">Otomatis Rp0 untuk LFAMILIA Coin / QRIS manual. Untuk metode lain, kosong berarti mengikuti biaya gateway rute aktif.</p>
+                    <p class="adm-note" style="margin-top:6px">LFAMILIA Coin tidak dikenai fee. Persentase dan nominal bisa dipakai masing-masing atau bersamaan. Untuk kanal lain, atur biaya individual di sini atau tarif khusus provider.</p>
                 </div>
 
                 <div v-if="editor.id" class="adm-block full">
-                    <strong>Gateway untuk metode ini</strong>
+                    <strong>Provider untuk pilihan pembayaran ini</strong>
                     <p class="adm-note" style="margin:4px 0 0">Tarif kosong berarti mengikuti biaya di atas. Prioritas kecil dipilih lebih dulu.</p>
                     <div v-for="route in routesForEditor" :key="'r' + route.id" class="adm-route">
                         <div style="display:flex;justify-content:space-between;gap:6px;align-items:center">

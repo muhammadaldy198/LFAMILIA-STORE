@@ -16,7 +16,7 @@ class PaymentRouteCatalogService
      */
     public function sync(): array
     {
-        $result = ['created' => 0, 'updated' => 0, 'skipped' => 0, 'created_channels' => $this->ensureBankChannels()];
+        $result = ['created' => 0, 'updated' => 0, 'skipped' => 0, 'created_channels' => $this->ensureBankChannels() + $this->ensureEwalletChannels()];
 
         foreach ((array) config('payment_routes', []) as $definition) {
             $channelId = DB::table('payment_channels')
@@ -69,6 +69,43 @@ class PaymentRouteCatalogService
         }
 
         return $result;
+    }
+
+    /**
+     * Seed individual e-wallets only once; never overwrite admin fee or activation choices.
+     */
+    private function ensureEwalletChannels(): int
+    {
+        $generic = DB::table('payment_channels')->where('code', 'ewallet')->first();
+        if (! $generic) {
+            return 0;
+        }
+
+        $created = 0;
+        foreach ((array) config('payment_ewallet_channels', []) as $wallet) {
+            $code = (string) ($wallet['code'] ?? '');
+            if ($code === '' || DB::table('payment_channels')->where('code', $code)->exists()) {
+                continue;
+            }
+
+            DB::table('payment_channels')->insert([
+                'code' => $code,
+                'method' => 'EWALLET',
+                'name' => (string) $wallet['name'],
+                'description' => 'Bayar langsung melalui '.(string) $wallet['name'].'.',
+                'fee_flat_idr' => 0,
+                'fee_percent_bps' => 0,
+                'supports_order' => (bool) $generic->supports_order,
+                'supports_wallet_topup' => (bool) $generic->supports_wallet_topup,
+                'sort_order' => (int) $wallet['sort_order'],
+                'is_active' => false, // opt-in; merchant account support must be confirmed
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $created++;
+        }
+
+        return $created;
     }
 
     /**

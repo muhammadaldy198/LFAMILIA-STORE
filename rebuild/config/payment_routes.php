@@ -50,6 +50,20 @@ $routes = [
     ],
 ];
 
+// Each e-wallet has its own selectable channel and fee configuration.
+// Account-level activation is still required in Midtrans and the admin panel.
+foreach (require __DIR__.'/payment_ewallet_channels.php' as $wallet) {
+    $routes[] = [
+        'channel' => $wallet['code'],
+        'gateway' => 'MIDTRANS',
+        'provider_channel' => $wallet['midtrans'],
+        'configuration' => ['enabled_payments' => [$wallet['midtrans']]],
+        'priority' => 10,
+        'supports_order' => true,
+        'supports_wallet_topup' => true,
+    ];
+}
+
 // Each bank gets an independent route; the existing generic VA option remains
 // for existing payments and backwards compatibility.
 foreach (require __DIR__.'/payment_bank_channels.php' as $bank) {
