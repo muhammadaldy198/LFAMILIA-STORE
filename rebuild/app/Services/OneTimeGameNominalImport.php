@@ -104,6 +104,19 @@ class OneTimeGameNominalImport
                     continue;
                 }
 
+                // A legacy migration can run on installations that still
+                // contain multiple ACTIVE SKUs per nominal. Do not silently
+                // choose which existing provider mapping remains selected:
+                // skip the ambiguous group and retain all historical rows.
+                if ($existing->where('is_active', true)->count() > 1) {
+                    $result['groups_skipped']++;
+                    Log::warning('One-time game import skipped: multiple active legacy SKUs.', [
+                        'product_id' => $product->id,
+                    ]);
+
+                    continue;
+                }
+
                 // Never re-enable a SKU intentionally disabled by the merchant.
                 $disabled = $existing->filter(fn (ProviderMapping $mapping): bool => ! $mapping->is_active)
                     ->pluck('external_sku')->all();
