@@ -3,8 +3,10 @@
 namespace Tests\Feature;
 
 use App\Models\Product;
+use App\Services\DigiflazzAutoSources;
 use App\Services\OneTimeGameNominalImport;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -52,9 +54,9 @@ class OneTimeGameNominalImportTest extends TestCase
             'synced_at' => now(),
         ];
         // The importer should be idempotent even if old inactive rows remain.
-        app(\App\Services\DigiflazzAutoSources::class)->importGroup(
+        app(DigiflazzAutoSources::class)->importGroup(
             $product, collect([$item]), null, true, '10', false,
-            \Illuminate\Http\Request::create('/internal/legacy-refresh', 'POST')
+            Request::create('/internal/legacy-refresh', 'POST')
         );
         $this->assertSame(1, $package->mappings()->where('is_active', true)->count());
         $this->assertFalse((bool) $package->mappings()->where('external_sku', 'historical-refresh-B')->value('is_active'));
