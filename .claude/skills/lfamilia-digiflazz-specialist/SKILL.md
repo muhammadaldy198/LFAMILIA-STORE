@@ -14,28 +14,21 @@ Digiflazz rules and pricing formulas exactly as written in the repo and
 owner instructions. It does NOT invent pricing formulas, SKU policy, or
 supplier rules.
 
-## Precedence — read this first (hard rules, non-negotiable)
+## Precedence — read this first
 
-1. Owner instructions win over any skill. Order: explicit owner instruction
-   > `CLAUDE.md` (invariants) > `AGENTS.md` (how to work) > any skill.
-   If a skill contradicts an owner rule, the owner rule applies. Note the
-   conflict in the task/PR report — never silently rewrite a skill.
-2. **Do NOT invent pricing formulas or SKU policy.** Ground rules in
-   current owner decisions, project instructions, and verified provider
-   documentation. A newer explicit owner decision—especially an
-   explicitly approved redesign—supersedes older catalog/pricing rules
-   within that scope; update this skill's applicable rule rather than
-   silently applying stale formulas. If a rule remains undecided, ask the
-   owner rather than guessing.
-3. **Do NOT touch production** without explicit owner instruction
-   (`AGENTS.md` §3). Never use real customer data as fixtures,
-   screenshots, or public issue content (`CLAUDE.md` §29).
-4. **Payment tests ONLY simulation/sandbox** (`AGENTS.md` §3). Never send
-   a real Digiflazz transaction without explicit authorization for that
-   exact test.
-5. Never commit secrets. Never put real secrets in Markdown, screenshots,
-   fixtures, logs, PR comments, issues, or CI output (`AGENTS.md` §3,
-   `CLAUDE.md` §5).
+**CURRENT SOURCE OF TRUTH: `docs/PRD.md` v2.1 (24 October 2026).**
+Then `AGENTS.md` for work rules, `rebuild/PRODUCT.md` and
+`rebuild/FULFILLMENT.md` for implementation, this skill last.
+The owner's current instructions outrank all documents.
+Archived rules, historical `CLAUDE.md` sections and old plans are
+not product requirements.
+
+- Never infer a backup SKU `_B`, automatic failover, price tolerance,
+  an ML-specific markup or game-level markup from older instructions.
+- Never alter production, send actual provider transactions, merge or
+  deploy without explicit owner permission.
+- Never put credentials or production customer data in tests or reports.
+- Confirm external API protocol against current official documentation.
 
 ## When to activate
 
@@ -47,105 +40,36 @@ supplier rules.
   or fulfillment logic.
 - Working the Digiflazz seller / SKU spreadsheet (Buyer Area → Produk).
 
-## Catalog rules
+## Current catalog, pricing, and fulfillment contract
 
-Distinguish legacy catalog procedures from the owner's explicitly
-approved catalog redesign. For redesign work, the newer decisions below
-supersede older seller-selection, one-by-one import, multi-provider, and
-pricing rules; do not mix the old and new models.
+Current decisions supersede historical 2026-10-12 through 2026-10-22
+catalog rules. **Exactly one Digiflazz SKU is selected for each sellable
+nominal.** Supplier selection inside Digiflazz does not create a backup
+SKU at LFAMILIA.
 
-### Owner-approved catalog redesign decisions
+- **Three prices:** seller reference -> store cost -> sell price.
+- Store cost is initialized once during import with a configurable uplift
+  (default **2%**), rounded up to rupiah. Sync only updates seller
+  reference and supplier availability; store cost is preserved.
+- Sell price uses store cost × nominal markup (default **10%**),
+  rounded up. Markup is stored on NOMINAL, not game/product; fixed
+  sell price is also supported per nominal. ML ×1.06 is obsolete.
+- Digiflazz transaction **`max_price` = selected SKU store cost exactly**:
+  no additional 1%, no maximum across backups. Keep it in order snapshot.
+- A SKU with seller price above store cost is temporarily unavailable.
+  Hide the nominal; make it available again when provider data recovers.
+- Full Digiflazz sync interval defaults to **15 minutes**; failed sync
+  responses cannot be interpreted as removed SKUs.
+- Every import path, historical migration, attach action, admin activation
+  and checkout must obey one SKU per nominal. Old extra mappings are
+  historic data, not permission to substitute another SKU.
+- Block unusable chosen SKU. Never automatically choose another SKU.
+  Confirmed failure stops for human review; PENDING/UNKNOWN rechecks
+  the same transaction with exactly the same `ref_id`.
+- Keep customer input schema and provider destination template at the
+  product/game level; each required field must be represented.
 
-- Initial scope: one sellable product/nominal has exactly one provider;
-  do not design automatic multi-provider failover as part of this model.
-- Provider import is a bulk review workflow: select many provider SKUs,
-  map them to an existing or newly created game and nominal, allow
-  editable suggestions derived from provider names, then save reviewed
-  selections. Reviewed selections may become active and sellable on save.
-- Customer input fields and destination format belong to the game/product
-  and are shared by every nominal, never configured per SKU.
-- Default markup is 10%, editable by a non-programmer in Admin. Allow
-  overrides globally, per game, and per nominal; precedence is nominal,
-  then game, then global.
-- Provider-reported price and the store's editable cost basis are
-  distinct. Import the provider price as reference; Admin may edit the
-  store cost. Subsequent catalog sync refreshes the provider reference
-  but must preserve the Admin-edited store cost and catalog settings.
-- Provider availability is not a single boolean: keep seller product
-  status, buyer SKU status, stock, scheduled cut-off, provider price,
-  and Digiflazz `max_price` semantics distinct. Hide/unavailable status
-  during a scheduled cut-off is temporary; do not model it as permanent
-  deactivation. Owner has directed that provider-disabled SKUs and SKUs
-  whose latest seller price exceeds the store cost be disabled/hidden;
-  distinguish provider status from the Admin's editable store cost when
-  implementing this rule.
-- These are approved design constraints, not permission to edit code,
-  push, merge, or deploy. For remaining material behavior decisions,
-  research provider docs first and ask only the unresolved question.
-
-### Owner-approved end-to-end redesign decisions (discussion checkpoint)
-
-These decisions were explicitly confirmed by the owner for the broader catalog/admin-panel redesign; preserve them across sessions. They are design notes only, not authorization to edit code, delete VPS/catalog data, push, merge, or deploy. The site is still a development preview and has no buyers/orders; do not invent legacy customer-order retention requirements.
-
-- Rebuild the catalog from reviewed provider imports; recreate existing manual products through the new manual-product workflow. Do not frame this as preserving old customer orders.
-- Import UI: bulk-select many Digiflazz SKUs, group by suggested game, allow selecting individual rows and “select all” per game; infer editable game/nominal suggestions from provider product names; allow creating a game and its nominal(s) within the import flow; save reviewed selections together and allow immediate sale after save.
-- Duplicate suggestions: if two SKUs appear to map to the same game+nominal, warn and require admin choice; never silently create duplicates.
-- Store one provider/SKU for each sellable nominal in this initial redesign. No store-side multi-provider mapping/failover choice for the nominal. This does not mean Digiflazz has only one seller; Digiflazz's seller network is provider-side.
-- Game/customer input fields and destination template are configured once at game/product level and reused by every nominal/SKU.
-- Markup on store cost: initial default 10%, editable globally, per game, and per nominal, precedence nominal → game → global. Do not round the computed sell price.
-- Initial store cost proposal: provider seller price plus a separately configurable cost uplift, default 2%, also editable globally, per game, and per nominal, same specificity precedence. Example seller 12,000 + 2% = store cost / Digiflazz `max_price` 12,240; sell price at 10% = 13,464.
-- Admin may edit store cost. Store cost is distinct from the latest Digiflazz seller price; successful sync refreshes seller reference/status but does not overwrite the admin-saved store cost. Recalculate sell price from store cost and effective markup when store cost changes.
-- Send the store cost exactly as Digiflazz transaction `max_price`. If latest seller price exceeds store cost, the SKU is temporarily unavailable/hidden and becomes available again when price returns within the cap.
-- Refresh Digiflazz full pricelist every 5 minutes. Preserve last successful catalog/status if sync fails; never infer missing/inactive from a failed request.
-- On a successful complete sync, a previously known SKU absent from the response is disabled/hidden. If it later reappears, reactivate automatically unless admin manually disabled it. Seller/SKU inactive, stock unavailable, and active cut-off are temporary unavailability and recover automatically when provider state recovers; keep these distinct from manual admin disablement.
-- Manual products: create the game/product and multiple nominal rows in one form; enter cost per nominal; use the same global/game/nominal markup rules; manual fulfillment remains with admin/CS.
-- Mobile admin UX: minimize vertical scrolling; use long horizontal rows with sideways scrolling rather than stacked cards for nominal and import SKU lists. Edit opens a dedicated nominal editor with a return-to-list action. Per-game grouping and individual/bulk selection remain available.
-- Owner approved this summarized design for continued specification work. It is not yet a fully reviewed implementation spec and is not code-change authorization by itself.
-
-### Legacy catalog operations
-
-The rules in `AGENTS.md` §3 and `references/digiflazz-rules.md` (seller
-rating threshold, catalog Harga Max formula, one-by-one Buyer Area
-updates, and existing multi-source fulfillment) describe the legacy
-workflow. Apply them only when the task explicitly concerns that
-workflow; do not carry them into the approved redesign without checking
-scope.
-
-### Where the precedence rule actually lives (check before "unused")
-
-The nominal → game → global rule is real and active, but it is implemented inline in
-several places rather than through one helper:
-
-- store-cost uplift: `DigiflazzCatalogImport::initialStoreCost()` — `package.cost_uplift_percent ?? product.cost_uplift_percent ?? global`
-- sell markup at checkout: `CheckoutPricing` — `package.sell_markup_percent ?? product.sell_markup_percent ?? global`
-- admin preview: `Catalog.vue` `effectiveUpliftPercent` / `effectiveMarkupPercent`
-- `CatalogPricingSettings::costUpliftFor` / `sellMarkupFor` — a fourth copy with no callers
-
-So an uncalled pricing helper is **not** evidence the feature was never built. Before reporting
-any pricing method as dead, grep the live paths for the *rule* (the `??` precedence chain and the
-`intdiv(... * 1000000 + 999999, 1000000)` rounding), not the symbol name. Uncalled + rule
-duplicated elsewhere = consolidation decision for the owner, not cleanup.
-
-The same holds for percentage rounding: `CatalogPricingSettings::applyPercent` / `percentUnits`
-are exercised only by tests, while `DigiflazzCatalogImport` and `CheckoutPricing::margin()` each
-re-implement the same arithmetic. Changing rounding rules means changing all three sites at once —
-treat that as a pricing change requiring tests at each boundary, never a refactor.
-
-## Pricing (do not invent)
-
-For the owner-approved catalog redesign, use the 10% editable global
-markup and the nominal → game → global override precedence specified
-above. The legacy pricing rules below apply only when the task explicitly
-concerns the legacy workflow; do not let them override a newer redesign
-decision.
-
-Legacy source: `AGENTS.md` §3 (Pricing).
-
-- **Legacy cost (`cost_idr`) = catalog Harga Max Digiflazz** (fixed, not
-  fluctuating seller price).
-- **Legacy ML sell price = cost × 1.06, not rounded.** Other legacy
-  games' formulas remain governed by their explicit decisions.
-- Do not change prices or fees without an applicable owner instruction.
+Use `references/digiflazz-rules.md` for current examples and tests.
 
 ## Provider contract (verified against developer.digiflazz.com)
 
@@ -174,48 +98,19 @@ Consequences to design around:
 - Webhook is an accelerator, never the only source: verified webhook + scheduled re-check for
   anything still uncertain.
 
-## Cut-off / availability
+## Cut-off, response codes, exact price cap
 
-Source: `AGENTS.md` §3 (via parent task brief, grounded in the
-checkout cut-off design) + `rebuild/FULFILLMENT.md` (unsent mapping
-skip).
-
-- **Checkout cut-off: a SKU whose modal (cost) exceeds Harga Max, or
-  whose seller is offline, is hidden ("Tidak tersedia").** This is
-  intended behaviour, not a bug. Do not "fix" it by showing the SKU.
-- Before an external request, a mapping may be declared unusable and
-  skipped (no provider risk yet) when, for example: mapping/provider
-  inactive; adapter unsupported; external SKU empty; Digiflazz catalog
-  item inactive, out of stock, or cut-off; voucher-stock key/stock
-  unavailable; provider cost invalid; cost exceeds the order's
-  `max_price` snapshot. (`rebuild/FULFILLMENT.md`, "Unsent mapping skip".)
-
-## Two different "Harga Max" — do NOT confuse them
-
-There are TWO different limits, with different formulas and different
-purposes. Never mix them up.
-
-1. **Catalog / Buyer Area Harga Max** = seller price × 1.02, rounded to
-   the nearest rupiah (`AGENTS.md` §3). Used for catalog / Buyer Area /
-   sync work. Example: seller 10.000 → 10.200.
-2. **Order snapshot `max_price` (transaction limit)** = highest modal
-   of active + available Digiflazz SKUs in the SAME nominal + 1%,
-   rounded UP (`rebuild/FULFILLMENT.md`, "Digiflazz max_price
-   snapshot"). Stored as an order snapshot and sent as `max_price` on
-   every Digiflazz attempt and reconciliation. This covers the most
-   expensive backup SKU. If only one eligible SKU exists, use that
-   SKU's price + 1%. Inactive / unavailable SKUs do not enlarge the
-   limit. Example: highest modal 10.000 → snapshot 10.100; highest
-   modal 10.047 → snapshot 10.148.
-   - Sell price is still computed from the primary SKU and is NOT
-     auto-raised when failover uses a more expensive seller; loss from
-     discount/promo is an accepted business decision.
-   - A SKU whose modal exceeds the snapshot limit must NOT be selected,
-     e.g. after a price rise beyond tolerance.
-   - Do NOT confuse `provider_mappings.max_price_idr` (administrative
-     per-source limit at sync) with
-     `order.snapshot.provider.max_price_idr` (transaction limit from
-     all candidates at checkout).
+- Verify seller/buyer active, stock, cutoff, freshness, identity, and
+  seller price <= store cost before authorizing checkout or fulfillment.
+- Do not substitute another SKU on any blocked or uncertain attempt.
+- `Sukses` with `rc=00` is success. `Pending` with `rc=03/99`
+  remains pending. `rc=01/70` are timeout results whose transactions
+  may already exist; reconcile rather than confirming failure.
+- Contradictory status and response code are `UNKNOWN`.
+- Digiflazz docs:
+  https://developer.digiflazz.com/api/buyer/topup/
+  https://developer.digiflazz.com/api/buyer/response-code/
+  https://developer.digiflazz.com/api/buyer/cek-status/
 
 ## Fulfillment safety (must never be broken)
 
@@ -322,17 +217,10 @@ Before implementing a broad redesign, inspect the local worktree and every open 
 
 ## Source map
 
-| Rule | Source |
+| Current rule | Owner |
 |---|---|
-| Seller ≥ 4.8, Harga Max = seller × 1.02 (nearest rupiah), save one-by-one, Buyer Area → Produk, single session, all ON, no seller ≥ 4.8 → delete | `AGENTS.md` §3 |
-| Cost = Harga Max (fixed); ML sell = cost × 1.06 NOT rounded; other games not decided | `AGENTS.md` §3 |
-| No production touch, simulation-only tests, no secrets in output | `AGENTS.md` §3 |
-| Deploy rules (no manual price change, no data deletion) | `AGENTS.md` §6 |
-| Working method, bugs audited before fix | `AGENTS.md` §2 |
-| Fulfillment safety, candidate order, NO DOUBLE FULFILLMENT, failover | `CLAUDE.md` §11 |
-| Provider / external-request rules | `CLAUDE.md` §12 |
-| Order safety, server-side price, immutable snapshot | `CLAUDE.md` §9 |
-| max_price snapshot (+1%, rounded UP), unsent skip, attempt states, reconciliation, double-fulfillment prevention | `rebuild/FULFILLMENT.md` |
-| Nominal ordering via Admin workspace | `rebuild/PRODUCT.md` |
-| Cut-off: SKU modal > Harga Max or seller offline → hidden ("Tidak tersedia") | Owner instruction (checkout cut-off design) |
-| Transaction endpoint, `md5(username+apiKey+ref_id)`, synchronous response, same-`ref_id` status check, 1-minute floor, 90-day danger, pricelist signature, webhook HMAC | developer.digiflazz.com (buyer docs) |
+| SKU policy, three prices, max_price and sync | `docs/PRD.md` §4, §8, §19 |
+| Coding, testing, staging and deployment | `AGENTS.md` |
+| Store cost, sell price and checkout | `rebuild/PRODUCT.md`, `rebuild/CHECKOUT.md` |
+| One-SKU fulfillment and reconciliation | `rebuild/FULFILLMENT.md` |
+| Provider HTTP protocol | Official Digiflazz buyer documentation |
