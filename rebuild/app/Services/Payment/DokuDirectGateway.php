@@ -194,7 +194,7 @@ class DokuDirectGateway
                 'expired_time' => $context['expires_minutes'],
                 'reusable_status' => false,
             ];
-            // BNI Non-SNAP uses "biling_type" (provider spelling) and requires
+            // BNI Non-SNAP requires billing_type and
             // a short, unique merchant reference in addition to the invoice.
             $apiPath = (string) ($context['route_configuration']['api_path'] ?? '');
             if ($apiPath === '/bni-virtual-account/v2/payment-code') {
@@ -202,6 +202,14 @@ class DokuDirectGateway
                 $vaInfo['merchant_unique_reference'] = strtoupper(substr(
                     hash('sha256', (string) $context['merchant_reference']), 0, 12
                 ));
+            }
+
+            $customerEmail = $context['customer_email'] ?? null;
+            // BNI accepts at most 64 email characters. Since this field is optional,
+            // omit overlong addresses instead of changing the recipient address.
+            if ($apiPath === '/bni-virtual-account/v2/payment-code'
+                && is_string($customerEmail) && strlen($customerEmail) > 64) {
+                $customerEmail = null;
             }
 
             $customerName = (string) ($context['customer_name'] ?: 'Customer LFAMILIA');
@@ -216,7 +224,7 @@ class DokuDirectGateway
                 'virtual_account_info' => $vaInfo,
                 'customer' => array_filter([
                     'name' => $customerName,
-                    'email' => $context['customer_email'],
+                    'email' => $customerEmail,
                     'phone' => $context['customer_phone'],
                 ]),
             ];
