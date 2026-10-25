@@ -16,6 +16,7 @@ use App\Services\PaymentRoutingService;
 use App\Services\PaymentService;
 use App\Services\PaymentStateService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Routing\Middleware\ThrottleRequests;
@@ -1711,6 +1712,13 @@ class PaymentTest extends TestCase
             ->where('wallet_id', $wallet->id)
             ->where('source', 'CHECKOUT')
             ->count());
+
+        $topupId = DB::table('wallet_topups')->where('user_id', $user->id)->value('id');
+        app(PaymentStateService::class)->closeTopupRefundReview((int) $topupId, 'Pemeriksaan selesai; penyesuaian manual terpisah.');
+        $this->actingAs($user)->postJson('/payments/orders/'.$checkout->json('order_number'), [
+            'idempotency_key' => 'refund-hold-payment-after-close-0001',
+        ])->assertOk()->assertJsonPath('status', 'PAID');
+        $this->assertSame(1, DB::table('wallet_ledger')->where('wallet_id', $wallet->id)->where('source', 'CHECKOUT')->count());
     }
 
     public function test_wallet_topup_paid_callback_credit_is_idempotent_and_fee_is_not_credited(): void
@@ -1830,32 +1838,44 @@ class PaymentTest extends TestCase
             ->where('idempotency_key', 'wallet-topup-refund:'.$paymentId)->count());
 
         try {
-            $states->resolveTopupRefundReview($topupId, 42);
-            $this->fail('Refund review must not create a negative wallet balance.');
+            $states->closeTopupRefundReview($topupId, '   ');
+            $this->fail('Alasan penutupan wajib diisi.');
         } catch (ValidationException $exception) {
-            $this->assertArrayHasKey('refund', $exception->errors());
+            $this->assertArrayHasKey('reason', $exception->errors());
         }
 
-        DB::table('wallets')->where('id', $wallet->id)->update([
-            'balance_idr' => 10000,
-            'updated_at' => now(),
-        ]);
-        $resolved = $states->resolveTopupRefundReview($topupId, 42);
+        // Menutup tinjauan TIDAK menggerakkan uang: saldo tetap 3.000.
+        $closed = $states->closeTopupRefundReview($topupId, 'Dana sudah dibalik gateway, saldo disesuaikan manual');
+        try {
+            $states->closeTopupRefundReview($topupId, 'Ditutup dua kali');
+            $this->fail('Tinjauan yang sudah ditutup tidak boleh ditutup lagi.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('topup', $exception->errors());
+        }
 
-        $this->assertSame('REFUNDED', $resolved['status']);
-        $this->assertSame(0, (int) DB::table('wallets')->where('id', $wallet->id)->value('balance_idr'));
+        $this->assertSame('CLOSED', $closed['result']);
+        $this->assertSame('REFUNDED', $closed['status']);
+        $this->assertSame(3000, $closed['balance_idr']);
+        $this->assertSame(3000, (int) DB::table('wallets')->where('id', $wallet->id)->value('balance_idr'));
         $this->assertSame('REFUNDED', DB::table('wallet_topups')->where('id', $topupId)->value('status'));
-        $ledger = DB::table('wallet_ledger')
-            ->where('idempotency_key', 'wallet-topup-refund:'.$paymentId)
-            ->firstOrFail();
-        $this->assertSame(-10000, (int) $ledger->amount_idr);
-        $this->assertSame('admin_user', $ledger->actor_type);
-        $this->assertSame('42', $ledger->actor_id);
-
-        $again = $states->resolveTopupRefundReview($topupId, 42);
-        $this->assertSame('ALREADY_REFUNDED', $again['result']);
-        $this->assertSame(1, DB::table('wallet_ledger')
+        $this->assertSame(0, DB::table('wallet_ledger')
             ->where('idempotency_key', 'wallet-topup-refund:'.$paymentId)->count());
+        $this->assertDatabaseHas('admin_notifications', [
+            'event_type' => 'wallet.topup_refund_review_closed',
+            'target_id' => (string) $topupId,
+        ]);
+
+        // Klik kedua: ditolak, bukan menambah audit atau mengubah saldo.
+        try {
+            $states->closeTopupRefundReview($topupId, 'Percobaan kedua');
+            $this->fail('Tinjauan yang sudah ditutup tidak boleh ditutup lagi.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('topup', $exception->errors());
+        }
+
+        $this->assertSame(3000, (int) DB::table('wallets')->where('id', $wallet->id)->value('balance_idr'));
+        $this->assertSame(1, DB::table('admin_notifications')
+            ->where('event_type', 'wallet.topup_refund_review_closed')->count());
     }
 
     public function test_expired_payment_closes_order_releases_voucher_and_late_paid_does_not_reopen(): void
@@ -2002,6 +2022,35 @@ class PaymentTest extends TestCase
             );
 
         Http::assertSentCount(1);
+        $this->assertSame(1, DB::table('payment_transactions')->where('order_id', $orderId)->count());
+    }
+
+    public function test_connection_exception_marks_payment_unknown_and_notifies_admin(): void
+    {
+        $catalog = $this->catalog();
+        $this->route('qris', 'MIDTRANS', 0, 0, 'qris');
+        IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
+            'config_ciphertext' => ['server_key' => 'server-test', 'is_production' => false],
+            'is_active' => true,
+        ]);
+        Http::fake([
+            'https://app.sandbox.midtrans.com/snap/v1/transactions' => function (): never {
+                throw new ConnectionException('Simulated connection loss.');
+            },
+        ]);
+        $checkout = $this->postJson('/checkout/orders', $this->guestCheckout(
+            $catalog['package_id'], 'qris', 'm7-connection-order-0001'
+        ))->assertCreated();
+
+        Log::spy();
+        $this->postJson('/payments/orders/'.$checkout->json('order_number'), [
+            'idempotency_key' => 'm7-connection-payment-0001', 'access_code' => $checkout->json('access_code'),
+        ])->assertUnprocessable()->assertJsonValidationErrors(['payment']);
+
+        $orderId = DB::table('orders')->where('order_number', $checkout->json('order_number'))->value('id');
+        $payment = DB::table('payment_transactions')->where('order_id', $orderId)->firstOrFail();
+        $this->assertSame('UNKNOWN', $payment->status);
+        $this->assertSame(1, DB::table('admin_notifications')->where('event_type', 'payment.unknown')->count());
         $this->assertSame(1, DB::table('payment_transactions')->where('order_id', $orderId)->count());
     }
 

@@ -379,7 +379,6 @@ class PaymentService
                 'payment_transaction_id' => $payment->id,
                 'order_id' => $payment->order_id,
                 'gateway_code' => $payment->gateway_code,
-                'error' => $exception::class,
             ]);
 
             // Gateway timeout tidak bisa dibedakan dari penolakan: transaksi bisa

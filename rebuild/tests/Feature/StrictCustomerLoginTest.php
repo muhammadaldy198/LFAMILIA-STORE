@@ -238,4 +238,32 @@ class StrictCustomerLoginTest extends TestCase
             ->assertRedirect('/login')
             ->assertSessionHas('status');
     }
+
+    public function test_resend_is_limited_per_email_without_sending_a_second_message(): void
+    {
+        $user = $this->unverified('limited-resend@example.test');
+        $this->from('/login')->post('/email/verification-resend', ['email' => $user->email])->assertSessionHas('status');
+        $this->from('/login')->post('/email/verification-resend', ['email' => $user->email])->assertSessionHas('status');
+
+        $this->assertSame(1, Queue::pushed(SendTransactionalEmailJob::class)
+            ->filter(fn (SendTransactionalEmailJob $job): bool => $job->recipient === $user->email
+                && str_contains((string) $job->text, '/email/confirm/'.$user->id.'/'))->count());
+    }
+
+    public function test_resend_email_hourly_limit_allows_three_and_suppresses_the_fourth(): void
+    {
+        $user = $this->unverified('hourly-limit@example.test');
+        foreach (range(1, 3) as $attempt) {
+            if ($attempt > 1) {
+                $this->travel(61)->seconds();
+            }
+            $this->from('/login')->post('/email/verification-resend', ['email' => $user->email])->assertSessionHas('status');
+        }
+        $this->travel(61)->seconds();
+        $this->from('/login')->post('/email/verification-resend', ['email' => $user->email])->assertSessionHas('status');
+
+        $this->assertSame(3, Queue::pushed(SendTransactionalEmailJob::class)
+            ->filter(fn (SendTransactionalEmailJob $job): bool => $job->recipient === $user->email
+                && str_contains((string) $job->text, '/email/confirm/'.$user->id.'/'))->count());
+    }
 }

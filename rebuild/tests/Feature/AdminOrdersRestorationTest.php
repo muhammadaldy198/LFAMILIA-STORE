@@ -151,6 +151,44 @@ class AdminOrdersRestorationTest extends TestCase
         $this->assertSame('Pembeli salah pilih nominal, minta dibatalkan lewat WhatsApp', $eventMeta['reason']);
     }
 
+    public function test_cancelling_order_releases_redeemed_voucher_quota(): void
+    {
+        $admin = $this->login();
+        Queue::fake();
+        $orderId = $this->order($admin);
+        DB::table('orders')->where('id', $orderId)->update(['status' => 'FAILED']);
+        DB::table('fulfillment_attempts')->where('order_id', $orderId)->update(['status' => 'MANUAL_FAILED']);
+        $voucherId = DB::table('vouchers')->insertGetId([
+            'code' => 'CANCEL-'.bin2hex(random_bytes(4)), 'discount_type' => 'FIXED',
+            'discount_value' => 100, 'total_quota' => 1, 'per_customer_limit' => 1,
+            'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $redemptionId = DB::table('voucher_redemptions')->insertGetId([
+            'voucher_id' => $voucherId, 'order_id' => $orderId, 'status' => 'REDEEMED',
+            'redeemed_at' => now(), 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $this->withSession(['admin.password_confirmed_at' => time()])
+            ->post('/admin/orders/'.$orderId.'/cancel', ['reason_code' => 'stok_habis', 'confirmed' => true])
+            ->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('voucher_redemptions', ['id' => $redemptionId, 'status' => 'RELEASED']);
+        $this->assertSame(0, DB::table('voucher_redemptions')->where('voucher_id', $voucherId)->whereIn('status', ['REDEEMED', 'RESERVED'])->count());
+    }
+
+    public function test_manual_success_requires_delivery_evidence_at_controller_boundary(): void
+    {
+        $admin = $this->login();
+        Queue::fake();
+        $orderId = $this->order($admin);
+        $attemptId = DB::table('fulfillment_attempts')->where('order_id', $orderId)->value('id');
+
+        $this->withSession(['admin.password_confirmed_at' => time()])
+            ->post('/admin/fulfillment/'.$attemptId.'/complete', ['delivery_code' => '  ', 'note' => '  '])
+            ->assertSessionHasErrors('delivery_code');
+        $this->assertSame('MANUAL_PENDING', DB::table('fulfillment_attempts')->where('id', $attemptId)->value('status'));
+    }
+
     public function test_admin_retry_hides_exhausted_blocked_but_allows_retriable_blocked(): void
     {
         $admin = $this->login();

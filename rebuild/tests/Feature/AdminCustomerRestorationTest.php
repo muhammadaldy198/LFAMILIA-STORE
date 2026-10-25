@@ -265,7 +265,7 @@ class AdminCustomerRestorationTest extends TestCase
         $this->withSession(['admin.password_confirmed_at' => time()])->post('/admin/customers/'.$user->id.'/wallet', $payload)
             ->assertRedirect()->assertSessionHasNoErrors();
         $this->withSession(['admin.password_confirmed_at' => time()])->post('/admin/customers/'.$user->id.'/wallet', $payload)
-            ->assertRedirect()->assertSessionHasNoErrors();
+            ->assertRedirect()->assertSessionHasNoErrors()->assertSessionHas('status', 'Kunci ini sudah pernah diproses untuk pelanggan ini; saldo tidak ditambah lagi.');
 
         $this->assertSame(15000, (int) DB::table('wallets')->where('user_id', $user->id)->value('balance_idr'));
         $this->assertSame(1, DB::table('wallet_ledger')
@@ -284,6 +284,14 @@ class AdminCustomerRestorationTest extends TestCase
         ])->assertSessionHasErrors(['amount_idr']);
 
         $this->assertSame(15000, (int) DB::table('wallets')->where('user_id', $user->id)->value('balance_idr'));
+
+        $other = $this->customer();
+        $this->withSession(['admin.password_confirmed_at' => time()])->post('/admin/customers/'.$other->id.'/wallet', [
+            'amount_idr' => 5000,
+            'reason' => 'Kunci milik pelanggan lain',
+            'idempotency_key' => 'customer-wallet-idempotent-0001',
+        ])->assertSessionHasErrors('idempotency_key');
+        $this->assertSame(0, (int) DB::table('wallets')->where('user_id', $other->id)->value('balance_idr'));
     }
 
     public function test_super_admin_membership_can_switch_manual_and_back_to_automatic(): void
