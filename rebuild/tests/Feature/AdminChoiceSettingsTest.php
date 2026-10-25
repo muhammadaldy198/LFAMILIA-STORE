@@ -66,6 +66,24 @@ class AdminChoiceSettingsTest extends TestCase
         $this->put('/admin/choice-settings', app(AdminChoiceSettings::class)->all())->assertForbidden();
     }
 
+    public function test_status_labels_read_customer_presentation_only_once_per_request(): void
+    {
+        $status = app(PublicOrderStatusService::class);
+        DB::enableQueryLog();
+        DB::flushQueryLog();
+        try {
+            for ($i = 0; $i < 40; $i++) {
+                $this->assertNotSame('', $status->label('SUCCESS'));
+            }
+            $settingsReads = array_filter(DB::getQueryLog(), fn (array $query): bool =>
+                str_contains(strtolower((string) $query['query']), 'system_settings'));
+            $this->assertCount(1, $settingsReads);
+        } finally {
+            DB::disableQueryLog();
+            DB::flushQueryLog();
+        }
+    }
+
     public function test_public_status_label_reads_existing_customer_text_editor(): void
     {
         DB::table('system_settings')->updateOrInsert(['key' => 'store.customer_presentation'], [

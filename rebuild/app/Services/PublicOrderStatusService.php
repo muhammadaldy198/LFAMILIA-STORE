@@ -4,6 +4,9 @@ namespace App\Services;
 
 final class PublicOrderStatusService
 {
+    /** Per-request cache: the service is scoped in AppServiceProvider. */
+    private ?array $customLabels = null;
+
     public function value(string $status): string
     {
         return match (strtoupper($status)) {
@@ -40,8 +43,8 @@ final class PublicOrderStatusService
             default => 'Gagal',
         };
 
-        $saved = app(CustomerPresentationService::class)->saved();
-        $custom = $saved['text']['order.status.'.$code.'.label'] ?? null;
+        $this->customLabels ??= app(CustomerPresentationService::class)->saved()['text'];
+        $custom = $this->customLabels['order.status.'.$code.'.label'] ?? null;
 
         return is_string($custom) && trim($custom) !== '' ? $custom : $default;
     }

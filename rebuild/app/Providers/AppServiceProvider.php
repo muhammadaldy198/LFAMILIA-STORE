@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Services\PublicOrderStatusService;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Middleware\TrustProxies;
 use Illuminate\Http\Request;
@@ -11,7 +12,11 @@ use LogicException;
 
 class AppServiceProvider extends ServiceProvider
 {
-    public function register(): void {}
+    public function register(): void
+    {
+        // One shared status-label dictionary per HTTP request or queue job.
+        $this->app->scoped(PublicOrderStatusService::class);
+    }
 
     public function boot(): void
     {
