@@ -3,9 +3,9 @@
 use App\Http\Controllers\AdminAccessController;
 use App\Http\Controllers\AdminAuditController;
 use App\Http\Controllers\AdminAuthController;
-use App\Http\Controllers\AdminChoiceSettingsController;
 use App\Http\Controllers\AdminCatalogController;
 use App\Http\Controllers\AdminCatalogMediaController;
+use App\Http\Controllers\AdminChoiceSettingsController;
 use App\Http\Controllers\AdminContentController;
 use App\Http\Controllers\AdminCustomerController;
 use App\Http\Controllers\AdminDashboardController;

@@ -33,7 +33,7 @@ class AdminChoiceSettingsController
 
         $before = $choices->all();
         $clean = [];
-        foreach (AdminChoiceSettings::DEFAULTS as $section => $defaults) {
+        foreach (array_keys(AdminChoiceSettings::DEFAULTS) as $section) {
             $codes = [];
             foreach ($data[$section] as $entry) {
                 if (isset($codes[$entry['code']])) {
@@ -54,8 +54,8 @@ class AdminChoiceSettingsController
             // The "other" cancellation and general support codes remain valid.
             $required = $section === 'cancellations' ? 'lainnya' : 'GENERAL';
             $protected = collect($clean[$section])->firstWhere('code', $required);
-            if (! $protected || ! $protected['active']) {
-                throw ValidationException::withMessages([$section => 'Kode '. $required .' harus tetap aktif.']);
+            if ($protected === null || $protected['active'] !== true) {
+                throw ValidationException::withMessages([$section => 'Kode '.$required.' harus tetap aktif.']);
             }
         }
 

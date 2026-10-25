@@ -162,6 +162,7 @@ class AdminDashboardController
         return Inertia::render('Admin/Dashboard', [
             'range' => $range, 'generatedAt' => $now->toIso8601String(), 'canViewFinance' => $finance,
             'canOrders' => $canOrders, 'canNotifications' => $canNotifications,
+            'manualOverdueMinutes' => app(OperationalSettings::class)->value('manual_overdue_minutes'),
             'metrics' => $metrics, 'chart' => $chart, 'recentOrders' => $recent,
             'activities' => $activities, 'integrations' => $integrations, 'digiflazzBalance' => $balance,
             'lastSyncedAt' => ($finance || $canProviders) ? $this->timestamp(DB::table('digiflazz_catalog_items')->max('synced_at')) : null,

@@ -192,6 +192,7 @@ class AdminFulfillmentController
             'attempts' => $attempts,
             'filters' => $filters,
             'metrics' => $metrics,
+            'manualOverdueMinutes' => app(OperationalSettings::class)->value('manual_overdue_minutes'),
             'statuses' => collect(self::STATUSES)->mapWithKeys(
                 fn (string $status): array => [$status => $presentation->status($status)]
             )->all(),
