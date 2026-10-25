@@ -7,6 +7,7 @@ use App\Services\AdminPermissionService;
 use App\Services\IntegrationRegistry;
 use App\Services\IntegrationRuntimeConfig;
 use App\Support\AuditLabels;
+use App\Support\ServiceHours;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -51,6 +52,31 @@ class AdminDashboardController
         }
         if ($permissions->allows($admin, 'fulfillment.manage')) {
             $metrics['pending_fulfillment'] = DB::table('fulfillment_attempts')->whereIn('status', ['CREATED', 'SENDING', 'PENDING', 'UNKNOWN', 'BLOCKED', 'MANUAL_PENDING'])->count();
+            // Count all manual overdue attempts, not only the first 1,000.
+            // Stream them in bounded batches to avoid loading the full queue
+            // into dashboard memory; use one reference time for all batches.
+            $overdue = 0;
+            $checkedAt = now();
+            DB::table('fulfillment_attempts as attempts')
+                ->join('orders', 'orders.id', '=', 'attempts.order_id')
+                ->join('products', 'products.id', '=', 'orders.product_id')
+                ->where('attempts.status', 'MANUAL_PENDING')
+                ->where('orders.status', '<>', 'CANCELLED')
+                ->select([
+                    'attempts.id as id', 'attempts.created_at',
+                    'products.manual_open_time', 'products.manual_close_time',
+                    'products.manual_timezone',
+                ])
+                ->lazyById(250, 'attempts.id', 'id')
+                ->each(function (object $row) use (&$overdue, $checkedAt): void {
+                    if (ServiceHours::elapsedMinutes(
+                        $row->created_at, $checkedAt,
+                        $row->manual_open_time, $row->manual_close_time, $row->manual_timezone
+                    ) > 60) {
+                        $overdue++;
+                    }
+                });
+            $metrics['manual_overdue'] = $overdue;
         }
         $balance = $finance ? $this->balance() : null;
         if ($finance) {

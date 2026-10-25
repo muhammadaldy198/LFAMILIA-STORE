@@ -116,6 +116,60 @@ class CatalogSyncDeactivationTest extends TestCase
         return ['active' => (bool) $fresh->is_active, 'marker' => (bool) $fresh->disabled_by_sync];
     }
 
+    public function test_store_cost_backfill_is_idempotent_and_skips_rows_without_a_reference(): void
+    {
+        $this->login();
+        $package = $this->package($this->product('AUTO_PROVIDER'), 'BACKFILL');
+        $filledId = $this->mapping($package, 'DIGIFLAZZ', 'backfill-with-price')->id;
+        $skippedId = $this->mapping($package, 'DIGIFLAZZ', 'backfill-no-price')->id;
+        $manualPackage = $this->package($this->product('MANUAL'), 'MANUAL_BACKFILL');
+        $manualId = $this->mapping($manualPackage, 'MANUAL', null)->id;
+        $voucherId = $this->mapping($package, 'VOUCHER_STOCK', 'voucher-backfill')->id;
+        DB::table('provider_mappings')->whereIn('id', [$manualId, $voucherId])->update([
+            'cost_idr' => 10000, 'seller_reference_price_idr' => 10000,
+            'store_cost_idr' => null, 'max_price_idr' => 12000,
+        ]);
+        DB::table('provider_mappings')->where('id', $filledId)->update([
+            'cost_idr' => 10001, 'seller_reference_price_idr' => 10001,
+            'store_cost_idr' => null, 'max_price_idr' => 12000,
+        ]);
+        DB::table('provider_mappings')->where('id', $skippedId)->update([
+            'cost_idr' => null, 'seller_reference_price_idr' => null,
+            'store_cost_idr' => null, 'max_price_idr' => null,
+        ]);
+
+        $migration = require database_path('migrations/2026_10_25_000000_backfill_store_cost_for_legacy_mappings.php');
+        $migration->up();
+        $this->assertSame(10202, (int) DB::table('provider_mappings')->where('id', $filledId)->value('store_cost_idr'));
+        $this->assertNull(DB::table('provider_mappings')->where('id', $skippedId)->value('store_cost_idr'));
+        foreach ([$manualId, $voucherId] as $untouchedId) {
+            $this->assertDatabaseHas('provider_mappings', [
+                'id' => $untouchedId, 'store_cost_idr' => null,
+                'cost_idr' => 10000, 'max_price_idr' => 12000,
+            ]);
+        }
+        $migration->up();
+        $this->assertSame(10202, (int) DB::table('provider_mappings')->where('id', $filledId)->value('store_cost_idr'));
+    }
+
+    public function test_legacy_mapping_sync_sets_store_cost_once_and_preserves_max_price(): void
+    {
+        $this->login();
+        $package = $this->package($this->product('AUTO_PROVIDER'), 'LEGACY_LOCK');
+        $mapping = $this->mapping($package, 'DIGIFLAZZ', 'legacy-lock-sku');
+        DB::table('provider_mappings')->where('id', $mapping->id)->update([
+            'store_cost_idr' => null, 'seller_reference_price_idr' => null, 'cost_idr' => 10000,
+            'max_price_idr' => 11000,
+        ]);
+        $this->fakeCatalog([$this->row('legacy-lock-sku')]);
+
+        app(DigiflazzCatalogService::class)->sync();
+
+        $fresh = DB::table('provider_mappings')->where('id', $mapping->id)->first();
+        $this->assertSame(10200, (int) $fresh->store_cost_idr);
+        $this->assertSame(11000, (int) $fresh->max_price_idr);
+    }
+
     /** (a) + (e): MANUAL dan VOUCHER_STOCK tidak pernah jadi kandidat sinkron. */
     public function test_manual_and_voucher_nominal_survive_a_sync_that_removes_a_digiflazz_sku(): void
     {

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Services\Payment\DokuDirectGateway;
 use App\Services\Payment\ManualQrisGateway;
 use App\Services\Payment\MidtransGateway;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\URL;
@@ -360,7 +361,7 @@ class PaymentService
             }
 
             throw $exception;
-        } catch (RuntimeException $exception) {
+        } catch (RuntimeException|ConnectionException $exception) {
             $unknown = DB::table('payment_transactions')
                 ->where('id', $payment->id)
                 ->where('status', 'SENDING')
@@ -379,6 +380,18 @@ class PaymentService
                 'order_id' => $payment->order_id,
                 'gateway_code' => $payment->gateway_code,
             ]);
+
+            // Gateway timeout tidak bisa dibedakan dari penolakan: transaksi bisa
+            // saja sudah terbuat di sisi gateway. Admin harus memeriksa manual.
+            $this->notifications->record(
+                'payment.unknown',
+                'Pembayaran perlu diperiksa',
+                'Pembuatan pembayaran #'.$payment->id.' ('.$payment->gateway_code.') tidak dapat dipastikan: '.$exception::class.'. Periksa status di gateway sebelum menyuruh pembeli membayar ulang.',
+                'WARNING',
+                'payment_transaction',
+                (int) $payment->id,
+                ['order_id' => $payment->order_id, 'gateway_code' => $payment->gateway_code]
+            );
 
             throw ValidationException::withMessages([
                 'payment' => 'Status pembuatan pembayaran belum dapat dipastikan. Jangan ulangi pembayaran; periksa status transaksi.',

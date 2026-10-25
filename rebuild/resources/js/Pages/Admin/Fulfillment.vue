@@ -157,7 +157,9 @@ const runOn = (action, row) => {
                             </td>
                             <td>
                                 <span class="adm-tag" :class="tone(row.status)">{{ rowStatus(row) }}</span>
+                                <span v-if="row.is_overdue" class="adm-tag danger">Lewat 60 menit</span>
                                 <p class="dim">Pesanan: {{ row.order_status_label }}</p>
+                                <p v-if="row.manual_age_minutes" class="dim">Menunggu {{ row.manual_age_minutes }} menit jam layanan</p>
                                 <p v-if="row.note" class="dim">{{ row.note }}</p>
                             </td>
                             <td>
@@ -195,7 +197,7 @@ const runOn = (action, row) => {
             <template #footer>
                 <button type="button" class="adm-btn" @click="modal = ''">Batal</button>
                 <button v-if="modal === 'fail'" type="button" class="adm-btn danger" :disabled="busy || !form.reason.trim()" @click="run('fail')">Nyatakan gagal</button>
-                <button v-else type="button" class="adm-btn primary" :disabled="busy" @click="run('complete')">Tandai berhasil</button>
+                <button v-else type="button" class="adm-btn primary" :disabled="busy || (!form.delivery_code.trim() && !form.note.trim())" @click="run('complete')">Tandai berhasil</button>
             </template>
         </AdminModal>
     </AdminLayout>

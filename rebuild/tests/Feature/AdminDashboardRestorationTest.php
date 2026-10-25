@@ -88,6 +88,82 @@ class AdminDashboardRestorationTest extends TestCase
             ->has('recentOrders', 1)->missing('recentOrders.0.total_idr')->missing('topProducts'));
     }
 
+    public function test_manual_overdue_metric_counts_more_than_one_thousand_attempts_without_cancelled_orders(): void
+    {
+        $this->login('ADMIN', ['dashboard.view', 'fulfillment.manage']);
+        $product = Product::firstOrCreate(['slug' => 'dashboard-regression'], [
+            'name' => 'Dashboard Game', 'category_id' => Category::where('slug', 'game')->value('id'),
+            'fulfillment_mode' => 'MANUAL', 'is_active' => true, 'margin_percent' => 10,
+        ]);
+        $package = ProductPackage::firstOrCreate(['product_id' => $product->id, 'code' => 'D10'], [
+            'name' => '10 Diamonds', 'is_active' => true,
+        ]);
+        $providerId = DB::table('providers')->where('code', 'MANUAL')->value('id');
+        $this->assertNotNull($providerId);
+        $mappingId = DB::table('provider_mappings')->insertGetId([
+            'product_package_id' => $package->id,
+            'provider_id' => $providerId,
+            'cost_idr' => 9000,
+            'store_cost_idr' => 9000,
+            'is_active' => true,
+            'priority' => 0,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // 1,001 overdue orders and one cancelled order with a stale pending
+        // attempt. The count must include the full queue but exclude cancelled.
+        $prefix = 'DASH-BULK-'.bin2hex(random_bytes(6)).'-';
+        $queuedAt = now()->subMinutes(90)->toDateTimeString();
+        $orders = [];
+        for ($i = 1; $i <= 1002; $i++) {
+            $orders[] = [
+                'order_number' => $prefix.$i,
+                'product_id' => $product->id,
+                'product_package_id' => $package->id,
+                'status' => $i === 1002 ? 'CANCELLED' : 'PROCESSING',
+                'currency' => 'IDR',
+                'customer_input' => '{}',
+                'snapshot' => '{}',
+                'cost_idr' => 9000,
+                'margin_idr' => 1000,
+                'total_idr' => 10000,
+                'idempotency_key' => 'dashboard-overdue-'.$prefix.$i,
+                'created_at' => $queuedAt,
+                'updated_at' => $queuedAt,
+            ];
+        }
+        foreach (array_chunk($orders, 100) as $batch) {
+            DB::table('orders')->insert($batch);
+        }
+
+        $orderIds = DB::table('orders')->where('order_number', 'like', $prefix.'%')
+            ->pluck('id', 'order_number');
+        $this->assertCount(1002, $orderIds);
+        $attempts = [];
+        for ($i = 1; $i <= 1002; $i++) {
+            $attempts[] = [
+                'order_id' => $orderIds[$prefix.$i],
+                'provider_mapping_id' => $mappingId,
+                'provider_id' => $providerId,
+                'attempt_no' => 1,
+                'external_reference' => 'FUL-'.$prefix.$i.'-1',
+                'status' => 'MANUAL_PENDING',
+                'correlation_id' => 'DASH-BULK-'.$i,
+                'safe_to_failover' => false,
+                'created_at' => $queuedAt,
+                'updated_at' => $queuedAt,
+            ];
+        }
+        foreach (array_chunk($attempts, 100) as $batch) {
+            DB::table('fulfillment_attempts')->insert($batch);
+        }
+
+        $this->get('/admin/panel')->assertOk()->assertInertia(
+            fn (Assert $page) => $page->where('metrics.manual_overdue', 1001)
+        );
+    }
+
     public function test_read_only_balance_probe_is_cached_and_failure_keeps_dashboard_available(): void
     {
         $this->login();

@@ -17,6 +17,7 @@ const props = defineProps({
     walletSettings: { type: Object, default: () => ({}) },
     manualQrisAsset: Object,
     manualPayments: { type: Array, default: () => [] },
+    refundReviews: { type: Array, default: () => [] },
     pageSettings: { type: Object, default: () => ({}) },
     callbackUrls: { type: Object, default: () => ({}) },
 });
@@ -209,6 +210,22 @@ const saveWallet = () => {
 const confirmManual = async id => {
     if (!(await confirmSensitive('Konfirmasi bahwa pembayaran QRIS manual ini benar-benar sudah diterima?'))) return;
     router.post('/admin/payments/manual/' + id + '/confirm', {}, { preserveScroll: true });
+};
+
+// ---------- tinjauan refund top up ----------
+const review = reactive({ open: false, id: 0, customer: '', reason: '' });
+const openReview = row => {
+    review.open = true;
+    review.id = row.id;
+    review.customer = row.customer_name;
+    review.reason = '';
+};
+const submitReview = () => {
+    if (review.reason.trim().length < 3) return;
+    router.post('/admin/payments/topups/' + review.id + '/close-review', { reason: review.reason.trim() }, {
+        preserveScroll: true,
+        onSuccess: () => { review.open = false; review.reason = ''; },
+    });
 };
 
 // ---------- transaksi ----------
@@ -484,6 +501,24 @@ const successRate = computed(() => {
                 </div>
             </section>
 
+            <section v-if="refundReviews.length" class="adm-card">
+                <div class="adm-card-head">
+                    <div>
+                        <h2>Top up perlu ditinjau</h2>
+                        <p>Gateway melaporkan refund. Menutup tinjauan TIDAK mengubah saldo pelanggan; penyelesaian dana lewat penyesuaian saldo manual.</p>
+                    </div>
+                </div>
+                <div class="adm-card-body" style="display:grid;gap:6px">
+                    <div v-for="row in refundReviews" :key="row.id" class="adm-list-row">
+                        <div>
+                            <strong>{{ row.customer_name }}</strong>
+                            <div class="adm-note">{{ rupiah(row.amount_idr) }} · {{ wibDateTime(row.created_at) }} · {{ row.customer_email }}</div>
+                        </div>
+                        <button type="button" class="adm-btn sm" @click="openReview(row)">Selesaikan tinjauan</button>
+                    </div>
+                </div>
+            </section>
+
             <section v-if="manualPayments.length" class="adm-card">
                 <div class="adm-card-head">
                     <div>
@@ -501,6 +536,16 @@ const successRate = computed(() => {
                     </div>
                 </div>
             </section>
+
+            <AdminModal v-model:open="review.open" title="Selesaikan tinjauan top up" description="Tidak ada uang yang dipindahkan. Saldo pelanggan tetap seperti sekarang.">
+                <p class="adm-note">Top up milik <strong>{{ review.customer }}</strong> akan ditandai selesai ditinjau, sehingga pembayaran saldo pelanggan terbuka kembali.</p>
+                <label class="adm-field"><span>Alasan / hasil pemeriksaan (wajib)</span>
+                    <textarea v-model="review.reason" class="adm-textarea" maxlength="500" placeholder="mis. dana sudah dibalik gateway, saldo disesuaikan manual" /></label>
+                <template #footer>
+                    <button type="button" class="adm-btn" @click="review.open = false">Batal</button>
+                    <button type="button" class="adm-btn primary" :disabled="review.reason.trim().length < 3" @click="submitReview">Tandai selesai</button>
+                </template>
+            </AdminModal>
 
         </template>
 

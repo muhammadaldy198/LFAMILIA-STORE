@@ -358,12 +358,25 @@ class AdminCustomerController
             'idempotency_key' => ['required', 'string', 'min:16', 'max:120', 'regex:/^[A-Za-z0-9:_-]+$/'],
         ]);
 
-        DB::transaction(function () use ($request, $userId, $data, $audit): void {
+        $applied = true;
+        DB::transaction(function () use ($request, $userId, $data, $audit, &$applied): void {
             User::query()->whereNull('deleted_at')->lockForUpdate()->findOrFail($userId);
             $wallet = DB::table('wallets')->where('user_id', $userId)->lockForUpdate()->first();
             abort_unless($wallet, 404);
 
-            if (DB::table('wallet_ledger')->where('idempotency_key', $data['idempotency_key'])->exists()) {
+            // Scope the adjustment key to this customer while preserving the
+            // global uniqueness of wallet_ledger keys used by payment flows.
+            // Also recognize legacy unscoped adjustment keys for THIS wallet,
+            // so replaying an adjustment made before this fix never credits twice.
+            $ledgerKey = 'customer-wallet:'.hash('sha256', $userId.':'.$data['idempotency_key']);
+            $alreadyApplied = DB::table('wallet_ledger')
+                ->where('wallet_id', $wallet->id)
+                ->where('source', 'ADMIN_ADJUSTMENT')
+                ->whereIn('idempotency_key', [$ledgerKey, $data['idempotency_key']])
+                ->exists();
+            if ($alreadyApplied) {
+                $applied = false;
+
                 return;
             }
 
@@ -387,10 +400,12 @@ class AdminCustomerController
                 'balance_after_idr' => $afterBalance,
                 'source' => 'ADMIN_ADJUSTMENT',
                 'reference_type' => 'CUSTOMER',
-                'reference_id' => substr($userId.':'.$data['idempotency_key'], 0, 100),
+                // Hash long request keys instead of truncating their suffix:
+                // two distinct keys must never share a ledger reference.
+                'reference_id' => 'customer:'.$userId.':'.hash('sha256', $data['idempotency_key']),
                 'actor_type' => 'admin_user',
                 'actor_id' => (string) $request->user('admin')->id,
-                'idempotency_key' => $data['idempotency_key'],
+                'idempotency_key' => $ledgerKey,
                 'created_at' => now(),
             ]);
             $audit->record(
@@ -407,7 +422,9 @@ class AdminCustomerController
             );
         }, 3);
 
-        return back()->with('status', 'Saldo pelanggan berhasil disesuaikan.');
+        return back()->with('status', $applied
+            ? 'Saldo pelanggan berhasil disesuaikan.'
+            : 'Kunci ini sudah pernah diproses untuk pelanggan ini; saldo tidak ditambah lagi.');
     }
 
     public function updateMembership(

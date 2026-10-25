@@ -41,7 +41,7 @@ class AdminOrdersController
             ->select('orders.*', 'products.name as product_name', 'packages.name as package_name',
                 'users.name as buyer_name', 'users.email as buyer_email', 'users.phone as buyer_phone',
                 'providers.code as provider_code', 'channels.name as channel_name', 'products.manual_instructions')
-            ->selectRaw("EXISTS(SELECT 1 FROM fulfillment_attempts fa WHERE fa.order_id = orders.id AND fa.id = (SELECT MAX(fb.id) FROM fulfillment_attempts fb WHERE fb.order_id = orders.id) AND fa.status IN ('UNKNOWN','BLOCKED','MANUAL_FAILED')) as needs_attention")
+            ->selectRaw("EXISTS(SELECT 1 FROM fulfillment_attempts fa WHERE fa.order_id = orders.id AND fa.id = (SELECT MAX(fb.id) FROM fulfillment_attempts fb WHERE fb.order_id = orders.id) AND fa.status IN ('UNKNOWN','BLOCKED','MANUAL_FAILED') AND orders.status <> 'CANCELLED') as needs_attention")
             ->selectRaw('(SELECT fa.status FROM fulfillment_attempts fa WHERE fa.order_id = orders.id ORDER BY fa.id DESC LIMIT 1) as fulfillment_status');
         if ($q = trim((string) $request->query('q'))) {
             $query->where(function (Builder $query) use ($q): void {
@@ -53,7 +53,7 @@ class AdminOrdersController
         }
         if ($status = $request->query('status')) {
             if ($status === 'attention') {
-                $query->whereRaw("EXISTS(SELECT 1 FROM fulfillment_attempts fa WHERE fa.order_id = orders.id AND fa.id = (SELECT MAX(fb.id) FROM fulfillment_attempts fb WHERE fb.order_id = orders.id) AND fa.status IN ('UNKNOWN','BLOCKED','MANUAL_FAILED'))");
+                $query->whereRaw("EXISTS(SELECT 1 FROM fulfillment_attempts fa WHERE fa.order_id = orders.id AND fa.id = (SELECT MAX(fb.id) FROM fulfillment_attempts fb WHERE fb.order_id = orders.id) AND fa.status IN ('UNKNOWN','BLOCKED','MANUAL_FAILED') AND orders.status <> 'CANCELLED')");
             } else {
                 $query->where('orders.status', $status);
             }
@@ -83,9 +83,9 @@ class AdminOrdersController
     {
         $query = $this->query($request);
         $counts = (clone $query)->reorder()->select('orders.status')->selectRaw('COUNT(*) as total')->groupBy('orders.status')->pluck('total', 'orders.status');
-        $attention = (clone $query)->whereRaw("EXISTS(SELECT 1 FROM fulfillment_attempts fa WHERE fa.order_id = orders.id AND fa.id = (SELECT MAX(fb.id) FROM fulfillment_attempts fb WHERE fb.order_id = orders.id) AND fa.status IN ('UNKNOWN','BLOCKED','MANUAL_FAILED'))")->count();
+        $attention = (clone $query)->whereRaw("EXISTS(SELECT 1 FROM fulfillment_attempts fa WHERE fa.order_id = orders.id AND fa.id = (SELECT MAX(fb.id) FROM fulfillment_attempts fb WHERE fb.order_id = orders.id) AND fa.status IN ('UNKNOWN','BLOCKED','MANUAL_FAILED') AND orders.status <> 'CANCELLED')")->count();
         $rows = $query
-            ->orderByRaw("CASE WHEN EXISTS(SELECT 1 FROM fulfillment_attempts fa WHERE fa.order_id = orders.id AND fa.id = (SELECT MAX(fb.id) FROM fulfillment_attempts fb WHERE fb.order_id = orders.id) AND fa.status IN ('UNKNOWN','BLOCKED','MANUAL_FAILED')) THEN 0 WHEN orders.status = 'PENDING_PAYMENT' THEN 1 ELSE 2 END")
+            ->orderByRaw("CASE WHEN EXISTS(SELECT 1 FROM fulfillment_attempts fa WHERE fa.order_id = orders.id AND fa.id = (SELECT MAX(fb.id) FROM fulfillment_attempts fb WHERE fb.order_id = orders.id) AND fa.status IN ('UNKNOWN','BLOCKED','MANUAL_FAILED') AND orders.status <> 'CANCELLED') THEN 0 WHEN orders.status = 'PENDING_PAYMENT' THEN 1 ELSE 2 END")
             ->orderByDesc('orders.id')
             ->paginate((int) $request->query('per_page', 25))->withQueryString();
         $presentation->preloadFieldLabels($rows->items());

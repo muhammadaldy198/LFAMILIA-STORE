@@ -145,101 +145,61 @@ class PaymentStateService
     }
 
     /**
-     * Complete an internal wallet reversal after a refunded top-up entered REFUND_REVIEW.
+     * Tutup top up berstatus REFUND_REVIEW TANPA menggerakkan uang.
+     *
+     * Gateway sudah membalik dananya di luar sistem. Saldo pelanggan dibiarkan
+     * apa adanya; penyelesaian uang yang sebenarnya dilakukan lewat penyesuaian
+     * saldo manual yang sudah ada. Method ini hanya membuka kunci pembayaran
+     * saldo dengan menandai tinjauan selesai.
      *
      * @return array<string, mixed>
      */
-    public function resolveTopupRefundReview(int $topupId, int $adminId): array
+    public function closeTopupRefundReview(int $topupId, string $reason): array
     {
-        return DB::transaction(function () use ($topupId, $adminId): array {
+        $reason = trim($reason);
+        if ($reason === '') {
+            throw ValidationException::withMessages(['reason' => 'Alasan wajib diisi.']);
+        }
+
+        return DB::transaction(function () use ($topupId, $reason): array {
             $topup = DB::table('wallet_topups')->where('id', $topupId)
                 ->lockForUpdate()->first();
             if (! $topup) {
-                throw ValidationException::withMessages(['refund' => 'Top up tidak ditemukan.']);
-            }
-            if ($topup->status === 'REFUNDED') {
-                return ['result' => 'ALREADY_REFUNDED', 'status' => 'REFUNDED'];
+                throw ValidationException::withMessages(['topup' => 'Top up tidak ditemukan.']);
             }
             if ($topup->status !== 'REFUND_REVIEW') {
                 throw ValidationException::withMessages([
-                    'refund' => 'Top up ini tidak sedang menunggu penyelesaian refund.',
+                    'topup' => 'Top up ini tidak sedang menunggu tinjauan.',
                 ]);
             }
 
-            $payment = DB::table('payment_transactions')
-                ->where('wallet_topup_id', $topup->id)
-                ->where('status', 'REFUNDED')
-                ->orderByDesc('id')
-                ->lockForUpdate()
-                ->first();
-            if (! $payment) {
-                throw ValidationException::withMessages([
-                    'refund' => 'Pembayaran refund terverifikasi tidak ditemukan.',
-                ]);
-            }
-
-            $wallet = DB::table('wallets')->where('id', $topup->wallet_id)
-                ->lockForUpdate()->first();
-            if (! $wallet) {
-                throw ValidationException::withMessages(['refund' => 'Wallet tidak ditemukan.']);
-            }
-
-            $refundKey = 'wallet-topup-refund:'.$payment->id;
-            if (DB::table('wallet_ledger')->where('idempotency_key', $refundKey)->exists()) {
-                DB::table('wallet_topups')->where('id', $topup->id)->update([
+            $closed = DB::table('wallet_topups')
+                ->where('id', $topup->id)
+                ->where('status', 'REFUND_REVIEW')
+                ->update([
                     'status' => 'REFUNDED',
                     'updated_at' => now(),
                 ]);
-
-                return ['result' => 'ALREADY_REVERSED', 'status' => 'REFUNDED'];
-            }
-
-            $amount = (int) $topup->amount_idr;
-            $before = (int) $wallet->balance_idr;
-            if ($before < $amount) {
+            if ($closed !== 1) {
                 throw ValidationException::withMessages([
-                    'refund' => 'Saldo pelanggan belum cukup untuk menyelesaikan pengembalian dana.',
+                    'topup' => 'Top up ini sudah ditutup sebelumnya.',
                 ]);
             }
 
-            $after = $before - $amount;
-            DB::table('wallets')->where('id', $wallet->id)->update([
-                'balance_idr' => $after,
-                'version' => DB::raw('version + 1'),
-                'updated_at' => now(),
-            ]);
-            DB::table('wallet_ledger')->insert([
-                'wallet_id' => $wallet->id,
-                'amount_idr' => -$amount,
-                'balance_before_idr' => $before,
-                'balance_after_idr' => $after,
-                'source' => 'REFUND',
-                'reference_type' => 'WALLET_TOPUP',
-                'reference_id' => (string) $topup->id,
-                'actor_type' => 'admin_user',
-                'actor_id' => (string) $adminId,
-                'idempotency_key' => $refundKey,
-                'created_at' => now(),
-            ]);
-            DB::table('wallet_topups')->where('id', $topup->id)->update([
-                'status' => 'REFUNDED',
-                'updated_at' => now(),
-            ]);
-
             $this->notifications->record(
-                'wallet.topup_refund_resolved',
-                'Refund top up terselesaikan',
-                'Refund top up #'.$topup->id.' sudah direkonsiliasi dengan saldo pelanggan.',
+                'wallet.topup_refund_review_closed',
+                'Tinjauan refund top up ditutup',
+                'Tinjauan top up #'.$topup->id.' ditutup dengan alasan: '.$reason.'. Saldo pelanggan tidak diubah.',
                 'INFO',
                 'wallet_topup',
                 $topup->id
             );
 
             return [
-                'result' => 'REFUNDED',
+                'result' => 'CLOSED',
                 'status' => 'REFUNDED',
-                'balance_before_idr' => $before,
-                'balance_after_idr' => $after,
+                'balance_idr' => (int) DB::table('wallets')->where('id', $topup->wallet_id)->value('balance_idr'),
+                'reason' => $reason,
             ];
         }, 3);
     }

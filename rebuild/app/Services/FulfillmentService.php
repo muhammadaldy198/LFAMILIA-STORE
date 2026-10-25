@@ -378,6 +378,12 @@ class FulfillmentService
             $request = $this->json($attempt->request_payload);
             $this->validateProviderResponse($request, $response);
 
+            // Cancellation is terminal even when a valid provider result arrives late.
+            // Keep both the cancelled order and its attempt unchanged.
+            if ($attempt->status === 'CANCELLED' || $order->status === 'CANCELLED') {
+                return false;
+            }
+
             $incoming = $this->providerStatus((string) $response['status']);
             if ($attempt->status === 'SUCCESS') {
                 return false;
@@ -668,6 +674,13 @@ class FulfillmentService
 
     public function completeManual(int $attemptId, ?string $deliveryCode, ?string $note, int $adminId): void
     {
+        // Tidak boleh ada pesanan "sukses" tanpa bukti serah-terima.
+        if (trim((string) $deliveryCode) === '' && trim((string) $note) === '') {
+            throw ValidationException::withMessages([
+                'delivery_code' => 'Isi minimal kode pengiriman atau catatan sebelum menandai sukses.',
+            ]);
+        }
+
         DB::transaction(function () use ($attemptId, $deliveryCode, $note, $adminId): void {
             $attempt = DB::table('fulfillment_attempts')->where('id', $attemptId)
                 ->lockForUpdate()->first();
@@ -764,12 +777,16 @@ class FulfillmentService
         DB::transaction(function () use ($attemptId, $reason): void {
             $attempt = DB::table('fulfillment_attempts')->where('id', $attemptId)
                 ->lockForUpdate()->first();
-            if (! $attempt || in_array($attempt->status, ['SUCCESS', 'FAILED_CONFIRMED'], true)) {
+            if (! $attempt || in_array($attempt->status, ['SUCCESS', 'FAILED_CONFIRMED', 'CANCELLED'], true)) {
+                return;
+            }
+
+            $order = DB::table('orders')->where('id', $attempt->order_id)->lockForUpdate()->first();
+            if ($order?->status === 'CANCELLED') {
                 return;
             }
 
             $wasBlocked = $attempt->status === 'BLOCKED';
-            $order = DB::table('orders')->where('id', $attempt->order_id)->lockForUpdate()->first();
             DB::table('fulfillment_attempts')->where('id', $attempt->id)->update([
                 'status' => 'BLOCKED',
                 'safe_to_failover' => false,
@@ -812,7 +829,12 @@ class FulfillmentService
         DB::transaction(function () use ($attemptId, $reason): void {
             $attempt = DB::table('fulfillment_attempts')->where('id', $attemptId)
                 ->lockForUpdate()->first();
-            if (! $attempt || in_array($attempt->status, ['SUCCESS', 'FAILED_CONFIRMED'], true)) {
+            if (! $attempt || in_array($attempt->status, ['SUCCESS', 'FAILED_CONFIRMED', 'CANCELLED'], true)) {
+                return;
+            }
+
+            $order = DB::table('orders')->where('id', $attempt->order_id)->lockForUpdate()->first();
+            if ($order?->status === 'CANCELLED') {
                 return;
             }
 
@@ -823,7 +845,6 @@ class FulfillmentService
                 'last_checked_at' => now(),
                 'updated_at' => now(),
             ]);
-            $order = DB::table('orders')->where('id', $attempt->order_id)->lockForUpdate()->first();
             if ($order) {
                 if ($order->status === 'PAID') {
                     DB::table('orders')->where('id', $order->id)->update([
