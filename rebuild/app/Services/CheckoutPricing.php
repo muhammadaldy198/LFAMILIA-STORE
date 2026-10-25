@@ -248,7 +248,7 @@ class CheckoutPricing
         })->values();
 
         // The existing SELL_PRICE rule does not allow a negative margin.
-        // Skip an unaffordable source so an eligible backup can still be used.
+        // An unaffordable SKU is unavailable; never substitute a backup automatically.
         // There is no fixed minimum-margin percentage.
         if ($context->pricing_mode === 'SELL_PRICE') {
             $eligibleMappings = $eligibleMappings->filter(
@@ -264,9 +264,6 @@ class CheckoutPricing
         }
 
         $cost = (int) ($mapping->store_cost_idr ?? $mapping->cost_idr);
-        $legacyDigiflazzPricing = $mapping->provider_code === 'DIGIFLAZZ'
-            && $mapping->store_cost_idr === null
-            && $context->package_sell_markup_percent === null;
         // Baris katalog lama (belum punya modal toko baru dan tanpa override markup)
         // tetap memakai margin lamanya. Semua baris lain — termasuk nominal manual
         // yang modal tokonya diisi admin — memakai harga jual modal toko × markup.
@@ -291,15 +288,10 @@ class CheckoutPricing
             throw ValidationException::withMessages(['package_id' => 'Harga jual nominal berada di bawah modal.']);
         }
 
-        $maxPrice = $mapping->max_price_idr !== null ? (int) $mapping->max_price_idr : null;
-        if ($mapping->provider_code === 'DIGIFLAZZ') {
-            // Legacy catalog entries retain their provider-price tolerance.
-            $maxPrice = $mapping->is_manual_price
-                ? (int) $mapping->max_price_idr
-                : ($legacyDigiflazzPricing
-                    ? (int) $eligibleMappings->where('provider_code', 'DIGIFLAZZ')->max('cost_idr')
-                    : $cost);
-        }
+        // One selected SKU only. Provider max_price is its exact store cost.
+        $maxPrice = $mapping->provider_code === 'DIGIFLAZZ'
+            ? $cost
+            : ($mapping->max_price_idr !== null ? (int) $mapping->max_price_idr : null);
 
         return [
             'product_id' => (int) $context->product_id,

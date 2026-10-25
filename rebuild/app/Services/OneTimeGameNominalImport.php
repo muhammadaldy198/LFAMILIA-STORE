@@ -115,49 +115,23 @@ class OneTimeGameNominalImport
                     continue;
                 }
 
+                // Historical migration runs on fresh installs too. Pick one
+                // selected SKU, never create an automatic backup mapping.
+                $owned = $safe->first(fn (object $item): bool => $existing->contains(
+                    fn (ProviderMapping $mapping): bool => $mapping->is_active
+                        && $mapping->external_sku === $item->buyer_sku_code
+                ));
+                $selected = $owned ?? $safe->sortBy('price_idr')->first();
+
                 $beforePackageCount = $product->packages()->count();
                 $beforeMappingCount = ProviderMapping::query()->where('provider_id', $provider->id)
                     ->whereIn('product_package_id', $product->packages()->pluck('id'))->count();
 
-                DB::transaction(function () use ($product, $safe, $template, $sources, $provider, $catalogImporter, $audit, $request): void {
-                    // Manual mode: no auto_source_group tag; future catalogue sync
-                    // will update prices, but will not import new denominations.
-                    $package = $sources->importGroup(
-                        $product, $safe, $template, true,
+                DB::transaction(function () use ($product, $selected, $template, $sources, $request): void {
+                    $sources->importGroup(
+                        $product, collect([$selected]), $template, true,
                         (string) $product->margin_percent, false, $request
                     );
-
-                    // Fill sources that importGroup safely omits at supplier cutoff.
-                    foreach ($safe as $item) {
-                        if ($package->mappings()->where('provider_id', $provider->id)
-                            ->where('external_sku', $item->buyer_sku_code)->exists()) {
-                            continue;
-                        }
-                        $mapping = $catalogImporter->upsert(
-                            $package, (string) $item->buyer_sku_code,
-                            (int) $item->price_idr, (int) $item->price_idr
-                        );
-                        $mapping->update([
-                            'is_active' => true,
-                            'fulfillment_config' => ['customer_no_template' => $template],
-                        ]);
-                        $audit->record($request, 'catalog.manual_source_cutoff_attached',
-                            'provider_mapping', $mapping->id, null, $mapping->fresh()->toArray());
-                    }
-
-                    // Deterministic cheapest-first fallback, not arbitrary all-zero priority.
-                    $ranked = $package->mappings()->where('provider_id', $provider->id)
-                        ->where('is_active', true)
-                        ->orderBy('cost_idr')->orderBy('external_sku')->orderBy('id')->get();
-                    foreach ($ranked as $position => $mapping) {
-                        if ((int) $mapping->priority === $position) {
-                            continue;
-                        }
-                        $before = $mapping->toArray();
-                        $mapping->update(['priority' => $position]);
-                        $audit->record($request, 'catalog.manual_source_ranked',
-                            'provider_mapping', $mapping->id, $before, $mapping->fresh()->toArray());
-                    }
                 }, 2);
 
                 $result['packages_created'] += $product->packages()->count() - $beforePackageCount;

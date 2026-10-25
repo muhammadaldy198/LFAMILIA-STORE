@@ -225,8 +225,9 @@ class FulfillmentTest extends TestCase
             ['status' => 'Gagal', 'rc' => '70'],
             ['status' => 'Gagal', 'rc' => '00'],
             ['status' => 'Pending', 'rc' => '00'],
-        ] as $responseState) {
-            $catalog = $this->automaticCatalog();
+        ] as $case => $responseState) {
+            $sku = 'DF-CONFLICT-'.$case;
+            $catalog = $this->automaticCatalog(sku: $sku);
             $orderId = $this->paidOrder($catalog);
 
             // Open a real fulfillment attempt without sending to the provider.
@@ -237,7 +238,7 @@ class FulfillmentTest extends TestCase
                 'status' => 'PENDING',
                 'request_payload' => json_encode([
                     'ref_id' => $ref,
-                    'buyer_sku_code' => 'DF-PRIMARY',
+                    'buyer_sku_code' => $sku,
                     'customer_no' => '1234567890',
                     'max_price' => 12000,
                 ], JSON_THROW_ON_ERROR),
@@ -245,7 +246,7 @@ class FulfillmentTest extends TestCase
 
             $service->applyProviderResult((int) $attempt->id, [
                 'ref_id' => $ref,
-                'buyer_sku_code' => 'DF-PRIMARY',
+                'buyer_sku_code' => $sku,
                 'customer_no' => '1234567890',
                 'status' => $responseState['status'],
                 'rc' => $responseState['rc'],
@@ -582,7 +583,7 @@ class FulfillmentTest extends TestCase
         $this->markTestSkipped('Per PRD §47, automatic failover to another SKU is disabled.');
     }
 
-    public function test_unusable_primary_source_is_skipped_before_any_provider_send(): void
+    public function test_unusable_selected_source_blocks_without_switching_to_another_sku(): void
     {
         Queue::fake();
         $this->credentials();
@@ -607,10 +608,11 @@ class FulfillmentTest extends TestCase
 
         $attempts = DB::table('fulfillment_attempts')->where('order_id', $orderId)
             ->orderBy('attempt_no')->get();
-        $this->assertCount(2, $attempts);
+        // A historic second mapping must never be chosen automatically.
+        $this->assertCount(1, $attempts);
         $this->assertSame('BLOCKED', $attempts[0]->status);
-        $this->assertSame($secondId, (int) $attempts[1]->provider_mapping_id);
-        $this->assertSame('CREATED', $attempts[1]->status);
+        $this->assertSame((int) $catalog['mapping_id'], (int) $attempts[0]->provider_mapping_id);
+        $this->assertNotSame($secondId, (int) $attempts[0]->provider_mapping_id);
         Http::assertNothingSent();
     }
 

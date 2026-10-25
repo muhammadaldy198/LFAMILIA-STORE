@@ -33,6 +33,12 @@ class DigiflazzAutoSources
 
     public function importGroup(Product $product, Collection $items, ?string $template, bool $publish, string $margin, bool $automatic, Request $request, ?string $costUplift = null): ProductPackage
     {
+        // Enforce one SKU per nominal for all import callers, not only UI.
+        if ($items->count() !== 1) {
+            throw ValidationException::withMessages([
+                'item_ids' => 'Satu nominal hanya boleh memiliki satu SKU Digiflazz terpilih.',
+            ]);
+        }
         $provider = Provider::where('code', 'DIGIFLAZZ')->firstOrFail();
         $existing = ProviderMapping::where('provider_id', $provider->id)
             ->whereIn('external_sku', $items->pluck('buyer_sku_code'))->lockForUpdate()->get();
@@ -94,7 +100,7 @@ class DigiflazzAutoSources
             }
             $mapping->update([
                 // Do not silently reactivate an existing disabled SKU when
-                // the owner enables or refreshes auto-managed backups.
+                // the historical automatic import grouping is refreshed.
                 'is_active' => $automatic && $existingBySku->has($item->buyer_sku_code)
                     ? (bool) $existingBySku->get($item->buyer_sku_code)->is_active
                     : ($publish ?: $mapping->is_active),

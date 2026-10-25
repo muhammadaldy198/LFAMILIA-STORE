@@ -13,7 +13,7 @@ class OneTimeGameNominalImportTest extends TestCase
 {
     use DatabaseTransactions;
 
-    public function test_imports_two_suppliers_as_one_manual_game_nominal_and_never_touches_non_games(): void
+    public function test_imports_one_selected_sku_per_nominal_and_never_touches_non_games(): void
     {
         $now = now();
         $gameId = DB::table('categories')->where('slug', 'game')->value('id');
@@ -60,7 +60,7 @@ class OneTimeGameNominalImportTest extends TestCase
                 'price_idr' => $price, 'baseline_price_idr' => $price,
                 'buyer_active' => true, 'seller_active' => true,
                 'unlimited_stock' => true, 'stock' => 0, 'multi' => false,
-                // One backup source currently in cutoff must still be attached.
+                // The second seller SKU is not imported as a backup.
                 'start_cut_off' => $sku === 'ONCE_TEST_FF5_B' ? '23:45' : '00:00',
                 'end_cut_off' => '00:00',
                 'synced_at' => $now, 'created_at' => $now, 'updated_at' => $now,
@@ -72,16 +72,16 @@ class OneTimeGameNominalImportTest extends TestCase
         $first = app(OneTimeGameNominalImport::class)->run();
         $this->assertSame(1, $first['games_activated']);
         $this->assertSame(1, $first['packages_created']);
-        $this->assertSame(2, $first['mappings_created']);
+        $this->assertSame(1, $first['mappings_created']);
 
         $package = $game->packages()->firstOrFail();
         $this->assertTrue($game->fresh()->is_active);
         $this->assertTrue($package->is_active);
         $this->assertSame(5, (int) $package->nominal_value);
         $mappings = $package->mappings()->orderBy('priority')->get();
-        $this->assertCount(2, $mappings);
-        $this->assertSame(['ONCE_TEST_FF5_A', 'ONCE_TEST_FF5_B'], $mappings->pluck('external_sku')->all());
-        $this->assertSame([0, 1], $mappings->pluck('priority')->all());
+        $this->assertCount(1, $mappings);
+        $this->assertSame(['ONCE_TEST_FF5_A'], $mappings->pluck('external_sku')->all());
+        $this->assertSame([0], $mappings->pluck('priority')->all());
         foreach ($mappings as $mapping) {
             $this->assertTrue($mapping->is_active);
             $this->assertSame('{{destination}}', $mapping->fulfillment_config['customer_no_template']);
