@@ -59,6 +59,18 @@ const routeFeeText = row => {
 };
 
 const activeRoutesFor = channel => routes.filter(route => route.payment_channel_id === channel.id && route.is_active);
+const gatewayRoutesFor = channel => routes.filter(route => route.payment_channel_id === channel.id && route.selectable);
+const selectedGatewayId = (channel, purpose) => {
+    const supportKey = purpose === 'order' ? 'supports_order' : 'supports_wallet_topup';
+    const assigned = gatewayRoutesFor(channel).filter(route => route.is_active && route[supportKey]);
+    return assigned.length === 1 ? String(assigned[0].id) : '';
+};
+const chooseGateway = (channel, purpose, routeId) => {
+    if (!routeId) return;
+    router.post('/admin/payments/channels/' + channel.id + '/select-gateway', {
+        route_id: Number(routeId), purpose,
+    }, { preserveScroll: true, onError: () => router.reload({ only: ['channels', 'routes'] }) });
+};
 const chargedFeeText = channel => {
     const active = activeRoutesFor(channel);
     if (!active.length) return 'Belum ada gateway aktif';
@@ -310,7 +322,7 @@ const successRate = computed(() => {
                 <div class="adm-card-head">
                     <div>
                         <h2>Metode Pembayaran</h2>
-                        <p>Urutan tabel = urutan pilihan pelanggan. Buka "Ubah" untuk mengganti nama, biaya yang ditagih, dan gateway.</p>
+                        <p>Admin dapat memilih gateway per metode untuk pesanan atau top up. Tidak ada gateway utama/cadangan atau perpindahan otomatis.</p>
                     </div>
                     <div v-if="isSuperAdmin" style="display:flex;gap:6px;flex-wrap:wrap">
                         <button type="button" class="adm-btn" @click="syncChannels">Pulihkan metode bawaan</button>
@@ -320,7 +332,7 @@ const successRate = computed(() => {
                 <div class="adm-scroll">
                     <table class="adm-table">
                         <thead>
-                            <tr><th>Metode</th><th>Jenis</th><th>Biaya ditagih</th><th>Kesiapan</th><th>Status</th><th>Tindakan</th></tr>
+                            <tr><th>Metode</th><th>Jenis</th><th>Gateway terpilih</th><th>Biaya ditagih</th><th>Kesiapan</th><th>Status</th><th>Tindakan</th></tr>
                         </thead>
                         <tbody>
                             <tr v-for="channel in channels" :key="channel.id">
@@ -338,6 +350,25 @@ const successRate = computed(() => {
                                     </div>
                                 </td>
                                 <td>{{ methodLabel(channel.method) }}</td>
+                                <td>
+                                    <div v-if="gatewayRoutesFor(channel).length > 1" style="display:grid;gap:6px;min-width:160px">
+                                        <label v-if="channel.supports_order" class="adm-field">
+                                            <span>Pesanan</span>
+                                            <select class="adm-input" :value="selectedGatewayId(channel, 'order')" @change="chooseGateway(channel, 'order', $event.target.value)">
+                                                <option value="" disabled>Belum dipilih</option>
+                                                <option v-for="route in gatewayRoutesFor(channel)" :key="'order-'+route.id" :value="route.id">{{ route.gateway_name }}</option>
+                                            </select>
+                                        </label>
+                                        <label v-if="channel.supports_wallet_topup" class="adm-field">
+                                            <span>Top up saldo</span>
+                                            <select class="adm-input" :value="selectedGatewayId(channel, 'topup')" @change="chooseGateway(channel, 'topup', $event.target.value)">
+                                                <option value="" disabled>Belum dipilih</option>
+                                                <option v-for="route in gatewayRoutesFor(channel)" :key="'topup-'+route.id" :value="route.id">{{ route.gateway_name }}</option>
+                                            </select>
+                                        </label>
+                                    </div>
+                                    <span v-else class="adm-note">{{ gatewayRoutesFor(channel)[0]?.gateway_name || 'Internal' }}</span>
+                                </td>
                                 <td>
                                     <strong>{{ chargedFeeText(channel) }}</strong>
                                     <div class="adm-note">Dasar: {{ (Number(channel.fee_percent_bps || 0) / 100).toLocaleString('id-ID', { maximumFractionDigits: 2 }) }}% + {{ rupiah(channel.fee_flat_idr) }}</div>
