@@ -31,13 +31,17 @@ class BankVirtualAccountProvisioningTest extends TestCase
                 && $route['gateway'] === 'DOKU');
 
             $this->assertSame([$bank['midtrans']], $midtrans['configuration']['enabled_payments']);
-            if ($bank['doku'] === null) {
-                $this->assertNull($doku, 'DOKU BSI route must not be guessed.');
+            if (empty($bank['doku_direct_path'])) {
+                $this->assertNull($doku, 'DOKU Direct route must have a verified channel protocol.');
 
                 continue;
             }
-            $this->assertSame([$bank['doku']], $doku['configuration']['payment_method_types']);
-            $this->assertSame('/checkout/v1/payment', $doku['configuration']['api_path']);
+            $this->assertSame($bank['doku'], $doku['provider_channel']);
+            $this->assertSame($bank['doku_direct_path'], $doku['configuration']['api_path']);
+            $this->assertSame(
+                ['va_number' => 'virtual_account_info.virtual_account_number'],
+                $doku['configuration']['public_paths']
+            );
         }
     }
 
@@ -58,9 +62,9 @@ class BankVirtualAccountProvisioningTest extends TestCase
         $first = $catalog->sync();
 
         $this->assertSame(7, $first['created_channels']);
-        $this->assertSame(13, $first['created']);
+        $this->assertSame(12, $first['created']);
         $this->assertSame(7, DB::table('payment_channels')->whereIn('code', $codes)->count());
-        $this->assertSame(13, DB::table('payment_routes')->whereIn(
+        $this->assertSame(12, DB::table('payment_routes')->whereIn(
             'payment_channel_id', DB::table('payment_channels')->whereIn('code', $codes)->pluck('id')
         )->count());
 
@@ -150,7 +154,7 @@ class BankVirtualAccountProvisioningTest extends TestCase
             && $request['enabled_payments'] === ['bca_va']);
     }
 
-    public function test_doku_checkout_receives_only_selected_bank(): void
+    public function test_doku_direct_api_receives_only_selected_bank(): void
     {
         $gateway = new DokuDirectGateway(
             Mockery::mock(DokuSignature::class),
@@ -160,8 +164,7 @@ class BankVirtualAccountProvisioningTest extends TestCase
 
         $payload = $method->invoke($gateway, [
             'route_configuration' => [
-                'api_path' => '/checkout/v1/payment',
-                'payment_method_types' => ['VIRTUAL_ACCOUNT_BCA'],
+                'api_path' => '/bca-virtual-account/v2/payment-code',
             ],
             'merchant_reference' => 'PAY-123',
             'amount_idr' => 10000,
@@ -172,7 +175,9 @@ class BankVirtualAccountProvisioningTest extends TestCase
             'customer_phone' => '08123456789',
         ]);
 
-        $this->assertSame(['VIRTUAL_ACCOUNT_BCA'], $payload['payment']['payment_method_types']);
+        $this->assertSame(false, $payload['virtual_account_info']['reusable_status']);
+        $this->assertSame(60, $payload['virtual_account_info']['expired_time']);
+        $this->assertArrayNotHasKey('payment', $payload);
         $this->assertSame(10000, $payload['order']['amount']);
     }
 }
