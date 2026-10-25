@@ -179,9 +179,15 @@ class DigiflazzAutoSources
 
     public function orderProduct(Product $product): void
     {
-        foreach (app(CatalogNominalOrder::class)->sort($product->packages()->get()) as $order => $package) {
-            $package->update(['sort_order' => $order]);
-        }
+        DB::transaction(function () use ($product): void {
+            // Sync acquires package locks ascending by ID. Lock the entire
+            // product's set in the same order BEFORE sorting by nominal,
+            // which may otherwise update rows in the reverse order.
+            $packages = $product->packages()->orderBy('id')->lockForUpdate()->get();
+            foreach (app(CatalogNominalOrder::class)->sort($packages) as $order => $package) {
+                $package->update(['sort_order' => $order]);
+            }
+        }, 3);
     }
 
     public function enableProduct(Product $product, Request $request): int
