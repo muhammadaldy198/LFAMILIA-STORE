@@ -149,7 +149,7 @@ class AdminPaymentController
                 // DOKU channels without a verified Non-SNAP Direct adapter are not selectable.
                 'selectable' => $route->gateway_code !== 'DOKU'
                     || in_array($route->channel_code, [
-                        'virtual_account', 'va_bca', 'va_bni', 'va_mandiri', 'va_permata', 'va_cimb',
+                        'virtual_account', 'va_bni', 'va_permata',
                     ], true),
             ]);
 
@@ -458,7 +458,7 @@ class AdminPaymentController
             if ($selected->gateway_code === 'DOKU') {
                 $configuration = json_decode((string) $selected->configuration, true);
                 $path = is_array($configuration) ? (string) ($configuration['api_path'] ?? '') : '';
-                if (! preg_match('~^/(?:doku|bca|bni|mandiri|permata|cimb)-virtual-account/v2/payment-code$~', $path)) {
+                if (! preg_match('~^/(?:doku|bni|permata)-virtual-account/v2/payment-code$~', $path)) {
                     throw ValidationException::withMessages([
                         'route_id' => 'Kanal DOKU ini belum memiliki adapter Direct API yang didukung.',
                     ]);
