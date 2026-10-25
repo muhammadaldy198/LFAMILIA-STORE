@@ -70,7 +70,7 @@ class PaymentService
             throw ValidationException::withMessages(['payment' => 'Pesanan sudah kedaluwarsa.']);
         }
 
-        $route = $this->routing->byRouteId((int) $order->payment_route_id);
+        $route = $this->routing->byRouteId((int) $order->payment_route_id, 'order', false, true);
 
         $payment = DB::transaction(function () use ($order, $route, $idempotencyKey, $fingerprint): object {
             DB::table('orders')->where('id', $order->id)->lockForUpdate()->firstOrFail();
@@ -198,7 +198,7 @@ class PaymentService
                 return ['payment' => $existingTopupPayment, 'topup' => $lockedTopup, 'route' => null];
             }
 
-            $route = $this->routing->byRouteId((int) $lockedTopup->payment_route_id, 'topup', true);
+            $route = $this->routing->byRouteId((int) $lockedTopup->payment_route_id, 'topup', true, true);
             if (in_array($route['gateway_code'], ['WALLET', 'MANUAL_QRIS'], true)) {
                 throw ValidationException::withMessages(['payment' => 'Metode ini tidak dapat dipakai untuk top up saldo.']);
             }

@@ -170,24 +170,31 @@ class PaymentRoutingService
     /**
      * @return array<string, mixed>
      */
-    public function byRouteId(int $routeId, string $purpose = 'order', bool $lock = false): array
+    public function byRouteId(int $routeId, string $purpose = 'order', bool $lock = false, bool $pinnedInvoice = false): array
     {
         $unavailableGateways = $this->unavailableExternalGatewayCodes();
         $query = DB::table('payment_routes as routes')
             ->join('payment_channels as channels', 'channels.id', '=', 'routes.payment_channel_id')
             ->join('payment_gateways as gateways', 'gateways.id', '=', 'routes.payment_gateway_id')
             ->where('routes.id', $routeId)
-            ->where('routes.is_active', true)
+            // Existing invoices keep their original provider even if admin later
+            // selects a different route for NEW payments. Gateway health and
+            // channel availability are still enforced below.
+            ->when(! $pinnedInvoice, fn ($query) => $query->where('routes.is_active', true))
             ->where('channels.is_active', true)
             ->where('gateways.is_active', true)
             ->where('gateways.is_maintenance', false)
             ->when($unavailableGateways !== [], fn ($query) => $query->whereNotIn('gateways.code', $unavailableGateways))
-            ->when($purpose === 'order', function ($query): void {
-                $query->where('channels.supports_order', true)
-                    ->where('routes.supports_order', true);
-            }, function ($query): void {
-                $query->where('channels.supports_wallet_topup', true)
-                    ->where('routes.supports_wallet_topup', true);
+            ->when($purpose === 'order', function ($query) use ($pinnedInvoice): void {
+                $query->where('channels.supports_order', true);
+                if (! $pinnedInvoice) {
+                    $query->where('routes.supports_order', true);
+                }
+            }, function ($query) use ($pinnedInvoice): void {
+                $query->where('channels.supports_wallet_topup', true);
+                if (! $pinnedInvoice) {
+                    $query->where('routes.supports_wallet_topup', true);
+                }
             })
             ->select(
                 'routes.id as route_id',

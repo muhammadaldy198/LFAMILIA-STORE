@@ -321,6 +321,16 @@ class AdminPaymentRestorationTest extends TestCase
         $this->assertSame('DOKU', $routing->resolve('virtual_account', false, 'order')['gateway_code']);
         $this->assertSame('MIDTRANS', $routing->resolve('virtual_account', false, 'topup')['gateway_code']);
 
+        // A previously created order still belongs to Midtrans. Disabling
+        // that route for NEW orders must not rewrite its existing invoice.
+        $this->assertSame('MIDTRANS', $routing->byRouteId((int) $routes['MIDTRANS'], 'order', false, true)['gateway_code']);
+        try {
+            $routing->byRouteId((int) $routes['MIDTRANS'], 'order');
+            $this->fail('Inactive route must not be selectable for a new order.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('payment', $exception->errors());
+        }
+
         DB::table('payment_gateways')->where('code', 'DOKU')->update(['is_maintenance' => true]);
 
         try {

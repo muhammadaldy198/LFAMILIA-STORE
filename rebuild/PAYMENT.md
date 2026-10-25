@@ -10,6 +10,8 @@ Customer memilih **payment channel** publik. Route internal untuk channel itu di
 
 Implementasi mempunyai gateway registry untuk Midtrans, DOKU, Manual QRIS, dan LFAMILIA Wallet. Dukungan kode tidak berarti gateway eksternal sudah live-configured.
 
+**Invoice yang sudah dibuat tetap memakai gateway semula.** Perubahan pemilihan gateway hanya berlaku untuk pesanan/top up baru. Invoice belum kedaluwarsa dengan rute yang dulu dipilih masih boleh memulai pembayaran lewat provider aslinya selama kanal dan gateway masih aktif serta tidak maintenance. Tidak ada pengalihan provider untuk invoice lama.
+
 `PaymentRoutingService` hanya memilih route yang:
 
 - channel aktif;
