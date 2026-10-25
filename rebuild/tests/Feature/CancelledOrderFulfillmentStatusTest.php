@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AdminUser;
 use App\Services\AdminManualOrderService;
+use App\Services\FulfillmentService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
@@ -101,6 +102,50 @@ class CancelledOrderFulfillmentStatusTest extends TestCase
         $this->get('/admin/fulfillment?scope=action&q='.urlencode($number))->assertOk()->assertInertia(
             fn (Assert $page) => $page->has('attempts.data', 0)
         );
+    }
+
+    public function test_late_provider_results_cannot_reopen_a_cancelled_order(): void
+    {
+        $admin = $this->login();
+        Queue::fake();
+
+        foreach (['gagal', 'sukses', 'pending'] as $status) {
+            $orderId = $this->order($admin, 'CANCEL-LATE-'.strtoupper($status));
+            $attempt = DB::table('fulfillment_attempts')->where('order_id', $orderId)->first();
+            $request = [
+                'ref_id' => (string) $attempt->external_reference,
+                'buyer_sku_code' => 'CANCEL-TEST-SKU',
+                'customer_no' => 'CANCEL-TEST-DESTINATION',
+            ];
+            DB::table('fulfillment_attempts')->where('id', $attempt->id)->update([
+                'status' => 'FAILED_CONFIRMED',
+                'request_payload' => json_encode($request, JSON_THROW_ON_ERROR),
+            ]);
+            DB::table('orders')->where('id', $orderId)->update(['status' => 'BLOCKED']);
+
+            $this->withSession(['admin.password_confirmed_at' => time()])
+                ->post('/admin/orders/'.$orderId.'/cancel', ['confirmed' => true, 'reason_code' => 'stok_habis'])
+                ->assertRedirect()->assertSessionHasNoErrors();
+
+            app(FulfillmentService::class)->applyProviderResult((int) $attempt->id, [
+                ...$request,
+                'status' => $status,
+                'sn' => 'LATE-SERIAL',
+            ], 'webhook');
+
+            $this->assertSame('CANCELLED', DB::table('orders')->where('id', $orderId)->value('status'));
+            $this->assertDatabaseHas('fulfillment_attempts', [
+                'id' => $attempt->id,
+                'status' => 'CANCELLED',
+                'serial_number' => null,
+            ]);
+            $this->assertSame(
+                0,
+                DB::table('order_events')->where('order_id', $orderId)
+                    ->whereIn('event_type', ['FULFILLMENT_SUCCEEDED', 'FULFILLMENT_FAILED_CONFIRMED', 'FULFILLMENT_PENDING'])
+                    ->count()
+            );
+        }
     }
 
     public function test_order_with_a_successful_attempt_cannot_be_cancelled(): void

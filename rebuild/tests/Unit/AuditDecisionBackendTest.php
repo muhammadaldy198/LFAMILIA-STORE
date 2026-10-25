@@ -23,6 +23,14 @@ class AuditDecisionBackendTest extends TestCase
         $this->assertSame(0, ServiceHours::elapsedMinutes('2026-10-25 18:00:00+07:00', '2026-10-25 19:30:00+07:00', '08:00', '17:00', 'Asia/Jakarta'));
     }
 
+    public function test_overnight_service_hours_include_previous_days_open_window(): void
+    {
+        $this->assertSame(90, ServiceHours::elapsedMinutes('2026-10-26 01:00:00+07:00', '2026-10-26 02:30:00+07:00', '22:00', '06:00', 'Asia/Jakarta'));
+        $this->assertSame(30, ServiceHours::elapsedMinutes('2026-10-26 05:30:00+07:00', '2026-10-26 07:30:00+07:00', '22:00', '06:00', 'Asia/Jakarta'));
+        $this->assertSame(480, ServiceHours::elapsedMinutes('2026-10-25 20:00:00+07:00', '2026-10-26 10:00:00+07:00', '22:00', '06:00', 'Asia/Jakarta'));
+        $this->assertSame(0, ServiceHours::elapsedMinutes('2026-10-26 07:00:00+07:00', '2026-10-26 08:00:00+07:00', '22:00', '06:00', 'Asia/Jakarta'));
+    }
+
     public function test_guest_data_purge_cleans_old_guests_but_keeps_recent_and_member_orders(): void
     {
         $category = Category::where('slug', 'game')->firstOrFail();

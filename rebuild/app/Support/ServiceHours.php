@@ -38,6 +38,10 @@ class ServiceHours
 
         $minutes = 0;
         $cursor = $start->copy()->startOfDay();
+        // An overnight window that started yesterday may still be open after midnight.
+        if (strcmp((string) $close, (string) $open) <= 0) {
+            $cursor->subDay();
+        }
         $guard = 0;
         while ($cursor->lessThanOrEqualTo($end) && $guard++ < 366) {
             [$windowStart, $windowEnd] = self::window($cursor, (string) $open, (string) $close);

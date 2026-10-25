@@ -236,9 +236,12 @@ class AdminDigiflazzRestorationTest extends TestCase
             'is_manual_price' => false,
         ])->assertRedirect()->assertSessionHasNoErrors();
         app(DigiflazzCatalogService::class)->sync('manual-lock-sku');
+        // Unlocking clears the old ceiling. Supplier sync refreshes the seller
+        // price and seeds store cost once, without introducing a new price type.
         $this->assertDatabaseHas('provider_mappings', [
             'id' => $mapping->id, 'is_manual_price' => false,
-            'cost_idr' => 10500, 'max_price_idr' => 10500,
+            'cost_idr' => 10500, 'seller_reference_price_idr' => 10500,
+            'store_cost_idr' => 10710, 'max_price_idr' => null,
         ]);
     }
 
