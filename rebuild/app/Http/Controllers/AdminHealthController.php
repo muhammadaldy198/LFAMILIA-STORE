@@ -308,7 +308,7 @@ class AdminHealthController
             $count = DB::table('fulfillment_attempts as attempts')
                 ->joinSub($latestIds, 'latest_attempts', fn ($join) => $join->on('latest_attempts.id', '=', 'attempts.id'))
                 ->whereIn('attempts.status', ['PENDING', 'UNKNOWN', 'SENDING'])
-                ->where('attempts.created_at', '<=', $checkedAt->copy()->subMinutes(15))
+                ->where('attempts.created_at', '<=', $checkedAt->copy()->subMinutes(app(\App\Services\OperationalSettings::class)->value('stale_fulfillment_minutes')))
                 ->count();
         } catch (Throwable) {
             return [

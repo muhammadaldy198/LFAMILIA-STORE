@@ -7,6 +7,7 @@ use App\Services\AdminPermissionService;
 use App\Services\IntegrationRegistry;
 use App\Services\IntegrationRuntimeConfig;
 use App\Support\AuditLabels;
+use App\Services\OperationalSettings;
 use App\Support\ServiceHours;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -57,6 +58,7 @@ class AdminDashboardController
             // into dashboard memory; use one reference time for all batches.
             $overdue = 0;
             $checkedAt = now();
+            $manualOverdueMinutes = app(OperationalSettings::class)->value('manual_overdue_minutes');
             DB::table('fulfillment_attempts as attempts')
                 ->join('orders', 'orders.id', '=', 'attempts.order_id')
                 ->join('products', 'products.id', '=', 'orders.product_id')
@@ -68,11 +70,11 @@ class AdminDashboardController
                     'products.manual_timezone',
                 ])
                 ->lazyById(250, 'attempts.id', 'id')
-                ->each(function (object $row) use (&$overdue, $checkedAt): void {
+                ->each(function (object $row) use (&$overdue, $checkedAt, $manualOverdueMinutes): void {
                     if (ServiceHours::elapsedMinutes(
                         $row->created_at, $checkedAt,
                         $row->manual_open_time, $row->manual_close_time, $row->manual_timezone
-                    ) > 60) {
+                    ) > $manualOverdueMinutes) {
                         $overdue++;
                     }
                 });

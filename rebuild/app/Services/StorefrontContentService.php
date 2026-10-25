@@ -20,6 +20,8 @@ class StorefrontContentService
 
         return [
             'storeName' => $settings['store.name'] ?? 'LFAMILIA STORE',
+            'seoTitle' => $settings['store.seo_title'] ?? '',
+            'seoDescription' => $settings['store.seo_description'] ?? '',
             'tagline' => $settings['store.tagline'] ?? 'Top up favoritmu, sat set tanpa ribet.',
             'supportWhatsapp' => $settings['store.support_whatsapp'] ?? '',
             'instagramUrl' => $settings['store.instagram_url'] ?? '',

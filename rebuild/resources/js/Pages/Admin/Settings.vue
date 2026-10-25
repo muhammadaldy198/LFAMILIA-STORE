@@ -12,6 +12,8 @@ const props = defineProps({
 const form = reactive({
     store_name: props.settings['store.name'] || '',
     tagline: props.settings['store.tagline'] || '',
+    seo_title: props.settings['store.seo_title'] || '',
+    seo_description: props.settings['store.seo_description'] || '',
     support_whatsapp: props.settings['store.support_whatsapp'] || '',
     email: props.settings['store.email'] || '',
     business_hours: props.settings['store.business_hours'] || '',
@@ -27,6 +29,8 @@ watch(() => props.settings, value => {
     Object.assign(form, {
         store_name: value['store.name'] || '',
         tagline: value['store.tagline'] || '',
+        seo_title: value['store.seo_title'] || '',
+        seo_description: value['store.seo_description'] || '',
         support_whatsapp: value['store.support_whatsapp'] || '',
         email: value['store.email'] || '',
         business_hours: value['store.business_hours'] || '',
@@ -79,6 +83,16 @@ const save = () => {
                         <span>Tagline</span>
                         <input v-model="form.tagline" class="adm-input" minlength="3" maxlength="160" required>
                         <span class="hint">3–160 karakter.</span>
+                    </label>
+                </div>
+
+                <strong style="display:block;margin-top:14px">SEO Website</strong>
+                <div class="adm-grid" style="margin-top:6px">
+                    <label class="adm-field"><span>Judul SEO bawaan</span>
+                        <input v-model="form.seo_title" class="adm-input" maxlength="100" placeholder="Nama toko" />
+                    </label>
+                    <label class="adm-field"><span>Deskripsi SEO bawaan</span>
+                        <textarea v-model="form.seo_description" class="adm-textarea" maxlength="160" rows="2" placeholder="Deskripsi toko untuk mesin pencari" />
                     </label>
                 </div>
 

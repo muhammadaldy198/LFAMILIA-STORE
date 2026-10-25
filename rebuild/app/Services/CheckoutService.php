@@ -212,7 +212,7 @@ class CheckoutService
                     ]);
                 }
 
-                $reservationMinutes = max(5, min(120, (int) config('lfamilia.checkout_reservation_minutes', 30)));
+                $reservationMinutes = app(OperationalSettings::class)->value('checkout_reservation_minutes');
                 $expiresAt = now()->addMinutes($reservationMinutes);
                 $correlationId = preg_match('/^[A-Za-z0-9._:-]{8,100}$/', (string) ($data['_correlation_id'] ?? ''))
                     ? (string) $data['_correlation_id']

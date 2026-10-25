@@ -13,16 +13,19 @@
         );
         $seoProduct = request()->routeIs('catalog.show') ? ($page['props']['product'] ?? []) : [];
         $seoArticle = request()->routeIs('content.article') ? ($page['props']['article'] ?? []) : [];
-        $seoName = $seoProduct['name'] ?? $seoArticle['title'] ?? 'LFAMILIA STORE';
+        $seoStoreName = $page['props']['storefront']['storeName'] ?? 'LFAMILIA STORE';
+        $seoHomeTitle = $page['props']['storefront']['seoTitle'] ?? '';
+        $seoHomeDescription = $page['props']['storefront']['seoDescription'] ?? '';
+        $seoName = $seoProduct['name'] ?? $seoArticle['title'] ?? ($seoHomeTitle ?: $seoStoreName);
         $seoDescription = $seoProduct['description'] ?? $seoArticle['summary']
-            ?? 'LFAMILIA STORE menyediakan top up game, voucher digital, pulsa, paket data, dan layanan digital dengan pilihan pembayaran praktis.';
+            ?? ($seoHomeDescription ?: ($seoStoreName.' menyediakan top up game, voucher digital, pulsa, paket data, dan layanan digital.'));
         $seoDescription = mb_substr(trim(strip_tags((string) $seoDescription)), 0, 160);
         $seoCanonical = request()->routeIs('catalog.index') ? route('catalog.index') : url()->current();
         $seoImage = $seoProduct['image_url'] ?? $seoArticle['cover_url'] ?? null;
         $seoStructuredData = [
             '@context' => 'https://schema.org',
             '@type' => 'WebSite',
-            'name' => 'LFAMILIA STORE',
+            'name' => $seoStoreName,
             'url' => route('catalog.index'),
             'inLanguage' => 'id-ID',
             'potentialAction' => [
@@ -39,7 +42,7 @@
         <meta name="robots" content="index,follow">
         <meta name="description" content="{{ $seoDescription }}">
         <link rel="canonical" href="{{ $seoCanonical }}">
-        <meta property="og:site_name" content="LFAMILIA STORE">
+        <meta property="og:site_name" content="{{ $seoStoreName }}">
         <meta property="og:locale" content="id_ID">
         <meta property="og:type" content="{{ $seoArticle ? 'article' : 'website' }}">
         <meta property="og:title" content="{{ $seoName }}">

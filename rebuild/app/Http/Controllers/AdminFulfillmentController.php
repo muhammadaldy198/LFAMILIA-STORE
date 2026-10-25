@@ -172,7 +172,8 @@ class AdminFulfillmentController
                 'manual_instructions' => $attempt->manual_instructions,
                 'delivery' => $delivery,
                 'manual_age_minutes' => $manualAge,
-                'is_overdue' => $attempt->status === 'MANUAL_PENDING' && $manualAge > 60,
+                'is_overdue' => $attempt->status === 'MANUAL_PENDING'
+                    && $manualAge > app(\App\Services\OperationalSettings::class)->value('manual_overdue_minutes'),
                 'can_complete' => ! $terminal && $attempt->status === 'MANUAL_PENDING'
                     && in_array($attempt->order_status, ['PAID', 'PROCESSING'], true),
                 'can_fail' => ! $terminal && $attempt->status === 'MANUAL_PENDING',
