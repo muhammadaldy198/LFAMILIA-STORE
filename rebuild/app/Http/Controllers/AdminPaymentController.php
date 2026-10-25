@@ -404,6 +404,83 @@ class AdminPaymentController
         return back()->with('status', 'Pengaturan gateway disimpan.');
     }
 
+    /**
+     * Operator-owned gateway assignment. This is a deliberate selection,
+     * never an automatic backup or provider failover.
+     */
+    public function selectGateway(Request $request, int $channelId, PaymentRoutingService $routing): RedirectResponse
+    {
+        $data = $request->validate([
+            'route_id' => ['required', 'integer', 'min:1'],
+            'purpose' => ['required', 'in:order,topup'],
+        ]);
+
+        $field = $data['purpose'] === 'order' ? 'supports_order' : 'supports_wallet_topup';
+        $otherField = $data['purpose'] === 'order' ? 'supports_wallet_topup' : 'supports_order';
+
+        $selectedGateway = DB::transaction(function () use ($channelId, $data, $field, $otherField, $routing): string {
+            $channel = DB::table('payment_channels')->where('id', $channelId)->lockForUpdate()->first();
+            abort_unless($channel, 404);
+            if (! $channel->is_active || ! $channel->{$field}) {
+                throw ValidationException::withMessages(['route_id' => 'Metode atau tujuan pembayaran belum aktif.']);
+            }
+
+            $routes = DB::table('payment_routes as routes')
+                ->join('payment_gateways as gateways', 'gateways.id', '=', 'routes.payment_gateway_id')
+                ->where('routes.payment_channel_id', $channelId)
+                ->whereIn('gateways.code', ['MIDTRANS', 'DOKU'])
+                ->orderBy('routes.id')
+                ->lockForUpdate()
+                ->get([
+                    'routes.id',
+                    'routes.is_active',
+                    'routes.supports_order',
+                    'routes.supports_wallet_topup',
+                    'routes.configuration',
+                    'gateways.code as gateway_code',
+                    'gateways.is_active as gateway_active',
+                    'gateways.is_maintenance as gateway_maintenance',
+                ]);
+
+            $selected = $routes->first(fn (object $route): bool => (int) $route->id === (int) $data['route_id']);
+            if (! $selected || ! $selected->gateway_active || $selected->gateway_maintenance
+                || ! $routing->gatewayReady((string) $selected->gateway_code)) {
+                throw ValidationException::withMessages([
+                    'route_id' => 'Gateway belum siap. Lengkapi integrasi dan aktifkan gateway terlebih dahulu.',
+                ]);
+            }
+
+            if ($selected->gateway_code === 'DOKU') {
+                $configuration = json_decode((string) $selected->configuration, true);
+                $path = is_array($configuration) ? (string) ($configuration['api_path'] ?? '') : '';
+                if (! preg_match('~^/(?:doku|bca|bni|mandiri|permata|cimb)-virtual-account/v2/payment-code$~', $path)) {
+                    throw ValidationException::withMessages([
+                        'route_id' => 'Kanal DOKU ini belum memiliki adapter Direct API yang didukung.',
+                    ]);
+                }
+            }
+
+            foreach ($routes as $route) {
+                $chosen = (int) $route->id === (int) $selected->id;
+                DB::table('payment_routes')->where('id', $route->id)->update([
+                    $field => $chosen,
+                    'is_active' => $chosen || ((bool) $route->is_active && (bool) $route->{$otherField}),
+                    'updated_at' => now(),
+                ]);
+            }
+
+            return (string) $selected->gateway_code;
+        });
+
+        $this->audit($request, 'payment.gateway.selected', 'payment_channel', $channelId, null, [
+            'purpose' => $data['purpose'],
+            'route_id' => (int) $data['route_id'],
+            'gateway_code' => $selectedGateway,
+        ]);
+
+        return back()->with('status', 'Gateway pembayaran untuk metode ini berhasil dipilih.');
+    }
+
     public function updateRoute(Request $request, int $id): RedirectResponse
     {
         $before = DB::table('payment_routes')->where('id', $id)->first();
