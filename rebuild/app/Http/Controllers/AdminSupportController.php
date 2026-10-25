@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -183,13 +184,17 @@ class AdminSupportController
         ]);
         $reply = trim((string) ($data['reply'] ?? ''));
         $adminId = (int) $request->user('admin')->id;
+        $activeKinds = array_column($choices->active('support'), 'code');
 
-        [$before, $after] = DB::transaction(function () use ($id, $data, $reply, $adminId): array {
+        [$before, $after] = DB::transaction(function () use ($id, $data, $reply, $adminId, $activeKinds): array {
             $ticket = DB::table('support_tickets')->where('id', $id)->lockForUpdate()->first();
             abort_unless($ticket, 404);
 
             $before = (array) $ticket;
             $kind = (string) ($data['kind'] ?? $ticket->kind ?? 'GENERAL');
+            if ($kind !== $ticket->kind && ! in_array($kind, $activeKinds, true)) {
+                throw ValidationException::withMessages(['kind' => 'Kategori tiket ini sudah nonaktif. Pilih kategori aktif.']);
+            }
             DB::table('support_tickets')->where('id', $id)->update([
                 'status' => $data['status'],
                 'kind' => $kind,
