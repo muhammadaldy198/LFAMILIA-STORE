@@ -269,6 +269,111 @@ class AdminPaymentRestorationTest extends TestCase
         $this->assertArrayNotHasKey('gateway_code', $publicTopup);
     }
 
+    public function test_admin_can_assign_gateway_per_purpose_without_failover(): void
+    {
+        $this->login('ADMIN');
+
+        DB::table('payment_channels')->where('code', 'virtual_account')->update([
+            'is_active' => true,
+            'supports_order' => true,
+            'supports_wallet_topup' => true,
+        ]);
+        DB::table('payment_gateways')->whereIn('code', ['MIDTRANS', 'DOKU'])->update([
+            'is_active' => true,
+            'is_maintenance' => false,
+        ]);
+        IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
+            'config_ciphertext' => ['server_key' => 'test-server-key', 'is_production' => false],
+            'is_active' => true,
+        ]);
+        IntegrationCredential::updateOrCreate(['code' => 'doku'], [
+            'config_ciphertext' => ['client_id' => 'test-client-id', 'secret_key' => 'test-doku-secret'],
+            'is_active' => true,
+        ]);
+
+        $channelId = DB::table('payment_channels')->where('code', 'virtual_account')->value('id');
+        $routes = DB::table('payment_routes as routes')
+            ->join('payment_gateways as gateway', 'gateway.id', '=', 'routes.payment_gateway_id')
+            ->where('routes.payment_channel_id', $channelId)
+            ->pluck('routes.id', 'gateway.code');
+
+        $this->assertTrue($routes->has('MIDTRANS'));
+        $this->assertTrue($routes->has('DOKU'));
+        DB::table('payment_routes')->where('payment_channel_id', $channelId)
+            ->where('id', $routes['MIDTRANS'])->update([
+                'is_active' => true, 'supports_order' => true, 'supports_wallet_topup' => true,
+            ]);
+        DB::table('payment_routes')->where('payment_channel_id', $channelId)
+            ->where('id', $routes['DOKU'])->update([
+                'is_active' => false, 'supports_order' => true, 'supports_wallet_topup' => true,
+                'configuration' => json_encode([
+                    'api_path' => '/checkout/v1/payment',
+                    'public_paths' => ['payment_url' => 'response.payment.url'],
+                ], JSON_THROW_ON_ERROR),
+            ]);
+
+        $this->post('/admin/payments/channels/'.$channelId.'/select-gateway', [
+            'route_id' => $routes['DOKU'],
+            'purpose' => 'order',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $routing = app(PaymentRoutingService::class);
+        $this->assertSame('DOKU', $routing->resolve('virtual_account', false, 'order')['gateway_code']);
+        $this->assertSame('MIDTRANS', $routing->resolve('virtual_account', false, 'topup')['gateway_code']);
+
+        // A previously created order still belongs to Midtrans. Disabling
+        // that route for NEW orders must not rewrite its existing invoice.
+        $this->assertSame('MIDTRANS', $routing->byRouteId((int) $routes['MIDTRANS'], 'order', false, true)['gateway_code']);
+        try {
+            $routing->byRouteId((int) $routes['MIDTRANS'], 'order');
+            $this->fail('Inactive route must not be selectable for a new order.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('payment', $exception->errors());
+        }
+
+        DB::table('payment_gateways')->where('code', 'DOKU')->update(['is_maintenance' => true]);
+
+        try {
+            $routing->resolve('virtual_account', false, 'order');
+            $this->fail('Gateway outage must not trigger automatic switch to Midtrans.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('payment_channel_code', $exception->errors());
+        }
+        $this->assertSame('MIDTRANS', $routing->resolve('virtual_account', false, 'topup')['gateway_code']);
+    }
+
+    public function test_admin_can_select_hosted_doku_checkout_route(): void
+    {
+        $this->login('ADMIN');
+        $channelId = DB::table('payment_channels')->where('code', 'virtual_account')->value('id');
+        $dokuId = DB::table('payment_gateways')->where('code', 'DOKU')->value('id');
+        $routeId = DB::table('payment_routes')
+            ->where('payment_channel_id', $channelId)
+            ->where('payment_gateway_id', $dokuId)
+            ->value('id');
+
+        DB::table('payment_channels')->where('id', $channelId)->update(['is_active' => true]);
+        DB::table('payment_gateways')->where('id', $dokuId)->update([
+            'is_active' => true, 'is_maintenance' => false,
+        ]);
+        IntegrationCredential::updateOrCreate(['code' => 'doku'], [
+            'config_ciphertext' => ['client_id' => 'test-client-id', 'secret_key' => 'test-doku-secret'],
+            'is_active' => true,
+        ]);
+        DB::table('payment_routes')->where('id', $routeId)->update([
+            'configuration' => json_encode(['api_path' => '/checkout/v1/payment'], JSON_THROW_ON_ERROR),
+        ]);
+
+        $this->post('/admin/payments/channels/'.$channelId.'/select-gateway', [
+            'route_id' => $routeId, 'purpose' => 'order',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame('DOKU', app(PaymentRoutingService::class)->resolve('virtual_account', false, 'order')['gateway_code']);
+        $this->assertSame(
+            '/checkout/v1/payment',
+            json_decode(DB::table('payment_routes')->where('id', $routeId)->value('configuration'), true)['api_path']
+        );
+    }
+
     public function test_admin_payment_topup_readiness_requires_gateway_credentials(): void
     {
         $this->login('SUPER_ADMIN');

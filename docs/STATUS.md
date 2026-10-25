@@ -45,7 +45,7 @@ Bagian ini menyatakan **kode tersedia**, bukan "sudah dipakai pelanggan".
 - Midtrans Snap: pembuatan pembayaran, webhook `sha512` terverifikasi
 - QRIS manual: konfirmasi oleh admin
 - Saldo LFAMILIA: ledger, top up, bayar pesanan (fitur aktif, **belum pernah dipakai pelanggan**)
-- DOKU: kode ada, **tidak aktif** (cadangan; pengaktifan manual oleh admin atas keputusan pemilik)
+- DOKU Checkout: kode tersedia namun belum aktif; Admin/Superadmin menentukan pemakaian per metode dan tujuan secara manual setelah verifikasi.
 
 **Pengiriman**
 - Digiflazz: `ref_id` unik, `sign` md5, cek ulang otomatis 3× jeda 2 menit, webhook `sha1`
@@ -85,7 +85,7 @@ Bagian ini menyatakan **kode tersedia**, bukan "sudah dipakai pelanggan".
 | Pelanggan nyata | belum ada |
 | Transaksi nyata | belum ada |
 | Top up saldo oleh pelanggan | belum pernah |
-| DOKU | belum dipasang (cadangan) |
+| DOKU Checkout | belum siap transaksi nyata; butuh verifikasi sandbox, aktivasi kanal, dan konfigurasi merchant |
 | Deploy isi `main` terbaru ke produksi | belum — menunggu perintah pemilik |
 | Sebagian aksi backend tanpa tombol di panel | 9 endpoint (lihat `ADMIN-PANEL.md` §10) |
 | Blok rekonsiliasi refund top up di Pembayaran | disembunyikan dari panel; route masih ada — **diputuskan dibuang** (antrean kode nomor 5) |

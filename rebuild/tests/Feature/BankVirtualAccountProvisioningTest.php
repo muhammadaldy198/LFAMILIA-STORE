@@ -99,6 +99,57 @@ class BankVirtualAccountProvisioningTest extends TestCase
         $this->assertSame(['enabled_payments' => ['bca_va']], json_decode($route->configuration, true));
     }
 
+    public function test_legacy_bank_routes_preserve_existing_effective_midtrans_choice(): void
+    {
+        $channelId = DB::table('payment_channels')->where('code', 'va_bni')->value('id');
+        $midtransId = DB::table('payment_gateways')->where('code', 'MIDTRANS')->value('id');
+        $dokuId = DB::table('payment_gateways')->where('code', 'DOKU')->value('id');
+        $dokuDefault = collect(config('payment_routes'))->first(
+            fn (array $r): bool => $r['channel'] === 'va_bni' && $r['gateway'] === 'DOKU'
+        );
+        $midtransDefault = collect(config('payment_routes'))->first(
+            fn (array $r): bool => $r['channel'] === 'va_bni' && $r['gateway'] === 'MIDTRANS'
+        );
+
+        DB::table('payment_gateways')->where('id', $midtransId)->update(['is_active' => true]);
+        DB::table('payment_gateways')->where('id', $dokuId)->update(['is_active' => false]);
+        DB::table('payment_routes')->where('payment_channel_id', $channelId)
+            ->where('payment_gateway_id', $midtransId)->update([
+                'is_active' => true, 'priority' => $midtransDefault['priority'],
+            ]);
+        DB::table('payment_routes')->where('payment_channel_id', $channelId)
+            ->where('payment_gateway_id', $dokuId)->update([
+                'is_active' => true,
+                'priority' => $dokuDefault['priority'],
+                'provider_channel' => $dokuDefault['provider_channel'],
+                'configuration' => json_encode($dokuDefault['configuration'], JSON_THROW_ON_ERROR),
+                'supports_order' => $dokuDefault['supports_order'],
+                'supports_wallet_topup' => $dokuDefault['supports_wallet_topup'],
+            ]);
+
+        $migration = require database_path('migrations/2026_10_25_000002_preserve_legacy_midtrans_bank_selection.php');
+        $migration->up();
+        $this->assertSame(1, (int) DB::table('payment_routes')
+            ->where('payment_channel_id', $channelId)->where('payment_gateway_id', $midtransId)->value('is_active'));
+        $this->assertSame(0, (int) DB::table('payment_routes')
+            ->where('payment_channel_id', $channelId)->where('payment_gateway_id', $dokuId)->value('is_active'));
+
+        // A custom operator route must never be overwritten by the migration.
+        DB::table('payment_routes')->where('payment_channel_id', $channelId)
+            ->where('payment_gateway_id', $dokuId)->update(['is_active' => true, 'priority' => 77]);
+        $migration->up();
+        $this->assertSame(1, (int) DB::table('payment_routes')
+            ->where('payment_channel_id', $channelId)->where('payment_gateway_id', $dokuId)->value('is_active'));
+
+        // When the DOKU gateway is deliberately enabled, no implicit assignment occurs.
+        DB::table('payment_gateways')->where('id', $dokuId)->update(['is_active' => true]);
+        DB::table('payment_routes')->where('payment_channel_id', $channelId)
+            ->where('payment_gateway_id', $dokuId)->update(['priority' => $dokuDefault['priority']]);
+        $migration->up();
+        $this->assertSame(1, (int) DB::table('payment_routes')
+            ->where('payment_channel_id', $channelId)->where('payment_gateway_id', $dokuId)->value('is_active'));
+    }
+
     public function test_midtrans_generic_routes_only_expose_merchant_active_methods(): void
     {
         $routes = collect(config('payment_routes'));

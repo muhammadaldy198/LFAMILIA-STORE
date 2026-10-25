@@ -6,9 +6,11 @@
 
 Customer memilih **payment channel** publik. Route internal untuk channel itu diselesaikan backend **hanya dari route yang sudah diaktifkan admin**.
 
-**Model pemilik (keputusan 2026-10-24): tidak ada perpindahan gateway otomatis.** Midtrans adalah gateway utama; **DOKU adalah cadangan**. Gateway hidup/mati adalah keputusan manual admin di panel (**Admin > Pembayaran > Gateway**) atas keputusan pemilik — kode tidak pernah mengaktifkan, menonaktifkan, atau memindahkan gateway sendiri. `PaymentRoutingService` di bawah ini hanya menyelesaikan route di antara yang sudah aktif; itu bukan failover dan bukan pengalihan gateway.
+**Keputusan pemilik 2026-10-25:** Midtrans dan DOKU adalah gateway mandiri dan setara, tanpa istilah utama/cadangan maupun failover. Admin/Superadmin menetapkan gateway secara eksplisit per metode dan tujuan pembayaran (pesanan atau top up saldo). Jika pilihan ganda/tidak tersedia, metode tidak dapat digunakan; sistem tidak mengalihkan ke provider lainnya. DOKU memakai hosted DOKU Checkout (`/checkout/v1/payment`) dan halaman pembayaran DOKU, tanpa perubahan ke Direct API.
 
 Implementasi mempunyai gateway registry untuk Midtrans, DOKU, Manual QRIS, dan LFAMILIA Wallet. Dukungan kode tidak berarti gateway eksternal sudah live-configured.
+
+**Invoice yang sudah dibuat tetap memakai gateway semula.** Perubahan pemilihan gateway hanya berlaku untuk pesanan/top up baru. Invoice belum kedaluwarsa dengan rute yang dulu dipilih masih boleh memulai pembayaran lewat provider aslinya selama kanal dan gateway masih aktif serta tidak maintenance. Tidak ada pengalihan provider untuk invoice lama.
 
 `PaymentRoutingService` hanya memilih route yang:
 

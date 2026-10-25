@@ -211,7 +211,7 @@ Format tiap halaman: **untuk apa · isi · aksi · catatan**. Nama berkas Vue ad
 **Untuk apa.** Mengatur cara pelanggan membayar.
 **Isi.** Tiga tab: **Metode Pembayaran**, **Transaksi Pembayaran**, **Halaman Pembayaran**. Bagian: gateway & kanal, QRIS manual, top up LFAMILIA Coin, alamat notifikasi gateway, pengaturan halaman pembayaran (warna aksen, banner, teks, sakelar).
 **Aksi.** Tambah/ubah/hapus kanal, sinkron kanal, unggah logo & gambar QRIS, aktifkan QRIS manual, konfirmasi pembayaran QRIS manual, simpan top up, ubah route gateway, simpan pengaturan halaman + unggah banner, pulihkan metode bawaan.
-**Catatan.** Konfirmasi QRIS manual memakai konfirmasi kata sandi. DOKU tampil sebagai belum dipakai.
+**Catatan.** Konfirmasi QRIS manual memakai konfirmasi kata sandi. DOKU Checkout dan Midtrans berdiri sendiri; pemilihan gateway ditentukan manual per metode dan tujuan, bukan utama/cadangan.
 
 ### 4.14 Laporan — `/admin/reports`
 `AdminReportController` · `reports.view` (+ `reports.finance`) · `Reports.vue`
