@@ -94,14 +94,11 @@ class PaymentRoutingService
             ]);
         }
 
-        $unavailableGateways = $this->unavailableExternalGatewayCodes();
+        // Choose the operator's route before checking health: never fail over.
         $routeQuery = DB::table('payment_routes as routes')
             ->join('payment_gateways as gateways', 'gateways.id', '=', 'routes.payment_gateway_id')
             ->where('routes.payment_channel_id', $channel->id)
             ->where('routes.is_active', true)
-            ->where('gateways.is_active', true)
-            ->where('gateways.is_maintenance', false)
-            ->when($unavailableGateways !== [], fn ($query) => $query->whereNotIn('gateways.code', $unavailableGateways))
             ->when($purpose === 'order',
                 fn ($query) => $query->where('routes.supports_order', true),
                 fn ($query) => $query->where('routes.supports_wallet_topup', true))
@@ -115,16 +112,21 @@ class PaymentRoutingService
                 'routes.fee_percent_bps as route_fee_percent_bps',
                 'gateways.id as gateway_id',
                 'gateways.code as gateway_code',
-                'gateways.kind as gateway_kind'
+                'gateways.kind as gateway_kind',
+                'gateways.is_active as gateway_active',
+                'gateways.is_maintenance as gateway_maintenance'
             );
         if ($lock) {
             $routeQuery->lockForUpdate();
         }
-        $route = $routeQuery->first();
+        $matches = $routeQuery->limit(2)->get();
+        $route = $matches->first();
 
-        if (! $route) {
+        if ($matches->count() !== 1 || ! $route
+            || ! $route->gateway_active || $route->gateway_maintenance
+            || ! $this->gatewayReady((string) $route->gateway_code)) {
             throw ValidationException::withMessages([
-                'payment_channel_code' => 'Metode pembayaran sedang tidak tersedia.',
+                'payment_channel_code' => 'Gateway belum dipilih secara tunggal atau sedang tidak tersedia. Hubungi admin.',
             ]);
         }
 
