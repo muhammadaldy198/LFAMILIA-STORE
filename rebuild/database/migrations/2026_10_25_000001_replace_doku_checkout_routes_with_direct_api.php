@@ -51,7 +51,12 @@ return new class extends Migration
             DB::table('payment_routes')
                 ->where('payment_gateway_id', $dokuId)
                 ->where('payment_channel_id', $briId)
-                ->update(['is_active' => false, 'updated_at' => now()]);
+                ->update([
+                    'is_active' => false,
+                    'provider_channel' => null,
+                    'configuration' => json_encode(['disabled_reason' => 'REQUIRES_SNAP_DIRECT_API'], JSON_THROW_ON_ERROR),
+                    'updated_at' => now(),
+                ]);
         }
     }
 
