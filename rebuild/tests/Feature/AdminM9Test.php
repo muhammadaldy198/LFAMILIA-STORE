@@ -186,8 +186,10 @@ class AdminM9Test extends TestCase
         $this->withSession(['admin.password_confirmed_at' => time()])->post('/admin/customers/'.$user->id.'/wallet', $payload)->assertRedirect();
 
         $this->assertSame(5000, (int) DB::table('wallets')->where('user_id', $user->id)->value('balance_idr'));
+        $scopedKey = 'customer-wallet:'.hash('sha256', $user->id.':'.$payload['idempotency_key']);
         $this->assertSame(1, DB::table('wallet_ledger')
-            ->where('idempotency_key', 'admin-wallet-idempotent-0001')->count());
+            ->where('wallet_id', DB::table('wallets')->where('user_id', $user->id)->value('id'))
+            ->where('idempotency_key', $scopedKey)->count());
 
         $this->withSession(['admin.password_confirmed_at' => time()])->post('/admin/customers/'.$user->id.'/wallet', [
             'amount_idr' => -6000,
