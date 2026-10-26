@@ -62,7 +62,10 @@ class PaymentRouteCatalogService
                 // Bank VA routes are pre-wired automatically. Gateway credentials,
                 // maintenance state and the channel toggle still gate visibility.
                 'is_active' => ($definition['gateway'] ?? '') === 'MIDTRANS'
-                    && in_array((string) ($definition['channel'] ?? ''), array_column((array) config('payment_bank_channels', []), 'code'), true),
+                    && collect(config('payment_bank_channels', []))->contains(
+                        fn (array $bank): bool => $bank['code'] === ($definition['channel'] ?? '')
+                            && ($bank['initially_active'] ?? true) === true
+                    ),
                 'created_at' => now(),
             ]);
             $result['created']++;
@@ -83,6 +86,10 @@ class PaymentRouteCatalogService
 
         $created = 0;
         foreach ((array) config('payment_ewallet_channels', []) as $wallet) {
+            if (! empty($wallet['requires_integration'])) {
+                continue; // Listed for reference only; no incomplete payment channel.
+            }
+
             $code = (string) ($wallet['code'] ?? '');
             if ($code === '' || DB::table('payment_channels')->where('code', $code)->exists()) {
                 continue;
