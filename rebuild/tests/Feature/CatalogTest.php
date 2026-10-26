@@ -43,7 +43,7 @@ class CatalogTest extends TestCase
         $this->actingAs($admin, 'admin');
         $category = Category::where('slug', 'game')->firstOrFail();
         $provider = Provider::where('code', 'MANUAL')->firstOrFail();
-        $provider->update(['is_active' => false]);
+        DB::table('providers')->where('id', $provider->id)->update(['is_active' => false]);
         $suffix = bin2hex(random_bytes(4));
         $product = Product::create([
             'category_id' => $category->id,
@@ -75,7 +75,7 @@ class CatalogTest extends TestCase
             ->where('products.0.storefront_status', 'Provider pengiriman nonaktif')
             ->etc());
 
-        $provider->update(['is_active' => true]);
+        DB::table('providers')->where('id', $provider->id)->update(['is_active' => true]);
         $this->get($url)->assertOk()->assertInertia(fn (Assert $page) => $page
             ->component('Admin/Catalog')
             ->where('products.0.buyable_nominal_count', 1)
