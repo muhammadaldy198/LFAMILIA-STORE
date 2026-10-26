@@ -143,26 +143,14 @@ class DokuCheckoutGateway
             throw new RuntimeException('DOKU_CREATE_UNCERTAIN');
         }
 
-        $public = ['kind' => 'doku_checkout'];
-        foreach ((array) ($route['public_paths'] ?? []) as $name => $dataPath) {
-            if (! is_string($name) || ! is_string($dataPath)
-                || ! in_array($name, ['payment_code', 'payment_url', 'qr_string', 'va_number'], true)) {
-                continue;
-            }
-            $value = data_get($data, $dataPath);
-            if (is_string($value) || is_numeric($value)) {
-                $public[$name] = (string) $value;
-            }
-        }
-
-        // Hosted Checkout must return a payable URL. A successful API response
-        // without it is not a usable payment page; do not report it as ready.
-        $checkoutUrl = $public['payment_url'] ?? data_get($data, 'response.payment.url');
+        // Hosted DOKU Checkout supplies exactly one payment-page URL.
+        // Never expose direct-VA instructions through this adapter.
+        $checkoutUrl = data_get($data, 'response.payment.url');
         if (! is_string($checkoutUrl) || ! filter_var($checkoutUrl, FILTER_VALIDATE_URL)
             || ! str_starts_with($checkoutUrl, 'https://')) {
             throw new RuntimeException('DOKU_CREATE_UNCERTAIN');
         }
-        $public['payment_url'] = $checkoutUrl;
+        $public = ['kind' => 'doku_checkout', 'payment_url' => $checkoutUrl];
 
         return [
             'status' => 'PENDING',
