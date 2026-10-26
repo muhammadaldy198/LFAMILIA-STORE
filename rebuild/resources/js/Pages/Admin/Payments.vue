@@ -377,6 +377,8 @@ const successRate = computed(() => {
                                     <div style="display:flex;gap:4px;flex-wrap:wrap">
                                         <span class="adm-tag" :class="channel.available_order ? 'ok' : 'bad'">Pesanan {{ channel.available_order ? 'siap' : 'belum siap' }}</span>
                                         <span v-if="channel.supports_wallet_topup" class="adm-tag" :class="channel.available_topup ? 'ok' : 'bad'">Top up {{ channel.available_topup ? 'siap' : 'belum siap' }}</span>
+                                        <p v-if="channel.supports_order && !channel.available_order" class="adm-note" style="width:100%">{{ channel.order_readiness_reason }}</p>
+                                        <p v-if="channel.supports_wallet_topup && !channel.available_topup" class="adm-note" style="width:100%">Top up: {{ channel.topup_readiness_reason }}</p>
                                     </div>
                                 </td>
                                 <td><span class="adm-tag" :class="channel.is_active ? 'ok' : 'bad'">{{ channel.is_active ? 'Aktif' : 'Nonaktif' }}</span></td>
@@ -661,7 +663,7 @@ const successRate = computed(() => {
 
         <!-- pop-up metode -->
         <AdminModal :open="!!editor" :title="editor?.id ? 'Ubah metode pembayaran' : 'Tambah metode pembayaran'"
-            description="Nama, jenis, dan status metode. Biaya bawaan metode dipakai bila tidak ada biaya gateway khusus."
+            description="Pilih metode bawaan yang sudah punya route gateway. Metode baru dengan kode bebas belum otomatis terhubung ke Midtrans atau DOKU."
             wide @update:open="value => { if (!value) closeEditor(); }">
             <div v-if="editor" class="adm-grid">
                 <label class="adm-field">
@@ -722,7 +724,10 @@ const successRate = computed(() => {
                             <button type="button" class="adm-btn sm" @click="saveRoute(route)">Simpan gateway</button>
                         </div>
                     </div>
-                    <p v-if="!routesForEditor.length" class="adm-note" style="margin-top:8px">Belum ada gateway terhubung untuk metode ini.</p>
+                    <p v-if="!routesForEditor.length" class="err" style="margin-top:8px">
+                        Belum ada koneksi API untuk kode metode ini. Menambahkan nama dan memilih Aktif tidak otomatis membuat integrasi.
+                        Gunakan metode VA/e-wallet bawaan melalui "Pulihkan metode bawaan", lalu pilih gateway Midtrans atau DOKU.
+                    </p>
                 </div>
 
                 <div class="adm-block">
@@ -733,7 +738,7 @@ const successRate = computed(() => {
                 <div class="adm-block">
                     <strong>Status</strong>
                     <label class="adm-switch-row"><button type="button" class="adm-switch" role="switch" :aria-checked="editor.is_active" @click="editor.is_active = !editor.is_active" /> Metode aktif</label>
-                    <p class="adm-note">Hanya tampil bila gateway siap.</p>
+                    <p class="adm-note">Aktif hanya berarti diizinkan oleh Admin. Agar muncul di checkout harus ada satu gateway dipilih, gateway aktif, dan kredensial tersedia.</p>
                 </div>
 
                 <div class="adm-field full">
