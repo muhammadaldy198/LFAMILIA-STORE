@@ -49,6 +49,7 @@ class AdminPaymentController
                 'routes.payment_channel_id',
                 'routes.payment_gateway_id',
                 'routes.provider_channel',
+                'routes.configuration',
                 'routes.priority',
                 'routes.fee_flat_idr',
                 'routes.fee_percent_bps',
@@ -288,6 +289,12 @@ class AdminPaymentController
         }
         if (! $routing->gatewayReady((string) $route->gateway_code)) {
             return ['ready' => false, 'reason' => 'Kredensial gateway belum siap. Periksa menu Integrasi.'];
+        }
+        if ((string) $route->gateway_code === 'DOKU') {
+            $settings = json_decode((string) $route->configuration, true);
+            if (! is_array($settings) || ($settings['api_path'] ?? '') !== '/checkout/v1/payment') {
+                return ['ready' => false, 'reason' => 'Route DOKU lama tidak didukung. Pulihkan ke DOKU Checkout dahulu.'];
+            }
         }
 
         return ['ready' => true, 'reason' => null];
