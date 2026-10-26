@@ -182,6 +182,15 @@ const removeChannel = () => {
 
 const syncChannels = () => router.post('/admin/payments/channels/sync', {}, { preserveScroll: true });
 
+const onEditorMethodChange = () => {
+    if (!editor.value) return;
+    editor.value.provider_method = '';
+    // DOKU Checkout is currently connected to VA methods only.
+    if (editor.value.gateway_code === 'DOKU' && editor.value.method !== 'VIRTUAL_ACCOUNT') {
+        editor.value.gateway_code = 'MIDTRANS';
+    }
+};
+
 const routesForEditor = computed(() => editor.value
     ? routes.filter(route => route.payment_channel_id === editor.value.id)
     : []);
@@ -669,7 +678,7 @@ const successRate = computed(() => {
 
         <!-- pop-up metode -->
         <AdminModal :open="!!editor" :title="editor?.id ? 'Ubah metode pembayaran' : 'Tambah metode pembayaran'"
-            description="Pilih metode bawaan yang sudah punya route gateway. Metode baru dengan kode bebas belum otomatis terhubung ke Midtrans atau DOKU."
+            description="Pilih gateway dan nama bank dari daftar kode yang tersedia. Kode terisi otomatis dan tetap boleh diketik sendiri."
             wide @update:open="value => { if (!value) closeEditor(); }">
             <div v-if="editor" class="adm-grid">
                 <label class="adm-field">
@@ -685,7 +694,7 @@ const successRate = computed(() => {
                 </label>
                 <label class="adm-field">
                     <span>Kategori pembayaran</span>
-                    <select v-model="editor.method" class="adm-select">
+                    <select v-model="editor.method" class="adm-select" @change="onEditorMethodChange">
                         <option value="QRIS">QRIS</option><option value="VIRTUAL_ACCOUNT">Virtual Account</option>
                         <option value="EWALLET">E-Wallet</option><option value="RETAIL">Gerai Retail</option>
                         <option value="WALLET">Saldo</option><option value="OTHER">Lainnya</option>
@@ -698,7 +707,7 @@ const successRate = computed(() => {
 
                 <div v-if="!editor.id || !routesForEditor.length" class="adm-block full">
                     <strong>Koneksi gateway</strong>
-                    <p class="adm-note">Pilih penyedia dan kode metode API yang benar, bukan hanya nama tampilan. Pilihan yang disediakan mengikuti katalog metode terintegrasi. Dukungan aktual harus diaktifkan pada akun merchant.</p>
+                    <p class="adm-note">Tidak perlu menghafal kode. Pilih bank/e-wallet pada daftar di bawah, lalu kode API-nya terisi otomatis. Ketersediaan transaksi tetap mengikuti aktivasi akun merchant.</p>
                     <div class="adm-grid" style="margin-top:8px">
                         <label class="adm-field">
                             <span>Gateway penyedia</span>
@@ -708,17 +717,26 @@ const successRate = computed(() => {
                             </select>
                         </label>
                         <label class="adm-field">
-                            <span>Kode metode pada penyedia</span>
-                            <input v-model="editor.provider_method" class="adm-input mono"
-                                list="payment-provider-methods" maxlength="80"
-                                :placeholder="providerMethodChoices[0]?.code || 'Kode API dari penyedia'">
-                            <datalist id="payment-provider-methods">
+                            <span>Daftar kode bank/e-wallet</span>
+                            <select class="adm-select"
+                                :value="providerMethodChoices.some(item => item.code === editor.provider_method) ? editor.provider_method : ''"
+                                @change="editor.provider_method = $event.target.value">
+                                <option value="">— Pilih nama pembayaran dan kodenya —</option>
                                 <option v-for="item in providerMethodChoices" :key="item.gateway+'-'+item.code"
-                                    :value="item.code">{{ item.label }}</option>
-                            </datalist>
+                                    :value="item.code">{{ item.label }} — {{ item.code }}</option>
+                            </select>
+                            <span v-if="!providerMethodChoices.length" class="hint">
+                                Belum ada kode bawaan untuk kategori dan gateway ini. Jangan aktifkan sebelum memastikan kode resmi dari penyedia.
+                            </span>
+                            <span v-else class="hint">Daftar berdasarkan integrasi yang sudah ada di LFAMILIA, bukan daftar aktivasi akun merchant.</span>
+                        </label>
+                        <label class="adm-field">
+                            <span>Kode metode provider <b class="req">*</b></span>
+                            <input v-model="editor.provider_method" class="adm-input mono"
+                                maxlength="80" placeholder="Pilih daftar di samping atau ketik kode resmi">
                             <span v-if="errors.provider_method" class="err">{{ errors.provider_method }}</span>
                             <span v-if="errors.gateway_code" class="err">{{ errors.gateway_code }}</span>
-                            <span class="hint">Kode baru di luar daftar hanya bisa dipakai jika sudah benar-benar didukung gateway dan merchant.</span>
+                            <span class="hint">Terisi otomatis setelah memilih daftar. Boleh diketik manual hanya bila kode baru sudah didukung gateway.</span>
                         </label>
                     </div>
                 </div>
