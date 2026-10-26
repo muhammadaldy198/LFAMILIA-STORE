@@ -415,16 +415,16 @@ test('import margin reads the active pricing setting', () => {
     assert.match(catalog, /margin_percent: Number\(importMargin\.value \|\| 0\)/);
 });
 
-// Tab Sumber: dua kolom impor global + modal bisa diedit di tabel + saklar
-// sinkron otomatis semua produk.
-test('source tab edits store cost and toggles whole-catalog auto sync', () => {
+// Tab Sumber mempertahankan edit modal per SKU, tetapi saklar sinkron
+// seluruh katalog hanya ada di halaman Digiflazz.
+test('source tab edits store cost and links to canonical Digiflazz sync settings', () => {
     const catalog = read('Catalog.vue');
-    // Harga modal per sumber bisa diubah langsung dari tabel Sumber.
+    const digiflazz = read('Digiflazz.vue');
     assert.match(catalog, /saveMapping\(mapping, \{ store_cost_idr: Number\(\$event\.target\.value \|\| 0\) \}\)/);
-    // Saklar sinkron otomatis seluruh katalog (bukan per produk).
-    assert.match(catalog, /const toggleAutoSync = \(\) => \{/);
-    // Saklar memakai route ber-izin katalog, bukan route integrasi provider.
-    assert.match(catalog, /router\.put\('\/admin\/catalog\/auto-sync'/);
+    assert.doesNotMatch(catalog, /const toggleAutoSync =/);
+    assert.doesNotMatch(catalog, /router\.put\('\/admin\/catalog\/auto-sync'/);
+    assert.match(catalog, /href="\/admin\/digiflazz"/);
+    assert.match(digiflazz, /settings\.put\('\/admin\/digiflazz\/settings'/);
     assert.doesNotMatch(catalog, /products\/\$\{product\.value\.id\}\/sync/);
 });
 
