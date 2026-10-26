@@ -13,6 +13,19 @@ $routes = [
         'supports_wallet_topup' => true,
     ],
     [
+        'channel' => 'qris',
+        'gateway' => 'DOKU',
+        'provider_channel' => 'DOKU_CHECKOUT',
+        'configuration' => [
+            'api_path' => '/checkout/v1/payment',
+            'payment_method_types' => ['QRIS'],
+            'public_paths' => ['payment_url' => 'response.payment.url'],
+        ],
+        'priority' => 20,
+        'supports_order' => true,
+        'supports_wallet_topup' => true,
+    ],
+    [
         'channel' => 'virtual_account',
         'gateway' => 'MIDTRANS',
         'provider_channel' => null,
@@ -50,42 +63,84 @@ $routes = [
     ],
 ];
 
-// Each e-wallet has its own selectable channel and fee configuration.
-// Account-level activation is still required in Midtrans and the admin panel.
+// Individually selectable methods. Newly created customer-facing methods stay
+// inactive until an operator explicitly enables the merchant-supported gateway.
 foreach (require __DIR__.'/payment_ewallet_channels.php' as $wallet) {
-    $routes[] = [
-        'channel' => $wallet['code'],
-        'gateway' => 'MIDTRANS',
-        'provider_channel' => $wallet['midtrans'],
-        'configuration' => ['enabled_payments' => [$wallet['midtrans']]],
-        'priority' => 10,
-        'supports_order' => true,
-        'supports_wallet_topup' => true,
-    ];
+    if (! empty($wallet['midtrans'])) {
+        $routes[] = [
+            'channel' => $wallet['code'],
+            'gateway' => 'MIDTRANS',
+            'provider_channel' => $wallet['midtrans'],
+            'configuration' => ['enabled_payments' => [$wallet['midtrans']]],
+            'priority' => 10,
+            'supports_order' => true,
+            'supports_wallet_topup' => true,
+        ];
+    }
+    if (! empty($wallet['doku']) && empty($wallet['requires_integration'])) {
+        $routes[] = [
+            'channel' => $wallet['code'],
+            'gateway' => 'DOKU',
+            'provider_channel' => 'DOKU_CHECKOUT',
+            'configuration' => [
+                'api_path' => '/checkout/v1/payment',
+                'payment_method_types' => [$wallet['doku']],
+                'public_paths' => ['payment_url' => 'response.payment.url'],
+            ],
+            'priority' => 20,
+            'supports_order' => true,
+            'supports_wallet_topup' => true,
+        ];
+    }
 }
 
-// Each bank gets an independent route; the existing generic VA option remains
-// for existing payments and backwards compatibility.
+// Every source-supported bank has a route only at its documented provider.
 foreach (require __DIR__.'/payment_bank_channels.php' as $bank) {
+    if (! empty($bank['midtrans'])) {
+        $routes[] = [
+            'channel' => $bank['code'],
+            'gateway' => 'MIDTRANS',
+            'provider_channel' => $bank['midtrans'],
+            'configuration' => ['enabled_payments' => [$bank['midtrans']]],
+            'priority' => 10,
+            'supports_order' => true,
+            'supports_wallet_topup' => true,
+        ];
+    }
+    if (! empty($bank['doku'])) {
+        $routes[] = [
+            'channel' => $bank['code'],
+            'gateway' => 'DOKU',
+            'provider_channel' => 'DOKU_CHECKOUT',
+            'configuration' => [
+                'api_path' => '/checkout/v1/payment',
+                'payment_method_types' => [$bank['doku']],
+                'public_paths' => ['payment_url' => 'response.payment.url'],
+            ],
+            'priority' => 20,
+            'supports_order' => true,
+            'supports_wallet_topup' => true,
+        ];
+    }
+}
+
+foreach (require __DIR__.'/payment_retail_channels.php' as $store) {
     $routes[] = [
-        'channel' => $bank['code'],
+        'channel' => $store['code'],
         'gateway' => 'MIDTRANS',
-        'provider_channel' => $bank['midtrans'],
-        'configuration' => ['enabled_payments' => [$bank['midtrans']]],
+        'provider_channel' => $store['midtrans'],
+        'configuration' => ['enabled_payments' => [$store['midtrans']]],
         'priority' => 10,
         'supports_order' => true,
         'supports_wallet_topup' => true,
     ];
-    if (empty($bank['doku'])) {
-        continue; // BSI is currently enabled on Midtrans only; do not invent a DOKU protocol.
-    }
     $routes[] = [
-        'channel' => $bank['code'],
+        'channel' => $store['code'],
         'gateway' => 'DOKU',
         'provider_channel' => 'DOKU_CHECKOUT',
         'configuration' => [
             'api_path' => '/checkout/v1/payment',
-            'payment_method_types' => [$bank['doku']],
+            'payment_method_types' => [$store['doku']],
             'public_paths' => ['payment_url' => 'response.payment.url'],
         ],
         'priority' => 20,

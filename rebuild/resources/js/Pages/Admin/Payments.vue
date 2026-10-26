@@ -200,6 +200,11 @@ const saveRoute = row => {
 };
 
 // ---------- QRIS manual ----------
+const manualQrisMethod = computed(() => props.channels.find(channel => channel.code === 'manual_qris'));
+const manualQrisReady = computed(() => Boolean(
+    props.manualQrisAsset?.is_active && props.manualQrisAsset?.image_url
+    && manualQrisMethod.value?.available_order
+));
 const uploadQris = event => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -209,7 +214,7 @@ const uploadQris = event => {
     });
 };
 const toggleQris = () => {
-    router.put('/admin/payments/manual-qris', { is_active: !props.manualQrisAsset?.is_active }, { preserveScroll: true });
+    router.put('/admin/payments/manual-qris', { is_active: !manualQrisReady.value }, { preserveScroll: true });
 };
 
 // ---------- saldo ----------
@@ -408,7 +413,7 @@ const successRate = computed(() => {
                         <h2>QRIS manual</h2>
                         <p>QRIS manual berbeda dari QRIS gateway: pembayaran harus dikonfirmasi admin sebelum pesanan diproses, dan gambar QRIS wajib aktif.</p>
                     </div>
-                    <span class="adm-tag" :class="manualQrisAsset?.is_active ? 'ok' : 'bad'">{{ manualQrisAsset?.is_active ? 'Aktif' : 'Nonaktif' }}</span>
+                    <span class="adm-tag" :class="manualQrisReady ? 'ok' : 'bad'">{{ manualQrisReady ? 'Siap di checkout' : 'Belum siap di checkout' }}</span>
                 </div>
                 <div class="adm-card-body" style="display:grid;gap:10px">
                     <div class="adm-media-preview wide">
@@ -416,10 +421,11 @@ const successRate = computed(() => {
                         <span v-else class="adm-note">Gambar QRIS belum diunggah.</span>
                     </div>
                     <p class="adm-note">Rekomendasi: 1000 × 1000 px (1:1), PNG/WebP tajam. Gambar ini dikirim ke halaman pembayaran pelanggan.</p>
+                    <p v-if="!manualQrisReady" class="adm-note">{{ manualQrisMethod?.order_readiness_reason || 'Aktifkan QRIS Manual setelah mengunggah gambar QR.' }}</p>
                     <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
                         <input type="file" accept="image/png,image/jpeg,image/webp" class="adm-input" style="padding:4px;max-width:260px" @change="uploadQris">
                         <button type="button" class="adm-btn" :disabled="!manualQrisAsset" @click="toggleQris">
-                            {{ manualQrisAsset?.is_active ? 'Nonaktifkan QRIS manual' : 'Aktifkan QRIS manual' }}
+                            {{ manualQrisReady ? 'Nonaktifkan QRIS manual' : 'Aktifkan QRIS manual' }}
                         </button>
                     </div>
                     <p class="adm-note">Logo QRIS di daftar metode diatur lewat tombol Ubah pada baris QRIS, bukan di sini.</p>

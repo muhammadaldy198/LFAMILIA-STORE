@@ -16,7 +16,7 @@ class PaymentRouteCatalogService
      */
     public function sync(): array
     {
-        $result = ['created' => 0, 'updated' => 0, 'skipped' => 0, 'created_channels' => $this->ensureBankChannels() + $this->ensureEwalletChannels()];
+        $result = ['created' => 0, 'updated' => 0, 'skipped' => 0, 'created_channels' => $this->ensureBankChannels() + $this->ensureEwalletChannels() + $this->ensureRetailChannels()];
 
         foreach ((array) config('payment_routes', []) as $definition) {
             $channelId = DB::table('payment_channels')
@@ -62,7 +62,10 @@ class PaymentRouteCatalogService
                 // Bank VA routes are pre-wired automatically. Gateway credentials,
                 // maintenance state and the channel toggle still gate visibility.
                 'is_active' => ($definition['gateway'] ?? '') === 'MIDTRANS'
-                    && in_array((string) ($definition['channel'] ?? ''), array_column((array) config('payment_bank_channels', []), 'code'), true),
+                    && collect(config('payment_bank_channels', []))->contains(
+                        fn (array $bank): bool => $bank['code'] === ($definition['channel'] ?? '')
+                            && ($bank['initially_active'] ?? true) === true
+                    ),
                 'created_at' => now(),
             ]);
             $result['created']++;
@@ -83,6 +86,10 @@ class PaymentRouteCatalogService
 
         $created = 0;
         foreach ((array) config('payment_ewallet_channels', []) as $wallet) {
+            if (! empty($wallet['requires_integration'])) {
+                continue; // Listed for reference only; no incomplete payment channel.
+            }
+
             $code = (string) ($wallet['code'] ?? '');
             if ($code === '' || DB::table('payment_channels')->where('code', $code)->exists()) {
                 continue;
@@ -99,6 +106,42 @@ class PaymentRouteCatalogService
                 'supports_wallet_topup' => (bool) $generic->supports_wallet_topup,
                 'sort_order' => (int) $wallet['sort_order'],
                 'is_active' => false, // opt-in; merchant account support must be confirmed
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $created++;
+        }
+
+        return $created;
+    }
+
+    /**
+     * Create retail channels without turning on a store method before merchant activation.
+     */
+    private function ensureRetailChannels(): int
+    {
+        $generic = DB::table('payment_channels')->where('code', 'ewallet')->first();
+        if (! $generic) {
+            return 0;
+        }
+
+        $created = 0;
+        foreach ((array) config('payment_retail_channels', []) as $store) {
+            if (DB::table('payment_channels')->where('code', $store['code'])->exists()) {
+                continue;
+            }
+
+            DB::table('payment_channels')->insert([
+                'code' => $store['code'],
+                'method' => 'RETAIL',
+                'name' => $store['name'],
+                'description' => 'Bayar melalui '.(string) $store['name'].'.',
+                'fee_flat_idr' => 0,
+                'fee_percent_bps' => 0,
+                'supports_order' => (bool) $generic->supports_order,
+                'supports_wallet_topup' => (bool) $generic->supports_wallet_topup,
+                'sort_order' => (int) $store['sort_order'],
+                'is_active' => false,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);

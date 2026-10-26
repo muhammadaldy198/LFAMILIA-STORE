@@ -4,11 +4,14 @@ namespace Tests\Feature;
 
 use App\Models\AdminUser;
 use App\Models\IntegrationCredential;
+use App\Models\StoreAsset;
 use App\Services\PaymentRoutingService;
 use App\Services\WalletTopupService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
@@ -36,6 +39,71 @@ class AdminPaymentRestorationTest extends TestCase
         $this->actingAs($admin, 'admin');
 
         return $admin;
+    }
+
+    public function test_manual_qris_activation_requires_an_uploaded_qr_image(): void
+    {
+        $this->login('SUPER_ADMIN');
+        $asset = StoreAsset::where('key', 'manual_qris')->firstOrFail();
+        $asset->clearMediaCollection('image');
+
+        $this->from('/admin/payments')->put('/admin/payments/manual-qris', [
+            'is_active' => true,
+        ])->assertRedirect('/admin/payments')->assertSessionHasErrors('manual_qris');
+
+        $this->assertSame(0, (int) DB::table('payment_gateways')
+            ->where('code', 'MANUAL_QRIS')->value('is_active'));
+    }
+
+    public function test_one_manual_qris_switch_controls_route_gateway_and_checkout_visibility(): void
+    {
+        $this->login('SUPER_ADMIN');
+        Storage::fake(config('media-library.disk_name', 'public'));
+        $asset = StoreAsset::where('key', 'manual_qris')->firstOrFail();
+        $asset->clearMediaCollection('image');
+        $asset->addMedia(UploadedFile::fake()->image('manual-qr.png', 600, 600))
+            ->toMediaCollection('image', config('media-library.disk_name', 'public'));
+
+        $channel = DB::table('payment_channels')->where('code', 'manual_qris')->firstOrFail();
+        $gateway = DB::table('payment_gateways')->where('code', 'MANUAL_QRIS')->firstOrFail();
+        $route = DB::table('payment_routes')->where('payment_channel_id', $channel->id)
+            ->where('payment_gateway_id', $gateway->id)->firstOrFail();
+
+        DB::table('payment_channels')->where('id', $channel->id)->update(['is_active' => false]);
+        DB::table('payment_gateways')->where('id', $gateway->id)->update([
+            'is_active' => false, 'is_maintenance' => false,
+        ]);
+        DB::table('payment_routes')->where('id', $route->id)->update(['is_active' => false]);
+
+        $this->assertNull(collect(app(PaymentRoutingService::class)
+            ->publicOrderChannels(null))->firstWhere('code', 'manual_qris'));
+
+        $this->put('/admin/payments/manual-qris', ['is_active' => true])
+            ->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertSame(1, (int) DB::table('payment_channels')
+            ->where('id', $channel->id)->value('is_active'));
+        $this->assertSame(1, (int) DB::table('payment_gateways')
+            ->where('id', $gateway->id)->value('is_active'));
+        $this->assertSame(1, (int) DB::table('payment_routes')
+            ->where('id', $route->id)->value('is_active'));
+        $visible = collect(app(PaymentRoutingService::class)->publicOrderChannels(null))
+            ->firstWhere('code', 'manual_qris');
+        $this->assertIsArray($visible);
+        $this->assertSame('qris', $visible['group']);
+
+        $this->get('/admin/payments')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/Payments')
+            ->where('channels', fn ($channels): bool => collect($channels)
+                ->firstWhere('code', 'manual_qris')['available_order'] === true)
+            ->etc());
+
+        $this->put('/admin/payments/manual-qris', ['is_active' => false])
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame(0, (int) DB::table('payment_gateways')
+            ->where('id', $gateway->id)->value('is_active'));
+        $this->assertNull(collect(app(PaymentRoutingService::class)
+            ->publicOrderChannels(null))->firstWhere('code', 'manual_qris'));
     }
 
     public function test_active_custom_method_is_not_ready_without_unique_gateway_route(): void

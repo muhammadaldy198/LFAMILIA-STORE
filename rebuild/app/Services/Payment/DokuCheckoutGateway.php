@@ -181,9 +181,22 @@ class DokuCheckoutGateway
         $payment = ['payment_due_date' => $context['expires_minutes']];
         $methods = $context['route_configuration']['payment_method_types'] ?? null;
         if (is_array($methods) && $methods !== []) {
-            $payment['payment_method_types'] = array_values(array_filter(
-                $methods, fn ($method): bool => is_string($method) && str_starts_with($method, 'VIRTUAL_ACCOUNT_')
-            ));
+            $allowed = ['QRIS'];
+            foreach (['payment_bank_channels', 'payment_ewallet_channels', 'payment_retail_channels'] as $catalog) {
+                foreach ((array) config($catalog, []) as $entry) {
+                    if (! empty($entry['doku']) && empty($entry['requires_integration'])) {
+                        $allowed[] = (string) $entry['doku'];
+                    }
+                }
+            }
+            if (array_values(array_filter($methods,
+                fn ($method): bool => ! is_string($method) || ! in_array($method, $allowed, true)
+            )) !== []) {
+                throw ValidationException::withMessages([
+                    'payment' => 'Kode metode DOKU Checkout tidak didukung oleh katalog LFAMILIA.',
+                ]);
+            }
+            $payment['payment_method_types'] = array_values($methods);
         }
 
         return [

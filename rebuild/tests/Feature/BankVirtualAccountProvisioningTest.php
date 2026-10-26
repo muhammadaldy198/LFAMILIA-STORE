@@ -10,6 +10,7 @@ use App\Services\PaymentRouteCatalogService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Validation\ValidationException;
 use Mockery;
 use ReflectionMethod;
 use Tests\TestCase;
@@ -18,10 +19,10 @@ class BankVirtualAccountProvisioningTest extends TestCase
 {
     use DatabaseTransactions;
 
-    public function test_verified_midtrans_bank_routes_exclude_unsupported_doku_bsi(): void
+    public function test_every_official_bank_route_is_scoped_to_its_supported_gateway(): void
     {
         $banks = config('payment_bank_channels');
-        $this->assertCount(7, $banks);
+        $this->assertCount(16, $banks);
         $routes = collect(config('payment_routes'));
 
         foreach ($banks as $bank) {
@@ -30,14 +31,17 @@ class BankVirtualAccountProvisioningTest extends TestCase
             $doku = $routes->first(fn (array $route): bool => $route['channel'] === $bank['code']
                 && $route['gateway'] === 'DOKU');
 
-            $this->assertSame([$bank['midtrans']], $midtrans['configuration']['enabled_payments']);
-            if ($bank['doku'] === null) {
-                $this->assertNull($doku, 'DOKU BSI route must not be guessed.');
-
-                continue;
+            if (empty($bank['midtrans'])) {
+                $this->assertNull($midtrans);
+            } else {
+                $this->assertSame([$bank['midtrans']], $midtrans['configuration']['enabled_payments']);
             }
-            $this->assertSame([$bank['doku']], $doku['configuration']['payment_method_types']);
-            $this->assertSame('/checkout/v1/payment', $doku['configuration']['api_path']);
+            if (empty($bank['doku'])) {
+                $this->assertNull($doku);
+            } else {
+                $this->assertSame([$bank['doku']], $doku['configuration']['payment_method_types']);
+                $this->assertSame('/checkout/v1/payment', $doku['configuration']['api_path']);
+            }
         }
     }
 
@@ -57,10 +61,13 @@ class BankVirtualAccountProvisioningTest extends TestCase
         $catalog = app(PaymentRouteCatalogService::class);
         $first = $catalog->sync();
 
-        $this->assertSame(7, $first['created_channels']);
-        $this->assertSame(13, $first['created']);
-        $this->assertSame(7, DB::table('payment_channels')->whereIn('code', $codes)->count());
-        $this->assertSame(13, DB::table('payment_routes')->whereIn(
+        $expectedRoutes = collect($banks)->sum(
+            fn (array $bank): int => (empty($bank['midtrans']) ? 0 : 1) + (empty($bank['doku']) ? 0 : 1)
+        );
+        $this->assertGreaterThanOrEqual(count($banks), $first['created_channels']);
+        $this->assertGreaterThanOrEqual($expectedRoutes, $first['created']);
+        $this->assertSame(count($banks), DB::table('payment_channels')->whereIn('code', $codes)->count());
+        $this->assertSame($expectedRoutes, DB::table('payment_routes')->whereIn(
             'payment_channel_id', DB::table('payment_channels')->whereIn('code', $codes)->pluck('id')
         )->count());
 
@@ -97,6 +104,77 @@ class BankVirtualAccountProvisioningTest extends TestCase
         $this->assertSame(0, (int) $route->is_active);
         $this->assertSame(73, (int) $route->priority);
         $this->assertSame(['enabled_payments' => ['bca_va']], json_decode($route->configuration, true));
+    }
+
+    public function test_hosted_doku_checkout_routes_include_qris_wallets_and_retail_methods(): void
+    {
+        $routes = collect(config('payment_routes'));
+        $codes = [
+            ['qris', 'QRIS'],
+            ['ewallet_ovo', 'EMONEY_OVO'],
+            ['ewallet_shopeepay', 'EMONEY_SHOPEE_PAY'],
+            ['ewallet_dana', 'EMONEY_DANA'],
+            ['ewallet_linkaja', 'EMONEY_LINKAJA'],
+            ['retail_alfamart', 'ONLINE_TO_OFFLINE_ALFA'],
+            ['retail_indomaret', 'ONLINE_TO_OFFLINE_INDOMARET'],
+        ];
+        foreach ($codes as [$channel, $method]) {
+            $route = $routes->first(fn (array $row): bool => $row['channel'] === $channel
+                && $row['gateway'] === 'DOKU');
+            $this->assertNotNull($route, $channel);
+            $this->assertSame('/checkout/v1/payment', $route['configuration']['api_path']);
+            $this->assertSame([$method], $route['configuration']['payment_method_types']);
+        }
+
+        $this->assertNull($routes->first(
+            fn (array $row): bool => $row['channel'] === 'ewallet_doku' && $row['gateway'] === 'DOKU'
+        ), 'DOKU Wallet must not be provisioned before its extra notification URL is supported.');
+    }
+
+    public function test_doku_checkout_payload_restricts_payment_to_exact_official_method_code(): void
+    {
+        $gateway = app(DokuCheckoutGateway::class);
+        $payload = new ReflectionMethod($gateway, 'payload');
+        $context = [
+            'route_configuration' => ['payment_method_types' => ['ONLINE_TO_OFFLINE_INDOMARET']],
+            'expires_minutes' => 30, 'merchant_reference' => 'REF-RETAIL-1',
+            'amount_idr' => 20000, 'return_url' => null,
+            'customer_name' => 'Guest', 'customer_email' => null, 'customer_phone' => null,
+        ];
+
+        $body = $payload->invoke($gateway, $context);
+        $this->assertSame(['ONLINE_TO_OFFLINE_INDOMARET'], $body['payment']['payment_method_types']);
+
+        $context['route_configuration']['payment_method_types'] = ['VIRTUAL_ACCOUNT_Sinarmas'];
+        $body = $payload->invoke($gateway, $context);
+        $this->assertSame(['VIRTUAL_ACCOUNT_Sinarmas'], $body['payment']['payment_method_types']);
+
+        $context['route_configuration']['payment_method_types'] = ['EMONEY_FAKE'];
+        $this->expectException(ValidationException::class);
+        $payload->invoke($gateway, $context);
+    }
+
+    public function test_new_retail_channels_are_off_until_merchant_activates_them(): void
+    {
+        $codes = array_column(config('payment_retail_channels'), 'code');
+        $ids = DB::table('payment_channels')->whereIn('code', $codes)->pluck('id');
+        DB::table('payment_routes')->whereIn('payment_channel_id', $ids)->delete();
+        DB::table('payment_channels')->whereIn('code', $codes)->delete();
+
+        $result = app(PaymentRouteCatalogService::class)->sync();
+        $this->assertGreaterThanOrEqual(2, $result['created_channels']);
+
+        $methods = DB::table('payment_channels')->whereIn('code', $codes)->get();
+        $this->assertCount(2, $methods);
+        foreach ($methods as $method) {
+            $this->assertSame('RETAIL', $method->method);
+            $this->assertSame(0, (int) $method->is_active);
+            $this->assertSame(2, DB::table('payment_routes')
+                ->where('payment_channel_id', $method->id)->count());
+            $this->assertSame(0, DB::table('payment_routes')
+                ->where('payment_channel_id', $method->id)
+                ->where('is_active', true)->count());
+        }
     }
 
     public function test_legacy_bank_routes_preserve_existing_effective_midtrans_choice(): void
