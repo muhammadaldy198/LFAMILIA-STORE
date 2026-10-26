@@ -31,9 +31,9 @@ const totalOrders = computed(() => chart.value.reduce((sum, row) => sum + Number
 const boxes = computed(() => [
     { key: 'revenue', label: 'Omzet Hari Ini', value: m.value.revenue_today == null ? null : rupiah(m.value.revenue_today), note: 'Pembayaran diterima hari ini' },
     { key: 'orders', label: 'Pesanan Hari Ini', value: m.value.orders_today == null ? null : num(m.value.orders_today), note: 'Semua status' },
-    { key: 'products', label: 'Produk Aktif', value: m.value.active_products == null ? null : num(m.value.active_products), note: 'Tampil di toko' },
+    { key: 'products', label: 'Produk Aktif', value: m.value.active_products == null ? null : num(m.value.active_products), note: 'Status aktif; belum tentu tersedia di toko' },
     { key: 'digiflazz', label: 'Saldo Digiflazz', value: props.digiflazzBalance?.amount_idr == null ? null : rupiah(props.digiflazzBalance.amount_idr), note: props.digiflazzBalance?.status === 'DOWN' ? 'Tidak dapat diperiksa' : 'Diperiksa dari penyedia' },
-    { key: 'paid', label: 'Pembayaran Berhasil', value: m.value.success_period == null ? null : num(m.value.success_period), note: 'Pesanan berstatus sukses di periode grafik' },
+    { key: 'paid', label: 'Pesanan Selesai', value: m.value.success_period == null ? null : num(m.value.success_period), note: 'Pesanan selesai dikirim dalam periode grafik' },
     { key: 'wallet', label: 'Saldo Wallet', value: m.value.wallet_balance == null ? null : rupiah(m.value.wallet_balance), note: 'Total saldo pelanggan' },
     { key: 'tickets', label: 'Tiket Terbuka', value: m.value.open_tickets == null ? null : num(m.value.open_tickets), note: 'Belum selesai' },
     { key: 'fulfillment', label: 'Pending Fulfillment', value: m.value.pending_fulfillment == null ? null : num(m.value.pending_fulfillment), note: 'Belum terkirim' },
