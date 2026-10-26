@@ -10,52 +10,21 @@ const admin = computed(() => panel.value.admin || {});
 const initial = computed(() => String(admin.value.name || 'A').trim().slice(0, 1).toUpperCase());
 const unread = computed(() => Number(panel.value.unread_notifications || 0));
 
-const MENU = [
-    { group: null, items: [{ label: 'Dashboard', href: '/admin/panel' }] },
-    { group: 'Transaksi', items: [
-        { label: 'Pesanan', href: '/admin/orders' },
-        { label: 'Manual', href: '/admin/fulfillment' },
-        { label: 'Promo', href: '/admin/vouchers' },
-    ] },
-    { group: 'Katalog', items: [
-        { label: 'Produk', href: '/admin/catalog' },
-        { label: 'Kategori', href: '/admin/catalog/categories' },
-    ] },
-    { group: 'Konten', items: [
-        { label: 'Banner & Konten', href: '/admin/content' },
-        { label: 'Tampilan Toko', href: '/admin/content/presentation' },
-    ] },
-    { group: 'Integrasi', items: [
-        { label: 'Digiflazz', href: '/admin/digiflazz' },
-        { label: 'Validasi Akun', href: '/admin/nickname-tools' },
-        { label: 'Provider', href: '/admin/providers' },
-    ] },
-    { group: 'Keuangan', items: [
-        { label: 'Pembayaran', href: '/admin/payments' },
-        { label: 'Laporan', href: '/admin/reports' },
-    ] },
-    { group: 'Pelanggan', items: [
-        { label: 'Pelanggan', href: '/admin/customers' },
-        { label: 'Layanan Pelanggan', href: '/admin/support' },
-    ] },
-    { group: 'Sistem', items: [
-        { label: 'Notifikasi', href: '/admin/notifications' },
-        { label: 'Integrasi', href: '/admin/integrations' },
-        { label: 'Kesehatan Sistem', href: '/admin/health' },
-        { label: 'Catatan Audit', href: '/admin/audit' },
-    ] },
-    { group: 'Pengaturan', items: [
-        { label: 'Admin & Akses', href: '/admin/access' },
-        { label: 'Pengaturan', href: '/admin/settings' },
-    ] },
-];
-
-// Backend tetap penentu izin: menu hanya tampil bila route-nya diizinkan.
+// Label, urutan, kelompok dan izin menu berasal dari server, bukan daftar duplikat di Vue.
 const allowed = computed(() => new Set((panel.value.menu || []).map(item => item.href)));
-const groups = computed(() => MENU.map(section => ({
-    group: section.group,
-    items: section.items.filter(item => !allowed.value.size || allowed.value.has(item.href)),
-})).filter(section => section.items.length));
+const groups = computed(() => {
+    const sections = [];
+    for (const item of panel.value.menu || []) {
+        const group = item.group ?? null;
+        let section = sections.find(entry => entry.group === group);
+        if (!section) {
+            section = { group, items: [] };
+            sections.push(section);
+        }
+        section.items.push({ label: item.label, href: item.href });
+    }
+    return sections;
+});
 
 const isActive = href => {
     const path = page.url.split('?')[0];
