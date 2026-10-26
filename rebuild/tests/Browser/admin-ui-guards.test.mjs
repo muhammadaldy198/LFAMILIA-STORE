@@ -203,6 +203,19 @@ test('sidebar covers every backend menu entry and names the support group', () =
     assert.match(service, /'label' => 'Pengiriman'/);
     assert.doesNotMatch(layout, /lf-admin(?!-)/);
 });
+test('catalog shows checkout readiness and Digiflazz owns the only sync switch', () => {
+    const catalog = read('Catalog.vue');
+    const controller = repo('app/Http/Controllers/AdminCatalogController.php');
+    const dashboard = read('Dashboard.vue');
+    assert.match(catalog, /row\.storefront_status/);
+    assert.match(catalog, /row\.buyable_nominal_count/);
+    assert.match(controller, /forPackages\(\$pagePackageIds\)/);
+    assert.doesNotMatch(catalog, /toggleAutoSync/, 'global sync switch must live in Digiflazz');
+    assert.match(catalog, /href="\/admin\/digiflazz"/);
+    assert.match(dashboard, /label: 'Pesanan Selesai'/);
+    assert.doesNotMatch(dashboard, /label: 'Pembayaran Berhasil'/);
+});
+
 test('support and fulfillment lead with the work list instead of metric cards', () => {
     assert.match(read('Support.vue'), /class="adm-summary"/);
     for (const file of ['Support.vue', 'Fulfillment.vue', 'Settings.vue']) {
