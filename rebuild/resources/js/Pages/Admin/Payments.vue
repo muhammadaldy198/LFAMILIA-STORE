@@ -357,7 +357,7 @@ const successRate = computed(() => {
                                 </td>
                                 <td>{{ methodLabel(channel.method) }}</td>
                                 <td>
-                                    <div v-if="gatewayRoutesFor(channel).length > 1" style="display:grid;gap:6px;min-width:160px">
+                                    <div v-if="gatewayRoutesFor(channel).length > 0" style="display:grid;gap:6px;min-width:160px">
                                         <label v-if="channel.supports_order" class="adm-field">
                                             <span>Pesanan</span>
                                             <select class="adm-input" :value="selectedGatewayId(channel, 'order')" @change="chooseGateway(channel, 'order', $event.target.value)">
@@ -373,7 +373,7 @@ const successRate = computed(() => {
                                             </select>
                                         </label>
                                     </div>
-                                    <span v-else class="adm-note">{{ gatewayRoutesFor(channel)[0]?.gateway_name || 'Internal' }}</span>
+                                    <span v-else class="adm-note">{{ channel.route_count ? 'Gateway internal' : 'Belum terhubung — klik Ubah' }}</span>
                                 </td>
                                 <td>
                                     <strong>{{ chargedFeeText(channel) }}</strong>
@@ -740,7 +740,7 @@ const successRate = computed(() => {
 
                 <div v-if="editor.id" class="adm-block full">
                     <strong>Provider untuk pilihan pembayaran ini</strong>
-                    <p class="adm-note" style="margin:4px 0 0">Tarif kosong berarti mengikuti biaya di atas. Prioritas kecil dipilih lebih dulu.</p>
+                    <p class="adm-note" style="margin:4px 0 0">Tarif kosong mengikuti biaya metode. Pilih gateway untuk pesanan dan top up lewat kolom Gateway terpilih. Jangan aktifkan dua route sekaligus.</p>
                     <div v-for="route in routesForEditor" :key="'r' + route.id" class="adm-route">
                         <div style="display:flex;justify-content:space-between;gap:6px;align-items:center">
                             <strong>{{ route.gateway_name }}</strong>
@@ -753,7 +753,7 @@ const successRate = computed(() => {
                             <label class="adm-field"><span>Biaya persen (%)</span><input v-model.number="route.fee_percent" type="number" min="0" max="99.99" step="0.01" class="adm-input" :disabled="routeIsFree(route) || !route.custom_fee"></label>
                         </div>
                         <div style="display:flex;justify-content:space-between;gap:6px;align-items:center;margin-top:6px">
-                            <label class="adm-switch-row"><button type="button" class="adm-switch" role="switch" :aria-checked="route.is_active" @click="route.is_active = !route.is_active" /> Aktif untuk checkout</label>
+                            <span class="adm-note">{{ route.is_active ? 'Route aktif' : 'Route tidak aktif' }} · pilih gateway melalui kolom utama</span>
                             <button type="button" class="adm-btn sm" @click="saveRoute(route)">Simpan gateway</button>
                         </div>
                     </div>
