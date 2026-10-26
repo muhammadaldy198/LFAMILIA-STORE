@@ -20,19 +20,38 @@ class IndividualEwalletProvisioningTest extends TestCase
         DB::table('payment_channels')->whereIn('code', $codes)->delete();
 
         $result = app(PaymentRouteCatalogService::class)->sync();
-        $this->assertSame(2, $result['created_channels']);
-        $gateway = DB::table('payment_gateways')->where('code', 'MIDTRANS')->value('id');
+        $supported = array_values(array_filter($wallets, fn (array $wallet): bool => empty($wallet['requires_integration'])));
+        $this->assertGreaterThanOrEqual(count($supported), $result['created_channels']);
 
         foreach ($wallets as $wallet) {
-            $channel = DB::table('payment_channels')->where('code', $wallet['code'])->firstOrFail();
+            $channel = DB::table('payment_channels')->where('code', $wallet['code'])->first();
+            if (! empty($wallet['requires_integration'])) {
+                $this->assertNull($channel, 'Do not provision DOKU Wallet before its special callback works.');
+
+                continue;
+            }
+
+            $this->assertNotNull($channel);
             $this->assertSame(0, (int) $channel->is_active);
             $this->assertSame(0, (int) $channel->fee_flat_idr);
             $this->assertSame(0, (int) $channel->fee_percent_bps);
-            $route = DB::table('payment_routes')
-                ->where('payment_channel_id', $channel->id)
-                ->where('payment_gateway_id', $gateway)->firstOrFail();
-            $this->assertSame(0, (int) $route->is_active);
-            $this->assertSame([$wallet['midtrans']], json_decode($route->configuration, true)['enabled_payments']);
+            foreach (['MIDTRANS' => 'midtrans', 'DOKU' => 'doku'] as $gatewayCode => $key) {
+                $route = DB::table('payment_routes')
+                    ->join('payment_gateways', 'payment_gateways.id', '=', 'payment_routes.payment_gateway_id')
+                    ->where('payment_routes.payment_channel_id', $channel->id)
+                    ->where('payment_gateways.code', $gatewayCode)->first();
+                if (empty($wallet[$key])) {
+                    $this->assertNull($route, $gatewayCode.' must not be invented for '.$wallet['code']);
+
+                    continue;
+                }
+
+                $this->assertNotNull($route, $gatewayCode.' route missing for '.$wallet['code']);
+                $this->assertSame(0, (int) $route->is_active);
+                $configuration = json_decode($route->configuration, true);
+                $this->assertSame([$wallet[$key]], $gatewayCode === 'MIDTRANS'
+                    ? $configuration['enabled_payments'] : $configuration['payment_method_types']);
+            }
         }
 
         $gopay = DB::table('payment_channels')->where('code', 'ewallet_gopay')->firstOrFail();
