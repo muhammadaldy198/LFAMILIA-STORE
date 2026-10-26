@@ -268,8 +268,8 @@ class AdminPaymentController
             return ['ready' => false, 'reason' => 'Metode tidak diaktifkan untuk tujuan transaksi ini.'];
         }
 
-        $selected = $routes->filter(fn (object $route): bool =>
-            (bool) $route->is_active && (bool) $route->{$purpose}
+        $selected = $routes->filter(
+            fn (object $route): bool => (bool) $route->is_active && (bool) $route->{$purpose}
         )->values();
         if ($selected->isEmpty()) {
             return ['ready' => false, 'reason' => $routes->isEmpty()
