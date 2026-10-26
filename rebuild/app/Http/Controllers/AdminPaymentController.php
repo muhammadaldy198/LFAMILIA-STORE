@@ -82,6 +82,8 @@ class AdminPaymentController
         $channels = PaymentChannel::query()->orderBy('sort_order')->orderBy('id')->get()
             ->map(function (PaymentChannel $channel) use ($routing, $routesByChannel): array {
                 $routes = $routesByChannel->get($channel->id, collect());
+                $orderReadiness = $this->paymentReadiness($channel, $routes, 'supports_order', $routing);
+                $topupReadiness = $this->paymentReadiness($channel, $routes, 'supports_wallet_topup', $routing);
 
                 return [
                     'id' => (int) $channel->id,
@@ -98,20 +100,10 @@ class AdminPaymentController
                     'is_active' => (bool) $channel->is_active,
                     'route_count' => $routes->count(),
                     'active_route_count' => $routes->where('is_active', true)->count(),
-                    'available_order' => (bool) $channel->is_active && $routes->contains(
-                        fn (object $route): bool => (bool) $route->is_active
-                            && (bool) $route->supports_order
-                            && (bool) $route->gateway_active
-                            && ! (bool) $route->gateway_maintenance
-                            && $routing->gatewayReady((string) $route->gateway_code)
-                    ),
-                    'available_topup' => (bool) $channel->is_active && $routes->contains(
-                        fn (object $route): bool => (bool) $route->is_active
-                            && (bool) $route->supports_wallet_topup
-                            && (bool) $route->gateway_active
-                            && ! (bool) $route->gateway_maintenance
-                            && $routing->gatewayReady((string) $route->gateway_code)
-                    ),
+                    'available_order' => $orderReadiness['ready'],
+                    'available_topup' => $topupReadiness['ready'],
+                    'order_readiness_reason' => $orderReadiness['reason'],
+                    'topup_readiness_reason' => $topupReadiness['reason'],
                 ];
             })->values();
 
@@ -230,6 +222,47 @@ class AdminPaymentController
                 'doku' => rtrim((string) config('app.url'), '/').'/api/payments/doku/notification',
             ],
         ]);
+    }
+
+    /**
+     * Match the public router: each channel and purpose must have exactly one
+     * active route, and that route's gateway must be usable.
+     *
+     * @return array{ready:bool,reason:?string}
+     */
+    private function paymentReadiness(PaymentChannel $channel, $routes, string $purpose, PaymentRoutingService $routing): array
+    {
+        if (! $channel->is_active) {
+            return ['ready' => false, 'reason' => 'Metode pembayaran nonaktif.'];
+        }
+        if (! $channel->{$purpose}) {
+            return ['ready' => false, 'reason' => 'Metode tidak diaktifkan untuk tujuan transaksi ini.'];
+        }
+
+        $selected = $routes->filter(fn (object $route): bool =>
+            (bool) $route->is_active && (bool) $route->{$purpose}
+        )->values();
+        if ($selected->isEmpty()) {
+            return ['ready' => false, 'reason' => $routes->isEmpty()
+                ? 'Belum ada koneksi gateway untuk metode ini. Gunakan metode bawaan yang telah terintegrasi.'
+                : 'Belum ada gateway dipilih. Pilih gateway untuk tujuan ini di kolom Gateway terpilih.'];
+        }
+        if ($selected->count() > 1) {
+            return ['ready' => false, 'reason' => 'Lebih dari satu gateway aktif. Pilih tepat satu gateway untuk tujuan ini.'];
+        }
+
+        $route = $selected->first();
+        if (! $route->gateway_active) {
+            return ['ready' => false, 'reason' => 'Gateway belum diaktifkan pada pengaturan Gateway.'];
+        }
+        if ($route->gateway_maintenance) {
+            return ['ready' => false, 'reason' => 'Gateway sedang dalam mode pemeliharaan.'];
+        }
+        if (! $routing->gatewayReady((string) $route->gateway_code)) {
+            return ['ready' => false, 'reason' => 'Kredensial gateway belum siap. Periksa menu Integrasi.'];
+        }
+
+        return ['ready' => true, 'reason' => null];
     }
 
     public function storeChannel(Request $request): RedirectResponse
