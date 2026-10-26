@@ -130,6 +130,15 @@ class PaymentRoutingService
             ]);
         }
 
+        if ((string) $route->gateway_code === 'DOKU') {
+            $settings = json_decode((string) $route->configuration, true);
+            if (! is_array($settings) || ($settings['api_path'] ?? '') !== '/checkout/v1/payment') {
+                throw ValidationException::withMessages([
+                    'payment_channel_code' => 'Kanal DOKU harus memakai DOKU Checkout. Perbaiki routing di panel Admin.',
+                ]);
+            }
+        }
+
         return [
             'channel_id' => (int) $channel->id,
             'channel_code' => (string) $channel->code,
@@ -221,6 +230,15 @@ class PaymentRoutingService
             throw ValidationException::withMessages([
                 'payment' => 'Metode pembayaran sedang tidak tersedia.',
             ]);
+        }
+
+        if ((string) $row->gateway_code === 'DOKU') {
+            $settings = json_decode((string) $row->configuration, true);
+            if (! is_array($settings) || ($settings['api_path'] ?? '') !== '/checkout/v1/payment') {
+                throw ValidationException::withMessages([
+                    'payment' => 'Routing DOKU lama tidak didukung. Gunakan DOKU Checkout.',
+                ]);
+            }
         }
 
         return [
