@@ -269,11 +269,76 @@ class AdminPaymentController
     {
         $data = $this->channelData($request);
         $data['code'] = strtolower(trim($data['code']));
+        $connection = $request->validate([
+            'gateway_code' => ['required', Rule::in(['MIDTRANS', 'DOKU'])],
+            'provider_method' => ['required', 'string', 'min:2', 'max:80'],
+        ]);
+        $configuration = $this->providerMethodConfiguration(
+            (string) $data['method'], (string) $connection['gateway_code'], (string) $connection['provider_method']
+        );
 
-        $channel = PaymentChannel::create($data);
-        $this->audit($request, 'payment.channel.created', 'payment_channel', $channel->id, null, $channel->toArray());
+        DB::transaction(function () use ($request, $data, $connection, $configuration): void {
+            $gateway = DB::table('payment_gateways')
+                ->where('code', $connection['gateway_code'])->firstOrFail();
 
-        return back()->with('status', 'Metode pembayaran ditambahkan.');
+            $channel = PaymentChannel::create($data);
+            DB::table('payment_routes')->insert([
+                'payment_channel_id' => $channel->id,
+                'payment_gateway_id' => $gateway->id,
+                'provider_channel' => $connection['gateway_code'] === 'MIDTRANS'
+                    ? $connection['provider_method'] : 'DOKU_CHECKOUT',
+                'configuration' => json_encode($configuration, JSON_THROW_ON_ERROR),
+                'priority' => 10,
+                'supports_order' => (bool) $data['supports_order'],
+                'supports_wallet_topup' => (bool) $data['supports_wallet_topup'],
+                'is_active' => (bool) $data['is_active'],
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->audit($request, 'payment.channel.created', 'payment_channel', $channel->id, null, [
+                'channel' => $channel->toArray(),
+                'gateway' => $connection['gateway_code'],
+                'provider_method' => $connection['provider_method'],
+            ]);
+        });
+
+        return back()->with('status', 'Metode dan koneksi gateway dibuat. Periksa kesiapan penyedia sebelum digunakan.');
+    }
+
+    /**
+     * Protocol fields come from a validated gateway method identifier, never
+     * a free-form API path or payment request template from the Admin form.
+     * The external merchant account must still have the method enabled.
+     *
+     * @return array<string, mixed>
+     */
+    private function providerMethodConfiguration(string $method, string $gatewayCode, string $providerMethod): array
+    {
+        if ($gatewayCode === 'MIDTRANS') {
+            if (! preg_match('/^[a-z][a-z0-9_]{1,79}$/D', $providerMethod)
+                || ! in_array($method, ['QRIS', 'VIRTUAL_ACCOUNT', 'EWALLET', 'RETAIL'], true)) {
+                throw ValidationException::withMessages([
+                    'provider_method' => 'Masukkan kode pembayaran Midtrans Snap yang valid untuk jenis metode ini.',
+                ]);
+            }
+
+            return ['enabled_payments' => [$providerMethod]];
+        }
+
+        // Only VA types are wired through the DOKU Checkout payment types
+        // contract in this project; other DOKU products need contract tests.
+        if ($gatewayCode !== 'DOKU' || $method !== 'VIRTUAL_ACCOUNT'
+            || ! preg_match('/^VIRTUAL_ACCOUNT_[A-Z][A-Z0-9_]{1,63}$/D', $providerMethod)) {
+            throw ValidationException::withMessages([
+                'provider_method' => 'DOKU Checkout saat ini membutuhkan kode VA yang didukung.',
+            ]);
+        }
+
+        return [
+            'api_path' => '/checkout/v1/payment',
+            'payment_method_types' => [$providerMethod],
+            'public_paths' => ['payment_url' => 'response.payment.url'],
+        ];
     }
 
     public function channel(Request $request, int $id): RedirectResponse
@@ -281,6 +346,13 @@ class AdminPaymentController
         $channel = PaymentChannel::findOrFail($id);
         $data = $this->channelData($request, $channel->id);
         $data['code'] = strtolower(trim($data['code']));
+
+        if ($channel->method !== $data['method']
+            && DB::table('payment_routes')->where('payment_channel_id', $channel->id)->exists()) {
+            throw ValidationException::withMessages([
+                'method' => 'Jenis metode dengan route yang sudah terhubung tidak boleh diubah. Buat pilihan baru dengan kode penyedia yang sesuai.',
+            ]);
+        }
 
         $before = $channel->toArray();
         $channel->update($data);
