@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\IntegrationRuntimeConfig;
 use App\Services\MidtransStatusVerification;
-use App\Services\Payment\DokuDirectGateway;
+use App\Services\Payment\DokuCheckoutGateway;
 use App\Services\Payment\DokuSignature;
 use App\Services\Payment\MidtransGateway;
 use App\Services\PaymentStateService;
@@ -98,7 +98,7 @@ class PaymentWebhookController
     public function doku(
         Request $request,
         DokuSignature $signature,
-        DokuDirectGateway $doku,
+        DokuCheckoutGateway $doku,
         PaymentStateService $states,
         IntegrationRuntimeConfig $runtime,
     ): JsonResponse {

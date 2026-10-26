@@ -38,6 +38,119 @@ class AdminPaymentRestorationTest extends TestCase
         return $admin;
     }
 
+    public function test_active_custom_method_is_not_ready_without_unique_gateway_route(): void
+    {
+        $this->login('SUPER_ADMIN');
+        $code = 'va_unrouted_'.bin2hex(random_bytes(3));
+        DB::table('payment_channels')->insert([
+            'code' => $code,
+            'name' => 'Test Unrouted',
+            'method' => 'VIRTUAL_ACCOUNT',
+            'fee_flat_idr' => 0,
+            'fee_percent_bps' => 0,
+            'supports_order' => true,
+            'supports_wallet_topup' => true,
+            'sort_order' => 880,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->get('/admin/payments')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/Payments')
+            ->where('channels', function ($channels) use ($code): bool {
+                $channel = collect($channels)->firstWhere('code', $code);
+
+                return is_array($channel)
+                    && $channel['is_active'] === true
+                    && $channel['available_order'] === false
+                    && $channel['available_topup'] === false
+                    && str_contains($channel['order_readiness_reason'], 'Belum ada koneksi gateway');
+            }));
+    }
+
+    public function test_admin_created_method_is_bound_to_midtrans_provider_method_and_checkout(): void
+    {
+        $this->login('SUPER_ADMIN');
+        $code = 'va_custom_'.bin2hex(random_bytes(3));
+        DB::table('payment_gateways')->where('code', 'MIDTRANS')->update([
+            'is_active' => true, 'is_maintenance' => false,
+        ]);
+        IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
+            'config_ciphertext' => ['server_key' => 'test-sandbox-key', 'is_production' => false],
+            'is_active' => true,
+        ]);
+
+        $this->post('/admin/payments/channels', [
+            'code' => $code,
+            'name' => 'VA Custom',
+            'method' => 'VIRTUAL_ACCOUNT',
+            'description' => 'VA testing',
+            'fee_flat_idr' => 0,
+            'fee_percent_bps' => 0,
+            'sort_order' => 881,
+            'supports_order' => true,
+            'supports_wallet_topup' => true,
+            'is_active' => true,
+            'gateway_code' => 'MIDTRANS',
+            'provider_method' => 'bni_va',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $channel = DB::table('payment_channels')->where('code', $code)->firstOrFail();
+        $route = DB::table('payment_routes')->where('payment_channel_id', $channel->id)->firstOrFail();
+        $this->assertSame('bni_va', $route->provider_channel);
+        $this->assertSame(['enabled_payments' => ['bni_va']], json_decode($route->configuration, true));
+        $this->assertSame('MIDTRANS', app(PaymentRoutingService::class)->resolve($code)['gateway_code']);
+        $this->assertTrue(collect(app(PaymentRoutingService::class)->publicOrderChannels(null))
+            ->contains('code', $code));
+    }
+
+    public function test_admin_can_connect_legacy_active_method_without_route(): void
+    {
+        $this->login('SUPER_ADMIN');
+        $code = 'va_fix_'.bin2hex(random_bytes(3));
+        $id = DB::table('payment_channels')->insertGetId([
+            'code' => $code, 'name' => 'VA orphan', 'method' => 'VIRTUAL_ACCOUNT',
+            'fee_flat_idr' => 0, 'fee_percent_bps' => 0, 'supports_order' => true,
+            'supports_wallet_topup' => true, 'sort_order' => 889, 'is_active' => true,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $this->put('/admin/payments/channels/'.$id, [
+            'code' => $code, 'name' => 'VA orphan', 'method' => 'VIRTUAL_ACCOUNT',
+            'description' => 'VA custom', 'fee_flat_idr' => 0, 'fee_percent_bps' => 0,
+            'supports_order' => true, 'supports_wallet_topup' => true,
+            'sort_order' => 889, 'is_active' => true,
+            'gateway_code' => 'DOKU', 'provider_method' => 'VIRTUAL_ACCOUNT_BNI',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $route = DB::table('payment_routes')->where('payment_channel_id', $id)->firstOrFail();
+        $this->assertSame('DOKU_CHECKOUT', $route->provider_channel);
+        $this->assertSame('/checkout/v1/payment', json_decode($route->configuration, true)['api_path']);
+    }
+
+    public function test_multiple_gateways_for_same_purpose_are_not_marked_ready(): void
+    {
+        $this->login('SUPER_ADMIN');
+        $id = DB::table('payment_channels')->where('code', 'virtual_account')->value('id');
+        DB::table('payment_channels')->where('id', $id)->update(['is_active' => true]);
+        DB::table('payment_gateways')->whereIn('code', ['MIDTRANS', 'DOKU'])->update([
+            'is_active' => true, 'is_maintenance' => false,
+        ]);
+        DB::table('payment_routes')->where('payment_channel_id', $id)
+            ->update(['is_active' => true, 'supports_order' => true]);
+
+        $this->get('/admin/payments')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/Payments')
+            ->where('channels', function ($channels): bool {
+                $channel = collect($channels)->firstWhere('code', 'virtual_account');
+
+                return is_array($channel)
+                    && $channel['available_order'] === false
+                    && str_contains($channel['order_readiness_reason'], 'Lebih dari satu gateway aktif');
+            }));
+    }
+
     public function test_payment_workspace_restores_registry_and_hides_legacy_sensitive_route_values(): void
     {
         $this->login();

@@ -20,6 +20,7 @@ const props = defineProps({
     refundReviews: { type: Array, default: () => [] },
     pageSettings: { type: Object, default: () => ({}) },
     callbackUrls: { type: Object, default: () => ({}) },
+    providerMethods: { type: Array, default: () => [] },
 });
 
 const tab = ref('settings');
@@ -95,6 +96,7 @@ const advanced = ref(false);
 const openCreate = () => {
     editor.value = {
         id: null, code: '', method: 'VIRTUAL_ACCOUNT', name: '', description: '',
+        gateway_code: 'MIDTRANS', provider_method: '',
         fee_flat_idr: 0, fee_percent: 0, supports_order: true, supports_wallet_topup: true,
         sort_order: props.channels.length ? Math.max(...props.channels.map(item => Number(item.sort_order || 0))) + 10 : 10,
         is_active: false,
@@ -105,7 +107,7 @@ const openCreate = () => {
     errors.value = {};
 };
 const openEdit = channel => {
-    editor.value = { ...channel, fee_percent: Number(channel.fee_percent_bps || 0) / 100 };
+    editor.value = { ...channel, gateway_code: 'MIDTRANS', provider_method: '', fee_percent: Number(channel.fee_percent_bps || 0) / 100 };
     logoFile.value = null;
     logoPreview.value = channel.logo_url || '';
     advanced.value = false;
@@ -142,6 +144,8 @@ const saveChannel = () => {
         supports_wallet_topup: Boolean(row.supports_wallet_topup),
         sort_order: Number(row.sort_order || 0),
         is_active: Boolean(row.is_active),
+        ...((!row.id || !routes.some(route => route.payment_channel_id === row.id))
+            ? { gateway_code: row.gateway_code, provider_method: String(row.provider_method || '').trim() } : {}),
     };
     saving.value = 'channel';
     errors.value = {};
@@ -181,6 +185,8 @@ const syncChannels = () => router.post('/admin/payments/channels/sync', {}, { pr
 const routesForEditor = computed(() => editor.value
     ? routes.filter(route => route.payment_channel_id === editor.value.id)
     : []);
+const providerMethodChoices = computed(() => (props.providerMethods || []).filter(item =>
+    item.gateway === editor.value?.gateway_code && item.method === editor.value?.method));
 
 const saveRoute = row => {
     router.put('/admin/payments/routes/' + row.id, {
@@ -351,7 +357,7 @@ const successRate = computed(() => {
                                 </td>
                                 <td>{{ methodLabel(channel.method) }}</td>
                                 <td>
-                                    <div v-if="gatewayRoutesFor(channel).length > 1" style="display:grid;gap:6px;min-width:160px">
+                                    <div v-if="gatewayRoutesFor(channel).length > 0" style="display:grid;gap:6px;min-width:160px">
                                         <label v-if="channel.supports_order" class="adm-field">
                                             <span>Pesanan</span>
                                             <select class="adm-input" :value="selectedGatewayId(channel, 'order')" @change="chooseGateway(channel, 'order', $event.target.value)">
@@ -367,7 +373,7 @@ const successRate = computed(() => {
                                             </select>
                                         </label>
                                     </div>
-                                    <span v-else class="adm-note">{{ gatewayRoutesFor(channel)[0]?.gateway_name || 'Internal' }}</span>
+                                    <span v-else class="adm-note">{{ channel.route_count ? 'Gateway internal' : 'Belum terhubung — klik Ubah' }}</span>
                                 </td>
                                 <td>
                                     <strong>{{ chargedFeeText(channel) }}</strong>
@@ -377,6 +383,8 @@ const successRate = computed(() => {
                                     <div style="display:flex;gap:4px;flex-wrap:wrap">
                                         <span class="adm-tag" :class="channel.available_order ? 'ok' : 'bad'">Pesanan {{ channel.available_order ? 'siap' : 'belum siap' }}</span>
                                         <span v-if="channel.supports_wallet_topup" class="adm-tag" :class="channel.available_topup ? 'ok' : 'bad'">Top up {{ channel.available_topup ? 'siap' : 'belum siap' }}</span>
+                                        <p v-if="channel.supports_order && !channel.available_order" class="adm-note" style="width:100%">{{ channel.order_readiness_reason }}</p>
+                                        <p v-if="channel.supports_wallet_topup && !channel.available_topup" class="adm-note" style="width:100%">Top up: {{ channel.topup_readiness_reason }}</p>
                                     </div>
                                 </td>
                                 <td><span class="adm-tag" :class="channel.is_active ? 'ok' : 'bad'">{{ channel.is_active ? 'Aktif' : 'Nonaktif' }}</span></td>
@@ -661,7 +669,7 @@ const successRate = computed(() => {
 
         <!-- pop-up metode -->
         <AdminModal :open="!!editor" :title="editor?.id ? 'Ubah metode pembayaran' : 'Tambah metode pembayaran'"
-            description="Nama, jenis, dan status metode. Biaya bawaan metode dipakai bila tidak ada biaya gateway khusus."
+            description="Pilih metode bawaan yang sudah punya route gateway. Metode baru dengan kode bebas belum otomatis terhubung ke Midtrans atau DOKU."
             wide @update:open="value => { if (!value) closeEditor(); }">
             <div v-if="editor" class="adm-grid">
                 <label class="adm-field">
@@ -688,6 +696,33 @@ const successRate = computed(() => {
                     <input v-model="editor.description" class="adm-input" maxlength="160">
                 </label>
 
+                <div v-if="!editor.id || !routesForEditor.length" class="adm-block full">
+                    <strong>Koneksi gateway</strong>
+                    <p class="adm-note">Pilih penyedia dan kode metode API yang benar, bukan hanya nama tampilan. Pilihan yang disediakan mengikuti katalog metode terintegrasi. Dukungan aktual harus diaktifkan pada akun merchant.</p>
+                    <div class="adm-grid" style="margin-top:8px">
+                        <label class="adm-field">
+                            <span>Gateway penyedia</span>
+                            <select v-model="editor.gateway_code" class="adm-select" @change="editor.provider_method = ''">
+                                <option value="MIDTRANS">Midtrans Snap</option>
+                                <option v-if="editor.method === 'VIRTUAL_ACCOUNT'" value="DOKU">DOKU Checkout</option>
+                            </select>
+                        </label>
+                        <label class="adm-field">
+                            <span>Kode metode pada penyedia</span>
+                            <input v-model="editor.provider_method" class="adm-input mono"
+                                list="payment-provider-methods" maxlength="80"
+                                :placeholder="providerMethodChoices[0]?.code || 'Kode API dari penyedia'">
+                            <datalist id="payment-provider-methods">
+                                <option v-for="item in providerMethodChoices" :key="item.gateway+'-'+item.code"
+                                    :value="item.code">{{ item.label }}</option>
+                            </datalist>
+                            <span v-if="errors.provider_method" class="err">{{ errors.provider_method }}</span>
+                            <span v-if="errors.gateway_code" class="err">{{ errors.gateway_code }}</span>
+                            <span class="hint">Kode baru di luar daftar hanya bisa dipakai jika sudah benar-benar didukung gateway dan merchant.</span>
+                        </label>
+                    </div>
+                </div>
+
                 <div class="adm-block full">
                     <strong>Biaya untuk pilihan pembayaran ini</strong>
                     <div class="adm-grid" style="margin-top:8px">
@@ -705,7 +740,7 @@ const successRate = computed(() => {
 
                 <div v-if="editor.id" class="adm-block full">
                     <strong>Provider untuk pilihan pembayaran ini</strong>
-                    <p class="adm-note" style="margin:4px 0 0">Tarif kosong berarti mengikuti biaya di atas. Prioritas kecil dipilih lebih dulu.</p>
+                    <p class="adm-note" style="margin:4px 0 0">Tarif kosong mengikuti biaya metode. Pilih gateway untuk pesanan dan top up lewat kolom Gateway terpilih. Jangan aktifkan dua route sekaligus.</p>
                     <div v-for="route in routesForEditor" :key="'r' + route.id" class="adm-route">
                         <div style="display:flex;justify-content:space-between;gap:6px;align-items:center">
                             <strong>{{ route.gateway_name }}</strong>
@@ -718,11 +753,11 @@ const successRate = computed(() => {
                             <label class="adm-field"><span>Biaya persen (%)</span><input v-model.number="route.fee_percent" type="number" min="0" max="99.99" step="0.01" class="adm-input" :disabled="routeIsFree(route) || !route.custom_fee"></label>
                         </div>
                         <div style="display:flex;justify-content:space-between;gap:6px;align-items:center;margin-top:6px">
-                            <label class="adm-switch-row"><button type="button" class="adm-switch" role="switch" :aria-checked="route.is_active" @click="route.is_active = !route.is_active" /> Aktif untuk checkout</label>
+                            <span class="adm-note">{{ route.is_active ? 'Route aktif' : 'Route tidak aktif' }} · pilih gateway melalui kolom utama</span>
                             <button type="button" class="adm-btn sm" @click="saveRoute(route)">Simpan gateway</button>
                         </div>
                     </div>
-                    <p v-if="!routesForEditor.length" class="adm-note" style="margin-top:8px">Belum ada gateway terhubung untuk metode ini.</p>
+                    <p v-if="!routesForEditor.length" class="adm-note" style="margin-top:8px">Hubungkan ke gateway dengan mengisi kode metode penyedia di bagian "Koneksi gateway" sebelum menyimpan.</p>
                 </div>
 
                 <div class="adm-block">
@@ -733,7 +768,7 @@ const successRate = computed(() => {
                 <div class="adm-block">
                     <strong>Status</strong>
                     <label class="adm-switch-row"><button type="button" class="adm-switch" role="switch" :aria-checked="editor.is_active" @click="editor.is_active = !editor.is_active" /> Metode aktif</label>
-                    <p class="adm-note">Hanya tampil bila gateway siap.</p>
+                    <p class="adm-note">Aktif hanya berarti diizinkan oleh Admin. Agar muncul di checkout harus ada satu gateway dipilih, gateway aktif, dan kredensial tersedia.</p>
                 </div>
 
                 <div class="adm-field full">

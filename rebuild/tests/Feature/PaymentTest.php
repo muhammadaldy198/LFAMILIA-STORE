@@ -601,12 +601,12 @@ class PaymentTest extends TestCase
             ->where('event_id', 'fake')->count());
     }
 
-    public function test_doku_direct_request_and_signed_callback_mark_order_paid(): void
+    public function test_doku_checkout_request_and_signed_callback_mark_order_paid(): void
     {
         $catalog = $this->catalog();
         $this->route('virtual_account', 'DOKU', 2500, 0, null, [
-            'api_path' => '/doku-virtual-account/v2/payment-code',
-            'public_paths' => ['va_number' => 'virtual_account_info.virtual_account_number'],
+            'api_path' => '/checkout/v1/payment',
+            'public_paths' => ['payment_url' => 'response.payment.url'],
         ]);
         IntegrationCredential::updateOrCreate(['code' => 'doku'], [
             'config_ciphertext' => [
@@ -653,7 +653,7 @@ class PaymentTest extends TestCase
             $body = json_decode($request->body(), true, 512, JSON_THROW_ON_ERROR);
             $responseData = [
                 'order' => ['invoice_number' => $body['order']['invoice_number']],
-                'virtual_account_info' => ['virtual_account_number' => '88000000123456'],
+                'response' => ['payment' => ['url' => 'https://sandbox.doku.test/checkout/order-123']],
             ];
             $responseBody = json_encode($responseData, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
             $timestamp = now('UTC')->format('Y-m-d\\TH:i:s\\Z');
@@ -661,7 +661,7 @@ class PaymentTest extends TestCase
                 'MCH-TEST',
                 $requestId,
                 $timestamp,
-                '/doku-virtual-account/v2/payment-code',
+                '/checkout/v1/payment',
                 $responseBody,
                 'doku-secret'
             );
@@ -685,7 +685,7 @@ class PaymentTest extends TestCase
             'access_code' => $checkout->json('access_code'),
         ])->assertOk()
             ->assertJsonPath('status', 'PENDING')
-            ->assertJsonPath('instructions.va_number', '88000000123456');
+            ->assertJsonPath('instructions.payment_url', 'https://sandbox.doku.test/checkout/order-123');
 
         $payment = DB::table('payment_transactions')
             ->where('idempotency_key', 'm7-doku-payment-0001')->firstOrFail();

@@ -8,7 +8,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
-class DokuDirectGateway
+class DokuCheckoutGateway
 {
     public function __construct(
         private readonly DokuSignature $signature,
@@ -84,7 +84,7 @@ class DokuDirectGateway
 
         $route = $context['route_configuration'];
         $path = (string) ($route['api_path'] ?? '');
-        if (! str_starts_with($path, '/') || str_contains($path, '..')) {
+        if ($path !== '/checkout/v1/payment') {
             throw ValidationException::withMessages(['payment' => 'Konfigurasi metode pembayaran belum lengkap.']);
         }
 
@@ -143,17 +143,14 @@ class DokuDirectGateway
             throw new RuntimeException('DOKU_CREATE_UNCERTAIN');
         }
 
-        $public = ['kind' => $path === '/checkout/v1/payment' ? 'doku_checkout' : 'instructions'];
-        foreach ((array) ($route['public_paths'] ?? []) as $name => $dataPath) {
-            if (! is_string($name) || ! is_string($dataPath)
-                || ! in_array($name, ['payment_code', 'payment_url', 'qr_string', 'va_number'], true)) {
-                continue;
-            }
-            $value = data_get($data, $dataPath);
-            if (is_string($value) || is_numeric($value)) {
-                $public[$name] = (string) $value;
-            }
+        // Hosted DOKU Checkout supplies exactly one payment-page URL.
+        // Never expose direct-VA instructions through this adapter.
+        $checkoutUrl = data_get($data, 'response.payment.url');
+        if (! is_string($checkoutUrl) || ! filter_var($checkoutUrl, FILTER_VALIDATE_URL)
+            || ! str_starts_with($checkoutUrl, 'https://')) {
+            throw new RuntimeException('DOKU_CREATE_UNCERTAIN');
         }
+        $public = ['kind' => 'doku_checkout', 'payment_url' => $checkoutUrl];
 
         return [
             'status' => 'PENDING',
@@ -179,83 +176,30 @@ class DokuDirectGateway
      */
     private function payload(array $context): array
     {
-        if (($context['route_configuration']['api_path'] ?? '') === '/checkout/v1/payment') {
-            $payment = ['payment_due_date' => $context['expires_minutes']];
-            $methods = $context['route_configuration']['payment_method_types'] ?? null;
-            if (is_array($methods) && $methods !== []) {
-                $payment['payment_method_types'] = array_values(array_filter(
-                    $methods, fn ($method): bool => is_string($method) && str_starts_with($method, 'VIRTUAL_ACCOUNT_')
-                ));
-            }
-
-            return [
-                'order' => [
-                    'invoice_number' => $context['merchant_reference'],
-                    'amount' => $context['amount_idr'],
-                    'auto_redirect' => ! empty($context['return_url']),
-                    'callback_url_result' => $context['return_url'] ?? null,
-                ],
-                'payment' => $payment,
-                'customer' => array_filter([
-                    'name' => $context['customer_name'] ?: 'Customer LFAMILIA',
-                    'email' => $context['customer_email'],
-                    'phone' => $context['customer_phone'],
-                ]),
-            ];
+        // DOKU Checkout only. A merchant must never accidentally create a
+        // provider-direct VA from an old route or an editor-supplied template.
+        $payment = ['payment_due_date' => $context['expires_minutes']];
+        $methods = $context['route_configuration']['payment_method_types'] ?? null;
+        if (is_array($methods) && $methods !== []) {
+            $payment['payment_method_types'] = array_values(array_filter(
+                $methods, fn ($method): bool => is_string($method) && str_starts_with($method, 'VIRTUAL_ACCOUNT_')
+            ));
         }
 
-        $template = $context['route_configuration']['request_template'] ?? null;
-        if (! is_array($template)) {
-            return [
-                'order' => [
-                    'invoice_number' => $context['merchant_reference'],
-                    'amount' => $context['amount_idr'],
-                ],
-                'virtual_account_info' => [
-                    'expired_time' => $context['expires_minutes'],
-                    'reusable_status' => false,
-                ],
-                'customer' => array_filter([
-                    'name' => $context['customer_name'] ?: 'Customer LFAMILIA',
-                    'email' => $context['customer_email'],
-                    'phone' => $context['customer_phone'],
-                ]),
-            ];
-        }
-
-        $replacements = [
-            '{{merchant_reference}}' => (string) $context['merchant_reference'],
-            '{{amount_idr}}' => (string) $context['amount_idr'],
-            '{{customer_name}}' => (string) ($context['customer_name'] ?: 'Customer LFAMILIA'),
-            '{{customer_email}}' => (string) ($context['customer_email'] ?? ''),
-            '{{customer_phone}}' => (string) ($context['customer_phone'] ?? ''),
-            '{{expires_minutes}}' => (string) $context['expires_minutes'],
+        return [
+            'order' => [
+                'invoice_number' => $context['merchant_reference'],
+                'amount' => $context['amount_idr'],
+                'auto_redirect' => ! empty($context['return_url']),
+                'callback_url_result' => $context['return_url'] ?? null,
+            ],
+            'payment' => $payment,
+            'customer' => array_filter([
+                'name' => $context['customer_name'] ?: 'Customer LFAMILIA',
+                'email' => $context['customer_email'],
+                'phone' => $context['customer_phone'],
+            ]),
         ];
-
-        return $this->replaceTemplate($template, $replacements);
-    }
-
-    /**
-     * @param  array<string, mixed>  $value
-     * @param  array<string, string>  $replacements
-     * @return array<string, mixed>
-     */
-    private function replaceTemplate(array $value, array $replacements): array
-    {
-        $result = [];
-        foreach ($value as $key => $item) {
-            if (is_array($item)) {
-                $result[$key] = $this->replaceTemplate($item, $replacements);
-            } elseif (is_string($item) && array_key_exists($item, $replacements)) {
-                $replacement = $replacements[$item];
-                $result[$key] = in_array($item, ['{{amount_idr}}', '{{expires_minutes}}'], true)
-                    ? (int) $replacement : $replacement;
-            } else {
-                $result[$key] = $item;
-            }
-        }
-
-        return $result;
     }
 
     private function firstString(array $values): ?string
