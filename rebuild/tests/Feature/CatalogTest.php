@@ -37,6 +37,52 @@ class CatalogTest extends TestCase
         ]);
     }
 
+    public function test_admin_catalog_distinguishes_active_product_from_actually_buyable_nominal(): void
+    {
+        $admin = $this->admin();
+        $this->actingAs($admin, 'admin');
+        $category = Category::where('slug', 'game')->firstOrFail();
+        $provider = Provider::where('code', 'MANUAL')->firstOrFail();
+        $provider->update(['is_active' => false]);
+        $suffix = bin2hex(random_bytes(4));
+        $product = Product::create([
+            'category_id' => $category->id,
+            'name' => 'Readiness Manual '.$suffix,
+            'slug' => 'readiness-manual-'.$suffix,
+            'fulfillment_mode' => 'MANUAL',
+            'margin_percent' => 10,
+            'is_active' => true,
+        ]);
+        $package = $product->packages()->create([
+            'code' => 'READINESS'.$suffix,
+            'name' => 'Nominal tersedia',
+            'is_active' => true,
+        ]);
+        ProviderMapping::create([
+            'product_package_id' => $package->id,
+            'provider_id' => $provider->id,
+            'cost_idr' => 8000,
+            'store_cost_idr' => 8000,
+            'max_price_idr' => null,
+            'is_active' => true,
+        ]);
+
+        $url = '/admin/catalog?tab=manual&q='.rawurlencode($suffix);
+        $this->get($url)->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/Catalog')
+            ->where('products.0.is_active', true)
+            ->where('products.0.buyable_nominal_count', 0)
+            ->where('products.0.storefront_status', 'Provider pengiriman nonaktif')
+            ->etc());
+
+        $provider->update(['is_active' => true]);
+        $this->get($url)->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/Catalog')
+            ->where('products.0.buyable_nominal_count', 1)
+            ->where('products.0.storefront_status', 'Tampil di toko')
+            ->etc());
+    }
+
     public function test_index_hides_products_without_buyable_packages(): void
     {
         $category = Category::where('slug', 'game')->firstOrFail();
