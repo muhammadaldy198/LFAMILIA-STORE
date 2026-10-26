@@ -6,13 +6,16 @@ use App\Models\AdminUser;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductReview;
+use App\Models\StoreAsset;
 use App\Models\User;
 use App\Services\CheckoutPricing;
 use App\Services\PaymentRoutingService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
@@ -218,6 +221,13 @@ class StorefrontParityTest extends TestCase
 
     public function test_public_payment_presentation_has_groups_but_never_gateway_identity(): void
     {
+        Storage::fake(config('media-library.disk_name', 'public'));
+        $asset = StoreAsset::where('key', 'manual_qris')->firstOrFail();
+        $asset->forceFill(['is_active' => true])->save();
+        $asset->clearMediaCollection('image');
+        $asset->addMedia(UploadedFile::fake()->image('manual-qris.png', 600, 600))
+            ->toMediaCollection('image', config('media-library.disk_name', 'public'));
+
         DB::table('payment_gateways')->where('code', 'MANUAL_QRIS')->update([
             'is_active' => true,
             'is_maintenance' => false,
