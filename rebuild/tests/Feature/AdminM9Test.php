@@ -48,9 +48,10 @@ class AdminM9Test extends TestCase
         $menu = app(AdminPermissionService::class)->menu($super);
 
         $this->assertSame([
-            'Dashboard', 'Pesanan', 'Produk', 'Kategori', 'Manual', 'Banner & Konten', 'Tampilan Toko', 'Digiflazz',
-            'Validasi Akun', 'Provider', 'Pembayaran', 'Pelanggan', 'Promo', 'Layanan Pelanggan', 'Laporan',
-            'Admin & Akses', 'Pengaturan', 'Notifikasi', 'Integrasi', 'Kesehatan Sistem', 'Catatan Audit',
+            'Dashboard', 'Pesanan', 'Pengiriman', 'Promo', 'Produk', 'Kategori', 'Banner & Konten',
+            'Tampilan Toko', 'Digiflazz', 'Validasi Akun', 'Provider', 'Pembayaran', 'Laporan', 'Pelanggan',
+            'Layanan Pelanggan', 'Notifikasi', 'Integrasi', 'Kesehatan Sistem', 'Catatan Audit',
+            'Admin & Akses', 'Pengaturan',
         ], collect($menu)->pluck('label')->all());
         $this->assertCount(21, $menu);
 

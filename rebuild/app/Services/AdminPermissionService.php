@@ -11,7 +11,7 @@ class AdminPermissionService
         'orders.view' => 'Pesanan',
         'catalog.manage' => 'Produk & katalog',
         'content.manage' => 'Banner & konten',
-        'fulfillment.manage' => 'Penanganan manual',
+        'fulfillment.manage' => 'Pengiriman pesanan',
         'providers.manage' => 'Digiflazz & provider',
         'payments.manage' => 'Pembayaran operasional',
         'customers.view' => 'Pelanggan',
@@ -47,32 +47,33 @@ class AdminPermissionService
     }
 
     /**
-     * @return array<int, array{label:string,href:string,permission:?string,super_only:bool}>
+     * @return array<int, array{label:string,href:string,group:?string,permission:?string,super_only:bool}>
      */
     public function menu(?AdminUser $admin): array
     {
+        // Satu sumber menu untuk label, urutan, kelompok, dan hak akses sidebar.
         $items = [
-            ['label' => 'Dashboard', 'href' => '/admin/panel', 'permission' => 'dashboard.view'],
-            ['label' => 'Pesanan', 'href' => '/admin/orders', 'permission' => 'orders.view'],
-            ['label' => 'Produk', 'href' => '/admin/catalog', 'permission' => 'catalog.manage'],
-            ['label' => 'Kategori', 'href' => '/admin/catalog/categories', 'permission' => 'catalog.manage'],
-            ['label' => 'Manual', 'href' => '/admin/fulfillment', 'permission' => 'fulfillment.manage'],
-            ['label' => 'Banner & Konten', 'href' => '/admin/content', 'permission' => 'content.manage'],
-            ['label' => 'Tampilan Toko', 'href' => '/admin/content/presentation', 'permission' => 'content.manage'],
-            ['label' => 'Digiflazz', 'href' => '/admin/digiflazz', 'permission' => 'providers.manage'],
-            ['label' => 'Validasi Akun', 'href' => '/admin/nickname-tools', 'permission' => null, 'super_only' => true],
-            ['label' => 'Provider', 'href' => '/admin/providers', 'permission' => 'providers.manage'],
-            ['label' => 'Pembayaran', 'href' => '/admin/payments', 'permission' => 'payments.manage'],
-            ['label' => 'Pelanggan', 'href' => '/admin/customers', 'permission' => 'customers.view'],
-            ['label' => 'Promo', 'href' => '/admin/vouchers', 'permission' => 'vouchers.manage'],
-            ['label' => 'Layanan Pelanggan', 'href' => '/admin/support', 'permission' => 'support.manage'],
-            ['label' => 'Laporan', 'href' => '/admin/reports', 'permission' => 'reports.view'],
-            ['label' => 'Admin & Akses', 'href' => '/admin/access', 'permission' => null, 'super_only' => true],
-            ['label' => 'Pengaturan', 'href' => '/admin/settings', 'permission' => 'settings.manage'],
-            ['label' => 'Notifikasi', 'href' => '/admin/notifications', 'permission' => 'notifications.view'],
-            ['label' => 'Integrasi', 'href' => '/admin/integrations', 'permission' => null, 'super_only' => true],
-            ['label' => 'Kesehatan Sistem', 'href' => '/admin/health', 'permission' => null, 'super_only' => true],
-            ['label' => 'Catatan Audit', 'href' => '/admin/audit', 'permission' => null, 'super_only' => true],
+            ['label' => 'Dashboard', 'href' => '/admin/panel', 'group' => null, 'permission' => 'dashboard.view'],
+            ['label' => 'Pesanan', 'href' => '/admin/orders', 'group' => 'Transaksi', 'permission' => 'orders.view'],
+            ['label' => 'Pengiriman', 'href' => '/admin/fulfillment', 'group' => 'Transaksi', 'permission' => 'fulfillment.manage'],
+            ['label' => 'Promo', 'href' => '/admin/vouchers', 'group' => 'Transaksi', 'permission' => 'vouchers.manage'],
+            ['label' => 'Produk', 'href' => '/admin/catalog', 'group' => 'Katalog', 'permission' => 'catalog.manage'],
+            ['label' => 'Kategori', 'href' => '/admin/catalog/categories', 'group' => 'Katalog', 'permission' => 'catalog.manage'],
+            ['label' => 'Banner & Konten', 'href' => '/admin/content', 'group' => 'Konten', 'permission' => 'content.manage'],
+            ['label' => 'Tampilan Toko', 'href' => '/admin/content/presentation', 'group' => 'Konten', 'permission' => 'content.manage'],
+            ['label' => 'Digiflazz', 'href' => '/admin/digiflazz', 'group' => 'Integrasi', 'permission' => 'providers.manage'],
+            ['label' => 'Validasi Akun', 'href' => '/admin/nickname-tools', 'group' => 'Integrasi', 'permission' => null, 'super_only' => true],
+            ['label' => 'Provider', 'href' => '/admin/providers', 'group' => 'Integrasi', 'permission' => 'providers.manage'],
+            ['label' => 'Pembayaran', 'href' => '/admin/payments', 'group' => 'Keuangan', 'permission' => 'payments.manage'],
+            ['label' => 'Laporan', 'href' => '/admin/reports', 'group' => 'Keuangan', 'permission' => 'reports.view'],
+            ['label' => 'Pelanggan', 'href' => '/admin/customers', 'group' => 'Pelanggan', 'permission' => 'customers.view'],
+            ['label' => 'Layanan Pelanggan', 'href' => '/admin/support', 'group' => 'Pelanggan', 'permission' => 'support.manage'],
+            ['label' => 'Notifikasi', 'href' => '/admin/notifications', 'group' => 'Sistem', 'permission' => 'notifications.view'],
+            ['label' => 'Integrasi', 'href' => '/admin/integrations', 'group' => 'Sistem', 'permission' => null, 'super_only' => true],
+            ['label' => 'Kesehatan Sistem', 'href' => '/admin/health', 'group' => 'Sistem', 'permission' => null, 'super_only' => true],
+            ['label' => 'Catatan Audit', 'href' => '/admin/audit', 'group' => 'Sistem', 'permission' => null, 'super_only' => true],
+            ['label' => 'Admin & Akses', 'href' => '/admin/access', 'group' => 'Pengaturan', 'permission' => null, 'super_only' => true],
+            ['label' => 'Pengaturan', 'href' => '/admin/settings', 'group' => 'Pengaturan', 'permission' => 'settings.manage'],
         ];
 
         return collect($items)

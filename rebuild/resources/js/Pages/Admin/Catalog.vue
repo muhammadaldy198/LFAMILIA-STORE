@@ -101,18 +101,6 @@ const editorOpen = ref(false);
 const product = ref(null);
 const editTab = ref('info');
 const saveBusy = ref('');
-const syncSettingsBusy = ref(false);
-// Sinkron otomatis berlaku untuk seluruh katalog Digiflazz (semua produk
-// otomatis), bukan per produk. Produk manual/stok voucher tidak disentuh.
-const toggleAutoSync = () => {
-    if (syncSettingsBusy.value) return;
-    syncSettingsBusy.value = true;
-    router.put('/admin/catalog/auto-sync', { enabled: !props.autoSync }, {
-        preserveScroll: true,
-        onError: bag => { editErrors.value = bag; },
-        onFinish: () => { syncSettingsBusy.value = false; },
-    });
-};
 const editErrors = ref({});
 
 const openEditor = (row) => {
@@ -641,7 +629,12 @@ onMounted(() => {
                             <td>{{ row.fulfillment_mode === 'MANUAL' ? 'Manual' : 'Otomatis' }}</td>
                             <td>{{ activePackages(row) }} aktif dari {{ row.packages.length }}</td>
                             <td>{{ row.sort_order }}</td>
-                            <td><span class="adm-tag" :class="row.is_active ? 'ok' : 'bad'">{{ row.is_active ? 'Aktif' : 'Nonaktif' }}</span></td>
+                            <td>
+                                <span class="adm-tag" :class="row.is_active ? 'ok' : 'bad'">{{ row.is_active ? 'Aktif' : 'Nonaktif' }}</span>
+                                <p v-if="row.is_active" class="adm-note" :style="{ color: row.buyable_nominal_count > 0 ? 'var(--a-ok)' : 'var(--a-danger)' }">
+                                    {{ row.storefront_status }} · {{ row.buyable_nominal_count }} nominal bisa dibeli
+                                </p>
+                            </td>
                             <td>
                                 <button type="button" class="adm-btn sm" @click="openEditorFull(row)">Ubah</button>
                                 <button type="button" class="adm-btn sm" @click="togglePopular(row)">{{ row.popular ? 'Lepas unggulan' : 'Jadikan unggulan' }}</button>
@@ -824,12 +817,10 @@ onMounted(() => {
                             Sumber pemenuhan per nominal. Prioritas kecil dipakai lebih dulu. Harga modal bisa diubah langsung di kolom Modal.
                             Produk manual dan stok voucher tidak pernah disentuh sinkron Digiflazz.
                         </span>
-                        <label class="adm-switch-row" style="margin:0">
-                            <button type="button" class="adm-switch" role="switch" :aria-checked="autoSync"
-                                :disabled="syncSettingsBusy"
-                                @click="toggleAutoSync" />
-                            Sinkron otomatis semua produk{{ autoSync ? ' (' + (syncIntervalMinutes || 15) + ' menit)' : '' }}
-                        </label>
+                        <span>
+                            Sinkron Digiflazz: {{ autoSync ? 'aktif' : 'nonaktif' }}{{ autoSync ? ' · setiap ' + (syncIntervalMinutes || 15) + ' menit' : '' }}
+                            · <Link href="/admin/digiflazz">Kelola di Digiflazz</Link>
+                        </span>
                     </div>
                 </div>
                 <p v-for="(message, key) in editErrors" :key="'src-'+key" class="err">{{ message }}</p>

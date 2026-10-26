@@ -194,13 +194,28 @@ test('sidebar covers every backend menu entry and names the support group', () =
     const layout = repo('resources/js/Components/Admin/AdminLayout.vue');
     const service = repo('app/Services/AdminPermissionService.php');
     const backend = [...service.matchAll(/'href' => '([^']+)'/g)].map(match => match[1]);
-    const sidebar = [...layout.matchAll(/href: '([^']+)'/g)].map(match => match[1]);
     assert.equal(backend.length, 21, 'daftar menu backend harus 21');
-    for (const href of backend) assert.ok(sidebar.includes(href), 'sidebar kehilangan ' + href);
-    assert.ok(sidebar.includes('/admin/notifications'));
-    assert.match(layout, /label: 'Layanan Pelanggan'/);
+    assert.equal(new Set(backend).size, backend.length, 'URL menu backend tidak boleh duplikat');
+    assert.doesNotMatch(layout, /const MENU =/, 'sidebar tidak boleh punya daftar menu kedua');
+    assert.match(layout, /panel\.value\.menu/, 'sidebar wajib memakai menu dari server');
+    assert.match(layout, /item\.group/, 'kelompok menu harus memakai metadata backend');
+    assert.match(service, /'label' => 'Layanan Pelanggan'/);
+    assert.match(service, /'label' => 'Pengiriman'/);
     assert.doesNotMatch(layout, /lf-admin(?!-)/);
 });
+test('catalog shows checkout readiness and Digiflazz owns the only sync switch', () => {
+    const catalog = read('Catalog.vue');
+    const controller = repo('app/Http/Controllers/AdminCatalogController.php');
+    const dashboard = read('Dashboard.vue');
+    assert.match(catalog, /row\.storefront_status/);
+    assert.match(catalog, /row\.buyable_nominal_count/);
+    assert.match(controller, /forPackages\(\$pagePackageIds\)/);
+    assert.doesNotMatch(catalog, /toggleAutoSync/, 'global sync switch must live in Digiflazz');
+    assert.match(catalog, /href="\/admin\/digiflazz"/);
+    assert.match(dashboard, /label: 'Pesanan Selesai'/);
+    assert.doesNotMatch(dashboard, /label: 'Pembayaran Berhasil'/);
+});
+
 test('support and fulfillment lead with the work list instead of metric cards', () => {
     assert.match(read('Support.vue'), /class="adm-summary"/);
     for (const file of ['Support.vue', 'Fulfillment.vue', 'Settings.vue']) {
@@ -400,16 +415,16 @@ test('import margin reads the active pricing setting', () => {
     assert.match(catalog, /margin_percent: Number\(importMargin\.value \|\| 0\)/);
 });
 
-// Tab Sumber: dua kolom impor global + modal bisa diedit di tabel + saklar
-// sinkron otomatis semua produk.
-test('source tab edits store cost and toggles whole-catalog auto sync', () => {
+// Tab Sumber mempertahankan edit modal per SKU, tetapi saklar sinkron
+// seluruh katalog hanya ada di halaman Digiflazz.
+test('source tab edits store cost and links to canonical Digiflazz sync settings', () => {
     const catalog = read('Catalog.vue');
-    // Harga modal per sumber bisa diubah langsung dari tabel Sumber.
+    const digiflazz = read('Digiflazz.vue');
     assert.match(catalog, /saveMapping\(mapping, \{ store_cost_idr: Number\(\$event\.target\.value \|\| 0\) \}\)/);
-    // Saklar sinkron otomatis seluruh katalog (bukan per produk).
-    assert.match(catalog, /const toggleAutoSync = \(\) => \{/);
-    // Saklar memakai route ber-izin katalog, bukan route integrasi provider.
-    assert.match(catalog, /router\.put\('\/admin\/catalog\/auto-sync'/);
+    assert.doesNotMatch(catalog, /const toggleAutoSync =/);
+    assert.doesNotMatch(catalog, /router\.put\('\/admin\/catalog\/auto-sync'/);
+    assert.match(catalog, /href="\/admin\/digiflazz"/);
+    assert.match(digiflazz, /settings\.put\('\/admin\/digiflazz\/settings'/);
     assert.doesNotMatch(catalog, /products\/\$\{product\.value\.id\}\/sync/);
 });
 

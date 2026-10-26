@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\AdminUser;
+use App\Services\AdminPermissionService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Support\Facades\DB;
@@ -47,6 +48,19 @@ class AdminAccessRestorationTest extends TestCase
     private function confirmed(): static
     {
         return $this->withSession(['admin.password_confirmed_at' => time()]);
+    }
+
+    public function test_admin_navigation_uses_grouped_server_menu_and_never_exposes_ungranted_links(): void
+    {
+        $permissions = app(AdminPermissionService::class);
+        $admin = $this->admin('ADMIN', ['permissions' => ['dashboard.view', 'fulfillment.manage']]);
+        $menu = $permissions->menu($admin);
+
+        $this->assertSame(['/admin/panel', '/admin/fulfillment'], array_column($menu, 'href'));
+        $this->assertSame([null, 'Transaksi'], array_column($menu, 'group'));
+        $this->assertSame('Pengiriman', $menu[1]['label']);
+        $this->assertSame([], $permissions->menu(null));
+        $this->assertCount(count(array_unique(array_column($menu, 'href'))), $menu);
     }
 
     public function test_access_workspace_has_summary_filters_pagination_permissions_and_recent_activity(): void

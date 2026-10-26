@@ -30,8 +30,28 @@ use Inertia\Response;
 class AdminCatalogController
 {
     // Dipakai halaman Produk: data per halaman dari server, bukan disaring di browser.
-    private function productRow(Product $product, $providers, array $stockCounts): array
+    private function productRow(Product $product, $providers, array $stockCounts, array $buyablePackageIds): array
     {
+        $activePackages = $product->packages->where('is_active', true);
+        $buyableCount = $activePackages->filter(
+            fn (ProductPackage $package): bool => isset($buyablePackageIds[(int) $package->id])
+        )->count();
+        $activeMappings = $activePackages->flatMap(
+            fn (ProductPackage $package) => $package->mappings->where('is_active', true)
+        );
+        $hasEnabledProvider = $activeMappings->contains(
+            fn (ProviderMapping $mapping): bool => (bool) ($providers->get($mapping->provider_id)?->is_active)
+        );
+        $storefrontStatus = match (true) {
+            ! $product->is_active => 'Produk nonaktif',
+            ! (bool) $product->category?->is_active => 'Kategori nonaktif',
+            $activePackages->isEmpty() => 'Belum ada nominal aktif',
+            $activeMappings->isEmpty() => 'Sumber nominal belum aktif',
+            ! $hasEnabledProvider => 'Provider pengiriman nonaktif',
+            $buyableCount === 0 => 'Nominal belum bisa dibeli: periksa modal, harga, atau stok',
+            default => 'Tampil di toko',
+        };
+
         return [
             ...$product->only('id', 'category_id', 'name', 'publisher', 'slug', 'description', 'fulfillment_mode',
                 'initials', 'accent_color', 'instant', 'package_tabs_enabled', 'package_tabs',
@@ -41,6 +61,8 @@ class AdminCatalogController
                 'nickname_server_field_key'),
             'image_url' => $product->getFirstMediaUrl('image'),
             'banner_url' => $product->getFirstMediaUrl('banner'),
+            'buyable_nominal_count' => $buyableCount,
+            'storefront_status' => $storefrontStatus,
             'fields' => $product->fields->sortBy('sort_order')->values()->toArray(),
             'notices' => $product->notices->sortBy('sort_order')->values()->map(fn (ProductNotice $notice): array => [
                 ...$notice->only('id', 'title', 'body', 'sort_order', 'is_active'),
@@ -79,7 +101,7 @@ class AdminCatalogController
             'per_page' => ['nullable', Rule::in([10, 25, 50, 100])],
             'page' => ['nullable', 'integer', 'min:1'],
         ]);
-        $products = Product::with(['media', 'packages.mappings', 'fields', 'notices'])
+        $products = Product::with(['category', 'media', 'packages.mappings', 'fields', 'notices'])
             ->when(($filters['tab'] ?? 'auto') === 'manual', fn ($query) => $query->where('fulfillment_mode', 'MANUAL'))
             ->when(($filters['tab'] ?? 'auto') !== 'manual', fn ($query) => $query->where('fulfillment_mode', '!=', 'MANUAL'))
             ->when(trim((string) ($filters['q'] ?? '')) !== '', function ($query) use ($filters): void {
@@ -93,6 +115,16 @@ class AdminCatalogController
             ? $products->orderBy('name')
             : $products->orderBy('sort_order')->orderBy('name');
         $products = $products->paginate((int) ($filters['per_page'] ?? 25), ['*'], 'page', (int) ($filters['page'] ?? 1))->withQueryString();
+
+        // Status toko memakai rule checkout yang sama, hanya untuk nominal pada halaman ini.
+        // Pratinjau admin di bawah tetap boleh membaca nominal nonaktif.
+        $pagePackageIds = $products->getCollection()
+            ->flatMap(fn (Product $product) => $product->packages->where('is_active', true)->pluck('id'))
+            ->map(fn ($id): int => (int) $id)->all();
+        $buyablePackageIds = array_fill_keys(
+            array_keys(app(CheckoutPricing::class)->forPackages($pagePackageIds)),
+            true
+        );
 
         $providers = Provider::all(['id', 'code', 'display_name', 'is_active'])->keyBy('id');
         $stockCounts = app(VoucherStockService::class)->counts();
@@ -119,7 +151,7 @@ class AdminCatalogController
                 'tab' => $filters['tab'] ?? 'auto', 'q' => $filters['q'] ?? '', 'category' => $filters['category'] ?? '',
                 'status' => $filters['status'] ?? '', 'sort' => $filters['sort'] ?? 'order', 'per_page' => (int) ($filters['per_page'] ?? 25),
             ],
-            'products' => $products->getCollection()->map(fn (Product $product): array => $this->productRow($product, $providers, $stockCounts))->all(),
+            'products' => $products->getCollection()->map(fn (Product $product): array => $this->productRow($product, $providers, $stockCounts, $buyablePackageIds))->all(),
             'productPage' => [
                 'current_page' => $products->currentPage(),
                 'last_page' => $products->lastPage(),
