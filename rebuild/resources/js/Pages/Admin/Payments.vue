@@ -20,6 +20,7 @@ const props = defineProps({
     refundReviews: { type: Array, default: () => [] },
     pageSettings: { type: Object, default: () => ({}) },
     callbackUrls: { type: Object, default: () => ({}) },
+    providerMethods: { type: Array, default: () => [] },
 });
 
 const tab = ref('settings');
@@ -95,6 +96,7 @@ const advanced = ref(false);
 const openCreate = () => {
     editor.value = {
         id: null, code: '', method: 'VIRTUAL_ACCOUNT', name: '', description: '',
+        gateway_code: 'MIDTRANS', provider_method: '',
         fee_flat_idr: 0, fee_percent: 0, supports_order: true, supports_wallet_topup: true,
         sort_order: props.channels.length ? Math.max(...props.channels.map(item => Number(item.sort_order || 0))) + 10 : 10,
         is_active: false,
@@ -105,7 +107,7 @@ const openCreate = () => {
     errors.value = {};
 };
 const openEdit = channel => {
-    editor.value = { ...channel, fee_percent: Number(channel.fee_percent_bps || 0) / 100 };
+    editor.value = { ...channel, gateway_code: 'MIDTRANS', provider_method: '', fee_percent: Number(channel.fee_percent_bps || 0) / 100 };
     logoFile.value = null;
     logoPreview.value = channel.logo_url || '';
     advanced.value = false;
@@ -142,6 +144,8 @@ const saveChannel = () => {
         supports_wallet_topup: Boolean(row.supports_wallet_topup),
         sort_order: Number(row.sort_order || 0),
         is_active: Boolean(row.is_active),
+        ...((!row.id || !routes.some(route => route.payment_channel_id === row.id))
+            ? { gateway_code: row.gateway_code, provider_method: String(row.provider_method || '').trim() } : {}),
     };
     saving.value = 'channel';
     errors.value = {};
@@ -181,6 +185,8 @@ const syncChannels = () => router.post('/admin/payments/channels/sync', {}, { pr
 const routesForEditor = computed(() => editor.value
     ? routes.filter(route => route.payment_channel_id === editor.value.id)
     : []);
+const providerMethodChoices = computed(() => (props.providerMethods || []).filter(item =>
+    item.gateway === editor.value?.gateway_code && item.method === editor.value?.method));
 
 const saveRoute = row => {
     router.put('/admin/payments/routes/' + row.id, {
@@ -690,6 +696,33 @@ const successRate = computed(() => {
                     <input v-model="editor.description" class="adm-input" maxlength="160">
                 </label>
 
+                <div v-if="!editor.id || !routesForEditor.length" class="adm-block full">
+                    <strong>Koneksi gateway</strong>
+                    <p class="adm-note">Pilih penyedia dan kode metode API yang benar, bukan hanya nama tampilan. Pilihan yang disediakan mengikuti katalog metode terintegrasi. Dukungan aktual harus diaktifkan pada akun merchant.</p>
+                    <div class="adm-grid" style="margin-top:8px">
+                        <label class="adm-field">
+                            <span>Gateway penyedia</span>
+                            <select v-model="editor.gateway_code" class="adm-select" @change="editor.provider_method = ''">
+                                <option value="MIDTRANS">Midtrans Snap</option>
+                                <option v-if="editor.method === 'VIRTUAL_ACCOUNT'" value="DOKU">DOKU Checkout</option>
+                            </select>
+                        </label>
+                        <label class="adm-field">
+                            <span>Kode metode pada penyedia</span>
+                            <input v-model="editor.provider_method" class="adm-input mono"
+                                list="payment-provider-methods" maxlength="80"
+                                :placeholder="providerMethodChoices[0]?.code || 'Kode API dari penyedia'">
+                            <datalist id="payment-provider-methods">
+                                <option v-for="item in providerMethodChoices" :key="item.gateway+'-'+item.code"
+                                    :value="item.code">{{ item.label }}</option>
+                            </datalist>
+                            <span v-if="errors.provider_method" class="err">{{ errors.provider_method }}</span>
+                            <span v-if="errors.gateway_code" class="err">{{ errors.gateway_code }}</span>
+                            <span class="hint">Kode baru di luar daftar hanya bisa dipakai jika sudah benar-benar didukung gateway dan merchant.</span>
+                        </label>
+                    </div>
+                </div>
+
                 <div class="adm-block full">
                     <strong>Biaya untuk pilihan pembayaran ini</strong>
                     <div class="adm-grid" style="margin-top:8px">
@@ -724,10 +757,7 @@ const successRate = computed(() => {
                             <button type="button" class="adm-btn sm" @click="saveRoute(route)">Simpan gateway</button>
                         </div>
                     </div>
-                    <p v-if="!routesForEditor.length" class="err" style="margin-top:8px">
-                        Belum ada koneksi API untuk kode metode ini. Menambahkan nama dan memilih Aktif tidak otomatis membuat integrasi.
-                        Gunakan metode VA/e-wallet bawaan melalui "Pulihkan metode bawaan", lalu pilih gateway Midtrans atau DOKU.
-                    </p>
+                    <p v-if="!routesForEditor.length" class="adm-note" style="margin-top:8px">Hubungkan ke gateway dengan mengisi kode metode penyedia di bagian "Koneksi gateway" sebelum menyimpan.</p>
                 </div>
 
                 <div class="adm-block">
