@@ -3,7 +3,7 @@
 namespace Tests\Feature;
 
 use App\Services\IntegrationRuntimeConfig;
-use App\Services\Payment\DokuDirectGateway;
+use App\Services\Payment\DokuCheckoutGateway;
 use App\Services\Payment\DokuSignature;
 use App\Services\Payment\MidtransGateway;
 use App\Services\PaymentRouteCatalogService;
@@ -203,11 +203,11 @@ class BankVirtualAccountProvisioningTest extends TestCase
 
     public function test_doku_checkout_receives_only_selected_bank(): void
     {
-        $gateway = new DokuDirectGateway(
+        $gateway = new DokuCheckoutGateway(
             Mockery::mock(DokuSignature::class),
             Mockery::mock(IntegrationRuntimeConfig::class),
         );
-        $method = new ReflectionMethod(DokuDirectGateway::class, 'payload');
+        $method = new ReflectionMethod(DokuCheckoutGateway::class, 'payload');
 
         $payload = $method->invoke($gateway, [
             'route_configuration' => [
