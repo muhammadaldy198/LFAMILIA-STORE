@@ -16,7 +16,7 @@ class PaymentRouteCatalogService
      */
     public function sync(): array
     {
-        $result = ['created' => 0, 'updated' => 0, 'skipped' => 0, 'created_channels' => $this->ensureBankChannels() + $this->ensureEwalletChannels()];
+        $result = ['created' => 0, 'updated' => 0, 'skipped' => 0, 'created_channels' => $this->ensureBankChannels() + $this->ensureEwalletChannels() + $this->ensureRetailChannels()];
 
         foreach ((array) config('payment_routes', []) as $definition) {
             $channelId = DB::table('payment_channels')
@@ -99,6 +99,42 @@ class PaymentRouteCatalogService
                 'supports_wallet_topup' => (bool) $generic->supports_wallet_topup,
                 'sort_order' => (int) $wallet['sort_order'],
                 'is_active' => false, // opt-in; merchant account support must be confirmed
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $created++;
+        }
+
+        return $created;
+    }
+
+    /**
+     * Create retail channels without turning on a store method before merchant activation.
+     */
+    private function ensureRetailChannels(): int
+    {
+        $generic = DB::table('payment_channels')->where('code', 'ewallet')->first();
+        if (! $generic) {
+            return 0;
+        }
+
+        $created = 0;
+        foreach ((array) config('payment_retail_channels', []) as $store) {
+            if (DB::table('payment_channels')->where('code', $store['code'])->exists()) {
+                continue;
+            }
+
+            DB::table('payment_channels')->insert([
+                'code' => $store['code'],
+                'method' => 'RETAIL',
+                'name' => $store['name'],
+                'description' => 'Bayar melalui '.(string) $store['name'].'.',
+                'fee_flat_idr' => 0,
+                'fee_percent_bps' => 0,
+                'supports_order' => (bool) $generic->supports_order,
+                'supports_wallet_topup' => (bool) $generic->supports_wallet_topup,
+                'sort_order' => (int) $store['sort_order'],
+                'is_active' => false,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
