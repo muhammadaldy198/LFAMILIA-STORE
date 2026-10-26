@@ -183,6 +183,15 @@ test('payment settings keep one page and edit each method in a modal', () => {
     for (const marker of order) { const position = source.indexOf(marker); assert.ok(position > previous, marker); previous = position; }
     assert.doesNotMatch(source, /lf-admin/);
 });
+test('checkout displays separate QRIS choices when both manual and automatic methods are available', () => {
+    const checkout = repo('resources/js/Components/Checkout/PaymentMethods.vue');
+    const panel = read('Payments.vue');
+    assert.match(checkout, /group\\.key!=='qris' \\|\\| group\\.items\\.length > 1/);
+    assert.match(checkout, /v-for="channel in group\\.items"/);
+    assert.match(panel, /const manualQrisReady = computed/);
+    assert.match(panel, /is_active: !manualQrisReady\\.value/);
+});
+
 test('customer detail starts at profile and confirms wallet changes before posting', () => {
     const source = read('CustomerDetail.vue');
     assert.ok(source.indexOf('<h2>Profil</h2>') < source.indexOf('<h2>Akun game tersimpan</h2>'));
