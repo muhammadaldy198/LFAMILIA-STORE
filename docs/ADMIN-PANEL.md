@@ -67,13 +67,13 @@ Semua penyuntingan (tambah/ubah) memakai **pop-up tengah** (`AdminModal`). Penge
 
 ## 3. Struktur & navigasi
 
-Sidebar 216px, gelap, berkelompok; di HP jadi laci. Urutan dan label diambil dari `AdminLayout.vue` + `AdminPermissionService::menu()`.
+Sidebar 216px, gelap, berkelompok; di HP jadi laci. Urutan, label, kelompok, dan izin menu berasal dari satu sumber: `AdminPermissionService::menu()`; `AdminLayout.vue` hanya menampilkannya.
 
 | Grup | Menu | Alamat | Izin |
 |---|---|---|---|
 | — | Dashboard | `/admin/panel` | `dashboard.view` |
 | Transaksi | Pesanan | `/admin/orders` | `orders.view` |
-| Transaksi | Manual | `/admin/fulfillment` | `fulfillment.manage` |
+| Transaksi | Pengiriman | `/admin/fulfillment` | `fulfillment.manage` |
 | Transaksi | Promo | `/admin/vouchers` | `vouchers.manage` |
 | Katalog | Produk | `/admin/catalog` | `catalog.manage` |
 | Katalog | Kategori | `/admin/catalog/categories` | `catalog.manage` |
@@ -96,7 +96,7 @@ Sidebar 216px, gelap, berkelompok; di HP jadi laci. Urutan dan label diambil dar
 Aturan:
 
 - **Server tetap penentu.** Sidebar hanya menampilkan menu yang dikirim backend; menyembunyikan menu bukan pengaman.
-- Label yang dipakai apa adanya: **Manual**, **Promo**, **Layanan Pelanggan** (grup Pelanggan). Istilah Inggris lama sudah diganti: `System Health` → **Kesehatan Sistem**, `Audit Log` → **Catatan Audit**.
+- Label yang dipakai apa adanya: **Pengiriman**, **Promo**, **Layanan Pelanggan** (grup Pelanggan). Istilah Inggris lama sudah diganti: `System Health` → **Kesehatan Sistem**, `Audit Log` → **Catatan Audit**.
 - Pencarian global di kepala panel (`/admin/search`) mencari pesanan, pelanggan, dan produk.
 
 ---
@@ -129,7 +129,7 @@ Format tiap halaman: **untuk apa · isi · aksi · catatan**. Nama berkas Vue ad
 **Aksi.** Salin nomor, cek ulang pembayaran (bila `can_check`), kirim ulang pengiriman, batalkan pesanan, selesaikan/gagalkan percobaan manual.
 **Catatan.** Pembatalan memakai pop-up + konfirmasi kata sandi server. Tombol muncul menurut props (`canCancel`, `canResendDelivery`, `canCheckFulfillment`), bukan disembunyikan di klien saja.
 
-### 4.4 Antrean Manual — `/admin/fulfillment`
+### 4.4 Pengiriman — `/admin/fulfillment`
 `AdminFulfillmentController` · `fulfillment.manage` · `Fulfillment.vue`
 
 **Untuk apa.** Menangani pesanan yang tidak selesai otomatis.
