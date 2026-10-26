@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Services\Payment\DokuDirectGateway;
+use App\Services\Payment\DokuCheckoutGateway;
 use App\Services\Payment\ManualQrisGateway;
 use App\Services\Payment\MidtransGateway;
 use Illuminate\Http\Client\ConnectionException;
@@ -19,7 +19,7 @@ class PaymentService
         private readonly PaymentRoutingService $routing,
         private readonly PaymentStateService $states,
         private readonly MidtransGateway $midtrans,
-        private readonly DokuDirectGateway $doku,
+        private readonly DokuCheckoutGateway $doku,
         private readonly ManualQrisGateway $manualQris,
         private readonly AdminNotificationService $notifications,
     ) {}
