@@ -236,18 +236,24 @@ class AdminPaymentController
     {
         $choices = [
             ['gateway' => 'MIDTRANS', 'method' => 'QRIS', 'code' => 'other_qris', 'label' => 'QRIS Otomatis'],
+            ['gateway' => 'DOKU', 'method' => 'QRIS', 'code' => 'QRIS', 'label' => 'QRIS Otomatis'],
         ];
-        foreach ((array) config('payment_bank_channels', []) as $bank) {
-            $choices[] = ['gateway' => 'MIDTRANS', 'method' => 'VIRTUAL_ACCOUNT',
-                'code' => (string) $bank['midtrans'], 'label' => (string) $bank['name']];
-            if (! empty($bank['doku'])) {
-                $choices[] = ['gateway' => 'DOKU', 'method' => 'VIRTUAL_ACCOUNT',
-                    'code' => (string) $bank['doku'], 'label' => (string) $bank['name']];
+        foreach ([
+            'payment_bank_channels' => 'VIRTUAL_ACCOUNT',
+            'payment_ewallet_channels' => 'EWALLET',
+            'payment_retail_channels' => 'RETAIL',
+        ] as $catalog => $method) {
+            foreach ((array) config($catalog, []) as $entry) {
+                foreach (['midtrans' => 'MIDTRANS', 'doku' => 'DOKU'] as $key => $gateway) {
+                    if (empty($entry[$key]) || ($gateway === 'DOKU' && ! empty($entry['requires_integration']))) {
+                        continue;
+                    }
+                    $choices[] = [
+                        'gateway' => $gateway, 'method' => $method,
+                        'code' => (string) $entry[$key], 'label' => (string) $entry['name'],
+                    ];
+                }
             }
-        }
-        foreach ((array) config('payment_ewallet_channels', []) as $wallet) {
-            $choices[] = ['gateway' => 'MIDTRANS', 'method' => 'EWALLET',
-                'code' => (string) $wallet['midtrans'], 'label' => (string) $wallet['name']];
         }
 
         return $choices;
@@ -360,12 +366,15 @@ class AdminPaymentController
             return ['enabled_payments' => [$providerMethod]];
         }
 
-        // Only VA types are wired through the DOKU Checkout payment types
-        // contract in this project; other DOKU products need contract tests.
-        if ($gatewayCode !== 'DOKU' || $method !== 'VIRTUAL_ACCOUNT'
-            || ! preg_match('/^VIRTUAL_ACCOUNT_[A-Z][A-Z0-9_]{1,63}$/D', $providerMethod)) {
+        // DOKU Checkout uses an exact provider-owned method code, including
+        // mixed-case IDs such as VIRTUAL_ACCOUNT_Sinarmas.
+        $supported = collect($this->providerMethodChoices())->contains(
+            fn (array $choice): bool => $choice['gateway'] === 'DOKU'
+                && $choice['method'] === $method && $choice['code'] === $providerMethod
+        );
+        if ($gatewayCode !== 'DOKU' || ! $supported) {
             throw ValidationException::withMessages([
-                'provider_method' => 'DOKU Checkout saat ini membutuhkan kode VA yang didukung.',
+                'provider_method' => 'Kode pembayaran ini belum terdaftar untuk DOKU Checkout dan kategorinya.',
             ]);
         }
 
