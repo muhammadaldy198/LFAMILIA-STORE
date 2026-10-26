@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\PaymentChannel;
+use App\Models\StoreAsset;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -28,6 +29,13 @@ class PaymentRoutingService
                     $route = $this->resolve((string) $channel->code, false, 'order');
                 } catch (ValidationException) {
                     return null;
+                }
+
+                if ($route['gateway_code'] === 'MANUAL_QRIS') {
+                    $asset = StoreAsset::where('key', 'manual_qris')->where('is_active', true)->first();
+                    if (! $asset || ! $asset->getFirstMedia('image')) {
+                        return null;
+                    }
                 }
 
                 return [
