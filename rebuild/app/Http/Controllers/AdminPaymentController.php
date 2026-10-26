@@ -296,6 +296,12 @@ class AdminPaymentController
         if (! $routing->gatewayReady((string) $route->gateway_code)) {
             return ['ready' => false, 'reason' => 'Kredensial gateway belum siap. Periksa menu Integrasi.'];
         }
+        if ((string) $route->gateway_code === 'MANUAL_QRIS') {
+            $asset = StoreAsset::where('key', 'manual_qris')->where('is_active', true)->first();
+            if (! $asset || ! $asset->getFirstMedia('image')) {
+                return ['ready' => false, 'reason' => 'Gambar QRIS Manual belum diunggah atau belum aktif.'];
+            }
+        }
         if ((string) $route->gateway_code === 'DOKU') {
             $settings = json_decode((string) $route->configuration, true);
             if (! is_array($settings) || ($settings['api_path'] ?? '') !== '/checkout/v1/payment') {
@@ -845,23 +851,59 @@ class AdminPaymentController
         ]);
 
         $asset = StoreAsset::where('key', 'manual_qris')->firstOrFail();
-        if ($data['is_active'] && ! $asset->getFirstMedia('image')) {
+        $enable = (bool) $data['is_active'];
+        if ($enable && ! $asset->getFirstMedia('image')) {
             throw ValidationException::withMessages([
                 'manual_qris' => 'Unggah gambar QRIS terlebih dahulu.',
             ]);
         }
 
-        $before = ['is_active' => (bool) $asset->is_active];
-        $asset->forceFill(['is_active' => (bool) $data['is_active']])->save();
-        if (! $data['is_active']) {
-            DB::table('payment_gateways')->where('code', 'MANUAL_QRIS')->update([
-                'is_active' => false,
-                'updated_at' => now(),
+        $channel = DB::table('payment_channels')->where('code', 'manual_qris')->first();
+        $gateway = DB::table('payment_gateways')->where('code', 'MANUAL_QRIS')->first();
+        $route = ($channel && $gateway) ? DB::table('payment_routes')
+            ->where('payment_channel_id', $channel->id)
+            ->where('payment_gateway_id', $gateway->id)->first() : null;
+        if (! $channel || ! $gateway || ! $route) {
+            throw ValidationException::withMessages([
+                'manual_qris' => 'Route QRIS Manual belum lengkap. Pulihkan metode bawaan terlebih dahulu.',
             ]);
         }
-        $this->audit($request, 'payment.manual_qris.updated', 'store_asset', $asset->id, $before, $data);
+        if ($enable && $gateway->is_maintenance) {
+            throw ValidationException::withMessages([
+                'manual_qris' => 'Gateway QRIS Manual sedang dalam pemeliharaan. Matikan mode pemeliharaan terlebih dahulu.',
+            ]);
+        }
 
-        return back()->with('status', $data['is_active'] ? 'QRIS manual diaktifkan.' : 'QRIS manual dinonaktifkan.');
+        $before = [
+            'asset_active' => (bool) $asset->is_active,
+            'channel_active' => (bool) $channel->is_active,
+            'gateway_active' => (bool) $gateway->is_active,
+            'route_active' => (bool) $route->is_active,
+        ];
+        DB::transaction(function () use ($asset, $channel, $gateway, $route, $enable): void {
+            $asset->forceFill(['is_active' => $enable])->save();
+            DB::table('payment_channels')->where('id', $channel->id)->update([
+                'is_active' => $enable,
+                'supports_order' => true,
+                'supports_wallet_topup' => false,
+                'updated_at' => now(),
+            ]);
+            DB::table('payment_gateways')->where('id', $gateway->id)->update([
+                'is_active' => $enable, 'updated_at' => now(),
+            ]);
+            DB::table('payment_routes')->where('id', $route->id)->update([
+                'is_active' => $enable,
+                'supports_order' => true,
+                'supports_wallet_topup' => false,
+                'updated_at' => now(),
+            ]);
+        });
+        $this->audit($request, 'payment.manual_qris.updated', 'store_asset', $asset->id, $before, [
+            'asset_active' => $enable, 'channel_active' => $enable,
+            'gateway_active' => $enable, 'route_active' => $enable,
+        ]);
+
+        return back()->with('status', $enable ? 'QRIS Manual siap digunakan untuk pesanan.' : 'QRIS Manual dinonaktifkan.');
     }
 
     public function confirmManual(Request $request, int $paymentId, PaymentStateService $states): RedirectResponse
