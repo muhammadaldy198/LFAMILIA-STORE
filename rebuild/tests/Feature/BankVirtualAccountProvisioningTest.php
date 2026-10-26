@@ -125,8 +125,8 @@ class BankVirtualAccountProvisioningTest extends TestCase
             $this->assertSame([$method], $route['configuration']['payment_method_types']);
         }
 
-        $this->assertNull($routes->first(fn (array $row): bool =>
-            $row['channel'] === 'ewallet_doku' && $row['gateway'] === 'DOKU'
+        $this->assertNull($routes->first(
+            fn (array $row): bool => $row['channel'] === 'ewallet_doku' && $row['gateway'] === 'DOKU'
         ), 'DOKU Wallet must not be provisioned before its extra notification URL is supported.');
     }
 
