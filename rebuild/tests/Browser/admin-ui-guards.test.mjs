@@ -194,11 +194,13 @@ test('sidebar covers every backend menu entry and names the support group', () =
     const layout = repo('resources/js/Components/Admin/AdminLayout.vue');
     const service = repo('app/Services/AdminPermissionService.php');
     const backend = [...service.matchAll(/'href' => '([^']+)'/g)].map(match => match[1]);
-    const sidebar = [...layout.matchAll(/href: '([^']+)'/g)].map(match => match[1]);
     assert.equal(backend.length, 21, 'daftar menu backend harus 21');
-    for (const href of backend) assert.ok(sidebar.includes(href), 'sidebar kehilangan ' + href);
-    assert.ok(sidebar.includes('/admin/notifications'));
-    assert.match(layout, /label: 'Layanan Pelanggan'/);
+    assert.equal(new Set(backend).size, backend.length, 'URL menu backend tidak boleh duplikat');
+    assert.doesNotMatch(layout, /const MENU =/, 'sidebar tidak boleh punya daftar menu kedua');
+    assert.match(layout, /panel\.value\.menu/, 'sidebar wajib memakai menu dari server');
+    assert.match(layout, /item\.group/, 'kelompok menu harus memakai metadata backend');
+    assert.match(service, /'label' => 'Layanan Pelanggan'/);
+    assert.match(service, /'label' => 'Pengiriman'/);
     assert.doesNotMatch(layout, /lf-admin(?!-)/);
 });
 test('support and fulfillment lead with the work list instead of metric cards', () => {
