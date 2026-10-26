@@ -217,11 +217,39 @@ class AdminPaymentController
                     'topups.id', 'topups.amount_idr', 'topups.created_at',
                     'users.name as customer_name', 'users.email as customer_email',
                 ]),
+            'providerMethods' => $this->providerMethodChoices(),
             'callbackUrls' => [
                 'midtrans' => rtrim((string) config('app.url'), '/').'/api/payments/midtrans/notification',
                 'doku' => rtrim((string) config('app.url'), '/').'/api/payments/doku/notification',
             ],
         ]);
+    }
+
+    /**
+     * Present provider API codes from the single source-controlled protocol
+     * catalog. Labels may be edited by the merchant; codes are provider owned.
+     *
+     * @return array<int, array{gateway:string,method:string,code:string,label:string}>
+     */
+    private function providerMethodChoices(): array
+    {
+        $choices = [
+            ['gateway' => 'MIDTRANS', 'method' => 'QRIS', 'code' => 'other_qris', 'label' => 'QRIS Otomatis'],
+        ];
+        foreach ((array) config('payment_bank_channels', []) as $bank) {
+            $choices[] = ['gateway' => 'MIDTRANS', 'method' => 'VIRTUAL_ACCOUNT',
+                'code' => (string) $bank['midtrans'], 'label' => (string) $bank['name']];
+            if (! empty($bank['doku'])) {
+                $choices[] = ['gateway' => 'DOKU', 'method' => 'VIRTUAL_ACCOUNT',
+                    'code' => (string) $bank['doku'], 'label' => (string) $bank['name']];
+            }
+        }
+        foreach ((array) config('payment_ewallet_channels', []) as $wallet) {
+            $choices[] = ['gateway' => 'MIDTRANS', 'method' => 'EWALLET',
+                'code' => (string) $wallet['midtrans'], 'label' => (string) $wallet['name']];
+        }
+
+        return $choices;
     }
 
     /**
@@ -354,11 +382,51 @@ class AdminPaymentController
             ]);
         }
 
-        $before = $channel->toArray();
-        $channel->update($data);
-        $this->audit($request, 'payment.channel.updated', 'payment_channel', $channel->id, $before, $channel->fresh()->toArray());
+        $hasRoute = DB::table('payment_routes')->where('payment_channel_id', $channel->id)->exists();
+        $connection = null;
+        $configuration = null;
+        if (! $hasRoute && ($request->filled('gateway_code') || $data['is_active'])) {
+            $connection = $request->validate([
+                'gateway_code' => ['required', Rule::in(['MIDTRANS', 'DOKU'])],
+                'provider_method' => ['required', 'string', 'min:2', 'max:80'],
+            ]);
+            $configuration = $this->providerMethodConfiguration(
+                (string) $data['method'], (string) $connection['gateway_code'],
+                (string) $connection['provider_method']
+            );
+        }
 
-        return back()->with('status', 'Metode pembayaran disimpan.');
+        $before = $channel->toArray();
+        DB::transaction(function () use ($channel, $data, $connection, $configuration): void {
+            $channel->update($data);
+            if ($connection !== null) {
+                $gatewayId = DB::table('payment_gateways')
+                    ->where('code', $connection['gateway_code'])->value('id');
+                if (! $gatewayId) {
+                    throw ValidationException::withMessages(['gateway_code' => 'Gateway tidak ditemukan.']);
+                }
+                DB::table('payment_routes')->insert([
+                    'payment_channel_id' => $channel->id,
+                    'payment_gateway_id' => $gatewayId,
+                    'provider_channel' => $connection['gateway_code'] === 'MIDTRANS'
+                        ? $connection['provider_method'] : 'DOKU_CHECKOUT',
+                    'configuration' => json_encode($configuration, JSON_THROW_ON_ERROR),
+                    'priority' => 10,
+                    'supports_order' => (bool) $data['supports_order'],
+                    'supports_wallet_topup' => (bool) $data['supports_wallet_topup'],
+                    'is_active' => (bool) $data['is_active'],
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+        });
+        $this->audit($request, 'payment.channel.updated', 'payment_channel', $channel->id, $before, [
+            'channel' => $channel->fresh()->toArray(),
+            'gateway_attached' => $connection['gateway_code'] ?? null,
+        ]);
+
+        return back()->with('status', $connection === null
+            ? 'Metode pembayaran disimpan.' : 'Metode terhubung dengan route gateway. Periksa status kesiapan.');
     }
 
     public function destroyChannel(Request $request, int $id): RedirectResponse
