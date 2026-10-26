@@ -112,14 +112,14 @@ function choosePayment(code) {
                             </button>
 
                             <div v-if="group.key!=='wallet'" class="lf-payment-brand-strip">
-                                <span v-if="group.key==='qris'">{{groupChannel(group)?.description || group.title}}</span>
+                                <span v-if="group.key==='qris'">{{group.items.length > 1 ? 'Pilih QRIS Otomatis atau QRIS Manual' : (groupChannel(group)?.description || group.title)}}</span>
                                 <template v-else>
                                     <span v-for="channel in group.items.slice(0,7)" :key="channel.code">{{channel.name}}</span>
                                 </template>
                             </div>
 
                             <div
-                                v-if="group.key!=='wallet' && group.key!=='qris' && group.items.some(x=>x.code===paymentChannelCode)"
+                                v-if="group.key!=='wallet' && (group.key!=='qris' || group.items.length > 1) && group.items.some(x=>x.code===paymentChannelCode)"
                                 class="lfx-payment-method-grid"
                                 role="radiogroup"
                                 :aria-label="'Pilih metode '+group.title"
