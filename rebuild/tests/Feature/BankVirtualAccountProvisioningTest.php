@@ -10,6 +10,7 @@ use App\Services\PaymentRouteCatalogService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Validation\ValidationException;
 use Mockery;
 use ReflectionMethod;
 use Tests\TestCase;
@@ -149,7 +150,7 @@ class BankVirtualAccountProvisioningTest extends TestCase
         $this->assertSame(['VIRTUAL_ACCOUNT_Sinarmas'], $body['payment']['payment_method_types']);
 
         $context['route_configuration']['payment_method_types'] = ['EMONEY_FAKE'];
-        $this->expectException(\Illuminate\Validation\ValidationException::class);
+        $this->expectException(ValidationException::class);
         $payload->invoke($gateway, $context);
     }
 
