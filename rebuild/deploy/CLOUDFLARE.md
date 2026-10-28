@@ -10,8 +10,7 @@
 - Ingress `lfamilia.com` dan `www.lfamilia.com` → `https://127.0.0.1:443` (Origin SNI `lfamilia.com`); `panel.lfamilia.com` → `https://127.0.0.1:8443`.
 - Origin HTTPS memverifikasi CA bundle dan hostname dengan `noTLSVerify: false`; ingress terakhir `http_status:404`.
 - DNSSEC aktif; SSL mode **Full (strict)**; Always Use HTTPS **on**; minimum TLS **1.2**; TLS 1.3 **on**.
-- Domain lama `lfamiliastore.my.id` dipertahankan untuk jalur legacy. Redirect **halaman publik GET/HEAD saja** ke apex domain baru; jalur API, auth, checkout, payment, orders, admin, dan tautan sensitif dikecualikan.
-- Jangan menghapus DNS/Access legacy sebelum URL callback provider lama dan order yang masih beredar dipastikan aman.
+- Satu-satunya domain customer yang didukung adalah `lfamilia.com` beserta alias `www.lfamilia.com`. Tidak ada fallback atau routing kompatibilitas domain sebelumnya.
 
 ## Proteksi aplikasi
 
@@ -26,7 +25,7 @@
 - Resend: domain sender `lfamilia.com` **verified**; DKIM/SPF/MX dipasang melalui DNS, `_dmarc` sementara `p=none`.
 - Cloudflare Email Routing: `support@lfamilia.com` dan `admin@lfamilia.com` meneruskan ke penerima pemilik yang sudah diverifikasi.
 - Sender `integration_credentials` Resend `from_email` dan pengaturan `store.email` masih perlu disesuaikan via panel admin/VPS; DNS saja tidak mengubah isinya.
-- Notifikasi provider domain baru: `/api/fulfillment/digiflazz/webhook`, `/api/payments/midtrans/notification`, `/api/payments/doku/notification`; Google OAuth `/auth/google/callback`. Ubah URL di dashboard provider, tidak cukup di source code.
+- Notifikasi provider domain baru: `/api/fulfillment/digiflazz/webhook`, `/api/payments/midtrans/notification`, `/api/payments/doku/notification`; Google OAuth `/auth/google/callback`. **Wajib** ubah URL callback di dashboard masing-masing provider ke `https://lfamilia.com`, tidak cukup di source code. Sebelum pembaruan dan uji callback berhasil, pembayaran/fulfillment tetap dalam mode uji.
 
 ## Hal yang belum dinyatakan lulus
 

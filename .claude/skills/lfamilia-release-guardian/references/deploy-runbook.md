@@ -1,6 +1,6 @@
 # LFAMILIA STORE — production deployment guard (new VPS)
 
-> Revised for the 2026-10-29 migration. Legacy SSH target, paths, and Termux relay on the previous VPS are **obsolete and must not be used**.
+> Revised for the 2026-10-29 migration. Only the new VPS and `lfamilia.com` are supported. Do not use previous server targets, configuration, or customer-facing domains.
 
 ## Verified destination and separation of duties
 
@@ -49,9 +49,10 @@ Only BETOL may configure origin/vhost, enable or restart services, change `.env`
 
 ## Migration acceptance (pending unless proven)
 
-- `APP_URL=https://lfamilia.com`, `APP_TRUSTED_HOSTS=lfamilia.com,www.lfamilia.com`, `SESSION_DOMAIN=.lfamilia.com` set on VPS.
+- `APP_URL=https://lfamilia.com`, `APP_TRUSTED_HOSTS=lfamilia.com,www.lfamilia.com`, `SESSION_DOMAIN=.lfamilia.com` set on VPS. Do not add retired hostnames to the trusted-host allowlist.
 - `store.email` and active Resend `from_email` updated in admin, with real test email.
-- Provider notification URLs and Google OAuth redirect updated **in vendor dashboards**.
+- Provider notification URLs and Google OAuth redirect updated **in vendor dashboards** to `https://lfamilia.com` (mandatory, no fallback).
+- **Turnstile**: Cloudflare widget hostname set to `lfamilia.com`, then update **active** Admin Integrations → Turnstile `allowed_hostnames` to include `lfamilia.com`; remove retired hostname entries and test login, register, forgot-password. Do not blindly enable production profile.
 - Sandbox payment and TEST fulfillment completed end-to-end without spending real funds.
 - Encrypted off-site backup to R2 plus readback/restore-verify **successful**.
 

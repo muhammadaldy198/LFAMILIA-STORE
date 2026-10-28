@@ -59,6 +59,46 @@ class SecurityM10Test extends TestCase
             ->assertBadRequest();
     }
 
+    public function test_only_lfamilia_customer_hosts_are_trusted(): void
+    {
+        config(['lfamilia.trusted_hosts' => ['lfamilia.com', 'www.lfamilia.com']]);
+
+        $this->withServerVariables(['HTTP_HOST' => 'lfamilia.com'])
+            ->get('/login')->assertOk();
+
+        $this->withServerVariables(['HTTP_HOST' => 'www.lfamilia.com'])
+            ->get('/login')->assertOk();
+
+        $this->withServerVariables(['HTTP_HOST' => 'retired.example'])
+            ->get('/login')->assertBadRequest();
+    }
+
+    public function test_turnstile_accepts_new_domain_from_selected_profile(): void
+    {
+        Queue::fake();
+        $this->enableTurnstile(['allowed_hostnames' => ['lfamilia.com']]);
+
+        Http::fake([
+            'https://challenges.cloudflare.com/turnstile/v0/siteverify' => Http::response([
+                'success' => true,
+                'action' => 'register',
+                'hostname' => 'lfamilia.com',
+            ]),
+        ]);
+
+        $this->withServerVariables(['HTTP_HOST' => 'lfamilia.com'])
+            ->post('/register', [
+                'name' => 'Domain User',
+                'email' => 'domain-new@example.test',
+                'phone' => '081234567891',
+                'password' => 'SecurePassword123!',
+                'password_confirmation' => 'SecurePassword123!',
+                'turnstile_token' => 'valid-domain-token',
+            ])->assertRedirect();
+
+        $this->assertDatabaseHas('users', ['email' => 'domain-new@example.test']);
+    }
+
     public function test_session_security_defaults_keep_24_hour_lifetime_and_encryption(): void
     {
         $this->assertSame(1440, config('session.lifetime'));

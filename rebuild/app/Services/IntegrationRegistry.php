@@ -366,7 +366,7 @@ class IntegrationRegistry
                         'secret' => false,
                         'required' => false,
                         'type' => 'csv',
-                        'help' => 'Pisahkan beberapa hostname dengan koma. Jangan sertakan http:// atau https://.',
+                        'help' => 'Untuk website LFAMILIA, gunakan lfamilia.com. Pisahkan hostname dengan koma, tanpa http:// atau https://. Isi profil environment Turnstile yang sedang aktif.',
                     ],
                 ],
                 'note' => 'Test dan Production memakai credential terpisah. Backend hanya membaca profile dari environment yang dipilih.',
