@@ -54,23 +54,18 @@ class SecurityM10Test extends TestCase
     {
         config(['lfamilia.trusted_hosts' => ['lfamilia.com']]);
 
-        $this->withServerVariables(['HTTP_HOST' => 'evil.example'])
-            ->get('/login')
-            ->assertBadRequest();
+        $this->get('https://evil.example/login')->assertBadRequest();
     }
 
     public function test_only_lfamilia_customer_hosts_are_trusted(): void
     {
         config(['lfamilia.trusted_hosts' => ['lfamilia.com', 'www.lfamilia.com']]);
 
-        $this->withServerVariables(['HTTP_HOST' => 'lfamilia.com'])
-            ->get('/login')->assertOk();
+        $this->get('https://lfamilia.com/login')->assertOk();
 
-        $this->withServerVariables(['HTTP_HOST' => 'www.lfamilia.com'])
-            ->get('/login')->assertOk();
+        $this->get('https://www.lfamilia.com/login')->assertOk();
 
-        $this->withServerVariables(['HTTP_HOST' => 'retired.example'])
-            ->get('/login')->assertBadRequest();
+        $this->get('https://retired.example/login')->assertBadRequest();
     }
 
     public function test_turnstile_accepts_new_domain_from_selected_profile(): void
@@ -103,8 +98,7 @@ class SecurityM10Test extends TestCase
             ]),
         ]);
 
-        $this->withServerVariables(['HTTP_HOST' => 'lfamilia.com'])
-            ->post('/register', [
+        $this->post('https://lfamilia.com/register', [
                 'name' => 'Domain User',
                 'email' => 'domain-new@example.test',
                 'phone' => '081234567891',
