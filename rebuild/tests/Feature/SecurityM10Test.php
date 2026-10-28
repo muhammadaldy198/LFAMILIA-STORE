@@ -76,7 +76,24 @@ class SecurityM10Test extends TestCase
     public function test_turnstile_accepts_new_domain_from_selected_profile(): void
     {
         Queue::fake();
-        $this->enableTurnstile(['allowed_hostnames' => ['lfamilia.com']]);
+        IntegrationCredential::updateOrCreate(['code' => 'turnstile'], [
+            'is_active' => true,
+            'config_ciphertext' => [
+                'environment' => 'production',
+                'profiles' => [
+                    'test' => [
+                        'site_key' => 'test-site',
+                        'secret_key' => 'test-secret',
+                        'allowed_hostnames' => ['localhost'],
+                    ],
+                    'production' => [
+                        'site_key' => 'site-key-test',
+                        'secret_key' => 'turnstile-secret-test',
+                        'allowed_hostnames' => ['lfamilia.com'],
+                    ],
+                ],
+            ],
+        ]);
 
         Http::fake([
             'https://challenges.cloudflare.com/turnstile/v0/siteverify' => Http::response([
