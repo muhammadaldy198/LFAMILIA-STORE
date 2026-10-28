@@ -445,7 +445,7 @@ class TransactionalEmailService
 
     private function csLine(): string
     {
-        $supportEmail = (string) ((app(StorefrontContentService::class)->settings()['store.email'] ?? '') ?: 'support@lfamiliastore.my.id');
+        $supportEmail = (string) ((app(StorefrontContentService::class)->settings()['store.email'] ?? '') ?: 'support@lfamilia.com');
 
         return 'Butuh bantuan? Hubungi CS: '.$supportEmail.' / '.$this->contactUrl();
     }

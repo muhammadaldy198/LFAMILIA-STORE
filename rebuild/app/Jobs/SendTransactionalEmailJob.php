@@ -64,14 +64,14 @@ class SendTransactionalEmailJob implements ShouldQueue
         $message = nl2br($escape($mailText ?? $this->text), false);
         try {
             $identity = app(StorefrontContentService::class)->settings();
-            $siteUrl = (string) config('app.url', 'https://lfamiliastore.my.id');
+            $siteUrl = (string) config('app.url', 'https://lfamilia.com');
         } catch (Throwable) {
             // Plain PHPUnit tests and maintenance pages may have no Laravel DB.
             $identity = [];
-            $siteUrl = 'https://lfamiliastore.my.id';
+            $siteUrl = 'https://lfamilia.com';
         }
         $storeName = $escape((string) ($identity['store.name'] ?? 'LFAMILIA STORE'));
-        $supportEmail = (string) (($identity['store.email'] ?? '') ?: 'support@lfamiliastore.my.id');
+        $supportEmail = (string) (($identity['store.email'] ?? '') ?: 'support@lfamilia.com');
         $safeEmail = $escape($supportEmail);
         $baseUrl = rtrim($siteUrl, '/');
         $configuredContact = (string) (($identity['store.support_url'] ?? '') ?: '/contact');

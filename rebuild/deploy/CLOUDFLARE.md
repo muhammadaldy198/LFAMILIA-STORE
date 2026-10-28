@@ -1,53 +1,42 @@
-# Cloudflare production baseline
+# Cloudflare production baseline — LFAMILIA.COM
 
-Status di bawah diverifikasi melalui **@Cloudflare** pada 2026-10-04. Jangan mengganti status ini dengan asumsi dari config lokal.
+> Status operasional terverifikasi lewat Cloudflare API pada 2026-10-29. Konfigurasi kredensial selalu di Cloudflare/VPS, bukan di git.
 
-## Zone/DNS
+## Zone, DNS, dan Tunnel
 
-Zone `lfamiliastore.my.id` aktif dan tidak paused.
+- Domain utama: `https://lfamilia.com`, `www.lfamilia.com` (redirect canonical ke apex).
+- CloudPanel: `panel.lfamilia.com` via Cloudflare Access.
+- Ketiga record DNS merupakan proxied CNAME ke tunnel `lfamilia-origin-20261028` (ID `f23b8901-3ef5-4ac0-9613-284ff7f7a6d5`).
+- Ingress `lfamilia.com` dan `www.lfamilia.com` → `https://127.0.0.1:443` (Origin SNI `lfamilia.com`); `panel.lfamilia.com` → `https://127.0.0.1:8443`.
+- Origin HTTPS memverifikasi CA bundle dan hostname dengan `noTLSVerify: false`; ingress terakhir `http_status:404`.
+- DNSSEC aktif; SSL mode **Full (strict)**; Always Use HTTPS **on**; minimum TLS **1.2**; TLS 1.3 **on**.
+- Domain lama `lfamiliastore.my.id` dipertahankan untuk jalur legacy. Redirect **halaman publik GET/HEAD saja** ke apex domain baru; jalur API, auth, checkout, payment, orders, admin, dan tautan sensitif dikecualikan.
+- Jangan menghapus DNS/Access legacy sebelum URL callback provider lama dan order yang masih beredar dipastikan aman.
 
-- apex `lfamiliastore.my.id`: proxied;
-- `www.lfamiliastore.my.id`: proxied CNAME ke apex;
-- `panel.lfamiliastore.my.id`: proxied.
+## Proteksi aplikasi
 
-Origin IP sengaja tidak ditulis di dokumentasi.
+- Cloudflare Access: `lfamilia.com/admin` (owner/admin) dan `panel.lfamilia.com` (owner); CloudPanel session 4 jam, admin 24 jam.
+- WAF memblokir scanner umum, membatasi webhook Digiflazz ke IP yang ditentukan di aturan, dan mengecualikan callback yang dipilih dari Managed Free WAF (validasi signature/provider tetap WAJIB di Laravel).
+- Cache bypass pada `/api/`, `/admin`, `/account`, `/checkout`, `/payment`, `/orders`, `/auth/` dan rute sensitif lain.
+- Nginx website dan clp-nginx panel adalah dua instance berbeda; port 443/8443 tidak diekspos secara publik. Pada VPS hanya SSH publik sesuai laporan pemelihara VPS.
+- PHP dan MySQL/Redis dijalankan di origin, bukan Workers atau Pages.
 
-Mail records tetap DNS-only sesuai jenis record dan tidak boleh diproxy seperti traffic web.
+## Email dan integrasi
 
-Cloudflare Pages/Workers/D1 **bukan runtime utama aplikasi**. Jangan membuat ulang relay hostname Digiflazz lama kecuali ada requirement baru yang eksplisit.
+- Resend: domain sender `lfamilia.com` **verified**; DKIM/SPF/MX dipasang melalui DNS, `_dmarc` sementara `p=none`.
+- Cloudflare Email Routing: `support@lfamilia.com` dan `admin@lfamilia.com` meneruskan ke penerima pemilik yang sudah diverifikasi.
+- Sender `integration_credentials` Resend `from_email` dan pengaturan `store.email` masih perlu disesuaikan via panel admin/VPS; DNS saja tidak mengubah isinya.
+- Notifikasi provider domain baru: `/api/fulfillment/digiflazz/webhook`, `/api/payments/midtrans/notification`, `/api/payments/doku/notification`; Google OAuth `/auth/google/callback`. Ubah URL di dashboard provider, tidak cukup di source code.
 
-## SSL/TLS
+## Hal yang belum dinyatakan lulus
 
-Verified zone settings:
-
-- SSL mode: **Full (strict)**;
-- Always Use HTTPS: **on**;
-- minimum TLS version: **1.2**;
-- TLS 1.3: **on**.
-
-VPS/Nginx memakai Cloudflare Origin CA certificate untuk origin TLS yang diperiksa pada Tahap 4.
-
-## Cloudflare Access
-
-Dua Access application terverifikasi:
-
-- **LFAMILIA Admin** → `lfamiliastore.my.id/admin`;
-- **LFAMILIA CloudPanel** → `panel.lfamiliastore.my.id`.
-
-Keduanya mempunyai allow policy. CloudPanel session duration yang terbaca saat audit adalah 4 jam; aplikasi Admin terkonfigurasi 24 jam.
-
-Access tidak menggantikan Laravel auth/RBAC. `/admin` tetap memerlukan guard/permission Laravel setelah request lolos edge.
-
-## Origin firewall
-
-Pada VPS, UFW membatasi HTTP/HTTPS dan CloudPanel 8443 ke Cloudflare network ranges. Dengan demikian origin web tidak dimaksudkan menjadi jalur publik langsung.
-
-Saat Cloudflare IP ranges berubah, firewall server harus disinkronkan melalui prosedur security/server, bukan dengan membuka origin ke semua alamat.
+- Pengujian transaksi Midtrans/DOKU sandbox dan Digiflazz TEST end-to-end; callback provider nyata tanpa uang asli.
+- Backup off-site R2; bucket `lfamilia-production-backups` tersedia namun teramati kosong pada saat migrasi.
+- Verifikasi akhir reset password/email dengan sender Resend baru dan OAuth Google.
 
 ## Ownership
 
-- DNS/Access/zone TLS → **@Cloudflare**.
-- Nginx/UFW/Origin CA install/service → **@Remote Desktop Commander**.
-- Source/config documentation → **@GitHub**.
-
-Jangan simpan API token Cloudflare, Access secret, Origin CA private key, atau origin IP di repository.
+- Cloudflare API/DNS/Access/WAF/Tunnel token: pengelola Cloudflare.
+- Nginx, firewall, `cloudflared` service, origin TLS, DB/Redis, R2 rclone/backup: BETOL (VPS).
+- Laravel code, env examples, CI, PR/Codex Review: GitHub.
+- **Tidak** simpan token, private key, .env produksi, API key, atau IP origin dalam git.

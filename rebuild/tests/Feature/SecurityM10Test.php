@@ -52,7 +52,7 @@ class SecurityM10Test extends TestCase
 
     public function test_trusted_host_guard_rejects_unconfigured_host(): void
     {
-        config(['lfamilia.trusted_hosts' => ['lfamiliastore.my.id']]);
+        config(['lfamilia.trusted_hosts' => ['lfamilia.com']]);
 
         $this->withServerVariables(['HTTP_HOST' => 'evil.example'])
             ->get('/login')
@@ -136,7 +136,7 @@ class SecurityM10Test extends TestCase
 
     public function test_turnstile_rejects_wrong_action_and_hostname(): void
     {
-        $this->enableTurnstile(['allowed_hostnames' => ['lfamiliastore.my.id']]);
+        $this->enableTurnstile(['allowed_hostnames' => ['lfamilia.com']]);
 
         Http::fake([
             'https://challenges.cloudflare.com/turnstile/v0/siteverify' => Http::response([

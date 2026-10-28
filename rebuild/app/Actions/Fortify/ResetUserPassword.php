@@ -3,6 +3,7 @@
 namespace App\Actions\Fortify;
 
 use App\Models\User;
+use App\Services\StorefrontContentService;
 use App\Services\TransactionalEmailService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -29,6 +30,7 @@ class ResetUserPassword implements ResetsUserPasswords
         });
 
         if (is_string($user->email)) {
+            $supportEmail = (string) ((app(StorefrontContentService::class)->settings()['store.email'] ?? '') ?: 'support@lfamilia.com');
             app(TransactionalEmailService::class)->queue(
                 $user->email,
                 'Kata sandi LFAMILIA STORE berhasil diatur ulang',
@@ -37,7 +39,7 @@ class ResetUserPassword implements ResetsUserPasswords
                     '',
                     'Kata sandi akun LFAMILIA STORE berhasil diatur ulang.',
                     '',
-                    'Jika kamu tidak melakukan ini, segera hubungi CS: support@lfamiliastore.my.id',
+                    'Jika kamu tidak melakukan ini, segera hubungi CS: '.$supportEmail,
                     '',
                     'Jangan bagikan kata sandi atau kode keamanan kepada siapa pun.',
                 ])

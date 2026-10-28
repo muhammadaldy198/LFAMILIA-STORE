@@ -185,7 +185,7 @@ class CustomerAreaTest extends TestCase
         Queue::assertPushed(SendTransactionalEmailJob::class, fn (SendTransactionalEmailJob $job): bool => $job->recipient === $user->fresh()->email
             && str_contains($job->subject, 'berhasil diperbarui')
             && str_contains($job->text, 'Kata sandi akun LFAMILIA STORE berhasil diperbarui')
-            && str_contains($job->text, 'support@lfamiliastore.my.id'));
+            && str_contains($job->text, 'support@lfamilia.com'));
 
         SupportTicket::create([
             'user_id' => $user->id, 'subject' => 'Help', 'message' => 'My account',

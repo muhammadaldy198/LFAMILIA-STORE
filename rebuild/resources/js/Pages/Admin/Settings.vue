@@ -107,7 +107,7 @@ const save = () => {
                     </label>
                     <label class="adm-field">
                         <span>Email</span>
-                        <input v-model="form.email" type="email" class="adm-input" maxlength="255" placeholder="bantuan@lfamiliastore.my.id">
+                        <input v-model="form.email" type="email" class="adm-input" maxlength="255" placeholder="bantuan@lfamilia.com">
                     </label>
                     <label class="adm-field">
                         <span>Jam layanan</span>

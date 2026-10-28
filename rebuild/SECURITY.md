@@ -81,3 +81,12 @@ Cloudflare Access adalah lapisan tambahan. Authorization Laravel tetap wajib unt
 - Super Admin → Integrasi: provider/application credential yang dikelola aplikasi.
 
 Dilarang hardcode secret, commit `.env`, menaruh credential di fixture production, atau membocorkan secret di log/Markdown.
+
+
+## Migration note — 2026-10-29
+
+Zona historis `lfamiliastore.my.id` pada audit di atas tetap dipertahankan sebagai domain lama.
+Zona aktif baru `lfamilia.com` memakai Cloudflare Tunnel tersendiri, DNS proxied untuk apex/www/panel, SSL Full (strict), TLS minimum 1.2, dan Cloudflare Access untuk `/admin` serta `panel.lfamilia.com`.
+Port origin web/panel tidak dibuka untuk internet; koneksi `cloudflared` keluar dari VPS menuju Cloudflare.
+Token Tunnel/Origin CA private key dan konfigurasi provider tidak boleh disimpan di repository.
+Verifikasi checkout sandbox, callback pembayaran, OAuth, dan backup off-site harus lolos sebelum transaksi live dibuka.

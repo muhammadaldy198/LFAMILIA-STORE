@@ -142,7 +142,7 @@ class CustomerEmailMomentsTest extends TestCase
                 && str_contains($job->text, 'WIB')
                 && str_contains($job->text, 'invoice='.$invoice)
                 && str_contains($job->text, '/orders/check')
-                && str_contains($job->text, 'support@lfamiliastore.my.id')
+                && str_contains($job->text, 'support@lfamilia.com')
                 && str_contains($job->text, 'Kode akses pesanan: '.(string) $order->json('access_code'))
                 && str_contains($job->text, 'Jangan bagikan ke siapa pun');
         });
@@ -332,7 +332,7 @@ class CustomerEmailMomentsTest extends TestCase
                 && str_contains($job->text, 'Rp 11.078')
                 && str_contains($job->subject, 'sedang diproses')
                 && str_contains($job->text, '/orders/check')
-                && str_contains($job->text, 'support@lfamiliastore.my.id');
+                && str_contains($job->text, 'support@lfamilia.com');
         });
     }
 
@@ -409,7 +409,7 @@ class CustomerEmailMomentsTest extends TestCase
                 && str_contains($job->text, 'SERIAL-123')
                 && str_contains($job->text, 'Rp 11.000')
                 && str_contains($job->text, '/orders/check')
-                && str_contains($job->text, 'support@lfamiliastore.my.id');
+                && str_contains($job->text, 'support@lfamilia.com');
         });
     }
 
@@ -608,7 +608,7 @@ class CustomerEmailMomentsTest extends TestCase
                 && str_contains($job->text, $invoice)
                 && str_contains($job->text, '100 Diamonds')
                 && str_contains($job->text, 'Rp 11.000')
-                && str_contains($job->text, 'support@lfamiliastore.my.id')
+                && str_contains($job->text, 'support@lfamilia.com')
                 && str_contains($job->text, 'bukti bayar')
                 && ! str_contains($lower, 'refund')
                 && ! str_contains($lower, 'pengembalian dana')

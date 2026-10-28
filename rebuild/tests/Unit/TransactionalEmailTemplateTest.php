@@ -15,7 +15,8 @@ class TransactionalEmailTemplateTest extends TestCase
         $html = $method->invoke($job);
 
         $this->assertStringContainsString('LFAMILIA STORE', $html);
-        $this->assertStringContainsString('support@lfamiliastore.my.id', $html);
+        $this->assertStringContainsString('https://lfamilia.com', $html);
+        $this->assertStringContainsString('support@lfamilia.com', $html);
         $this->assertStringContainsString('lfamilia-footer-desktop-wordmark.jpg', $html);
         $this->assertStringContainsString('&lt;script&gt;alert(1)&lt;/script&gt;', $html);
         $this->assertStringContainsString("Hello &lt;b&gt;customer&lt;/b&gt;<br>\nSecond line", $html);
