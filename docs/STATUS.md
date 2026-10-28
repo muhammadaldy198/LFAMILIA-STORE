@@ -2,8 +2,8 @@
 
 Catatan apa yang **sudah jalan** dan apa yang **belum**. Aturan produk ada di [`PRD.md`](PRD.md), spesifikasi panel ada di [`ADMIN-PANEL.md`](ADMIN-PANEL.md).
 
-**Terakhir diperbarui:** 24 Oktober 2026
-**Keadaan situs:** ada di alamat publik `lfamiliastore.my.id`. **Produksi menjalankan PR #295** (panel admin hasil desain ulang sudah termasuk). Toko **belum grand opening**: belum ada pelanggan nyata, belum ada transaksi nyata. Digiflazz masih mode test dan Midtrans masih sandbox sampai pemilik memerintahkan sebaliknya.
+**Terakhir diperbarui:** 29 Oktober 2026
+**Keadaan situs:** domain publik utama kini `lfamilia.com` melalui Cloudflare Tunnel baru (homepage dan healthcheck publik lulus). Tidak ada domain customer cadangan atau periode kompatibilitas alamat sebelumnya. Toko **belum grand opening / transaksi live**; Digiflazz TEST dan Midtrans sandbox dipertahankan. Verifikasi callback penyedia, Google OAuth, Resend transaction send, serta backup off-site masih diperlukan. Perubahan source migrasi domain ada di PR terpisah dan belum berarti otomatis ter-deploy.
 
 ---
 

@@ -52,11 +52,62 @@ class SecurityM10Test extends TestCase
 
     public function test_trusted_host_guard_rejects_unconfigured_host(): void
     {
-        config(['lfamilia.trusted_hosts' => ['lfamiliastore.my.id']]);
+        config(['lfamilia.trusted_hosts' => ['lfamilia.com']]);
 
-        $this->withServerVariables(['HTTP_HOST' => 'evil.example'])
-            ->get('/login')
-            ->assertBadRequest();
+        $this->get('https://evil.example/login')->assertBadRequest();
+    }
+
+    public function test_only_lfamilia_customer_hosts_are_trusted(): void
+    {
+        config(['lfamilia.trusted_hosts' => ['lfamilia.com', 'www.lfamilia.com']]);
+
+        $this->get('https://lfamilia.com/login')->assertOk();
+
+        $this->get('https://www.lfamilia.com/login')->assertOk();
+
+        $this->get('https://retired.example/login')->assertBadRequest();
+    }
+
+    public function test_turnstile_accepts_new_domain_from_selected_profile(): void
+    {
+        Queue::fake();
+        IntegrationCredential::updateOrCreate(['code' => 'turnstile'], [
+            'is_active' => true,
+            'config_ciphertext' => [
+                'environment' => 'production',
+                'profiles' => [
+                    'test' => [
+                        'site_key' => 'test-site',
+                        'secret_key' => 'test-secret',
+                        'allowed_hostnames' => ['localhost'],
+                    ],
+                    'production' => [
+                        'site_key' => 'site-key-test',
+                        'secret_key' => 'turnstile-secret-test',
+                        'allowed_hostnames' => ['lfamilia.com'],
+                    ],
+                ],
+            ],
+        ]);
+
+        Http::fake([
+            'https://challenges.cloudflare.com/turnstile/v0/siteverify' => Http::response([
+                'success' => true,
+                'action' => 'register',
+                'hostname' => 'lfamilia.com',
+            ]),
+        ]);
+
+        $this->post('https://lfamilia.com/register', [
+            'name' => 'Domain User',
+            'email' => 'domain-new@example.test',
+            'phone' => '081234567891',
+            'password' => 'SecurePassword123!',
+            'password_confirmation' => 'SecurePassword123!',
+            'turnstile_token' => 'valid-domain-token',
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('users', ['email' => 'domain-new@example.test']);
     }
 
     public function test_session_security_defaults_keep_24_hour_lifetime_and_encryption(): void
@@ -136,7 +187,7 @@ class SecurityM10Test extends TestCase
 
     public function test_turnstile_rejects_wrong_action_and_hostname(): void
     {
-        $this->enableTurnstile(['allowed_hostnames' => ['lfamiliastore.my.id']]);
+        $this->enableTurnstile(['allowed_hostnames' => ['lfamilia.com']]);
 
         Http::fake([
             'https://challenges.cloudflare.com/turnstile/v0/siteverify' => Http::response([

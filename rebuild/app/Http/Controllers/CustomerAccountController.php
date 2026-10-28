@@ -10,6 +10,7 @@ use App\Services\CustomerAccountDeletion;
 use App\Services\MembershipService;
 use App\Services\PaymentRoutingService;
 use App\Services\PublicOrderStatusService;
+use App\Services\StorefrontContentService;
 use App\Services\TransactionalEmailService;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
@@ -128,6 +129,7 @@ class CustomerAccountController
         });
         $request->session()->regenerate();
         if (is_string($user->email)) {
+            $supportEmail = (string) ((app(StorefrontContentService::class)->settings()['store.email'] ?? '') ?: 'support@lfamilia.com');
             $emails->queue(
                 $user->email,
                 'Kata sandi LFAMILIA STORE berhasil diperbarui',
@@ -136,7 +138,7 @@ class CustomerAccountController
                     '',
                     'Kata sandi akun LFAMILIA STORE berhasil diperbarui.',
                     '',
-                    'Jika kamu tidak melakukan perubahan ini, segera hubungi CS: support@lfamiliastore.my.id',
+                    'Jika kamu tidak melakukan perubahan ini, segera hubungi CS: '.$supportEmail,
                     '',
                     'Jangan bagikan kata sandi atau kode keamanan kepada siapa pun.',
                 ])

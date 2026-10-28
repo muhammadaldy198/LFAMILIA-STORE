@@ -20,9 +20,9 @@ Admin tetap memakai authorization Laravel di server. Cloudflare Access adalah la
 
 ### CloudPanel
 
-`Browser → Cloudflare Access → Cloudflare proxy → panel.lfamiliastore.my.id:8443 → CloudPanel`
+`Browser → Cloudflare Access → Cloudflare proxy → panel.lfamilia.com (Tunnel → localhost:8443) → CloudPanel`
 
-Pada audit 2026-10-04, zone Cloudflare aktif, hostname panel proxied, aplikasi Access LFAMILIA CloudPanel terpasang, dan origin memakai Cloudflare Origin CA.
+Pada migrasi 2026-10-29, domain utama menggunakan lfamilia.com melalui Tunnel baru; panel.lfamilia.com dilindungi Cloudflare Access. Origin 443 dan panel 8443 menggunakan Cloudflare Origin CA dengan verifikasi TLS.
 
 ## Transaction flow
 

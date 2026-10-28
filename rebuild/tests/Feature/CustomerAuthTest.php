@@ -97,7 +97,7 @@ class CustomerAuthTest extends TestCase
                 'token' => 'example-reset-token', 'email' => $user->email,
             ]))
             && str_contains($job->text, 'Jika kamu tidak meminta ini')
-            && str_contains($job->text, 'support@lfamiliastore.my.id'));
+            && str_contains($job->text, 'support@lfamilia.com'));
 
         $token = Password::broker('users')->createToken($user);
 
@@ -113,7 +113,7 @@ class CustomerAuthTest extends TestCase
         Queue::assertPushed(SendTransactionalEmailJob::class, fn (SendTransactionalEmailJob $job): bool => $job->recipient === $user->email
             && str_contains($job->subject, 'berhasil diatur ulang')
             && str_contains($job->text, 'Kata sandi akun LFAMILIA STORE berhasil diatur ulang')
-            && str_contains($job->text, 'support@lfamiliastore.my.id'));
+            && str_contains($job->text, 'support@lfamilia.com'));
     }
 
     public function test_sanctum_api_requires_a_customer_token(): void

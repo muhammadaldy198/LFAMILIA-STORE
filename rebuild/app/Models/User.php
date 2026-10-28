@@ -77,7 +77,7 @@ class User extends Authenticatable implements MustVerifyEmailContract
                 '',
                 'Jika kamu tidak meminta ini, abaikan email ini dan jangan bagikan tautan kepada siapa pun.',
                 '',
-                'Butuh bantuan? Hubungi CS: '.((app(StorefrontContentService::class)->settings()['store.email'] ?? '') ?: 'support@lfamiliastore.my.id'),
+                'Butuh bantuan? Hubungi CS: '.((app(StorefrontContentService::class)->settings()['store.email'] ?? '') ?: 'support@lfamilia.com'),
             ]),
             'password_reset'
         )->afterCommit();

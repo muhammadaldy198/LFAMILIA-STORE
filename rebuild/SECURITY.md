@@ -39,40 +39,20 @@ Webhook/provider result menggunakan signature/source/reference validation yang d
 
 Redirect frontend tidak pernah menjadi bukti paid.
 
-## Server security — diverifikasi 2026-10-04, dikoreksi 2026-10-24
+## Server security — current infrastructure, 2026-10-29
 
-Pada VPS production saat audit Tahap 4 (2026-10-04), SSH tercatat key-only. **Keadaan itu sudah berubah atas keputusan pemilik (2026-10-06):**
+Berdasarkan laporan BETOL, origin berada di VPS baru dengan CloudPanel dan nginx, MySQL/Redis lokal, queue/scheduler, sertifikat Cloudflare Origin CA untuk HTTPS (443) dan panel (8443), serta firewall yang tidak mengekspos port HTTP/HTTPS/panel secara publik. Detail firewall, proses, dan layanan harus diverifikasi ulang oleh BETOL dari VPS; jangan menyamakan laporan VPS sebelumnya dengan keadaan server baru.
 
-- SSH password authentication: **ENABLED** (keputusan pemilik — pemilik menyadari keamanan lebih rendah dan memilih begitu untuk sementara);
-- keyboard-interactive auth: mengikuti pengaturan SSH aktif;
-- public-key auth: **enabled**;
-- root login: **password diizinkan** (`PermitRootLogin yes`);
-- Fail2ban: **active + enabled**;
-- UFW: **active**;
-- public HTTP/HTTPS rules dibatasi ke Cloudflare networks;
-- port CloudPanel 8443 dibatasi ke Cloudflare networks;
-- MySQL listen pada localhost;
-- Redis listen pada localhost;
-- unattended security updates: **active + enabled**;
-- network hardening yang diperiksa: SYN cookies aktif, redirects/send_redirects nonaktif, rp_filter strict;
-- Nginx origin certificate adalah Cloudflare Origin CA.
+## Cloudflare — verified API, 2026-10-29
 
-Tidak ada private key, origin IP, password, token, atau encryption material yang didokumentasikan di repo.
-
-## Cloudflare — diverifikasi melalui @Cloudflare 2026-10-04
-
-- zone `lfamiliastore.my.id`: active;
-- apex dan `www`: proxied;
-- `panel.lfamiliastore.my.id`: proxied;
-- SSL mode: **strict**;
-- Always Use HTTPS: **on**;
-- minimum TLS: **1.2**;
-- TLS 1.3: **on**;
-- Access application: **LFAMILIA Admin** pada `lfamiliastore.my.id/admin`;
-- Access application: **LFAMILIA CloudPanel** pada `panel.lfamiliastore.my.id`;
-- kedua aplikasi mempunyai allow policy yang terkonfigurasi.
-
-Cloudflare Access adalah lapisan tambahan. Authorization Laravel tetap wajib untuk `/admin`.
+- Domain customer tunggal: `lfamilia.com` (alias `www.lfamilia.com`).
+- CloudPanel: `panel.lfamilia.com`, terlindungi Cloudflare Access.
+- Website `/admin`: terlindungi Cloudflare Access **dan** otorisasi Laravel.
+- Ketiga hostname memakai CNAME proxied ke Tunnel `lfamilia-origin-20261028`.
+- TLS **Full (strict)**, TLS minimum **1.2**, DNSSEC **aktif**, origin `noTLSVerify:false` dengan CA pool.
+- Route webhook wajib tetap melalui URL `https://lfamilia.com` yang dikonfigurasi di dashboard masing-masing provider; Laravel tetap memverifikasi signature, nominal, order reference, dan state.
+- Cloudflare Turnstile memerlukan hostname `lfamilia.com` pada widget Cloudflare **serta** profil integrasi aktif `allowed_hostnames` di aplikasi, jika allowlist digunakan.
+- Tidak ada dukungan runtime untuk alamat customer sebelumnya dalam konfigurasi target ini. Kredensial lama dan konfigurasi provider tidak otomatis berubah melalui PR.
 
 ## Secret management
 
@@ -81,3 +61,4 @@ Cloudflare Access adalah lapisan tambahan. Authorization Laravel tetap wajib unt
 - Super Admin → Integrasi: provider/application credential yang dikelola aplikasi.
 
 Dilarang hardcode secret, commit `.env`, menaruh credential di fixture production, atau membocorkan secret di log/Markdown.
+

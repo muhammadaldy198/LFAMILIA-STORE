@@ -295,7 +295,7 @@ class BankVirtualAccountProvisioningTest extends TestCase
             'merchant_reference' => 'PAY-123',
             'amount_idr' => 10000,
             'expires_minutes' => 60,
-            'return_url' => 'https://lfamiliastore.my.id/payment',
+            'return_url' => 'https://lfamilia.com/payment',
             'customer_name' => 'Test Customer',
             'customer_email' => 'customer@example.test',
             'customer_phone' => '08123456789',
