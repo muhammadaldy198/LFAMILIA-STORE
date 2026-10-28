@@ -99,13 +99,13 @@ class SecurityM10Test extends TestCase
         ]);
 
         $this->post('https://lfamilia.com/register', [
-                'name' => 'Domain User',
-                'email' => 'domain-new@example.test',
-                'phone' => '081234567891',
-                'password' => 'SecurePassword123!',
-                'password_confirmation' => 'SecurePassword123!',
-                'turnstile_token' => 'valid-domain-token',
-            ])->assertRedirect();
+            'name' => 'Domain User',
+            'email' => 'domain-new@example.test',
+            'phone' => '081234567891',
+            'password' => 'SecurePassword123!',
+            'password_confirmation' => 'SecurePassword123!',
+            'turnstile_token' => 'valid-domain-token',
+        ])->assertRedirect();
 
         $this->assertDatabaseHas('users', ['email' => 'domain-new@example.test']);
     }
