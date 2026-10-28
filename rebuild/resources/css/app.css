@@ -1992,7 +1992,7 @@ body:where(:not(.lfx, .lfx *)){margin:0;font-family:Inter,ui-sans-serif,system-u
 .lf-home-popup-dismiss:where(:not(.lfx, .lfx *)){border-top:0!important}
 /* =========================================================
    MOBILE CHECKOUT — LFAMILIA LEGACY PARITY
-   Geometry follows the checkout currently used by lfamiliastore.my.id.
+   Geometry follows the checkout currently used by lfamilia.com.
    Only the palette is mapped to the current customer homepage.
    Quantity is intentionally omitted by product decision.
    ========================================================= */
@@ -3275,7 +3275,7 @@ body:where(:not(.lfx, .lfx *)){margin:0;font-family:Inter,ui-sans-serif,system-u
 /* =========================================================
    CHECKOUT SOURCE-OF-TRUTH OVERRIDES
    Mirrors the final mobile geometry from app/checkout/page.tsx
-   + app/checkout/layout.tsx + app/globals.css on lfamiliastore.my.id.
+   + app/checkout/layout.tsx + app/globals.css on lfamilia.com.
    Palette remains the current LFAMILIA homepage palette.
    Quantity is intentionally omitted.
    ========================================================= */
