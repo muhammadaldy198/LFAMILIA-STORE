@@ -94,7 +94,6 @@ class GuardLogoutIsolationTest extends TestCase
         $this->get('/admin/panel')->assertRedirect(route('admin.login'));
     }
 
-
     public function test_admin_confirmation_cannot_be_reused_after_another_admin_logs_in(): void
     {
         [, $firstAdmin] = $this->logInBoth();
