@@ -32,7 +32,12 @@ class EnsureCustomerSessionFresh
             // once on deployment; otherwise inactive sessions could evade resets.
             if (! is_string($stored) || ! hash_equals($current, $stored)) {
                 $guard->logoutCurrentDevice();
-                $request->session()->forget(self::SESSION_KEY);
+                $request->session()->forget([
+                    self::SESSION_KEY,
+                    'auth.password_confirmed_at',
+                    'auth.google_phone_onboarding_at',
+                    'auth.google_phone_onboarding_user_id',
+                ]);
                 // Rotate and destroy the old session ID while preserving any
                 // independent admin-guard login in this browser.
                 $request->session()->regenerate(true);
