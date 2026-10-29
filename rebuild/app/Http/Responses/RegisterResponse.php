@@ -10,8 +10,8 @@ class RegisterResponse implements RegisterResponseContract
     public function toResponse($request)
     {
         Auth::guard(config('fortify.guard'))->logout();
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
+        $request->session()->forget('security.customer_auth_fingerprint');
+        $request->session()->regenerate(true);
 
         $message = 'Pendaftaran berhasil. Periksa email untuk memverifikasi akun sebelum masuk.';
 
