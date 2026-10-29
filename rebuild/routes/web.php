@@ -35,6 +35,7 @@ use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\CustomerAccountController;
 use App\Http\Controllers\CustomerEmailVerificationController;
 use App\Http\Controllers\CustomerOrderController;
+use App\Http\Controllers\CustomerLogoutController;
 use App\Http\Controllers\CustomerPasswordConfirmController;
 use App\Http\Controllers\CustomerPhoneController;
 use App\Http\Controllers\GoogleAuthController;
@@ -125,6 +126,10 @@ Route::get('/orders/guest/{orderNumber}/events', [GuestOrderController::class, '
 // sesi login. Tanpa signature → 403.
 Route::get('/orders/{orderNumber}/status', [CustomerOrderController::class, 'showSigned'])
     ->name('orders.status.signed');
+
+// Override Fortify's full-session invalidation: customer logout must not end admin auth.
+Route::post('/logout', CustomerLogoutController::class)
+    ->middleware('auth:web')->name('logout');
 
 Route::middleware('guest:web')->group(function (): void {
     Route::get('/auth/google/redirect', [GoogleAuthController::class, 'redirect'])
