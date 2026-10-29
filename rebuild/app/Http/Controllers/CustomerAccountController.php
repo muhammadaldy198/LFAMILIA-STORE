@@ -163,8 +163,8 @@ class CustomerAccountController
 
         $deletion->delete($user);
         Auth::guard('web')->logout();
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
+        $request->session()->forget('security.customer_auth_fingerprint');
+        $request->session()->regenerate(true);
 
         return redirect('/')->with('status', 'Akun dihapus.');
     }
