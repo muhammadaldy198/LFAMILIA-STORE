@@ -77,8 +77,8 @@ class AdminAuthController
     public function logout(Request $request): RedirectResponse
     {
         Auth::guard('admin')->logout();
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
+        // Rotate the session ID and CSRF token without removing customer auth.
+        $request->session()->regenerate(true);
 
         return redirect()->route('admin.login');
     }
