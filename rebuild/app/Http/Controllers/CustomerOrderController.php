@@ -94,7 +94,12 @@ class CustomerOrderController
             && (! $request->user() || (int) $request->user()->id !== (int) $record->user_id)) {
             if ($request->user()) {
                 Auth::guard('web')->logout();
-                $request->session()->forget('security.customer_auth_fingerprint');
+                $request->session()->forget([
+                    'security.customer_auth_fingerprint',
+                    'auth.password_confirmed_at',
+                    'auth.google_phone_onboarding_at',
+                    'auth.google_phone_onboarding_user_id',
+                ]);
                 $request->session()->regenerate(true);
 
                 return redirect()->guest(route('login'))->with(
