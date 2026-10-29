@@ -160,9 +160,9 @@ class PaymentPageController
             && $routing->gatewayCodeForRoute((int) $order->payment_route_id) === 'WALLET'
             && (! $request->user() || (int) $request->user()->id !== (int) $order->user_id)) {
             if ($request->user()) {
-                Auth::logout();
-                $request->session()->invalidate();
-                $request->session()->regenerateToken();
+                Auth::guard('web')->logout();
+                $request->session()->forget('security.customer_auth_fingerprint');
+                $request->session()->regenerate(true);
 
                 return redirect()->guest(route('login'))->with(
                     'status',
