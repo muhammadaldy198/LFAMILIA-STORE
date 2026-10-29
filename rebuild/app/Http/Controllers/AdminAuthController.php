@@ -67,6 +67,8 @@ class AdminAuthController
         }
 
         $risk->clear('admin', $request->ip(), $identity);
+        // Password confirmation must belong to the newly authenticated admin.
+        $request->session()->forget(AdminPasswordConfirmController::SESSION_KEY);
         $request->session()->forget('security.admin_login_challenge');
         $request->session()->regenerate();
         $admin->forceFill(['last_login_at' => now()])->save();
@@ -77,6 +79,7 @@ class AdminAuthController
     public function logout(Request $request): RedirectResponse
     {
         Auth::guard('admin')->logout();
+        $request->session()->forget(AdminPasswordConfirmController::SESSION_KEY);
         // Rotate the session ID and CSRF token without removing customer auth.
         $request->session()->regenerate(true);
 
