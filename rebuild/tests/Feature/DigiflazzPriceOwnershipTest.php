@@ -299,5 +299,20 @@ class DigiflazzPriceOwnershipTest extends TestCase
         $quote = app(CheckoutPricing::class)->forPackage($package->id);
         $this->assertSame('DIGIFLAZZ', $quote['provider_code']);
         $this->assertSame(12000, $quote['subtotal_idr']);
+
+        // Opened while voucher stock existed, submitted after the last code
+        // was reserved: do not apply the intended voucher 8% to Digiflazz.
+        $this->put('/admin/catalog/packages/'.$package->id, [
+            'code' => $package->code,
+            'name' => $package->name,
+            'sort_order' => 0,
+            'is_active' => true,
+            'pricing_mode' => 'PERCENT',
+            'margin_percent' => 8,
+            'price_source' => 'VOUCHER_STOCK',
+        ])->assertSessionHasErrors('pricing_mode');
+        $this->assertEquals(6, (float) $package->fresh()->margin_percent);
+        $this->assertEquals(20, (float) $package->fresh()->digiflazz_markup_percent);
+        $this->assertSame(12000, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
     }
 }
