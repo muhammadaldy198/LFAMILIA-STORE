@@ -320,8 +320,9 @@ class AdminCatalogController
             'manual_open_time' => ['nullable', 'regex:/^([01]\\d|2[0-3]):[0-5]\\d$/'],
             'manual_close_time' => ['nullable', 'regex:/^([01]\\d|2[0-3]):[0-5]\\d$/'],
             'manual_timezone' => ['nullable', Rule::in(['Asia/Jakarta', 'Asia/Makassar', 'Asia/Jayapura'])],
-            // Deprecated game-level margin is internal compatibility data only.
-            // Every Digiflazz nominal has its own markup.
+            // Manual legacy requests may still provide this field; Digiflazz
+            // never uses it to calculate a selling price.
+            'margin_percent' => ['sometimes', 'numeric', 'min:0', 'max:1000', 'decimal:0,4'],
             'sort_order' => ['required', 'integer', 'min:0'],
             // Satu formulir boleh membawa banyak baris nominal untuk produk manual.
             'packages' => ['sometimes', 'array', 'max:100'],
@@ -335,7 +336,7 @@ class AdminCatalogController
         ]);
         $rows = collect($data['packages'] ?? [])->values();
         unset($data['packages']);
-        $data['margin_percent'] = $data['fulfillment_mode'] === 'AUTO_PROVIDER' ? 12 : 0;
+        $data['margin_percent'] = $data['fulfillment_mode'] === 'AUTO_PROVIDER' ? 12 : ($data['margin_percent'] ?? 0);
         $data['slug'] = ($data['slug'] ?? null) ?: Str::slug($data['name']);
         if (! $data['slug']) {
             throw ValidationException::withMessages(['name' => 'Nama produk tidak valid.']);
@@ -443,7 +444,8 @@ class AdminCatalogController
             'manual_open_time' => ['nullable', 'regex:/^([01]\\d|2[0-3]):[0-5]\\d$/'],
             'manual_close_time' => ['nullable', 'regex:/^([01]\\d|2[0-3]):[0-5]\\d$/'],
             'manual_timezone' => ['nullable', Rule::in(['Asia/Jakarta', 'Asia/Makassar', 'Asia/Jayapura'])],
-            // Legacy game-level price columns are not writable in the product editor.
+            // Kept for manual legacy API compatibility only.
+            'margin_percent' => ['sometimes', 'numeric', 'min:0', 'max:1000', 'decimal:0,4'],
             'sort_order' => ['required', 'integer', 'min:0'],
             'is_active' => ['required', 'boolean'],
             'cost_uplift_percent' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:1000', 'decimal:0,4'],
