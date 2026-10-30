@@ -118,5 +118,32 @@ class DigiflazzPriceOwnershipTest extends TestCase
         $quote = app(CheckoutPricing::class)->forPackage($package->id);
         $this->assertSame('VOUCHER_STOCK', $quote['provider_code']);
         $this->assertSame(15000, $quote['subtotal_idr']);
+
+        // Explicit admin edits replace the retained voucher cap while leaving
+        // Digiflazz's independent 20% nominal markup unchanged.
+        $admin = $this->createAdmin([
+            'name' => 'Voucher price owner',
+            'email' => 'voucher-price-'.bin2hex(random_bytes(4)).'@example.test',
+            'password' => bcrypt('a-test-password'),
+            'role' => 'SUPER_ADMIN', 'is_active' => true,
+        ]);
+        $this->actingAs($admin, 'admin');
+        $this->put('/admin/catalog/packages/'.$package->id, [
+            'code' => $package->code,
+            'name' => $package->name,
+            'sort_order' => 0,
+            'is_active' => true,
+            'pricing_mode' => 'SELL_PRICE',
+            'sell_price_idr' => 18000,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertSame(18000, (int) $package->fresh()->legacy_voucher_sell_price_idr);
+        $this->assertSame('PERCENT', $package->fresh()->pricing_mode);
+        $this->assertSame(18000, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
+
+        $voucher->update(['is_active' => false]);
+        $quote = app(CheckoutPricing::class)->forPackage($package->id);
+        $this->assertSame('DIGIFLAZZ', $quote['provider_code']);
+        $this->assertSame(12000, $quote['subtotal_idr']);
     }
 }
