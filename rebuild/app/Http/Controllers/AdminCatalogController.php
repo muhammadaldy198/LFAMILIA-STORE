@@ -880,7 +880,10 @@ class AdminCatalogController
 
         $highestActiveCost = $package->mappings()->where('is_active', true)
             ->selectRaw('MAX(COALESCE(store_cost_idr, cost_idr)) as aggregate')->value('aggregate');
-        if ($product->fulfillment_mode === 'MANUAL'
+        $hasDigiflazzSource = $package->mappings()
+            ->where('provider_id', Provider::where('code', 'DIGIFLAZZ')->value('id'))
+            ->exists();
+        if (! $hasDigiflazzSource
             && ($data['pricing_mode'] ?? $package->pricing_mode) === 'SELL_PRICE'
             && (int) ($data['sell_price_idr'] ?? $package->sell_price_idr) < (int) ($newCost ?? $highestActiveCost)) {
             throw ValidationException::withMessages(['sell_price_idr' => 'Harga jual tidak boleh di bawah modal.']);
