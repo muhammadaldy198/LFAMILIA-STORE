@@ -504,7 +504,7 @@ const sellPriceOf = seller => {
     const price = Number(seller || 0);
     return product?.price_markup_type === 'FIXED'
         ? price + Number(product.price_markup_fixed_idr || 0)
-        : Math.ceil(price * (1 + Number(product?.margin_percent ?? 12) / 100));
+        : price + Math.ceil(price * Math.round(Number(product?.margin_percent ?? 12) * 10000) / 1000000);
 };
 
 const openImport = () => {
