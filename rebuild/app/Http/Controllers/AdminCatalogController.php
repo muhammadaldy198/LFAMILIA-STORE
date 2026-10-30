@@ -144,6 +144,7 @@ class AdminCatalogController
         );
 
         $providers = Provider::all(['id', 'code', 'display_name', 'is_active'])->keyBy('id');
+        $digiflazzProviderId = $providers->firstWhere('code', 'DIGIFLAZZ')?->id;
         $stockCounts = app(VoucherStockService::class)->counts();
         $checkoutPreviews = collect(app(CheckoutPricing::class)
             ->forPackages(ProductPackage::query()->pluck('id')->map(fn ($id): int => (int) $id)->all(), true))
@@ -153,9 +154,20 @@ class AdminCatalogController
         return Inertia::render('Admin/Catalog', [
             'checkoutPreviews' => $checkoutPreviews,
             'autoProductOptions' => Product::where('fulfillment_mode', 'AUTO_PROVIDER')
+                ->with(['packages' => fn ($query) => $query->select(
+                    'id', 'product_id', 'nominal_value', 'group_name', 'pricing_mode', 'margin_percent', 'margin_fixed_idr'
+                ), 'packages.mappings' => fn ($query) => $query->select('id', 'product_package_id', 'provider_id')])
                 ->get(['id', 'name'])
                 ->sort(fn (Product $a, Product $b): int => strnatcasecmp($a->name, $b->name) ?: ($a->id <=> $b->id))
-                ->values()->map(fn (Product $product): array => $product->only('id', 'name')),
+                ->values()->map(fn (Product $product): array => [
+                    ...$product->only('id', 'name'),
+                    'nominals' => $product->packages
+                        ->filter(fn (ProductPackage $package): bool => $package->nominal_value !== null
+                            && ! $package->mappings->contains('provider_id', $digiflazzProviderId))
+                        ->values()->map(fn (ProductPackage $package): array => $package->only(
+                            'nominal_value', 'group_name', 'pricing_mode', 'margin_percent', 'margin_fixed_idr'
+                        ))->all(),
+                ]),
             'categories' => Category::with('media')->orderBy('sort_order')->get()->map(fn (Category $category): array => [
                 ...$category->only('id', 'name', 'slug', 'icon', 'sort_order', 'is_active'),
                 'image_url' => $category->getFirstMediaUrl('image'),
@@ -897,9 +909,20 @@ class AdminCatalogController
             ->where('provider_id', Provider::where('code', 'DIGIFLAZZ')->value('id'))
             ->exists();
         if ($hasDigiflazzSource) {
-            if (isset($data['pricing_mode']) && ! in_array($data['pricing_mode'], ['PERCENT', 'FIXED'], true)) {
+            $effectiveMode = $data['pricing_mode'] ?? $package->pricing_mode;
+            if (! in_array($effectiveMode, ['PERCENT', 'FIXED'], true)) {
                 throw ValidationException::withMessages([
                     'pricing_mode' => 'Harga Digiflazz harus berupa persentase atau tambahan rupiah per nominal.',
+                ]);
+            }
+            // Validate the effective mode and price even when the client sends
+            // only one price field, without the pricing_mode field.
+            $effectiveValue = $effectiveMode === 'FIXED'
+                ? (array_key_exists('margin_fixed_idr', $data) ? $data['margin_fixed_idr'] : $package->margin_fixed_idr)
+                : (array_key_exists('margin_percent', $data) ? $data['margin_percent'] : $package->margin_percent);
+            if ($effectiveValue === null || ! is_numeric($effectiveValue)) {
+                throw ValidationException::withMessages([
+                    $effectiveMode === 'FIXED' ? 'margin_fixed_idr' : 'margin_percent' => 'Nilai markup nominal Digiflazz wajib diisi.',
                 ]);
             }
             if (isset($data['sell_price_idr']) || isset($data['sell_markup_percent'])) {
