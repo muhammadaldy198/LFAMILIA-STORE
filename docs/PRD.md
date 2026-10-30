@@ -88,8 +88,8 @@ Kategori → Produk → Nominal → Sumber (SKU penyedia)
 ```
 
 - **Kategori** punya nama, slug, ikon, urutan, status aktif.
-- **Produk** punya kategori, nama, slug, urutan, status aktif, penanda populer, media, dan untuk produk Digiflazz pengaturan markup sendiri (% atau tambahan Rp; lihat §4.3).
-- **Nominal** punya kode, nama, nilai nominal (opsional), urutan, status aktif. Nominal nonaktif tidak muncul di toko. **Nama nominal hasil impor dari penyedia tidak memuat nama game/produk** — fokus ke nominalnya (mis. "5 Diamond", bukan "Free Fire 5 Diamond"); berlaku untuk semua produk.
+- **Produk** punya kategori, nama, slug, urutan, status aktif, penanda populer, dan media. Produk tidak memiliki pengaturan markup Digiflazz; markup diatur pada nominal.
+- **Nominal** punya kode, nama, nilai nominal (opsional), urutan, status aktif, dan untuk Digiflazz tambahan harga independen (% atau Rp). Nominal nonaktif tidak muncul di toko. **Nama nominal hasil impor dari penyedia tidak memuat nama game/produk** — fokus ke nominalnya (mis. "5 Diamond", bukan "Free Fire 5 Diamond"); berlaku untuk semua produk.
 - **Sumber** menghubungkan nominal ke SKU penyedia dan status aktif. Untuk Digiflazz, harga seller SKU tersinkron adalah harga dasar tanpa modal/harga manual terpisah; pembeli tidak memilih SKU.
 
 ### 4.2 Aturan tampil
@@ -103,10 +103,10 @@ Kategori → Produk → Nominal → Sumber (SKU penyedia)
 
 ### 4.3 Harga (aturan baru 31 Oktober 2026)
 
-**Untuk produk Digiflazz, harga jual = harga seller SKU terpilih + markup produk.**
+**Untuk setiap nominal Digiflazz, harga jual = harga seller SKU terpilih + markup nominal tersebut.**
 
 - Harga seller terbaru diambil dari daftar harga Digiflazz berkala, disimpan di database, dan menjadi harga dasar. Tidak ada biaya modal toko tambahan ataupun harga jual tetap khusus Digiflazz.
-- **Default markup saat membuat produk otomatis/menyiapkan impor = 12%** atas harga seller. Admin dapat mengubah **per produk** menjadi persentase (%) atau tambahan nominal rupiah (Rp); pengaturan ini berlaku untuk semua SKU yang dihubungkan ke produk tersebut.
+- **Default markup setiap nominal baru hasil impor = 12%** atas harga seller. Admin dapat mengubah **setiap nominal secara terpisah** menjadi persentase (%) atau tambahan rupiah (Rp); tidak ada markup pada tingkat produk.
 - Perubahan harga seller otomatis memengaruhi harga jual katalog/checkout setelah sinkronisasi; pengaturan markup tidak ditimpa sinkronisasi. Pembulatan margin persen ke rupiah dilakukan ke atas.
 - Nama produk dan nominal yang sudah dimiliki toko tidak boleh diubah oleh impor/sinkronisasi Digiflazz. Proses tersebut hanya menghubungkan SKU dan memperbarui data seller; perubahan nama hanya melalui editor admin toko.
 - Satu nominal hanya memiliki satu SKU aktif terpilih, tanpa SKU cadangan/failover. Mesin DigiTools terpisah mengelola referensi seller dan pemilihan SKU; LFAMILIA STORE tidak menjalankan ulang mesin seller DigiTools.
@@ -119,7 +119,7 @@ Kategori → Produk → Nominal → Sumber (SKU penyedia)
 - Sinkronisasi bersifat **menarik data**, bukan mendorong. Admin yang memicu, atau penjadwal yang menjalankan **tiap 15 menit** untuk seluruh katalog (ada saklar di panel; tidak ada sinkronisasi per produk). Daftar harga penyedia disimpan di database sendiri dan diperbarui berkala — dokumentasi Digiflazz menyatakan ada limitasi pengecekan daftar harga, jadi gunakan secara bijak.
 - Yang hilang dari penyedia: **pemetaan yang belum pernah dipakai pesanan dihapus**; **pemetaan yang pernah dipakai dipertahankan tetapi dinonaktifkan**. Nominal yang tidak lagi punya sumber aktif **dinonaktifkan otomatis oleh sinkronisasi** (penanda dinonaktifkan-oleh-sinkronisasi) dan aktif lagi hanya bila SKU-nya kembali. Produk dan nominal buatan admin sendiri tidak dihapus sinkronisasi.
 - Sinkronisasi juga **membuat pemetaan sumber awal** untuk nominal aktif yang belum terpetakan.
-- Perubahan harga seller dari sinkronisasi **mengubah harga jual katalog dan quote berikutnya** sesuai markup produk, tanpa mengubah markup atau nama toko (lihat §4.3).
+- Perubahan harga seller dari sinkronisasi **mengubah harga jual katalog dan quote berikutnya** sesuai markup per nominal, tanpa mengubah markup atau nama toko (lihat §4.3).
 - Setiap sinkronisasi mencatat: kapan, oleh siapa/sistem, berapa baris berubah.
 
 ---
