@@ -59,7 +59,7 @@ class DigiflazzCatalogImport
             throw new InvalidArgumentException('Mapping Digiflazz tidak valid.');
         }
 
-        return DB::transaction(function () use ($package, $buyerSkuCode, $costIdr, $costUplift): ProviderMapping {
+        return DB::transaction(function () use ($package, $buyerSkuCode, $costIdr): ProviderMapping {
             // Serialize importer/attach operations on this nominal. A second
             // Digiflazz mapping must never be created by an alternate caller.
             ProductPackage::whereKey($package->id)->lockForUpdate()->firstOrFail();
