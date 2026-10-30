@@ -360,8 +360,7 @@ class AdminDigiflazzRestorationTest extends TestCase
         $this->login();
         $catalog = $this->mappedItem('manual-six-percent-sku');
         $catalog['product']->category->update(['is_active' => true]);
-        $catalog['product']->update(['margin_percent' => 6, 'price_markup_type' => 'PERCENT']);
-        $catalog['package']->update(['pricing_mode' => 'SELL_PRICE', 'sell_price_idr' => 2000]);
+        $catalog['package']->update(['pricing_mode' => 'PERCENT', 'margin_percent' => 6]);
         $quote = app(CheckoutPricing::class)->forPackage($catalog['package']->id);
         $this->assertSame(10000, $quote['cost_idr']);
         $this->assertSame(600, $quote['margin_idr']);
