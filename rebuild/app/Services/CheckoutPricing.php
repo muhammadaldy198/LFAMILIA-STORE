@@ -260,7 +260,8 @@ class CheckoutPricing
         // There is no fixed minimum-margin percentage.
         if ($context->pricing_mode === 'SELL_PRICE') {
             $eligibleMappings = $eligibleMappings->filter(
-                fn (object $candidate): bool => (int) $candidate->cost_idr <= (int) $context->sell_price_idr
+                fn (object $candidate): bool => $candidate->provider_code === 'DIGIFLAZZ'
+                    || (int) $candidate->cost_idr <= (int) $context->sell_price_idr
             )->values();
         }
 
@@ -299,7 +300,7 @@ class CheckoutPricing
                     'SELL_PRICE' => (int) $context->sell_price_idr - $cost,
                     default => $this->margin($cost, (string) $percent),
                 };
-            }
+        }
         if ($margin < 0) {
             throw ValidationException::withMessages(['package_id' => 'Harga jual nominal berada di bawah modal.']);
         }
