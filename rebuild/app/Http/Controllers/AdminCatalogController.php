@@ -56,7 +56,7 @@ class AdminCatalogController
         return [
             ...$product->only('id', 'category_id', 'name', 'publisher', 'slug', 'description', 'fulfillment_mode',
                 'initials', 'accent_color', 'instant', 'package_tabs_enabled', 'package_tabs',
-                'customer_no_template', 'manual_instructions', 'manual_open_time', 'manual_close_time', 'manual_timezone', 'margin_percent', 'price_markup_type', 'price_markup_fixed_idr', 'sort_order', 'is_active', 'popular',
+                'customer_no_template', 'manual_instructions', 'manual_open_time', 'manual_close_time', 'manual_timezone', 'sort_order', 'is_active', 'popular',
                 'cost_uplift_percent',
                 'nickname_check_enabled', 'nickname_game_code', 'nickname_user_field_key',
                 'nickname_server_field_key'),
@@ -153,9 +153,9 @@ class AdminCatalogController
         return Inertia::render('Admin/Catalog', [
             'checkoutPreviews' => $checkoutPreviews,
             'autoProductOptions' => Product::where('fulfillment_mode', 'AUTO_PROVIDER')
-                ->get(['id', 'name', 'margin_percent', 'price_markup_type', 'price_markup_fixed_idr'])
+                ->get(['id', 'name'])
                 ->sort(fn (Product $a, Product $b): int => strnatcasecmp($a->name, $b->name) ?: ($a->id <=> $b->id))
-                ->values()->map(fn (Product $product): array => $product->only('id', 'name', 'margin_percent', 'price_markup_type', 'price_markup_fixed_idr')),
+                ->values()->map(fn (Product $product): array => $product->only('id', 'name')),
             'categories' => Category::with('media')->orderBy('sort_order')->get()->map(fn (Category $category): array => [
                 ...$category->only('id', 'name', 'slug', 'icon', 'sort_order', 'is_active'),
                 'image_url' => $category->getFirstMediaUrl('image'),
@@ -320,9 +320,8 @@ class AdminCatalogController
             'manual_open_time' => ['nullable', 'regex:/^([01]\\d|2[0-3]):[0-5]\\d$/'],
             'manual_close_time' => ['nullable', 'regex:/^([01]\\d|2[0-3]):[0-5]\\d$/'],
             'manual_timezone' => ['nullable', Rule::in(['Asia/Jakarta', 'Asia/Makassar', 'Asia/Jayapura'])],
-            'margin_percent' => ['required', 'numeric', 'min:0', 'max:1000', 'decimal:0,4'],
-            'price_markup_type' => ['sometimes', Rule::in(['PERCENT', 'FIXED'])],
-            'price_markup_fixed_idr' => ['sometimes', 'integer', 'min:0', 'max:1000000000'],
+            // Deprecated game-level margin is internal compatibility data only.
+            // Every Digiflazz nominal has its own markup.
             'sort_order' => ['required', 'integer', 'min:0'],
             // Satu formulir boleh membawa banyak baris nominal untuk produk manual.
             'packages' => ['sometimes', 'array', 'max:100'],
@@ -336,11 +335,7 @@ class AdminCatalogController
         ]);
         $rows = collect($data['packages'] ?? [])->values();
         unset($data['packages']);
-        if ($data['fulfillment_mode'] === 'AUTO_PROVIDER') {
-            $data['margin_percent'] = (string) ($data['margin_percent'] ?? '12');
-            $data['price_markup_type'] ??= 'PERCENT';
-            $data['price_markup_fixed_idr'] ??= 0;
-        }
+        $data['margin_percent'] = $data['fulfillment_mode'] === 'AUTO_PROVIDER' ? 12 : 0;
         $data['slug'] = ($data['slug'] ?? null) ?: Str::slug($data['name']);
         if (! $data['slug']) {
             throw ValidationException::withMessages(['name' => 'Nama produk tidak valid.']);
@@ -448,9 +443,7 @@ class AdminCatalogController
             'manual_open_time' => ['nullable', 'regex:/^([01]\\d|2[0-3]):[0-5]\\d$/'],
             'manual_close_time' => ['nullable', 'regex:/^([01]\\d|2[0-3]):[0-5]\\d$/'],
             'manual_timezone' => ['nullable', Rule::in(['Asia/Jakarta', 'Asia/Makassar', 'Asia/Jayapura'])],
-            'margin_percent' => ['required', 'numeric', 'min:0', 'max:1000', 'decimal:0,4'],
-            'price_markup_type' => ['sometimes', Rule::in(['PERCENT', 'FIXED'])],
-            'price_markup_fixed_idr' => ['sometimes', 'integer', 'min:0', 'max:1000000000'],
+            // Legacy game-level price columns are not writable in the product editor.
             'sort_order' => ['required', 'integer', 'min:0'],
             'is_active' => ['required', 'boolean'],
             'cost_uplift_percent' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:1000', 'decimal:0,4'],
@@ -901,6 +894,18 @@ class AdminCatalogController
         $hasDigiflazzSource = $package->mappings()
             ->where('provider_id', Provider::where('code', 'DIGIFLAZZ')->value('id'))
             ->exists();
+        if ($hasDigiflazzSource) {
+            if (isset($data['pricing_mode']) && ! in_array($data['pricing_mode'], ['PERCENT', 'FIXED'], true)) {
+                throw ValidationException::withMessages([
+                    'pricing_mode' => 'Harga Digiflazz harus berupa persentase atau tambahan rupiah per nominal.',
+                ]);
+            }
+            if (isset($data['sell_price_idr']) || isset($data['sell_markup_percent'])) {
+                throw ValidationException::withMessages([
+                    'pricing_mode' => 'Nominal Digiflazz tidak memakai harga jual tetap atau markup global.',
+                ]);
+            }
+        }
         if (! $hasDigiflazzSource
             && ($data['pricing_mode'] ?? $package->pricing_mode) === 'SELL_PRICE'
             && (int) ($data['sell_price_idr'] ?? $package->sell_price_idr) < (int) ($newCost ?? $highestActiveCost)) {
