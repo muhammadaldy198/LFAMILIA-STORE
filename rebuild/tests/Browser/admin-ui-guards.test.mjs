@@ -434,6 +434,19 @@ test('source tab edits store cost and links to canonical Digiflazz sync settings
     assert.doesNotMatch(catalog, /products\/\$\{product\.value\.id\}\/sync/);
 });
 
+test('new local voucher nominal keeps its own price controls', () => {
+    const catalog = read('Catalog.vue');
+    // New AUTO_PROVIDER nominal does not yet have a Digiflazz mapping,
+    // so its fixed-price or percentage controls must remain visible.
+    assert.match(catalog, /const usesDigiflazz = product\.value\?\.fulfillment_mode === 'AUTO_PROVIDER'/);
+    assert.match(catalog, /Boolean\(nominalEditing\.value\?\.mappings\?\.some\(m => m\.provider_code === 'DIGIFLAZZ'\)\)/);
+    assert.doesNotMatch(catalog, /!nominalEditing\.value \|\|/);
+    assert.match(catalog, /v-if="!nominalEditing\?\.mappings\?\.some\(m => m\.provider_code === 'DIGIFLAZZ'\)"/);
+    const nominal = repo('resources/js/lib/catalogNominal.js');
+    assert.match(nominal, /sell_price_idr: form\.price_mode === 'FIXED'/);
+    assert.match(nominal, /margin_percent: form\.price_mode === 'MARKUP'/);
+});
+
 // CR-03: membuat akun admin baru (termasuk Super Admin) juga menanyakan kata
 // sandi di UI, bukan hanya perubahan peran/izin.
 test('creating an admin account asks for password confirmation', () => {
