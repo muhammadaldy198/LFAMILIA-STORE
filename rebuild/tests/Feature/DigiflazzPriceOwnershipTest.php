@@ -146,6 +146,7 @@ class DigiflazzPriceOwnershipTest extends TestCase
         $this->assertSame('DIGIFLAZZ', $quote['provider_code']);
         $this->assertSame(12000, $quote['subtotal_idr']);
     }
+
     public function test_voucher_stock_exhaustion_never_changes_digiflazz_nominal_markup(): void
     {
         DB::table('providers')->whereIn('code', ['DIGIFLAZZ', 'VOUCHER_STOCK'])->update(['is_active' => true]);
