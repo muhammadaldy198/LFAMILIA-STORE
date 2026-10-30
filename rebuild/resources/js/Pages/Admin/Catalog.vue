@@ -615,6 +615,7 @@ const sellPriceOf = seller => {
 const openImport = () => {
     importErrors.value = {};
     importPicked.value = [];
+    importProductId.value = '';
     importSearch.value = '';
     importBrand.value = '';
     importCategory.value = '';
@@ -622,7 +623,6 @@ const openImport = () => {
     importPage.value = 1;
     importInfo.value = '';
     importPublish.value = true;
-    if (!importProductId.value && autoProducts.value.length) importProductId.value = String(autoProducts.value[0].id);
     importOpen.value = true;
 };
 const toggleImportRow = id => {
@@ -1104,6 +1104,7 @@ onMounted(() => {
                 <label class="adm-field">
                     <span>Produk tujuan <b class="req">*</b></span>
                     <select v-model="importProductId" class="adm-select">
+                        <option value="">Pilih produk tujuan</option>
                         <option v-for="row in autoProducts" :key="row.id" :value="String(row.id)">{{ row.name }}</option>
                     </select>
                 </label>
