@@ -1372,7 +1372,7 @@ class AdminDigiflazzRestorationTest extends TestCase
         $this->post('/admin/digiflazz/sync')->assertRedirect()->assertSessionHasNoErrors();
         $item = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'cr02-sku')->first();
         $this->post('/admin/catalog/products/'.$product->id.'/import', [
-            'item_ids' => [$item->id], 'margin_percent' => 12,
+            'item_ids' => [$item->id],
         ])->assertRedirect()->assertSessionHasNoErrors();
 
         $package = $product->packages()->firstOrFail();
@@ -1401,7 +1401,7 @@ class AdminDigiflazzRestorationTest extends TestCase
 
         // Dua kolom global di pop-up impor: modal +2% (bawaan), jual +10% (bawaan).
         $this->post('/admin/catalog/products/'.$product->id.'/import', [
-            'item_ids' => [$item->id], 'cost_uplift_percent' => 2, 'margin_percent' => 10,
+            'item_ids' => [$item->id],
         ])->assertRedirect()->assertSessionHasNoErrors();
 
         $mapping = $product->packages()->firstOrFail()->mappings()->firstOrFail();
@@ -1433,7 +1433,7 @@ class AdminDigiflazzRestorationTest extends TestCase
         $item = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'uplift-5-sku')->first();
 
         $this->post('/admin/catalog/products/'.$product->id.'/import', [
-            'item_ids' => [$item->id], 'cost_uplift_percent' => 5, 'margin_percent' => 10,
+            'item_ids' => [$item->id],
         ])->assertRedirect()->assertSessionHasNoErrors();
 
         $package = $product->packages()->firstOrFail();
