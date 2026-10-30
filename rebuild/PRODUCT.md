@@ -22,14 +22,11 @@ Digiflazz SKU masuk melalui trusted catalog/import/sync flow. Customer tidak dap
 
 ## Pricing
 
-Harga jual katalog dihitung dari **modal toko**, bukan langsung dari harga seller provider:
+Untuk setiap nominal **Digiflazz**: harga jual = harga seller SKU tersinkron + markup produk. Default produk otomatis baru adalah **12%**; admin dapat memilih markup persen atau tambahan tetap **dalam rupiah**, bukan harga jual tetap. Harga seller tidak diedit dari panel, dan tidak ada tambahan modal toko sebagai lapisan perhitungan Digiflazz.
 
-- **modal toko** = `provider_mappings.store_cost_idr` — dibentuk sekali saat impor/bootstrap dengan menambahkan **tambahan modal** (uplift, bawaan 2%) di atas harga seller, lalu boleh diedit admin. Sync provider memperbarui harga seller sebagai referensi (`seller_reference_price_idr`) tanpa menimpa modal toko dan tanpa menerapkan ulang uplift.
-- **harga jual** = modal toko × **markup jual** yang berlaku (bawaan 10%). Markup berlaku di tingkat **nominal** (mode persen; admin dapat menggantinya menjadi harga tetap per nominal). Produk/game **tidak punya markup sendiri** — markup tingkat produk dihapus (PR #302; keputusan pemilik 2026-10-24). Harga rupiah dibulatkan ke atas, tanpa pembulatan "cantik".
+Harga seller dan SKU diperbarui melalui price-list Digiflazz setiap 15 menit. Sinkronisasi **tidak pernah mengganti nama produk atau nama nominal yang sudah ditata toko**, tidak menimpa markup produk, dan tidak memilih SKU cadangan. Setiap order menyimpan snapshot harga. Mapping cost lama tetap tersedia untuk kebutuhan kompatibilitas/fulfillment saja.
 
-Nominal manual memakai modal toko yang diketik admin apa adanya (tanpa uplift) dengan markup yang sama.
-
-Server menolak harga jual di bawah modal. Nominal dengan modal toko akan **sementara tidak tersedia** bila harga seller provider naik di atas modal toko tersebut, dan tersedia kembali otomatis ketika harganya turun ke dalam batas. Checkout membuat snapshot sehingga perubahan katalog, cost, margin, atau provider berikutnya tidak menulis ulang transaksi lama.
+Produk manual dan stok voucher internal tetap boleh mencatat modal layanan tersendiri. Lihat [kebijakan keputusan 31 Oktober 2026](docs/digiflazz-pricing-2026-10-31.md).
 
 ## Media
 
