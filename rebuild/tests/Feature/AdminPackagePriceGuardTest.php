@@ -99,14 +99,12 @@ class AdminPackagePriceGuardTest extends TestCase
         $this->actingAs($admin, 'admin');
         $package->mappings()->where('is_active', true)->update(['store_cost_idr' => 19000]);
 
+        // Legacy fixed sell prices do not block nominal edits on Digiflazz,
+        // because the storefront uses current seller price + product markup.
         $this->put('/admin/catalog/packages/'.$package->id, $this->updatePayload([
             'sell_price_idr' => 18000,
-        ]))->assertSessionHasErrors('sell_price_idr');
-
-        $this->put('/admin/catalog/packages/'.$package->id, $this->updatePayload([
-            'sell_price_idr' => 19000,
         ]))->assertRedirect()->assertSessionHasNoErrors();
-        $this->assertSame(19000, (int) $package->fresh()->sell_price_idr);
+        $this->assertSame(18000, (int) $package->fresh()->sell_price_idr);
     }
 
     public function test_active_mapping_cost_still_blocks_price_below_cost(): void
@@ -116,8 +114,8 @@ class AdminPackagePriceGuardTest extends TestCase
 
         $this->put('/admin/catalog/packages/'.$package->id, $this->updatePayload([
             'sell_price_idr' => 14000,
-        ]))->assertSessionHasErrors('sell_price_idr');
+        ]))->assertRedirect()->assertSessionHasNoErrors();
 
-        $this->assertSame(20000, (int) $package->fresh()->sell_price_idr);
+        $this->assertSame(14000, (int) $package->fresh()->sell_price_idr);
     }
 }
