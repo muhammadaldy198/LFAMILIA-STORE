@@ -45,7 +45,7 @@ class AdminPackagePriceGuardTest extends TestCase
             'pricing_mode' => 'SELL_PRICE',
             'sell_price_idr' => 20000,
         ]);
-        $providerId = DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
+        $providerId = DB::table('providers')->where('code', 'VOUCHER_STOCK')->value('id');
         ProviderMapping::create([
             'product_package_id' => $package->id,
             'provider_id' => $providerId,
@@ -99,11 +99,30 @@ class AdminPackagePriceGuardTest extends TestCase
         $this->actingAs($admin, 'admin');
         $package->mappings()->where('is_active', true)->update(['store_cost_idr' => 19000]);
 
-        // Legacy fixed sell prices do not block nominal edits on Digiflazz,
-        // because the storefront uses current seller price + product markup.
+        // Non-Digiflazz fixed prices must not fall below active store cost.
+        $this->put('/admin/catalog/packages/'.$package->id, $this->updatePayload([
+            'sell_price_idr' => 18000,
+        ]))->assertSessionHasErrors('sell_price_idr');
+        $this->assertSame(20000, (int) $package->fresh()->sell_price_idr);
+    }
+
+    public function test_historical_inactive_digiflazz_does_not_block_active_voucher_fixed_price_edit(): void
+    {
+        [$admin, $package] = $this->packageWithMappings();
+        $this->actingAs($admin, 'admin');
+        ProviderMapping::create([
+            'product_package_id' => $package->id,
+            'provider_id' => DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id'),
+            'external_sku' => 'HIST-DG-'.bin2hex(random_bytes(4)),
+            'cost_idr' => 10000, 'store_cost_idr' => 10000,
+            'is_active' => false, 'priority' => 0,
+        ]);
+
         $this->put('/admin/catalog/packages/'.$package->id, $this->updatePayload([
             'sell_price_idr' => 18000,
         ]))->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertSame('SELL_PRICE', $package->fresh()->pricing_mode);
         $this->assertSame(18000, (int) $package->fresh()->sell_price_idr);
     }
 
@@ -114,8 +133,8 @@ class AdminPackagePriceGuardTest extends TestCase
 
         $this->put('/admin/catalog/packages/'.$package->id, $this->updatePayload([
             'sell_price_idr' => 14000,
-        ]))->assertRedirect()->assertSessionHasNoErrors();
+        ]))->assertSessionHasErrors('sell_price_idr');
 
-        $this->assertSame(14000, (int) $package->fresh()->sell_price_idr);
+        $this->assertSame(20000, (int) $package->fresh()->sell_price_idr);
     }
 }

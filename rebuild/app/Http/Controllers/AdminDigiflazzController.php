@@ -429,7 +429,7 @@ class AdminDigiflazzController
                     collect([$item]),
                     $template,
                     $publish,
-                    (string) $product->margin_percent,
+                    '12',
                     false,
                     $request,
                 );

@@ -95,26 +95,19 @@ Interval API diatur pada Pengaturan monitor & sinkron otomatis (minimal 5 menit)
 
 Filter Normal/Peringatan/Kritis memakai aritmetika desimal pada kolom harga unsigned agar harga turun tidak menyebabkan error MySQL.
 
-## Harga katalog: modal toko → harga jual
+## Harga Digiflazz: harga seller → harga jual per nominal
 
-Harga jual seluruh katalog mengikuti **dua tahap yang terpisah**:
+Harga Digiflazz mengikuti harga seller SKU yang dipilih, tanpa harga modal toko terpisah untuk perhitungan checkout. Setiap **nominal** memiliki satu aturan tambah harga sendiri: **persentase (%)** atau **tambahan rupiah (Rp)**. Bawaan nominal baru hasil impor adalah 12%; pengaturan ini tidak ada di tingkat produk/game.
 
-1. **Tambahan modal (uplift)** — persentase di atas harga seller provider. Berlaku **sekali** saat modal nominal pertama kali dibentuk (impor/provider bootstrap); nilai hasilnya disimpan sebagai **modal toko** (`provider_mappings.store_cost_idr`). Sync berikutnya **tidak** menerapkan ulang uplift dan tidak menimpa modal toko.
-2. **Markup jual** — persentase di atas **modal toko** untuk menghasilkan harga jual; diterapkan saat harga dihitung, bukan disimpan ulang.
+Harga jual = harga seller SKU terkini + tambahan harga nominal. Persen dibulatkan ke atas ke satu rupiah. Sinkronisasi seller tidak mengubah aturan markup nominal, nama nominal, maupun snapshot harga pesanan yang sudah dibuat. SKU terpilih tetap satu per nominal, tanpa fallback.
 
-Bawaan: uplift 2%, markup jual 10%. Keduanya bisa diubah **global**, **per game/produk**, dan **per nominal**; yang lebih spesifik menang (nominal → game → global); kolom yang dikosongkan berarti mengikuti level di atasnya. Perubahan markup langsung berlaku karena harga jual dihitung dari modal toko × markup yang berlaku. Harga rupiah dibulatkan ke atas (integer ceiling), tanpa pembulatan "cantik". Nilai persen dibatasi 0–1000.
-
-Contoh: seller Rp12.000 → uplift 2% = modal toko Rp12.240 → markup 10% = harga jual Rp13.464 (markup 12% = Rp13.709).
-
-Di halaman Produk, harga seller provider disimpan terpisah sebagai referensi (`seller_reference_price_idr`) dan tetap diperbarui oleh sync, sehingga admin bisa membandingkan "modal toko" (milik toko, bisa diedit) dengan "harga seller" (laporan provider). Mengubah modal toko tidak mengubah harga seller, dan modal toko tidak boleh diisi di bawah harga referensi seller saat itu.
-
-**Ketersediaan sementara:** untuk nominal dengan modal toko, bila harga seller provider naik **di atas** modal toko yang ditetapkan, nominal tersebut sementara tidak bisa dibeli dan hilang dari halaman customer; otomatis tersedia kembali saat harga seller turun ke dalam batas modal toko. Ini berbeda dari penonaktifan manual admin yang tetap nonaktif sampai diubah. Halaman Digiflazz menandai baris seperti ini sebagai peringatan dengan batas kelayakan = modal toko.
+Produk manual dan voucher lokal menggunakan perhitungan modal/harga terpisah yang sudah ada. Pengaturan markup global hanya berlaku untuk jalur manual/voucher, bukan Digiflazz. Kolom akuntansi lama yang disimpan pada mapping tetap digunakan untuk kompatibilitas dan audit, bukan sebagai tambahan biaya Digiflazz.
 
 ## Impor nominal langsung untuk dijual
 
 Pemilih SKU menyediakan **Langsung jual setelah impor** (aktif secara default). Satu submit mengimpor SKU yang tersedia dan masih segar, menyimpan margin serta format ID tujuan, dan mengaktifkan nominal, sumber Digiflazz, serta produk. Kategori dan integrasi Digiflazz harus sudah aktif; pengaturan tersebut tidak diaktifkan diam-diam. Nonaktifkan pilihan ini untuk menyimpan draf.
 
-Formulir impor punya dua kolom persen global untuk semua SKU terpilih: **Harga modal (%)** (bawaan 2, di atas harga seller) dan **Harga jual (%)** (bawaan 10, di atas modal toko). Angka harga jual disimpan sebagai margin nominal (mode persen), bukan markup produk — produk tidak punya markup sendiri di panel. Admin bisa mengubah atau menggantinya menjadi harga tetap dari editor nominal. Panel menampilkan pratinjau harga seller → modal toko → harga jual beserta total pilihan.
+Impor tidak mengubah markup nominal yang sudah ada. Nominal baru mendapatkan markup awal 12% atas harga seller; admin dapat mengubah setiap nominal menjadi persentase lain atau tambahan Rp. Pratinjau impor menampilkan harga seller → harga jual dengan aturan efektif nominal tersebut. Tidak ada pengaturan markup Digiflazz di formulir produk dan tidak ada harga jual tetap Digiflazz.
 
 Format tujuan diisi dari konfigurasi sumber existing, satu kolom pelanggan, atau format Mobile Legends yang dikenal (User ID diikuti Zone ID). Produk lain dengan beberapa kolom harus menetapkan format di pemilih SKU. Backend menolak placeholder asing, format kosong, dan kolom wajib yang terlewat. Tidak ada request pembayaran atau topup provider saat impor.
 

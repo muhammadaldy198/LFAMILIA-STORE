@@ -309,14 +309,14 @@ test('no template expression unwraps a ref that Vue already unwraps', () => {
 
 test('round-two admin fixes keep their UI entry points', () => {
     const catalog = read('Catalog.vue');
-    // Nominal manual tetap didukung; seller Digiflazz memakai markup produk.
+    // Nominal manual tetap didukung; seller Digiflazz memakai markup per nominal.
     assert.match(catalog, /manual_instructions/);
-    assert.match(catalog, /price_markup_type/);
-    assert.match(catalog, /price_markup_fixed_idr/);
+    assert.doesNotMatch(catalog, /info\.price_markup_type|info\.price_markup_fixed_idr/);
+    assert.match(catalog, /isDigiflazzNominal/);
     // Global pricing remains available only for manual and voucher markup.
     assert.match(catalog, /\/admin\/catalog\/pricing/);
     assert.match(catalog, /Markup Manual \/ Voucher/);
-    assert.match(catalog, /Produk Digiflazz memakai markup produk masing-masing/);
+    assert.match(catalog, /Digiflazz memakai markup per nominal/);
     assert.doesNotMatch(catalog, /margin\/preview|Margin global|catalog\/margin/);
     assert.match(catalog, /\/packages\/\$\{row\.id\}\/duplicate/);
     assert.match(catalog, /\/voucher-stock/);
@@ -407,16 +407,18 @@ test('editing a nominal keeps stored pricing and nominal_value', async () => {
     // Catalog.vue memakai helper itu, bukan payload lama yang menimpa null.
     const catalog = read('Catalog.vue');
     assert.match(catalog, /import \{ nominalMode, nominalPayload, nominalPriceValue \} from '\.\.\/\.\.\/lib\/catalogNominal'/);
-    assert.match(catalog, /const payload = nominalPayload\(nominalEditing\.value, nominal,/);
+    assert.match(catalog, /const payload = nominalPayload\(savedRow, nominal,/);
+    assert.match(catalog, /legacy_voucher_sell_price_idr/);
     assert.doesNotMatch(catalog, /nominal_value: null,\s*\n\s*pricing_mode:/);
 });
 
-// Harga Digiflazz berasal dari SKU seller + markup milik produk, bukan
-// penambahan modal global atau harga jual tetap saat impor.
-test('import displays selected product markup without overwriting product names', () => {
+// Harga Digiflazz dari SKU seller + markup nominal independen.
+test('import defaults new nominal markup to twelve percent without overwriting product names', () => {
     const catalog = read('Catalog.vue');
-    assert.match(catalog, /price_markup_type === 'FIXED'/);
-    assert.match(catalog, /Number\(product\?\.margin_percent \?\? 12\)/);
+    assert.match(catalog, /Markup nominal baru/);
+    assert.match(catalog, /Math\.ceil\(price \* percentage \/ 100\)/);
+    assert.match(catalog, /: 12;/);
+    assert.doesNotMatch(catalog, /info\.price_markup_type|info\.price_markup_fixed_idr/);
     assert.match(catalog, /nama produk dan nama nominal lama tetap milik toko/i);
     assert.match(catalog, /seller Digiflazz/i);
     assert.doesNotMatch(catalog, /importUplift|importMargin/);
@@ -442,14 +444,11 @@ test('source tab edits store cost and links to canonical Digiflazz sync settings
     assert.doesNotMatch(catalog, /products\/\$\{product\.value\.id\}\/sync/);
 });
 
-test('new local voucher nominal keeps its own price controls', () => {
+test('Digiflazz and local voucher nominals each keep their price controls', () => {
     const catalog = read('Catalog.vue');
-    // New AUTO_PROVIDER nominal does not yet have a Digiflazz mapping,
-    // so its fixed-price or percentage controls must remain visible.
-    assert.match(catalog, /const usesDigiflazz = product\.value\?\.fulfillment_mode === 'AUTO_PROVIDER'/);
-    assert.match(catalog, /Boolean\(nominalEditing\.value\?\.mappings\?\.some\(m => m\.provider_code === 'DIGIFLAZZ'\)\)/);
-    assert.doesNotMatch(catalog, /!nominalEditing\.value \|\|/);
-    assert.match(catalog, /v-if="!nominalEditing\?\.mappings\?\.some\(m => m\.provider_code === 'DIGIFLAZZ'\)"/);
+    assert.match(catalog, /const isDigiflazzNominal = computed/);
+    assert.match(catalog, /Nominal Digiflazz|Jenis tambahan harga nominal/);
+    assert.match(catalog, /margin_fixed_idr = nominal\.price_mode === 'FIXED'/);
     const nominal = repo('resources/js/lib/catalogNominal.js');
     assert.match(nominal, /sell_price_idr: form\.price_mode === 'FIXED'/);
     assert.match(nominal, /margin_percent: form\.price_mode === 'MARKUP'/);

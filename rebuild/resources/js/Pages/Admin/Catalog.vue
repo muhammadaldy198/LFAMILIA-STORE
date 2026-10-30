@@ -80,9 +80,6 @@ const submitAdd = () => {
         description: add.description || null,
         fulfillment_mode: mode.value,
         sort_order: Number(add.sort_order || 0),
-        margin_percent: mode.value === 'AUTO_PROVIDER' ? 12 : 0,
-        price_markup_type: 'PERCENT',
-        price_markup_fixed_idr: 0,
         // Petunjuk & jam layanan dipakai pemberitahuan fulfillment dan toko.
         ...(mode.value === 'MANUAL' ? {
             manual_instructions: add.manual_instructions || null,
@@ -147,7 +144,6 @@ const syncMapping = mapping => {
 const info = reactive({
     name: '', slug: '', publisher: '', category_id: '', fulfillment_mode: 'AUTO_PROVIDER',
     sort_order: 0, description: '', is_active: false, nickname_check_enabled: false,
-    price_markup_type: 'PERCENT', margin_percent: 12, price_markup_fixed_idr: 0,
     nickname_game_code: '', nickname_user_field_key: '', nickname_server_field_key: '',
     ...MANUAL_DEFAULTS,
 });
@@ -163,9 +159,6 @@ const loadInfo = () => {
         sort_order: product.value.sort_order ?? 0,
         description: product.value.description || '',
         is_active: Boolean(product.value.is_active),
-        price_markup_type: product.value.price_markup_type || 'PERCENT',
-        margin_percent: Number(product.value.margin_percent ?? 12),
-        price_markup_fixed_idr: Number(product.value.price_markup_fixed_idr ?? 0),
         nickname_check_enabled: Boolean(product.value.nickname_check_enabled),
         nickname_game_code: product.value.nickname_game_code || '',
         nickname_user_field_key: product.value.nickname_user_field_key || '',
@@ -183,9 +176,6 @@ const saveInfo = () => {
         ...info,
         category_id: Number(info.category_id),
         sort_order: Number(info.sort_order || 0),
-        margin_percent: Number(info.margin_percent || 0),
-        price_markup_type: info.price_markup_type,
-        price_markup_fixed_idr: Number(info.price_markup_fixed_idr || 0),
         nickname_check_enabled: info.nickname_game_code ? info.nickname_check_enabled : false,
         manual_instructions: info.manual_instructions || null,
         manual_open_time: info.manual_open_time || null,
@@ -205,6 +195,7 @@ const fieldKeyOptions = computed(() => (product.value?.fields || []).map(row => 
 /* ---------- nominal ---------- */
 const nominalOpen = ref(false);
 const nominalEditing = ref(null);
+const isDigiflazzNominal = computed(() => Boolean(nominalEditing.value?.is_digiflazz_pricing));
 const nominalErrors = ref({});
 const nominalImage = ref(null);
 const nominal = reactive({
@@ -219,8 +210,14 @@ const openNominal = (row = null) => {
         group_name: row?.group_name || '',
         sort_order: row?.sort_order ?? (product.value?.packages.length ?? 0),
         is_active: row ? Boolean(row.is_active) : true,
-        price_mode: nominalMode(row),
-        price_value: nominalPriceValue(row),
+        price_mode: isDigiflazzNominal.value
+            ? ((row?.digiflazz_markup_mode ?? row?.pricing_mode) === 'FIXED' ? 'FIXED' : 'MARKUP')
+            : (row?.legacy_voucher_sell_price_idr != null ? 'FIXED' : nominalMode(row)),
+        price_value: isDigiflazzNominal.value
+            ? ((row?.digiflazz_markup_mode ?? row?.pricing_mode) === 'FIXED'
+                ? (row?.digiflazz_markup_mode != null ? row.digiflazz_markup_fixed_idr : row.margin_fixed_idr) ?? 0
+                : (row?.digiflazz_markup_mode != null ? row.digiflazz_markup_percent : row?.margin_percent) ?? 12)
+            : (row?.legacy_voucher_sell_price_idr ?? nominalPriceValue(row)),
         // Modal toko yang ditampilkan adalah store_cost_idr, bukan cost_idr
         // (harga akuntansi lama yang bisa berbeda).
         cost_idr: row?.mappings?.[0]?.store_cost_idr ?? row?.mappings?.[0]?.cost_idr ?? '',
@@ -233,17 +230,38 @@ const openNominal = (row = null) => {
 const slugCode = (text) => String(text || 'nominal').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'nominal';
 
 const saveNominal = () => {
-    const payload = nominalPayload(nominalEditing.value, nominal, nominalEditing.value?.code || `${slugCode(nominal.name)}-${Date.now().toString(36).slice(-4)}`);
-    // New auto-provider nominals may be backed by LOCAL voucher stock.
-    // Only an existing Digiflazz mapping opts into seller-owned pricing.
-    const usesDigiflazz = product.value?.fulfillment_mode === 'AUTO_PROVIDER'
-        && Boolean(nominalEditing.value?.mappings?.some(m => m.provider_code === 'DIGIFLAZZ'));
-    if (usesDigiflazz) {
-        // Nominal is identified by the storefront; Digiflazz prices come from
-        // its selected SKU and the markup configured on the product.
-        for (const key of ['margin_percent', 'margin_fixed_idr', 'sell_price_idr', 'sell_markup_percent']) delete payload[key];
-        if (!nominalEditing.value) payload.pricing_mode = 'PRODUCT_MARGIN';
-        else delete payload.pricing_mode;
+    // When the voucher is the effective source, display/edit its retained
+    // fixed selling price rather than the same nominal's Digiflazz markup.
+    const savedRow = !isDigiflazzNominal.value && nominalEditing.value?.legacy_voucher_sell_price_idr != null
+        ? { ...nominalEditing.value, pricing_mode: 'SELL_PRICE',
+            sell_price_idr: nominalEditing.value.legacy_voucher_sell_price_idr }
+        : nominalEditing.value;
+    const payload = nominalPayload(savedRow, nominal, nominalEditing.value?.code || `${slugCode(nominal.name)}-${Date.now().toString(36).slice(-4)}`);
+    // Bind pricing to the source shown when the editor opened. If voucher
+    // stock runs out before Save, the server rejects stale price edits
+    // instead of silently changing Digiflazz's independent markup.
+    const mappings = nominalEditing.value?.mappings || [];
+    if (mappings.some(row => row.provider_code === 'DIGIFLAZZ')
+        && mappings.some(row => row.provider_code === 'VOUCHER_STOCK')) {
+        payload.price_source = isDigiflazzNominal.value ? 'DIGIFLAZZ' : 'VOUCHER_STOCK';
+    }
+    // Digiflazz has a markup per nominal: a percentage or added rupiah.
+    // Do not turn the FIXED increment into a fixed selling price.
+    // A name/status-only edit must leave this nominal's markup untouched.
+    if (isDigiflazzNominal.value) {
+        for (const key of ['pricing_mode', 'margin_percent', 'margin_fixed_idr', 'sell_price_idr', 'sell_markup_percent']) delete payload[key];
+        const row = nominalEditing.value;
+        const oldMode = (row.digiflazz_markup_mode ?? row.pricing_mode) === 'FIXED' ? 'FIXED' : 'MARKUP';
+        const oldValue = oldMode === 'FIXED'
+            ? (row.digiflazz_markup_mode != null ? row.digiflazz_markup_fixed_idr : row.margin_fixed_idr)
+            : (row.digiflazz_markup_mode != null ? row.digiflazz_markup_percent : row.margin_percent) ?? 12;
+        if (nominal.price_mode !== oldMode || Number(nominal.price_value) !== Number(oldValue)) {
+            payload.pricing_mode = nominal.price_mode === 'FIXED' ? 'FIXED' : 'PERCENT';
+            payload.margin_percent = nominal.price_mode === 'FIXED' ? null : Number(nominal.price_value);
+            payload.margin_fixed_idr = nominal.price_mode === 'FIXED' ? Number(nominal.price_value) : null;
+            payload.sell_price_idr = null;
+            payload.sell_markup_percent = null;
+        }
     }
     saveBusy.value = 'nominal';
     const finish = (bag) => { nominalErrors.value = bag; saveBusy.value = ''; };
@@ -538,8 +556,8 @@ const IMPORT_PER_PAGE = 50;
 const importCollator = new Intl.Collator('id-ID', { numeric: true, sensitivity: 'base' });
 
 const autoProducts = computed(() => props.autoProductOptions);
-const importProduct = computed(() => props.products.find(row => Number(row.id) === Number(importProductId.value))
-    || props.autoProductOptions.find(row => Number(row.id) === Number(importProductId.value)) || null);
+const importProduct = computed(() => props.autoProductOptions.find(row => Number(row.id) === Number(importProductId.value))
+    || props.products.find(row => Number(row.id) === Number(importProductId.value)) || null);
 const importAvailable = computed(() => props.digiflazzItems.filter(row => !row.mapped && row.available));
 const importCategories = computed(() => [...new Set(importAvailable.value.map(row => row.category).filter(Boolean))].sort(importCollator.compare));
 const importBrands = computed(() => [...new Set(importAvailable.value
@@ -604,12 +622,20 @@ const bulkClearImport = () => {
     importPicked.value = importPicked.value.filter(id => !matched.has(id));
     importInfo.value = 'Pilihan pada hasil filter dibersihkan.';
 };
-const sellPriceOf = seller => {
-    const product = importProduct.value;
+const sellPriceOf = (seller, item) => {
     const price = Number(seller || 0);
-    return product?.price_markup_type === 'FIXED'
-        ? price + Number(product.price_markup_fixed_idr || 0)
-        : price + Math.ceil(price * Math.round(Number(product?.margin_percent ?? 12) * 10000) / 1000000);
+    // The importer reuses an unmapped nominal when game/type and numeric
+    // nominal match. Preview its saved markup rather than inventing a new 12%.
+    const existing = importProduct.value?.nominals?.find(nominal =>
+        item?.nominal_value != null
+        && Number(nominal.nominal_value) === Number(item.nominal_value)
+        && String(nominal.group_name || '') === String(item.type || '')
+    );
+    if (existing?.pricing_mode === 'FIXED') return price + Number(existing.margin_fixed_idr || 0);
+    const percentage = existing?.pricing_mode === 'PERCENT'
+        ? Number(existing.margin_percent ?? 12)
+        : 12;
+    return price + Math.ceil(price * percentage / 100);
 };
 
 const openImport = () => {
@@ -831,22 +857,6 @@ onMounted(() => {
                         </select>
                         <span class="hint">Bisa diubah kapan saja tanpa mengosongkan nominal.</span>
                     </label>
-                    <template v-if="info.fulfillment_mode === 'AUTO_PROVIDER'">
-                        <label class="adm-field">
-                            <span>Jenis tambahan harga Digiflazz</span>
-                            <select v-model="info.price_markup_type" class="adm-select">
-                                <option value="PERCENT">Persentase (%)</option>
-                                <option value="FIXED">Tambahan rupiah (Rp)</option>
-                            </select>
-                        </label>
-                        <label class="adm-field">
-                            <span>{{ info.price_markup_type === 'FIXED' ? 'Tambahan per nominal (Rp)' : 'Margin produk (%)' }}</span>
-                            <input v-if="info.price_markup_type === 'FIXED'" v-model.number="info.price_markup_fixed_idr" class="adm-input" type="number" min="0" max="1000000000" step="1">
-                            <input v-else v-model.number="info.margin_percent" class="adm-input" type="number" min="0" max="1000" step="0.01">
-                            <span class="hint">Harga jual = harga seller Digiflazz + tambahan ini. Nama produk tidak berubah saat SKU disinkronkan.</span>
-                            <span v-if="editErrors.margin_percent || editErrors.price_markup_fixed_idr || editErrors.price_markup_type" class="err">{{ editErrors.margin_percent || editErrors.price_markup_fixed_idr || editErrors.price_markup_type }}</span>
-                        </label>
-                    </template>
                     <label class="adm-field"><span>Posisi di toko</span><input v-model="info.sort_order" type="number" min="0" class="adm-input"></label>
                     <label class="adm-switch-row"><button type="button" class="adm-switch" role="switch" :aria-checked="info.is_active" @click="info.is_active = !info.is_active" />Aktif di toko</label>
                     <label class="adm-field full"><span>Deskripsi</span><textarea v-model="info.description" class="adm-textarea" maxlength="5000" /></label>
@@ -1083,12 +1093,12 @@ onMounted(() => {
         </AdminModal>
 
 
-        <AdminModal v-model:open="priceOpen" title="Markup global manual dan voucher" description="Hanya untuk nominal manual dan voucher lokal yang memakai markup global. Produk Digiflazz memakai markup produk masing-masing.">
+        <AdminModal v-model:open="priceOpen" title="Markup global manual dan voucher" description="Hanya untuk nominal manual dan voucher lokal yang memakai markup global. Digiflazz memakai markup per nominal.">
             <div class="adm-grid">
                 <label class="adm-field">
                     <span>Markup jual manual / voucher (%)</span>
                     <input v-model.number="manualVoucherMarkup" type="number" min="0" max="1000" step="0.01" class="adm-input">
-                    <span class="hint">Tidak mengubah margin produk Digiflazz, harga seller, atau SKU terhubung.</span>
+                    <span class="hint">Tidak mengubah markup nominal Digiflazz, harga seller, atau SKU terhubung.</span>
                     <span v-if="priceErrors.sell_markup_percent" class="err">{{ priceErrors.sell_markup_percent }}</span>
                     <span v-if="priceErrors.cost_uplift_percent" class="err">{{ priceErrors.cost_uplift_percent }}</span>
                 </label>
@@ -1109,9 +1119,9 @@ onMounted(() => {
                     </select>
                 </label>
                 <div class="adm-field">
-                    <span>Tambahan harga produk</span>
-                    <strong>{{ importProduct?.price_markup_type === 'FIXED' ? rupiah(importProduct?.price_markup_fixed_idr ?? 0) + ' per nominal' : (importProduct?.margin_percent ?? 12) + '%' }}</strong>
-                    <span class="hint">Default 12% saat produk dibuat. Ubah di editor Informasi Produk, bukan saat menghubungkan SKU.</span>
+                    <span>Markup nominal baru</span>
+                    <strong>12% dari harga seller</strong>
+                    <span class="hint">Nominal baru memakai 12%. Nominal lama tanpa SKU memakai markup tersimpan. Setiap nominal bisa diubah sendiri setelah impor.</span>
                 </div>
                 <label class="adm-field">
                     <span>Kategori</span>
@@ -1164,7 +1174,7 @@ onMounted(() => {
                             <td><strong>{{ row.product_name }}</strong><p class="dim">{{ row.brand }}</p></td>
                             <td class="mono">{{ row.buyer_sku_code }}</td>
                             <td class="num">{{ rupiah(row.price_idr) }}</td>
-                            <td class="num">{{ rupiah(sellPriceOf(row.price_idr)) }}</td>
+                            <td class="num">{{ rupiah(sellPriceOf(row.price_idr, row)) }}</td>
                         </tr>
                         <tr v-if="!importRows.length"><td colspan="5" class="adm-empty">Tidak ada SKU tersedia untuk saringan ini. Sinkronkan daftar harga di menu Digiflazz lebih dulu.</td></tr>
                     </tbody>
@@ -1191,17 +1201,17 @@ onMounted(() => {
                 <label class="adm-field"><span>Grup / tabel</span><input v-model="nominal.group_name" class="adm-input" placeholder="Umum" maxlength="120"><span class="hint">Kosong berarti Umum.</span></label>
                 <label class="adm-field"><span>Posisi</span><input v-model="nominal.sort_order" type="number" min="0" class="adm-input"></label>
                 <label class="adm-switch-row"><button type="button" class="adm-switch" role="switch" :aria-checked="nominal.is_active" @click="nominal.is_active = !nominal.is_active" />Nominal aktif</label>
-                <label v-if="!nominalEditing?.mappings?.some(m => m.provider_code === 'DIGIFLAZZ')" class="adm-field">
-                    <span>Harga</span>
+                <label class="adm-field">
+                    <span>{{ isDigiflazzNominal ? 'Jenis tambahan harga nominal' : 'Harga' }}</span>
                     <select v-model="nominal.price_mode" class="adm-select">
-                        <option value="FIXED">Harga tetap</option>
-                        <option value="MARKUP">Markup dari modal</option>
+                        <option value="FIXED">{{ isDigiflazzNominal ? 'Tambahan rupiah (Rp)' : 'Harga tetap' }}</option>
+                        <option value="MARKUP">{{ isDigiflazzNominal ? 'Persentase (%)' : 'Markup dari modal' }}</option>
                     </select>
                 </label>
-                <label v-if="!nominalEditing?.mappings?.some(m => m.provider_code === 'DIGIFLAZZ')" class="adm-field">
-                    <span>{{ nominal.price_mode === 'FIXED' ? 'Harga jual (Rp)' : 'Markup (%)' }}</span>
-                    <input v-model="nominal.price_value" type="number" min="0" class="adm-input">
-                    <span v-if="nominalErrors.sell_price_idr" class="err">{{ nominalErrors.sell_price_idr }}</span>
+                <label class="adm-field">
+                    <span>{{ nominal.price_mode === 'FIXED' ? (isDigiflazzNominal ? 'Tambahan harga (Rp)' : 'Harga jual (Rp)') : 'Markup (%)' }}</span>
+                    <input v-model="nominal.price_value" type="number" min="0" :max="isDigiflazzNominal && nominal.price_mode === 'FIXED' ? 1000000000 : undefined" :step="nominal.price_mode === 'FIXED' ? '1' : '0.0001'" class="adm-input" required>
+                    <span v-if="nominalErrors.sell_price_idr || nominalErrors.margin_fixed_idr || nominalErrors.margin_percent || nominalErrors.pricing_mode" class="err">{{ nominalErrors.sell_price_idr || nominalErrors.margin_fixed_idr || nominalErrors.margin_percent || nominalErrors.pricing_mode }}</span>
                 </label>
                 <label v-if="product?.fulfillment_mode === 'MANUAL'" class="adm-field">
                     <span>Modal (Rp)</span>

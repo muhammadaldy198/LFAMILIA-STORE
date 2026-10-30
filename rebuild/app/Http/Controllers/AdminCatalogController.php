@@ -17,6 +17,7 @@ use App\Services\CatalogNominalOrder;
 use App\Services\CatalogPricingSettings;
 use App\Services\CheckoutPricing;
 use App\Services\DigiflazzCatalogService;
+use App\Services\DigiflazzPriceOwnership;
 use App\Services\VoucherStockService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -31,7 +32,7 @@ use Inertia\Response;
 class AdminCatalogController
 {
     // Dipakai halaman Produk: data per halaman dari server, bukan disaring di browser.
-    private function productRow(Product $product, $providers, array $stockCounts, array $buyablePackageIds): array
+    private function productRow(Product $product, $providers, array $stockCounts, array $buyablePackageIds, array $priceOwners): array
     {
         $activePackages = $product->packages->where('is_active', true);
         $buyableCount = $activePackages->filter(
@@ -56,7 +57,7 @@ class AdminCatalogController
         return [
             ...$product->only('id', 'category_id', 'name', 'publisher', 'slug', 'description', 'fulfillment_mode',
                 'initials', 'accent_color', 'instant', 'package_tabs_enabled', 'package_tabs',
-                'customer_no_template', 'manual_instructions', 'manual_open_time', 'manual_close_time', 'manual_timezone', 'margin_percent', 'price_markup_type', 'price_markup_fixed_idr', 'sort_order', 'is_active', 'popular',
+                'customer_no_template', 'manual_instructions', 'manual_open_time', 'manual_close_time', 'manual_timezone', 'sort_order', 'is_active', 'popular',
                 'cost_uplift_percent',
                 'nickname_check_enabled', 'nickname_game_code', 'nickname_user_field_key',
                 'nickname_server_field_key'),
@@ -71,7 +72,9 @@ class AdminCatalogController
             'packages' => $product->packages->sortBy([
                 ['sort_order', 'asc'], ['nominal_value', 'asc'],
             ])->values()->map(fn (ProductPackage $package): array => [
-                ...$package->only('id', 'code', 'name', 'note', 'group_name', 'nominal_value', 'sort_order', 'is_active', 'pricing_mode', 'margin_percent', 'margin_fixed_idr', 'sell_price_idr', 'sell_markup_percent', 'cost_uplift_percent'),
+                ...$package->only('id', 'code', 'name', 'note', 'group_name', 'nominal_value', 'sort_order', 'is_active', 'pricing_mode', 'margin_percent', 'margin_fixed_idr', 'sell_price_idr', 'sell_markup_percent', 'cost_uplift_percent', 'legacy_voucher_sell_price_idr',
+                    'digiflazz_markup_mode', 'digiflazz_markup_percent', 'digiflazz_markup_fixed_idr'),
+                'is_digiflazz_pricing' => $priceOwners[(int) $package->id] ?? false,
                 'image_url' => $package->getFirstMediaUrl('image'),
                 'mappings' => $package->mappings->map(fn (ProviderMapping $mapping): array => [
                     ...$mapping->only('id', 'provider_id', 'external_sku', 'cost_idr',
@@ -144,18 +147,39 @@ class AdminCatalogController
         );
 
         $providers = Provider::all(['id', 'code', 'display_name', 'is_active'])->keyBy('id');
+        $digiflazzProviderId = $providers->firstWhere('code', 'DIGIFLAZZ')?->id;
         $stockCounts = app(VoucherStockService::class)->counts();
-        $checkoutPreviews = collect(app(CheckoutPricing::class)
-            ->forPackages(ProductPackage::query()->pluck('id')->map(fn ($id): int => (int) $id)->all(), true))
-            ->map(fn (array $quote): int => (int) $quote['subtotal_idr'])
-            ->all();
+        $previewQuotes = app(CheckoutPricing::class)
+            ->forPackages(ProductPackage::query()->pluck('id')->map(fn ($id): int => (int) $id)->all(), true);
+        $checkoutPreviews = collect($previewQuotes)
+            ->map(fn (array $quote): int => (int) $quote['subtotal_idr'])->all();
+        $priceOwnership = app(DigiflazzPriceOwnership::class);
+        $priceOwners = [];
+        foreach ($products->getCollection() as $rowProduct) {
+            foreach ($rowProduct->packages as $rowPackage) {
+                $priceOwners[(int) $rowPackage->id] = $priceOwnership->usesDigiflazz(
+                    $rowPackage, $previewQuotes[(int) $rowPackage->id] ?? null
+                );
+            }
+        }
 
         return Inertia::render('Admin/Catalog', [
             'checkoutPreviews' => $checkoutPreviews,
             'autoProductOptions' => Product::where('fulfillment_mode', 'AUTO_PROVIDER')
-                ->get(['id', 'name', 'margin_percent', 'price_markup_type', 'price_markup_fixed_idr'])
+                ->with(['packages' => fn ($query) => $query->select(
+                    'id', 'product_id', 'nominal_value', 'group_name', 'pricing_mode', 'margin_percent', 'margin_fixed_idr'
+                ), 'packages.mappings' => fn ($query) => $query->select('id', 'product_package_id', 'provider_id')])
+                ->get(['id', 'name'])
                 ->sort(fn (Product $a, Product $b): int => strnatcasecmp($a->name, $b->name) ?: ($a->id <=> $b->id))
-                ->values()->map(fn (Product $product): array => $product->only('id', 'name', 'margin_percent', 'price_markup_type', 'price_markup_fixed_idr')),
+                ->values()->map(fn (Product $product): array => [
+                    ...$product->only('id', 'name'),
+                    'nominals' => $product->packages
+                        ->filter(fn (ProductPackage $package): bool => $package->nominal_value !== null
+                            && ! $package->mappings->contains('provider_id', $digiflazzProviderId))
+                        ->values()->map(fn (ProductPackage $package): array => $package->only(
+                            'nominal_value', 'group_name', 'pricing_mode', 'margin_percent', 'margin_fixed_idr'
+                        ))->all(),
+                ]),
             'categories' => Category::with('media')->orderBy('sort_order')->get()->map(fn (Category $category): array => [
                 ...$category->only('id', 'name', 'slug', 'icon', 'sort_order', 'is_active'),
                 'image_url' => $category->getFirstMediaUrl('image'),
@@ -169,7 +193,7 @@ class AdminCatalogController
                 'tab' => $filters['tab'] ?? 'auto', 'q' => $filters['q'] ?? '', 'category' => $filters['category'] ?? '',
                 'status' => $filters['status'] ?? '', 'sort' => $filters['sort'] ?? 'name', 'per_page' => (int) ($filters['per_page'] ?? 25),
             ],
-            'products' => $products->getCollection()->map(fn (Product $product): array => $this->productRow($product, $providers, $stockCounts, $buyablePackageIds))->all(),
+            'products' => $products->getCollection()->map(fn (Product $product): array => $this->productRow($product, $providers, $stockCounts, $buyablePackageIds, $priceOwners))->all(),
             'productPage' => [
                 'current_page' => $products->currentPage(),
                 'last_page' => $products->lastPage(),
@@ -320,9 +344,9 @@ class AdminCatalogController
             'manual_open_time' => ['nullable', 'regex:/^([01]\\d|2[0-3]):[0-5]\\d$/'],
             'manual_close_time' => ['nullable', 'regex:/^([01]\\d|2[0-3]):[0-5]\\d$/'],
             'manual_timezone' => ['nullable', Rule::in(['Asia/Jakarta', 'Asia/Makassar', 'Asia/Jayapura'])],
-            'margin_percent' => ['required', 'numeric', 'min:0', 'max:1000', 'decimal:0,4'],
-            'price_markup_type' => ['sometimes', Rule::in(['PERCENT', 'FIXED'])],
-            'price_markup_fixed_idr' => ['sometimes', 'integer', 'min:0', 'max:1000000000'],
+            // Manual legacy requests may still provide this field; Digiflazz
+            // never uses it to calculate a selling price.
+            'margin_percent' => ['sometimes', 'numeric', 'min:0', 'max:1000', 'decimal:0,4'],
             'sort_order' => ['required', 'integer', 'min:0'],
             // Satu formulir boleh membawa banyak baris nominal untuk produk manual.
             'packages' => ['sometimes', 'array', 'max:100'],
@@ -336,11 +360,7 @@ class AdminCatalogController
         ]);
         $rows = collect($data['packages'] ?? [])->values();
         unset($data['packages']);
-        if ($data['fulfillment_mode'] === 'AUTO_PROVIDER') {
-            $data['margin_percent'] = (string) ($data['margin_percent'] ?? '12');
-            $data['price_markup_type'] ??= 'PERCENT';
-            $data['price_markup_fixed_idr'] ??= 0;
-        }
+        $data['margin_percent'] = $data['fulfillment_mode'] === 'AUTO_PROVIDER' ? 12 : ($data['margin_percent'] ?? 0);
         $data['slug'] = ($data['slug'] ?? null) ?: Str::slug($data['name']);
         if (! $data['slug']) {
             throw ValidationException::withMessages(['name' => 'Nama produk tidak valid.']);
@@ -448,9 +468,8 @@ class AdminCatalogController
             'manual_open_time' => ['nullable', 'regex:/^([01]\\d|2[0-3]):[0-5]\\d$/'],
             'manual_close_time' => ['nullable', 'regex:/^([01]\\d|2[0-3]):[0-5]\\d$/'],
             'manual_timezone' => ['nullable', Rule::in(['Asia/Jakarta', 'Asia/Makassar', 'Asia/Jayapura'])],
-            'margin_percent' => ['required', 'numeric', 'min:0', 'max:1000', 'decimal:0,4'],
-            'price_markup_type' => ['sometimes', Rule::in(['PERCENT', 'FIXED'])],
-            'price_markup_fixed_idr' => ['sometimes', 'integer', 'min:0', 'max:1000000000'],
+            // Kept for manual legacy API compatibility only.
+            'margin_percent' => ['sometimes', 'numeric', 'min:0', 'max:1000', 'decimal:0,4'],
             'sort_order' => ['required', 'integer', 'min:0'],
             'is_active' => ['required', 'boolean'],
             'cost_uplift_percent' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:1000', 'decimal:0,4'],
@@ -841,6 +860,7 @@ class AdminCatalogController
             'sort_order' => ['required', 'integer', 'min:0'],
             'is_active' => ['required', 'boolean'],
             'pricing_mode' => ['sometimes', Rule::in(['PRODUCT_MARGIN', 'PERCENT', 'FIXED', 'SELL_PRICE'])],
+            'price_source' => ['sometimes', Rule::in(['DIGIFLAZZ', 'VOUCHER_STOCK'])],
             'margin_percent' => ['nullable', 'numeric', 'min:0', 'max:1000', 'decimal:0,4', 'required_if:pricing_mode,PERCENT'],
             'margin_fixed_idr' => ['nullable', 'integer', 'min:0', 'max:1000000000', 'required_if:pricing_mode,FIXED'],
             'sell_price_idr' => ['nullable', 'integer', 'min:1', 'max:1000000000', 'required_if:pricing_mode,SELL_PRICE'],
@@ -898,16 +918,90 @@ class AdminCatalogController
 
         $highestActiveCost = $package->mappings()->where('is_active', true)
             ->selectRaw('MAX(COALESCE(store_cost_idr, cost_idr)) as aggregate')->value('aggregate');
-        $hasDigiflazzSource = $package->mappings()
-            ->where('provider_id', Provider::where('code', 'DIGIFLAZZ')->value('id'))
-            ->exists();
+        $effectiveQuote = app(CheckoutPricing::class)->forPackages([(int) $package->id], true);
+        $hasDigiflazzSource = app(DigiflazzPriceOwnership::class)->usesDigiflazz(
+            $package, $effectiveQuote[(int) $package->id] ?? null
+        );
+        $expectedPriceSource = $data['price_source'] ?? null;
+        unset($data['price_source']);
+        $changesDigiflazzPrice = array_key_exists('pricing_mode', $data)
+            || array_key_exists('margin_percent', $data)
+            || array_key_exists('margin_fixed_idr', $data)
+            || isset($data['sell_price_idr']) || isset($data['sell_markup_percent']);
+        if ($expectedPriceSource !== null && $changesDigiflazzPrice
+            && $expectedPriceSource !== ($hasDigiflazzSource ? 'DIGIFLAZZ' : 'VOUCHER_STOCK')) {
+            throw ValidationException::withMessages([
+                'pricing_mode' => 'Sumber harga nominal berubah sejak editor dibuka. Muat ulang nominal sebelum menyimpan harga.',
+            ]);
+        }
+        if ($hasDigiflazzSource && $changesDigiflazzPrice) {
+            $effectiveMode = $data['pricing_mode'] ?? $package->digiflazz_markup_mode ?? $package->pricing_mode;
+            if (! in_array($effectiveMode, ['PERCENT', 'FIXED'], true)) {
+                throw ValidationException::withMessages([
+                    'pricing_mode' => 'Harga Digiflazz harus berupa persentase atau tambahan rupiah per nominal.',
+                ]);
+            }
+            // Validate the effective mode and price even when the client sends
+            // only one price field, without the pricing_mode field.
+            $effectiveValue = $effectiveMode === 'FIXED'
+                ? (array_key_exists('margin_fixed_idr', $data) ? $data['margin_fixed_idr']
+                    : ($package->digiflazz_markup_mode !== null ? $package->digiflazz_markup_fixed_idr : $package->margin_fixed_idr))
+                : (array_key_exists('margin_percent', $data) ? $data['margin_percent']
+                    : ($package->digiflazz_markup_mode !== null ? $package->digiflazz_markup_percent : $package->margin_percent));
+            if ($effectiveValue === null || ! is_numeric($effectiveValue)) {
+                throw ValidationException::withMessages([
+                    $effectiveMode === 'FIXED' ? 'margin_fixed_idr' : 'margin_percent' => 'Nilai markup nominal Digiflazz wajib diisi.',
+                ]);
+            }
+            if (isset($data['sell_price_idr']) || isset($data['sell_markup_percent'])) {
+                throw ValidationException::withMessages([
+                    'pricing_mode' => 'Nominal Digiflazz tidak memakai harga jual tetap atau markup global.',
+                ]);
+            }
+        }
+        $overridesDigiflazzPrice = $hasDigiflazzSource && $changesDigiflazzPrice
+            && $package->digiflazz_markup_mode !== null;
+        $newDigiflazzPricing = [];
+        if ($overridesDigiflazzPrice) {
+            $mode = $data['pricing_mode'] ?? $package->digiflazz_markup_mode;
+            $newDigiflazzPricing = [
+                'digiflazz_markup_mode' => $mode,
+                'digiflazz_markup_percent' => $mode === 'PERCENT'
+                    ? ($data['margin_percent'] ?? $package->digiflazz_markup_percent) : null,
+                'digiflazz_markup_fixed_idr' => $mode === 'FIXED'
+                    ? ($data['margin_fixed_idr'] ?? $package->digiflazz_markup_fixed_idr) : null,
+            ];
+            // Never overwrite voucher pricing when its Digiflazz source is
+            // selected for checkout. These fields belong to the other source.
+            unset($data['pricing_mode'], $data['margin_percent'], $data['margin_fixed_idr'],
+                $data['sell_price_idr'], $data['sell_markup_percent']);
+        }
+        // A mixed-source nominal can retain a separate fixed voucher price.
+        // Editing that voucher must not accidentally replace its Digiflazz
+        // percentage/additional-IDR rule on the same package.
+        $hasRetainedVoucherPrice = ! $hasDigiflazzSource
+            && $package->legacy_voucher_sell_price_idr !== null;
+        $editsVoucherPrice = $hasRetainedVoucherPrice
+            && (array_key_exists('pricing_mode', $data) || array_key_exists('sell_price_idr', $data));
+        $voucherMode = $editsVoucherPrice
+            ? ($data['pricing_mode'] ?? 'SELL_PRICE') : null;
+        $replacementVoucherPrice = $voucherMode === 'SELL_PRICE'
+            ? (int) ($data['sell_price_idr'] ?? $package->legacy_voucher_sell_price_idr)
+            : null;
         if (! $hasDigiflazzSource
-            && ($data['pricing_mode'] ?? $package->pricing_mode) === 'SELL_PRICE'
-            && (int) ($data['sell_price_idr'] ?? $package->sell_price_idr) < (int) ($newCost ?? $highestActiveCost)) {
+            && (($hasRetainedVoucherPrice && $voucherMode === 'SELL_PRICE')
+                || (! $hasRetainedVoucherPrice && ($data['pricing_mode'] ?? $package->pricing_mode) === 'SELL_PRICE'))
+            && (int) ($hasRetainedVoucherPrice ? $replacementVoucherPrice : ($data['sell_price_idr'] ?? $package->sell_price_idr))
+                < (int) ($newCost ?? ($effectiveQuote[(int) $package->id]['cost_idr'] ?? $highestActiveCost))) {
             throw ValidationException::withMessages(['sell_price_idr' => 'Harga jual tidak boleh di bawah modal.']);
         }
+        if ($editsVoucherPrice && $voucherMode === 'SELL_PRICE') {
+            // Retain the independent Digiflazz rule; only the voucher cap
+            // is changed by this editor action.
+            unset($data['pricing_mode'], $data['sell_price_idr']);
+        }
         $wasActive = (bool) $package->is_active;
-        DB::transaction(function () use ($request, $package, $product, $isActive, $data, $audit, $newCost, $wasActive): void {
+        DB::transaction(function () use ($request, $package, $product, $isActive, $data, $audit, $newCost, $wasActive, $editsVoucherPrice, $replacementVoucherPrice, $newDigiflazzPricing): void {
             $before = $package->toArray();
             // is_active memakai hasil hitungan server: nominal tanpa modal
             // dimatikan walau klien mengirim true.
@@ -915,6 +1009,14 @@ class AdminCatalogController
                 ...collect($data)->except(['cost_idr', 'store_cost_idr', 'is_active'])->all(),
                 'is_active' => $isActive,
             ]);
+            if ($newDigiflazzPricing !== []) {
+                $package->forceFill($newDigiflazzPricing)->save();
+            }
+            if ($editsVoucherPrice) {
+                // A successful fixed-price edit must affect checkout too.
+                // Switching to percentage pricing removes the legacy cap.
+                $package->forceFill(['legacy_voucher_sell_price_idr' => $replacementVoucherPrice])->save();
+            }
             // Admin menyalakan sendiri: penanda "dimatikan sinkron" dilepas supaya
             // sinkron berikutnya tidak menganggapnya miliknya.
             if ($isActive && $package->disabled_by_sync) {
@@ -1099,6 +1201,23 @@ class AdminCatalogController
             $audit,
             &$result
         ): void {
+            // Keep the Digiflazz rule when a formerly Digiflazz-only nominal
+            // gains voucher stock. Otherwise later voucher price edits would
+            // silently change Digiflazz's selling price on stock exhaustion.
+            $lockedPackage = ProductPackage::whereKey($package->id)->lockForUpdate()->firstOrFail();
+            if ($lockedPackage->digiflazz_markup_mode === null
+                && $lockedPackage->mappings()->where('provider_id', Provider::where('code', 'DIGIFLAZZ')->value('id'))->exists()) {
+                $packageBefore = $lockedPackage->toArray();
+                $fixed = $lockedPackage->pricing_mode === 'FIXED';
+                $lockedPackage->forceFill([
+                    'digiflazz_markup_mode' => $fixed ? 'FIXED' : 'PERCENT',
+                    'digiflazz_markup_percent' => $fixed ? null : ($lockedPackage->margin_percent ?? 12),
+                    'digiflazz_markup_fixed_idr' => $fixed ? $lockedPackage->margin_fixed_idr : null,
+                ])->save();
+                $audit->record($request, 'catalog.package.updated', 'product_package',
+                    $lockedPackage->id, $packageBefore, $lockedPackage->toArray());
+            }
+
             $mapping = ProviderMapping::firstOrNew([
                 'product_package_id' => $package->id,
                 'provider_id' => $provider->id,

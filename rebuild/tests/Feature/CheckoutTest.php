@@ -71,6 +71,8 @@ class CheckoutTest extends TestCase
             'code' => 'PKG'.bin2hex(random_bytes(3)),
             'name' => '100 Diamonds',
             'nominal_value' => 100,
+            // Explicit nominal markup: fixtures must not inherit a game price.
+            'pricing_mode' => 'PERCENT', 'margin_percent' => 10,
             'is_active' => true,
         ]);
         $mappingId = DB::table('provider_mappings')->insertGetId([
@@ -132,8 +134,8 @@ class CheckoutTest extends TestCase
         $this->seedCheckoutDigiflazzCatalog($catalog['package_id']);
 
         $quote = app(CheckoutPricing::class)->forPackage($catalog['package_id']);
-        $this->assertSame(1440, $quote['margin_idr']);
-        $this->assertSame(13440, $quote['subtotal_idr']);
+        $this->assertSame(1200, $quote['margin_idr']);
+        $this->assertSame(13200, $quote['subtotal_idr']);
 
         DB::table('product_packages')->where('id', $catalog['package_id'])->update([
             'margin_percent' => null,

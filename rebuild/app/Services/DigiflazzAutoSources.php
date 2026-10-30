@@ -87,6 +87,16 @@ class DigiflazzAutoSources
                 $package = $matchingPackage;
             }
         }
+        // Importing a draft Digiflazz SKU must never reprice a nominal that
+        // currently sells voucher stock. Require a separate nominal (or an
+        // explicit source migration) rather than changing its price fields.
+        if ($package !== null && $package->mappings()
+            ->where('provider_id', Provider::where('code', 'VOUCHER_STOCK')->value('id'))
+            ->where('is_active', true)->exists()) {
+            throw ValidationException::withMessages([
+                'item_ids' => 'Nominal ini masih memiliki sumber voucher lokal aktif. Pisahkan nominal terlebih dahulu sebelum memasang SKU Digiflazz.',
+            ]);
+        }
         if ($package !== null && $package->mappings()
             ->where('provider_id', $provider->id)
             ->where('external_sku', '<>', $first->buyer_sku_code)
@@ -97,26 +107,32 @@ class DigiflazzAutoSources
                 'item_ids' => 'Nominal ini sudah memiliki SKU Digiflazz lain.',
             ]);
         }
-        // Kolom "Harga jual (%)" di pop-up impor disimpan sebagai margin nominal
-        // (mode persen), bukan markup produk, supaya bisa diubah atau diganti ke
-        // harga tetap langsung dari editor nominal.
+        // New Digiflazz nominal gets its own 12% markup, not a product price.
+        // Existing explicit nominal pricing must never be overwritten by import/sync.
         if (! $package) {
             $package = $product->packages()->create([
                 'code' => 'DF_'.substr(hash('sha256', $first->buyer_sku_code), 0, 20),
                 'name' => GameNamePrefix::strip($first->product_name, $first->brand, $product->name),
                 'group_name' => $first->type ?: null,
                 'nominal_value' => $nominal, 'sort_order' => 0, 'is_active' => $publish,
-                'pricing_mode' => 'PRODUCT_MARGIN',
+                'pricing_mode' => 'PERCENT',
+                'margin_percent' => 12,
+                'margin_fixed_idr' => null,
                 'sell_price_idr' => null,
             ]);
             app(AdminAuditService::class)->record($request, 'catalog.package.imported', 'product_package', $package->id, null, $package->toArray());
         } else {
             $before = $package->toArray();
+            $newPricing = ! $package->mappings()->where('provider_id', $provider->id)->exists()
+                && in_array($package->pricing_mode, ['PRODUCT_MARGIN', 'SELL_PRICE'], true)
+                ? ['pricing_mode' => 'PERCENT', 'margin_percent' => 12,
+                    'margin_fixed_idr' => null, 'sell_price_idr' => null, 'sell_markup_percent' => null]
+                : [];
             $package->update([
                 'nominal_value' => $package->nominal_value ?? $nominal,
                 'is_active' => $publish ?: $package->is_active,
-                // Existing nominal name and pricing metadata are store-owned.
-                // SKU attach/sync must not overwrite them.
+                ...$newPricing,
+                // Existing nominal name and explicit pricing are store-owned.
             ]);
             app(AdminAuditService::class)->record($request, 'catalog.package.updated', 'product_package', $package->id, $before, $package->fresh()->toArray());
         }
