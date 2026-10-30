@@ -677,7 +677,10 @@ class FulfillmentTest extends TestCase
         $this->credentials();
         $catalog = $this->automaticCatalog(cost: 10000, maxPrice: 15000);
         $orderId = $this->paidOrder($catalog, snapshotMaxPrice: 10000);
-        DB::table('provider_mappings')->where('id', $catalog['mapping_id'])->update(['cost_idr' => 11000]);
+        // Price protection uses the verified seller catalog, not a stale
+        // mapping cost, so simulate an actual supplier price increase.
+        DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'DF-PRIMARY')
+            ->update(['price_idr' => 11000, 'synced_at' => now()]);
 
         Http::fake();
         app(FulfillmentService::class)->startOrder($orderId);
