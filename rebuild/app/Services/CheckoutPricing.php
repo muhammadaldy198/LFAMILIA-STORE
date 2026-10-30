@@ -42,6 +42,7 @@ class CheckoutPricing
                 'packages.pricing_mode', 'packages.margin_percent as package_margin_percent',
                 'packages.sell_markup_percent as package_sell_markup_percent',
                 'packages.margin_fixed_idr', 'packages.sell_price_idr',
+                'packages.legacy_voucher_sell_price_idr',
                 'products.id as product_id',
                 'products.name as product_name',
                 'products.slug as product_slug',
@@ -152,6 +153,7 @@ class CheckoutPricing
                 'packages.pricing_mode', 'packages.margin_percent as package_margin_percent',
                 'packages.sell_markup_percent as package_sell_markup_percent',
                 'packages.margin_fixed_idr', 'packages.sell_price_idr',
+                'packages.legacy_voucher_sell_price_idr',
                 'products.id as product_id',
                 'products.name as product_name',
                 'products.slug as product_slug',
@@ -251,15 +253,23 @@ class CheckoutPricing
                 && (int) $candidate->live_cost_idr <= (int) $candidate->max_price_idr;
         })->values();
 
-        // The existing SELL_PRICE rule does not allow a negative margin.
-        // An unaffordable SKU is unavailable; never substitute a backup automatically.
-        // There is no fixed minimum-margin percentage.
-        if ($context->pricing_mode === 'SELL_PRICE') {
-            $eligibleMappings = $eligibleMappings->filter(
-                fn (object $candidate): bool => $candidate->provider_code === 'DIGIFLAZZ'
-                    || (int) $candidate->cost_idr <= (int) $context->sell_price_idr
-            )->values();
-        }
+        // Preserve the original SELL_PRICE voucher eligibility across a
+        // Digiflazz nominal migration. A voucher that cost more than its
+        // legacy fixed price must NOT take over checkout just because the
+        // package's pricing_mode became PERCENT or FIXED.
+        $legacyVoucherPrice = $context->legacy_voucher_sell_price_idr !== null
+            ? (int) $context->legacy_voucher_sell_price_idr : null;
+        $eligibleMappings = $eligibleMappings->filter(function (object $candidate) use ($context, $legacyVoucherPrice): bool {
+            if ($candidate->provider_code === 'DIGIFLAZZ') {
+                return true;
+            }
+            if ($candidate->provider_code === 'VOUCHER_STOCK' && $legacyVoucherPrice !== null) {
+                return (int) $candidate->cost_idr <= $legacyVoucherPrice;
+            }
+
+            return $context->pricing_mode !== 'SELL_PRICE'
+                || (int) $candidate->cost_idr <= (int) $context->sell_price_idr;
+        })->values();
 
         $mapping = $eligibleMappings->first();
         if ($mapping === null) {
@@ -292,13 +302,15 @@ class CheckoutPricing
                     ? null
                     : ($context->package_sell_markup_percent ?? $this->globalSellMarkupPercent()));
             $percent = $context->package_margin_percent ?? $this->globalSellMarkupPercent();
-            $margin = $markupPercent !== null
-                ? $this->margin($cost, (string) $markupPercent)
-                : match ($context->pricing_mode) {
-                    'FIXED' => (int) $context->margin_fixed_idr,
-                    'SELL_PRICE' => (int) $context->sell_price_idr - $cost,
-                    default => $this->margin($cost, (string) $percent),
-                };
+            $margin = $mapping->provider_code === 'VOUCHER_STOCK' && $legacyVoucherPrice !== null
+                ? $legacyVoucherPrice - $cost
+                : ($markupPercent !== null
+                    ? $this->margin($cost, (string) $markupPercent)
+                    : match ($context->pricing_mode) {
+                        'FIXED' => (int) $context->margin_fixed_idr,
+                        'SELL_PRICE' => (int) $context->sell_price_idr - $cost,
+                        default => $this->margin($cost, (string) $percent),
+                    });
         }
         if ($margin < 0) {
             throw ValidationException::withMessages(['package_id' => 'Harga jual nominal berada di bawah modal.']);
