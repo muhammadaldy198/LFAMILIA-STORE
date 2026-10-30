@@ -17,6 +17,7 @@ use App\Services\StorefrontContentService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -136,16 +137,26 @@ class CatalogController
             ->when(($filters['mode'] ?? null) === 'manual', fn ($query) => $query->where('fulfillment_mode', 'MANUAL'))
             ->when($search !== '', fn ($query) => $this->searchScope($query, $search));
 
-        $products = $baseProducts
-            ->whereIn('id', $this->buyableProductIds())
-            ->orderBy('sort_order')->orderBy('name')->paginate(24)
-            ->withQueryString()
-            ->through(fn (Product $product): array => [
-                ...$product->only('name', 'slug', 'initials', 'accent_color', 'instant'),
-                'category_name' => $product->category->name,
-                'category_slug' => $product->category->slug,
-                'image_url' => $product->getFirstMediaUrl('image'),
-            ]);
+        // Natural name order is calculated before pagination so numbered names
+        // (5, 20, 1100) do not move between pages in SQL string order.
+        $buyable = $baseProducts->whereIn('id', $this->buyableProductIds());
+        $orderedIds = (clone $buyable)->withoutEagerLoads()->reorder()->get(['id', 'name'])
+            ->sort(fn (Product $a, Product $b): int => strnatcasecmp($a->name, $b->name)
+                ?: ($a->id <=> $b->id))->pluck('id')->values();
+        $perPage = 24;
+        $currentPage = max(1, (int) $request->query('page', 1));
+        $pageIds = $orderedIds->forPage($currentPage, $perPage)->all();
+        $positions = array_flip($pageIds);
+        $pageProducts = Product::with(['category', 'media'])->whereIn('id', $pageIds)->get()
+            ->sortBy(fn (Product $row): int => $positions[$row->id])->values();
+        $products = (new LengthAwarePaginator($pageProducts, $orderedIds->count(), $perPage, $currentPage, [
+            'path' => $request->url(), 'query' => $request->query(),
+        ]))->through(fn (Product $product): array => [
+            ...$product->only('name', 'slug', 'initials', 'accent_color', 'instant'),
+            'category_name' => $product->category->name,
+            'category_slug' => $product->category->slug,
+            'image_url' => $product->getFirstMediaUrl('image'),
+        ]);
 
         $basePopular = Product::with(['category', 'media'])
             ->withCount(['reviews as active_reviews_count' => fn ($query) => $query->where('is_active', true)])

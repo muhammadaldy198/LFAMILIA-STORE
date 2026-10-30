@@ -143,6 +143,16 @@ try {
 
                 if (!imported) {
                     await click('Impor dari Digiflazz');
+                    // Impor sekarang wajib memilih produk tujuan secara eksplisit.
+                    await evaluate(`(() => {
+                        const select = [...document.querySelectorAll('[role=dialog] select')]
+                            .find(element => [...element.options].some(option => option.textContent.trim() === 'Pilih produk tujuan'));
+                        const option = select && [...select.options].find(option => option.value !== '');
+                        if (!option) throw Error('No eligible destination product for Digiflazz import');
+                        select.value = option.value;
+                        select.dispatchEvent(new Event('change', { bubbles: true }));
+                    })()`);
+                    await pause(200);
                     const row = await evaluate(`(() => {
                         const tr = [...document.querySelectorAll('[role=dialog] tbody tr')].find(r => r.querySelector('input[type=checkbox]'));
                         if (!tr) return null;
