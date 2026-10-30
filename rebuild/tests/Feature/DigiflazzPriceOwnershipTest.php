@@ -231,5 +231,4 @@ class DigiflazzPriceOwnershipTest extends TestCase
         $this->assertSame('VOUCHER_STOCK', $quote['provider_code']);
         $this->assertSame(10600, $quote['subtotal_idr']);
     }
-
 }
