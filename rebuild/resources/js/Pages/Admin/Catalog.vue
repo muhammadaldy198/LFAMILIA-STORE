@@ -234,8 +234,10 @@ const slugCode = (text) => String(text || 'nominal').toLowerCase().replace(/[^a-
 
 const saveNominal = () => {
     const payload = nominalPayload(nominalEditing.value, nominal, nominalEditing.value?.code || `${slugCode(nominal.name)}-${Date.now().toString(36).slice(-4)}`);
+    // New auto-provider nominals may be backed by LOCAL voucher stock.
+    // Only an existing Digiflazz mapping opts into seller-owned pricing.
     const usesDigiflazz = product.value?.fulfillment_mode === 'AUTO_PROVIDER'
-        && (!nominalEditing.value || (nominalEditing.value.mappings || []).some(m => m.provider_code === 'DIGIFLAZZ'));
+        && Boolean(nominalEditing.value?.mappings?.some(m => m.provider_code === 'DIGIFLAZZ'));
     if (usesDigiflazz) {
         // Nominal is identified by the storefront; Digiflazz prices come from
         // its selected SKU and the markup configured on the product.
@@ -1023,14 +1025,14 @@ onMounted(() => {
                 <label class="adm-field"><span>Grup / tabel</span><input v-model="nominal.group_name" class="adm-input" placeholder="Umum" maxlength="120"><span class="hint">Kosong berarti Umum.</span></label>
                 <label class="adm-field"><span>Posisi</span><input v-model="nominal.sort_order" type="number" min="0" class="adm-input"></label>
                 <label class="adm-switch-row"><button type="button" class="adm-switch" role="switch" :aria-checked="nominal.is_active" @click="nominal.is_active = !nominal.is_active" />Nominal aktif</label>
-                <label v-if="product?.fulfillment_mode === 'MANUAL' || (nominalEditing && !nominalEditing.mappings?.some(m => m.provider_code === 'DIGIFLAZZ'))" class="adm-field">
+                <label v-if="!nominalEditing?.mappings?.some(m => m.provider_code === 'DIGIFLAZZ')" class="adm-field">
                     <span>Harga</span>
                     <select v-model="nominal.price_mode" class="adm-select">
                         <option value="FIXED">Harga tetap</option>
                         <option value="MARKUP">Markup dari modal</option>
                     </select>
                 </label>
-                <label v-if="product?.fulfillment_mode === 'MANUAL' || (nominalEditing && !nominalEditing.mappings?.some(m => m.provider_code === 'DIGIFLAZZ'))" class="adm-field">
+                <label v-if="!nominalEditing?.mappings?.some(m => m.provider_code === 'DIGIFLAZZ')" class="adm-field">
                     <span>{{ nominal.price_mode === 'FIXED' ? 'Harga jual (Rp)' : 'Markup (%)' }}</span>
                     <input v-model="nominal.price_value" type="number" min="0" class="adm-input">
                     <span v-if="nominalErrors.sell_price_idr" class="err">{{ nominalErrors.sell_price_idr }}</span>
