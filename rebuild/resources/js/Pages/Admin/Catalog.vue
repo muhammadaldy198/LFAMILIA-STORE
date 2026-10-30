@@ -237,6 +237,14 @@ const saveNominal = () => {
             sell_price_idr: nominalEditing.value.legacy_voucher_sell_price_idr }
         : nominalEditing.value;
     const payload = nominalPayload(savedRow, nominal, nominalEditing.value?.code || `${slugCode(nominal.name)}-${Date.now().toString(36).slice(-4)}`);
+    // Bind pricing to the source shown when the editor opened. If voucher
+    // stock runs out before Save, the server rejects stale price edits
+    // instead of silently changing Digiflazz's independent markup.
+    const mappings = nominalEditing.value?.mappings || [];
+    if (mappings.some(row => row.provider_code === 'DIGIFLAZZ')
+        && mappings.some(row => row.provider_code === 'VOUCHER_STOCK')) {
+        payload.price_source = isDigiflazzNominal.value ? 'DIGIFLAZZ' : 'VOUCHER_STOCK';
+    }
     // Digiflazz has a markup per nominal: a percentage or added rupiah.
     // Do not turn the FIXED increment into a fixed selling price.
     // A name/status-only edit must leave this nominal's markup untouched.
