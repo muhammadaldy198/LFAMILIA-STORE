@@ -4,12 +4,21 @@ use App\Models\ProductPackage;
 use App\Services\CheckoutPricing;
 use App\Services\DigiflazzPriceOwnership;
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
     public function up(): void
     {
+        // A previously fixed-price voucher may coexist with an active Digiflazz
+        // mapping. Preserve its original cap and selling price independently
+        // when the nominal itself moves to percentage/IDR Digiflazz markup.
+        Schema::table('product_packages', function (Blueprint $table): void {
+            $table->unsignedBigInteger('legacy_voucher_sell_price_idr')->nullable();
+        });
+
         // Previously Digiflazz checkout always used product markup, even when
         // a nominal had different legacy pricing fields. Transfer the actual
         // effective price rule to each nominal before switching checkout logic.
@@ -28,7 +37,7 @@ return new class extends Migration
                     ->where('mappings.provider_id', $providerId);
             })
             ->select(
-                'packages.id',
+                'packages.id', 'packages.pricing_mode', 'packages.sell_price_idr',
                 'products.margin_percent',
                 'products.price_markup_type',
                 'products.price_markup_fixed_idr'
@@ -39,6 +48,11 @@ return new class extends Migration
                 $models = ProductPackage::with('product')->whereIn('id', $ids)->get()->keyBy('id');
                 $quotes = app(CheckoutPricing::class)->forPackages($ids, true);
                 $ownership = app(DigiflazzPriceOwnership::class);
+                $voucherPackageIds = DB::table('provider_mappings as mappings')
+                    ->join('providers', 'providers.id', '=', 'mappings.provider_id')
+                    ->whereIn('mappings.product_package_id', $ids)
+                    ->where('providers.code', 'VOUCHER_STOCK')
+                    ->pluck('mappings.product_package_id')->flip()->all();
 
                 foreach ($packages as $package) {
                     $model = $models->get($package->id);
@@ -49,6 +63,9 @@ return new class extends Migration
                     }
                     $fixed = $package->price_markup_type === 'FIXED';
                     DB::table('product_packages')->where('id', $package->id)->update([
+                        // Only a legacy SELL_PRICE voucher needs its own cap.
+                        'legacy_voucher_sell_price_idr' => $package->pricing_mode === 'SELL_PRICE'
+                            && isset($voucherPackageIds[$package->id]) ? $package->sell_price_idr : null,
                         'pricing_mode' => $fixed ? 'FIXED' : 'PERCENT',
                         'margin_percent' => $fixed ? null : ($package->margin_percent ?? 12),
                         'margin_fixed_idr' => $fixed ? (int) $package->price_markup_fixed_idr : null,
