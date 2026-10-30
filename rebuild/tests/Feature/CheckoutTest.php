@@ -205,7 +205,7 @@ class CheckoutTest extends TestCase
         $catalog = $this->catalog();
         $this->seedCheckoutDigiflazzCatalog($catalog['package_id']);
         DB::table('digiflazz_catalog_items')
-            ->where('buyer_sku_code', $catalog['provider_sku'])
+            ->where('buyer_sku_code', DB::table('provider_mappings')->where('id', $catalog['mapping_id'])->value('external_sku'))
             ->update(['price_idr' => 12240, 'synced_at' => now()]);
         DB::table('provider_mappings')->where('id', $catalog['mapping_id'])
             ->update(['cost_idr' => 12240, 'max_price_idr' => 12240]);
