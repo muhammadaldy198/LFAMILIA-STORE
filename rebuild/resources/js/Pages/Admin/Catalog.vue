@@ -195,9 +195,7 @@ const fieldKeyOptions = computed(() => (product.value?.fields || []).map(row => 
 /* ---------- nominal ---------- */
 const nominalOpen = ref(false);
 const nominalEditing = ref(null);
-const isDigiflazzNominal = computed(() => Boolean(
-    nominalEditing.value?.mappings?.some(mapping => mapping.provider_code === 'DIGIFLAZZ')
-));
+const isDigiflazzNominal = computed(() => Boolean(nominalEditing.value?.is_digiflazz_pricing));
 const nominalErrors = ref({});
 const nominalImage = ref(null);
 const nominal = reactive({
