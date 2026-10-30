@@ -127,7 +127,7 @@ class AdminPanelRestorationTest extends TestCase
         $package = $product->packages()->firstOrFail();
         $package->update(['is_active' => true]);
         $package->mappings()->update(['is_active' => true]);
-        $this->assertSame('PRODUCT_MARGIN', $package->fresh()->pricing_mode);
+        $this->assertSame('PERCENT', $package->fresh()->pricing_mode);
 
         // Impor SKU lain tidak boleh menimpa margin nominal yang sudah diatur.
         $otherId = DB::table('digiflazz_catalog_items')->insertGetId([
@@ -142,8 +142,8 @@ class AdminPanelRestorationTest extends TestCase
             'item_ids' => [$otherId],
         ])->assertRedirect()->assertSessionHasNoErrors();
 
-        $this->assertSame('PRODUCT_MARGIN', $package->fresh()->pricing_mode);
-        $this->assertSame(11000, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
+        $this->assertSame('PERCENT', $package->fresh()->pricing_mode);
+        $this->assertSame(11200, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
     }
 
     public function test_activating_automatic_product_validates_existing_destination_template(): void
@@ -237,17 +237,17 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertTrue($package->is_active);
         $this->assertTrue($mapping->is_active);
         $this->assertSame('{{user_id}}{{zone_id}}', $product->fresh()->customer_no_template);
-        // Margin is owned by the product; imported SKUs never rename it or reprice the nominal.
+        // Legacy product margin is unchanged but no longer sets SKU prices.
         $this->assertEqualsWithDelta(10, (float) $product->fresh()->margin_percent, 0.0001);
-        $this->assertSame('PRODUCT_MARGIN', $package->fresh()->pricing_mode);
+        $this->assertSame('PERCENT', $package->fresh()->pricing_mode);
         $this->assertNull($product->fresh()->sell_markup_percent);
-        // Redesign: store cost (10000 + 2%) × import margin 12% = 11424.
-        $this->assertSame(11000, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
+        // Seller price 10000 + nominal's own 12% = 11200.
+        $this->assertSame(11200, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
         $response = $this->get('/catalog/'.$product->slug);
         $response->assertOk();
         $response->assertInertia(function (AssertableInertia $page): void {
             $page->where('packages.0.is_available', true);
-            $page->where('packages.0.price_idr', 11000);
+            $page->where('packages.0.price_idr', 11200);
         });
         $this->assertDatabaseHas('audit_logs', ['action' => 'catalog.mapping.updated', 'target_id' => (string) $mapping->id]);
         Http::assertSentCount(1);
@@ -269,7 +269,7 @@ class AdminPanelRestorationTest extends TestCase
         ])->assertRedirect()->assertSessionHasNoErrors();
         $package = $product->packages()->firstOrFail();
         $this->assertSame('{{destination}}', $product->fresh()->customer_no_template);
-        $this->assertSame(11000, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
+        $this->assertSame(11200, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
     }
 
     public function test_publish_import_rejects_invalid_destination_formats_without_partial_activation(): void
@@ -1105,10 +1105,9 @@ class AdminPanelRestorationTest extends TestCase
         // dicover AdminPackagePriceGuardTest).
         ProviderMapping::create(['product_package_id' => $package->id, 'provider_id' => Provider::where('code', 'DIGIFLAZZ')->value('id'), 'external_sku' => 'floor-sku', 'cost_idr' => 10000, 'max_price_idr' => 10000, 'is_active' => true]);
         $this->put('/admin/catalog/packages/'.$package->id, ['code' => 'FLOOR', 'name' => 'Floor', 'sort_order' => 0, 'is_active' => false,
-            'pricing_mode' => 'SELL_PRICE', 'sell_price_idr' => 9000])->assertRedirect()->assertSessionHasNoErrors();
-        // Legacy fixed price metadata does not block a Digiflazz nominal edit.
-        // Checkout always uses the seller price and product markup.
-        $this->assertSame('SELL_PRICE', $package->fresh()->pricing_mode);
+            'pricing_mode' => 'SELL_PRICE', 'sell_price_idr' => 9000])->assertSessionHasErrors('pricing_mode');
+        // Digiflazz must reject a fixed selling price.
+        $this->assertNotSame('SELL_PRICE', $package->fresh()->pricing_mode);
     }
 
     public function test_full_sync_blocks_mapped_skus_absent_from_response(): void
