@@ -1,7 +1,7 @@
 # PRD — LFAMILIA STORE
 
 **Versi:** 2.1 (penyelarasan dengan Buku Keputusan pemilik, 24 Oktober 2026 — rincian perubahan di §23)
-**Tanggal:** 22 Oktober 2026, direvisi 25 Oktober 2026
+**Tanggal:** 22 Oktober 2026, direvisi 31 Oktober 2026
 **Menggantikan:** `PRD-LFAMILIA-STORE-v1.md` dan `PRD-TRACEABILITY-2026-10.md` (keduanya diarsipkan di `docs/archive/2026-10-22-pra-redesign/`)
 **Sifat dokumen:** aturan produk. Tidak berisi laporan kemajuan, tidak berisi centang status, tidak berisi prosedur server.
 
@@ -88,42 +88,38 @@ Kategori → Produk → Nominal → Sumber (SKU penyedia)
 ```
 
 - **Kategori** punya nama, slug, ikon, urutan, status aktif.
-- **Produk** punya kategori, nama, slug, urutan, status aktif, penanda "populer", dan gambar/ikon (media produk). Produk **tidak** punya margin/markup sendiri (lihat §4.3).
+- **Produk** punya kategori, nama, slug, urutan, status aktif, penanda populer, media, dan untuk produk Digiflazz pengaturan markup sendiri (% atau tambahan Rp; lihat §4.3).
 - **Nominal** punya kode, nama, nilai nominal (opsional), urutan, status aktif. Nominal nonaktif tidak muncul di toko. **Nama nominal hasil impor dari penyedia tidak memuat nama game/produk** — fokus ke nominalnya (mis. "5 Diamond", bukan "Free Fire 5 Diamond"); berlaku untuk semua produk.
-- **Sumber** menghubungkan nominal ke SKU penyedia, punya harga modal, status aktif, dan penanda "harga manual". Satu nominal dilayani **satu SKU penyedia terpilih**; pembeli tidak bisa memilih SKU dan tidak melihat pemetaan internal.
+- **Sumber** menghubungkan nominal ke SKU penyedia dan status aktif. Untuk Digiflazz, harga seller SKU tersinkron adalah harga dasar tanpa modal/harga manual terpisah; pembeli tidak memilih SKU.
 
 ### 4.2 Aturan tampil
 
 - Yang tidak aktif tidak pernah tampil ke pembeli, tapi tidak dihapus — hanya disembunyikan.
 - Produk tanpa nominal aktif tidak bisa dibeli.
 - Nominal tanpa sumber aktif **tidak boleh** bisa dibeli; kalau dipaksa, checkout menolak dengan alasan yang jelas.
-- Nominal yang tidak tersedia — sumbernya nonaktif/hilang, harga seller melewati modal toko, atau data katalognya basi lebih dari 24 jam — **hilang total dari tampilan pembeli** (tombolnya nonaktif/hilang sendiri), bukan tampil dengan label "tidak bisa dibeli".
+- Nominal yang tidak tersedia — sumbernya nonaktif/hilang, identitas SKU tidak cocok, atau data katalognya basi lebih dari 24 jam — **hilang total dari tampilan pembeli** (tombolnya nonaktif/hilang sendiri), bukan tampil dengan label "tidak bisa dibeli".
 - Urutan tampil produk mengikuti urutan yang diatur admin, bukan abjad.
 - **Urutan nominal produk** tampil dari nilai kecil ke besar.
 
-### 4.3 Harga
+### 4.3 Harga (aturan baru 31 Oktober 2026)
 
-Harga berjalan dengan **sistem tiga harga**: **harga seller** (harga dari penyedia) → **harga modal toko** → **harga jual**.
+**Untuk produk Digiflazz, harga jual = harga seller SKU terpilih + markup produk.**
 
-Aturan:
-
-- **Harga modal toko dibentuk sekali** saat impor/mapping: harga seller + **tambahan modal (bawaan 2%)**. Sesudah dibentuk, modal toko **tidak berubah mengikuti harga seller**; sinkronisasi berikutnya hanya memperbarui harga seller sebagai referensi — tidak menimpa modal toko dan tidak menerapkan ulang tambahan modal. Modal toko boleh diedit admin, tetapi **tidak boleh di bawah harga referensi seller saat itu**.
-- **Harga jual = modal toko × markup (bawaan 10%).** Hasilnya disimpan di tingkat **nominal** sebagai margin mode persen; admin dapat mengubah persennya per nominal atau menggantinya menjadi harga tetap. **Tidak ada markup di tingkat produk.**
-- Impor memakai **dua kolom persen global** untuk semua SKU terpilih (modal bawaan 2% di atas harga seller, jual bawaan 10% di atas modal toko), dengan pratinjau seller → modal toko → harga jual sebelum diterapkan.
-- Harga rupiah **dibulatkan ke atas**; tidak ada pembulatan "cantik".
-- **Harga jual tidak boleh lebih murah dari modal toko** — server menolaknya.
-- **Nominal disembunyikan otomatis** bila harga seller naik di atas modal toko, dan tampil lagi otomatis bila harga seller turun kembali ke dalam batas (lihat §4.2).
-- **Batas `max_price` per pesanan Digiflazz = harga modal toko dari satu SKU yang dipilih untuk nominal itu, persis tanpa tambahan 1% dan tanpa perhitungan harga SKU cadangan.** Batas ini dihitung saat checkout dan disimpan pada snapshot pesanan; transaksi tidak dikirim otomatis jika harga seller melewati modal toko.
-- **Harga yang dibayar pembeli adalah harga saat pesanan dibuat** (snapshot). Kalau harga katalog berubah setelah itu, pesanan lama tidak berubah.
-- Harga modal dan harga seller **disimpan di database sendiri**; harga tidak pernah ditanyakan ke penyedia saat ada pengunjung.
-- Perubahan harga dan margin hanya lewat panel admin, tercatat di audit log.
+- Harga seller terbaru diambil dari daftar harga Digiflazz berkala, disimpan di database, dan menjadi harga dasar. Tidak ada biaya modal toko tambahan ataupun harga jual tetap khusus Digiflazz.
+- **Default markup saat membuat produk otomatis/menyiapkan impor = 12%** atas harga seller. Admin dapat mengubah **per produk** menjadi persentase (%) atau tambahan nominal rupiah (Rp); pengaturan ini berlaku untuk semua SKU yang dihubungkan ke produk tersebut.
+- Perubahan harga seller otomatis memengaruhi harga jual katalog/checkout setelah sinkronisasi; pengaturan markup tidak ditimpa sinkronisasi. Pembulatan margin persen ke rupiah dilakukan ke atas.
+- Nama produk dan nominal yang sudah dimiliki toko tidak boleh diubah oleh impor/sinkronisasi Digiflazz. Proses tersebut hanya menghubungkan SKU dan memperbarui data seller; perubahan nama hanya melalui editor admin toko.
+- Satu nominal hanya memiliki satu SKU aktif terpilih, tanpa SKU cadangan/failover. Mesin DigiTools terpisah mengelola referensi seller dan pemilihan SKU; LFAMILIA STORE tidak menjalankan ulang mesin seller DigiTools.
+- Untuk permintaan transaksi Digiflazz, `max_price` sama dengan harga seller SKU terbaru yang digunakan saat checkout, tanpa tambahan persentase. Pesanan tidak mengganti SKU diam-diam jika harga provider berubah. Harga pembeli tersimpan sebagai snapshot saat pesanan dibuat.
+- Kolom cost mapping lama tetap ada untuk kompatibilitas/audit internal, tetapi **bukan** input margin harga jual Digiflazz. Produk manual dan stok voucher lokal tetap menggunakan perhitungan modal layanan tersendiri.
+- Tidak ada panggilan price-list pada setiap kunjungan pembeli. Harga diverifikasi di server dari katalog tersinkron, bukan dari input browser.
 
 ### 4.4 Sinkronisasi katalog dari penyedia
 
 - Sinkronisasi bersifat **menarik data**, bukan mendorong. Admin yang memicu, atau penjadwal yang menjalankan **tiap 15 menit** untuk seluruh katalog (ada saklar di panel; tidak ada sinkronisasi per produk). Daftar harga penyedia disimpan di database sendiri dan diperbarui berkala — dokumentasi Digiflazz menyatakan ada limitasi pengecekan daftar harga, jadi gunakan secara bijak.
 - Yang hilang dari penyedia: **pemetaan yang belum pernah dipakai pesanan dihapus**; **pemetaan yang pernah dipakai dipertahankan tetapi dinonaktifkan**. Nominal yang tidak lagi punya sumber aktif **dinonaktifkan otomatis oleh sinkronisasi** (penanda dinonaktifkan-oleh-sinkronisasi) dan aktif lagi hanya bila SKU-nya kembali. Produk dan nominal buatan admin sendiri tidak dihapus sinkronisasi.
 - Sinkronisasi juga **membuat pemetaan sumber awal** untuk nominal aktif yang belum terpetakan.
-- Perubahan harga seller dari sinkronisasi **tidak mengubah modal toko dan tidak mengubah harga jual** (lihat §4.3).
+- Perubahan harga seller dari sinkronisasi **mengubah harga jual katalog dan quote berikutnya** sesuai markup produk, tanpa mengubah markup atau nama toko (lihat §4.3).
 - Setiap sinkronisasi mencatat: kapan, oleh siapa/sistem, berapa baris berubah.
 
 ---
