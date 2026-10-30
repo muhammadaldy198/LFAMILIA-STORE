@@ -1336,7 +1336,7 @@ class AdminPanelRestorationTest extends TestCase
         $this->get('/admin/catalog?tab=auto&q=Natural%20Order')->assertOk()
             ->assertInertia(fn (AssertableInertia $page) => $page
                 ->component('Admin/Catalog')
-                ->where('products', fn ($rows): bool => array_column($rows, 'name') === [
+                ->where('products', fn ($rows): bool => collect($rows)->pluck('name')->all() === [
                     'Natural Order 5', 'Natural Order 20', 'Natural Order 1100',
                 ])
                 ->etc());
@@ -1371,7 +1371,7 @@ class AdminPanelRestorationTest extends TestCase
         $this->get('/admin/digiflazz?brand=Mobile%20Legends&per_page=25')->assertOk()
             ->assertInertia(fn (AssertableInertia $page) => $page
                 ->component('Admin/Digiflazz')
-                ->where('items.data', fn ($rows): bool => array_column($rows, 'buyer_sku_code') === [
+                ->where('items.data', fn ($rows): bool => collect($rows)->pluck('buyer_sku_code')->all() === [
                     'ml-5', 'ml-20', 'ml-1100', 'ml-20-weekly',
                 ])
                 ->etc());
