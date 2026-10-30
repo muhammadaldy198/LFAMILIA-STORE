@@ -82,9 +82,10 @@ class DigiflazzPriceOwnershipTest extends TestCase
         $package = $product->packages()->create([
             'code' => 'MIXED-QUOTE-'.bin2hex(random_bytes(3)),
             'name' => 'Mixed price nominal', 'pricing_mode' => 'PERCENT',
-            'margin_percent' => 20, 'legacy_voucher_sell_price_idr' => 15000,
+            'margin_percent' => 20,
             'is_active' => true,
         ]);
+        $package->forceFill(['legacy_voucher_sell_price_idr' => 15000])->save();
         $stockKey = 'mixed-source-'.bin2hex(random_bytes(4));
         app(VoucherStockService::class)->import($stockKey, 'TEST-VOUCHER-CODE');
         $voucher = ProviderMapping::create([
