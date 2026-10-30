@@ -1376,5 +1376,4 @@ class AdminPanelRestorationTest extends TestCase
                 ])
                 ->etc());
     }
-
 }
