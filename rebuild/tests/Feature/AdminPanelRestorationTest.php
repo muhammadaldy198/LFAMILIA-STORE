@@ -345,11 +345,11 @@ class AdminPanelRestorationTest extends TestCase
             $this->assertSame(1, $package->mappings()->count());
             $this->assertSame(1, $package->mappings()->where('is_active', true)->count());
             $this->assertSame([0], $package->mappings()->orderBy('priority')->pluck('priority')->map(fn ($value): int => (int) $value)->all());
-            // Price is calculated from current seller SKU and product-level 10% markup.
+            // Each new imported nominal has its own default 12% markup.
             $quote = app(CheckoutPricing::class)->forPackage($package->id);
             $sellerPrice = (int) $package->mappings()->firstOrFail()->cost_idr;
-            $this->assertSame('PRODUCT_MARGIN', $package->pricing_mode);
-            $this->assertSame($sellerPrice + intdiv(($sellerPrice * 10) + 99, 100), $quote['subtotal_idr']);
+            $this->assertSame('PERCENT', $package->pricing_mode);
+            $this->assertSame($sellerPrice + intdiv(($sellerPrice * 12) + 99, 100), $quote['subtotal_idr']);
             $this->assertSame(1, $package->mappings()->count());
         }
         $response = $this->get('/catalog/'.$product->slug);
