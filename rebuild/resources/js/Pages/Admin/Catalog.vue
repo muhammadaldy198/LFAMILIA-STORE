@@ -483,10 +483,6 @@ const importPublish = ref(true);
 const autoProducts = computed(() => props.autoProductOptions);
 const importProduct = computed(() => props.products.find(row => Number(row.id) === Number(importProductId.value))
     || props.autoProductOptions.find(row => Number(row.id) === Number(importProductId.value)) || null);
-// Dua kolom global untuk SEMUA SKU yang dipilih, bukan per SKU:
-// harga modal = seller + uplift (default 2%), harga jual = modal + margin (default 10%).
-const importUplift = ref(Number(props.pricingSettings?.cost_uplift_percent ?? 2));
-const importMargin = ref(Number(props.pricingSettings?.sell_markup_percent ?? 0));
 const importBrands = computed(() => [...new Set(props.digiflazzItems.map(row => row.brand))].sort((a, b) => a.localeCompare(b, 'id-ID')));
 const importRows = computed(() => props.digiflazzItems.filter(row => {
     if (row.mapped || !row.available) return false;
@@ -494,8 +490,13 @@ const importRows = computed(() => props.digiflazzItems.filter(row => {
     const term = importSearch.value.trim().toLowerCase();
     return !term || `${row.product_name} ${row.buyer_sku_code}`.toLowerCase().includes(term);
 }).slice(0, 60));
-const storeCostOf = seller => Math.ceil(Number(seller || 0) * (100 + importUplift.value) / 100);
-const sellPriceOf = seller => Math.ceil(storeCostOf(seller) * (100 + Number(importMargin.value || 0)) / 100);
+const sellPriceOf = seller => {
+    const product = importProduct.value;
+    const price = Number(seller || 0);
+    return product?.price_markup_type === 'FIXED'
+        ? price + Number(product.price_markup_fixed_idr || 0)
+        : Math.ceil(price * (1 + Number(product?.margin_percent ?? 12) / 100));
+};
 
 const openImport = () => {
     importErrors.value = {};
@@ -504,8 +505,6 @@ const openImport = () => {
     importBrand.value = '';
     importPublish.value = true;
     if (!importProductId.value && autoProducts.value.length) importProductId.value = String(autoProducts.value[0].id);
-    importUplift.value = Number(importProduct.value?.cost_uplift_percent ?? props.pricingSettings?.cost_uplift_percent ?? 2);
-    importMargin.value = Number(props.pricingSettings?.sell_markup_percent ?? 0);
     importOpen.value = true;
 };
 const toggleImportRow = id => {
@@ -517,8 +516,6 @@ const submitImport = () => {
     importErrors.value = {};
     router.post(`/admin/catalog/products/${importProduct.value.id}/import`, {
         item_ids: importPicked.value,
-        cost_uplift_percent: Number(importUplift.value || 0),
-        margin_percent: Number(importMargin.value || 0),
         publish: importPublish.value,
     }, {
         preserveScroll: true,
@@ -955,7 +952,7 @@ onMounted(() => {
         </AdminModal>
 
 
-        <AdminModal v-model:open="importOpen" title="Impor nominal dari Digiflazz" description="Nominal yang dipilih disalin ke produk dengan harga modal dan harga jual sesuai aturan toko." wide>
+        <AdminModal v-model:open="importOpen" title="Hubungkan SKU Digiflazz" description="SKU dan harga seller dihubungkan ke produk tujuan. Nama produk yang sudah ada tidak akan berubah." wide>
             <div class="adm-grid two">
                 <label class="adm-field">
                     <span>Produk tujuan <b class="req">*</b></span>
@@ -963,16 +960,11 @@ onMounted(() => {
                         <option v-for="row in autoProducts" :key="row.id" :value="String(row.id)">{{ row.name }}</option>
                     </select>
                 </label>
-                <label class="adm-field">
-                    <span>Harga modal (%)</span>
-                    <input v-model="importUplift" type="number" min="0" max="1000" step="0.1" class="adm-input">
-                    <span class="hint">Tambahan dari harga seller Digiflazz, berlaku untuk semua SKU terpilih.</span>
-                </label>
-                <label class="adm-field">
-                    <span>Harga jual (%)</span>
-                    <input v-model="importMargin" type="number" min="0" max="1000" step="0.1" class="adm-input">
-                    <span class="hint">Dihitung dari harga modal, berlaku untuk semua SKU terpilih.</span>
-                </label>
+                <div class="adm-field">
+                    <span>Tambahan harga produk</span>
+                    <strong>{{ importProduct?.price_markup_type === 'FIXED' ? rupiah(importProduct?.price_markup_fixed_idr ?? 0) + ' per nominal' : (importProduct?.margin_percent ?? 12) + '%' }}</strong>
+                    <span class="hint">Default 12% saat produk dibuat. Ubah di editor Informasi Produk, bukan saat menghubungkan SKU.</span>
+                </div>
                 <label class="adm-field">
                     <span>Merek</span>
                     <select v-model="importBrand" class="adm-select">
@@ -995,21 +987,20 @@ onMounted(() => {
 
             <div class="adm-scroll" style="margin-top:10px;max-height:46vh">
                 <table class="adm-table">
-                    <thead><tr><th></th><th>Nominal</th><th>SKU</th><th class="num">Harga seller</th><th class="num">Modal toko</th><th class="num">Harga jual</th></tr></thead>
+                    <thead><tr><th></th><th>Nominal</th><th>SKU</th><th class="num">Harga seller</th><th class="num">Harga jual</th></tr></thead>
                     <tbody>
                         <tr v-for="row in importRows" :key="row.id">
                             <td><input type="checkbox" :checked="importPicked.includes(row.id)" @change="toggleImportRow(row.id)"></td>
                             <td><strong>{{ row.product_name }}</strong><p class="dim">{{ row.brand }}</p></td>
                             <td class="mono">{{ row.buyer_sku_code }}</td>
                             <td class="num">{{ rupiah(row.price_idr) }}</td>
-                            <td class="num">{{ rupiah(storeCostOf(row.price_idr)) }}</td>
                             <td class="num">{{ rupiah(sellPriceOf(row.price_idr)) }}</td>
                         </tr>
-                        <tr v-if="!importRows.length"><td colspan="6" class="adm-empty">Tidak ada SKU tersedia untuk saringan ini. Sinkronkan daftar harga di menu Digiflazz lebih dulu.</td></tr>
+                        <tr v-if="!importRows.length"><td colspan="5" class="adm-empty">Tidak ada SKU tersedia untuk saringan ini. Sinkronkan daftar harga di menu Digiflazz lebih dulu.</td></tr>
                     </tbody>
                 </table>
             </div>
-            <p class="adm-note">{{ importPicked.length }} dipilih · modal toko memakai tambahan {{ importUplift }}% dari harga seller.</p>
+            <p class="adm-note">{{ importPicked.length }} SKU dipilih · nama produk dan nama nominal lama tetap milik toko.</p>
             <template #footer>
                 <button type="button" class="adm-btn" @click="importOpen = false">Batal</button>
                 <button type="button" class="adm-btn primary" :disabled="importBusy || !importPicked.length || !importProduct" @click="submitImport">
