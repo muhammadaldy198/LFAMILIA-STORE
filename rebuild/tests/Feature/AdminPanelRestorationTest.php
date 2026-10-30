@@ -1307,4 +1307,74 @@ class AdminPanelRestorationTest extends TestCase
                     && (int) $mapping['seller_reference_price_idr'] === 10000;
             }));
     }
+
+    public function test_catalog_nominal_sort_reads_numeric_values_in_natural_order(): void
+    {
+        $nominals = collect([
+            ['id' => 3, 'name' => 'Mobile Legends 1100 Diamonds'],
+            ['id' => 2, 'name' => 'Mobile Legends 20 Diamonds'],
+            ['id' => 1, 'name' => 'Mobile Legends 5 Diamonds'],
+        ]);
+
+        $this->assertSame([1, 2, 3], app(CatalogNominalOrder::class)->sort($nominals)->pluck('id')->all());
+    }
+
+    public function test_admin_product_list_uses_natural_name_sort_before_pagination(): void
+    {
+        $this->login();
+        foreach ([1100, 5, 20] as $amount) {
+            Product::create([
+                'category_id' => Category::where('slug', 'game')->value('id'),
+                'name' => 'Natural Order '.$amount,
+                'slug' => 'natural-order-'.$amount.'-'.bin2hex(random_bytes(3)),
+                'is_active' => false,
+                'fulfillment_mode' => 'AUTO_PROVIDER',
+                'margin_percent' => 12,
+            ]);
+        }
+
+        $this->get('/admin/catalog?tab=auto&q=Natural%20Order')->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->component('Admin/Catalog')
+                ->where('products', fn ($rows): bool => array_column($rows, 'name') === [
+                    'Natural Order 5', 'Natural Order 20', 'Natural Order 1100',
+                ])
+                ->etc());
+    }
+
+    public function test_bulk_import_accepts_separate_types_and_orders_numeric_nominals(): void
+    {
+        $this->login();
+        $this->fakeCatalog([
+            $this->row(['buyer_sku_code' => 'ml-1100', 'brand' => 'Mobile Legends',
+                'product_name' => 'Mobile Legends 1100 Diamonds', 'type' => 'Diamonds']),
+            $this->row(['buyer_sku_code' => 'ml-5', 'brand' => 'Mobile Legends',
+                'product_name' => 'Mobile Legends 5 Diamonds', 'type' => 'Diamonds']),
+            $this->row(['buyer_sku_code' => 'ml-20', 'brand' => 'Mobile Legends',
+                'product_name' => 'Mobile Legends 20 Diamonds', 'type' => 'Diamonds']),
+            $this->row(['buyer_sku_code' => 'ml-20-weekly', 'brand' => 'Mobile Legends',
+                'product_name' => 'Mobile Legends 20 Weekly', 'type' => 'Weekly']),
+        ]);
+        app(DigiflazzCatalogService::class)->sync();
+        $product = $this->product();
+        $ids = DB::table('digiflazz_catalog_items')
+            ->where('brand', 'Mobile Legends')->pluck('id')->all();
+        $this->assertCount(4, $ids);
+
+        $this->post('/admin/catalog/products/'.$product->id.'/import', [
+            'item_ids' => $ids, 'publish' => false,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertSame([5, 20, 20, 1100], $product->packages()
+            ->orderBy('sort_order')->pluck('nominal_value')->map(fn ($value): int => (int) $value)->all());
+
+        $this->get('/admin/digiflazz?brand=Mobile%20Legends&per_page=25')->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->component('Admin/Digiflazz')
+                ->where('items.data', fn ($rows): bool => array_column($rows, 'buyer_sku_code') === [
+                    'ml-5', 'ml-20', 'ml-1100', 'ml-20-weekly',
+                ])
+                ->etc());
+    }
+
 }
