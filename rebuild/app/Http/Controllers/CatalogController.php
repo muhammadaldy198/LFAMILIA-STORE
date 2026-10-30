@@ -152,11 +152,11 @@ class CatalogController
         $products = (new LengthAwarePaginator($pageProducts, $orderedIds->count(), $perPage, $currentPage, [
             'path' => $request->url(), 'query' => $request->query(),
         ]))->through(fn (Product $product): array => [
-                ...$product->only('name', 'slug', 'initials', 'accent_color', 'instant'),
-                'category_name' => $product->category->name,
-                'category_slug' => $product->category->slug,
-                'image_url' => $product->getFirstMediaUrl('image'),
-            ]);
+            ...$product->only('name', 'slug', 'initials', 'accent_color', 'instant'),
+            'category_name' => $product->category->name,
+            'category_slug' => $product->category->slug,
+            'image_url' => $product->getFirstMediaUrl('image'),
+        ]);
 
         $basePopular = Product::with(['category', 'media'])
             ->withCount(['reviews as active_reviews_count' => fn ($query) => $query->where('is_active', true)])
