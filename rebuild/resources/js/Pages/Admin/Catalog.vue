@@ -1171,7 +1171,7 @@ onMounted(() => {
                 </table>
             </div>
             <div style="display:flex;align-items:center;gap:8px;justify-content:space-between;flex-wrap:wrap;margin-top:8px">
-                <p class="adm-note">{{ importPicked.length }} SKU dipilih dari seluruh halaman · nama produk dan nominal lama tetap milik toko.</p>
+                <p class="adm-note">{{ importPicked.length }} SKU dipilih dari seluruh halaman · nama produk dan nama nominal lama tetap milik toko.</p>
                 <div style="display:flex;align-items:center;gap:8px">
                     <button type="button" class="adm-btn sm" :disabled="importPage <= 1" @click="importPage--">Sebelumnya</button>
                     <span class="adm-note">Halaman {{ importPage }} / {{ importPageCount }}</span>
