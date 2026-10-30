@@ -963,7 +963,7 @@ class AdminDigiflazzRestorationTest extends TestCase
         $this->assertDatabaseHas('provider_mappings', [
             'external_sku' => 'BOOT1.000', 'priority' => 0, 'is_active' => true,
             'is_manual_price' => false, 'cost_idr' => 10000, 'store_cost_idr' => 10000,
-            'seller_reference_price_idr' => 10000, 'max_price_idr' => 10200,
+            'seller_reference_price_idr' => 10000, 'max_price_idr' => 10000,
         ]);
         $this->assertSame(0, app(DigiflazzAutoSources::class)->sync());
         $this->assertSame(1, ProviderMapping::where('product_package_id', $sample['package']->id)->count());
