@@ -1105,8 +1105,10 @@ class AdminPanelRestorationTest extends TestCase
         // dicover AdminPackagePriceGuardTest).
         ProviderMapping::create(['product_package_id' => $package->id, 'provider_id' => Provider::where('code', 'DIGIFLAZZ')->value('id'), 'external_sku' => 'floor-sku', 'cost_idr' => 10000, 'max_price_idr' => 10000, 'is_active' => true]);
         $this->put('/admin/catalog/packages/'.$package->id, ['code' => 'FLOOR', 'name' => 'Floor', 'sort_order' => 0, 'is_active' => false,
-            'pricing_mode' => 'SELL_PRICE', 'sell_price_idr' => 9000])->assertSessionHasErrors('sell_price_idr');
-        $this->assertSame('PRODUCT_MARGIN', $package->fresh()->pricing_mode);
+            'pricing_mode' => 'SELL_PRICE', 'sell_price_idr' => 9000])->assertRedirect()->assertSessionHasNoErrors();
+        // Legacy fixed price metadata does not block a Digiflazz nominal edit.
+        // Checkout always uses the seller price and product markup.
+        $this->assertSame('SELL_PRICE', $package->fresh()->pricing_mode);
     }
 
     public function test_full_sync_blocks_mapped_skus_absent_from_response(): void
