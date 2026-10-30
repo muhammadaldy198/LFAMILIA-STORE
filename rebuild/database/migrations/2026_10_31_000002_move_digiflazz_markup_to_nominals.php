@@ -15,9 +15,11 @@ return new class extends Migration
         // A previously fixed-price voucher may coexist with an active Digiflazz
         // mapping. Preserve its original cap and selling price independently
         // when the nominal itself moves to percentage/IDR Digiflazz markup.
-        Schema::table('product_packages', function (Blueprint $table): void {
-            $table->unsignedBigInteger('legacy_voucher_sell_price_idr')->nullable();
-        });
+        if (! Schema::hasColumn('product_packages', 'legacy_voucher_sell_price_idr')) {
+            Schema::table('product_packages', function (Blueprint $table): void {
+                $table->unsignedBigInteger('legacy_voucher_sell_price_idr')->nullable();
+            });
+        }
 
         // Previously Digiflazz checkout always used product markup, even when
         // a nominal had different legacy pricing fields. Transfer the actual
