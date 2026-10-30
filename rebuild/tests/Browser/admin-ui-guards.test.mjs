@@ -407,7 +407,8 @@ test('editing a nominal keeps stored pricing and nominal_value', async () => {
     // Catalog.vue memakai helper itu, bukan payload lama yang menimpa null.
     const catalog = read('Catalog.vue');
     assert.match(catalog, /import \{ nominalMode, nominalPayload, nominalPriceValue \} from '\.\.\/\.\.\/lib\/catalogNominal'/);
-    assert.match(catalog, /const payload = nominalPayload\(nominalEditing\.value, nominal,/);
+    assert.match(catalog, /const payload = nominalPayload\(savedRow, nominal,/);
+    assert.match(catalog, /legacy_voucher_sell_price_idr/);
     assert.doesNotMatch(catalog, /nominal_value: null,\s*\n\s*pricing_mode:/);
 });
 
