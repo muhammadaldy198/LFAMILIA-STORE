@@ -667,12 +667,12 @@ class CatalogTest extends TestCase
             'priority' => 1, 'is_active' => false, 'created_at' => now(), 'updated_at' => now(),
         ]);
         $this->put('/admin/catalog/mappings/'.$mappingId, [
-            'priority' => 1, 'is_active' => true, 'is_manual_price' => false,
+            'priority' => 1, 'is_active' => true,
         ])->assertSessionHasErrors('is_active');
         $this->assertDatabaseHas('provider_mappings', ['id' => $mappingId, 'is_active' => false]);
         $product->update(['customer_no_template' => '{{user_id}}{{zone_id}}']);
         $this->put('/admin/catalog/mappings/'.$mappingId, [
-            'priority' => 1, 'is_active' => true, 'is_manual_price' => false,
+            'priority' => 1, 'is_active' => true,
         ])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertDatabaseHas('provider_mappings', ['id' => $mappingId, 'is_active' => true]);
     }
