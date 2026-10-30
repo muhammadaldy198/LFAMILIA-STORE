@@ -1,8 +1,5 @@
 <?php
 
-use App\Models\ProductPackage;
-use App\Services\CheckoutPricing;
-use App\Services\DigiflazzPriceOwnership;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -18,6 +15,16 @@ return new class extends Migration
         if (! Schema::hasColumn('product_packages', 'legacy_voucher_sell_price_idr')) {
             Schema::table('product_packages', function (Blueprint $table): void {
                 $table->unsignedBigInteger('legacy_voucher_sell_price_idr')->nullable();
+            });
+        }
+
+        // A mixed voucher + Digiflazz nominal needs two independent rules:
+        // preserve voucher pricing untouched and backfill its Digiflazz markup.
+        if (! Schema::hasColumn('product_packages', 'digiflazz_markup_mode')) {
+            Schema::table('product_packages', function (Blueprint $table): void {
+                $table->string('digiflazz_markup_mode', 10)->nullable();
+                $table->decimal('digiflazz_markup_percent', 8, 4)->nullable();
+                $table->unsignedBigInteger('digiflazz_markup_fixed_idr')->nullable();
             });
         }
 
@@ -47,9 +54,6 @@ return new class extends Migration
             ->orderBy('packages.id')
             ->chunkById(200, function ($packages): void {
                 $ids = $packages->pluck('id')->map(fn ($id): int => (int) $id)->all();
-                $models = ProductPackage::with('product')->whereIn('id', $ids)->get()->keyBy('id');
-                $quotes = app(CheckoutPricing::class)->forPackages($ids, true);
-                $ownership = app(DigiflazzPriceOwnership::class);
                 $voucherPackageIds = DB::table('provider_mappings as mappings')
                     ->join('providers', 'providers.id', '=', 'mappings.provider_id')
                     ->whereIn('mappings.product_package_id', $ids)
@@ -57,17 +61,22 @@ return new class extends Migration
                     ->pluck('mappings.product_package_id')->flip()->all();
 
                 foreach ($packages as $package) {
-                    $model = $models->get($package->id);
-                    if ($model === null || ! $ownership->usesDigiflazz($model, $quotes[$package->id] ?? null)) {
-                        // Preserve local voucher prices even if a historical
-                        // Digiflazz mapping still belongs to this nominal.
+                    $fixed = $package->price_markup_type === 'FIXED';
+                    // Never overwrite a voucher's existing percentage, fixed
+                    // increment or fixed selling price. Store the Digiflazz
+                    // rule separately on that same nominal, even if voucher
+                    // stock is currently available or Digiflazz is inactive.
+                    if (isset($voucherPackageIds[$package->id])) {
+                        DB::table('product_packages')->where('id', $package->id)->update([
+                            'digiflazz_markup_mode' => $fixed ? 'FIXED' : 'PERCENT',
+                            'digiflazz_markup_percent' => $fixed ? null : ($package->margin_percent ?? 12),
+                            'digiflazz_markup_fixed_idr' => $fixed ? (int) $package->price_markup_fixed_idr : null,
+                        ]);
+
                         continue;
                     }
-                    $fixed = $package->price_markup_type === 'FIXED';
+
                     DB::table('product_packages')->where('id', $package->id)->update([
-                        // Only a legacy SELL_PRICE voucher needs its own cap.
-                        'legacy_voucher_sell_price_idr' => $package->pricing_mode === 'SELL_PRICE'
-                            && isset($voucherPackageIds[$package->id]) ? $package->sell_price_idr : null,
                         'pricing_mode' => $fixed ? 'FIXED' : 'PERCENT',
                         'margin_percent' => $fixed ? null : ($package->margin_percent ?? 12),
                         'margin_fixed_idr' => $fixed ? (int) $package->price_markup_fixed_idr : null,
