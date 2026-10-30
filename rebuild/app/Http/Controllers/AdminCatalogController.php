@@ -783,6 +783,7 @@ class AdminCatalogController
                 'integer', 'min:0', 'max:1000000000'],
             'is_active' => ['sometimes', 'boolean'],
             'pricing_mode' => ['sometimes', Rule::in(['PRODUCT_MARGIN', 'PERCENT', 'FIXED', 'SELL_PRICE'])],
+            'price_source' => ['sometimes', Rule::in(['DIGIFLAZZ', 'VOUCHER_STOCK'])],
             'margin_percent' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:1000', 'decimal:0,4', 'required_if:pricing_mode,PERCENT'],
             'margin_fixed_idr' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:1000000000', 'required_if:pricing_mode,FIXED'],
             'sell_price_idr' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:1000000000', 'required_if:pricing_mode,SELL_PRICE'],
@@ -921,10 +922,18 @@ class AdminCatalogController
         $hasDigiflazzSource = app(DigiflazzPriceOwnership::class)->usesDigiflazz(
             $package, $effectiveQuote[(int) $package->id] ?? null
         );
+        $expectedPriceSource = $data['price_source'] ?? null;
+        unset($data['price_source']);
         $changesDigiflazzPrice = array_key_exists('pricing_mode', $data)
             || array_key_exists('margin_percent', $data)
             || array_key_exists('margin_fixed_idr', $data)
             || isset($data['sell_price_idr']) || isset($data['sell_markup_percent']);
+        if ($expectedPriceSource !== null && $changesDigiflazzPrice
+            && $expectedPriceSource !== ($hasDigiflazzSource ? 'DIGIFLAZZ' : 'VOUCHER_STOCK')) {
+            throw ValidationException::withMessages([
+                'pricing_mode' => 'Sumber harga nominal berubah sejak editor dibuka. Muat ulang nominal sebelum menyimpan harga.',
+            ]);
+        }
         if ($hasDigiflazzSource && $changesDigiflazzPrice) {
             $effectiveMode = $data['pricing_mode'] ?? $package->digiflazz_markup_mode ?? $package->pricing_mode;
             if (! in_array($effectiveMode, ['PERCENT', 'FIXED'], true)) {
