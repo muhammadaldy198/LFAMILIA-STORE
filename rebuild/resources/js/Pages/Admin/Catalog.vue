@@ -211,10 +211,12 @@ const openNominal = (row = null) => {
         sort_order: row?.sort_order ?? (product.value?.packages.length ?? 0),
         is_active: row ? Boolean(row.is_active) : true,
         price_mode: isDigiflazzNominal.value
-            ? (row?.pricing_mode === 'FIXED' ? 'FIXED' : 'MARKUP')
+            ? ((row?.digiflazz_markup_mode ?? row?.pricing_mode) === 'FIXED' ? 'FIXED' : 'MARKUP')
             : (row?.legacy_voucher_sell_price_idr != null ? 'FIXED' : nominalMode(row)),
         price_value: isDigiflazzNominal.value
-            ? (row?.pricing_mode === 'FIXED' ? (row.margin_fixed_idr ?? 0) : (row?.margin_percent ?? 12))
+            ? ((row?.digiflazz_markup_mode ?? row?.pricing_mode) === 'FIXED'
+                ? (row?.digiflazz_markup_mode != null ? row.digiflazz_markup_fixed_idr : row.margin_fixed_idr) ?? 0
+                : (row?.digiflazz_markup_mode != null ? row.digiflazz_markup_percent : row?.margin_percent) ?? 12)
             : (row?.legacy_voucher_sell_price_idr ?? nominalPriceValue(row)),
         // Modal toko yang ditampilkan adalah store_cost_idr, bukan cost_idr
         // (harga akuntansi lama yang bisa berbeda).
@@ -241,8 +243,10 @@ const saveNominal = () => {
     if (isDigiflazzNominal.value) {
         for (const key of ['pricing_mode', 'margin_percent', 'margin_fixed_idr', 'sell_price_idr', 'sell_markup_percent']) delete payload[key];
         const row = nominalEditing.value;
-        const oldMode = row.pricing_mode === 'FIXED' ? 'FIXED' : 'MARKUP';
-        const oldValue = row.pricing_mode === 'FIXED' ? row.margin_fixed_idr : (row.margin_percent ?? 12);
+        const oldMode = (row.digiflazz_markup_mode ?? row.pricing_mode) === 'FIXED' ? 'FIXED' : 'MARKUP';
+        const oldValue = oldMode === 'FIXED'
+            ? (row.digiflazz_markup_mode != null ? row.digiflazz_markup_fixed_idr : row.margin_fixed_idr)
+            : (row.digiflazz_markup_mode != null ? row.digiflazz_markup_percent : row.margin_percent) ?? 12;
         if (nominal.price_mode !== oldMode || Number(nominal.price_value) !== Number(oldValue)) {
             payload.pricing_mode = nominal.price_mode === 'FIXED' ? 'FIXED' : 'PERCENT';
             payload.margin_percent = nominal.price_mode === 'FIXED' ? null : Number(nominal.price_value);
