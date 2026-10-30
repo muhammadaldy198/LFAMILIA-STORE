@@ -431,6 +431,30 @@ const openEditorFull = (row) => {
     loadInfo();
     loadFields();
 };
+/* ---------- pengaturan markup produk non-Digiflazz ---------- */
+const priceOpen = ref(false);
+const priceBusy = ref('');
+const priceErrors = ref({});
+const manualVoucherMarkup = ref(Number(props.pricingSettings?.sell_markup_percent ?? 10));
+const openPricing = () => {
+    priceErrors.value = {};
+    manualVoucherMarkup.value = Number(props.pricingSettings?.sell_markup_percent ?? 10);
+    priceOpen.value = true;
+};
+const savePricing = () => {
+    priceBusy.value = 'pricing';
+    router.put('/admin/catalog/pricing', {
+        // Retain the legacy field only because this endpoint still requires it.
+        // It is NOT applied to Digiflazz selling prices or edited in this UI.
+        cost_uplift_percent: Number(props.pricingSettings?.cost_uplift_percent ?? 2),
+        sell_markup_percent: Number(manualVoucherMarkup.value),
+    }, {
+        preserveScroll: true,
+        onError: bag => { priceErrors.value = bag; },
+        onFinish: () => { priceBusy.value = ''; },
+        onSuccess: () => { priceOpen.value = false; },
+    });
+};
 /* ---------- salin nominal & stok kode ---------- */
 // Produk stok kode = produk yang nominalnya mengambil kode dari stok sendiri.
 const stockProduct = computed(() => (product.value?.packages || [])
@@ -552,6 +576,7 @@ onMounted(() => {
             <div class="adm-head-actions">
                 <Link href="/admin/catalog/categories" class="adm-btn">Kategori</Link>
                 <a href="/" target="_blank" rel="noopener" class="adm-btn">Lihat toko</a>
+                <button type="button" class="adm-btn" @click="openPricing">Markup Manual / Voucher</button>
                 <button v-if="autoProducts.length" type="button" class="adm-btn" @click="openImport">Impor dari Digiflazz</button>
                 <button type="button" class="adm-btn primary" @click="openAdd">Tambah produk</button>
             </div>
@@ -962,6 +987,22 @@ onMounted(() => {
             </template>
         </AdminModal>
 
+
+        <AdminModal v-model:open="priceOpen" title="Markup global manual dan voucher" description="Hanya untuk nominal manual dan voucher lokal yang memakai markup global. Produk Digiflazz memakai markup produk masing-masing.">
+            <div class="adm-grid">
+                <label class="adm-field">
+                    <span>Markup jual manual / voucher (%)</span>
+                    <input v-model.number="manualVoucherMarkup" type="number" min="0" max="1000" step="0.01" class="adm-input">
+                    <span class="hint">Tidak mengubah margin produk Digiflazz, harga seller, atau SKU terhubung.</span>
+                    <span v-if="priceErrors.sell_markup_percent" class="err">{{ priceErrors.sell_markup_percent }}</span>
+                    <span v-if="priceErrors.cost_uplift_percent" class="err">{{ priceErrors.cost_uplift_percent }}</span>
+                </label>
+            </div>
+            <template #footer>
+                <button type="button" class="adm-btn" @click="priceOpen = false">Batal</button>
+                <button type="button" class="adm-btn primary" :disabled="!!priceBusy" @click="savePricing">{{ priceBusy ? 'Menyimpan…' : 'Simpan markup' }}</button>
+            </template>
+        </AdminModal>
 
         <AdminModal v-model:open="importOpen" title="Hubungkan SKU Digiflazz" description="SKU dan harga seller dihubungkan ke produk tujuan. Nama produk yang sudah ada tidak akan berubah." wide>
             <div class="adm-grid two">
