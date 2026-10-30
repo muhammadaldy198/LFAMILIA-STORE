@@ -212,10 +212,10 @@ const openNominal = (row = null) => {
         is_active: row ? Boolean(row.is_active) : true,
         price_mode: isDigiflazzNominal.value
             ? (row?.pricing_mode === 'FIXED' ? 'FIXED' : 'MARKUP')
-            : nominalMode(row),
+            : (row?.legacy_voucher_sell_price_idr != null ? 'FIXED' : nominalMode(row)),
         price_value: isDigiflazzNominal.value
             ? (row?.pricing_mode === 'FIXED' ? (row.margin_fixed_idr ?? 0) : (row?.margin_percent ?? 12))
-            : nominalPriceValue(row),
+            : (row?.legacy_voucher_sell_price_idr ?? nominalPriceValue(row)),
         // Modal toko yang ditampilkan adalah store_cost_idr, bukan cost_idr
         // (harga akuntansi lama yang bisa berbeda).
         cost_idr: row?.mappings?.[0]?.store_cost_idr ?? row?.mappings?.[0]?.cost_idr ?? '',
@@ -228,7 +228,13 @@ const openNominal = (row = null) => {
 const slugCode = (text) => String(text || 'nominal').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'nominal';
 
 const saveNominal = () => {
-    const payload = nominalPayload(nominalEditing.value, nominal, nominalEditing.value?.code || `${slugCode(nominal.name)}-${Date.now().toString(36).slice(-4)}`);
+    // When the voucher is the effective source, display/edit its retained
+    // fixed selling price rather than the same nominal's Digiflazz markup.
+    const savedRow = !isDigiflazzNominal.value && nominalEditing.value?.legacy_voucher_sell_price_idr != null
+        ? { ...nominalEditing.value, pricing_mode: 'SELL_PRICE',
+            sell_price_idr: nominalEditing.value.legacy_voucher_sell_price_idr }
+        : nominalEditing.value;
+    const payload = nominalPayload(savedRow, nominal, nominalEditing.value?.code || `${slugCode(nominal.name)}-${Date.now().toString(36).slice(-4)}`);
     // Digiflazz has a markup per nominal: a percentage or added rupiah.
     // Do not turn the FIXED increment into a fixed selling price.
     // A name/status-only edit must leave this nominal's markup untouched.
