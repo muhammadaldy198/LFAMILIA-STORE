@@ -88,6 +88,41 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertSame('{{already_set}}', $product->fresh()->customer_no_template);
     }
 
+    public function test_draft_digiflazz_import_never_reprices_active_local_voucher_nominal(): void
+    {
+        $this->login();
+        $this->fakeCatalog([$this->row()]);
+        app(DigiflazzCatalogService::class)->sync();
+        $product = $this->product();
+        $package = $product->packages()->create([
+            'code' => 'LOCAL-10-'.bin2hex(random_bytes(3)),
+            'name' => '10 Diamonds',
+            'nominal_value' => 10,
+            'group_name' => 'Umum',
+            'pricing_mode' => 'SELL_PRICE',
+            'sell_price_idr' => 15000,
+            'is_active' => true,
+        ]);
+        $package->mappings()->create([
+            'provider_id' => Provider::where('code', 'VOUCHER_STOCK')->value('id'),
+            'external_sku' => null,
+            'cost_idr' => 10000,
+            'store_cost_idr' => 10000,
+            'is_active' => true,
+        ]);
+        $itemId = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'restore-sku')->value('id');
+
+        $this->post('/admin/catalog/products/'.$product->id.'/import', [
+            'item_ids' => [$itemId], 'publish' => false,
+        ])->assertSessionHasErrors('item_ids');
+
+        $this->assertSame(15000, (int) $package->fresh()->sell_price_idr);
+        $this->assertSame('SELL_PRICE', $package->fresh()->pricing_mode);
+        $this->assertSame(1, $package->mappings()->count());
+        $this->assertSame(0, $package->mappings()->where('provider_id',
+            Provider::where('code', 'DIGIFLAZZ')->value('id'))->count());
+    }
+
     public function test_sync_import_and_resync_preserve_baseline_and_inactive_import(): void
     {
         $this->login();
