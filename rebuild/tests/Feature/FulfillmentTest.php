@@ -212,6 +212,61 @@ class FulfillmentTest extends TestCase
         Http::assertSentCount(1);
     }
 
+    public function test_legacy_manual_mapping_lock_does_not_block_snapshot_authorized_seller_price(): void
+    {
+        Queue::fake();
+        $this->credentials();
+        $catalog = $this->automaticCatalog(10000, 10000, sku: 'DF-LEGACY-LOCK');
+        $orderId = $this->paidOrder($catalog, 10000);
+
+        // This simulates a pre-migration manually locked mapping. Its stored
+        // cost is stale, but the paid order snapshot authorizes Rp10,000.
+        DB::table('provider_mappings')->where('id', $catalog['mapping_id'])->update([
+            'cost_idr' => 8000, 'store_cost_idr' => 8000,
+            'max_price_idr' => 8000, 'is_manual_price' => true,
+        ]);
+        Http::fake(function ($request) {
+            $this->assertSame('DF-LEGACY-LOCK', $request['buyer_sku_code']);
+            $this->assertSame(10000, $request['max_price']);
+
+            return Http::response(['data' => [
+                'ref_id' => $request['ref_id'],
+                'customer_no' => $request['customer_no'],
+                'buyer_sku_code' => $request['buyer_sku_code'],
+                'message' => 'Sukses',
+                'status' => 'Sukses',
+                'rc' => '00',
+                'sn' => 'LEGACY-SNAPSHOT',
+                'price' => 10000,
+            ]]);
+        });
+
+        $service = app(FulfillmentService::class);
+        $service->startOrder($orderId);
+        $attempt = DB::table('fulfillment_attempts')->where('order_id', $orderId)->firstOrFail();
+        $this->assertSame('CREATED', $attempt->status);
+        $service->sendAttempt((int) $attempt->id);
+        Http::assertSentCount(1);
+        $this->assertSame('SUCCESS', DB::table('orders')->where('id', $orderId)->value('status'));
+    }
+
+    public function test_old_order_snapshot_still_blocks_seller_price_above_its_cap(): void
+    {
+        Queue::fake();
+        $catalog = $this->automaticCatalog(10000, 10000, sku: 'DF-LEGACY-SPIKE');
+        $orderId = $this->paidOrder($catalog, 9000);
+        DB::table('provider_mappings')->where('id', $catalog['mapping_id'])->update([
+            'is_manual_price' => true, 'cost_idr' => 8000,
+            'max_price_idr' => 8000, 'store_cost_idr' => 8000,
+        ]);
+        Http::fake();
+        app(FulfillmentService::class)->startOrder($orderId);
+        $attempt = DB::table('fulfillment_attempts')->where('order_id', $orderId)->firstOrFail();
+        $this->assertSame('BLOCKED', $attempt->status);
+        $this->assertSame('PAID', DB::table('orders')->where('id', $orderId)->value('status'));
+        Http::assertNothingSent();
+    }
+
     public function test_digiflazz_conflicting_codes_and_timeout_do_not_complete_or_fail_a_paid_order(): void
     {
         Queue::fake();
