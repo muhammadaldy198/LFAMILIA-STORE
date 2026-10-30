@@ -96,7 +96,7 @@ class AdminPanelRestorationTest extends TestCase
         $this->post('/admin/digiflazz/sync')->assertRedirect()->assertSessionHasNoErrors();
         $item = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'restore-sku')->first();
         $product = $this->product();
-        $this->post('/admin/catalog/products/'.$product->id.'/import', ['item_ids' => [$item->id], 'margin_percent' => 12])->assertRedirect()->assertSessionHasNoErrors();
+        $this->post('/admin/catalog/products/'.$product->id.'/import', ['item_ids' => [$item->id]])->assertRedirect()->assertSessionHasNoErrors();
         $package = $product->packages()->firstOrFail();
         $mapping = $package->mappings()->firstOrFail();
         $this->assertFalse($package->is_active);
@@ -107,7 +107,7 @@ class AdminPanelRestorationTest extends TestCase
         $this->post('/admin/catalog/mappings/'.$mapping->id.'/sync')->assertRedirect()->assertSessionHasNoErrors();
         $this->assertSame(12000, (int) $mapping->fresh()->cost_idr);
         $this->assertSame(10000, (int) DB::table('digiflazz_catalog_items')->where('id', $item->id)->value('baseline_price_idr'));
-        $this->post('/admin/catalog/products/'.$product->id.'/import', ['item_ids' => [$item->id], 'margin_percent' => 12])->assertSessionHasNoErrors();
+        $this->post('/admin/catalog/products/'.$product->id.'/import', ['item_ids' => [$item->id]])->assertSessionHasNoErrors();
         $this->assertSame(1, $product->packages()->count());
     }
 
@@ -123,7 +123,7 @@ class AdminPanelRestorationTest extends TestCase
         $itemId = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'restore-sku')->value('id');
 
         $this->post('/admin/catalog/products/'.$product->id.'/import', [
-            'item_ids' => [$itemId], 'margin_percent' => 12,
+            'item_ids' => [$itemId],
         ])->assertRedirect()->assertSessionHasNoErrors();
         $package = $product->packages()->firstOrFail();
         $package->update(['is_active' => true]);
@@ -140,7 +140,7 @@ class AdminPanelRestorationTest extends TestCase
             'created_at' => now(), 'updated_at' => now(),
         ]);
         $this->post('/admin/catalog/products/'.$product->id.'/import', [
-            'item_ids' => [$otherId], 'margin_percent' => 25,
+            'item_ids' => [$otherId],
         ])->assertRedirect()->assertSessionHasNoErrors();
 
         $this->assertSame('12.0000', (string) $package->fresh()->margin_percent);
@@ -191,7 +191,7 @@ class AdminPanelRestorationTest extends TestCase
         ]);
         $itemId = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'restore-sku')->value('id');
         $this->post('/admin/catalog/products/'.$product->id.'/import', [
-            'item_ids' => [$itemId], 'margin_percent' => 10, 'publish' => true,
+            'item_ids' => [$itemId], 'publish' => true,
         ])->assertRedirect()->assertSessionHasNoErrors();
 
         $this->put('/admin/catalog/products/'.$product->id.'/fields', [
@@ -230,7 +230,7 @@ class AdminPanelRestorationTest extends TestCase
         }
         $id = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'restore-sku')->value('id');
         $this->post('/admin/catalog/products/'.$product->id.'/import', [
-            'item_ids' => [$id], 'margin_percent' => 12, 'publish' => true,
+            'item_ids' => [$id], 'publish' => true,
         ])->assertRedirect()->assertSessionHasNoErrors();
         $package = $product->packages()->firstOrFail();
         $mapping = $package->mappings()->firstOrFail();
@@ -266,7 +266,7 @@ class AdminPanelRestorationTest extends TestCase
         $product->update(['customer_no_template' => '{{destination}}']);
         $id = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'restore-sku')->value('id');
         $this->post('/admin/catalog/products/'.$product->id.'/import', [
-            'item_ids' => [$id], 'margin_percent' => 5, 'publish' => true,
+            'item_ids' => [$id], 'publish' => true,
         ])->assertRedirect()->assertSessionHasNoErrors();
         $package = $product->packages()->firstOrFail();
         $this->assertSame('{{destination}}', $product->fresh()->customer_no_template);
@@ -289,7 +289,7 @@ class AdminPanelRestorationTest extends TestCase
         $id = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'restore-sku')->value('id');
         foreach (['', '{{user_id}}', '{{unknown}}{{zone_id}}', '{{user_id}}{{zone_id}'] as $template) {
             $this->post('/admin/catalog/products/'.$product->id.'/import', [
-                'item_ids' => [$id], 'margin_percent' => 10, 'publish' => true, 'customer_no_template' => $template,
+                'item_ids' => [$id], 'publish' => true, 'customer_no_template' => $template,
             ])->assertSessionHasErrors('customer_no_template');
             $this->assertSame(0, $product->packages()->count());
             $this->assertFalse($product->fresh()->is_active);
@@ -309,14 +309,14 @@ class AdminPanelRestorationTest extends TestCase
         $product->fields()->create(['field_key' => 'destination', 'label' => 'ID tujuan', 'type' => 'text', 'is_required' => true, 'sort_order' => 0]);
         $ids = DB::table('digiflazz_catalog_items')->whereIn('buyer_sku_code', ['restore-sku', 'restore-unavailable'])->pluck('id')->all();
         $this->post('/admin/catalog/products/'.$product->id.'/import', [
-            'item_ids' => $ids, 'margin_percent' => 10, 'publish' => true,
+            'item_ids' => $ids, 'publish' => true,
         ])->assertSessionHasErrors('item_ids');
         $this->assertSame(0, $product->packages()->count());
         $this->assertFalse($product->fresh()->is_active);
         $provider->forceFill(['is_active' => false])->save();
         $id = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'restore-sku')->value('id');
         $this->post('/admin/catalog/products/'.$product->id.'/import', [
-            'item_ids' => [$id], 'margin_percent' => 10, 'publish' => true,
+            'item_ids' => [$id], 'publish' => true,
         ])->assertSessionHasErrors('publish');
         $this->assertSame(0, (int) $provider->fresh()->is_active);
         $this->assertSame(0, $product->packages()->count());
@@ -339,7 +339,7 @@ class AdminPanelRestorationTest extends TestCase
         $product->fields()->create(['field_key' => 'destination', 'label' => 'ID tujuan', 'type' => 'text', 'is_required' => true, 'sort_order' => 0]);
         $ids = DB::table('digiflazz_catalog_items')->whereIn('buyer_sku_code', ['group-20-A', 'group-7-A', 'group-10-B'])->pluck('id')->all();
         $this->post('/admin/catalog/products/'.$product->id.'/import', [
-            'item_ids' => $ids, 'margin_percent' => 10, 'publish' => true,
+            'item_ids' => $ids, 'publish' => true,
         ])->assertRedirect()->assertSessionHasNoErrors();
         $packages = $product->packages()->orderBy('sort_order')->get();
         $this->assertSame([7, 10, 20], $packages->pluck('nominal_value')->map(fn ($value): int => (int) $value)->all());
@@ -382,7 +382,7 @@ class AdminPanelRestorationTest extends TestCase
         ]);
         $skuId = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'rank-expensive')->value('id');
         $this->post('/admin/catalog/products/'.$product->id.'/import', [
-            'item_ids' => [$skuId], 'margin_percent' => 10, 'publish' => true,
+            'item_ids' => [$skuId], 'publish' => true,
         ])->assertSessionHasNoErrors();
         $package = $product->packages()->sole();
         $this->assertSame(['rank-expensive'], $package->mappings()->pluck('external_sku')->all());
@@ -403,7 +403,7 @@ class AdminPanelRestorationTest extends TestCase
         $product = $this->product();
         $ids = DB::table('digiflazz_catalog_items')->whereIn('buyer_sku_code', ['plain', 'region', 'bonus'])->pluck('id')->all();
         $this->post('/admin/catalog/products/'.$product->id.'/import', [
-            'item_ids' => $ids, 'margin_percent' => 10,
+            'item_ids' => $ids,
         ])->assertSessionHasErrors('item_ids');
         $this->assertSame(0, $product->packages()->count());
     }
@@ -419,7 +419,7 @@ class AdminPanelRestorationTest extends TestCase
         $product->fields()->create(['field_key' => 'destination', 'label' => 'ID tujuan', 'type' => 'text', 'is_required' => true, 'sort_order' => 0]);
         $id = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'sync-A')->value('id');
         $this->post('/admin/catalog/products/'.$product->id.'/import', [
-            'item_ids' => [$id], 'margin_percent' => 10, 'publish' => true,
+            'item_ids' => [$id], 'publish' => true,
         ])->assertSessionHasNoErrors();
         $package = $product->packages()->firstOrFail();
         $this->assertSame(1, $package->mappings()->count());
@@ -471,7 +471,7 @@ class AdminPanelRestorationTest extends TestCase
         $product = $this->product();
         $ids = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'like', 'large-%-A')->pluck('id')->all();
         $this->post('/admin/catalog/products/'.$product->id.'/import', [
-            'item_ids' => $ids, 'margin_percent' => 10,
+            'item_ids' => $ids,
         ])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertSame(500, $product->packages()->count());
         $this->assertSame(500, ProviderMapping::whereIn('product_package_id', $product->packages()->pluck('id'))->count());
@@ -510,13 +510,13 @@ class AdminPanelRestorationTest extends TestCase
         $id = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'restore-sku')->value('id');
 
         $this->post('/admin/catalog/products/'.$product->id.'/import', [
-            'item_ids' => [$id], 'margin_percent' => 10,
+            'item_ids' => [$id],
         ])->assertSessionHasErrors('item_ids');
         $this->assertSame(0, $product->packages()->count());
 
         $product->update(['package_tabs' => ['Diamonds', 'Weekly']]);
         $this->post('/admin/catalog/products/'.$product->id.'/import', [
-            'item_ids' => [$id], 'margin_percent' => 10,
+            'item_ids' => [$id],
         ])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertSame('Weekly', $product->packages()->firstOrFail()->group_name);
     }
@@ -528,9 +528,9 @@ class AdminPanelRestorationTest extends TestCase
         app(DigiflazzCatalogService::class)->sync();
         $id = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'restore-sku')->value('id');
         $product = $this->product();
-        $this->post('/admin/catalog/products/'.$product->id.'/import', ['item_ids' => [$id], 'margin_percent' => 10])->assertSessionHasErrors('item_ids');
+        $this->post('/admin/catalog/products/'.$product->id.'/import', ['item_ids' => [$id]])->assertSessionHasErrors('item_ids');
         DB::table('digiflazz_catalog_items')->where('id', $id)->update(['seller_active' => true, 'synced_at' => now()->subDays(2)]);
-        $this->post('/admin/catalog/products/'.$product->id.'/import', ['item_ids' => [$id], 'margin_percent' => 10])->assertSessionHasErrors('item_ids');
+        $this->post('/admin/catalog/products/'.$product->id.'/import', ['item_ids' => [$id]])->assertSessionHasErrors('item_ids');
         $this->assertSame(0, $product->packages()->count());
     }
 
