@@ -43,6 +43,8 @@ class CheckoutPricing
                 'packages.sell_markup_percent as package_sell_markup_percent',
                 'packages.margin_fixed_idr', 'packages.sell_price_idr',
                 'packages.legacy_voucher_sell_price_idr',
+                'packages.digiflazz_markup_mode', 'packages.digiflazz_markup_percent',
+                'packages.digiflazz_markup_fixed_idr',
                 'products.id as product_id',
                 'products.name as product_name',
                 'products.slug as product_slug',
@@ -154,6 +156,8 @@ class CheckoutPricing
                 'packages.sell_markup_percent as package_sell_markup_percent',
                 'packages.margin_fixed_idr', 'packages.sell_price_idr',
                 'packages.legacy_voucher_sell_price_idr',
+                'packages.digiflazz_markup_mode', 'packages.digiflazz_markup_percent',
+                'packages.digiflazz_markup_fixed_idr',
                 'products.id as product_id',
                 'products.name as product_name',
                 'products.slug as product_slug',
@@ -283,9 +287,12 @@ class CheckoutPricing
             // Digiflazz: markup is owned by each nominal, never by the product.
             // SELL_PRICE and PRODUCT_MARGIN legacy packages are backfilled in
             // the forward migration before this code is deployed.
-            $margin = $context->pricing_mode === 'FIXED'
-                ? (int) $context->margin_fixed_idr
-                : $this->margin($cost, (string) ($context->package_margin_percent ?? '12'));
+            $digiflazzMode = $context->digiflazz_markup_mode ?? $context->pricing_mode;
+            $margin = $digiflazzMode === 'FIXED'
+                ? (int) ($context->digiflazz_markup_mode !== null
+                    ? $context->digiflazz_markup_fixed_idr : $context->margin_fixed_idr)
+                : $this->margin($cost, (string) ($context->digiflazz_markup_mode !== null
+                    ? $context->digiflazz_markup_percent : ($context->package_margin_percent ?? '12')));
         } else {
             $cost = (int) ($mapping->store_cost_idr ?? $mapping->cost_idr);
 
@@ -329,7 +336,9 @@ class CheckoutPricing
             'category_name' => $context->category_name,
             'fulfillment_mode' => $context->fulfillment_mode,
             'margin_percent' => (string) ($mapping->provider_code === 'DIGIFLAZZ'
-                ? ($context->pricing_mode === 'FIXED' ? '0' : ($context->package_margin_percent ?? '12'))
+                ? (($context->digiflazz_markup_mode ?? $context->pricing_mode) === 'FIXED' ? '0'
+                    : ($context->digiflazz_markup_mode !== null
+                        ? $context->digiflazz_markup_percent : ($context->package_margin_percent ?? '12')))
                 : ($context->package_margin_percent ?? $this->globalSellMarkupPercent())),
             'package_id' => (int) $context->package_id,
             'package_code' => $context->package_code,
