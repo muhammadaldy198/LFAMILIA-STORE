@@ -17,6 +17,7 @@ use App\Services\CatalogNominalOrder;
 use App\Services\CatalogPricingSettings;
 use App\Services\CheckoutPricing;
 use App\Services\DigiflazzCatalogService;
+use App\Services\DigiflazzPriceOwnership;
 use App\Services\VoucherStockService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -31,7 +32,7 @@ use Inertia\Response;
 class AdminCatalogController
 {
     // Dipakai halaman Produk: data per halaman dari server, bukan disaring di browser.
-    private function productRow(Product $product, $providers, array $stockCounts, array $buyablePackageIds): array
+    private function productRow(Product $product, $providers, array $stockCounts, array $buyablePackageIds, array $priceOwners): array
     {
         $activePackages = $product->packages->where('is_active', true);
         $buyableCount = $activePackages->filter(
@@ -72,6 +73,7 @@ class AdminCatalogController
                 ['sort_order', 'asc'], ['nominal_value', 'asc'],
             ])->values()->map(fn (ProductPackage $package): array => [
                 ...$package->only('id', 'code', 'name', 'note', 'group_name', 'nominal_value', 'sort_order', 'is_active', 'pricing_mode', 'margin_percent', 'margin_fixed_idr', 'sell_price_idr', 'sell_markup_percent', 'cost_uplift_percent'),
+                'is_digiflazz_pricing' => $priceOwners[(int) $package->id] ?? false,
                 'image_url' => $package->getFirstMediaUrl('image'),
                 'mappings' => $package->mappings->map(fn (ProviderMapping $mapping): array => [
                     ...$mapping->only('id', 'provider_id', 'external_sku', 'cost_idr',
@@ -146,10 +148,19 @@ class AdminCatalogController
         $providers = Provider::all(['id', 'code', 'display_name', 'is_active'])->keyBy('id');
         $digiflazzProviderId = $providers->firstWhere('code', 'DIGIFLAZZ')?->id;
         $stockCounts = app(VoucherStockService::class)->counts();
-        $checkoutPreviews = collect(app(CheckoutPricing::class)
-            ->forPackages(ProductPackage::query()->pluck('id')->map(fn ($id): int => (int) $id)->all(), true))
-            ->map(fn (array $quote): int => (int) $quote['subtotal_idr'])
-            ->all();
+        $previewQuotes = app(CheckoutPricing::class)
+            ->forPackages(ProductPackage::query()->pluck('id')->map(fn ($id): int => (int) $id)->all(), true);
+        $checkoutPreviews = collect($previewQuotes)
+            ->map(fn (array $quote): int => (int) $quote['subtotal_idr'])->all();
+        $priceOwnership = app(DigiflazzPriceOwnership::class);
+        $priceOwners = [];
+        foreach ($products->getCollection() as $rowProduct) {
+            foreach ($rowProduct->packages as $rowPackage) {
+                $priceOwners[(int) $rowPackage->id] = $priceOwnership->usesDigiflazz(
+                    $rowPackage, $previewQuotes[(int) $rowPackage->id] ?? null
+                );
+            }
+        }
 
         return Inertia::render('Admin/Catalog', [
             'checkoutPreviews' => $checkoutPreviews,
@@ -181,7 +192,7 @@ class AdminCatalogController
                 'tab' => $filters['tab'] ?? 'auto', 'q' => $filters['q'] ?? '', 'category' => $filters['category'] ?? '',
                 'status' => $filters['status'] ?? '', 'sort' => $filters['sort'] ?? 'name', 'per_page' => (int) ($filters['per_page'] ?? 25),
             ],
-            'products' => $products->getCollection()->map(fn (Product $product): array => $this->productRow($product, $providers, $stockCounts, $buyablePackageIds))->all(),
+            'products' => $products->getCollection()->map(fn (Product $product): array => $this->productRow($product, $providers, $stockCounts, $buyablePackageIds, $priceOwners))->all(),
             'productPage' => [
                 'current_page' => $products->currentPage(),
                 'last_page' => $products->lastPage(),
@@ -905,9 +916,10 @@ class AdminCatalogController
 
         $highestActiveCost = $package->mappings()->where('is_active', true)
             ->selectRaw('MAX(COALESCE(store_cost_idr, cost_idr)) as aggregate')->value('aggregate');
-        $hasDigiflazzSource = $package->mappings()
-            ->where('provider_id', Provider::where('code', 'DIGIFLAZZ')->value('id'))
-            ->exists();
+        $effectiveQuote = app(CheckoutPricing::class)->forPackages([(int) $package->id], true);
+        $hasDigiflazzSource = app(DigiflazzPriceOwnership::class)->usesDigiflazz(
+            $package, $effectiveQuote[(int) $package->id] ?? null
+        );
         $changesDigiflazzPrice = array_key_exists('pricing_mode', $data)
             || array_key_exists('margin_percent', $data)
             || array_key_exists('margin_fixed_idr', $data)
