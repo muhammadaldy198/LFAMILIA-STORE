@@ -87,6 +87,16 @@ class DigiflazzAutoSources
                 $package = $matchingPackage;
             }
         }
+        // Importing a draft Digiflazz SKU must never reprice a nominal that
+        // currently sells voucher stock. Require a separate nominal (or an
+        // explicit source migration) rather than changing its price fields.
+        if ($package !== null && $package->mappings()
+            ->where('provider_id', Provider::where('code', 'VOUCHER_STOCK')->value('id'))
+            ->where('is_active', true)->exists()) {
+            throw ValidationException::withMessages([
+                'item_ids' => 'Nominal ini masih memiliki sumber voucher lokal aktif. Pisahkan nominal terlebih dahulu sebelum memasang SKU Digiflazz.',
+            ]);
+        }
         if ($package !== null && $package->mappings()
             ->where('provider_id', $provider->id)
             ->where('external_sku', '<>', $first->buyer_sku_code)
