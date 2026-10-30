@@ -1192,6 +1192,23 @@ class AdminCatalogController
             $audit,
             &$result
         ): void {
+            // Keep the Digiflazz rule when a formerly Digiflazz-only nominal
+            // gains voucher stock. Otherwise later voucher price edits would
+            // silently change Digiflazz's selling price on stock exhaustion.
+            $lockedPackage = ProductPackage::whereKey($package->id)->lockForUpdate()->firstOrFail();
+            if ($lockedPackage->digiflazz_markup_mode === null
+                && $lockedPackage->mappings()->where('provider_id', Provider::where('code', 'DIGIFLAZZ')->value('id'))->exists()) {
+                $packageBefore = $lockedPackage->toArray();
+                $fixed = $lockedPackage->pricing_mode === 'FIXED';
+                $lockedPackage->forceFill([
+                    'digiflazz_markup_mode' => $fixed ? 'FIXED' : 'PERCENT',
+                    'digiflazz_markup_percent' => $fixed ? null : ($lockedPackage->margin_percent ?? 12),
+                    'digiflazz_markup_fixed_idr' => $fixed ? $lockedPackage->margin_fixed_idr : null,
+                ])->save();
+                $audit->record($request, 'catalog.package.updated', 'product_package',
+                    $lockedPackage->id, $packageBefore, $lockedPackage->toArray());
+            }
+
             $mapping = ProviderMapping::firstOrNew([
                 'product_package_id' => $package->id,
                 'provider_id' => $provider->id,
