@@ -153,8 +153,9 @@ class AdminCatalogController
         return Inertia::render('Admin/Catalog', [
             'checkoutPreviews' => $checkoutPreviews,
             'autoProductOptions' => Product::where('fulfillment_mode', 'AUTO_PROVIDER')
-                ->orderBy('name')->get(['id', 'name', 'margin_percent', 'price_markup_type', 'price_markup_fixed_idr'])
-                ->map(fn (Product $product): array => $product->only('id', 'name', 'margin_percent', 'price_markup_type', 'price_markup_fixed_idr')),
+                ->get(['id', 'name', 'margin_percent', 'price_markup_type', 'price_markup_fixed_idr'])
+                ->sort(fn (Product $a, Product $b): int => strnatcasecmp($a->name, $b->name) ?: ($a->id <=> $b->id))
+                ->values()->map(fn (Product $product): array => $product->only('id', 'name', 'margin_percent', 'price_markup_type', 'price_markup_fixed_idr')),
             'categories' => Category::with('media')->orderBy('sort_order')->get()->map(fn (Category $category): array => [
                 ...$category->only('id', 'name', 'slug', 'icon', 'sort_order', 'is_active'),
                 'image_url' => $category->getFirstMediaUrl('image'),
