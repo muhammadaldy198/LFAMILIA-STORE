@@ -313,7 +313,10 @@ test('round-two admin fixes keep their UI entry points', () => {
     assert.match(catalog, /manual_instructions/);
     assert.match(catalog, /price_markup_type/);
     assert.match(catalog, /price_markup_fixed_idr/);
-    assert.doesNotMatch(catalog, /\/admin\/catalog\/pricing/);
+    // Global pricing remains available only for manual and voucher markup.
+    assert.match(catalog, /\/admin\/catalog\/pricing/);
+    assert.match(catalog, /Markup Manual \/ Voucher/);
+    assert.match(catalog, /Produk Digiflazz memakai markup produk masing-masing/);
     assert.doesNotMatch(catalog, /margin\/preview|Margin global|catalog\/margin/);
     assert.match(catalog, /\/packages\/\$\{row\.id\}\/duplicate/);
     assert.match(catalog, /\/voucher-stock/);
