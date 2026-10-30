@@ -15,7 +15,7 @@ class DigiflazzSellerMarkupTest extends TestCase
 {
     use DatabaseTransactions;
 
-    public function test_digiflazz_uses_current_seller_price_and_product_markup_not_legacy_cost_or_fixed_price(): void
+    public function test_digiflazz_uses_current_seller_price_and_nominal_markup_not_legacy_cost_or_fixed_price(): void
     {
         $category = Category::where('slug', 'game')->firstOrFail();
         $category->update(['is_active' => true]);
@@ -36,7 +36,8 @@ class DigiflazzSellerMarkupTest extends TestCase
         $package = $product->packages()->create([
             'code' => 'SELLER'.$suffix,
             'name' => 'Nama Nominal Toko',
-            'pricing_mode' => 'SELL_PRICE',
+            'pricing_mode' => 'PERCENT',
+            'margin_percent' => 12,
             'sell_price_idr' => 9000,
             'is_active' => true,
         ]);
@@ -60,7 +61,7 @@ class DigiflazzSellerMarkupTest extends TestCase
         $this->assertSame(13440, $quote['subtotal_idr']);
         $this->assertSame(12000, $quote['max_price_idr']);
 
-        $product->update(['price_markup_type' => 'FIXED', 'price_markup_fixed_idr' => 1500]);
+        $package->update(['pricing_mode' => 'FIXED', 'margin_fixed_idr' => 1500, 'margin_percent' => null]);
         DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'SELLER-'.$suffix)
             ->update(['price_idr' => 13000, 'synced_at' => now()]);
         $quote = app(CheckoutPricing::class)->forPackage($package->id);
@@ -69,5 +70,31 @@ class DigiflazzSellerMarkupTest extends TestCase
         $this->assertSame(14500, $quote['subtotal_idr']);
         $this->assertSame('Nama Toko Tetap '.$suffix, $product->fresh()->name);
         $this->assertSame('Nama Nominal Toko', $package->fresh()->name);
+
+        // A second nominal of the SAME product can have a different price rule.
+        $otherPackage = $product->packages()->create([
+            'code' => 'SELLER-OTHER'.$suffix,
+            'name' => 'Nominal Kedua',
+            'pricing_mode' => 'PERCENT',
+            'margin_percent' => 6,
+            'is_active' => true,
+        ]);
+        ProviderMapping::create([
+            'product_package_id' => $otherPackage->id,
+            'provider_id' => $provider->id,
+            'external_sku' => 'SELLER-OTHER-'.$suffix,
+            'cost_idr' => 10000,
+            'store_cost_idr' => 10000,
+            'max_price_idr' => 10000,
+            'is_manual_price' => false,
+            'is_active' => true,
+        ]);
+        $this->seedCheckoutDigiflazzCatalog($otherPackage->id);
+        DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'SELLER-OTHER-'.$suffix)
+            ->update(['price_idr' => 10000, 'synced_at' => now()]);
+        $otherQuote = app(CheckoutPricing::class)->forPackage($otherPackage->id);
+        $this->assertSame(600, $otherQuote['margin_idr']);
+        $this->assertSame(10600, $otherQuote['subtotal_idr']);
+        $this->assertSame(14500, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
     }
 }
