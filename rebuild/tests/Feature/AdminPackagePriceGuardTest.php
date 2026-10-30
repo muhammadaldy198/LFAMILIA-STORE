@@ -106,6 +106,26 @@ class AdminPackagePriceGuardTest extends TestCase
         $this->assertSame(20000, (int) $package->fresh()->sell_price_idr);
     }
 
+    public function test_historical_inactive_digiflazz_does_not_block_active_voucher_fixed_price_edit(): void
+    {
+        [$admin, $package] = $this->packageWithMappings();
+        $this->actingAs($admin, 'admin');
+        ProviderMapping::create([
+            'product_package_id' => $package->id,
+            'provider_id' => DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id'),
+            'external_sku' => 'HIST-DG-'.bin2hex(random_bytes(4)),
+            'cost_idr' => 10000, 'store_cost_idr' => 10000,
+            'is_active' => false, 'priority' => 0,
+        ]);
+
+        $this->put('/admin/catalog/packages/'.$package->id, $this->updatePayload([
+            'sell_price_idr' => 18000,
+        ]))->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertSame('SELL_PRICE', $package->fresh()->pricing_mode);
+        $this->assertSame(18000, (int) $package->fresh()->sell_price_idr);
+    }
+
     public function test_active_mapping_cost_still_blocks_price_below_cost(): void
     {
         [$admin, $package] = $this->packageWithMappings();
