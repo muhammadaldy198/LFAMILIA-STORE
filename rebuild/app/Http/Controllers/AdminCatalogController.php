@@ -20,6 +20,7 @@ use App\Services\DigiflazzCatalogService;
 use App\Services\VoucherStockService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -111,10 +112,26 @@ class AdminCatalogController
             ->when($filters['category'] ?? null, fn ($query, $id) => $query->where('category_id', (int) $id))
             ->when(($filters['status'] ?? '') === 'active', fn ($query) => $query->where('is_active', true))
             ->when(($filters['status'] ?? '') === 'inactive', fn ($query) => $query->where('is_active', false));
-        ($filters['sort'] ?? 'order') === 'name'
-            ? $products->orderBy('name')
-            : $products->orderBy('sort_order')->orderBy('name');
-        $products = $products->paginate((int) ($filters['per_page'] ?? 25), ['*'], 'page', (int) ($filters['page'] ?? 1))->withQueryString();
+        $perPage = (int) ($filters['per_page'] ?? 25);
+        $currentPage = (int) ($filters['page'] ?? 1);
+        if (($filters['sort'] ?? 'name') === 'name') {
+            // Sort natural BEFORE paging: Product 5 must precede Product 20 and Product 1100.
+            // Only retrieve ID + name for the full set; load heavyweight relations for one page.
+            $orderedIds = (clone $products)->reorder()->get(['id', 'name'])
+                ->sort(fn (Product $a, Product $b): int => strnatcasecmp($a->name, $b->name)
+                    ?: ($a->id <=> $b->id))->pluck('id')->values();
+            $pageIds = $orderedIds->forPage($currentPage, $perPage)->all();
+            $positions = array_flip($pageIds);
+            $pageProducts = Product::with(['category', 'media', 'packages.mappings', 'fields', 'notices'])
+                ->whereIn('id', $pageIds)->get()
+                ->sortBy(fn (Product $row): int => $positions[$row->id])->values();
+            $products = new LengthAwarePaginator($pageProducts, $orderedIds->count(), $perPage, $currentPage, [
+                'path' => $request->url(), 'query' => $request->query(),
+            ]);
+        } else {
+            $products = $products->orderBy('sort_order')->orderBy('name')->orderBy('id')
+                ->paginate($perPage, ['*'], 'page', $currentPage)->withQueryString();
+        }
 
         // Status toko memakai rule checkout yang sama, hanya untuk nominal pada halaman ini.
         // Pratinjau admin di bawah tetap boleh membaca nominal nonaktif.
@@ -149,7 +166,7 @@ class AdminCatalogController
                 ->get(['id', 'name', 'code', 'requires_server', 'requires_region_check']),
             'productFilters' => [
                 'tab' => $filters['tab'] ?? 'auto', 'q' => $filters['q'] ?? '', 'category' => $filters['category'] ?? '',
-                'status' => $filters['status'] ?? '', 'sort' => $filters['sort'] ?? 'order', 'per_page' => (int) ($filters['per_page'] ?? 25),
+                'status' => $filters['status'] ?? '', 'sort' => $filters['sort'] ?? 'name', 'per_page' => (int) ($filters['per_page'] ?? 25),
             ],
             'products' => $products->getCollection()->map(fn (Product $product): array => $this->productRow($product, $providers, $stockCounts, $buyablePackageIds))->all(),
             'productPage' => [
