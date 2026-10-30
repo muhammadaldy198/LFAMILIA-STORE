@@ -908,7 +908,11 @@ class AdminCatalogController
         $hasDigiflazzSource = $package->mappings()
             ->where('provider_id', Provider::where('code', 'DIGIFLAZZ')->value('id'))
             ->exists();
-        if ($hasDigiflazzSource) {
+        $changesDigiflazzPrice = array_key_exists('pricing_mode', $data)
+            || array_key_exists('margin_percent', $data)
+            || array_key_exists('margin_fixed_idr', $data)
+            || isset($data['sell_price_idr']) || isset($data['sell_markup_percent']);
+        if ($hasDigiflazzSource && $changesDigiflazzPrice) {
             $effectiveMode = $data['pricing_mode'] ?? $package->pricing_mode;
             if (! in_array($effectiveMode, ['PERCENT', 'FIXED'], true)) {
                 throw ValidationException::withMessages([
