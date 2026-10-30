@@ -93,9 +93,14 @@ class CustomerOrderController
             && $routing->gatewayCodeForRoute((int) $record->payment_route_id) === 'WALLET'
             && (! $request->user() || (int) $request->user()->id !== (int) $record->user_id)) {
             if ($request->user()) {
-                Auth::logout();
-                $request->session()->invalidate();
-                $request->session()->regenerateToken();
+                Auth::guard('web')->logout();
+                $request->session()->forget([
+                    'security.customer_auth_fingerprint',
+                    'auth.password_confirmed_at',
+                    'auth.google_phone_onboarding_at',
+                    'auth.google_phone_onboarding_user_id',
+                ]);
+                $request->session()->regenerate(true);
 
                 return redirect()->guest(route('login'))->with(
                     'status',
