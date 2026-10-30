@@ -59,6 +59,8 @@ class AdminPromotionRestorationTest extends TestCase
             'code' => 'PROMO'.bin2hex(random_bytes(3)),
             'name' => '100 Diamonds',
             'nominal_value' => 100,
+            // Explicit nominal markup: fixtures must not inherit a game price.
+            'pricing_mode' => 'PERCENT', 'margin_percent' => 10,
             'is_active' => true,
         ]);
         DB::table('provider_mappings')->insert([
