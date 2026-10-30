@@ -420,7 +420,12 @@ test('import displays selected product markup without overwriting product names'
     assert.match(catalog, /nama produk dan nama nominal lama tetap milik toko/i);
     assert.match(catalog, /seller Digiflazz/i);
     assert.doesNotMatch(catalog, /importUplift|importMargin/);
-    assert.doesNotMatch(catalog, /cost_uplift_percent: Number\(/);
+    const importSubmit = catalog.split('const submitImport = () => {')[1]?.split('\n};')[0];
+    assert.ok(importSubmit, 'SKU import submission must exist');
+    assert.doesNotMatch(importSubmit, /cost_uplift_percent|sell_markup_percent|margin_percent/);
+    // The separate global settings form must remain available for local
+    // voucher and manual PRODUCT_MARGIN pricing.
+    assert.match(catalog, /cost_uplift_percent: Number\(/);
 });
 
 // Tab Sumber hanya bisa mengubah modal sumber manual; harga seller
