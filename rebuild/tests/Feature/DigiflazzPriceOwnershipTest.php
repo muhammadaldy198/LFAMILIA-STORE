@@ -68,6 +68,7 @@ class DigiflazzPriceOwnershipTest extends TestCase
         $voucher->update(['is_active' => false]);
         $this->assertTrue($owner->usesDigiflazz($package), 'Unmapped/draft Digiflazz nominal can retain its markup');
     }
+
     public function test_migrated_sell_price_voucher_cap_prevents_checkout_source_switch(): void
     {
         DB::table('providers')->whereIn('code', ['DIGIFLAZZ', 'VOUCHER_STOCK'])->update(['is_active' => true]);
