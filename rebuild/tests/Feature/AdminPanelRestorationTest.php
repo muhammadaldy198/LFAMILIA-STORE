@@ -14,7 +14,6 @@ use App\Services\CatalogPricingSettings;
 use App\Services\CheckoutPricing;
 use App\Services\CustomerCleanupService;
 use App\Services\DigiflazzCatalogService;
-use App\Services\DigiflazzFixedPricePolicy;
 use App\Services\FulfillmentService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\Client\Factory;
