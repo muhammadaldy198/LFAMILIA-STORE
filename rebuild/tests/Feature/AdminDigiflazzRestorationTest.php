@@ -62,6 +62,7 @@ class AdminDigiflazzRestorationTest extends TestCase
             'product_id' => $product->id,
             'code' => strtoupper(substr(hash('sha256', $sku), 0, 12)),
             'name' => 'Nominal '.$sku,
+            'pricing_mode' => 'PERCENT', 'margin_percent' => 10,
             'sort_order' => 0,
             'is_active' => true,
         ]);
@@ -1274,10 +1275,10 @@ class AdminDigiflazzRestorationTest extends TestCase
 
         $package = $product->packages()->firstOrFail();
         $mapping = $package->mappings()->firstOrFail();
-        // Impor hanya menyimpan harga seller, sementara produk menyimpan markup.
+        // Impor menyimpan harga seller dan setiap nominal memiliki markup default 12%.
         $this->assertSame(10000, (int) $mapping->store_cost_idr);
         $this->assertSame(10000, (int) $mapping->max_price_idr);
-        $this->assertSame('PRODUCT_MARGIN', $package->fresh()->pricing_mode);
+        $this->assertSame('PERCENT', $package->fresh()->pricing_mode);
         $this->assertSame(10, (int) $product->fresh()->margin_percent);
         $this->assertNull($product->fresh()->sell_markup_percent);
     }
@@ -1301,16 +1302,16 @@ class AdminDigiflazzRestorationTest extends TestCase
 
         $mapping = $product->packages()->firstOrFail()->mappings()->firstOrFail();
         $package = $product->packages()->firstOrFail();
-        // Harga seller 10.000 + markup produk 10% = 11.000.
+        // Harga seller 10.000 + markup nominal bawaan 12% = 11.200.
         $this->assertSame(10000, (int) $mapping->store_cost_idr);
-        $this->assertSame('PRODUCT_MARGIN', $package->pricing_mode);
+        $this->assertSame('PERCENT', $package->pricing_mode);
         $this->assertSame(10, (int) $product->margin_percent);
         // Harga yang benar-benar ditagih dihitung dari modal × margin nominal.
         Category::where('slug', 'game')->update(['is_active' => true]);
         Provider::where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
         $package->update(['is_active' => true]);
         $package->mappings()->update(['is_active' => true]);
-        $this->assertSame(11000, (int) app(CheckoutPricing::class)->previewForPackage($package->id)['subtotal_idr']);
+        $this->assertSame(11200, (int) app(CheckoutPricing::class)->previewForPackage($package->id)['subtotal_idr']);
     }
 
     public function test_import_honours_a_different_cost_column_for_every_selected_sku(): void
@@ -1338,7 +1339,7 @@ class AdminDigiflazzRestorationTest extends TestCase
         Provider::where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
         $package->update(['is_active' => true]);
         $package->mappings()->update(['is_active' => true]);
-        $this->assertSame(22000, (int) app(CheckoutPricing::class)->previewForPackage($package->id)['subtotal_idr']);
+        $this->assertSame(22400, (int) app(CheckoutPricing::class)->previewForPackage($package->id)['subtotal_idr']);
     }
 
     public function test_full_sync_never_touches_manual_or_voucher_sources(): void
