@@ -117,7 +117,7 @@ class AdminCatalogController
         if (($filters['sort'] ?? 'name') === 'name') {
             // Sort natural BEFORE paging: Product 5 must precede Product 20 and Product 1100.
             // Only retrieve ID + name for the full set; load heavyweight relations for one page.
-            $orderedIds = (clone $products)->reorder()->get(['id', 'name'])
+            $orderedIds = (clone $products)->withoutEagerLoads()->reorder()->get(['id', 'name'])
                 ->sort(fn (Product $a, Product $b): int => strnatcasecmp($a->name, $b->name)
                     ?: ($a->id <=> $b->id))->pluck('id')->values();
             $pageIds = $orderedIds->forPage($currentPage, $perPage)->all();
