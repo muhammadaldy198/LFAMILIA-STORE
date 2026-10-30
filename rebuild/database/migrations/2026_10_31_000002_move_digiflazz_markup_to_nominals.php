@@ -17,11 +17,22 @@ return new class extends Migration
 
         DB::table('product_packages as packages')
             ->join('products', 'products.id', '=', 'packages.product_id')
+            ->where('products.fulfillment_mode', 'AUTO_PROVIDER')
             ->whereExists(function ($query) use ($providerId): void {
                 $query->selectRaw('1')
                     ->from('provider_mappings as mappings')
                     ->whereColumn('mappings.product_package_id', 'packages.id')
                     ->where('mappings.provider_id', $providerId);
+            })
+            // A local voucher can be the actual checkout source while keeping
+            // an old, inactive Digiflazz mapping. Preserve voucher pricing.
+            ->whereNotExists(function ($query): void {
+                $query->selectRaw('1')
+                    ->from('provider_mappings as local_mappings')
+                    ->join('providers as local_providers', 'local_providers.id', '=', 'local_mappings.provider_id')
+                    ->whereColumn('local_mappings.product_package_id', 'packages.id')
+                    ->where('local_mappings.is_active', true)
+                    ->where('local_providers.code', 'VOUCHER_STOCK');
             })
             ->select(
                 'packages.id',
