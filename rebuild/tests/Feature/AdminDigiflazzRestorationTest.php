@@ -356,6 +356,40 @@ class AdminDigiflazzRestorationTest extends TestCase
         $this->assertSame(12.0, (float) $catalog['product']->fresh()->margin_percent);
     }
 
+    public function test_editing_digiflazz_nominal_uses_fixed_increment_and_rejects_null_partial_markup(): void
+    {
+        $this->login();
+        $catalog = $this->mappedItem('nominal-increment');
+        $catalog['product']->category->update(['is_active' => true]);
+        $package = $catalog['package'];
+        $url = '/admin/catalog/packages/'.$package->id;
+        $metadata = [
+            'code' => $package->code, 'name' => $package->name,
+            'sort_order' => 0, 'is_active' => true,
+        ];
+
+        $this->put($url, [
+            ...$metadata,
+            'pricing_mode' => 'FIXED',
+            'margin_fixed_idr' => 2000,
+            'margin_percent' => null,
+            'sell_price_idr' => null,
+            'sell_markup_percent' => null,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertSame(12000, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
+        $this->put($url, [...$metadata, 'name' => 'Label baru'])
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame(2000, (int) $package->fresh()->margin_fixed_idr);
+
+        $this->put($url, [...$metadata, 'margin_fixed_idr' => null])
+            ->assertSessionHasErrors('margin_fixed_idr');
+        $this->assertSame(12000, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
+
+        $this->put($url, [...$metadata, 'pricing_mode' => 'SELL_PRICE', 'sell_price_idr' => 5000])
+            ->assertSessionHasErrors('pricing_mode');
+    }
+
     public function test_admin_can_sell_at_six_percent_margin_without_hidden_eight_percent_cutoff(): void
     {
         $this->login();
