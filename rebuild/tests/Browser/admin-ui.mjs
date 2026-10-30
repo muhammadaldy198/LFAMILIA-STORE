@@ -157,7 +157,7 @@ try {
                         const tr = [...document.querySelectorAll('[role=dialog] tbody tr')].find(r => r.querySelector('input[type=checkbox]'));
                         if (!tr) return null;
                         const cells = [...tr.cells].map(c => c.innerText.trim());
-                        // Kolom: SKU, harga seller, harga jual dari markup produk.
+                        // Kolom: SKU, harga seller, harga jual default nominal baru 12%.
                         return { sku: cells[2], seller: cells[3], sell: cells[4] };
                     })()`);
                     if (!row) throw Error('Import picker has no available SKU to import');
@@ -188,14 +188,14 @@ try {
     if (imported) {
         await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
         await navigate('/admin/catalog');
-        // Only the seller SKU is imported: original product markup owns price.
+        // Each imported SKU carries a separate nominal markup.
         const stored = await evaluate(`JSON.parse(document.getElementById('app').dataset.page).props.products
             .flatMap(p => (p.packages || []).map(k => ({
                 sku: (k.mappings || []).map(m => m.external_sku).join(','),
                 cost: Number((k.mappings || [])[0]?.cost_idr ?? 0),
-                type: p.price_markup_type || 'PERCENT',
-                percent: Number(p.margin_percent || 0),
-                fixed: Number(p.price_markup_fixed_idr || 0),
+                type: k.pricing_mode,
+                percent: Number(k.margin_percent || 0),
+                fixed: Number(k.margin_fixed_idr || 0),
                 active: k.is_active,
             })))
             .filter(k => k.sku === ${JSON.stringify(importedSku)})`);
@@ -205,10 +205,10 @@ try {
             ? nominal.cost + nominal.fixed
             : nominal.cost + Math.ceil(nominal.cost * nominal.percent / 100);
         if (String(nominal.cost) !== importedCost || String(expectedSell) !== importedPrice) {
-            throw Error('Seller price + product markup does not match import preview: '
+            throw Error('Seller price + nominal markup does not match import preview: '
                 + JSON.stringify({ stored, importedCost, importedPrice }));
         }
-        console.log('PASS imported SKU stored with seller price and product markup');
+        console.log('PASS imported SKU stored with seller price and nominal markup');
     }
     console.log('Admin UI smoke passed (' + paths.length + ' menu + ' + detailPaths.length + ' detail, ' + sizes.length + ' viewports).');
 } finally {
