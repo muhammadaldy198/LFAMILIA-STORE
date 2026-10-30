@@ -304,6 +304,22 @@ const move = (index, direction) => {
     router.put(`/admin/catalog/products/${product.value.id}/packages/reorder`, { ids: list.map(row => row.id) }, { preserveScroll: true });
 };
 
+const nominalNumber = row => {
+    if (row.nominal_value !== null && row.nominal_value !== undefined && row.nominal_value !== '') return Number(row.nominal_value);
+    const match = String(row.name || '').match(/\d+(?:[.,]\d{3})*/u);
+    return match ? Number(match[0].replace(/[.,]/g, '')) : Number.MAX_SAFE_INTEGER;
+};
+const sortNominalsNaturally = () => {
+    if (!product.value?.packages?.length) return;
+    const collator = new Intl.Collator('id-ID', { numeric: true, sensitivity: 'base' });
+    const list = [...product.value.packages].sort((a, b) => nominalNumber(a) - nominalNumber(b)
+        || collator.compare(a.name || '', b.name || '')
+        || collator.compare(a.group_name || '', b.group_name || '')
+        || Number(a.id) - Number(b.id));
+    product.value.packages = list;
+    router.put('/admin/catalog/products/' + product.value.id + '/packages/reorder',
+        { ids: list.map(row => row.id) }, { preserveScroll: true });
+};
 const costOf = (row) => {
     const mapping = (row.mappings || [])[0];
     return mapping ? Number(mapping.store_cost_idr ?? mapping.cost_idr ?? 0) : null;
@@ -879,8 +895,11 @@ onMounted(() => {
 
             <div v-if="editTab === 'price'" style="padding-top:12px">
                 <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:8px">
-                    <p class="adm-note">Geser baris untuk mengubah urutan tampil. Harga SKU Digiflazz mengikuti seller; tambahan harga diatur pada Informasi Produk.</p>
-                    <button type="button" class="adm-btn primary sm" @click="openNominal()">Tambah nominal</button>
+                    <p class="adm-note">Urutan angka dari kecil ke besar. Bisa tetap diubah manual dengan geser atau panah.</p>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap">
+                        <button type="button" class="adm-btn sm" :disabled="!product?.packages?.length" @click="sortNominalsNaturally">Urutkan nominal otomatis (angka / A–Z)</button>
+                        <button type="button" class="adm-btn primary sm" @click="openNominal()">Tambah nominal</button>
+                    </div>
                 </div>
                 <div class="adm-scroll">
                     <table class="adm-table">
