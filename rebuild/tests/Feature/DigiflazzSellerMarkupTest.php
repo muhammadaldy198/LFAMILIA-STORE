@@ -20,7 +20,7 @@ class DigiflazzSellerMarkupTest extends TestCase
         $category = Category::where('slug', 'game')->firstOrFail();
         $category->update(['is_active' => true]);
         $provider = Provider::where('code', 'DIGIFLAZZ')->firstOrFail();
-        $provider->update(['is_active' => true]);
+        $provider->forceFill(['is_active' => true])->save();
         $suffix = bin2hex(random_bytes(4));
 
         $product = Product::create([
