@@ -509,22 +509,85 @@ const saveStock = () => {
 const importOpen = ref(false);
 const importBusy = ref(false);
 const importErrors = ref({});
+const importInfo = ref('');
 const importProductId = ref('');
+const importCategory = ref('');
 const importBrand = ref('');
+const importType = ref('');
 const importSearch = ref('');
 const importPicked = ref([]);
 const importPublish = ref(true);
+const importPage = ref(1);
+const IMPORT_PER_PAGE = 50;
+const importCollator = new Intl.Collator('id-ID', { numeric: true, sensitivity: 'base' });
 
 const autoProducts = computed(() => props.autoProductOptions);
 const importProduct = computed(() => props.products.find(row => Number(row.id) === Number(importProductId.value))
     || props.autoProductOptions.find(row => Number(row.id) === Number(importProductId.value)) || null);
-const importBrands = computed(() => [...new Set(props.digiflazzItems.map(row => row.brand))].sort((a, b) => a.localeCompare(b, 'id-ID')));
-const importRows = computed(() => props.digiflazzItems.filter(row => {
-    if (row.mapped || !row.available) return false;
-    if (importBrand.value && row.brand !== importBrand.value) return false;
-    const term = importSearch.value.trim().toLowerCase();
-    return !term || `${row.product_name} ${row.buyer_sku_code}`.toLowerCase().includes(term);
-}).slice(0, 60));
+const importAvailable = computed(() => props.digiflazzItems.filter(row => !row.mapped && row.available));
+const importCategories = computed(() => [...new Set(importAvailable.value.map(row => row.category).filter(Boolean))].sort(importCollator.compare));
+const importBrands = computed(() => [...new Set(importAvailable.value
+    .filter(row => !importCategory.value || row.category === importCategory.value)
+    .map(row => row.brand).filter(Boolean))].sort(importCollator.compare));
+const importTypes = computed(() => [...new Set(importAvailable.value
+    .filter(row => (!importCategory.value || row.category === importCategory.value)
+        && (!importBrand.value || row.brand === importBrand.value))
+    .map(row => row.type).filter(Boolean))].sort(importCollator.compare));
+const importMatches = computed(() => {
+    const term = importSearch.value.trim().toLocaleLowerCase('id-ID');
+    return importAvailable.value.filter(row => {
+        if (importCategory.value && row.category !== importCategory.value) return false;
+        if (importBrand.value && row.brand !== importBrand.value) return false;
+        if (importType.value && row.type !== importType.value) return false;
+        return !term || [row.product_name, row.buyer_sku_code, row.brand, row.type]
+            .some(value => String(value || '').toLocaleLowerCase('id-ID').includes(term));
+    }).sort((a, b) => importCollator.compare(a.brand || '', b.brand || '')
+        || importCollator.compare(a.type || '', b.type || '')
+        || (a.nominal_value == null ? 1 : b.nominal_value == null ? -1 : Number(a.nominal_value) - Number(b.nominal_value))
+        || importCollator.compare(a.product_name || '', b.product_name || '')
+        || importCollator.compare(a.buyer_sku_code || '', b.buyer_sku_code || ''));
+});
+const importPageCount = computed(() => Math.max(1, Math.ceil(importMatches.value.length / IMPORT_PER_PAGE)));
+const importRows = computed(() => importMatches.value.slice((importPage.value - 1) * IMPORT_PER_PAGE, importPage.value * IMPORT_PER_PAGE));
+const importGroupKey = row => row.nominal_value == null
+    ? 'sku:' + row.buyer_sku_code
+    : 'value:' + String(row.type || '').toLocaleLowerCase('id-ID') + ':' + Number(row.nominal_value);
+const importGroupCounts = computed(() => {
+    const counts = new Map();
+    for (const row of importMatches.value) {
+        const key = importGroupKey(row);
+        counts.set(key, (counts.get(key) || 0) + 1);
+    }
+    return counts;
+});
+const importAmbiguousCount = computed(() => importMatches.value.filter(row => importGroupCounts.value.get(importGroupKey(row)) > 1).length);
+const canBulkImport = computed(() => Boolean(importBrand.value || importSearch.value.trim().length >= 2));
+watch([importCategory, importBrand, importType, importSearch], () => { importPage.value = 1; importInfo.value = ''; });
+const bulkSelectImport = () => {
+    if (!canBulkImport.value) {
+        importInfo.value = 'Pilih game/brand atau cari nama game dahulu agar SKU game lain tidak tercampur.';
+        return;
+    }
+    // Jangan pernah memilih seller/SKU otomatis untuk nominal yang memiliki kandidat ganda.
+    const existing = new Set(importPicked.value);
+    const selectedKeys = new Set(importAvailable.value.filter(row => existing.has(row.id)).map(importGroupKey));
+    let added = 0;
+    for (const row of importMatches.value) {
+        const key = importGroupKey(row);
+        if (importGroupCounts.value.get(key) !== 1 || selectedKeys.has(key) || existing.size >= 2000) continue;
+        existing.add(row.id);
+        selectedKeys.add(key);
+        added++;
+    }
+    importPicked.value = [...existing];
+    importInfo.value = added + ' SKU ditambahkan. '
+        + (importAmbiguousCount.value ? importAmbiguousCount.value + ' SKU dengan nominal ganda dilewati; pilih salah satu SKU sendiri.' : '');
+};
+const bulkClearImport = () => {
+    const matched = new Set(importMatches.value.map(row => row.id));
+    importPicked.value = importPicked.value.filter(id => !matched.has(id));
+    importInfo.value = 'Pilihan pada hasil filter dibersihkan.';
+};
 const sellPriceOf = seller => {
     const product = importProduct.value;
     const price = Number(seller || 0);
@@ -538,12 +601,25 @@ const openImport = () => {
     importPicked.value = [];
     importSearch.value = '';
     importBrand.value = '';
+    importCategory.value = '';
+    importType.value = '';
+    importPage.value = 1;
+    importInfo.value = '';
     importPublish.value = true;
     if (!importProductId.value && autoProducts.value.length) importProductId.value = String(autoProducts.value[0].id);
     importOpen.value = true;
 };
 const toggleImportRow = id => {
-    importPicked.value = importPicked.value.includes(id) ? importPicked.value.filter(x => x !== id) : [...importPicked.value, id];
+    if (importPicked.value.includes(id)) {
+        importPicked.value = importPicked.value.filter(x => x !== id);
+    } else {
+        const chosen = importAvailable.value.find(row => row.id === id);
+        if (!chosen) return;
+        const key = importGroupKey(chosen);
+        const conflicts = new Set(importAvailable.value.filter(row => importGroupKey(row) === key).map(row => row.id));
+        importPicked.value = [...importPicked.value.filter(x => !conflicts.has(x)), id];
+    }
+    importInfo.value = '';
 };
 const submitImport = () => {
     if (!importProduct.value || !importPicked.value.length) return;
@@ -1018,10 +1094,24 @@ onMounted(() => {
                     <span class="hint">Default 12% saat produk dibuat. Ubah di editor Informasi Produk, bukan saat menghubungkan SKU.</span>
                 </div>
                 <label class="adm-field">
-                    <span>Merek</span>
-                    <select v-model="importBrand" class="adm-select">
-                        <option value="">Semua merek</option>
+                    <span>Kategori</span>
+                    <select v-model="importCategory" class="adm-select" @change="importBrand = ''; importType = ''">
+                        <option value="">Semua kategori</option>
+                        <option v-for="category in importCategories" :key="category" :value="category">{{ category }}</option>
+                    </select>
+                </label>
+                <label class="adm-field">
+                    <span>Game / brand</span>
+                    <select v-model="importBrand" class="adm-select" @change="importType = ''">
+                        <option value="">Semua game / brand</option>
                         <option v-for="brand in importBrands" :key="brand" :value="brand">{{ brand }}</option>
+                    </select>
+                </label>
+                <label class="adm-field">
+                    <span>Sub-brand / jenis</span>
+                    <select v-model="importType" class="adm-select">
+                        <option value="">Semua jenis</option>
+                        <option v-for="type in importTypes" :key="type" :value="type">{{ type }}</option>
                     </select>
                 </label>
                 <label class="adm-field">
@@ -1037,6 +1127,14 @@ onMounted(() => {
             <p v-if="importErrors.item_ids" class="err">{{ importErrors.item_ids }}</p>
             <p v-if="importErrors.publish" class="err">{{ importErrors.publish }}</p>
 
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px">
+                <strong>{{ importMatches.length }} SKU cocok</strong>
+                <button type="button" class="adm-btn sm primary" :disabled="importBusy || !importMatches.length || !canBulkImport" @click="bulkSelectImport">Pilih semua hasil filter ({{ importMatches.length }})</button>
+                <button type="button" class="adm-btn sm" :disabled="importBusy || !importMatches.length" @click="bulkClearImport">Hapus pilihan hasil filter</button>
+                <span v-if="!canBulkImport" class="adm-note">Pilih game/brand atau cari nama (minimal 2 karakter) untuk memilih massal.</span>
+            </div>
+            <p v-if="importAmbiguousCount" class="adm-note">{{ importAmbiguousCount }} kandidat SKU berbagi nominal; pemilihan massal melewatinya agar seller tidak dipilih otomatis.</p>
+            <p v-if="importInfo" role="status" class="adm-note">{{ importInfo }}</p>
             <div class="adm-scroll" style="margin-top:10px;max-height:46vh">
                 <table class="adm-table">
                     <thead><tr><th></th><th>Nominal</th><th>SKU</th><th class="num">Harga seller</th><th class="num">Harga jual</th></tr></thead>
@@ -1052,7 +1150,14 @@ onMounted(() => {
                     </tbody>
                 </table>
             </div>
-            <p class="adm-note">{{ importPicked.length }} SKU dipilih · nama produk dan nama nominal lama tetap milik toko.</p>
+            <div style="display:flex;align-items:center;gap:8px;justify-content:space-between;flex-wrap:wrap;margin-top:8px">
+                <p class="adm-note">{{ importPicked.length }} SKU dipilih dari seluruh halaman · nama produk dan nominal lama tetap milik toko.</p>
+                <div style="display:flex;align-items:center;gap:8px">
+                    <button type="button" class="adm-btn sm" :disabled="importPage <= 1" @click="importPage--">Sebelumnya</button>
+                    <span class="adm-note">Halaman {{ importPage }} / {{ importPageCount }}</span>
+                    <button type="button" class="adm-btn sm" :disabled="importPage >= importPageCount" @click="importPage++">Berikutnya</button>
+                </div>
+            </div>
             <template #footer>
                 <button type="button" class="adm-btn" @click="importOpen = false">Batal</button>
                 <button type="button" class="adm-btn primary" :disabled="importBusy || !importPicked.length || !importProduct" @click="submitImport">
