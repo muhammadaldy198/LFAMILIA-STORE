@@ -72,7 +72,8 @@ class AdminCatalogController
             'packages' => $product->packages->sortBy([
                 ['sort_order', 'asc'], ['nominal_value', 'asc'],
             ])->values()->map(fn (ProductPackage $package): array => [
-                ...$package->only('id', 'code', 'name', 'note', 'group_name', 'nominal_value', 'sort_order', 'is_active', 'pricing_mode', 'margin_percent', 'margin_fixed_idr', 'sell_price_idr', 'sell_markup_percent', 'cost_uplift_percent', 'legacy_voucher_sell_price_idr'),
+                ...$package->only('id', 'code', 'name', 'note', 'group_name', 'nominal_value', 'sort_order', 'is_active', 'pricing_mode', 'margin_percent', 'margin_fixed_idr', 'sell_price_idr', 'sell_markup_percent', 'cost_uplift_percent', 'legacy_voucher_sell_price_idr',
+                    'digiflazz_markup_mode', 'digiflazz_markup_percent', 'digiflazz_markup_fixed_idr'),
                 'is_digiflazz_pricing' => $priceOwners[(int) $package->id] ?? false,
                 'image_url' => $package->getFirstMediaUrl('image'),
                 'mappings' => $package->mappings->map(fn (ProviderMapping $mapping): array => [
@@ -925,7 +926,7 @@ class AdminCatalogController
             || array_key_exists('margin_fixed_idr', $data)
             || isset($data['sell_price_idr']) || isset($data['sell_markup_percent']);
         if ($hasDigiflazzSource && $changesDigiflazzPrice) {
-            $effectiveMode = $data['pricing_mode'] ?? $package->pricing_mode;
+            $effectiveMode = $data['pricing_mode'] ?? $package->digiflazz_markup_mode ?? $package->pricing_mode;
             if (! in_array($effectiveMode, ['PERCENT', 'FIXED'], true)) {
                 throw ValidationException::withMessages([
                     'pricing_mode' => 'Harga Digiflazz harus berupa persentase atau tambahan rupiah per nominal.',
@@ -934,8 +935,10 @@ class AdminCatalogController
             // Validate the effective mode and price even when the client sends
             // only one price field, without the pricing_mode field.
             $effectiveValue = $effectiveMode === 'FIXED'
-                ? (array_key_exists('margin_fixed_idr', $data) ? $data['margin_fixed_idr'] : $package->margin_fixed_idr)
-                : (array_key_exists('margin_percent', $data) ? $data['margin_percent'] : $package->margin_percent);
+                ? (array_key_exists('margin_fixed_idr', $data) ? $data['margin_fixed_idr']
+                    : ($package->digiflazz_markup_mode !== null ? $package->digiflazz_markup_fixed_idr : $package->margin_fixed_idr))
+                : (array_key_exists('margin_percent', $data) ? $data['margin_percent']
+                    : ($package->digiflazz_markup_mode !== null ? $package->digiflazz_markup_percent : $package->margin_percent));
             if ($effectiveValue === null || ! is_numeric($effectiveValue)) {
                 throw ValidationException::withMessages([
                     $effectiveMode === 'FIXED' ? 'margin_fixed_idr' : 'margin_percent' => 'Nilai markup nominal Digiflazz wajib diisi.',
@@ -946,6 +949,23 @@ class AdminCatalogController
                     'pricing_mode' => 'Nominal Digiflazz tidak memakai harga jual tetap atau markup global.',
                 ]);
             }
+        }
+        $overridesDigiflazzPrice = $hasDigiflazzSource && $changesDigiflazzPrice
+            && $package->digiflazz_markup_mode !== null;
+        $newDigiflazzPricing = [];
+        if ($overridesDigiflazzPrice) {
+            $mode = $data['pricing_mode'] ?? $package->digiflazz_markup_mode;
+            $newDigiflazzPricing = [
+                'digiflazz_markup_mode' => $mode,
+                'digiflazz_markup_percent' => $mode === 'PERCENT'
+                    ? ($data['margin_percent'] ?? $package->digiflazz_markup_percent) : null,
+                'digiflazz_markup_fixed_idr' => $mode === 'FIXED'
+                    ? ($data['margin_fixed_idr'] ?? $package->digiflazz_markup_fixed_idr) : null,
+            ];
+            // Never overwrite voucher pricing when its Digiflazz source is
+            // selected for checkout. These fields belong to the other source.
+            unset($data['pricing_mode'], $data['margin_percent'], $data['margin_fixed_idr'],
+                $data['sell_price_idr'], $data['sell_markup_percent']);
         }
         // A mixed-source nominal can retain a separate fixed voucher price.
         // Editing that voucher must not accidentally replace its Digiflazz
@@ -972,7 +992,7 @@ class AdminCatalogController
             unset($data['pricing_mode'], $data['sell_price_idr']);
         }
         $wasActive = (bool) $package->is_active;
-        DB::transaction(function () use ($request, $package, $product, $isActive, $data, $audit, $newCost, $wasActive, $editsVoucherPrice, $replacementVoucherPrice): void {
+        DB::transaction(function () use ($request, $package, $product, $isActive, $data, $audit, $newCost, $wasActive, $editsVoucherPrice, $replacementVoucherPrice, $newDigiflazzPricing): void {
             $before = $package->toArray();
             // is_active memakai hasil hitungan server: nominal tanpa modal
             // dimatikan walau klien mengirim true.
@@ -980,6 +1000,9 @@ class AdminCatalogController
                 ...collect($data)->except(['cost_idr', 'store_cost_idr', 'is_active'])->all(),
                 'is_active' => $isActive,
             ]);
+            if ($newDigiflazzPricing !== []) {
+                $package->forceFill($newDigiflazzPricing)->save();
+            }
             if ($editsVoucherPrice) {
                 // A successful fixed-price edit must affect checkout too.
                 // Switching to percentage pricing removes the legacy cap.
