@@ -1,5 +1,8 @@
 <?php
 
+use App\Models\ProductPackage;
+use App\Services\CheckoutPricing;
+use App\Services\DigiflazzPriceOwnership;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 
@@ -24,16 +27,6 @@ return new class extends Migration
                     ->whereColumn('mappings.product_package_id', 'packages.id')
                     ->where('mappings.provider_id', $providerId);
             })
-            // A local voucher can be the actual checkout source while keeping
-            // an old, inactive Digiflazz mapping. Preserve voucher pricing.
-            ->whereNotExists(function ($query): void {
-                $query->selectRaw('1')
-                    ->from('provider_mappings as local_mappings')
-                    ->join('providers as local_providers', 'local_providers.id', '=', 'local_mappings.provider_id')
-                    ->whereColumn('local_mappings.product_package_id', 'packages.id')
-                    ->where('local_mappings.is_active', true)
-                    ->where('local_providers.code', 'VOUCHER_STOCK');
-            })
             ->select(
                 'packages.id',
                 'products.margin_percent',
@@ -42,7 +35,18 @@ return new class extends Migration
             )
             ->orderBy('packages.id')
             ->chunkById(200, function ($packages): void {
+                $ids = $packages->pluck('id')->map(fn ($id): int => (int) $id)->all();
+                $models = ProductPackage::with('product')->whereIn('id', $ids)->get()->keyBy('id');
+                $quotes = app(CheckoutPricing::class)->forPackages($ids, true);
+                $ownership = app(DigiflazzPriceOwnership::class);
+
                 foreach ($packages as $package) {
+                    $model = $models->get($package->id);
+                    if ($model === null || ! $ownership->usesDigiflazz($model, $quotes[$package->id] ?? null)) {
+                        // Preserve local voucher prices even if a historical
+                        // Digiflazz mapping still belongs to this nominal.
+                        continue;
+                    }
                     $fixed = $package->price_markup_type === 'FIXED';
                     DB::table('product_packages')->where('id', $package->id)->update([
                         'pricing_mode' => $fixed ? 'FIXED' : 'PERCENT',
