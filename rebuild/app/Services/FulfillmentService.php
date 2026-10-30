@@ -165,11 +165,9 @@ class FulfillmentService
                 $customerInput = $this->json($order->customer_input);
                 $customerNo = $this->targetBuilder->customerNo($customerInput, $config);
                 $maxPrice = $this->maxPrice($snapshot);
-                if ($mapping->is_manual_price) {
-                    // Provider-side last line of defense: never authorize a
-                    // supplier charge above the admin's locked per-SKU cap.
-                    $maxPrice = min($maxPrice, (int) $mapping->max_price_idr);
-                }
+                // The order snapshot is authoritative. This cap is captured at
+                // checkout for the selected SKU and must not be overridden by
+                // legacy manual-price fields left in a mapping row.
 
                 $request = [
                     'buyer_sku_code' => (string) $mapping->external_sku,
@@ -998,15 +996,18 @@ class FulfillmentService
             if (! $this->digiflazzCatalog->verifiedIdentityMatches($item, $mapping->fulfillment_config)) {
                 return 'Identitas produk SKU Digiflazz berubah. Periksa ulang mapping di panel admin.';
             }
-            if ($mapping->is_manual_price) {
-                if (! $item || (int) $item->price_idr <= 0) {
-                    return 'Harga supplier Digiflazz belum tersedia untuk sumber terkunci.';
-                }
-                if ((int) $item->price_idr > (int) $mapping->max_price_idr
-                    || (int) $item->price_idr > $this->maxPrice($snapshot)) {
-                    return 'Harga supplier Digiflazz melewati batas harga aman.';
-                }
+            // The current seller price must never exceed the immutable
+            // order snapshot cap. Ignore legacy mapping cost/lock fields:
+            // checkout prices Digiflazz from the verified seller catalog.
+            // Older orders retain their own historic cap in the snapshot.
+            if ((int) $item->price_idr <= 0) {
+                return 'Harga supplier Digiflazz belum tersedia.';
             }
+            if ((int) $item->price_idr > $this->maxPrice($snapshot)) {
+                return 'Harga supplier Digiflazz melewati batas harga aman order.';
+            }
+
+            return null;
         }
         if ($mapping->provider_code === 'VOUCHER_STOCK') {
             $config = $this->json($mapping->fulfillment_config);
