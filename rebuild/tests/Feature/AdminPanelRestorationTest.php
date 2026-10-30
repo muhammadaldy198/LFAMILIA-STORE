@@ -534,7 +534,8 @@ class AdminPanelRestorationTest extends TestCase
     public function test_price_modes_and_availability_are_enforced_server_side(): void
     {
         $product = $this->product();
-        $package = ProductPackage::create(['product_id' => $product->id, 'code' => 'R10', 'name' => '10', 'is_active' => true]);
+        $package = ProductPackage::create(['product_id' => $product->id, 'code' => 'R10', 'name' => '10',
+            'pricing_mode' => 'PERCENT', 'margin_percent' => 10, 'is_active' => true]);
         $provider = Provider::where('code', 'DIGIFLAZZ')->firstOrFail();
         $provider->forceFill(['is_active' => true])->save();
         ProviderMapping::create(['product_package_id' => $package->id, 'provider_id' => $provider->id, 'external_sku' => 'restore-sku', 'cost_idr' => 10000, 'max_price_idr' => 10000, 'is_active' => true]);
@@ -542,10 +543,10 @@ class AdminPanelRestorationTest extends TestCase
         $pricing = app(CheckoutPricing::class);
         $this->assertSame(11000, $pricing->forPackage($package->id)['subtotal_idr']);
         $package->update(['pricing_mode' => 'PERCENT', 'margin_percent' => 5]);
-        $this->assertSame(11000, $pricing->forPackage($package->id)['subtotal_idr']);
+        $this->assertSame(10500, $pricing->forPackage($package->id)['subtotal_idr']);
         $package->update(['pricing_mode' => 'FIXED', 'margin_fixed_idr' => 123]);
-        $this->assertSame(11000, $pricing->forPackage($package->id)['subtotal_idr']);
-        $package->update(['pricing_mode' => 'SELL_PRICE', 'sell_price_idr' => 15000]);
+        $this->assertSame(10123, $pricing->forPackage($package->id)['subtotal_idr']);
+        $package->update(['pricing_mode' => 'PERCENT', 'margin_percent' => 10]);
         $this->assertSame(11000, $pricing->forPackage($package->id)['subtotal_idr']);
         $this->fakeCatalog([$this->row(['seller_product_status' => false])]);
         app(DigiflazzCatalogService::class)->sync();
@@ -1039,8 +1040,8 @@ class AdminPanelRestorationTest extends TestCase
         ])->assertSessionHasNoErrors();
 
         $package = $product->packages()->firstOrFail();
-        $this->assertSame('PRODUCT_MARGIN', $package->pricing_mode);
-        $this->assertSame(11000, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
+        $this->assertSame('PERCENT', $package->pricing_mode);
+        $this->assertSame(11200, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
         $this->assertSame(10000, app(CheckoutPricing::class)->forPackage($package->id)['max_price_idr']);
 
         $this->fakeCatalog([
@@ -1049,15 +1050,15 @@ class AdminPanelRestorationTest extends TestCase
         ]);
         app(DigiflazzCatalogService::class)->sync();
         // The unselected seller is never auto-attached as a backup.
-        $this->assertSame(13750, app(CheckoutPricing::class)->forPackages([$package->id])[$package->id]['subtotal_idr']);
+        $this->assertSame(14000, app(CheckoutPricing::class)->forPackages([$package->id])[$package->id]['subtotal_idr']);
 
         $this->fakeCatalog([
             $this->row(['buyer_sku_code' => 'fixed-price-A', 'price' => 12500]),
             $this->row(['buyer_sku_code' => 'fixed-price-B', 'price' => 11800]),
         ]);
         app(DigiflazzCatalogService::class)->sync();
-        $this->assertSame(13750, app(CheckoutPricing::class)->forPackages([$package->id])[$package->id]['subtotal_idr']);
-        $this->assertSame('PRODUCT_MARGIN', $package->fresh()->pricing_mode);
+        $this->assertSame(14000, app(CheckoutPricing::class)->forPackages([$package->id])[$package->id]['subtotal_idr']);
+        $this->assertSame('PERCENT', $package->fresh()->pricing_mode);
     }
 
     public function test_fixed_price_recommendation_uses_store_cost_and_checkout_price_matches_admin_preview(): void
@@ -1069,8 +1070,8 @@ class AdminPanelRestorationTest extends TestCase
         $product->category->update(['is_active' => true]);
         $product->update(['margin_percent' => 10, 'price_markup_type' => 'PERCENT']);
         $package = $product->packages()->create([
-            'code' => 'DF_store_cost', 'name' => 'Nama Nominal Toko', 'pricing_mode' => 'SELL_PRICE',
-            'sell_price_idr' => 15000, 'is_active' => true,
+            'code' => 'DF_store_cost', 'name' => 'Nama Nominal Toko', 'pricing_mode' => 'PERCENT',
+            'margin_percent' => 10, 'is_active' => true,
         ]);
         $package->mappings()->create([
             'provider_id' => Provider::where('code', 'DIGIFLAZZ')->value('id'),
