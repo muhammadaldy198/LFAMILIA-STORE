@@ -962,7 +962,7 @@ class AdminDigiflazzRestorationTest extends TestCase
         $this->assertSame(1, app(DigiflazzAutoSources::class)->sync());
         $this->assertDatabaseHas('provider_mappings', [
             'external_sku' => 'BOOT1.000', 'priority' => 0, 'is_active' => true,
-            'is_manual_price' => false, 'cost_idr' => 10000, 'store_cost_idr' => 10200,
+            'is_manual_price' => false, 'cost_idr' => 10000, 'store_cost_idr' => 10000,
             'seller_reference_price_idr' => 10000, 'max_price_idr' => 10200,
         ]);
         $this->assertSame(0, app(DigiflazzAutoSources::class)->sync());
@@ -1119,7 +1119,7 @@ class AdminDigiflazzRestorationTest extends TestCase
         // never reprice an active mapping for a different verified product.
         $this->assertDatabaseHas('provider_mappings', [
             'id' => $mapping->id, 'cost_idr' => 10000,
-            'store_cost_idr' => 10200, 'max_price_idr' => 10200, 'is_active' => true,
+            'store_cost_idr' => 10000, 'max_price_idr' => 10000, 'is_active' => true,
         ]);
 
         // Redesign: seller availability returns only when the verified identity
@@ -1275,13 +1275,11 @@ class AdminDigiflazzRestorationTest extends TestCase
 
         $package = $product->packages()->firstOrFail();
         $mapping = $package->mappings()->firstOrFail();
-        // Modal toko = seller + uplift 2%; batas harga = modal, bukan markup 35%.
-        $this->assertSame(10200, (int) $mapping->store_cost_idr);
-        $this->assertSame(10200, (int) $mapping->max_price_idr);
-        // Margin tersimpan di nominalnya = angka yang dipakai, dan markup
-        // produk tidak lagi disentuh impor.
-        $this->assertSame(12, (int) round((float) $package->fresh()->margin_percent));
-        $this->assertSame('PERCENT', $package->fresh()->pricing_mode);
+        // Impor hanya menyimpan harga seller, sementara produk menyimpan markup.
+        $this->assertSame(10000, (int) $mapping->store_cost_idr);
+        $this->assertSame(10000, (int) $mapping->max_price_idr);
+        $this->assertSame('PRODUCT_MARGIN', $package->fresh()->pricing_mode);
+        $this->assertSame(10, (int) $product->fresh()->margin_percent);
         $this->assertNull($product->fresh()->sell_markup_percent);
     }
 
@@ -1304,16 +1302,16 @@ class AdminDigiflazzRestorationTest extends TestCase
 
         $mapping = $product->packages()->firstOrFail()->mappings()->firstOrFail();
         $package = $product->packages()->firstOrFail();
-        // Modal = 10.000 + 2% = 10.200; harga jual = modal + 10% = 11.220.
-        $this->assertSame(10200, (int) $mapping->store_cost_idr);
-        $this->assertSame('PERCENT', $package->pricing_mode);
-        $this->assertSame(10, (int) round((float) $package->margin_percent));
+        // Harga seller 10.000 + markup produk 10% = 11.000.
+        $this->assertSame(10000, (int) $mapping->store_cost_idr);
+        $this->assertSame('PRODUCT_MARGIN', $package->pricing_mode);
+        $this->assertSame(10, (int) $product->margin_percent);
         // Harga yang benar-benar ditagih dihitung dari modal × margin nominal.
         Category::where('slug', 'game')->update(['is_active' => true]);
         Provider::where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
         $package->update(['is_active' => true]);
         $package->mappings()->update(['is_active' => true]);
-        $this->assertSame(11220, (int) app(CheckoutPricing::class)->previewForPackage($package->id)['subtotal_idr']);
+        $this->assertSame(11000, (int) app(CheckoutPricing::class)->previewForPackage($package->id)['subtotal_idr']);
     }
 
     public function test_import_honours_a_different_cost_column_for_every_selected_sku(): void
@@ -1335,13 +1333,13 @@ class AdminDigiflazzRestorationTest extends TestCase
         ])->assertRedirect()->assertSessionHasNoErrors();
 
         $package = $product->packages()->firstOrFail();
-        // Modal = 20.000 + 5% = 21.000; jual = 21.000 + 10% = 23.100.
-        $this->assertSame(21000, (int) $package->mappings()->firstOrFail()->store_cost_idr);
+        // Harga seller 20.000 menjadi harga dasar tanpa biaya modal tambahan.
+        $this->assertSame(20000, (int) $package->mappings()->firstOrFail()->store_cost_idr);
         Category::where('slug', 'game')->update(['is_active' => true]);
         Provider::where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
         $package->update(['is_active' => true]);
         $package->mappings()->update(['is_active' => true]);
-        $this->assertSame(23100, (int) app(CheckoutPricing::class)->previewForPackage($package->id)['subtotal_idr']);
+        $this->assertSame(22000, (int) app(CheckoutPricing::class)->previewForPackage($package->id)['subtotal_idr']);
     }
 
     public function test_full_sync_never_touches_manual_or_voucher_sources(): void
