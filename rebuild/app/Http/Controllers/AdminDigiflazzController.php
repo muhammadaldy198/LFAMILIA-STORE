@@ -135,20 +135,20 @@ class AdminDigiflazzController
             $sorted->count(), $filters['per_page'], $currentPage,
             ['path' => $request->url(), 'query' => $request->query()],
         ))->through(function (object $item) use ($service, $monitor, $monitorSettings): array {
-                $health = $monitor->health($item, $monitorSettings);
+            $health = $monitor->health($item, $monitorSettings);
 
-                return [
-                    ...((array) $item),
-                    ...$health,
-                    'available' => $service->available($item),
-                    'mapped' => $item->mapping_id !== null,
-                    'mapping_active' => (bool) $item->mapping_active,
-                    'multi' => (bool) ($item->multi ?? false),
-                    'buyer_active' => (bool) $item->buyer_active,
-                    'seller_active' => (bool) $item->seller_active,
-                    'unlimited_stock' => (bool) $item->unlimited_stock,
-                ];
-            });
+            return [
+                ...((array) $item),
+                ...$health,
+                'available' => $service->available($item),
+                'mapped' => $item->mapping_id !== null,
+                'mapping_active' => (bool) $item->mapping_active,
+                'multi' => (bool) ($item->multi ?? false),
+                'buyer_active' => (bool) $item->buyer_active,
+                'seller_active' => (bool) $item->seller_active,
+                'unlimited_stock' => (bool) $item->unlimited_stock,
+            ];
+        });
 
         $admin = $request->user('admin');
         $connection = $monitor->connection(app(AdminPermissionService::class)->allows($admin, 'reports.finance'));
