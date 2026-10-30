@@ -1278,13 +1278,13 @@ class CatalogTest extends TestCase
             ->assertRedirect()->assertSessionHasNoErrors();
         $this->assertFalse($mapping->fresh()->is_active);
 
-        // Kunci harga manual tidak boleh terlepas hanya karena panel mengirim
-        // prioritas/status.
-        $mapping->update(['is_manual_price' => true, 'max_price_idr' => 9000, 'is_active' => true]);
+        // Cost seller Digiflazz is read-only, while priority and enabled state
+        // can still be managed without changing storefront metadata.
+        $mapping->update(['is_manual_price' => false, 'is_active' => true]);
         $this->put('/admin/catalog/mappings/'.$mapping->id, [
-            'priority' => 2, 'is_active' => true, 'is_manual_price' => true,
+            'priority' => 2, 'is_active' => true,
         ])->assertRedirect()->assertSessionHasNoErrors();
-        $this->assertTrue($mapping->fresh()->is_manual_price);
+        $this->assertFalse($mapping->fresh()->is_manual_price);
         $this->assertSame(2, (int) $mapping->fresh()->priority);
 
         // Sinkron per mapping tetap ada; sinkron per produk dibuang karena
