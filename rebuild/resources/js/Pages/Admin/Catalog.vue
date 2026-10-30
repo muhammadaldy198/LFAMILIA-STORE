@@ -540,8 +540,8 @@ const IMPORT_PER_PAGE = 50;
 const importCollator = new Intl.Collator('id-ID', { numeric: true, sensitivity: 'base' });
 
 const autoProducts = computed(() => props.autoProductOptions);
-const importProduct = computed(() => props.products.find(row => Number(row.id) === Number(importProductId.value))
-    || props.autoProductOptions.find(row => Number(row.id) === Number(importProductId.value)) || null);
+const importProduct = computed(() => props.autoProductOptions.find(row => Number(row.id) === Number(importProductId.value))
+    || props.products.find(row => Number(row.id) === Number(importProductId.value)) || null);
 const importAvailable = computed(() => props.digiflazzItems.filter(row => !row.mapped && row.available));
 const importCategories = computed(() => [...new Set(importAvailable.value.map(row => row.category).filter(Boolean))].sort(importCollator.compare));
 const importBrands = computed(() => [...new Set(importAvailable.value
@@ -606,10 +606,20 @@ const bulkClearImport = () => {
     importPicked.value = importPicked.value.filter(id => !matched.has(id));
     importInfo.value = 'Pilihan pada hasil filter dibersihkan.';
 };
-const sellPriceOf = seller => {
+const sellPriceOf = (seller, item) => {
     const price = Number(seller || 0);
-    // Newly imported nominal starts at 12%; admin can then edit each nominal.
-    return price + Math.ceil(price * 12 / 100);
+    // The importer reuses an unmapped nominal when game/type and numeric
+    // nominal match. Preview its saved markup rather than inventing a new 12%.
+    const existing = importProduct.value?.nominals?.find(nominal =>
+        item?.nominal_value != null
+        && Number(nominal.nominal_value) === Number(item.nominal_value)
+        && String(nominal.group_name || '') === String(item.type || '')
+    );
+    if (existing?.pricing_mode === 'FIXED') return price + Number(existing.margin_fixed_idr || 0);
+    const percentage = existing?.pricing_mode === 'PERCENT'
+        ? Number(existing.margin_percent ?? 12)
+        : 12;
+    return price + Math.ceil(price * percentage / 100);
 };
 
 const openImport = () => {
@@ -1095,7 +1105,7 @@ onMounted(() => {
                 <div class="adm-field">
                     <span>Markup nominal baru</span>
                     <strong>12% dari harga seller</strong>
-                    <span class="hint">Setiap nominal dapat diubah sendiri ke persentase atau tambahan Rp setelah diimpor. Markup nominal lama tidak diubah.</span>
+                    <span class="hint">Nominal baru memakai 12%. Nominal lama tanpa SKU memakai markup tersimpan. Setiap nominal bisa diubah sendiri setelah impor.</span>
                 </div>
                 <label class="adm-field">
                     <span>Kategori</span>
@@ -1148,7 +1158,7 @@ onMounted(() => {
                             <td><strong>{{ row.product_name }}</strong><p class="dim">{{ row.brand }}</p></td>
                             <td class="mono">{{ row.buyer_sku_code }}</td>
                             <td class="num">{{ rupiah(row.price_idr) }}</td>
-                            <td class="num">{{ rupiah(sellPriceOf(row.price_idr)) }}</td>
+                            <td class="num">{{ rupiah(sellPriceOf(row.price_idr, row)) }}</td>
                         </tr>
                         <tr v-if="!importRows.length"><td colspan="5" class="adm-empty">Tidak ada SKU tersedia untuk saringan ini. Sinkronkan daftar harga di menu Digiflazz lebih dulu.</td></tr>
                     </tbody>
