@@ -26,7 +26,7 @@ const tab = ref(props.productFilters.tab || 'auto');
 const q = ref(props.productFilters.q || '');
 const categoryId = ref(props.productFilters.category || '');
 const status = ref(props.productFilters.status || '');
-const sort = ref(props.productFilters.sort || 'order');
+const sort = ref(props.productFilters.sort || 'name');
 const perPage = ref(props.productFilters.per_page || 25);
 const page = ref(props.productPage.current_page || 1);
 const busy = ref(false);
@@ -50,9 +50,9 @@ const load = (extra = {}) => {
     });
 };
 const applyFilters = () => { page.value = 1; load(); };
-const resetFilters = () => { q.value = ''; categoryId.value = ''; status.value = ''; sort.value = 'order'; perPage.value = 25; page.value = 1; load(); };
+const resetFilters = () => { q.value = ''; categoryId.value = ''; status.value = ''; sort.value = 'name'; perPage.value = 25; page.value = 1; load(); };
 const goPage = value => { page.value = value; load(); };
-const hasFilters = computed(() => Boolean(q.value || categoryId.value || status.value || sort.value !== 'order' || Number(perPage.value) !== 25));
+const hasFilters = computed(() => Boolean(q.value || categoryId.value || status.value || sort.value !== 'name' || Number(perPage.value) !== 25));
 const switchTab = value => { tab.value = value; page.value = 1; load(); };
 
 /* ---------- tambah produk ---------- */
@@ -687,8 +687,8 @@ onMounted(() => {
                 <label class="adm-field narrow">
                     <span>Urutkan</span>
                     <select v-model="sort" class="adm-select" @change="applyFilters">
-                        <option value="order">Urutan toko</option>
-                        <option value="name">Nama A–Z</option>
+                        <option value="name">Nama A–Z / angka</option>
+                        <option value="order">Urutan toko (manual)</option>
                     </select>
                 </label>
                 <label class="adm-field narrow">
