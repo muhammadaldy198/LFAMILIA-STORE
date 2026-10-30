@@ -72,7 +72,7 @@ class AdminCatalogController
             'packages' => $product->packages->sortBy([
                 ['sort_order', 'asc'], ['nominal_value', 'asc'],
             ])->values()->map(fn (ProductPackage $package): array => [
-                ...$package->only('id', 'code', 'name', 'note', 'group_name', 'nominal_value', 'sort_order', 'is_active', 'pricing_mode', 'margin_percent', 'margin_fixed_idr', 'sell_price_idr', 'sell_markup_percent', 'cost_uplift_percent'),
+                ...$package->only('id', 'code', 'name', 'note', 'group_name', 'nominal_value', 'sort_order', 'is_active', 'pricing_mode', 'margin_percent', 'margin_fixed_idr', 'sell_price_idr', 'sell_markup_percent', 'cost_uplift_percent', 'legacy_voucher_sell_price_idr'),
                 'is_digiflazz_pricing' => $priceOwners[(int) $package->id] ?? false,
                 'image_url' => $package->getFirstMediaUrl('image'),
                 'mappings' => $package->mappings->map(fn (ProviderMapping $mapping): array => [
@@ -947,13 +947,32 @@ class AdminCatalogController
                 ]);
             }
         }
+        // A mixed-source nominal can retain a separate fixed voucher price.
+        // Editing that voucher must not accidentally replace its Digiflazz
+        // percentage/additional-IDR rule on the same package.
+        $hasRetainedVoucherPrice = ! $hasDigiflazzSource
+            && $package->legacy_voucher_sell_price_idr !== null;
+        $editsVoucherPrice = $hasRetainedVoucherPrice
+            && (array_key_exists('pricing_mode', $data) || array_key_exists('sell_price_idr', $data));
+        $voucherMode = $editsVoucherPrice
+            ? ($data['pricing_mode'] ?? 'SELL_PRICE') : null;
+        $replacementVoucherPrice = $voucherMode === 'SELL_PRICE'
+            ? (int) ($data['sell_price_idr'] ?? $package->legacy_voucher_sell_price_idr)
+            : null;
         if (! $hasDigiflazzSource
-            && ($data['pricing_mode'] ?? $package->pricing_mode) === 'SELL_PRICE'
-            && (int) ($data['sell_price_idr'] ?? $package->sell_price_idr) < (int) ($newCost ?? $highestActiveCost)) {
+            && (($hasRetainedVoucherPrice && $voucherMode === 'SELL_PRICE')
+                || (! $hasRetainedVoucherPrice && ($data['pricing_mode'] ?? $package->pricing_mode) === 'SELL_PRICE'))
+            && (int) ($hasRetainedVoucherPrice ? $replacementVoucherPrice : ($data['sell_price_idr'] ?? $package->sell_price_idr))
+                < (int) ($newCost ?? ($effectiveQuote[(int) $package->id]['cost_idr'] ?? $highestActiveCost))) {
             throw ValidationException::withMessages(['sell_price_idr' => 'Harga jual tidak boleh di bawah modal.']);
         }
+        if ($editsVoucherPrice && $voucherMode === 'SELL_PRICE') {
+            // Retain the independent Digiflazz rule; only the voucher cap
+            // is changed by this editor action.
+            unset($data['pricing_mode'], $data['sell_price_idr']);
+        }
         $wasActive = (bool) $package->is_active;
-        DB::transaction(function () use ($request, $package, $product, $isActive, $data, $audit, $newCost, $wasActive): void {
+        DB::transaction(function () use ($request, $package, $product, $isActive, $data, $audit, $newCost, $wasActive, $editsVoucherPrice, $replacementVoucherPrice): void {
             $before = $package->toArray();
             // is_active memakai hasil hitungan server: nominal tanpa modal
             // dimatikan walau klien mengirim true.
@@ -961,6 +980,11 @@ class AdminCatalogController
                 ...collect($data)->except(['cost_idr', 'store_cost_idr', 'is_active'])->all(),
                 'is_active' => $isActive,
             ]);
+            if ($editsVoucherPrice) {
+                // A successful fixed-price edit must affect checkout too.
+                // Switching to percentage pricing removes the legacy cap.
+                $package->forceFill(['legacy_voucher_sell_price_idr' => $replacementVoucherPrice])->save();
+            }
             // Admin menyalakan sendiri: penanda "dimatikan sinkron" dilepas supaya
             // sinkron berikutnya tidak menganggapnya miliknya.
             if ($isActive && $package->disabled_by_sync) {
