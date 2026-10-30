@@ -132,8 +132,8 @@ class CheckoutTest extends TestCase
         $this->seedCheckoutDigiflazzCatalog($catalog['package_id']);
 
         $quote = app(CheckoutPricing::class)->forPackage($catalog['package_id']);
-        $this->assertSame(1200, $quote['margin_idr']);
-        $this->assertSame(13200, $quote['subtotal_idr']);
+        $this->assertSame(1440, $quote['margin_idr']);
+        $this->assertSame(13440, $quote['subtotal_idr']);
 
         DB::table('product_packages')->where('id', $catalog['package_id'])->update([
             'margin_percent' => null,
@@ -141,14 +141,14 @@ class CheckoutTest extends TestCase
             'sell_markup_percent' => null,
         ]);
         $quote = app(CheckoutPricing::class)->forPackage($catalog['package_id']);
-        $this->assertSame(960, $quote['margin_idr']);
-        $this->assertSame(12960, $quote['subtotal_idr']);
+        $this->assertSame(1440, $quote['margin_idr']);
+        $this->assertSame(13440, $quote['subtotal_idr']);
 
         DB::table('product_packages')->where('id', $catalog['package_id'])
             ->update(['sell_markup_percent' => null]);
         $quote = app(CheckoutPricing::class)->forPackage($catalog['package_id']);
-        $this->assertSame(960, $quote['margin_idr']);
-        $this->assertSame(12960, $quote['subtotal_idr']);
+        $this->assertSame(1440, $quote['margin_idr']);
+        $this->assertSame(13440, $quote['subtotal_idr']);
     }
 
     public function test_server_calculates_price_and_idempotent_guest_retry_returns_same_order_and_access_code(): void
@@ -204,6 +204,9 @@ class CheckoutTest extends TestCase
     {
         $catalog = $this->catalog();
         $this->seedCheckoutDigiflazzCatalog($catalog['package_id']);
+        DB::table('digiflazz_catalog_items')
+            ->where('buyer_sku_code', DB::table('provider_mappings')->where('id', $catalog['mapping_id'])->value('external_sku'))
+            ->update(['price_idr' => 12240, 'synced_at' => now()]);
         DB::table('provider_mappings')->where('id', $catalog['mapping_id'])
             ->update(['cost_idr' => 12240, 'max_price_idr' => 12240]);
         DB::table('product_packages')->where('id', $catalog['package_id'])
@@ -242,9 +245,9 @@ class CheckoutTest extends TestCase
 
         $quote = app(CheckoutPricing::class)->forPackage($catalog['package_id']);
 
-        $this->assertSame(10200, $quote['cost_idr']);
-        $this->assertSame(11220, $quote['subtotal_idr']);
-        $this->assertSame(10200, $quote['max_price_idr']);
+        $this->assertSame(10000, $quote['cost_idr']);
+        $this->assertSame(11000, $quote['subtotal_idr']);
+        $this->assertSame(10000, $quote['max_price_idr']);
     }
 
     public function test_catalog_pricing_edits_do_not_change_existing_order_snapshots(): void
@@ -407,7 +410,7 @@ class CheckoutTest extends TestCase
     {
         $catalog = $this->catalog();
         DB::table('provider_mappings')->where('id', $catalog['mapping_id'])->update([
-            'max_price_idr' => 9000,
+            'is_active' => false,
         ]);
 
         $payload = $this->guestPayload($catalog['package_id'], 'checkout-unavailable-0001');

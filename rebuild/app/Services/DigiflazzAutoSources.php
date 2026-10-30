@@ -71,14 +71,21 @@ class DigiflazzAutoSources
             throw ValidationException::withMessages(['item_ids' => 'Tidak ada SKU Digiflazz yang aktif dan tersedia.']);
         }
         $nominal = app(CatalogNominalOrder::class)->value($first->product_name, $first->brand);
-        // Do not silently create a duplicate storefront nominal when a
-        // different Digiflazz SKU was imported for the same game and group.
-        if ($package === null && $nominal !== null && $product->packages()
-            ->where('nominal_value', $nominal)
-            ->where('group_name', $first->type ?: null)->exists()) {
-            throw ValidationException::withMessages([
-                'item_ids' => 'Nominal ini sudah terdaftar. Lepas SKU lama sebelum menggantinya.',
-            ]);
+        // Connect an SKU to an existing, unmapped nominal WITHOUT changing
+        // the store-owned product or nominal name. Never swap an existing SKU.
+        if ($package === null && $nominal !== null) {
+            $matchingPackage = $product->packages()
+                ->where('nominal_value', $nominal)
+                ->where('group_name', $first->type ?: null)
+                ->lockForUpdate()->first();
+            if ($matchingPackage !== null) {
+                if ($matchingPackage->mappings()->where('provider_id', $provider->id)->exists()) {
+                    throw ValidationException::withMessages([
+                        'item_ids' => 'Nominal ini sudah memiliki SKU Digiflazz. Lepas SKU lama terlebih dahulu.',
+                    ]);
+                }
+                $package = $matchingPackage;
+            }
         }
         if ($package !== null && $package->mappings()
             ->where('provider_id', $provider->id)
@@ -99,7 +106,7 @@ class DigiflazzAutoSources
                 'name' => GameNamePrefix::strip($first->product_name, $first->brand, $product->name),
                 'group_name' => $first->type ?: null,
                 'nominal_value' => $nominal, 'sort_order' => 0, 'is_active' => $publish,
-                'pricing_mode' => 'PERCENT', 'margin_percent' => $margin,
+                'pricing_mode' => 'PRODUCT_MARGIN',
                 'sell_price_idr' => null,
             ]);
             app(AdminAuditService::class)->record($request, 'catalog.package.imported', 'product_package', $package->id, null, $package->toArray());
@@ -108,9 +115,8 @@ class DigiflazzAutoSources
             $package->update([
                 'nominal_value' => $package->nominal_value ?? $nominal,
                 'is_active' => $publish ?: $package->is_active,
-                // Impor manual memakai angka yang baru diketik admin; impor
-                // otomatis tidak boleh menimpa harga yang sudah diatur.
-                ...($automatic ? [] : ['pricing_mode' => 'PERCENT', 'margin_percent' => $margin, 'sell_price_idr' => null]),
+                // Existing nominal name and pricing metadata are store-owned.
+                // SKU attach/sync must not overwrite them.
             ]);
             app(AdminAuditService::class)->record($request, 'catalog.package.updated', 'product_package', $package->id, $before, $package->fresh()->toArray());
         }

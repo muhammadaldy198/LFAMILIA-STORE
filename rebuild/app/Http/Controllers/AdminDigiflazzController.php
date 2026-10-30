@@ -10,7 +10,6 @@ use App\Services\AdminAuditService;
 use App\Services\AdminDigiflazzMonitorService;
 use App\Services\AdminPermissionService;
 use App\Services\CatalogNominalOrder;
-use App\Services\CatalogPricingSettings;
 use App\Services\DigiflazzAutoSources;
 use App\Services\DigiflazzCatalogImport;
 use App\Services\DigiflazzCatalogService;
@@ -371,8 +370,8 @@ class AdminDigiflazzController
         $data = $request->validate([
             'item_ids' => ['required', 'array', 'min:1', 'max:2000'],
             'item_ids.*' => ['required', 'integer', 'distinct', 'exists:digiflazz_catalog_items,id'],
-            'margin_percent' => ['sometimes', 'numeric', 'min:0', 'max:1000', 'decimal:0,4'],
-            'cost_uplift_percent' => ['sometimes', 'numeric', 'min:0', 'max:1000', 'decimal:0,4'],
+            'margin_percent' => ['prohibited'],
+            'cost_uplift_percent' => ['prohibited'],
             'publish' => ['sometimes', 'boolean'],
             'auto_sources' => ['prohibited'],
         ]);
@@ -408,10 +407,9 @@ class AdminDigiflazzController
                     collect([$item]),
                     $template,
                     $publish,
-                    (string) ($data['margin_percent'] ?? app(CatalogPricingSettings::class)->sellMarkupPercent()),
+                    (string) $product->margin_percent,
                     false,
                     $request,
-                    isset($data['cost_uplift_percent']) ? (string) $data['cost_uplift_percent'] : null,
                 );
             }
             $sources->orderProduct($product);

@@ -80,7 +80,9 @@ const submitAdd = () => {
         description: add.description || null,
         fulfillment_mode: mode.value,
         sort_order: Number(add.sort_order || 0),
-        margin_percent: 0,
+        margin_percent: mode.value === 'AUTO_PROVIDER' ? 12 : 0,
+        price_markup_type: 'PERCENT',
+        price_markup_fixed_idr: 0,
         // Petunjuk & jam layanan dipakai pemberitahuan fulfillment dan toko.
         ...(mode.value === 'MANUAL' ? {
             manual_instructions: add.manual_instructions || null,
@@ -125,8 +127,8 @@ const saveMapping = (mapping, changes) => {
     });
 };
 const toggleMapping = mapping => saveMapping(mapping, { is_active: !mapping.is_active });
-// Stok voucher tidak punya modal yang bisa diatur; server menolak angkanya.
-const canEditCost = mapping => mapping.provider_code !== 'VOUCHER_STOCK';
+// Seller Digiflazz is read-only; only manual sources have editable cost.
+const canEditCost = mapping => mapping.provider_code === 'MANUAL';
 const movePriority = (mapping, direction) => {
     saveBusy.value = 'source-'+mapping.id;
     router.put(`/admin/catalog/mappings/${mapping.id}`, { direction }, {
@@ -145,6 +147,7 @@ const syncMapping = mapping => {
 const info = reactive({
     name: '', slug: '', publisher: '', category_id: '', fulfillment_mode: 'AUTO_PROVIDER',
     sort_order: 0, description: '', is_active: false, nickname_check_enabled: false,
+    price_markup_type: 'PERCENT', margin_percent: 12, price_markup_fixed_idr: 0,
     nickname_game_code: '', nickname_user_field_key: '', nickname_server_field_key: '',
     ...MANUAL_DEFAULTS,
 });
@@ -160,6 +163,9 @@ const loadInfo = () => {
         sort_order: product.value.sort_order ?? 0,
         description: product.value.description || '',
         is_active: Boolean(product.value.is_active),
+        price_markup_type: product.value.price_markup_type || 'PERCENT',
+        margin_percent: Number(product.value.margin_percent ?? 12),
+        price_markup_fixed_idr: Number(product.value.price_markup_fixed_idr ?? 0),
         nickname_check_enabled: Boolean(product.value.nickname_check_enabled),
         nickname_game_code: product.value.nickname_game_code || '',
         nickname_user_field_key: product.value.nickname_user_field_key || '',
@@ -177,7 +183,9 @@ const saveInfo = () => {
         ...info,
         category_id: Number(info.category_id),
         sort_order: Number(info.sort_order || 0),
-        margin_percent: Number(product.value.margin_percent ?? 0),
+        margin_percent: Number(info.margin_percent || 0),
+        price_markup_type: info.price_markup_type,
+        price_markup_fixed_idr: Number(info.price_markup_fixed_idr || 0),
         nickname_check_enabled: info.nickname_game_code ? info.nickname_check_enabled : false,
         manual_instructions: info.manual_instructions || null,
         manual_open_time: info.manual_open_time || null,
@@ -226,6 +234,17 @@ const slugCode = (text) => String(text || 'nominal').toLowerCase().replace(/[^a-
 
 const saveNominal = () => {
     const payload = nominalPayload(nominalEditing.value, nominal, nominalEditing.value?.code || `${slugCode(nominal.name)}-${Date.now().toString(36).slice(-4)}`);
+    // New auto-provider nominals may be backed by LOCAL voucher stock.
+    // Only an existing Digiflazz mapping opts into seller-owned pricing.
+    const usesDigiflazz = product.value?.fulfillment_mode === 'AUTO_PROVIDER'
+        && Boolean(nominalEditing.value?.mappings?.some(m => m.provider_code === 'DIGIFLAZZ'));
+    if (usesDigiflazz) {
+        // Nominal is identified by the storefront; Digiflazz prices come from
+        // its selected SKU and the markup configured on the product.
+        for (const key of ['margin_percent', 'margin_fixed_idr', 'sell_price_idr', 'sell_markup_percent']) delete payload[key];
+        if (!nominalEditing.value) payload.pricing_mode = 'PRODUCT_MARGIN';
+        else delete payload.pricing_mode;
+    }
     saveBusy.value = 'nominal';
     const finish = (bag) => { nominalErrors.value = bag; saveBusy.value = ''; };
     if (nominalEditing.value) {
@@ -412,25 +431,23 @@ const openEditorFull = (row) => {
     loadInfo();
     loadFields();
 };
-/* ---------- pengaturan harga katalog ---------- */
+/* ---------- pengaturan markup produk non-Digiflazz ---------- */
 const priceOpen = ref(false);
 const priceBusy = ref('');
 const priceErrors = ref({});
-const price = reactive({
-    cost_uplift_percent: Number(props.pricingSettings?.cost_uplift_percent ?? 2),
-    sell_markup_percent: Number(props.pricingSettings?.sell_markup_percent ?? 10),
-});
+const manualVoucherMarkup = ref(Number(props.pricingSettings?.sell_markup_percent ?? 10));
 const openPricing = () => {
     priceErrors.value = {};
-    price.cost_uplift_percent = Number(props.pricingSettings?.cost_uplift_percent ?? 2);
-    price.sell_markup_percent = Number(props.pricingSettings?.sell_markup_percent ?? 10);
+    manualVoucherMarkup.value = Number(props.pricingSettings?.sell_markup_percent ?? 10);
     priceOpen.value = true;
 };
 const savePricing = () => {
     priceBusy.value = 'pricing';
     router.put('/admin/catalog/pricing', {
-        cost_uplift_percent: Number(price.cost_uplift_percent || 0),
-        sell_markup_percent: Number(price.sell_markup_percent || 0),
+        // Retain the legacy field only because this endpoint still requires it.
+        // It is NOT applied to Digiflazz selling prices or edited in this UI.
+        cost_uplift_percent: Number(props.pricingSettings?.cost_uplift_percent ?? 2),
+        sell_markup_percent: Number(manualVoucherMarkup.value),
     }, {
         preserveScroll: true,
         onError: bag => { priceErrors.value = bag; },
@@ -501,10 +518,6 @@ const importPublish = ref(true);
 const autoProducts = computed(() => props.autoProductOptions);
 const importProduct = computed(() => props.products.find(row => Number(row.id) === Number(importProductId.value))
     || props.autoProductOptions.find(row => Number(row.id) === Number(importProductId.value)) || null);
-// Dua kolom global untuk SEMUA SKU yang dipilih, bukan per SKU:
-// harga modal = seller + uplift (default 2%), harga jual = modal + margin (default 10%).
-const importUplift = ref(Number(props.pricingSettings?.cost_uplift_percent ?? 2));
-const importMargin = ref(Number(props.pricingSettings?.sell_markup_percent ?? 0));
 const importBrands = computed(() => [...new Set(props.digiflazzItems.map(row => row.brand))].sort((a, b) => a.localeCompare(b, 'id-ID')));
 const importRows = computed(() => props.digiflazzItems.filter(row => {
     if (row.mapped || !row.available) return false;
@@ -512,8 +525,13 @@ const importRows = computed(() => props.digiflazzItems.filter(row => {
     const term = importSearch.value.trim().toLowerCase();
     return !term || `${row.product_name} ${row.buyer_sku_code}`.toLowerCase().includes(term);
 }).slice(0, 60));
-const storeCostOf = seller => Math.ceil(Number(seller || 0) * (100 + importUplift.value) / 100);
-const sellPriceOf = seller => Math.ceil(storeCostOf(seller) * (100 + Number(importMargin.value || 0)) / 100);
+const sellPriceOf = seller => {
+    const product = importProduct.value;
+    const price = Number(seller || 0);
+    return product?.price_markup_type === 'FIXED'
+        ? price + Number(product.price_markup_fixed_idr || 0)
+        : price + Math.ceil(price * Math.round(Number(product?.margin_percent ?? 12) * 10000) / 1000000);
+};
 
 const openImport = () => {
     importErrors.value = {};
@@ -522,8 +540,6 @@ const openImport = () => {
     importBrand.value = '';
     importPublish.value = true;
     if (!importProductId.value && autoProducts.value.length) importProductId.value = String(autoProducts.value[0].id);
-    importUplift.value = Number(importProduct.value?.cost_uplift_percent ?? props.pricingSettings?.cost_uplift_percent ?? 2);
-    importMargin.value = Number(props.pricingSettings?.sell_markup_percent ?? 0);
     importOpen.value = true;
 };
 const toggleImportRow = id => {
@@ -535,8 +551,6 @@ const submitImport = () => {
     importErrors.value = {};
     router.post(`/admin/catalog/products/${importProduct.value.id}/import`, {
         item_ids: importPicked.value,
-        cost_uplift_percent: Number(importUplift.value || 0),
-        margin_percent: Number(importMargin.value || 0),
         publish: importPublish.value,
     }, {
         preserveScroll: true,
@@ -562,7 +576,7 @@ onMounted(() => {
             <div class="adm-head-actions">
                 <Link href="/admin/catalog/categories" class="adm-btn">Kategori</Link>
                 <a href="/" target="_blank" rel="noopener" class="adm-btn">Lihat toko</a>
-                <button type="button" class="adm-btn" @click="openPricing">Pengaturan harga</button>
+                <button type="button" class="adm-btn" @click="openPricing">Markup Manual / Voucher</button>
                 <button v-if="autoProducts.length" type="button" class="adm-btn" @click="openImport">Impor dari Digiflazz</button>
                 <button type="button" class="adm-btn primary" @click="openAdd">Tambah produk</button>
             </div>
@@ -725,6 +739,22 @@ onMounted(() => {
                         </select>
                         <span class="hint">Bisa diubah kapan saja tanpa mengosongkan nominal.</span>
                     </label>
+                    <template v-if="info.fulfillment_mode === 'AUTO_PROVIDER'">
+                        <label class="adm-field">
+                            <span>Jenis tambahan harga Digiflazz</span>
+                            <select v-model="info.price_markup_type" class="adm-select">
+                                <option value="PERCENT">Persentase (%)</option>
+                                <option value="FIXED">Tambahan rupiah (Rp)</option>
+                            </select>
+                        </label>
+                        <label class="adm-field">
+                            <span>{{ info.price_markup_type === 'FIXED' ? 'Tambahan per nominal (Rp)' : 'Margin produk (%)' }}</span>
+                            <input v-if="info.price_markup_type === 'FIXED'" v-model.number="info.price_markup_fixed_idr" class="adm-input" type="number" min="0" max="1000000000" step="1">
+                            <input v-else v-model.number="info.margin_percent" class="adm-input" type="number" min="0" max="1000" step="0.01">
+                            <span class="hint">Harga jual = harga seller Digiflazz + tambahan ini. Nama produk tidak berubah saat SKU disinkronkan.</span>
+                            <span v-if="editErrors.margin_percent || editErrors.price_markup_fixed_idr || editErrors.price_markup_type" class="err">{{ editErrors.margin_percent || editErrors.price_markup_fixed_idr || editErrors.price_markup_type }}</span>
+                        </label>
+                    </template>
                     <label class="adm-field"><span>Posisi di toko</span><input v-model="info.sort_order" type="number" min="0" class="adm-input"></label>
                     <label class="adm-switch-row"><button type="button" class="adm-switch" role="switch" :aria-checked="info.is_active" @click="info.is_active = !info.is_active" />Aktif di toko</label>
                     <label class="adm-field full"><span>Deskripsi</span><textarea v-model="info.description" class="adm-textarea" maxlength="5000" /></label>
@@ -773,12 +803,12 @@ onMounted(() => {
 
             <div v-if="editTab === 'price'" style="padding-top:12px">
                 <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:8px">
-                    <p class="adm-note">Geser baris untuk mengubah urutan tampil. Harga jual diambil dari aturan harga nominal.</p>
+                    <p class="adm-note">Geser baris untuk mengubah urutan tampil. Harga SKU Digiflazz mengikuti seller; tambahan harga diatur pada Informasi Produk.</p>
                     <button type="button" class="adm-btn primary sm" @click="openNominal()">Tambah nominal</button>
                 </div>
                 <div class="adm-scroll">
                     <table class="adm-table">
-                        <thead><tr><th>Nominal</th><th class="num">Sumber / Modal</th><th class="num">Harga jual</th><th class="num">Margin</th><th>Urutan</th><th>Status</th><th>Aksi</th></tr></thead>
+                        <thead><tr><th>Nominal</th><th class="num">Harga dasar seller</th><th class="num">Harga jual</th><th class="num">Margin</th><th>Urutan</th><th>Status</th><th>Aksi</th></tr></thead>
                         <tbody>
                             <tr v-for="(row, index) in product?.packages || []" :key="row.id" draggable="true" @dragstart="onDragStart(index)" @dragover.prevent @drop="onDrop(index)">
                                 <td>
@@ -814,8 +844,7 @@ onMounted(() => {
                 <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:8px">
                     <div class="adm-note" style="display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap">
                         <span>
-                            Sumber pemenuhan per nominal. Prioritas kecil dipakai lebih dulu. Harga modal bisa diubah langsung di kolom Modal.
-                            Produk manual dan stok voucher tidak pernah disentuh sinkron Digiflazz.
+                            Nama produk/nominal mengikuti pengaturan toko, bukan nama Digiflazz. Harga seller Digiflazz tidak bisa diedit; modal hanya untuk produk manual.
                         </span>
                         <span>
                             Sinkron Digiflazz: {{ autoSync ? 'aktif' : 'nonaktif' }}{{ autoSync ? ' · setiap ' + (syncIntervalMinutes || 15) + ' menit' : '' }}
@@ -826,7 +855,7 @@ onMounted(() => {
                 <p v-for="(message, key) in editErrors" :key="'src-'+key" class="err">{{ message }}</p>
                 <div class="adm-scroll">
                     <table class="adm-table">
-                        <thead><tr><th>Nominal</th><th>Sumber</th><th class="num">Modal</th><th class="num">Prioritas</th><th>Status</th><th>Aksi</th></tr></thead>
+                        <thead><tr><th>Nominal</th><th>Sumber</th><th class="num">Harga dasar</th><th class="num">Prioritas</th><th>Status</th><th>Aksi</th></tr></thead>
                         <tbody>
                             <template v-for="row in sourceRows" :key="row.id">
                                 <tr v-for="mapping in row.mappings" :key="mapping.id">
@@ -959,7 +988,23 @@ onMounted(() => {
         </AdminModal>
 
 
-        <AdminModal v-model:open="importOpen" title="Impor nominal dari Digiflazz" description="Nominal yang dipilih disalin ke produk dengan harga modal dan harga jual sesuai aturan toko." wide>
+        <AdminModal v-model:open="priceOpen" title="Markup global manual dan voucher" description="Hanya untuk nominal manual dan voucher lokal yang memakai markup global. Produk Digiflazz memakai markup produk masing-masing.">
+            <div class="adm-grid">
+                <label class="adm-field">
+                    <span>Markup jual manual / voucher (%)</span>
+                    <input v-model.number="manualVoucherMarkup" type="number" min="0" max="1000" step="0.01" class="adm-input">
+                    <span class="hint">Tidak mengubah margin produk Digiflazz, harga seller, atau SKU terhubung.</span>
+                    <span v-if="priceErrors.sell_markup_percent" class="err">{{ priceErrors.sell_markup_percent }}</span>
+                    <span v-if="priceErrors.cost_uplift_percent" class="err">{{ priceErrors.cost_uplift_percent }}</span>
+                </label>
+            </div>
+            <template #footer>
+                <button type="button" class="adm-btn" @click="priceOpen = false">Batal</button>
+                <button type="button" class="adm-btn primary" :disabled="!!priceBusy" @click="savePricing">{{ priceBusy ? 'Menyimpan…' : 'Simpan markup' }}</button>
+            </template>
+        </AdminModal>
+
+        <AdminModal v-model:open="importOpen" title="Hubungkan SKU Digiflazz" description="SKU dan harga seller dihubungkan ke produk tujuan. Nama produk yang sudah ada tidak akan berubah." wide>
             <div class="adm-grid two">
                 <label class="adm-field">
                     <span>Produk tujuan <b class="req">*</b></span>
@@ -967,16 +1012,11 @@ onMounted(() => {
                         <option v-for="row in autoProducts" :key="row.id" :value="String(row.id)">{{ row.name }}</option>
                     </select>
                 </label>
-                <label class="adm-field">
-                    <span>Harga modal (%)</span>
-                    <input v-model="importUplift" type="number" min="0" max="1000" step="0.1" class="adm-input">
-                    <span class="hint">Tambahan dari harga seller Digiflazz, berlaku untuk semua SKU terpilih.</span>
-                </label>
-                <label class="adm-field">
-                    <span>Harga jual (%)</span>
-                    <input v-model="importMargin" type="number" min="0" max="1000" step="0.1" class="adm-input">
-                    <span class="hint">Dihitung dari harga modal, berlaku untuk semua SKU terpilih.</span>
-                </label>
+                <div class="adm-field">
+                    <span>Tambahan harga produk</span>
+                    <strong>{{ importProduct?.price_markup_type === 'FIXED' ? rupiah(importProduct?.price_markup_fixed_idr ?? 0) + ' per nominal' : (importProduct?.margin_percent ?? 12) + '%' }}</strong>
+                    <span class="hint">Default 12% saat produk dibuat. Ubah di editor Informasi Produk, bukan saat menghubungkan SKU.</span>
+                </div>
                 <label class="adm-field">
                     <span>Merek</span>
                     <select v-model="importBrand" class="adm-select">
@@ -999,21 +1039,20 @@ onMounted(() => {
 
             <div class="adm-scroll" style="margin-top:10px;max-height:46vh">
                 <table class="adm-table">
-                    <thead><tr><th></th><th>Nominal</th><th>SKU</th><th class="num">Harga seller</th><th class="num">Modal toko</th><th class="num">Harga jual</th></tr></thead>
+                    <thead><tr><th></th><th>Nominal</th><th>SKU</th><th class="num">Harga seller</th><th class="num">Harga jual</th></tr></thead>
                     <tbody>
                         <tr v-for="row in importRows" :key="row.id">
                             <td><input type="checkbox" :checked="importPicked.includes(row.id)" @change="toggleImportRow(row.id)"></td>
                             <td><strong>{{ row.product_name }}</strong><p class="dim">{{ row.brand }}</p></td>
                             <td class="mono">{{ row.buyer_sku_code }}</td>
                             <td class="num">{{ rupiah(row.price_idr) }}</td>
-                            <td class="num">{{ rupiah(storeCostOf(row.price_idr)) }}</td>
                             <td class="num">{{ rupiah(sellPriceOf(row.price_idr)) }}</td>
                         </tr>
-                        <tr v-if="!importRows.length"><td colspan="6" class="adm-empty">Tidak ada SKU tersedia untuk saringan ini. Sinkronkan daftar harga di menu Digiflazz lebih dulu.</td></tr>
+                        <tr v-if="!importRows.length"><td colspan="5" class="adm-empty">Tidak ada SKU tersedia untuk saringan ini. Sinkronkan daftar harga di menu Digiflazz lebih dulu.</td></tr>
                     </tbody>
                 </table>
             </div>
-            <p class="adm-note">{{ importPicked.length }} dipilih · modal toko memakai tambahan {{ importUplift }}% dari harga seller.</p>
+            <p class="adm-note">{{ importPicked.length }} SKU dipilih · nama produk dan nama nominal lama tetap milik toko.</p>
             <template #footer>
                 <button type="button" class="adm-btn" @click="importOpen = false">Batal</button>
                 <button type="button" class="adm-btn primary" :disabled="importBusy || !importPicked.length || !importProduct" @click="submitImport">
@@ -1027,14 +1066,14 @@ onMounted(() => {
                 <label class="adm-field"><span>Grup / tabel</span><input v-model="nominal.group_name" class="adm-input" placeholder="Umum" maxlength="120"><span class="hint">Kosong berarti Umum.</span></label>
                 <label class="adm-field"><span>Posisi</span><input v-model="nominal.sort_order" type="number" min="0" class="adm-input"></label>
                 <label class="adm-switch-row"><button type="button" class="adm-switch" role="switch" :aria-checked="nominal.is_active" @click="nominal.is_active = !nominal.is_active" />Nominal aktif</label>
-                <label class="adm-field">
+                <label v-if="!nominalEditing?.mappings?.some(m => m.provider_code === 'DIGIFLAZZ')" class="adm-field">
                     <span>Harga</span>
                     <select v-model="nominal.price_mode" class="adm-select">
                         <option value="FIXED">Harga tetap</option>
                         <option value="MARKUP">Markup dari modal</option>
                     </select>
                 </label>
-                <label class="adm-field">
+                <label v-if="!nominalEditing?.mappings?.some(m => m.provider_code === 'DIGIFLAZZ')" class="adm-field">
                     <span>{{ nominal.price_mode === 'FIXED' ? 'Harga jual (Rp)' : 'Markup (%)' }}</span>
                     <input v-model="nominal.price_value" type="number" min="0" class="adm-input">
                     <span v-if="nominalErrors.sell_price_idr" class="err">{{ nominalErrors.sell_price_idr }}</span>
@@ -1076,24 +1115,6 @@ onMounted(() => {
             <template #footer>
                 <button type="button" class="adm-btn" @click="removeTarget = null">Batal</button>
                 <button type="button" class="adm-btn danger" @click="confirmRemove">Hapus</button>
-            </template>
-        </AdminModal>
-        <AdminModal v-model:open="priceOpen" title="Pengaturan harga katalog" description="Tambahan modal dari harga seller dan markup jual berlaku untuk impor berikutnya." wide>
-            <div class="adm-grid two">
-                <label class="adm-field">
-                    <span>Tambahan modal (%)</span>
-                    <input v-model="price.cost_uplift_percent" type="number" min="0" max="1000" step="0.1" class="adm-input">
-                    <span v-if="priceErrors.cost_uplift_percent" class="err">{{ priceErrors.cost_uplift_percent }}</span>
-                </label>
-                <label class="adm-field">
-                    <span>Markup jual (%)</span>
-                    <input v-model="price.sell_markup_percent" type="number" min="0" max="1000" step="0.1" class="adm-input">
-                    <span v-if="priceErrors.sell_markup_percent" class="err">{{ priceErrors.sell_markup_percent }}</span>
-                </label>
-            </div>
-            <template #footer>
-                <button type="button" class="adm-btn" @click="priceOpen = false">Tutup</button>
-                <button type="button" class="adm-btn primary" :disabled="!!priceBusy" @click="savePricing">{{ priceBusy === 'pricing' ? 'Menyimpan…' : 'Simpan persentase' }}</button>
             </template>
         </AdminModal>
         <AdminModal v-model:open="stockOpen" title="Stok kode" :description="stockRow?.name || ''">

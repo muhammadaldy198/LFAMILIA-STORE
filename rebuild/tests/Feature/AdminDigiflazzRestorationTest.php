@@ -271,49 +271,21 @@ class AdminDigiflazzRestorationTest extends TestCase
         $this->login();
         $catalog = $this->mappedItem('manual-lock-sku');
         $mapping = ProviderMapping::where('external_sku', 'manual-lock-sku')->firstOrFail();
-
+        $originalName = $catalog['product']->name;
         $this->put('/admin/catalog/mappings/'.$mapping->id, [
-            'priority' => 0, 'is_active' => true, 'customer_no_template' => '',
-            'is_manual_price' => true,
-        ])->assertSessionHasErrors('manual_price_idr');
-
-        $this->put('/admin/catalog/mappings/'.$mapping->id, [
-            'priority' => 0, 'is_active' => true, 'customer_no_template' => '',
+            'priority' => 0, 'is_active' => true,
             'is_manual_price' => true, 'manual_price_idr' => 11000,
-        ])->assertRedirect()->assertSessionHasNoErrors();
-        $this->assertDatabaseHas('provider_mappings', [
-            'id' => $mapping->id, 'is_manual_price' => true, 'cost_idr' => 11000, 'store_cost_idr' => 11000, 'max_price_idr' => 11000,
-        ]);
-
-        $this->fakeCatalog([$this->row([
-            'buyer_sku_code' => 'manual-lock-sku', 'price' => 10500,
-            'unlimited_stock' => false, 'stock' => 13,
-        ])]);
-        app(DigiflazzCatalogService::class)->sync();
-        $this->assertDatabaseHas('digiflazz_catalog_items', [
-            'buyer_sku_code' => 'manual-lock-sku', 'price_idr' => 10500, 'stock' => 13,
-        ]);
-        $this->assertDatabaseHas('provider_mappings', [
-            'id' => $mapping->id, 'cost_idr' => 11000, 'max_price_idr' => 11000,
-        ]);
-
-        app(DigiflazzCatalogImport::class)->upsert($catalog['package'], 'manual-lock-sku', 10800, 10800);
-        $this->assertDatabaseHas('provider_mappings', [
-            'id' => $mapping->id, 'cost_idr' => 11000, 'max_price_idr' => 11000,
-        ]);
-
-        $this->put('/admin/catalog/mappings/'.$mapping->id, [
-            'priority' => 0, 'is_active' => true, 'customer_no_template' => '',
-            'is_manual_price' => false,
-        ])->assertRedirect()->assertSessionHasNoErrors();
+        ])->assertSessionHasErrors(['is_manual_price', 'manual_price_idr']);
+        $this->fakeCatalog([$this->row(['buyer_sku_code' => 'manual-lock-sku', 'price' => 10500])]);
         app(DigiflazzCatalogService::class)->sync('manual-lock-sku');
-        // Unlocking clears the old ceiling. Supplier sync refreshes the seller
-        // price and seeds store cost once, without introducing a new price type.
         $this->assertDatabaseHas('provider_mappings', [
-            'id' => $mapping->id, 'is_manual_price' => false,
-            'cost_idr' => 10500, 'seller_reference_price_idr' => 10500,
-            'store_cost_idr' => 10710, 'max_price_idr' => null,
+            'id' => $mapping->id, 'cost_idr' => 10500,
+            'store_cost_idr' => 10500, 'max_price_idr' => 10500,
+            'is_manual_price' => false,
         ]);
+        app(DigiflazzCatalogImport::class)->upsert($catalog['package'], 'manual-lock-sku', 10800, 10800);
+        $this->assertSame(10800, (int) $mapping->fresh()->cost_idr);
+        $this->assertSame($originalName, $catalog['product']->fresh()->name);
     }
 
     public function test_manual_price_lock_sets_authoritative_store_cost_used_by_checkout(): void
@@ -321,14 +293,11 @@ class AdminDigiflazzRestorationTest extends TestCase
         $this->login();
         $catalog = $this->mappedItem('manual-lock-checkout', ['price_idr' => 10000]);
         $mapping = ProviderMapping::where('external_sku', 'manual-lock-checkout')->firstOrFail();
-
         $this->put('/admin/catalog/mappings/'.$mapping->id, [
             'priority' => 0, 'is_active' => true,
             'is_manual_price' => true, 'manual_price_idr' => 11000,
-        ])->assertRedirect()->assertSessionHasNoErrors();
-
-        $this->assertSame(11000, (int) $mapping->fresh()->store_cost_idr);
-        $this->assertSame(12100, app(CheckoutPricing::class)->forPackage($catalog['package']->id)['subtotal_idr']);
+        ])->assertSessionHasErrors(['is_manual_price', 'manual_price_idr']);
+        $this->assertSame(11000, app(CheckoutPricing::class)->forPackage($catalog['package']->id)['subtotal_idr']);
     }
 
     public function test_admin_store_cost_edit_updates_checkout_and_price_ceiling(): void
@@ -336,37 +305,25 @@ class AdminDigiflazzRestorationTest extends TestCase
         $this->login();
         $catalog = $this->mappedItem('store-cost-edit', ['price_idr' => 10000]);
         $mapping = ProviderMapping::where('external_sku', 'store-cost-edit')->firstOrFail();
-        $mapping->update(['store_cost_idr' => 11000]);
-
         $this->put('/admin/catalog/mappings/'.$mapping->id, [
             'priority' => 0, 'is_active' => true, 'store_cost_idr' => 12000,
-        ])->assertRedirect()->assertSessionHasNoErrors();
-
-        $this->assertSame(12000, (int) $mapping->fresh()->store_cost_idr);
-        $this->assertSame(12000, (int) $mapping->fresh()->max_price_idr);
-        $this->assertSame(13200, app(CheckoutPricing::class)->forPackage($catalog['package']->id)['subtotal_idr']);
+        ])->assertSessionHasErrors('store_cost_idr');
+        $quote = app(CheckoutPricing::class)->forPackage($catalog['package']->id);
+        $this->assertSame(10000, $quote['cost_idr']);
+        $this->assertSame(11000, $quote['subtotal_idr']);
+        $this->assertSame(10000, $quote['max_price_idr']);
     }
 
     public function test_import_initializes_store_cost_with_one_time_uplift_and_never_reapplies_it(): void
     {
         $catalog = $this->mappedItem('initial-uplift-once', ['price_idr' => 12000]);
         $mapping = ProviderMapping::where('external_sku', 'initial-uplift-once')->firstOrFail();
-        DB::table('products')->where('id', $catalog['product']->id)->update(['cost_uplift_percent' => 2]);
-        DB::table('provider_mappings')->where('id', $mapping->id)->update([
-            'cost_idr' => 12000,
-            'max_price_idr' => 12000,
-            'store_cost_idr' => null,
-            'seller_reference_price_idr' => null,
-        ]);
-
+        $catalog['product']->update(['cost_uplift_percent' => 5]);
         app(DigiflazzCatalogImport::class)->upsert($catalog['package'], 'initial-uplift-once', 12000, 12000);
         app(DigiflazzCatalogImport::class)->upsert($catalog['package'], 'initial-uplift-once', 12000, 12000);
-
         $this->assertDatabaseHas('provider_mappings', [
-            'id' => $mapping->id,
-            'seller_reference_price_idr' => 12000,
-            'store_cost_idr' => 12240,
-            'max_price_idr' => 12240,
+            'id' => $mapping->id, 'seller_reference_price_idr' => 12000,
+            'store_cost_idr' => 12000, 'max_price_idr' => 12000,
         ]);
     }
 
@@ -375,49 +332,27 @@ class AdminDigiflazzRestorationTest extends TestCase
         $this->login();
         $catalog = $this->mappedItem('admin-redesign-cost');
         $mapping = ProviderMapping::where('external_sku', 'admin-redesign-cost')->firstOrFail();
-        DB::table('provider_mappings')->where('id', $mapping->id)->update([
-            'store_cost_idr' => 10200,
-            'seller_reference_price_idr' => 10000,
-        ]);
-
         $this->put('/admin/catalog/mappings/'.$mapping->id, [
-            'priority' => 0, 'is_active' => true, 'customer_no_template' => '',
-            'is_manual_price' => false, 'store_cost_idr' => 11000,
-        ])->assertRedirect()->assertSessionHasNoErrors();
-
-        $this->assertDatabaseHas('provider_mappings', [
-            'id' => $mapping->id,
-            'store_cost_idr' => 11000,
-            'seller_reference_price_idr' => 10000,
-            'max_price_idr' => 11000,
-        ]);
+            'priority' => 0, 'is_active' => true, 'store_cost_idr' => 11000,
+        ])->assertSessionHasErrors('store_cost_idr');
+        $this->assertSame(10000, (int) $mapping->fresh()->cost_idr);
     }
 
     public function test_sync_refreshes_seller_reference_without_overwriting_redesign_store_cost(): void
     {
         $catalog = $this->mappedItem('redesign-cost-preservation');
         $mapping = ProviderMapping::where('external_sku', 'redesign-cost-preservation')->firstOrFail();
-        DB::table('provider_mappings')->where('id', $mapping->id)->update([
-            'store_cost_idr' => 10200,
-            'seller_reference_price_idr' => 10000,
-        ]);
-        $catalog['product']->update(['sell_markup_percent' => 10]);
+        $catalog['product']->update(['margin_percent' => 12]);
         $this->fakeCatalog([$this->row([
             'buyer_sku_code' => 'redesign-cost-preservation', 'price' => 10500,
         ])]);
-
-        app(DigiflazzCatalogService::class)->sync();
         app(DigiflazzCatalogService::class)->sync('redesign-cost-preservation');
-
-        $this->assertDatabaseHas('digiflazz_catalog_items', [
-            'buyer_sku_code' => 'redesign-cost-preservation', 'price_idr' => 10500,
-        ]);
         $this->assertDatabaseHas('provider_mappings', [
             'id' => $mapping->id,
-            'cost_idr' => 10500,
-            'store_cost_idr' => 10200,
-            'seller_reference_price_idr' => 10500,
+            'cost_idr' => 10500, 'store_cost_idr' => 10500,
+            'seller_reference_price_idr' => 10500, 'max_price_idr' => 10500,
         ]);
+        $this->assertSame(12.0, (float) $catalog['product']->fresh()->margin_percent);
     }
 
     public function test_admin_can_sell_at_six_percent_margin_without_hidden_eight_percent_cutoff(): void
@@ -425,37 +360,14 @@ class AdminDigiflazzRestorationTest extends TestCase
         $this->login();
         $catalog = $this->mappedItem('manual-six-percent-sku');
         $catalog['product']->category->update(['is_active' => true]);
-        $catalog['package']->update([
-            'pricing_mode' => 'SELL_PRICE',
-            'sell_price_idr' => 10600,
-        ]);
-        $mapping = ProviderMapping::where('external_sku', 'manual-six-percent-sku')->firstOrFail();
-
-        $this->put('/admin/catalog/mappings/'.$mapping->id, [
-            'priority' => 0,
-            'is_active' => true,
-            'customer_no_template' => '',
-            'is_manual_price' => true,
-            'manual_price_idr' => 10000,
-        ])->assertRedirect()->assertSessionHasNoErrors();
-
-        $this->assertDatabaseHas('provider_mappings', [
-            'id' => $mapping->id,
-            'is_manual_price' => true,
-            'cost_idr' => 10000,
-            'store_cost_idr' => 10000,
-            'max_price_idr' => 10000,
-        ]);
-
+        $catalog['product']->update(['margin_percent' => 6, 'price_markup_type' => 'PERCENT']);
+        $catalog['package']->update(['pricing_mode' => 'SELL_PRICE', 'sell_price_idr' => 2000]);
         $quote = app(CheckoutPricing::class)->forPackage($catalog['package']->id);
         $this->assertSame(10000, $quote['cost_idr']);
-        $this->assertSame(10000, $quote['max_price_idr']);
         $this->assertSame(600, $quote['margin_idr']);
         $this->assertSame(10600, $quote['subtotal_idr']);
-
-        $previews = app(CheckoutPricing::class)->forPackages([$catalog['package']->id]);
-        $this->assertSame(10600, $previews[$catalog['package']->id]['subtotal_idr']);
-        $this->assertSame(10000, $previews[$catalog['package']->id]['max_price_idr']);
+        $preview = app(CheckoutPricing::class)->forPackages([$catalog['package']->id]);
+        $this->assertSame(10600, $preview[$catalog['package']->id]['subtotal_idr']);
     }
 
     public function test_locked_cost_cannot_hide_supplier_spike_above_manual_maximum(): void
@@ -463,29 +375,15 @@ class AdminDigiflazzRestorationTest extends TestCase
         $this->login();
         $catalog = $this->mappedItem('manual-cutoff-sku');
         $catalog['product']->category->update(['is_active' => true]);
-        $catalog['package']->update(['pricing_mode' => 'SELL_PRICE', 'sell_price_idr' => 13000]);
         $mapping = ProviderMapping::where('external_sku', 'manual-cutoff-sku')->firstOrFail();
         $mapping->update(['is_manual_price' => true, 'cost_idr' => 11000, 'max_price_idr' => 11000]);
-
-        $this->assertSame(13000, app(CheckoutPricing::class)->forPackage($catalog['package']->id)['subtotal_idr']);
-
         $this->fakeCatalog([$this->row(['buyer_sku_code' => 'manual-cutoff-sku', 'price' => 11500])]);
         app(DigiflazzCatalogService::class)->sync('manual-cutoff-sku');
-        $this->assertDatabaseHas('provider_mappings', [
-            'id' => $mapping->id, 'is_manual_price' => true,
-            'cost_idr' => 11000, 'max_price_idr' => 11000,
-        ]);
-
-        try {
-            app(CheckoutPricing::class)->forPackage($catalog['package']->id);
-            $this->fail('The live supplier price must trigger the locked per-source cutoff.');
-        } catch (ValidationException $exception) {
-            $this->assertArrayHasKey('package_id', $exception->errors());
-        }
-        $this->assertArrayNotHasKey(
-            $catalog['package']->id,
-            app(CheckoutPricing::class)->forPackages([$catalog['package']->id])
-        );
+        $quote = app(CheckoutPricing::class)->forPackage($catalog['package']->id);
+        $this->assertSame(11500, $quote['cost_idr']);
+        $this->assertSame(12650, $quote['subtotal_idr']);
+        $this->assertSame(11500, $quote['max_price_idr']);
+        $this->assertFalse((bool) $mapping->fresh()->is_manual_price);
     }
 
     public function test_admin_can_attach_alternate_digiflazz_source_to_existing_nominal(): void
@@ -1064,8 +962,8 @@ class AdminDigiflazzRestorationTest extends TestCase
         $this->assertSame(1, app(DigiflazzAutoSources::class)->sync());
         $this->assertDatabaseHas('provider_mappings', [
             'external_sku' => 'BOOT1.000', 'priority' => 0, 'is_active' => true,
-            'is_manual_price' => false, 'cost_idr' => 10000, 'store_cost_idr' => 10200,
-            'seller_reference_price_idr' => 10000, 'max_price_idr' => 10200,
+            'is_manual_price' => false, 'cost_idr' => 10000, 'store_cost_idr' => 10000,
+            'seller_reference_price_idr' => 10000, 'max_price_idr' => 10000,
         ]);
         $this->assertSame(0, app(DigiflazzAutoSources::class)->sync());
         $this->assertSame(1, ProviderMapping::where('product_package_id', $sample['package']->id)->count());
@@ -1221,7 +1119,7 @@ class AdminDigiflazzRestorationTest extends TestCase
         // never reprice an active mapping for a different verified product.
         $this->assertDatabaseHas('provider_mappings', [
             'id' => $mapping->id, 'cost_idr' => 10000,
-            'store_cost_idr' => 10200, 'max_price_idr' => 10200, 'is_active' => true,
+            'store_cost_idr' => 10000, 'max_price_idr' => 10000, 'is_active' => true,
         ]);
 
         // Redesign: seller availability returns only when the verified identity
@@ -1372,18 +1270,16 @@ class AdminDigiflazzRestorationTest extends TestCase
         $this->post('/admin/digiflazz/sync')->assertRedirect()->assertSessionHasNoErrors();
         $item = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'cr02-sku')->first();
         $this->post('/admin/catalog/products/'.$product->id.'/import', [
-            'item_ids' => [$item->id], 'margin_percent' => 12,
+            'item_ids' => [$item->id],
         ])->assertRedirect()->assertSessionHasNoErrors();
 
         $package = $product->packages()->firstOrFail();
         $mapping = $package->mappings()->firstOrFail();
-        // Modal toko = seller + uplift 2%; batas harga = modal, bukan markup 35%.
-        $this->assertSame(10200, (int) $mapping->store_cost_idr);
-        $this->assertSame(10200, (int) $mapping->max_price_idr);
-        // Margin tersimpan di nominalnya = angka yang dipakai, dan markup
-        // produk tidak lagi disentuh impor.
-        $this->assertSame(12, (int) round((float) $package->fresh()->margin_percent));
-        $this->assertSame('PERCENT', $package->fresh()->pricing_mode);
+        // Impor hanya menyimpan harga seller, sementara produk menyimpan markup.
+        $this->assertSame(10000, (int) $mapping->store_cost_idr);
+        $this->assertSame(10000, (int) $mapping->max_price_idr);
+        $this->assertSame('PRODUCT_MARGIN', $package->fresh()->pricing_mode);
+        $this->assertSame(10, (int) $product->fresh()->margin_percent);
         $this->assertNull($product->fresh()->sell_markup_percent);
     }
 
@@ -1401,21 +1297,21 @@ class AdminDigiflazzRestorationTest extends TestCase
 
         // Dua kolom global di pop-up impor: modal +2% (bawaan), jual +10% (bawaan).
         $this->post('/admin/catalog/products/'.$product->id.'/import', [
-            'item_ids' => [$item->id], 'cost_uplift_percent' => 2, 'margin_percent' => 10,
+            'item_ids' => [$item->id],
         ])->assertRedirect()->assertSessionHasNoErrors();
 
         $mapping = $product->packages()->firstOrFail()->mappings()->firstOrFail();
         $package = $product->packages()->firstOrFail();
-        // Modal = 10.000 + 2% = 10.200; harga jual = modal + 10% = 11.220.
-        $this->assertSame(10200, (int) $mapping->store_cost_idr);
-        $this->assertSame('PERCENT', $package->pricing_mode);
-        $this->assertSame(10, (int) round((float) $package->margin_percent));
+        // Harga seller 10.000 + markup produk 10% = 11.000.
+        $this->assertSame(10000, (int) $mapping->store_cost_idr);
+        $this->assertSame('PRODUCT_MARGIN', $package->pricing_mode);
+        $this->assertSame(10, (int) $product->margin_percent);
         // Harga yang benar-benar ditagih dihitung dari modal × margin nominal.
         Category::where('slug', 'game')->update(['is_active' => true]);
         Provider::where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
         $package->update(['is_active' => true]);
         $package->mappings()->update(['is_active' => true]);
-        $this->assertSame(11220, (int) app(CheckoutPricing::class)->previewForPackage($package->id)['subtotal_idr']);
+        $this->assertSame(11000, (int) app(CheckoutPricing::class)->previewForPackage($package->id)['subtotal_idr']);
     }
 
     public function test_import_honours_a_different_cost_column_for_every_selected_sku(): void
@@ -1433,17 +1329,17 @@ class AdminDigiflazzRestorationTest extends TestCase
         $item = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'uplift-5-sku')->first();
 
         $this->post('/admin/catalog/products/'.$product->id.'/import', [
-            'item_ids' => [$item->id], 'cost_uplift_percent' => 5, 'margin_percent' => 10,
+            'item_ids' => [$item->id],
         ])->assertRedirect()->assertSessionHasNoErrors();
 
         $package = $product->packages()->firstOrFail();
-        // Modal = 20.000 + 5% = 21.000; jual = 21.000 + 10% = 23.100.
-        $this->assertSame(21000, (int) $package->mappings()->firstOrFail()->store_cost_idr);
+        // Harga seller 20.000 menjadi harga dasar tanpa biaya modal tambahan.
+        $this->assertSame(20000, (int) $package->mappings()->firstOrFail()->store_cost_idr);
         Category::where('slug', 'game')->update(['is_active' => true]);
         Provider::where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
         $package->update(['is_active' => true]);
         $package->mappings()->update(['is_active' => true]);
-        $this->assertSame(23100, (int) app(CheckoutPricing::class)->previewForPackage($package->id)['subtotal_idr']);
+        $this->assertSame(22000, (int) app(CheckoutPricing::class)->previewForPackage($package->id)['subtotal_idr']);
     }
 
     public function test_full_sync_never_touches_manual_or_voucher_sources(): void

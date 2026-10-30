@@ -55,7 +55,7 @@ class AdminCatalogController
         return [
             ...$product->only('id', 'category_id', 'name', 'publisher', 'slug', 'description', 'fulfillment_mode',
                 'initials', 'accent_color', 'instant', 'package_tabs_enabled', 'package_tabs',
-                'customer_no_template', 'manual_instructions', 'manual_open_time', 'manual_close_time', 'manual_timezone', 'margin_percent', 'sort_order', 'is_active', 'popular',
+                'customer_no_template', 'manual_instructions', 'manual_open_time', 'manual_close_time', 'manual_timezone', 'margin_percent', 'price_markup_type', 'price_markup_fixed_idr', 'sort_order', 'is_active', 'popular',
                 'cost_uplift_percent',
                 'nickname_check_enabled', 'nickname_game_code', 'nickname_user_field_key',
                 'nickname_server_field_key'),
@@ -136,8 +136,8 @@ class AdminCatalogController
         return Inertia::render('Admin/Catalog', [
             'checkoutPreviews' => $checkoutPreviews,
             'autoProductOptions' => Product::where('fulfillment_mode', 'AUTO_PROVIDER')
-                ->orderBy('name')->get(['id', 'name'])
-                ->map(fn (Product $product): array => ['id' => (int) $product->id, 'name' => $product->name]),
+                ->orderBy('name')->get(['id', 'name', 'margin_percent', 'price_markup_type', 'price_markup_fixed_idr'])
+                ->map(fn (Product $product): array => $product->only('id', 'name', 'margin_percent', 'price_markup_type', 'price_markup_fixed_idr')),
             'categories' => Category::with('media')->orderBy('sort_order')->get()->map(fn (Category $category): array => [
                 ...$category->only('id', 'name', 'slug', 'icon', 'sort_order', 'is_active'),
                 'image_url' => $category->getFirstMediaUrl('image'),
@@ -303,6 +303,8 @@ class AdminCatalogController
             'manual_close_time' => ['nullable', 'regex:/^([01]\\d|2[0-3]):[0-5]\\d$/'],
             'manual_timezone' => ['nullable', Rule::in(['Asia/Jakarta', 'Asia/Makassar', 'Asia/Jayapura'])],
             'margin_percent' => ['required', 'numeric', 'min:0', 'max:1000', 'decimal:0,4'],
+            'price_markup_type' => ['sometimes', Rule::in(['PERCENT', 'FIXED'])],
+            'price_markup_fixed_idr' => ['sometimes', 'integer', 'min:0', 'max:1000000000'],
             'sort_order' => ['required', 'integer', 'min:0'],
             // Satu formulir boleh membawa banyak baris nominal untuk produk manual.
             'packages' => ['sometimes', 'array', 'max:100'],
@@ -316,6 +318,11 @@ class AdminCatalogController
         ]);
         $rows = collect($data['packages'] ?? [])->values();
         unset($data['packages']);
+        if ($data['fulfillment_mode'] === 'AUTO_PROVIDER') {
+            $data['margin_percent'] = (string) ($data['margin_percent'] ?? '12');
+            $data['price_markup_type'] ??= 'PERCENT';
+            $data['price_markup_fixed_idr'] ??= 0;
+        }
         $data['slug'] = ($data['slug'] ?? null) ?: Str::slug($data['name']);
         if (! $data['slug']) {
             throw ValidationException::withMessages(['name' => 'Nama produk tidak valid.']);
@@ -424,6 +431,8 @@ class AdminCatalogController
             'manual_close_time' => ['nullable', 'regex:/^([01]\\d|2[0-3]):[0-5]\\d$/'],
             'manual_timezone' => ['nullable', Rule::in(['Asia/Jakarta', 'Asia/Makassar', 'Asia/Jayapura'])],
             'margin_percent' => ['required', 'numeric', 'min:0', 'max:1000', 'decimal:0,4'],
+            'price_markup_type' => ['sometimes', Rule::in(['PERCENT', 'FIXED'])],
+            'price_markup_fixed_idr' => ['sometimes', 'integer', 'min:0', 'max:1000000000'],
             'sort_order' => ['required', 'integer', 'min:0'],
             'is_active' => ['required', 'boolean'],
             'cost_uplift_percent' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:1000', 'decimal:0,4'],
@@ -871,7 +880,11 @@ class AdminCatalogController
 
         $highestActiveCost = $package->mappings()->where('is_active', true)
             ->selectRaw('MAX(COALESCE(store_cost_idr, cost_idr)) as aggregate')->value('aggregate');
-        if (($data['pricing_mode'] ?? $package->pricing_mode) === 'SELL_PRICE'
+        $hasDigiflazzSource = $package->mappings()
+            ->where('provider_id', Provider::where('code', 'DIGIFLAZZ')->value('id'))
+            ->exists();
+        if (! $hasDigiflazzSource
+            && ($data['pricing_mode'] ?? $package->pricing_mode) === 'SELL_PRICE'
             && (int) ($data['sell_price_idr'] ?? $package->sell_price_idr) < (int) ($newCost ?? $highestActiveCost)) {
             throw ValidationException::withMessages(['sell_price_idr' => 'Harga jual tidak boleh di bawah modal.']);
         }
@@ -1137,9 +1150,9 @@ class AdminCatalogController
             'priority' => ['required', 'integer', 'min:0', 'max:1000'],
             'is_active' => ['required', 'boolean'],
             'cost_idr' => [$provider->code === 'MANUAL' ? 'required' : 'prohibited', 'integer', 'min:0', 'max:1000000000'],
-            'is_manual_price' => [$provider->code === 'DIGIFLAZZ' ? 'sometimes' : 'prohibited', 'boolean'],
-            'manual_price_idr' => [$provider->code === 'DIGIFLAZZ' ? 'sometimes' : 'prohibited', 'integer', 'min:1', 'max:1000000000'],
-            'store_cost_idr' => [$provider->code === 'MANUAL' || $provider->code === 'DIGIFLAZZ' ? 'sometimes' : 'prohibited', 'integer', $provider->code === 'MANUAL' ? 'min:0' : 'min:1', 'max:1000000000'],
+            'is_manual_price' => ['prohibited'],
+            'manual_price_idr' => ['prohibited'],
+            'store_cost_idr' => [$provider->code === 'MANUAL' ? 'sometimes' : 'prohibited', 'integer', 'min:0', 'max:1000000000'],
         ]);
         if ($provider->code === 'MANUAL' && array_key_exists('cost_idr', $data)) {
             if (! array_key_exists('store_cost_idr', $data)
@@ -1151,16 +1164,6 @@ class AdminCatalogController
         }
 
         if ($provider->code === 'DIGIFLAZZ') {
-            if (isset($data['store_cost_idr'])) {
-                if ($mapping->seller_reference_price_idr !== null
-                    && (int) $data['store_cost_idr'] < (int) $mapping->seller_reference_price_idr) {
-                    throw ValidationException::withMessages([
-                        'store_cost_idr' => 'Store cost tidak boleh di bawah harga referensi seller saat ini.',
-                    ]);
-                }
-                $data['max_price_idr'] = (int) $data['store_cost_idr'];
-            }
-
             if ($data['is_active']) {
                 $product = Product::query()
                     ->join('product_packages', 'product_packages.product_id', '=', 'products.id')
@@ -1182,31 +1185,6 @@ class AdminCatalogController
                     ]);
                 }
             }
-            $locking = (bool) ($data['is_manual_price'] ?? $mapping->is_manual_price);
-            if ($locking && ! $mapping->is_manual_price && ! isset($data['manual_price_idr'])) {
-                throw ValidationException::withMessages([
-                    'manual_price_idr' => 'Isi harga manual saat mengaktifkan kunci harga.',
-                ]);
-            }
-            if (isset($data['manual_price_idr']) && ! $locking) {
-                throw ValidationException::withMessages([
-                    'manual_price_idr' => 'Aktifkan kunci harga sebelum menentukan harga manual.',
-                ]);
-            }
-            if ($locking && isset($data['manual_price_idr'])) {
-                // One admin-supplied amount is both the fixed accounting cost
-                // and per-source maximum. Never use an incoming seller price.
-                $data['cost_idr'] = $data['manual_price_idr'];
-                $data['store_cost_idr'] = $data['manual_price_idr'];
-                $data['max_price_idr'] = $data['manual_price_idr'];
-            } elseif ($mapping->is_manual_price && ! $locking) {
-                // Unlocking returns this mapping to supplier-controlled pricing;
-                // the next sync refreshes cost and ceiling from the live SKU.
-                $data['store_cost_idr'] = null;
-                $data['max_price_idr'] = null;
-            }
-            unset($data['manual_price_idr']);
-
             // An explicit admin edit overrides any earlier sync-generated disable.
             $data['disabled_by_sync'] = false;
         }

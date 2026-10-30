@@ -59,7 +59,7 @@ class DigiflazzCatalogImport
             throw new InvalidArgumentException('Mapping Digiflazz tidak valid.');
         }
 
-        return DB::transaction(function () use ($package, $buyerSkuCode, $costIdr, $costUplift): ProviderMapping {
+        return DB::transaction(function () use ($package, $buyerSkuCode, $costIdr): ProviderMapping {
             // Serialize importer/attach operations on this nominal. A second
             // Digiflazz mapping must never be created by an alternate caller.
             ProductPackage::whereKey($package->id)->lockForUpdate()->firstOrFail();
@@ -86,16 +86,13 @@ class DigiflazzCatalogImport
             }
 
             $before = $mapping->exists ? $mapping->toArray() : null;
-            // Auto-source imports may re-visit existing SKUs. Never reset a
-            // manual price lock from another synchronization path.
-            if (! $mapping->is_manual_price) {
-                $mapping->cost_idr = $costIdr;
-                $mapping->seller_reference_price_idr = $costIdr;
-                if ($mapping->store_cost_idr === null) {
-                    $mapping->store_cost_idr = $this->initialStoreCost($package, $package->product, $costIdr, $costUplift);
-                }
-                $mapping->max_price_idr = $mapping->store_cost_idr;
-            }
+            // Digiflazz supplies the only seller price. Historical accounting
+            // columns mirror that value and never apply a second cost uplift.
+            $mapping->cost_idr = $costIdr;
+            $mapping->seller_reference_price_idr = $costIdr;
+            $mapping->store_cost_idr = $costIdr;
+            $mapping->max_price_idr = $costIdr;
+            $mapping->is_manual_price = false;
             $mapping->save();
             DB::table('audit_logs')->insert([
                 'actor_type' => 'system',

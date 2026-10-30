@@ -309,10 +309,14 @@ test('no template expression unwraps a ref that Vue already unwraps', () => {
 
 test('round-two admin fixes keep their UI entry points', () => {
     const catalog = read('Catalog.vue');
-    // Nominal manual: modal layanan, harga katalog, hapus produk.
+    // Nominal manual tetap didukung; seller Digiflazz memakai markup produk.
     assert.match(catalog, /manual_instructions/);
+    assert.match(catalog, /price_markup_type/);
+    assert.match(catalog, /price_markup_fixed_idr/);
+    // Global pricing remains available only for manual and voucher markup.
     assert.match(catalog, /\/admin\/catalog\/pricing/);
-    // Margin global sudah dibuang dari rancangan; hanya tiga harga yang tersisa.
+    assert.match(catalog, /Markup Manual \/ Voucher/);
+    assert.match(catalog, /Produk Digiflazz memakai markup produk masing-masing/);
     assert.doesNotMatch(catalog, /margin\/preview|Margin global|catalog\/margin/);
     assert.match(catalog, /\/packages\/\$\{row\.id\}\/duplicate/);
     assert.match(catalog, /\/voucher-stock/);
@@ -407,34 +411,48 @@ test('editing a nominal keeps stored pricing and nominal_value', async () => {
     assert.doesNotMatch(catalog, /nominal_value: null,\s*\n\s*pricing_mode:/);
 });
 
-// CR-02: margin impor dibaca dari setting harga yang aktif, bukan prop warisan.
-// Penjagaan di server saja tidak cukup: form yang masih mengirim 35 akan lolos.
-test('import margin reads the active pricing setting', () => {
+// Harga Digiflazz berasal dari SKU seller + markup milik produk, bukan
+// penambahan modal global atau harga jual tetap saat impor.
+test('import displays selected product markup without overwriting product names', () => {
     const catalog = read('Catalog.vue');
-    assert.match(catalog, /importMargin = ref\(Number\(props\.pricingSettings\?\.sell_markup_percent/);
-    // Angka impor selalu dari setting aktif, bukan markup produk yang tidak
-    // ada di panel.
-    assert.doesNotMatch(catalog, /importProduct\.value\?\.sell_markup_percent/);
-    assert.doesNotMatch(catalog, /defaultMargin|props\.pricingSettings\?\.default_margin/);
-    // Dua kolom global impor: harga modal (%) dan harga jual (%), keduanya
-    // bisa diubah admin dan dikirim bersama impor untuk semua SKU terpilih.
-    assert.match(catalog, /v-model="importUplift"/);
-    assert.match(catalog, /v-model="importMargin"/);
-    assert.match(catalog, /cost_uplift_percent: Number\(importUplift\.value \|\| 0\)/);
-    assert.match(catalog, /margin_percent: Number\(importMargin\.value \|\| 0\)/);
+    assert.match(catalog, /price_markup_type === 'FIXED'/);
+    assert.match(catalog, /Number\(product\?\.margin_percent \?\? 12\)/);
+    assert.match(catalog, /nama produk dan nama nominal lama tetap milik toko/i);
+    assert.match(catalog, /seller Digiflazz/i);
+    assert.doesNotMatch(catalog, /importUplift|importMargin/);
+    const importSubmit = catalog.split('const submitImport = () => {')[1]?.split('\n};')[0];
+    assert.ok(importSubmit, 'SKU import submission must exist');
+    assert.doesNotMatch(importSubmit, /cost_uplift_percent|sell_markup_percent|margin_percent/);
+    // The separate global settings form must remain available for local
+    // voucher and manual PRODUCT_MARGIN pricing.
+    assert.match(catalog, /cost_uplift_percent: Number\(/);
 });
 
-// Tab Sumber mempertahankan edit modal per SKU, tetapi saklar sinkron
-// seluruh katalog hanya ada di halaman Digiflazz.
+// Tab Sumber hanya bisa mengubah modal sumber manual; harga seller
+// Digiflazz read-only dan saklar sinkron di menu Digiflazz.
 test('source tab edits store cost and links to canonical Digiflazz sync settings', () => {
     const catalog = read('Catalog.vue');
     const digiflazz = read('Digiflazz.vue');
+    assert.match(catalog, /canEditCost = mapping => mapping.provider_code === 'MANUAL'/);
     assert.match(catalog, /saveMapping\(mapping, \{ store_cost_idr: Number\(\$event\.target\.value \|\| 0\) \}\)/);
     assert.doesNotMatch(catalog, /const toggleAutoSync =/);
     assert.doesNotMatch(catalog, /router\.put\('\/admin\/catalog\/auto-sync'/);
     assert.match(catalog, /href="\/admin\/digiflazz"/);
     assert.match(digiflazz, /settings\.put\('\/admin\/digiflazz\/settings'/);
     assert.doesNotMatch(catalog, /products\/\$\{product\.value\.id\}\/sync/);
+});
+
+test('new local voucher nominal keeps its own price controls', () => {
+    const catalog = read('Catalog.vue');
+    // New AUTO_PROVIDER nominal does not yet have a Digiflazz mapping,
+    // so its fixed-price or percentage controls must remain visible.
+    assert.match(catalog, /const usesDigiflazz = product\.value\?\.fulfillment_mode === 'AUTO_PROVIDER'/);
+    assert.match(catalog, /Boolean\(nominalEditing\.value\?\.mappings\?\.some\(m => m\.provider_code === 'DIGIFLAZZ'\)\)/);
+    assert.doesNotMatch(catalog, /!nominalEditing\.value \|\|/);
+    assert.match(catalog, /v-if="!nominalEditing\?\.mappings\?\.some\(m => m\.provider_code === 'DIGIFLAZZ'\)"/);
+    const nominal = repo('resources/js/lib/catalogNominal.js');
+    assert.match(nominal, /sell_price_idr: form\.price_mode === 'FIXED'/);
+    assert.match(nominal, /margin_percent: form\.price_mode === 'MARKUP'/);
 });
 
 // CR-03: membuat akun admin baru (termasuk Super Admin) juga menanyakan kata
@@ -478,14 +496,14 @@ test('catalog source tab uses existing mapping and sync routes', () => {
 });
 
 
-// CR-05: payload panel Sumber tidak boleh mengubah modal atau melepas kunci harga.
-test('catalog source payload keeps stored cost and manual price lock', () => {
+// CR-05: mapping Digiflazz tidak lagi memakai harga/kunci manual.
+test('catalog source payload leaves Digiflazz seller price read-only', () => {
     const manual = { id: 1, provider_code: 'MANUAL', cost_idr: 9000, store_cost_idr: 9500, priority: 4, is_active: true };
     assert.equal(mappingPayload(manual, { priority: 2 }).cost_idr, 9000);
     assert.equal(mappingPayload(manual, { priority: 2 }).priority, 2);
 
     const locked = { id: 2, provider_code: 'DIGIFLAZZ', is_manual_price: true, cost_idr: 8000, priority: 1, is_active: true };
-    assert.equal(mappingPayload(locked, { is_active: false }).is_manual_price, true);
+    assert.deepEqual(Object.keys(mappingPayload(locked, { is_active: false })).sort(), ['is_active', 'priority']);
 
     // Mapping biasa tidak mengirim field harga sama sekali.
     const plain = { id: 3, provider_code: 'DIGIFLAZZ', is_manual_price: false, cost_idr: 8000, priority: 1, is_active: true };

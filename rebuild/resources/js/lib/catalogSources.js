@@ -36,10 +36,6 @@ export const mappingPayload = (mapping, changes) => {
     if (changes && Object.prototype.hasOwnProperty.call(changes, 'store_cost_idr')) {
         payload.store_cost_idr = Number(changes.store_cost_idr || 0);
     }
-    if (mapping.provider_code === 'DIGIFLAZZ' && mappingIsLocked(mapping)) {
-        // Kunci harga harus tetap menyala supaya cost_idr manual tidak dilepas.
-        payload.is_manual_price = true;
-    }
     return payload;
 };
 

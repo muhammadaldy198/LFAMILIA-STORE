@@ -14,7 +14,6 @@ use App\Services\CatalogPricingSettings;
 use App\Services\CheckoutPricing;
 use App\Services\CustomerCleanupService;
 use App\Services\DigiflazzCatalogService;
-use App\Services\DigiflazzFixedPricePolicy;
 use App\Services\FulfillmentService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\Client\Factory;
@@ -96,18 +95,18 @@ class AdminPanelRestorationTest extends TestCase
         $this->post('/admin/digiflazz/sync')->assertRedirect()->assertSessionHasNoErrors();
         $item = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'restore-sku')->first();
         $product = $this->product();
-        $this->post('/admin/catalog/products/'.$product->id.'/import', ['item_ids' => [$item->id], 'margin_percent' => 12])->assertRedirect()->assertSessionHasNoErrors();
+        $this->post('/admin/catalog/products/'.$product->id.'/import', ['item_ids' => [$item->id]])->assertRedirect()->assertSessionHasNoErrors();
         $package = $product->packages()->firstOrFail();
         $mapping = $package->mappings()->firstOrFail();
         $this->assertFalse($package->is_active);
         $this->assertFalse($mapping->is_active);
-        // Redesign: the per-source cap is the store cost (seller 10000 + 2% uplift).
-        $this->assertSame(10200, (int) $mapping->max_price_idr);
+        // SKU is connected at the seller price without a separate cost uplift.
+        $this->assertSame(10000, (int) $mapping->max_price_idr);
         $this->fakeCatalog([$this->row(['price' => 12000])]);
         $this->post('/admin/catalog/mappings/'.$mapping->id.'/sync')->assertRedirect()->assertSessionHasNoErrors();
         $this->assertSame(12000, (int) $mapping->fresh()->cost_idr);
         $this->assertSame(10000, (int) DB::table('digiflazz_catalog_items')->where('id', $item->id)->value('baseline_price_idr'));
-        $this->post('/admin/catalog/products/'.$product->id.'/import', ['item_ids' => [$item->id], 'margin_percent' => 12])->assertSessionHasNoErrors();
+        $this->post('/admin/catalog/products/'.$product->id.'/import', ['item_ids' => [$item->id]])->assertSessionHasNoErrors();
         $this->assertSame(1, $product->packages()->count());
     }
 
@@ -123,12 +122,12 @@ class AdminPanelRestorationTest extends TestCase
         $itemId = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'restore-sku')->value('id');
 
         $this->post('/admin/catalog/products/'.$product->id.'/import', [
-            'item_ids' => [$itemId], 'margin_percent' => 12,
+            'item_ids' => [$itemId],
         ])->assertRedirect()->assertSessionHasNoErrors();
         $package = $product->packages()->firstOrFail();
         $package->update(['is_active' => true]);
         $package->mappings()->update(['is_active' => true]);
-        $this->assertSame('12.0000', (string) $package->fresh()->margin_percent);
+        $this->assertSame('PRODUCT_MARGIN', $package->fresh()->pricing_mode);
 
         // Impor SKU lain tidak boleh menimpa margin nominal yang sudah diatur.
         $otherId = DB::table('digiflazz_catalog_items')->insertGetId([
@@ -140,11 +139,11 @@ class AdminPanelRestorationTest extends TestCase
             'created_at' => now(), 'updated_at' => now(),
         ]);
         $this->post('/admin/catalog/products/'.$product->id.'/import', [
-            'item_ids' => [$otherId], 'margin_percent' => 25,
+            'item_ids' => [$otherId],
         ])->assertRedirect()->assertSessionHasNoErrors();
 
-        $this->assertSame('12.0000', (string) $package->fresh()->margin_percent);
-        $this->assertSame(11424, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
+        $this->assertSame('PRODUCT_MARGIN', $package->fresh()->pricing_mode);
+        $this->assertSame(11000, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
     }
 
     public function test_activating_automatic_product_validates_existing_destination_template(): void
@@ -191,7 +190,7 @@ class AdminPanelRestorationTest extends TestCase
         ]);
         $itemId = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'restore-sku')->value('id');
         $this->post('/admin/catalog/products/'.$product->id.'/import', [
-            'item_ids' => [$itemId], 'margin_percent' => 10, 'publish' => true,
+            'item_ids' => [$itemId], 'publish' => true,
         ])->assertRedirect()->assertSessionHasNoErrors();
 
         $this->put('/admin/catalog/products/'.$product->id.'/fields', [
@@ -230,7 +229,7 @@ class AdminPanelRestorationTest extends TestCase
         }
         $id = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'restore-sku')->value('id');
         $this->post('/admin/catalog/products/'.$product->id.'/import', [
-            'item_ids' => [$id], 'margin_percent' => 12, 'publish' => true,
+            'item_ids' => [$id], 'publish' => true,
         ])->assertRedirect()->assertSessionHasNoErrors();
         $package = $product->packages()->firstOrFail();
         $mapping = $package->mappings()->firstOrFail();
@@ -238,17 +237,17 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertTrue($package->is_active);
         $this->assertTrue($mapping->is_active);
         $this->assertSame('{{user_id}}{{zone_id}}', $product->fresh()->customer_no_template);
-        // Margin impor tersimpan di nominal, bukan di produk.
-        $this->assertEqualsWithDelta(12, (float) $package->fresh()->margin_percent, 0.0001);
-        $this->assertSame('PERCENT', $package->fresh()->pricing_mode);
+        // Margin is owned by the product; imported SKUs never rename it or reprice the nominal.
+        $this->assertEqualsWithDelta(10, (float) $product->fresh()->margin_percent, 0.0001);
+        $this->assertSame('PRODUCT_MARGIN', $package->fresh()->pricing_mode);
         $this->assertNull($product->fresh()->sell_markup_percent);
         // Redesign: store cost (10000 + 2%) × import margin 12% = 11424.
-        $this->assertSame(11424, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
+        $this->assertSame(11000, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
         $response = $this->get('/catalog/'.$product->slug);
         $response->assertOk();
         $response->assertInertia(function (AssertableInertia $page): void {
             $page->where('packages.0.is_available', true);
-            $page->where('packages.0.price_idr', 11424);
+            $page->where('packages.0.price_idr', 11000);
         });
         $this->assertDatabaseHas('audit_logs', ['action' => 'catalog.mapping.updated', 'target_id' => (string) $mapping->id]);
         Http::assertSentCount(1);
@@ -266,12 +265,11 @@ class AdminPanelRestorationTest extends TestCase
         $product->update(['customer_no_template' => '{{destination}}']);
         $id = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'restore-sku')->value('id');
         $this->post('/admin/catalog/products/'.$product->id.'/import', [
-            'item_ids' => [$id], 'margin_percent' => 5, 'publish' => true,
+            'item_ids' => [$id], 'publish' => true,
         ])->assertRedirect()->assertSessionHasNoErrors();
         $package = $product->packages()->firstOrFail();
         $this->assertSame('{{destination}}', $product->fresh()->customer_no_template);
-        // Redesign: store cost (10000 + 2%) × import margin 5% = 10710.
-        $this->assertSame(10710, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
+        $this->assertSame(11000, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
     }
 
     public function test_publish_import_rejects_invalid_destination_formats_without_partial_activation(): void
@@ -289,7 +287,7 @@ class AdminPanelRestorationTest extends TestCase
         $id = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'restore-sku')->value('id');
         foreach (['', '{{user_id}}', '{{unknown}}{{zone_id}}', '{{user_id}}{{zone_id}'] as $template) {
             $this->post('/admin/catalog/products/'.$product->id.'/import', [
-                'item_ids' => [$id], 'margin_percent' => 10, 'publish' => true, 'customer_no_template' => $template,
+                'item_ids' => [$id], 'publish' => true, 'customer_no_template' => $template,
             ])->assertSessionHasErrors('customer_no_template');
             $this->assertSame(0, $product->packages()->count());
             $this->assertFalse($product->fresh()->is_active);
@@ -309,14 +307,14 @@ class AdminPanelRestorationTest extends TestCase
         $product->fields()->create(['field_key' => 'destination', 'label' => 'ID tujuan', 'type' => 'text', 'is_required' => true, 'sort_order' => 0]);
         $ids = DB::table('digiflazz_catalog_items')->whereIn('buyer_sku_code', ['restore-sku', 'restore-unavailable'])->pluck('id')->all();
         $this->post('/admin/catalog/products/'.$product->id.'/import', [
-            'item_ids' => $ids, 'margin_percent' => 10, 'publish' => true,
+            'item_ids' => $ids, 'publish' => true,
         ])->assertSessionHasErrors('item_ids');
         $this->assertSame(0, $product->packages()->count());
         $this->assertFalse($product->fresh()->is_active);
         $provider->forceFill(['is_active' => false])->save();
         $id = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'restore-sku')->value('id');
         $this->post('/admin/catalog/products/'.$product->id.'/import', [
-            'item_ids' => [$id], 'margin_percent' => 10, 'publish' => true,
+            'item_ids' => [$id], 'publish' => true,
         ])->assertSessionHasErrors('publish');
         $this->assertSame(0, (int) $provider->fresh()->is_active);
         $this->assertSame(0, $product->packages()->count());
@@ -339,7 +337,7 @@ class AdminPanelRestorationTest extends TestCase
         $product->fields()->create(['field_key' => 'destination', 'label' => 'ID tujuan', 'type' => 'text', 'is_required' => true, 'sort_order' => 0]);
         $ids = DB::table('digiflazz_catalog_items')->whereIn('buyer_sku_code', ['group-20-A', 'group-7-A', 'group-10-B'])->pluck('id')->all();
         $this->post('/admin/catalog/products/'.$product->id.'/import', [
-            'item_ids' => $ids, 'margin_percent' => 10, 'publish' => true,
+            'item_ids' => $ids, 'publish' => true,
         ])->assertRedirect()->assertSessionHasNoErrors();
         $packages = $product->packages()->orderBy('sort_order')->get();
         $this->assertSame([7, 10, 20], $packages->pluck('nominal_value')->map(fn ($value): int => (int) $value)->all());
@@ -347,12 +345,11 @@ class AdminPanelRestorationTest extends TestCase
             $this->assertSame(1, $package->mappings()->count());
             $this->assertSame(1, $package->mappings()->where('is_active', true)->count());
             $this->assertSame([0], $package->mappings()->orderBy('priority')->pluck('priority')->map(fn ($value): int => (int) $value)->all());
-            // Harga jual = modal toko × margin nominal (bukan harga tetap).
+            // Price is calculated from current seller SKU and product-level 10% markup.
             $quote = app(CheckoutPricing::class)->forPackage($package->id);
-            $storeCost = (int) $package->mappings()->firstOrFail()->store_cost_idr;
-            $this->assertSame('PERCENT', $package->pricing_mode);
-            $this->assertSame(10, (int) $package->margin_percent);
-            $this->assertSame(intdiv(($storeCost * 110) + 99, 100), $quote['subtotal_idr']);
+            $sellerPrice = (int) $package->mappings()->firstOrFail()->cost_idr;
+            $this->assertSame('PRODUCT_MARGIN', $package->pricing_mode);
+            $this->assertSame($sellerPrice + intdiv(($sellerPrice * 10) + 99, 100), $quote['subtotal_idr']);
             $this->assertSame(1, $package->mappings()->count());
         }
         $response = $this->get('/catalog/'.$product->slug);
@@ -382,7 +379,7 @@ class AdminPanelRestorationTest extends TestCase
         ]);
         $skuId = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'rank-expensive')->value('id');
         $this->post('/admin/catalog/products/'.$product->id.'/import', [
-            'item_ids' => [$skuId], 'margin_percent' => 10, 'publish' => true,
+            'item_ids' => [$skuId], 'publish' => true,
         ])->assertSessionHasNoErrors();
         $package = $product->packages()->sole();
         $this->assertSame(['rank-expensive'], $package->mappings()->pluck('external_sku')->all());
@@ -403,7 +400,7 @@ class AdminPanelRestorationTest extends TestCase
         $product = $this->product();
         $ids = DB::table('digiflazz_catalog_items')->whereIn('buyer_sku_code', ['plain', 'region', 'bonus'])->pluck('id')->all();
         $this->post('/admin/catalog/products/'.$product->id.'/import', [
-            'item_ids' => $ids, 'margin_percent' => 10,
+            'item_ids' => $ids,
         ])->assertSessionHasErrors('item_ids');
         $this->assertSame(0, $product->packages()->count());
     }
@@ -419,7 +416,7 @@ class AdminPanelRestorationTest extends TestCase
         $product->fields()->create(['field_key' => 'destination', 'label' => 'ID tujuan', 'type' => 'text', 'is_required' => true, 'sort_order' => 0]);
         $id = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'sync-A')->value('id');
         $this->post('/admin/catalog/products/'.$product->id.'/import', [
-            'item_ids' => [$id], 'margin_percent' => 10, 'publish' => true,
+            'item_ids' => [$id], 'publish' => true,
         ])->assertSessionHasNoErrors();
         $package = $product->packages()->firstOrFail();
         $this->assertSame(1, $package->mappings()->count());
@@ -471,7 +468,7 @@ class AdminPanelRestorationTest extends TestCase
         $product = $this->product();
         $ids = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'like', 'large-%-A')->pluck('id')->all();
         $this->post('/admin/catalog/products/'.$product->id.'/import', [
-            'item_ids' => $ids, 'margin_percent' => 10,
+            'item_ids' => $ids,
         ])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertSame(500, $product->packages()->count());
         $this->assertSame(500, ProviderMapping::whereIn('product_package_id', $product->packages()->pluck('id'))->count());
@@ -510,13 +507,13 @@ class AdminPanelRestorationTest extends TestCase
         $id = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'restore-sku')->value('id');
 
         $this->post('/admin/catalog/products/'.$product->id.'/import', [
-            'item_ids' => [$id], 'margin_percent' => 10,
+            'item_ids' => [$id],
         ])->assertSessionHasErrors('item_ids');
         $this->assertSame(0, $product->packages()->count());
 
         $product->update(['package_tabs' => ['Diamonds', 'Weekly']]);
         $this->post('/admin/catalog/products/'.$product->id.'/import', [
-            'item_ids' => [$id], 'margin_percent' => 10,
+            'item_ids' => [$id],
         ])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertSame('Weekly', $product->packages()->firstOrFail()->group_name);
     }
@@ -528,9 +525,9 @@ class AdminPanelRestorationTest extends TestCase
         app(DigiflazzCatalogService::class)->sync();
         $id = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'restore-sku')->value('id');
         $product = $this->product();
-        $this->post('/admin/catalog/products/'.$product->id.'/import', ['item_ids' => [$id], 'margin_percent' => 10])->assertSessionHasErrors('item_ids');
+        $this->post('/admin/catalog/products/'.$product->id.'/import', ['item_ids' => [$id]])->assertSessionHasErrors('item_ids');
         DB::table('digiflazz_catalog_items')->where('id', $id)->update(['seller_active' => true, 'synced_at' => now()->subDays(2)]);
-        $this->post('/admin/catalog/products/'.$product->id.'/import', ['item_ids' => [$id], 'margin_percent' => 10])->assertSessionHasErrors('item_ids');
+        $this->post('/admin/catalog/products/'.$product->id.'/import', ['item_ids' => [$id]])->assertSessionHasErrors('item_ids');
         $this->assertSame(0, $product->packages()->count());
     }
 
@@ -545,11 +542,11 @@ class AdminPanelRestorationTest extends TestCase
         $pricing = app(CheckoutPricing::class);
         $this->assertSame(11000, $pricing->forPackage($package->id)['subtotal_idr']);
         $package->update(['pricing_mode' => 'PERCENT', 'margin_percent' => 5]);
-        $this->assertSame(10500, $pricing->forPackage($package->id)['subtotal_idr']);
+        $this->assertSame(11000, $pricing->forPackage($package->id)['subtotal_idr']);
         $package->update(['pricing_mode' => 'FIXED', 'margin_fixed_idr' => 123]);
-        $this->assertSame(10123, $pricing->forPackage($package->id)['subtotal_idr']);
+        $this->assertSame(11000, $pricing->forPackage($package->id)['subtotal_idr']);
         $package->update(['pricing_mode' => 'SELL_PRICE', 'sell_price_idr' => 15000]);
-        $this->assertSame(15000, $pricing->forPackage($package->id)['subtotal_idr']);
+        $this->assertSame(11000, $pricing->forPackage($package->id)['subtotal_idr']);
         $this->fakeCatalog([$this->row(['seller_product_status' => false])]);
         app(DigiflazzCatalogService::class)->sync();
         $this->expectException(ValidationException::class);
@@ -1042,9 +1039,9 @@ class AdminPanelRestorationTest extends TestCase
         ])->assertSessionHasNoErrors();
 
         $package = $product->packages()->firstOrFail();
-        $this->assertSame('PERCENT', $package->pricing_mode);
-        $this->assertSame(11220, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
-        $this->assertSame(10200, app(CheckoutPricing::class)->forPackage($package->id)['max_price_idr']);
+        $this->assertSame('PRODUCT_MARGIN', $package->pricing_mode);
+        $this->assertSame(11000, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
+        $this->assertSame(10000, app(CheckoutPricing::class)->forPackage($package->id)['max_price_idr']);
 
         $this->fakeCatalog([
             $this->row(['buyer_sku_code' => 'fixed-price-A', 'price' => 12500]),
@@ -1052,15 +1049,15 @@ class AdminPanelRestorationTest extends TestCase
         ]);
         app(DigiflazzCatalogService::class)->sync();
         // The unselected seller is never auto-attached as a backup.
-        $this->assertArrayNotHasKey($package->id, app(CheckoutPricing::class)->forPackages([$package->id]));
+        $this->assertSame(13750, app(CheckoutPricing::class)->forPackages([$package->id])[$package->id]['subtotal_idr']);
 
         $this->fakeCatalog([
             $this->row(['buyer_sku_code' => 'fixed-price-A', 'price' => 12500]),
             $this->row(['buyer_sku_code' => 'fixed-price-B', 'price' => 11800]),
         ]);
         app(DigiflazzCatalogService::class)->sync();
-        $this->assertArrayNotHasKey($package->id, app(CheckoutPricing::class)->forPackages([$package->id]));
-        $this->assertSame('PERCENT', $package->fresh()->pricing_mode);
+        $this->assertSame(13750, app(CheckoutPricing::class)->forPackages([$package->id])[$package->id]['subtotal_idr']);
+        $this->assertSame('PRODUCT_MARGIN', $package->fresh()->pricing_mode);
     }
 
     public function test_fixed_price_recommendation_uses_store_cost_and_checkout_price_matches_admin_preview(): void
@@ -1070,10 +1067,10 @@ class AdminPanelRestorationTest extends TestCase
         Provider::where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
         $product = $this->product();
         $product->category->update(['is_active' => true]);
-        $product->update(['sell_markup_percent' => 10]);
+        $product->update(['margin_percent' => 10, 'price_markup_type' => 'PERCENT']);
         $package = $product->packages()->create([
-            'code' => 'DF_store_cost', 'name' => 'Paket Store Cost', 'pricing_mode' => 'PRODUCT_MARGIN',
-            'margin_percent' => 0, 'is_active' => true,
+            'code' => 'DF_store_cost', 'name' => 'Nama Nominal Toko', 'pricing_mode' => 'SELL_PRICE',
+            'sell_price_idr' => 15000, 'is_active' => true,
         ]);
         $package->mappings()->create([
             'provider_id' => Provider::where('code', 'DIGIFLAZZ')->value('id'),
@@ -1082,34 +1079,19 @@ class AdminPanelRestorationTest extends TestCase
             'max_price_idr' => 10200, 'is_active' => true, 'priority' => 0,
         ]);
         app(DigiflazzCatalogService::class)->sync();
-        $package->mappings()->where('external_sku', 'store-price-sku')->update([
-            'store_cost_idr' => 10200, 'max_price_idr' => 10200,
-        ]);
 
-        $quote = app(CheckoutPricing::class)->forPackage($package->id);
-        $this->assertSame(11220, $quote['subtotal_idr']);
-
-        $proposal = collect(app(DigiflazzFixedPricePolicy::class)->proposals())
-            ->firstWhere('package_id', $package->id);
-        $this->assertSame(11220, $proposal['sell_price_idr']);
-
-        DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'store-price-sku')->update(['price_idr' => 12500]);
-        $this->assertNull(collect(app(DigiflazzFixedPricePolicy::class)->proposals())->firstWhere('package_id', $package->id));
-        DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'store-price-sku')->update(['price_idr' => 10000]);
-
-        $package->update(['pricing_mode' => 'SELL_PRICE', 'sell_price_idr' => 15000]);
-        $this->assertSame(15000, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
-
+        $this->assertSame(11000, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
         $this->get('/admin/catalog')->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
             ->component('Admin/Catalog')
-            ->where('checkoutPreviews.'.$package->id, 15000)
-            ->has('products', 1)
-            ->where('products.0.packages.0.id', $package->id)
-            ->where('products.0.packages.0.mappings.0.store_cost_idr', 10200));
+            ->where('checkoutPreviews.'.$package->id, 11000)
+            ->where('products.0.packages.0.name', 'Nama Nominal Toko'));
 
+        DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'store-price-sku')
+            ->update(['price_idr' => 12500, 'synced_at' => now()]);
+        $this->assertSame(13750, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
+        $this->assertSame('Nama Nominal Toko', $package->fresh()->name);
         $package->mappings()->update(['is_active' => false]);
         $this->assertArrayNotHasKey($package->id, app(CheckoutPricing::class)->forPackages([$package->id], true));
-        $this->assertArrayNotHasKey($package->id, app(CheckoutPricing::class)->forPackages([$package->id]));
     }
 
     public function test_fixed_sell_price_below_cost_is_rejected(): void
@@ -1122,8 +1104,10 @@ class AdminPanelRestorationTest extends TestCase
         // dicover AdminPackagePriceGuardTest).
         ProviderMapping::create(['product_package_id' => $package->id, 'provider_id' => Provider::where('code', 'DIGIFLAZZ')->value('id'), 'external_sku' => 'floor-sku', 'cost_idr' => 10000, 'max_price_idr' => 10000, 'is_active' => true]);
         $this->put('/admin/catalog/packages/'.$package->id, ['code' => 'FLOOR', 'name' => 'Floor', 'sort_order' => 0, 'is_active' => false,
-            'pricing_mode' => 'SELL_PRICE', 'sell_price_idr' => 9000])->assertSessionHasErrors('sell_price_idr');
-        $this->assertSame('PRODUCT_MARGIN', $package->fresh()->pricing_mode);
+            'pricing_mode' => 'SELL_PRICE', 'sell_price_idr' => 9000])->assertRedirect()->assertSessionHasNoErrors();
+        // Legacy fixed price metadata does not block a Digiflazz nominal edit.
+        // Checkout always uses the seller price and product markup.
+        $this->assertSame('SELL_PRICE', $package->fresh()->pricing_mode);
     }
 
     public function test_full_sync_blocks_mapped_skus_absent_from_response(): void

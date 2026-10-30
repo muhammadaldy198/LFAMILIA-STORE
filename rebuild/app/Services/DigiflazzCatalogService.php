@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\ProductPackage;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -146,25 +145,17 @@ class DigiflazzCatalogService
                     }
                     $matchingIds = $matching->pluck('id')->all();
                     if ($matchingIds !== []) {
-                        foreach ($matching->where('is_manual_price', false) as $mapping) {
-                            $updates = [
+                        foreach ($matching as $mapping) {
+                            // Seller price is authoritative, even for legacy
+                            // mappings that used to have a manual cost lock.
+                            DB::table('provider_mappings')->where('id', $mapping->id)->update([
                                 'cost_idr' => $row['price_idr'],
                                 'seller_reference_price_idr' => $row['price_idr'],
+                                'store_cost_idr' => $row['price_idr'],
+                                'max_price_idr' => $row['price_idr'],
+                                'is_manual_price' => false,
                                 'updated_at' => now(),
-                            ];
-                            if ($mapping->store_cost_idr === null) {
-                                // Backfill sekali dari aturan impor yang sama (nominal -> game -> global).
-                                // Jangan sentuh store_cost_idr yang sudah disetel admin.
-                                $package = ProductPackage::with('product')
-                                    ->find($mapping->product_package_id);
-                                $updates['store_cost_idr'] = $package && $package->product
-                                    ? app(DigiflazzCatalogImport::class)->initialStoreCost($package, $package->product, (int) $row['price_idr'])
-                                    : app(CatalogPricingSettings::class)->applyPercent(
-                                        (int) $row['price_idr'],
-                                        app(CatalogPricingSettings::class)->costUpliftPercent()
-                                    );
-                            }
-                            DB::table('provider_mappings')->where('id', $mapping->id)->update($updates);
+                            ]);
                         }
                         // Restore only mappings previously disabled *by sync*, and
                         // only if their verified supplier identity still matches.

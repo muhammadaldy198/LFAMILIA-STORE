@@ -238,8 +238,8 @@ class CatalogSyncDeactivationTest extends TestCase
         app(DigiflazzCatalogService::class)->sync();
 
         $fresh = DB::table('provider_mappings')->where('id', $mapping->id)->first();
-        $this->assertSame(10200, (int) $fresh->store_cost_idr);
-        $this->assertSame(11000, (int) $fresh->max_price_idr);
+        $this->assertSame(10000, (int) $fresh->store_cost_idr);
+        $this->assertSame(10000, (int) $fresh->max_price_idr);
     }
 
     /** (a) + (e): MANUAL dan VOUCHER_STOCK tidak pernah jadi kandidat sinkron. */
