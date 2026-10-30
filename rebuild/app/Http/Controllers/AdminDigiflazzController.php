@@ -10,7 +10,6 @@ use App\Services\AdminAuditService;
 use App\Services\AdminDigiflazzMonitorService;
 use App\Services\AdminPermissionService;
 use App\Services\CatalogNominalOrder;
-use App\Services\CatalogPricingSettings;
 use App\Services\DigiflazzAutoSources;
 use App\Services\DigiflazzCatalogImport;
 use App\Services\DigiflazzCatalogService;
