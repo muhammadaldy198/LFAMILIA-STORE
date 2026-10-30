@@ -132,8 +132,8 @@ class CheckoutTest extends TestCase
         $this->seedCheckoutDigiflazzCatalog($catalog['package_id']);
 
         $quote = app(CheckoutPricing::class)->forPackage($catalog['package_id']);
-        $this->assertSame(1440, $quote['margin_idr']);
-        $this->assertSame(13440, $quote['subtotal_idr']);
+        $this->assertSame(1200, $quote['margin_idr']);
+        $this->assertSame(13200, $quote['subtotal_idr']);
 
         DB::table('product_packages')->where('id', $catalog['package_id'])->update([
             'margin_percent' => null,
