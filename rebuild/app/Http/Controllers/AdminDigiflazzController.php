@@ -15,6 +15,7 @@ use App\Services\DigiflazzCatalogImport;
 use App\Services\DigiflazzCatalogService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -99,22 +100,41 @@ class AdminDigiflazzController
             ->orderBy('name')
             ->pluck('name');
 
-        $items = $base
-            ->orderByRaw('COALESCE(products.name, items.product_name)')
-            ->orderByRaw('COALESCE(packages.sort_order, 999999)')
-            ->orderBy('items.product_name')
-            ->select([
-                'items.*',
-                'mappings.id as mapping_id',
-                'mappings.is_active as mapping_active',
-                'packages.id as package_id',
-                'packages.name as local_package_name',
-                'products.id as product_id',
-                'products.name as local_product_name',
-            ])
-            ->paginate($filters['per_page'])
-            ->withQueryString()
-            ->through(function (object $item) use ($service, $monitor, $monitorSettings): array {
+        // Apply natural alphanumeric order to the complete filtered set, not only the page.
+        $natural = app(CatalogNominalOrder::class);
+        $sorted = $base->select([
+            'items.*',
+            'mappings.id as mapping_id',
+            'mappings.is_active as mapping_active',
+            'packages.id as package_id',
+            'packages.name as local_package_name',
+            'packages.nominal_value as local_nominal_value',
+            'products.id as product_id',
+            'products.name as local_product_name',
+        ])->get()->sort(function (object $a, object $b) use ($natural): int {
+            $groupA = $a->local_product_name ?: ($a->brand ?: $a->product_name);
+            $groupB = $b->local_product_name ?: ($b->brand ?: $b->product_name);
+            $group = strnatcasecmp($groupA, $groupB);
+            if ($group !== 0) {
+                return $group;
+            }
+            $type = strnatcasecmp((string) $a->type, (string) $b->type);
+            if ($type !== 0) {
+                return $type;
+            }
+            $numberA = $a->local_nominal_value ?? $natural->value($a->product_name, $a->brand);
+            $numberB = $b->local_nominal_value ?? $natural->value($b->product_name, $b->brand);
+
+            return ($numberA ?? PHP_INT_MAX) <=> ($numberB ?? PHP_INT_MAX)
+                ?: strnatcasecmp($a->local_package_name ?: $a->product_name, $b->local_package_name ?: $b->product_name)
+                ?: strcmp($a->buyer_sku_code, $b->buyer_sku_code);
+        })->values();
+        $currentPage = max(1, (int) $request->query('page', 1));
+        $items = (new LengthAwarePaginator(
+            $sorted->forPage($currentPage, $filters['per_page'])->values(),
+            $sorted->count(), $filters['per_page'], $currentPage,
+            ['path' => $request->url(), 'query' => $request->query()],
+        ))->through(function (object $item) use ($service, $monitor, $monitorSettings): array {
                 $health = $monitor->health($item, $monitorSettings);
 
                 return [
@@ -383,10 +403,12 @@ class AdminDigiflazzController
                 throw ValidationException::withMessages(['publish' => 'Aktifkan kategori produk dan integrasi Digiflazz sebelum menjual.']);
             }
             $selected = DB::table('digiflazz_catalog_items')->whereIn('id', $data['item_ids'])->lockForUpdate()->get();
-            $nominals = $selected->groupBy(fn (object $item): string => app(CatalogNominalOrder::class)
-                ->value((string) $item->product_name, (string) $item->brand) === null
-                ? 'sku:'.$item->buyer_sku_code
-                : 'value:'.app(CatalogNominalOrder::class)->value((string) $item->product_name, (string) $item->brand));
+            $nominals = $selected->groupBy(function (object $item): string {
+                $nominal = app(CatalogNominalOrder::class)->value((string) $item->product_name, (string) $item->brand);
+
+                return $nominal === null ? 'sku:'.$item->buyer_sku_code
+                    : 'value:'.mb_strtolower((string) $item->type).':'.$nominal;
+            });
             if ($nominals->contains(fn ($items): bool => $items->count() > 1)) {
                 throw ValidationException::withMessages([
                     'item_ids' => 'Beberapa SKU yang dipilih mengarah ke nominal sama. Pilih satu SKU untuk setiap nominal.',
