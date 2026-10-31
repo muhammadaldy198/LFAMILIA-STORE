@@ -694,20 +694,32 @@ class AdminCatalogController
         return redirect()->route('admin.catalog.index')->with('status', 'Produk berhasil dihapus.');
     }
 
-    public function destroyPackage(Request $request, ProductPackage $package, CatalogAudit $audit): RedirectResponse
+    public function destroyPackage(Request $request, string $package, CatalogAudit $audit): RedirectResponse
     {
-        if (DB::table('orders')->where('product_package_id', $package->id)->exists()) {
+        // Repeated requests (double-taps, stale dialogs) are idempotent.
+        // Do not let implicit route-model binding turn an already-deleted
+        // nominal into an HTML 404 in the Inertia admin interface.
+        $nominal = ProductPackage::find($package);
+        if ($nominal === null) {
+            return redirect()->route('admin.catalog.index')->with('status', 'Nominal sudah terhapus.');
+        }
+
+        if (DB::table('orders')->where('product_package_id', $nominal->id)->exists()) {
             throw ValidationException::withMessages([
                 'package' => 'Nominal memiliki riwayat pesanan dan tidak boleh dihapus. Nonaktifkan nominal jika tidak ingin dijual.',
             ]);
         }
 
-        DB::transaction(function () use ($request, $package, $audit): void {
-            $before = $package->toArray();
-            $id = $package->id;
-            $package->clearMediaCollection('image');
-            $package->mappings()->delete();
-            $package->delete();
+        DB::transaction(function () use ($request, $nominal, $audit): void {
+            // Serialize concurrent attempts on the same row. Only the first
+            // request deletes files, mappings and writes an audit event.
+            $locked = ProductPackage::query()->lockForUpdate()->find($nominal->id);
+            if ($locked === null) return;
+            $before = $locked->toArray();
+            $id = $locked->id;
+            $locked->clearMediaCollection('image');
+            $locked->mappings()->delete();
+            $locked->delete();
             $audit->record($request, 'catalog.package.deleted', 'product_package', $id, $before, []);
         });
 
