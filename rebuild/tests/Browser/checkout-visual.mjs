@@ -33,6 +33,12 @@ try{
      const preview=group.locator('.lf-payment-brand-strip--logos');
      await preview.waitFor();
      if(!await preview.locator('img').count() || (await preview.textContent()).trim())throw Error(category+' closed summary must contain logos, not method names');
+     const layout=await preview.evaluate(el=>{
+      const logo=el.querySelector('.lf-payment-brand-logo');
+      const row=getComputedStyle(el),item=logo&&getComputedStyle(logo);
+      return {wrap:row.flexWrap,overflow:row.overflow,shrink:item?.flexShrink,minWidth:item?.minWidth};
+     });
+     if(layout.wrap!=='nowrap'||layout.overflow!=='hidden'||Number(layout.shrink)!==1||layout.minWidth!=='0px')throw Error('Payment logo row must allow shrinking '+JSON.stringify({width,category,layout}));
      await group.locator('.lf-payment-group-main').click();
      if(await group.locator('.lf-payment-brand-strip').count())throw Error(category+' opened summary must be removed');
      const grid=group.locator('.lfx-payment-method-grid--compact');
