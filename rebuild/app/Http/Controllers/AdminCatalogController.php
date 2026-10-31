@@ -18,6 +18,7 @@ use App\Services\CatalogPricingSettings;
 use App\Services\CheckoutPricing;
 use App\Services\DigiflazzCatalogService;
 use App\Services\DigiflazzPriceOwnership;
+use App\Services\Fulfillment\DigiflazzDestinationTemplate;
 use App\Services\VoucherStockService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -1095,14 +1096,29 @@ class AdminCatalogController
             'fields.*.is_required' => ['required', 'boolean'],
         ]);
         $keys = array_column($data['fields'], 'field_key');
-        $template = trim((string) (array_key_exists('customer_no_template', $data)
-            ? $data['customer_no_template']
-            : ($product->customer_no_template ?? '')));
+        $template = (string) (app(DigiflazzDestinationTemplate::class)->resolve(
+            (string) $product->slug,
+            array_key_exists('customer_no_template', $data)
+                ? $data['customer_no_template'] : $product->customer_no_template,
+            $keys
+        ) ?? '');
         preg_match_all('/\{\{([^}]+)\}\}/', $template, $matches);
         $templateReferences = $matches[1] ?? [];
         $references = $templateReferences;
+        $nicknameUpdates = [];
         if ($product->nickname_check_enabled) {
-            $references = array_merge($references, array_filter([$product->nickname_user_field_key, $product->nickname_server_field_key]));
+            // Nickname lookup is advisory: stale checker keys must never block
+            // the real customer fields or the Digiflazz delivery template.
+            foreach (['nickname_user_field_key' => 'user_id', 'nickname_server_field_key' => 'zone_id'] as $setting => $canonical) {
+                $old = trim((string) $product->{$setting});
+                if ($old !== '' && ! in_array($old, $keys, true)) {
+                    if (in_array($canonical, $keys, true)) {
+                        $nicknameUpdates[$setting] = $canonical;
+                    } else {
+                        $nicknameUpdates['nickname_check_enabled'] = false;
+                    }
+                }
+            }
         }
         foreach ($matches[1] ?? [] as $fieldKey) {
             if (! preg_match('/^[a-z][a-z0-9_]*$/', $fieldKey) || ! in_array($fieldKey, $keys, true)) {
@@ -1112,7 +1128,7 @@ class AdminCatalogController
         if (preg_match('/\{(?!\{)|(?<!\})\}/', preg_replace('/\{\{[a-z][a-z0-9_]*\}\}/', '', $template) ?? $template)) {
             throw ValidationException::withMessages(['customer_no_template' => 'Format tujuan mengandung kurung kurawal yang tidak berpasangan.']);
         }
-        if ($template === '') {
+        if (! array_key_exists('customer_no_template', $data)) {
             $packageIds = $product->packages()->pluck('id');
             foreach (DB::table('provider_mappings as mappings')
                 ->join('providers', 'providers.id', '=', 'mappings.provider_id')
@@ -1125,7 +1141,7 @@ class AdminCatalogController
             }
         }
         if (array_diff($references, $keys)) {
-            throw ValidationException::withMessages(['fields' => 'Kode kolom masih dipakai cek nickname atau template pengiriman. Ubah pengaturan tersebut dahulu.']);
+            throw ValidationException::withMessages(['fields' => 'Format pengiriman lama masih merujuk kolom yang tidak ada. Periksa format tujuan produk.']);
         }
         $requiredKeys = collect($data['fields'])->filter(fn (array $field): bool => (bool) $field['is_required'])
             ->pluck('field_key')->all();
@@ -1141,16 +1157,22 @@ class AdminCatalogController
                 || ($requiredKeys !== [] && array_diff($requiredKeys, $templateReferences)))) {
             throw ValidationException::withMessages(['customer_no_template' => 'Format tujuan harus memakai placeholder kolom produk dan mencantumkan semua kolom wajib.']);
         }
-        DB::transaction(function () use ($request, $product, $data, $audit, $template): void {
-            $before = $product->fields()->get()->toArray();
-            $beforeTemplate = $product->customer_no_template;
-            $product->customer_no_template = $template !== '' ? $template : null;
-            $product->save();
-            if (array_key_exists('customer_no_template', $data) && $data['customer_no_template'] === null) {
+        DB::transaction(function () use ($request, $product, $data, $audit, $template, $nicknameUpdates): void {
+            $before = [
+                'fields' => $product->fields()->get()->toArray(),
+                'customer_no_template' => $product->customer_no_template,
+                'nickname_check_enabled' => $product->nickname_check_enabled,
+                'nickname_user_field_key' => $product->nickname_user_field_key,
+                'nickname_server_field_key' => $product->nickname_server_field_key,
+            ];
+            $product->forceFill([
+                'customer_no_template' => $template !== '' ? $template : null,
+                ...$nicknameUpdates,
+            ])->save();
+            if (array_key_exists('customer_no_template', $data)) {
                 $this->clearLegacyCustomerNoTemplates($product->id);
             }
             $product->refresh();
-            $before = ['fields' => $before, 'customer_no_template' => $beforeTemplate];
             $product->fields()->delete();
             foreach ($data['fields'] as $index => $field) {
                 ProductInputField::create([
@@ -1161,6 +1183,9 @@ class AdminCatalogController
                 $before, [
                     'fields' => $product->fields()->get()->toArray(),
                     'customer_no_template' => $product->customer_no_template,
+                    'nickname_check_enabled' => $product->nickname_check_enabled,
+                    'nickname_user_field_key' => $product->nickname_user_field_key,
+                    'nickname_server_field_key' => $product->nickname_server_field_key,
                 ]);
         });
 
