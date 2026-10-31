@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 const profile = await mkdtemp(join(tmpdir(), 'lfamilia-responsive-'));
@@ -106,6 +106,9 @@ try {
                 return {expanded:button?.getAttribute('aria-expanded'),preview:!!button?.parentElement.querySelector('[aria-label="Logo metode pembayaran"]'),cols,method:!!grid?.querySelector('button[role="radio"] strong'),scroll:document.documentElement.scrollWidth};
             })()`);
             if(after.expanded!=='true'||after.preview||after.cols!==2||!after.method||after.scroll>width+2)throw Error('Wallet expanded grid invalid '+JSON.stringify({width,category,after}));
+            await mkdir('checkout-visual-results',{recursive:true});
+            const image=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});
+            await writeFile('checkout-visual-results/wallet-'+(category==='E-Wallet'?'ewallet':'va')+'-'+width+'.png',Buffer.from(image.data,'base64'));
             console.log('PASS wallet top-up '+category+' '+width);
         }
     }
