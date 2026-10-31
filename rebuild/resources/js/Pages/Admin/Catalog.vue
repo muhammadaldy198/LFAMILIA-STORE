@@ -264,19 +264,22 @@ const saveNominal = () => {
         }
     }
     saveBusy.value = 'nominal';
-    const finish = (bag) => { nominalErrors.value = bag; saveBusy.value = ''; };
+    const handleErrors = bag => { nominalErrors.value = bag; };
+    const finish = () => { saveBusy.value = ''; };
     if (nominalEditing.value) {
         // Modal nominal manual tersimpan di pemetaan provider, bukan di paket.
         if (product.value.fulfillment_mode === 'MANUAL') payload.store_cost_idr = Number(nominal.cost_idr || 0);
         router.put(`/admin/catalog/packages/${nominalEditing.value.id}`, payload, {
-            preserveScroll: true, onError: finish, onSuccess: () => { nominalOpen.value = false; uploadNominalImage(); },
+            preserveScroll: true, onError: handleErrors, onFinish: finish,
+            onSuccess: () => { nominalOpen.value = false; uploadNominalImage(); },
         });
     } else {
         router.post(`/admin/catalog/products/${product.value.id}/packages`, {
             ...payload,
             cost_idr: product.value.fulfillment_mode === 'MANUAL' ? Number(nominal.cost_idr || 0) : 0,
         }, {
-            preserveScroll: true, onError: finish, onSuccess: () => { nominalOpen.value = false; },
+            preserveScroll: true, onError: handleErrors, onFinish: finish,
+            onSuccess: () => { nominalOpen.value = false; },
         });
     }
 };
