@@ -353,11 +353,12 @@ class AdminPaymentController
         $data['category_code'] = $category;
     }
 
-    private function categoryData(Request $request, bool $new): array
+    private function categoryData(Request $request, bool $new, ?string $currentCode = null): array
     {
         return $request->validate([
-            'code' => [$new ? 'required' : 'sometimes', 'string', 'min:2', 'max:40',
-                'regex:/^[a-z][a-z0-9_]*$/', Rule::unique('payment_categories', 'code')],
+            'code' => $new
+                ? ['required', 'string', 'min:2', 'max:40', 'regex:/^[a-z][a-z0-9_]*$/', Rule::unique('payment_categories', 'code')]
+                : ['sometimes', 'required', Rule::in([$currentCode])],
             'name' => ['required', 'string', 'min:2', 'max:100'],
             'description' => ['nullable', 'string', 'max:160'],
             'sort_order' => ['required', 'integer', 'min:0', 'max:9999'],
@@ -377,7 +378,7 @@ class AdminPaymentController
     public function updateCategory(Request $request, string $code): RedirectResponse
     {
         $category = PaymentCategory::query()->findOrFail($code);
-        $data = $this->categoryData($request, false);
+        $data = $this->categoryData($request, false, $code);
         unset($data['code']); // Stable technical grouping identifier.
         $before = $category->toArray();
         $category->update($data);
