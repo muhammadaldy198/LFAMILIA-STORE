@@ -250,6 +250,14 @@ class AdminPanelRestorationTest extends TestCase
             'item_ids' => [$itemId], 'publish' => true,
         ])->assertRedirect()->assertSessionHasNoErrors();
 
+        // Even a draft import may not replace an active product's shared
+        // delivery format with one that omits a required field.
+        $this->post('/admin/catalog/products/'.$product->id.'/import', [
+            'item_ids' => [$itemId], 'publish' => false,
+            'customer_no_template' => '{{user_id}}',
+        ])->assertSessionHasErrors('customer_no_template');
+        $this->assertSame('{{user_id}}{{zone_id}}', $product->fresh()->customer_no_template);
+
         $this->put('/admin/catalog/products/'.$product->id.'/fields', [
             'customer_no_template' => '{{zone_id}}',
             'fields' => [
