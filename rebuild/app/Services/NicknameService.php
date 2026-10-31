@@ -119,7 +119,7 @@ class NicknameService
                 'country' => $country,
                 'warning' => null,
             ];
-        } catch (NicknameServiceUnavailable | ValidationException) {
+        } catch (NicknameServiceUnavailable|ValidationException) {
             // Kokinpay only helps display a nickname. Its rejection or outage
             // cannot override the fulfillment target supplied by the buyer.
             return $this->warning('Nickname tidak berhasil diverifikasi. Pastikan ID tujuan sudah benar.');
