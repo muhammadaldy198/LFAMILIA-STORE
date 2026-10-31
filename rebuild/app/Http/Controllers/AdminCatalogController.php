@@ -168,11 +168,16 @@ class AdminCatalogController
             'autoProductOptions' => Product::where('fulfillment_mode', 'AUTO_PROVIDER')
                 ->with(['packages' => fn ($query) => $query->select(
                     'id', 'product_id', 'nominal_value', 'group_name', 'pricing_mode', 'margin_percent', 'margin_fixed_idr'
-                ), 'packages.mappings' => fn ($query) => $query->select('id', 'product_package_id', 'provider_id')])
-                ->get(['id', 'name'])
+                ), 'packages.mappings' => fn ($query) => $query->select('id', 'product_package_id', 'provider_id'),
+                    'fields' => fn ($query) => $query->orderBy('sort_order')->select(
+                        'id', 'product_id', 'field_key', 'is_required', 'sort_order'
+                    )])
+                ->get(['id', 'name', 'customer_no_template'])
                 ->sort(fn (Product $a, Product $b): int => strnatcasecmp($a->name, $b->name) ?: ($a->id <=> $b->id))
                 ->values()->map(fn (Product $product): array => [
-                    ...$product->only('id', 'name'),
+                    ...$product->only('id', 'name', 'customer_no_template'),
+                    'fields' => $product->fields->sortBy('sort_order')->values()
+                        ->map(fn (ProductInputField $field): array => $field->only('field_key', 'is_required'))->all(),
                     'nominals' => $product->packages
                         ->filter(fn (ProductPackage $package): bool => $package->nominal_value !== null
                             && ! $package->mappings->contains('provider_id', $digiflazzProviderId))
