@@ -223,3 +223,18 @@ test('resend-verification control is not nested inside the login form', () => {
     assert.ok(loginFormEnd > -1, 'form login harus ada penutupnya');
     assert.ok(login.indexOf('@click="resendVerification"') > loginFormEnd, 'tombol kirim ulang harus di luar form login');
 });
+
+
+test('wallet top-up payment groups show only logos while collapsed and compact two-column cards while expanded', () => {
+    const wallet = read('Pages/Customer/Wallet.vue');
+    assert.match(wallet, /openedPaymentGroup !== group\.code && \['va', 'ewallet'\]\.includes\(group\.code\)/);
+    assert.match(wallet, /v-for="channel in group\.items\.filter\(item => item\.logo_url\)"/);
+    assert.match(wallet, /:alt="channel\.name" loading="lazy"/);
+    assert.match(wallet, /openedPaymentGroup === group\.code/);
+    assert.match(wallet, /'grid-cols-2 p-2'/);
+    assert.match(wallet, /\{\{ channel\.name \}\}/);
+    assert.match(wallet, /quote\.total_idr/);
+    assert.match(wallet, /Biaya pembayaran/);
+    assert.match(wallet, /await postJson\('\/account\/wallet\/topups\/quote'/);
+    assert.match(wallet, /await postJson\('\/account\/wallet\/topups'/);
+});

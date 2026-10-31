@@ -137,19 +137,24 @@ async function createTopup() {
                             <span class="text-slate-400" aria-hidden="true">{{ openedPaymentGroup === group.code ? '▴' : '▾' }}</span>
                         </span>
                     </button>
-                    <div v-if="openedPaymentGroup === group.code" class="grid grid-cols-1 gap-2 border-t border-slate-700/80 p-3 sm:grid-cols-2" role="radiogroup" :aria-label="'Metode '+group.title">
+                    <div v-if="openedPaymentGroup !== group.code && ['va', 'ewallet'].includes(group.code)" class="flex flex-wrap items-center gap-2 border-t border-slate-700/80 px-3 py-2" aria-label="Logo metode pembayaran">
+                        <span v-for="channel in group.items.filter(item => item.logo_url)" :key="channel.code" class="flex h-7 w-14 items-center justify-center rounded bg-slate-800/80 px-1.5 py-1">
+                            <img :src="channel.logo_url" :alt="channel.name" loading="lazy" class="h-full w-full object-contain">
+                        </span>
+                    </div>
+                    <div v-if="openedPaymentGroup === group.code" class="grid gap-2 border-t border-slate-700/80" :class="['va', 'ewallet'].includes(group.code) ? 'grid-cols-2 p-2' : 'grid-cols-1 p-3 sm:grid-cols-2'" role="radiogroup" :aria-label="'Metode '+group.title">
                         <button v-for="channel in group.items" :key="channel.code" type="button" role="radio"
                             :aria-checked="paymentChannelCode === channel.code"
                             :disabled="Boolean(busy) || attemptLocked"
-                            class="flex min-h-[64px] min-w-0 items-center gap-3 rounded-lg border px-3 py-3 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300 disabled:opacity-50"
-                            :class="paymentChannelCode === channel.code ? 'border-cyan-400 bg-cyan-400/10' : 'border-slate-700 bg-slate-900'"
+                            class="flex min-w-0 rounded-lg border text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300 disabled:opacity-50"
+                            :class="[paymentChannelCode === channel.code ? 'border-cyan-400 bg-cyan-400/10' : 'border-slate-700 bg-slate-900', ['va', 'ewallet'].includes(group.code) ? 'min-h-[94px] flex-col items-start justify-between gap-2 p-2.5' : 'min-h-[64px] items-center gap-3 px-3 py-3']"
                             @click="paymentChannelCode = channel.code">
-                            <span class="flex size-10 shrink-0 items-center justify-center rounded-lg border border-slate-700 bg-slate-950">
-                                <img v-if="channel.logo_url" :src="channel.logo_url" :alt="channel.name" class="size-8 object-contain">
+                            <span class="flex shrink-0 items-center justify-center rounded-lg border border-slate-700 bg-slate-950" :class="['va', 'ewallet'].includes(group.code) ? 'h-7 w-16 px-1' : 'size-10'">
+                                <img v-if="channel.logo_url" :src="channel.logo_url" :alt="channel.name" class="max-h-full max-w-full object-contain">
                                 <span v-else class="text-xs font-semibold text-cyan-300">{{ channel.name.slice(0,2).toUpperCase() }}</span>
                             </span>
-                            <span class="min-w-0 flex-1"><strong class="block break-words text-sm text-slate-100">{{ channel.name }}</strong>
-                                <small v-if="channel.description" class="mt-0.5 block text-xs leading-snug text-slate-400">{{ channel.description }}</small></span>
+                            <span class="min-w-0 w-full flex-1"><strong class="block break-words text-xs leading-snug text-slate-100">{{ channel.name }}</strong>
+                                <small v-if="channel.description && !['va', 'ewallet'].includes(group.code)" class="mt-0.5 block text-xs leading-snug text-slate-400">{{ channel.description }}</small></span>
                             <span class="shrink-0 text-cyan-300" aria-hidden="true">{{ paymentChannelCode === channel.code ? '●' : '○' }}</span>
                         </button>
                     </div>

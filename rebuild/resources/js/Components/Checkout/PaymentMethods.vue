@@ -115,8 +115,17 @@ function choosePayment(code) {
                                 <span v-if="group.items.some(x=>x.code===paymentChannelCode)" class="lf-payment-check"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m8 12 2.5 2.5L16 9"/></svg></span>
                             </button>
 
-                            <div v-if="group.key!=='wallet'" class="lf-payment-brand-strip">
+                            <div
+                                v-if="group.key!=='wallet' && !( ['va', 'ewallet'].includes(group.key) && group.items.some(x=>x.code===paymentChannelCode))"
+                                class="lf-payment-brand-strip"
+                                :class="{ 'lf-payment-brand-strip--logos': ['va', 'ewallet'].includes(group.key) }"
+                            >
                                 <span v-if="group.key==='qris'">{{group.items.length > 1 ? 'Pilih QRIS Otomatis atau QRIS Manual' : (groupChannel(group)?.description || group.title)}}</span>
+                                <template v-else-if="['va', 'ewallet'].includes(group.key)">
+                                    <span v-for="channel in group.items.filter(item=>item.logo_url)" :key="channel.code" class="lf-payment-brand-logo">
+                                        <img :src="channel.logo_url" :alt="channel.name" loading="lazy">
+                                    </span>
+                                </template>
                                 <template v-else>
                                     <span v-for="channel in group.items.slice(0,7)" :key="channel.code">{{channel.name}}</span>
                                 </template>
@@ -125,6 +134,7 @@ function choosePayment(code) {
                             <div
                                 v-if="group.key!=='wallet' && (group.key!=='qris' || group.items.length > 1) && group.items.some(x=>x.code===paymentChannelCode)"
                                 class="lfx-payment-method-grid"
+                                :class="{ 'lfx-payment-method-grid--compact': ['va', 'ewallet'].includes(group.key) }"
                                 role="radiogroup"
                                 :aria-label="'Pilih metode '+group.title"
                             >
@@ -280,6 +290,65 @@ function choosePayment(code) {
  .lfx-payment-method-card { min-height:119px; padding:16px; }
  .lfx-payment-method-name { font-size:14px; line-height:1.45; }
  .lfx-payment-method-total { font-size:15px; }
+}
+
+
+/* VA/E-Wallet: closed groups show logos only; expanded groups use compact cards. */
+.lf-payment-brand-strip--logos {
+  flex-wrap: wrap;
+  overflow: visible;
+  gap: 6px;
+  padding: 7px 10px;
+  white-space: normal;
+}
+.lf-payment-brand-strip--logos > .lf-payment-brand-logo {
+  display: grid;
+  place-items: center;
+  flex: 0 0 58px;
+  box-sizing: border-box;
+  width: 58px;
+  height: 26px;
+  padding: 3px 5px;
+  border-radius: 4px;
+  background: rgba(255,255,255,.10);
+}
+.lf-payment-brand-strip--logos > .lf-payment-brand-logo:only-child {
+  padding: 3px 5px;
+  background: rgba(255,255,255,.10);
+  max-width: none;
+}
+.lf-payment-brand-logo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.lfx-payment-method-grid--compact {
+  gap: 8px;
+  padding: 10px;
+}
+.lfx-payment-method-grid--compact .lfx-payment-method-card {
+  min-height: 94px;
+  gap: 7px;
+  padding: 9px 10px;
+}
+.lfx-payment-method-grid--compact .lfx-payment-logo {
+  height: 21px;
+  max-width: 72px;
+}
+.lfx-payment-method-grid--compact .lfx-payment-method-name {
+  font-size: 11px;
+  line-height: 1.25;
+}
+.lfx-payment-method-grid--compact .lfx-payment-method-total {
+  padding-top: 6px;
+  font-size: 12px;
+}
+@media (max-width: 390px) {
+  .lf-payment-brand-strip--logos { gap: 5px; padding: 6px 8px; }
+  .lf-payment-brand-strip--logos > .lf-payment-brand-logo { flex-basis: 52px; width: 52px; height: 24px; }
+  .lfx-payment-method-grid--compact { gap: 7px; padding: 8px; }
+  .lfx-payment-method-grid--compact .lfx-payment-method-card { padding: 8px; }
 }
 
 </style>
