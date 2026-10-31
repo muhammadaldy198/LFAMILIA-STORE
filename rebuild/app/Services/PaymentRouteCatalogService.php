@@ -98,6 +98,7 @@ class PaymentRouteCatalogService
             DB::table('payment_channels')->insert([
                 'code' => $code,
                 'method' => 'EWALLET',
+                'category_code' => 'ewallet',
                 'name' => (string) $wallet['name'],
                 'description' => 'Bayar langsung melalui '.(string) $wallet['name'].'.',
                 'fee_flat_idr' => 0,
@@ -134,6 +135,7 @@ class PaymentRouteCatalogService
             DB::table('payment_channels')->insert([
                 'code' => $store['code'],
                 'method' => 'RETAIL',
+                'category_code' => 'retail',
                 'name' => $store['name'],
                 'description' => 'Bayar melalui '.(string) $store['name'].'.',
                 'fee_flat_idr' => 0,
@@ -172,6 +174,7 @@ class PaymentRouteCatalogService
             DB::table('payment_channels')->insert([
                 'code' => $code,
                 'method' => 'VIRTUAL_ACCOUNT',
+                'category_code' => 'va',
                 'name' => (string) $bank['name'],
                 'description' => 'Transfer otomatis melalui '.(string) $bank['name'].'.',
                 'fee_flat_idr' => (int) $generic->fee_flat_idr,

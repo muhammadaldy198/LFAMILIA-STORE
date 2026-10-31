@@ -73,4 +73,48 @@ class PaymentCategoryAdminTest extends TestCase
             'is_active' => (bool) $wallet->is_active,
         ])->assertSessionHasErrors('category_code');
     }
+
+    public function test_sync_restores_payment_methods_under_the_correct_categories(): void
+    {
+        // Simulate deleting unused preset/bank/e-wallet/retail channels.
+        // The sync operation must recreate the category, not rely on the
+        // one-time migration backfill or the generic 'other' default.
+        $expected = [
+            'saldo' => 'wallet',
+            'va_bss' => 'va',
+            'ewallet_linkaja' => 'ewallet',
+            'retail_indomaret' => 'retail',
+        ];
+
+        foreach (array_keys($expected) as $code) {
+            $id = DB::table('payment_channels')->where('code', $code)->value('id');
+            if ($id !== null) {
+                DB::table('payment_routes')->where('payment_channel_id', $id)->delete();
+                DB::table('payment_channels')->where('id', $id)->delete();
+            }
+        }
+
+        $this->post('/admin/payments/channels/sync')
+            ->assertRedirect()->assertSessionHasNoErrors();
+
+        foreach ($expected as $code => $categoryCode) {
+            $this->assertDatabaseHas('payment_channels', [
+                'code' => $code,
+                'category_code' => $categoryCode,
+            ]);
+        }
+
+        // A second sync must retain the categories and not overwrite
+        // merchant-selected display categories on existing methods.
+        DB::table('payment_channels')->where('code', 'va_bss')
+            ->update(['category_code' => 'other']);
+        $this->post('/admin/payments/channels/sync')
+            ->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertSame('other', DB::table('payment_channels')
+            ->where('code', 'va_bss')->value('category_code'));
+        $this->assertSame('wallet', DB::table('payment_channels')
+            ->where('code', 'saldo')->value('category_code'));
+    }
+
 }

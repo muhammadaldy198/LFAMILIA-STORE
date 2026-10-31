@@ -640,6 +640,7 @@ class AdminPaymentController
             }
             PaymentChannel::create([
                 ...$preset,
+                'category_code' => $this->defaultCategory((string) $preset['method']),
                 'fee_flat_idr' => 0,
                 'fee_percent_bps' => 0,
                 'is_active' => false,
