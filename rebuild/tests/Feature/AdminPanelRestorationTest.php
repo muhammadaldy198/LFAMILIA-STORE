@@ -1670,6 +1670,32 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertSame(14.0, (float) $nominal->fresh()->margin_percent);
     }
 
+    public function test_renaming_umum_updates_null_empty_and_whitespace_legacy_nominals(): void
+    {
+        $this->login();
+        $product = $this->product();
+        $group = $product->packageGroups()->where('name', 'Umum')->firstOrFail();
+        $nominals = collect([null, '', '  '])->map(function ($value, $index) use ($product) {
+            return $product->packages()->create([
+                'code' => 'LEGACY-UMUM-'.($index + 1),
+                'name' => 'Nominal Umum '.($index + 1),
+                'group_name' => $value,
+                'sort_order' => $index,
+                'is_active' => false,
+                'pricing_mode' => 'PERCENT',
+                'margin_percent' => 13,
+            ]);
+        });
+        $this->put('/admin/catalog/package-groups/'.$group->id, [
+            'name' => 'Umum Baru',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        foreach ($nominals as $nominal) {
+            $this->assertSame('Umum Baru', $nominal->fresh()->group_name);
+            $this->assertSame(13.0, (float) $nominal->fresh()->margin_percent);
+        }
+        $this->assertSame(['Umum Baru'], $product->fresh()->package_tabs);
+    }
+
     public function test_digiflazz_import_uses_selected_destination_group_instead_of_supplier_type(): void
     {
         $this->login();

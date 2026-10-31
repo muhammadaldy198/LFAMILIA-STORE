@@ -72,7 +72,7 @@ class AdminPackageGroupController
                 // Exact match protects legacy case-sensitive groups.
                 $ids = $product->packages()->get(['id', 'group_name'])
                     ->filter(fn ($row): bool => trim((string) $row->group_name) === $old
-                        || ($old === 'Umum' && $row->group_name === null))
+                        || ($old === 'Umum' && trim((string) $row->group_name) === ''))
                     ->pluck('id')->all();
                 if ($ids !== []) {
                     $product->packages()->whereIn('id', $ids)->update(['group_name' => $name]);
