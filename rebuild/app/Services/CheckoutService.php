@@ -167,7 +167,20 @@ class CheckoutService
         $prePrice = $this->pricing->forPackage((int) $data['package_id']);
         $product = Product::with(['fields', 'category'])->findOrFail($prePrice['product_id']);
         $input = $this->inputValidator->validate($product, $data['customer_input']);
-        $nickname = $this->nickname->check($product, $input);
+        // The mandatory destination fields are validated above. Kokinpay is
+        // advisory only and must not prevent a paid, deliverable order.
+        try {
+            $nickname = $this->nickname->check($product, $input);
+        } catch (\Throwable $exception) {
+            report($exception);
+            $nickname = [
+                'supported' => false,
+                'verified' => false,
+                'nickname' => null,
+                'country' => null,
+                'warning' => 'Pengecekan nickname tidak tersedia. Pastikan ID tujuan sudah benar.',
+            ];
+        }
 
         try {
             $result = DB::transaction(function () use ($data, $user, $fingerprint, $input, $nickname): array {
