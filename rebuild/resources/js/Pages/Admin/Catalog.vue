@@ -435,11 +435,15 @@ const resolveDestination = (slug, fields, saved = '') => {
 const templateNeedsCorrection = computed(() => [...String(destinationFormat.value || '')
     .matchAll(/\{\{([^}]+)\}\}/g)]
     .some(match => !fieldRows.value.some(row => row.field_key === match[1])));
+const template = computed(() => resolveDestination(product.value?.slug, fieldRows.value, destinationFormat.value));
+const requiredTemplateFieldsMissing = computed(() => fieldRows.value.some(row =>
+    row.is_required && !template.value.includes(`{{${row.field_key}}}`)
+));
 const showTemplateEditor = computed(() => fieldRows.value.length > 1
     && (!isMobileLegends(product.value?.slug) || templateNeedsCorrection.value
+        || requiredTemplateFieldsMissing.value
         || !fieldRows.value.some(row => row.field_key === 'user_id')
         || !fieldRows.value.some(row => row.field_key === 'zone_id')));
-const template = computed(() => resolveDestination(product.value?.slug, fieldRows.value, destinationFormat.value));
 
 // Contoh nilai per kode kolom, dipakai bila admin belum mengisi contoh isian.
 const SAMPLES = { user_id: '12345678', zone_id: '1234', destination: '12345678', email: 'nama@email.com', phone: '08123456789' };
