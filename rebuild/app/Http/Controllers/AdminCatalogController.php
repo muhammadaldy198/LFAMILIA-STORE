@@ -1101,8 +1101,23 @@ class AdminCatalogController
         preg_match_all('/\{\{([^}]+)\}\}/', $template, $matches);
         $templateReferences = $matches[1] ?? [];
         $references = $templateReferences;
+        $nicknameChanges = [];
         if ($product->nickname_check_enabled) {
-            $references = array_merge($references, array_filter([$product->nickname_user_field_key, $product->nickname_server_field_key]));
+            // Older nickname settings may still refer to removed field keys.
+            // Reconcile only canonical User ID / Zone ID replacements when
+            // those exact keys are explicitly present in the submitted form.
+            // Never disable nickname validation or guess another destination.
+            foreach (['nickname_user_field_key' => 'user_id', 'nickname_server_field_key' => 'zone_id'] as $setting => $replacement) {
+                $oldKey = trim((string) $product->{$setting});
+                if ($oldKey !== '' && ! in_array($oldKey, $keys, true)
+                    && in_array($replacement, $keys, true)) {
+                    $nicknameChanges[$setting] = $replacement;
+                }
+            }
+            $references = array_merge($references, array_filter([
+                $nicknameChanges['nickname_user_field_key'] ?? $product->nickname_user_field_key,
+                $nicknameChanges['nickname_server_field_key'] ?? $product->nickname_server_field_key,
+            ]));
         }
         foreach ($matches[1] ?? [] as $fieldKey) {
             if (! preg_match('/^[a-z][a-z0-9_]*$/', $fieldKey) || ! in_array($fieldKey, $keys, true)) {
@@ -1141,16 +1156,23 @@ class AdminCatalogController
                 || ($requiredKeys !== [] && array_diff($requiredKeys, $templateReferences)))) {
             throw ValidationException::withMessages(['customer_no_template' => 'Format tujuan harus memakai placeholder kolom produk dan mencantumkan semua kolom wajib.']);
         }
-        DB::transaction(function () use ($request, $product, $data, $audit, $template): void {
-            $before = $product->fields()->get()->toArray();
-            $beforeTemplate = $product->customer_no_template;
-            $product->customer_no_template = $template !== '' ? $template : null;
-            $product->save();
-            if (array_key_exists('customer_no_template', $data) && $data['customer_no_template'] === null) {
+        DB::transaction(function () use ($request, $product, $data, $audit, $template, $nicknameChanges): void {
+            $before = [
+                'fields' => $product->fields()->get()->toArray(),
+                'customer_no_template' => $product->customer_no_template,
+                'nickname_user_field_key' => $product->nickname_user_field_key,
+                'nickname_server_field_key' => $product->nickname_server_field_key,
+            ];
+            $product->forceFill([
+                'customer_no_template' => $template !== '' ? $template : null,
+                ...$nicknameChanges,
+            ])->save();
+            // Once a shared product template has been confirmed, obsolete
+            // per-SKU templates must not block later field edits.
+            if (array_key_exists('customer_no_template', $data)) {
                 $this->clearLegacyCustomerNoTemplates($product->id);
             }
             $product->refresh();
-            $before = ['fields' => $before, 'customer_no_template' => $beforeTemplate];
             $product->fields()->delete();
             foreach ($data['fields'] as $index => $field) {
                 ProductInputField::create([
@@ -1161,6 +1183,8 @@ class AdminCatalogController
                 $before, [
                     'fields' => $product->fields()->get()->toArray(),
                     'customer_no_template' => $product->customer_no_template,
+                    'nickname_user_field_key' => $product->nickname_user_field_key,
+                    'nickname_server_field_key' => $product->nickname_server_field_key,
                 ]);
         });
 
