@@ -1605,6 +1605,68 @@ class AdminPanelRestorationTest extends TestCase
         ])->assertRedirect()->assertSessionHasNoErrors();
     }
 
+    public function test_group_manager_rename_reorder_and_delete_guard_keep_nominals_attached(): void
+    {
+        $this->login();
+        $product = $this->product();
+        $this->post('/admin/catalog/products/'.$product->id.'/package-groups', [
+            'name' => 'Diamonds',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->post('/admin/catalog/products/'.$product->id.'/package-groups', [
+            'name' => 'Weekly',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $groups = $product->packageGroups()->orderBy('sort_order')->get();
+        $this->assertSame(['Diamonds', 'Weekly'], $groups->pluck('name')->all());
+
+        $nominal = $product->packages()->create([
+            'code' => 'GROUP-EDIT-10', 'name' => '10 Diamond',
+            'group_name' => 'Diamonds', 'is_active' => false,
+        ]);
+        $this->put('/admin/catalog/package-groups/'.$groups[0]->id, [
+            'name' => 'Gems',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame('Gems', $nominal->fresh()->group_name);
+
+        $this->put('/admin/catalog/products/'.$product->id.'/package-groups/ids/reorder', [
+            'ids' => [$groups[1]->id, $groups[0]->id],
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame(['Weekly', 'Gems'], $product->fresh()->package_tabs);
+        $this->delete('/admin/catalog/package-groups/'.$groups[0]->id)
+            ->assertSessionHasErrors('group');
+        $this->assertDatabaseHas('product_package_groups', ['id' => $groups[0]->id, 'name' => 'Gems']);
+
+        $this->delete('/admin/catalog/package-groups/'.$groups[1]->id)
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertDatabaseMissing('product_package_groups', ['id' => $groups[1]->id]);
+    }
+
+    public function test_digiflazz_import_uses_selected_destination_group_instead_of_supplier_type(): void
+    {
+        $this->login();
+        $this->fakeCatalog([$this->row([
+            'buyer_sku_code' => 'group-destination-10',
+            'product_name' => 'Restore 10 Diamonds', 'type' => 'Diamonds',
+        ])]);
+        app(DigiflazzCatalogService::class)->sync();
+        $product = $this->product();
+        $this->post('/admin/catalog/products/'.$product->id.'/package-groups', [
+            'name' => 'Special Group',
+        ])->assertSessionHasNoErrors();
+        $groupId = $product->packageGroups()->where('name', 'Special Group')->value('id');
+        $itemId = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'group-destination-10')->value('id');
+
+        $this->post('/admin/catalog/products/'.$product->id.'/import', [
+            'item_ids' => [$itemId], 'group_id' => $groupId, 'publish' => false,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame('Special Group', $product->packages()->firstOrFail()->group_name);
+
+        $other = $this->product();
+        $this->post('/admin/catalog/products/'.$other->id.'/import', [
+            'item_ids' => [$itemId], 'group_id' => $groupId, 'publish' => false,
+        ])->assertSessionHasErrors('group_id');
+        $this->assertSame(0, $other->packages()->count());
+    }
+
     public function test_catalog_nominal_sort_respects_manual_position_before_numeric_value(): void
     {
         $nominals = collect([
