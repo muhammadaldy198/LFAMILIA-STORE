@@ -140,10 +140,15 @@ class FulfillmentService
                                 ?: ($config['customer_no_template'] ?? null);
                         }
                     }
-                    $keys = array_keys($this->json($order->customer_input));
+                    $snapshotTemplate = (string) ($config['customer_no_template'] ?? '');
+                    // A checkout snapshot is immutable. Empty optional values
+                    // may be omitted from customer_input; that must NOT make
+                    // fulfillment rewrite a multi-field destination format.
+                    preg_match_all('/\{\{([a-z][a-z0-9_]*)\}\}/', $snapshotTemplate, $templateMatches);
+                    $keys = $templateMatches[1] ?: array_keys($this->json($order->customer_input));
                     $config['customer_no_template'] = app(DigiflazzDestinationTemplate::class)->resolve(
-                        (string) ($product?->slug ?? data_get($snapshot, 'product.slug', '')),
-                        $config['customer_no_template'] ?? null,
+                        (string) data_get($snapshot, 'product.slug', $product?->slug ?? ''),
+                        $snapshotTemplate !== '' ? $snapshotTemplate : null,
                         $keys
                     );
                 }
