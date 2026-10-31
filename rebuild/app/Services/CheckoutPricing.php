@@ -311,10 +311,10 @@ class CheckoutPricing
             throw ValidationException::withMessages(['package_id' => 'Harga jual nominal berada di bawah modal.']);
         }
 
-        // Digiflazz does not use an API max_price cap; retain the legacy
-        // snapshot field for non-Digiflazz provider compatibility only.
+        // Retain historical snapshot compatibility without enforcing or sending
+        // max_price to Digiflazz. The Digiflazz API request does not use it.
         $maxPrice = $mapping->provider_code === 'DIGIFLAZZ'
-            ? null
+            ? $cost
             : ($mapping->max_price_idr !== null ? (int) $mapping->max_price_idr : null);
 
         return [
