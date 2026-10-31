@@ -1693,7 +1693,7 @@ class AdminPanelRestorationTest extends TestCase
             $this->assertSame('Umum Baru', $nominal->fresh()->group_name);
             $this->assertSame(13.0, (float) $nominal->fresh()->margin_percent);
         }
-        $this->assertSame(['Umum Baru'], $product->fresh()->package_tabs);
+        $this->assertDatabaseHas('product_package_groups', ['id' => $group->id, 'name' => 'Umum Baru']);
     }
 
     public function test_digiflazz_import_uses_selected_destination_group_instead_of_supplier_type(): void
