@@ -423,7 +423,7 @@ class CheckoutTest extends TestCase
             ->where('idempotency_key', $payload['idempotency_key'])->count());
     }
 
-    public function test_nickname_service_outage_warns_but_does_not_block_checkout(): void
+    public function test_kokinpay_is_not_called_again_during_order_creation(): void
     {
         $catalog = $this->catalog([
             'nickname_check_enabled' => true,
@@ -458,7 +458,8 @@ class CheckoutTest extends TestCase
         );
         $this->assertTrue($snapshot['nickname']['supported']);
         $this->assertFalse($snapshot['nickname']['verified']);
-        $this->assertNotEmpty($snapshot['nickname']['warning']);
+        $this->assertNull($snapshot['nickname']['warning']);
+        Http::assertNothingSent();
     }
 
     public function test_invalid_kokinpay_nickname_is_advisory_and_order_is_created(): void
@@ -488,6 +489,7 @@ class CheckoutTest extends TestCase
 
         $this->assertSame(1, DB::table('orders')
             ->where('idempotency_key', 'checkout-nickname-invalid-0001')->count());
+        Http::assertNothingSent();
     }
 
     public function test_same_idempotency_key_cannot_be_reused_for_different_checkout(): void
