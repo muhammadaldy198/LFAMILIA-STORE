@@ -99,7 +99,7 @@ class AdminPackageGroupController
             // Old nominal group labels may still carry whitespace. Never
             // delete a group used by any such nominal.
             $inUse = $product->packages()->get(['group_name'])->contains(
-                fn ($row): bool => (trim((string) $row->group_name) ?: 'Umum') === $group->name
+                fn ($row): bool => (trim((string) $row->group_name) === '' ? 'Umum' : trim((string) $row->group_name)) === $group->name
             );
             if ($inUse || ($product->package_tabs_enabled && $product->packageGroups()->count() <= 1)) {
                 throw ValidationException::withMessages([

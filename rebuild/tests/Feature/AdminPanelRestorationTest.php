@@ -1732,6 +1732,8 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertSame('Nominal dari toko', $package->fresh()->name);
         $this->assertSame(15.0, (float) $package->fresh()->margin_percent);
         $this->assertTrue($package->mappings()->where('external_sku', 'numeric-zero-group-10')->exists());
+        $this->delete('/admin/catalog/package-groups/'.$groupId)
+            ->assertSessionHasErrors('group');
     }
 
     public function test_catalog_nominal_sort_respects_manual_position_before_numeric_value(): void
