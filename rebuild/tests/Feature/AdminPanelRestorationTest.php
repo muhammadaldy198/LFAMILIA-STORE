@@ -1491,6 +1491,45 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertTrue((bool) $product->fresh()->package_tabs_enabled);
     }
 
+    public function test_reorder_preserves_empty_configured_tabs_for_future_imports(): void
+    {
+        $this->login();
+        $product = $this->product();
+        foreach (['Diamonds', 'Pass'] as $index => $group) {
+            $product->packages()->create([
+                'code' => 'EMPTY-TAB-'.($index + 1),
+                'name' => 'Nominal '.($index + 1),
+                'group_name' => $group,
+                'sort_order' => $index,
+            ]);
+        }
+        $product->update([
+            'package_tabs_enabled' => true,
+            'package_tabs' => ['Diamonds', 'Weekly', 'Pass'],
+        ]);
+
+        $this->put('/admin/catalog/products/'.$product->id.'/package-groups/reorder', [
+            'groups' => ['Pass', 'Diamonds'],
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame(['Pass', 'Weekly', 'Diamonds'], $product->fresh()->package_tabs);
+
+        // A future nominal may still join a tab that had no packages.
+        $product->packages()->create([
+            'code' => 'EMPTY-TAB-3',
+            'name' => 'Weekly Pass',
+            'group_name' => 'Weekly',
+            'sort_order' => 2,
+        ]);
+        $this->put('/admin/catalog/products/'.$product->id, [
+            'category_id' => $product->category_id,
+            'name' => 'Tab Ready for Import',
+            'slug' => $product->slug,
+            'fulfillment_mode' => 'AUTO_PROVIDER',
+            'sort_order' => 0,
+            'is_active' => true,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+    }
+
     public function test_catalog_nominal_sort_respects_manual_position_before_numeric_value(): void
     {
         $nominals = collect([

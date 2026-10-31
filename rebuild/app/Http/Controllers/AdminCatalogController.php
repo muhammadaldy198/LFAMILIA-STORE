@@ -1431,9 +1431,26 @@ class AdminCatalogController
             ]);
         }
         $before = $product->package_tabs ?? [];
-        $product->update(['package_tabs' => $submitted]);
+        $stored = $submitted;
+        if ($product->package_tabs_enabled) {
+            // Legacy tabs without nominals are still valid future destinations.
+            // Keep their slots while reordering only the occupied group headings.
+            $remaining = $submitted;
+            $stored = [];
+            foreach ($before as $name) {
+                if (in_array(trim((string) $name), $current, true)) {
+                    if ($remaining !== []) {
+                        $stored[] = array_shift($remaining);
+                    }
+                } else {
+                    $stored[] = $name;
+                }
+            }
+            $stored = array_merge($stored, $remaining);
+        }
+        $product->update(['package_tabs' => $stored]);
         $audit->record($request, 'catalog.package-groups.reordered', 'product', $product->id,
-            $before, $submitted);
+            $before, $stored);
 
         return back();
     }
