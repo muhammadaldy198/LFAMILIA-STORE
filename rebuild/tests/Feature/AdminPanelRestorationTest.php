@@ -178,7 +178,7 @@ class AdminPanelRestorationTest extends TestCase
         ])->assertRedirect()->assertSessionHasNoErrors();
 
         $this->assertSame('PERCENT', $package->fresh()->pricing_mode);
-        $this->assertSame(11200, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
+        $this->assertSame(11000, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
     }
 
     public function test_bulk_publish_import_bootstraps_one_customer_destination_for_new_game(): void
@@ -306,13 +306,13 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertEqualsWithDelta(10, (float) $product->fresh()->margin_percent, 0.0001);
         $this->assertSame('PERCENT', $package->fresh()->pricing_mode);
         $this->assertNull($product->fresh()->sell_markup_percent);
-        // Seller price 10000 + nominal's own 12% = 11200.
-        $this->assertSame(11200, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
+        // Seller price 10000 + new nominal's 10% markup = 11000.
+        $this->assertSame(11000, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
         $response = $this->get('/catalog/'.$product->slug);
         $response->assertOk();
         $response->assertInertia(function (AssertableInertia $page): void {
             $page->where('packages.0.is_available', true);
-            $page->where('packages.0.price_idr', 11200);
+            $page->where('packages.0.price_idr', 11000);
         });
         $this->assertDatabaseHas('audit_logs', ['action' => 'catalog.mapping.updated', 'target_id' => (string) $mapping->id]);
         Http::assertSentCount(1);
@@ -334,7 +334,7 @@ class AdminPanelRestorationTest extends TestCase
         ])->assertRedirect()->assertSessionHasNoErrors();
         $package = $product->packages()->firstOrFail();
         $this->assertSame('{{destination}}', $product->fresh()->customer_no_template);
-        $this->assertSame(11200, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
+        $this->assertSame(11000, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
     }
 
     public function test_publish_import_rejects_invalid_destination_formats_without_partial_activation(): void
@@ -410,11 +410,11 @@ class AdminPanelRestorationTest extends TestCase
             $this->assertSame(1, $package->mappings()->count());
             $this->assertSame(1, $package->mappings()->where('is_active', true)->count());
             $this->assertSame([0], $package->mappings()->orderBy('priority')->pluck('priority')->map(fn ($value): int => (int) $value)->all());
-            // Each new imported nominal has its own default 12% markup.
+            // Each new imported nominal has its own default 10% markup.
             $quote = app(CheckoutPricing::class)->forPackage($package->id);
             $sellerPrice = (int) $package->mappings()->firstOrFail()->cost_idr;
             $this->assertSame('PERCENT', $package->pricing_mode);
-            $this->assertSame($sellerPrice + intdiv(($sellerPrice * 12) + 99, 100), $quote['subtotal_idr']);
+            $this->assertSame($sellerPrice + intdiv(($sellerPrice * 10) + 99, 100), $quote['subtotal_idr']);
             $this->assertSame(1, $package->mappings()->count());
         }
         $response = $this->get('/catalog/'.$product->slug);
@@ -1110,7 +1110,7 @@ class AdminPanelRestorationTest extends TestCase
 
         $package = $product->packages()->firstOrFail();
         $this->assertSame('PERCENT', $package->pricing_mode);
-        $this->assertSame(11200, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
+        $this->assertSame(11000, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
         $this->assertSame(10000, app(CheckoutPricing::class)->forPackage($package->id)['max_price_idr']);
 
         $this->fakeCatalog([
