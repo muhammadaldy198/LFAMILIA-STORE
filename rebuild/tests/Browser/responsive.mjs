@@ -90,9 +90,12 @@ try {
                 const region=document.querySelector('[aria-label="Pilih metode pembayaran top up"]');
                 const button=[...(region?.querySelectorAll('button[aria-expanded]')||[])].find(b=>b.innerText.includes(${JSON.stringify(category)}));
                 const preview=button?.parentElement.querySelector('[aria-label="Logo metode pembayaran"]');
-                return {found:!!button,images:preview?.querySelectorAll('img').length||0,text:preview?.textContent?.trim()||''};
+                const style=preview&&getComputedStyle(preview);
+                const item=preview?.querySelector('.lf-wallet-logo');
+                const itemStyle=item&&getComputedStyle(item);
+                return {found:!!button,images:preview?.querySelectorAll('img').length||0,text:preview?.textContent?.trim()||'',wrap:style?.flexWrap,overflow:style?.overflow,shrink:itemStyle?.flexShrink,minWidth:itemStyle?.minWidth};
             })()`);
-            if(!before.found||before.images<1||before.text)throw Error('Wallet collapsed logos invalid '+JSON.stringify({width,category,before}));
+            if(!before.found||before.images<1||before.text||before.wrap!=='nowrap'||before.overflow!=='hidden'||Number(before.shrink)!==1||before.minWidth!=='0px')throw Error('Wallet logo row must stay shrinkable on one line '+JSON.stringify({width,category,before}));
             await evaluate(`(()=>{
                 const region=document.querySelector('[aria-label="Pilih metode pembayaran top up"]');
                 [...region.querySelectorAll('button[aria-expanded]')].find(b=>b.innerText.includes(${JSON.stringify(category)})).click();
