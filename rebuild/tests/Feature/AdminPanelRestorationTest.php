@@ -1643,6 +1643,33 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertDatabaseMissing('product_package_groups', ['id' => $weekly->id]);
     }
 
+    public function test_group_rename_and_delete_guard_recognize_legacy_whitespace_labels(): void
+    {
+        $this->login();
+        $product = $this->product();
+        $this->post('/admin/catalog/products/'.$product->id.'/package-groups', [
+            'name' => 'Diamonds',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $group = $product->packageGroups()->where('name', 'Diamonds')->firstOrFail();
+        $nominal = $product->packages()->create([
+            'code' => 'WHITESPACE-DIAMONDS',
+            'name' => '20 Diamonds',
+            'group_name' => ' Diamonds ',
+            'sort_order' => 0,
+            'is_active' => false,
+            'pricing_mode' => 'PERCENT',
+            'margin_percent' => 14,
+        ]);
+        $this->delete('/admin/catalog/package-groups/'.$group->id)
+            ->assertSessionHasErrors('group');
+        $this->put('/admin/catalog/package-groups/'.$group->id, [
+            'name' => 'Gems',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame('Gems', $nominal->fresh()->group_name);
+        $this->assertSame('20 Diamonds', $nominal->fresh()->name);
+        $this->assertSame(14.0, (float) $nominal->fresh()->margin_percent);
+    }
+
     public function test_digiflazz_import_uses_selected_destination_group_instead_of_supplier_type(): void
     {
         $this->login();

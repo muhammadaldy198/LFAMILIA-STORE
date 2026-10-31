@@ -209,7 +209,7 @@ const openNominal = (row = null) => {
     nominalEditing.value = row;
     Object.assign(nominal, {
         name: row?.name || '',
-        group_name: row ? (row.group_name || 'Umum') : (product.value?.package_groups?.[0]?.name || ''),
+        group_name: row ? (String(row.group_name ?? '').trim() || 'Umum') : (product.value?.package_groups?.[0]?.name || ''),
         sort_order: row?.sort_order ?? (product.value?.packages.length ?? 0),
         is_active: row ? Boolean(row.is_active) : true,
         price_mode: isDigiflazzNominal.value
@@ -239,7 +239,7 @@ const saveNominal = () => {
             sell_price_idr: nominalEditing.value.legacy_voucher_sell_price_idr }
         : nominalEditing.value;
     const payload = nominalPayload(savedRow, nominal, nominalEditing.value?.code || `${slugCode(nominal.name)}-${Date.now().toString(36).slice(-4)}`);
-    const selectedGroup = product.value?.package_groups?.find(group => group.name === nominal.group_name);
+    const selectedGroup = product.value?.package_groups?.find(group => group.name === String(nominal.group_name ?? '').trim());
     if (!selectedGroup) {
         nominalErrors.value = { group_id: 'Buat atau pilih grup di tab Grup/Tabel dahulu.' };
         return;
@@ -776,7 +776,7 @@ const sellPriceOf = (seller, item) => {
     const existing = importProduct.value?.nominals?.find(nominal =>
         item?.nominal_value != null
         && Number(nominal.nominal_value) === Number(item.nominal_value)
-        && String(nominal.group_name || 'Umum') === String(selectedImportGroup.value?.name || item.type || 'Umum')
+        && (String(nominal.group_name ?? '').trim() || 'Umum') === (String(selectedImportGroup.value?.name ?? item.type ?? '').trim() || 'Umum')
     );
     if (existing?.pricing_mode === 'FIXED') return price + Number(existing.margin_fixed_idr || 0);
     const percentage = existing?.pricing_mode === 'PERCENT'
@@ -1069,7 +1069,7 @@ onMounted(() => {
                     <span v-else style="width:48px;height:48px;display:grid;place-items:center;border:1px solid var(--a-line);border-radius:8px">▦</span>
                     <div style="flex:1;min-width:90px">
                         <strong>{{ index + 1 }}. {{ group.name }}</strong>
-                        <p class="adm-note">{{ (product?.packages || []).filter(row => (row.group_name || 'Umum') === group.name).length }} nominal</p>
+                        <p class="adm-note">{{ (product?.packages || []).filter(row => (String(row.group_name ?? '').trim() || 'Umum') === group.name).length }} nominal</p>
                     </div>
                     <div style="display:flex;gap:4px;flex-wrap:wrap">
                         <button type="button" class="adm-btn sm" :disabled="groupBusy || index === 0" @click="moveGroup(index, -1)">↑</button>

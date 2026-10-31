@@ -71,14 +71,14 @@ class AdminPackageGroupController
             if ($name !== $old) {
                 // Exact match protects legacy case-sensitive groups.
                 $ids = $product->packages()->get(['id', 'group_name'])
-                    ->filter(fn ($row): bool => $row->group_name === $old
-                        || ($old === 'Umum' && ($row->group_name === null || $row->group_name === '')))
+                    ->filter(fn ($row): bool => trim((string) $row->group_name) === $old
+                        || ($old === 'Umum' && $row->group_name === null))
                     ->pluck('id')->all();
                 if ($ids !== []) {
                     $product->packages()->whereIn('id', $ids)->update(['group_name' => $name]);
                 }
                 $product->update(['package_tabs' => array_map(
-                    fn ($tab) => $tab === $old ? $name : $tab, $product->package_tabs ?? []
+                    fn ($tab) => trim((string) $tab) === $old ? $name : $tab, $product->package_tabs ?? []
                 )]);
                 $group->update(['name' => $name]);
             }
@@ -96,11 +96,11 @@ class AdminPackageGroupController
         DB::transaction(function () use ($request, $group, $audit): void {
             $product = Product::whereKey($group->product_id)->lockForUpdate()->firstOrFail();
             $group = ProductPackageGroup::whereKey($group->id)->lockForUpdate()->firstOrFail();
-            $inUse = $product->packages()->where('group_name', $group->name)->exists();
-            if ($group->name === 'Umum') {
-                $inUse = $inUse || $product->packages()
-                    ->where(fn ($q) => $q->whereNull('group_name')->orWhere('group_name', ''))->exists();
-            }
+            // Old nominal group labels may still carry whitespace. Never
+            // delete a group used by any such nominal.
+            $inUse = $product->packages()->get(['group_name'])->contains(
+                fn ($row): bool => (trim((string) $row->group_name) ?: 'Umum') === $group->name
+            );
             if ($inUse || ($product->package_tabs_enabled && $product->packageGroups()->count() <= 1)) {
                 throw ValidationException::withMessages([
                     'group' => 'Grup masih berisi nominal atau tab terakhir. Pindahkan nominal dahulu.',
@@ -108,7 +108,7 @@ class AdminPackageGroupController
             }
             $before = $group->toArray();
             $product->update(['package_tabs' => array_values(array_filter($product->package_tabs ?? [],
-                fn ($name): bool => $name !== $group->name))]);
+                fn ($name): bool => trim((string) $name) !== $group->name))]);
             $group->delete();
             $audit->record($request, 'catalog.group.deleted', 'product_package_group', $group->id, $before, []);
         }, 3);

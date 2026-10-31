@@ -22,16 +22,29 @@ return new class extends Migration
                 foreach ($products as $product) {
                     $names = [];
                     $tabs = json_decode((string) ($product->package_tabs ?? '[]'), true);
+                    $normalizedTabs = [];
                     foreach (is_array($tabs) ? $tabs : [] as $tab) {
                         $name = trim((string) $tab);
-                        if ($name !== '' && ! in_array($name, $names, true)) {
+                        if ($name !== '' && ! in_array($name, $normalizedTabs, true)) {
+                            $normalizedTabs[] = $name;
                             $names[] = $name;
                         }
                     }
+                    // Normalize the legacy tab configuration and the nominal
+                    // association together, not just the new group registry.
+                    if (is_array($tabs) && $tabs !== $normalizedTabs) {
+                        DB::table('products')->where('id', $product->id)
+                            ->update(['package_tabs' => json_encode($normalizedTabs)]);
+                    }
                     foreach (DB::table('product_packages')->where('product_id', $product->id)
-                        ->orderBy('sort_order')->orderBy('id')->pluck('group_name') as $label) {
-                        $name = trim((string) $label);
-                        $name = $name === '' ? 'Umum' : $name;
+                        ->orderBy('sort_order')->orderBy('id')->get(['id', 'group_name']) as $package) {
+                        $label = $package->group_name;
+                        $normalized = trim((string) $label);
+                        if ($label !== null && $label !== $normalized) {
+                            DB::table('product_packages')->where('id', $package->id)
+                                ->update(['group_name' => $normalized]);
+                        }
+                        $name = $normalized === '' ? 'Umum' : $normalized;
                         if (! in_array($name, $names, true)) {
                             $names[] = $name;
                         }
