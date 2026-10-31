@@ -5,7 +5,7 @@ import AdminLayout from '../../Components/Admin/AdminLayout.vue';
 import AdminModal from '../../Components/Admin/AdminModal.vue';
 import { rupiah } from '../../lib/adminFormat';
 import { nominalMode, nominalPayload, nominalPriceValue } from '../../lib/catalogNominal';
-import { orderedPackageGroups, movePackageGroup } from '../../lib/catalogGroups';
+import { orderedPackageGroups } from '../../lib/catalogGroups';
 import { canSyncMapping, mappingPayload, mappingStatusLabel, sortMappings } from '../../lib/catalogSources';
 
 const props = defineProps({
@@ -107,7 +107,7 @@ const openEditor = (row) => {
     product.value = JSON.parse(JSON.stringify(row));
     editTab.value = 'info';
     editErrors.value = {};
-    groupOrderError.value = '';
+    groupErrors.value = {};
     editorOpen.value = true;
 };
 
@@ -209,7 +209,7 @@ const openNominal = (row = null) => {
     nominalEditing.value = row;
     Object.assign(nominal, {
         name: row?.name || '',
-        group_name: row?.group_name || '',
+        group_name: row?.group_name || product.value?.package_groups?.[0]?.name || '',
         sort_order: row?.sort_order ?? (product.value?.packages.length ?? 0),
         is_active: row ? Boolean(row.is_active) : true,
         price_mode: isDigiflazzNominal.value
@@ -239,6 +239,12 @@ const saveNominal = () => {
             sell_price_idr: nominalEditing.value.legacy_voucher_sell_price_idr }
         : nominalEditing.value;
     const payload = nominalPayload(savedRow, nominal, nominalEditing.value?.code || `${slugCode(nominal.name)}-${Date.now().toString(36).slice(-4)}`);
+    const selectedGroup = product.value?.package_groups?.find(group => group.name === nominal.group_name);
+    if (!selectedGroup) {
+        nominalErrors.value = { group_id: 'Buat atau pilih grup di tab Grup/Tabel dahulu.' };
+        return;
+    }
+    payload.group_id = selectedGroup.id;
     // Bind pricing to the source shown when the editor opened. If voucher
     // stock runs out before Save, the server rejects stale price edits
     // instead of silently changing Digiflazz's independent markup.
@@ -333,28 +339,63 @@ const confirmRemove = () => {
     });
 };
 
-// The saved group priority is independent of nominal position and does not enable tabs.
-const packageGroupNames = computed(() => orderedPackageGroups(
-    product.value?.packages || [], product.value?.package_tabs || [],
-).map(group => group.name));
-const groupOrderError = ref('');
-const moveGroup = (index, direction) => {
-    if (!product.value || saveBusy.value) return;
-    const before = packageGroupNames.value;
-    const next = movePackageGroup(before, index, direction);
-    if (JSON.stringify(next) === JSON.stringify(before)) return;
-    const previous = [...(product.value.package_tabs || [])];
-    const productId = product.value.id;
-    product.value.package_tabs = next;
-    groupOrderError.value = '';
-    saveBusy.value = 'group-order';
-    router.put('/admin/catalog/products/' + productId + '/package-groups/reorder', { groups: next }, {
+// Grup/Tabel are separate editable records for every product.
+const packageGroups = computed(() => product.value?.package_groups || []);
+const groupOpen = ref(false), groupEditing = ref(null), groupName = ref('');
+const groupImage = ref(null), groupBusy = ref(false), groupErrors = ref({});
+const openGroup = (row = null) => {
+    groupEditing.value = row;
+    groupName.value = row?.name || '';
+    groupImage.value = null;
+    groupErrors.value = {};
+    groupOpen.value = true;
+};
+const saveGroup = () => {
+    if (!product.value || !groupName.value.trim() || groupBusy.value) return;
+    groupBusy.value = true;
+    groupErrors.value = {};
+    const data = { name: groupName.value.trim(), ...(groupImage.value ? { image: groupImage.value } : {}) };
+    const url = groupEditing.value ? '/admin/catalog/package-groups/' + groupEditing.value.id
+        : '/admin/catalog/products/' + product.value.id + '/package-groups';
+    const options = {
         preserveScroll: true,
-        onError: bag => {
-            if (product.value?.id === productId) product.value.package_tabs = previous;
-            groupOrderError.value = bag.groups || 'Gagal menyimpan urutan grup.';
-        },
-        onFinish: () => { saveBusy.value = ''; },
+        onError: bag => { groupErrors.value = bag; },
+        onSuccess: () => { groupOpen.value = false; },
+        onFinish: () => { groupBusy.value = false; },
+    };
+    if (groupEditing.value && groupImage.value) router.post(url, { ...data, _method: 'PUT' }, { ...options, forceFormData: true });
+    else if (groupEditing.value) router.put(url, data, options);
+    else router.post(url, data, { ...options, forceFormData: Boolean(groupImage.value) });
+};
+const removeGroup = row => {
+    if (!product.value || groupBusy.value || !window.confirm('Hapus grup ' + row.name + '? Pindahkan nominalnya lebih dulu.')) return;
+    groupBusy.value = true;
+    groupErrors.value = {};
+    router.delete('/admin/catalog/package-groups/' + row.id, {
+        preserveScroll: true, onError: bag => { groupErrors.value = bag; },
+        onFinish: () => { groupBusy.value = false; },
+    });
+};
+const removeGroupImage = row => {
+    groupBusy.value = true;
+    router.delete('/admin/catalog/media/package-group/' + row.id, {
+        data: { collection: 'image' }, preserveScroll: true,
+        onError: bag => { groupErrors.value = bag; },
+        onFinish: () => { groupBusy.value = false; },
+    });
+};
+const moveGroup = (index, direction) => {
+    if (!product.value || groupBusy.value) return;
+    const target = index + direction;
+    if (target < 0 || target >= packageGroups.value.length) return;
+    const rows = [...packageGroups.value];
+    [rows[index], rows[target]] = [rows[target], rows[index]];
+    groupBusy.value = true;
+    router.put('/admin/catalog/products/' + product.value.id + '/package-groups/ids/reorder', {
+        ids: rows.map(group => group.id),
+    }, {
+        preserveScroll: true, onError: bag => { groupErrors.value = bag; },
+        onFinish: () => { groupBusy.value = false; },
     });
 };
 
@@ -625,6 +666,7 @@ const importBusy = ref(false);
 const importErrors = ref({});
 const importInfo = ref('');
 const importProductId = ref('');
+const importGroupId = ref('');
 const importCategory = ref('');
 const importBrand = ref('');
 const importType = ref('');
@@ -639,6 +681,8 @@ const importCollator = new Intl.Collator('id-ID', { numeric: true, sensitivity: 
 const autoProducts = computed(() => props.autoProductOptions);
 const importProduct = computed(() => props.autoProductOptions.find(row => Number(row.id) === Number(importProductId.value))
     || props.products.find(row => Number(row.id) === Number(importProductId.value)) || null);
+const importGroups = computed(() => importProduct.value?.package_groups || []);
+const selectedImportGroup = computed(() => importGroups.value.find(group => String(group.id) === String(importGroupId.value)));
 const importFields = computed(() => importProduct.value?.fields?.length
     ? importProduct.value.fields
     : isMobileLegends(importProduct.value?.slug)
@@ -656,6 +700,7 @@ const importTemplateReady = computed(() => {
         && importFields.value.filter(field => field.is_required).every(field => used.includes(field.field_key));
 });
 watch(importProductId, () => {
+    importGroupId.value = '';
     importDestination.value = importProduct.value?.customer_no_template || '';
     importPublish.value = importTemplateReady.value;
     importErrors.value = {};
@@ -731,7 +776,7 @@ const sellPriceOf = (seller, item) => {
     const existing = importProduct.value?.nominals?.find(nominal =>
         item?.nominal_value != null
         && Number(nominal.nominal_value) === Number(item.nominal_value)
-        && String(nominal.group_name || '') === String(item.type || '')
+        && String(nominal.group_name || 'Umum') === String(selectedImportGroup.value?.name || item.type || 'Umum')
     );
     if (existing?.pricing_mode === 'FIXED') return price + Number(existing.margin_fixed_idr || 0);
     const percentage = existing?.pricing_mode === 'PERCENT'
@@ -744,6 +789,7 @@ const openImport = () => {
     importErrors.value = {};
     importPicked.value = [];
     importProductId.value = '';
+    importGroupId.value = '';
     importSearch.value = '';
     importBrand.value = '';
     importCategory.value = '';
@@ -767,11 +813,15 @@ const toggleImportRow = id => {
     importInfo.value = '';
 };
 const submitImport = () => {
-    if (!importProduct.value || !importPicked.value.length) return;
+    if (!importProduct.value || !importPicked.value.length || !selectedImportGroup.value) {
+        importErrors.value = { group_id: 'Pilih grup tujuan dari produk ini.' };
+        return;
+    }
     importBusy.value = true;
     importErrors.value = {};
     router.post(`/admin/catalog/products/${importProduct.value.id}/import`, {
         item_ids: importPicked.value,
+        group_id: Number(importGroupId.value),
         publish: importPublish.value && importTemplateReady.value,
         ...(importTemplateReady.value ? { customer_no_template: importTemplate.value } : {}),
     }, {
