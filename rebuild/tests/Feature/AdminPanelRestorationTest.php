@@ -1398,6 +1398,48 @@ class AdminPanelRestorationTest extends TestCase
             }));
     }
 
+    public function test_group_order_is_saved_independently_from_nominal_position(): void
+    {
+        $this->login();
+        $product = $this->product();
+        $a = $product->packages()->create([
+            'code' => 'GROUP-D', 'name' => '20 Diamond',
+            'group_name' => 'Diamonds', 'sort_order' => 2,
+        ]);
+        $b = $product->packages()->create([
+            'code' => 'GROUP-P', 'name' => 'Weekly Pass',
+            'group_name' => 'Pass', 'sort_order' => 1,
+        ]);
+        $c = $product->packages()->create([
+            'code' => 'GROUP-U', 'name' => '5 Diamond',
+            'group_name' => null, 'sort_order' => 0,
+        ]);
+
+        $route = '/admin/catalog/products/'.$product->id.'/package-groups/reorder';
+        $this->put($route, ['groups' => ['Pass', 'Umum', 'Diamonds']])
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame(['Pass', 'Umum', 'Diamonds'], $product->fresh()->package_tabs);
+        $this->assertFalse((bool) $product->fresh()->package_tabs_enabled);
+        $this->assertSame([0, 1, 2], $product->packages()->orderBy('sort_order')->pluck('sort_order')->all());
+
+        $this->put($route, ['groups' => ['Pass', 'Diamonds']])->assertSessionHasErrors('groups');
+        $this->put($route, ['groups' => ['Pass', 'Pass', 'Diamonds']])->assertSessionHasErrors('groups');
+        $this->assertSame(['Pass', 'Umum', 'Diamonds'], $product->fresh()->package_tabs);
+
+        $sorted = app(CatalogNominalOrder::class)->sort(collect([$a, $b, $c]));
+        $this->assertSame([$c->id, $b->id, $a->id], $sorted->pluck('id')->all());
+    }
+
+    public function test_catalog_nominal_sort_respects_manual_position_before_numeric_value(): void
+    {
+        $nominals = collect([
+            ['id' => 1, 'name' => '5 Diamonds', 'sort_order' => 3],
+            ['id' => 2, 'name' => '1100 Diamonds', 'sort_order' => 0],
+            ['id' => 3, 'name' => '20 Diamonds', 'sort_order' => 2],
+        ]);
+        $this->assertSame([2, 3, 1], app(CatalogNominalOrder::class)->sort($nominals)->pluck('id')->all());
+    }
+
     public function test_catalog_nominal_sort_reads_numeric_values_in_natural_order(): void
     {
         $nominals = collect([

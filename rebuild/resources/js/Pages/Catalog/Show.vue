@@ -10,6 +10,7 @@ import CheckoutVoucherModal from '../../Components/Checkout/VoucherModal.vue';
 import '../../../css/checkout.css';
 import { phoneCountries, LEADING_ZERO_PRESERVED_DIALS } from '../../Data/phoneCountries';
 import { flagUrl } from '../../lib/flags';
+import { orderedPackageGroups } from '../../lib/catalogGroups';
 
 const props = defineProps({
     product: Object,
@@ -191,23 +192,8 @@ const firstCheckoutError = computed(() => {
     return '';
 });
 
-const packageGroups = computed(() => {
-    const groups = new Map();
-    for (const item of props.packages || []) {
-        const name = item.group_name || '';
-        if (!groups.has(name)) groups.set(name, []);
-        groups.get(name).push(item);
-    }
-    const rows = [...groups.entries()].map(([name, items]) => ({ name, items }));
-    const configured = props.product?.package_tabs_enabled ? (props.product?.package_tabs || []) : [];
-    if (!configured.length) return rows;
-    return [...rows].sort((left, right) => {
-        const leftIndex = configured.indexOf(left.name);
-        const rightIndex = configured.indexOf(right.name);
-        return (leftIndex < 0 ? Number.MAX_SAFE_INTEGER : leftIndex)
-            - (rightIndex < 0 ? Number.MAX_SAFE_INTEGER : rightIndex);
-    });
-});
+// Honor group priority independently from legacy tab navigation.
+const packageGroups = computed(() => orderedPackageGroups(props.packages || [], props.product?.package_tabs || []));
 const packageTabs = computed(() => props.product?.package_tabs_enabled
     ? (props.product?.package_tabs || []).filter((name) => packageGroups.value.some((group) => group.name === name))
     : []);

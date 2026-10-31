@@ -1403,6 +1403,34 @@ class AdminCatalogController
         return back();
     }
 
+    public function reorderPackageGroups(Request $request, Product $product, CatalogAudit $audit): RedirectResponse
+    {
+        $data = $request->validate([
+            'groups' => ['present', 'array', 'max:1000'],
+            'groups.*' => ['required', 'string', 'max:120', 'distinct'],
+        ]);
+        // No new database table: the existing package_tabs JSON keeps the
+        // group priority, while package_tabs_enabled remains unchanged.
+        $current = $product->packages()->pluck('group_name')
+            ->map(fn ($name): string => trim((string) $name) ?: 'Umum')->unique()->values()->all();
+        $submitted = array_map(fn (string $name): string => trim($name) ?: 'Umum', $data['groups']);
+        $expected = $current;
+        $actual = $submitted;
+        sort($expected, SORT_STRING);
+        sort($actual, SORT_STRING);
+        if ($expected !== $actual || count($submitted) !== count(array_unique($submitted))) {
+            throw ValidationException::withMessages([
+                'groups' => 'Daftar grup berubah atau tidak lengkap. Muat ulang halaman produk.',
+            ]);
+        }
+        $before = $product->package_tabs ?? [];
+        $product->update(['package_tabs' => $submitted]);
+        $audit->record($request, 'catalog.package-groups.reordered', 'product', $product->id,
+            $before, $submitted);
+
+        return back();
+    }
+
     public function reorderPackages(Request $request, Product $product, CatalogAudit $audit): RedirectResponse
     {
         $data = $request->validate(['ids' => ['required', 'array', 'max:1000'], 'ids.*' => ['integer', 'distinct']]);
