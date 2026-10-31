@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Jobs\SendFulfillmentJob;
 use App\Services\Fulfillment\DigiflazzClient;
+use App\Services\Fulfillment\DigiflazzDestinationTemplate;
 use App\Services\Fulfillment\FulfillmentTargetBuilder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -129,7 +130,7 @@ class FulfillmentService
                     $product = DB::table('product_packages')
                         ->join('products', 'products.id', '=', 'product_packages.product_id')
                         ->where('product_packages.id', $order->product_package_id)
-                        ->select('products.customer_no_template', 'products.id')
+                        ->select('products.customer_no_template', 'products.id', 'products.slug')
                         ->first();
                     if ($product) {
                         if (array_key_exists('customer_no_template', $snapshot['provider'] ?? [])) {
@@ -139,6 +140,17 @@ class FulfillmentService
                                 ?: ($config['customer_no_template'] ?? null);
                         }
                     }
+                    $snapshotTemplate = (string) ($config['customer_no_template'] ?? '');
+                    // A checkout snapshot is immutable. Empty optional values
+                    // may be omitted from customer_input; that must NOT make
+                    // fulfillment rewrite a multi-field destination format.
+                    preg_match_all('/\{\{([a-z][a-z0-9_]*)\}\}/', $snapshotTemplate, $templateMatches);
+                    $keys = $templateMatches[1] ?: array_keys($this->json($order->customer_input));
+                    $config['customer_no_template'] = app(DigiflazzDestinationTemplate::class)->resolve(
+                        (string) data_get($snapshot, 'product.slug', $product?->slug ?? ''),
+                        $snapshotTemplate !== '' ? $snapshotTemplate : null,
+                        $keys
+                    );
                 }
                 if ($mapping->provider_code === 'VOUCHER_STOCK') {
                     $stockKey = trim((string) data_get($config, 'stock_key', ''));
@@ -164,16 +176,10 @@ class FulfillmentService
 
                 $customerInput = $this->json($order->customer_input);
                 $customerNo = $this->targetBuilder->customerNo($customerInput, $config);
-                $maxPrice = $this->maxPrice($snapshot);
-                // The order snapshot is authoritative. This cap is captured at
-                // checkout for the selected SKU and must not be overridden by
-                // legacy manual-price fields left in a mapping row.
-
                 $request = [
                     'buyer_sku_code' => (string) $mapping->external_sku,
                     'customer_no' => $customerNo,
                     'ref_id' => (string) $attempt->external_reference,
-                    'max_price' => $maxPrice,
                 ];
 
                 DB::table('fulfillment_attempts')->where('id', $attempt->id)->update([
@@ -461,23 +467,6 @@ class FulfillmentService
                     $order->id
                 );
                 $this->emails->queueOrderCompleted((int) $order->id, 'digiflazz');
-
-                if ($price !== null && $price > (int) ($request['max_price'] ?? PHP_INT_MAX)) {
-                    // Successful delivery cannot be reversed; raise an urgent accounting alert.
-                    $this->event((int) $order->id, 'FULFILLMENT_PRICE_GUARD_BREACH', 'SUCCESS', 'SUCCESS', [
-                        'attempt_id' => $attempt->id,
-                        'provider_price_idr' => $price,
-                        'max_price_idr' => (int) $request['max_price'],
-                    ]);
-                    $this->notifications->record(
-                        'fulfillment.price_guard_breach',
-                        'PENTING: harga penyedia melebihi batas',
-                        'Pesanan '.$order->order_number.' sudah terkirim tetapi harga penyedia melebihi batas harga. Tinjau selisih biaya.',
-                        'ERROR',
-                        'order',
-                        $order->id
-                    );
-                }
 
                 return false;
             }
@@ -1002,9 +991,6 @@ class FulfillmentService
             // Older orders retain their own historic cap in the snapshot.
             if ((int) $item->price_idr <= 0) {
                 return 'Harga supplier Digiflazz belum tersedia.';
-            }
-            if ((int) $item->price_idr > $this->maxPrice($snapshot)) {
-                return 'Harga supplier Digiflazz melewati batas harga aman order.';
             }
 
             return null;

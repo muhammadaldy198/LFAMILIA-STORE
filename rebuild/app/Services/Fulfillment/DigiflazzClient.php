@@ -32,7 +32,6 @@ class DigiflazzClient
                 (string) $config['api_key'].
                 (string) $request['ref_id']
             ),
-            'max_price' => (int) $request['max_price'],
             'cb_url' => rtrim((string) config('app.url'), '/').'/api/fulfillment/digiflazz/webhook',
         ];
 

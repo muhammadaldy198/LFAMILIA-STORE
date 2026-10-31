@@ -181,6 +181,28 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertSame(11200, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
     }
 
+    public function test_bulk_publish_import_bootstraps_one_customer_destination_for_new_game(): void
+    {
+        $this->login();
+        $this->fakeCatalog([$this->row()]);
+        app(DigiflazzCatalogService::class)->sync();
+        Provider::where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
+        $product = $this->product();
+        $product->category->update(['is_active' => true]);
+        $product->update(['is_active' => false, 'customer_no_template' => null]);
+        $id = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'restore-sku')->value('id');
+
+        $this->post('/admin/catalog/products/'.$product->id.'/import', [
+            'item_ids' => [$id], 'publish' => true,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertSame(['destination'], $product->fields()->pluck('field_key')->all());
+        $this->assertSame('{{destination}}', $product->fresh()->customer_no_template);
+        $this->assertTrue($product->fresh()->is_active);
+        $this->assertTrue($product->packages()->firstOrFail()->is_active);
+        $this->assertTrue($product->packages()->firstOrFail()->mappings()->firstOrFail()->is_active);
+    }
+
     public function test_activating_automatic_product_validates_existing_destination_template(): void
     {
         $this->login();
@@ -217,7 +239,7 @@ class AdminPanelRestorationTest extends TestCase
         $product = $this->product();
         $product->category->update(['is_active' => true]);
         $product->fields()->create(['field_key' => 'user_id', 'label' => 'ID pengguna', 'type' => 'text', 'is_required' => true, 'sort_order' => 0]);
-        $product->fields()->create(['field_key' => 'zone_id', 'label' => 'Zona', 'type' => 'text', 'is_required' => false, 'sort_order' => 1]);
+        $product->fields()->create(['field_key' => 'zone_id', 'label' => 'Zona', 'type' => 'text', 'is_required' => true, 'sort_order' => 1]);
         $product->update([
             'nickname_check_enabled' => true, 'nickname_game_code' => 'free-fire',
             'nickname_user_field_key' => 'user_id', 'nickname_server_field_key' => 'zone_id',
@@ -227,6 +249,14 @@ class AdminPanelRestorationTest extends TestCase
         $this->post('/admin/catalog/products/'.$product->id.'/import', [
             'item_ids' => [$itemId], 'publish' => true,
         ])->assertRedirect()->assertSessionHasNoErrors();
+
+        // Even a draft import may not replace an active product's shared
+        // delivery format with one that omits a required field.
+        $this->post('/admin/catalog/products/'.$product->id.'/import', [
+            'item_ids' => [$itemId], 'publish' => false,
+            'customer_no_template' => '{{user_id}}',
+        ])->assertSessionHasErrors('customer_no_template');
+        $this->assertSame('{{user_id}}{{zone_id}}', $product->fresh()->customer_no_template);
 
         $this->put('/admin/catalog/products/'.$product->id.'/fields', [
             'customer_no_template' => '{{zone_id}}',
@@ -626,8 +656,12 @@ class AdminPanelRestorationTest extends TestCase
         $this->put('/admin/catalog/products/'.$product->id.'/fields', ['fields' => $fields])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertSame(['user_id', 'zone_id'], $product->fields()->orderBy('sort_order')->pluck('field_key')->all());
         $product->update(['nickname_check_enabled' => true, 'nickname_game_code' => 'mobile-legends', 'nickname_user_field_key' => 'user_id', 'nickname_server_field_key' => 'zone_id']);
-        $this->put('/admin/catalog/products/'.$product->id.'/fields', ['fields' => [$fields[0]]])->assertSessionHasErrors('fields');
-        $this->assertSame(2, $product->fields()->count());
+        $this->put('/admin/catalog/products/'.$product->id.'/fields', [
+            'fields' => [$fields[0]], 'customer_no_template' => '{{user_id}}',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame(1, $product->fields()->count());
+        $this->assertFalse($product->fresh()->nickname_check_enabled);
+        $this->assertSame('{{user_id}}', $product->fresh()->customer_no_template);
     }
 
     public function test_categories_have_their_own_page_with_product_counts(): void

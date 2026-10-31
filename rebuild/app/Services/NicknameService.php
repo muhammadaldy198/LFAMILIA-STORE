@@ -47,15 +47,8 @@ class NicknameService
             return $this->unsupported();
         }
 
-        if (mb_strlen($userId) < 2) {
-            throw ValidationException::withMessages([
-                'customer_input.'.$userField => 'ID akun belum valid.',
-            ]);
-        }
-        if ($game->requires_server && $server === '') {
-            throw ValidationException::withMessages([
-                'customer_input.'.($serverField ?: 'server') => 'Server / Zone ID wajib diisi.',
-            ]);
+        if (mb_strlen($userId) < 2 || ($game->requires_server && $server === '')) {
+            return $this->warning('Nickname belum bisa diperiksa. Pastikan User ID dan Zone ID benar.');
         }
 
         $settings = $this->config->active();
@@ -126,8 +119,10 @@ class NicknameService
                 'country' => $country,
                 'warning' => null,
             ];
-        } catch (NicknameServiceUnavailable) {
-            return $this->warning('Nickname tidak berhasil diverifikasi karena layanan pengecekan sedang tidak tersedia. Pastikan ID sudah benar.');
+        } catch (NicknameServiceUnavailable|ValidationException) {
+            // Kokinpay only helps display a nickname. Its rejection or outage
+            // cannot override the fulfillment target supplied by the buyer.
+            return $this->warning('Nickname tidak berhasil diverifikasi. Pastikan ID tujuan sudah benar.');
         }
     }
 

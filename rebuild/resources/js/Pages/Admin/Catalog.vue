@@ -382,6 +382,7 @@ const saveNotice = () => {
 
 /* ---------- data pelanggan ---------- */
 const fieldRows = ref([]);
+const destinationFormat = ref('');
 const fieldBusy = ref(false);
 const fieldErrors = ref({});
 
@@ -390,6 +391,7 @@ const loadFields = () => {
         field_key: row.field_key, label: row.label, placeholder: row.placeholder || '',
         type: row.type || 'text', is_required: Boolean(row.is_required),
     }));
+    destinationFormat.value = product.value?.customer_no_template || '';
 };
 
 const FIELD_KEYS = [
@@ -415,12 +417,33 @@ const moveField = (index, direction) => {
     fieldRows.value = list;
 };
 
-const template = computed(() => {
-    const keys = fieldRows.value.map(row => `{{${row.field_key}}}`);
-    if (!keys.length) return '';
-    if (keys.length === 1) return keys[0];
-    return keys[0] + keys.slice(1).map(key => `(${key})`).join('');
-});
+const isMobileLegends = slug => ['mobile-legends', 'mobile-legends-bang-bang', 'mobile-legend']
+    .includes(String(slug || '').toLowerCase());
+const resolveDestination = (slug, fields, saved = '') => {
+    const keys = fields.map(row => row.field_key);
+    const stored = String(saved || '').trim();
+    if (isMobileLegends(slug) && keys.includes('user_id') && keys.includes('zone_id')
+        && (!stored || stored === '{{user_id}}({{zone_id}})')) {
+        return '{{user_id}}{{zone_id}}';
+    }
+    if (keys.length === 1) {
+        const referenced = [...stored.matchAll(/\{\{([^}]+)\}\}/g)].map(match => match[1]);
+        if (!stored || referenced.some(key => !keys.includes(key))) return `{{${keys[0]}}}`;
+    }
+    return stored;
+};
+const templateNeedsCorrection = computed(() => [...String(destinationFormat.value || '')
+    .matchAll(/\{\{([^}]+)\}\}/g)]
+    .some(match => !fieldRows.value.some(row => row.field_key === match[1])));
+const template = computed(() => resolveDestination(product.value?.slug, fieldRows.value, destinationFormat.value));
+const requiredTemplateFieldsMissing = computed(() => fieldRows.value.some(row =>
+    row.is_required && !template.value.includes(`{{${row.field_key}}}`)
+));
+const showTemplateEditor = computed(() => fieldRows.value.length > 1
+    && (!isMobileLegends(product.value?.slug) || templateNeedsCorrection.value
+        || requiredTemplateFieldsMissing.value
+        || !fieldRows.value.some(row => row.field_key === 'user_id')
+        || !fieldRows.value.some(row => row.field_key === 'zone_id')));
 
 // Contoh nilai per kode kolom, dipakai bila admin belum mengisi contoh isian.
 const SAMPLES = { user_id: '12345678', zone_id: '1234', destination: '12345678', email: 'nama@email.com', phone: '08123456789' };
@@ -551,6 +574,7 @@ const importType = ref('');
 const importSearch = ref('');
 const importPicked = ref([]);
 const importPublish = ref(true);
+const importDestination = ref('');
 const importPage = ref(1);
 const IMPORT_PER_PAGE = 50;
 const importCollator = new Intl.Collator('id-ID', { numeric: true, sensitivity: 'base' });
@@ -558,6 +582,27 @@ const importCollator = new Intl.Collator('id-ID', { numeric: true, sensitivity: 
 const autoProducts = computed(() => props.autoProductOptions);
 const importProduct = computed(() => props.autoProductOptions.find(row => Number(row.id) === Number(importProductId.value))
     || props.products.find(row => Number(row.id) === Number(importProductId.value)) || null);
+const importFields = computed(() => importProduct.value?.fields?.length
+    ? importProduct.value.fields
+    : isMobileLegends(importProduct.value?.slug)
+        ? [{ field_key: 'user_id', is_required: true }, { field_key: 'zone_id', is_required: true }]
+        : [{ field_key: 'destination', is_required: true }]);
+const importTemplate = computed(() => resolveDestination(
+    importProduct.value?.slug, importFields.value, importDestination.value
+));
+const importTemplateReady = computed(() => {
+    const source = importTemplate.value;
+    const used = [...source.matchAll(/\{\{([a-z][a-z0-9_]*)\}\}/g)].map(m => m[1]);
+    const remaining = source.replace(/\{\{([a-z][a-z0-9_]*)\}\}/g, '');
+    return used.length > 0 && !/[{}]/.test(remaining)
+        && used.every(key => importFields.value.some(field => field.field_key === key))
+        && importFields.value.filter(field => field.is_required).every(field => used.includes(field.field_key));
+});
+watch(importProductId, () => {
+    importDestination.value = importProduct.value?.customer_no_template || '';
+    importPublish.value = importTemplateReady.value;
+    importErrors.value = {};
+});
 const importAvailable = computed(() => props.digiflazzItems.filter(row => !row.mapped && row.available));
 const importCategories = computed(() => [...new Set(importAvailable.value.map(row => row.category).filter(Boolean))].sort(importCollator.compare));
 const importBrands = computed(() => [...new Set(importAvailable.value
@@ -649,6 +694,7 @@ const openImport = () => {
     importPage.value = 1;
     importInfo.value = '';
     importPublish.value = true;
+    importDestination.value = '';
     importOpen.value = true;
 };
 const toggleImportRow = id => {
@@ -669,7 +715,8 @@ const submitImport = () => {
     importErrors.value = {};
     router.post(`/admin/catalog/products/${importProduct.value.id}/import`, {
         item_ids: importPicked.value,
-        publish: importPublish.value,
+        publish: importPublish.value && importTemplateReady.value,
+        ...(importTemplateReady.value ? { customer_no_template: importTemplate.value } : {}),
     }, {
         preserveScroll: true,
         onError: bag => { importErrors.value = bag; },
@@ -1075,6 +1122,11 @@ onMounted(() => {
                 <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">
                     <button type="button" class="adm-btn sm" @click="addField">Tambah kolom</button>
                 </div>
+                <label v-if="showTemplateEditor" class="adm-field">
+                    <span>Format ID pengiriman sesuai produk</span>
+                    <input v-model="destinationFormat" class="adm-input" placeholder="Contoh: user_id + zone_id" maxlength="500">
+                    <span class="hint">Diatur satu kali per game, bukan per nominal. Gunakan format yang disyaratkan Digiflazz.</span>
+                </label>
                 <div class="adm-note adm-block">
                     Hasil kirim ke penyedia:
                     <strong class="mono" style="font-size:12.5px;color:var(--a-ink)">{{ preview || '—' }}</strong>
@@ -1148,14 +1200,20 @@ onMounted(() => {
                     <span>Cari SKU</span>
                     <input v-model="importSearch" class="adm-input" placeholder="Nama nominal atau kode SKU">
                 </label>
+                <label v-if="importFields.length > 1 && !isMobileLegends(importProduct?.slug)" class="adm-field full">
+                    <span>Format ID tujuan Digiflazz (satu kali per game)</span>
+                    <input v-model="importDestination" class="adm-input" placeholder="Gunakan kode kolom sesuai spesifikasi game" maxlength="500">
+                </label>
                 <label class="adm-switch-row full">
-                    <button type="button" class="adm-switch" role="switch" :aria-checked="importPublish" @click="importPublish = !importPublish" />
+                    <button type="button" class="adm-switch" role="switch" :aria-checked="importPublish && importTemplateReady" :disabled="!importTemplateReady" @click="importPublish = !importPublish" />
                     Langsung aktif dijual
                 </label>
+                <p v-if="importProduct && !importTemplateReady" class="adm-note full">Format ID tujuan belum dapat dipastikan. Impor tetap dapat dilakukan sebagai draf; jangan aktifkan pengiriman dengan format tebakan.</p>
             </div>
 
             <p v-if="importErrors.item_ids" class="err">{{ importErrors.item_ids }}</p>
             <p v-if="importErrors.publish" class="err">{{ importErrors.publish }}</p>
+            <p v-if="importErrors.customer_no_template" class="err">{{ importErrors.customer_no_template }}</p>
 
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px">
                 <strong>{{ importMatches.length }} SKU cocok</strong>

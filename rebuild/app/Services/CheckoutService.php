@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Product;
 use App\Models\User;
+use App\Services\Fulfillment\DigiflazzDestinationTemplate;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -16,7 +17,6 @@ class CheckoutService
     public function __construct(
         private readonly CheckoutPricing $pricing,
         private readonly CheckoutInputValidator $inputValidator,
-        private readonly NicknameService $nickname,
         private readonly GuestOrderAccess $guestAccess,
         private readonly PaymentRoutingService $paymentRouting,
         private readonly MembershipService $membership,
@@ -166,7 +166,15 @@ class CheckoutService
         $prePrice = $this->pricing->forPackage((int) $data['package_id']);
         $product = Product::with(['fields', 'category'])->findOrFail($prePrice['product_id']);
         $input = $this->inputValidator->validate($product, $data['customer_input']);
-        $nickname = $this->nickname->check($product, $input);
+        // Kokinpay is a UI-only helper. Never call (or charge) the
+        // external nickname service a second time while placing an order.
+        $nickname = [
+            'supported' => (bool) $product->nickname_check_enabled,
+            'verified' => false,
+            'nickname' => null,
+            'country' => null,
+            'warning' => null,
+        ];
 
         try {
             $result = DB::transaction(function () use ($data, $user, $fingerprint, $input, $nickname): array {
@@ -225,6 +233,13 @@ class CheckoutService
                         ? (json_decode($legacyConfig, true) ?: [])
                         : (array) $legacyConfig;
                     $customerNoTemplate = $legacyConfig['customer_no_template'] ?? null;
+                }
+                if ($price['provider_code'] === 'DIGIFLAZZ') {
+                    $customerNoTemplate = app(DigiflazzDestinationTemplate::class)->resolve(
+                        (string) $lockedProduct->slug,
+                        $customerNoTemplate,
+                        $lockedProduct->fields->pluck('field_key')->all()
+                    );
                 }
                 $snapshot = [
                     'checkout_fingerprint' => $fingerprint,
