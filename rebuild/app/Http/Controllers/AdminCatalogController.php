@@ -1119,10 +1119,17 @@ class AdminCatalogController
                     $nicknameChanges[$setting] = $replacement;
                 }
             }
-            $references = array_merge($references, array_filter([
-                $nicknameChanges['nickname_user_field_key'] ?? $product->nickname_user_field_key,
-                $nicknameChanges['nickname_server_field_key'] ?? $product->nickname_server_field_key,
-            ]));
+            // Nickname validation is optional; its old field references must
+            // never block saving the actual checkout/delivery destination.
+            // A checker without a usable User ID is simply paused.
+            $effectiveUserKey = $nicknameChanges['nickname_user_field_key'] ?? $product->nickname_user_field_key;
+            if (! in_array($effectiveUserKey, $keys, true)) {
+                $nicknameChanges['nickname_check_enabled'] = false;
+            }
+            if (($nicknameChanges['nickname_server_field_key'] ?? $product->nickname_server_field_key)
+                && ! in_array($nicknameChanges['nickname_server_field_key'] ?? $product->nickname_server_field_key, $keys, true)) {
+                $nicknameChanges['nickname_check_enabled'] = false;
+            }
         }
         foreach ($matches[1] ?? [] as $fieldKey) {
             if (! preg_match('/^[a-z][a-z0-9_]*$/', $fieldKey) || ! in_array($fieldKey, $keys, true)) {
@@ -1149,7 +1156,7 @@ class AdminCatalogController
             }
         }
         if (array_diff($references, $keys)) {
-            throw ValidationException::withMessages(['fields' => 'Kode kolom masih dipakai cek nickname atau template pengiriman. Ubah pengaturan tersebut dahulu.']);
+            throw ValidationException::withMessages(['fields' => 'Format tujuan pengiriman lama masih merujuk kolom yang tidak ada. Simpan format ID tujuan produk yang benar.']);
         }
         $requiredKeys = collect($data['fields'])->filter(fn (array $field): bool => (bool) $field['is_required'])
             ->pluck('field_key')->all();
@@ -1171,6 +1178,7 @@ class AdminCatalogController
                 'customer_no_template' => $product->customer_no_template,
                 'nickname_user_field_key' => $product->nickname_user_field_key,
                 'nickname_server_field_key' => $product->nickname_server_field_key,
+                'nickname_check_enabled' => $product->nickname_check_enabled,
             ];
             $product->forceFill([
                 'customer_no_template' => $template !== '' ? $template : null,
@@ -1194,6 +1202,7 @@ class AdminCatalogController
                     'customer_no_template' => $product->customer_no_template,
                     'nickname_user_field_key' => $product->nickname_user_field_key,
                     'nickname_server_field_key' => $product->nickname_server_field_key,
+                    'nickname_check_enabled' => $product->nickname_check_enabled,
                 ]);
         });
 
