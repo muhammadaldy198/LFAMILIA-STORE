@@ -60,6 +60,37 @@ class PaymentCategoryAdminTest extends TestCase
             ->firstWhere('code', 'virtual_account'));
     }
 
+    public function test_sync_dependent_categories_remain_protected_even_after_methods_are_moved(): void
+    {
+        DB::table('payment_categories')->insert([
+            'code' => 'custom_group', 'name' => 'Kategori Kustom',
+            'sort_order' => 999, 'is_active' => true,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        foreach (['wallet', 'qris', 'ewallet', 'va', 'retail', 'other'] as $code) {
+            // Even an empty system category must stay in the registry,
+            // because payment sync may recreate methods referencing its code.
+            DB::table('payment_channels')->where('category_code', $code)
+                ->where('method', '!=', 'WALLET')->update(['category_code' => 'custom_group']);
+
+            $this->delete('/admin/payments/categories/'.$code)
+                ->assertSessionHasErrors('category');
+
+            $this->assertDatabaseHas('payment_categories', ['code' => $code]);
+        }
+
+        $this->post('/admin/payments/channels/sync')
+            ->assertRedirect()->assertSessionHasNoErrors();
+
+        foreach (['wallet', 'qris', 'ewallet', 'va', 'retail', 'other'] as $code) {
+            $this->assertDatabaseHas('payment_categories', ['code' => $code]);
+        }
+
+        $this->delete('/admin/payments/categories/custom_group')
+            ->assertSessionHasErrors('category');
+    }
+
     public function test_wallet_category_cannot_be_deleted_or_reassigned(): void
     {
         $this->delete('/admin/payments/categories/wallet')->assertSessionHasErrors('category');

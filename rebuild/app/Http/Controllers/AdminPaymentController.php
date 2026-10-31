@@ -390,9 +390,9 @@ class AdminPaymentController
     public function destroyCategory(Request $request, string $code): RedirectResponse
     {
         $category = PaymentCategory::query()->findOrFail($code);
-        if (in_array($code, ['wallet', 'other'], true) || $category->channels()->exists()) {
+        if (in_array($code, PaymentCategory::SYSTEM_CODES, true) || $category->channels()->exists()) {
             throw ValidationException::withMessages([
-                'category' => 'Kategori bawaan saldo/lainnya atau kategori yang masih dipakai tidak dapat dihapus. Pindahkan metodenya dahulu.',
+                'category' => 'Kategori bawaan tidak dapat dihapus karena digunakan proses sinkronisasi. Kategori tambahan yang masih memiliki metode juga tidak dapat dihapus.',
             ]);
         }
         $before = $category->toArray();

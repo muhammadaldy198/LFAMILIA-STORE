@@ -7,6 +7,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class PaymentCategory extends Model
 {
+    // Stable keys referenced by payment catalog sync and checkout. Names,
+    // descriptions, order, and visibility stay editable in the admin panel.
+    public const SYSTEM_CODES = ['wallet', 'qris', 'ewallet', 'va', 'retail', 'other'];
+
     protected $primaryKey = 'code';
 
     public $incrementing = false;

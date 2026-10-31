@@ -383,7 +383,7 @@ const successRate = computed(() => {
                                 <td><strong>{{ category.name }}</strong><div class="adm-note">{{ category.description || category.code }}</div>
                                     <div v-if="isSuperAdmin" style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
                                         <button class="adm-btn sm" type="button" @click="openCategory(category)">Ubah kategori</button>
-                                        <button v-if="!['wallet','other'].includes(category.code) && !category.channels_count" class="adm-btn sm danger" type="button" @click="categoryPendingDelete = category">Hapus</button>
+                                        <button v-if="!['wallet','qris','ewallet','va','retail','other'].includes(category.code) && !category.channels_count" class="adm-btn sm danger" type="button" @click="categoryPendingDelete = category">Hapus</button>
                                     </div>
                                 </td>
                                 <td>{{ category.sort_order }}</td>
