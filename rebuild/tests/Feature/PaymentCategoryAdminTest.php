@@ -116,5 +116,4 @@ class PaymentCategoryAdminTest extends TestCase
         $this->assertSame('wallet', DB::table('payment_channels')
             ->where('code', 'saldo')->value('category_code'));
     }
-
 }
