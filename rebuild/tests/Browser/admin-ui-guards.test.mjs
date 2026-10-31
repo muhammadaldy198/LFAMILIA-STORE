@@ -413,11 +413,12 @@ test('editing a nominal keeps stored pricing and nominal_value', async () => {
 });
 
 // Harga Digiflazz dari SKU seller + markup nominal independen.
-test('import defaults new nominal markup to twelve percent without overwriting product names', () => {
+test('import defaults new nominal markup to ten percent without overwriting product names', () => {
     const catalog = read('Catalog.vue');
     assert.match(catalog, /Markup nominal baru/);
     assert.match(catalog, /Math\.ceil\(price \* percentage \/ 100\)/);
-    assert.match(catalog, /: 12;/);
+    assert.match(catalog, /: 10;/);
+    assert.match(catalog, /10% dari harga seller/);
     assert.doesNotMatch(catalog, /info\.price_markup_type|info\.price_markup_fixed_idr/);
     assert.match(catalog, /nama produk dan nama nominal lama tetap milik toko/i);
     assert.match(catalog, /seller Digiflazz/i);
