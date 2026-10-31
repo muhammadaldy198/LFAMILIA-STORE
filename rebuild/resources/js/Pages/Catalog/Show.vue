@@ -602,7 +602,7 @@ async function checkNickname() {
         nicknameResult.value = result;
         accountValidationSignature.value = signature;
         return true;
-    } catch (error) {
+    } catch (_error) {
         if (requestId !== accountValidationRequest || signature !== accountInputSignature()) return false;
 
         accountValidationSignature.value = signature;
