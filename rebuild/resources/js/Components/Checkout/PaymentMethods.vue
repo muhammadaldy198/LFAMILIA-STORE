@@ -100,7 +100,10 @@ function choosePayment(code) {
                                 @click="choosePayment(group.items.find(x=>x.code===paymentChannelCode)?.code || group.items.find(x=>usable(x))?.code)"
                             >
                                 <span v-if="group.key==='wallet'" class="lf-payment-wallet-art">
-                                    <img :src="groupChannel(group)?.logo_url || '/assets/payment/lfamilia-cash.webp'" :alt="'LFAMILIA Coin'">
+                                    <img :src="groupChannel(group)?.logo_url || '/assets/payment/lfamilia-cash.webp'" alt="LFAMILIA Coin">
+                                </span>
+                                <span v-else-if="group.key==='qris' && groupChannel(group)?.logo_url" class="lf-payment-qris-art">
+                                    <img :src="groupChannel(group).logo_url" :alt="groupChannel(group).name || 'QRIS'">
                                 </span>
                                 <span class="lf-payment-group-copy">
                                     <strong>{{group.title}}</strong>
@@ -154,6 +157,8 @@ function choosePayment(code) {
 .lf-payment-group-main{font-size:13px;line-height:1.5;width:100%;min-height:48px;display:flex;align-items:center;gap:8px;padding:8px 10px;border:0;background:transparent;color:var(--lf-color-text);text-align:left;cursor:pointer}
 .lf-payment-wallet-art{display:block;overflow:hidden;border:1px solid rgba(255,255,255,.1);background:#000}
 .lf-payment-wallet-art img{display:block;width:100%;height:100%;object-fit:cover}
+.lf-payment-qris-art{display:grid;place-items:center;flex:0 0 48px;width:48px;height:48px;padding:6px;box-sizing:border-box;border:1px solid rgba(255,255,255,.1);border-radius:11px;background:rgba(255,255,255,.055)}
+.lf-payment-qris-art img{display:block;max-width:100%;max-height:100%;object-fit:contain}
 .lf-payment-group-copy{min-width:0;flex:1}
 .lf-payment-group-copy strong{display:block;font-size:11px;line-height:1.2}
 .lf-payment-group-copy small{display:block;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--lf-color-muted);font-size:9px}
