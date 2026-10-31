@@ -116,8 +116,8 @@
   },
   "pages.catalog.show.4bfa0eb": {
     "group": "Pages/Catalog/Show",
-    "label": "Pembayaran otomatis belum tersedia. Kamu masih bisa memakai LFAMILIA Cash bila saldo mencukupi.",
-    "default": "Pembayaran otomatis belum tersedia. Kamu masih bisa memakai LFAMILIA Cash bila saldo mencukupi."
+    "label": "Pembayaran otomatis belum tersedia. Kamu masih bisa memakai LFAMILIA Coin bila saldo mencukupi.",
+    "default": "Pembayaran otomatis belum tersedia. Kamu masih bisa memakai LFAMILIA Coin bila saldo mencukupi."
   },
   "pages.catalog.show.f4a728b6": {
     "group": "Pages/Catalog/Show",
