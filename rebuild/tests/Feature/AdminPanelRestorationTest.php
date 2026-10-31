@@ -626,8 +626,12 @@ class AdminPanelRestorationTest extends TestCase
         $this->put('/admin/catalog/products/'.$product->id.'/fields', ['fields' => $fields])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertSame(['user_id', 'zone_id'], $product->fields()->orderBy('sort_order')->pluck('field_key')->all());
         $product->update(['nickname_check_enabled' => true, 'nickname_game_code' => 'mobile-legends', 'nickname_user_field_key' => 'user_id', 'nickname_server_field_key' => 'zone_id']);
-        $this->put('/admin/catalog/products/'.$product->id.'/fields', ['fields' => [$fields[0]]])->assertSessionHasErrors('fields');
-        $this->assertSame(2, $product->fields()->count());
+        $this->put('/admin/catalog/products/'.$product->id.'/fields', [
+            'fields' => [$fields[0]], 'customer_no_template' => '{{user_id}}',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame(1, $product->fields()->count());
+        $this->assertFalse($product->fresh()->nickname_check_enabled);
+        $this->assertSame('{{user_id}}', $product->fresh()->customer_no_template);
     }
 
     public function test_categories_have_their_own_page_with_product_counts(): void
