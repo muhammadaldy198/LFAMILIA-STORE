@@ -181,6 +181,28 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertSame(11200, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
     }
 
+    public function test_bulk_publish_import_bootstraps_one_customer_destination_for_new_game(): void
+    {
+        $this->login();
+        $this->fakeCatalog([$this->row()]);
+        app(DigiflazzCatalogService::class)->sync();
+        Provider::where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
+        $product = $this->product();
+        $product->category->update(['is_active' => true]);
+        $product->update(['is_active' => false, 'customer_no_template' => null]);
+        $id = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'restore-sku')->value('id');
+
+        $this->post('/admin/catalog/products/'.$product->id.'/import', [
+            'item_ids' => [$id], 'publish' => true,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertSame(['destination'], $product->fields()->pluck('field_key')->all());
+        $this->assertSame('{{destination}}', $product->fresh()->customer_no_template);
+        $this->assertTrue($product->fresh()->is_active);
+        $this->assertTrue($product->packages()->firstOrFail()->is_active);
+        $this->assertTrue($product->packages()->firstOrFail()->mappings()->firstOrFail()->is_active);
+    }
+
     public function test_activating_automatic_product_validates_existing_destination_template(): void
     {
         $this->login();
