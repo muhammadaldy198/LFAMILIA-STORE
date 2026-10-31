@@ -18,11 +18,15 @@ class PaymentRoutingService
     public function publicOrderChannels(?User $user): array
     {
         return PaymentChannel::query()
-            ->where('is_active', true)
-            ->where('supports_order', true)
-            ->orderBy('sort_order')
-            ->orderBy('id')
-            ->with('media')
+            ->select('payment_channels.*')
+            ->join('payment_categories as payment_category', 'payment_category.code', '=', 'payment_channels.category_code')
+            ->where('payment_channels.is_active', true)
+            ->where('payment_category.is_active', true)
+            ->where('payment_channels.supports_order', true)
+            ->orderBy('payment_category.sort_order')
+            ->orderBy('payment_channels.sort_order')
+            ->orderBy('payment_channels.id')
+            ->with(['media', 'category'])
             ->get()
             ->map(function (PaymentChannel $channel) use ($user): ?array {
                 try {
@@ -41,7 +45,10 @@ class PaymentRoutingService
                 return [
                     'code' => (string) $channel->code,
                     'name' => (string) $channel->name,
-                    'group' => $this->publicGroup((string) $channel->method),
+                    'group' => (string) $channel->category_code,
+                    'group_title' => (string) $channel->category?->name,
+                    'group_description' => (string) ($channel->category?->description ?? ''),
+                    'group_order' => (int) ($channel->category?->sort_order ?? 9999),
                     'description' => $channel->description ?: $this->defaultDescription((string) $channel->method),
                     'logo_url' => $channel->getFirstMediaUrl('logo') ?: null,
                     'available' => $route['gateway_code'] !== 'WALLET' || $user !== null,
@@ -55,11 +62,15 @@ class PaymentRoutingService
     public function publicTopupChannels(): array
     {
         return PaymentChannel::query()
-            ->where('is_active', true)
-            ->where('supports_wallet_topup', true)
-            ->orderBy('sort_order')
-            ->orderBy('id')
-            ->with('media')
+            ->select('payment_channels.*')
+            ->join('payment_categories as payment_category', 'payment_category.code', '=', 'payment_channels.category_code')
+            ->where('payment_channels.is_active', true)
+            ->where('payment_category.is_active', true)
+            ->where('payment_channels.supports_wallet_topup', true)
+            ->orderBy('payment_category.sort_order')
+            ->orderBy('payment_channels.sort_order')
+            ->orderBy('payment_channels.id')
+            ->with(['media', 'category'])
             ->get()
             ->map(function (PaymentChannel $channel): ?array {
                 try {
@@ -74,6 +85,10 @@ class PaymentRoutingService
                 return [
                     'code' => (string) $channel->code,
                     'name' => (string) $channel->name,
+                    'group' => (string) $channel->category_code,
+                    'group_title' => (string) $channel->category?->name,
+                    'group_description' => (string) ($channel->category?->description ?? ''),
+                    'group_order' => (int) ($channel->category?->sort_order ?? 9999),
                     'description' => $channel->description ?: $this->defaultDescription((string) $channel->method),
                     'logo_url' => $channel->getFirstMediaUrl('logo') ?: null,
                 ];
@@ -85,7 +100,11 @@ class PaymentRoutingService
      */
     public function resolve(string $channelCode, bool $lock = false, string $purpose = 'order'): array
     {
-        $query = DB::table('payment_channels')->where('code', $channelCode)->where('is_active', true);
+        $query = DB::table('payment_channels')->where('code', $channelCode)->where('is_active', true)
+            ->whereExists(fn ($category) => $category->selectRaw('1')
+                ->from('payment_categories')
+                ->whereColumn('payment_categories.code', 'payment_channels.category_code')
+                ->where('payment_categories.is_active', true));
         if ($purpose === 'order') {
             $query->where('supports_order', true);
         } else {
@@ -349,18 +368,6 @@ class PaymentRoutingService
         }
 
         return true;
-    }
-
-    private function publicGroup(string $method): string
-    {
-        return match ($method) {
-            'WALLET' => 'wallet',
-            'QRIS' => 'qris',
-            'VIRTUAL_ACCOUNT' => 'va',
-            'EWALLET' => 'ewallet',
-            'RETAIL' => 'retail',
-            default => 'other',
-        };
     }
 
     private function defaultDescription(string $method): string

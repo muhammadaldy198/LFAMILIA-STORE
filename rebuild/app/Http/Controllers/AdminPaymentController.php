@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\PaymentCategory;
 use App\Models\PaymentChannel;
 use App\Models\StoreAsset;
 use App\Services\AdminAuditService;
@@ -80,7 +81,7 @@ class AdminPaymentController
                 'active_route_count' => (int) ($activeRoutesByGateway[$gateway->id] ?? 0),
             ]);
 
-        $channels = PaymentChannel::query()->orderBy('sort_order')->orderBy('id')->get()
+        $channels = PaymentChannel::query()->with('category')->orderBy('sort_order')->orderBy('id')->get()
             ->map(function (PaymentChannel $channel) use ($routing, $routesByChannel): array {
                 $routes = $routesByChannel->get($channel->id, collect());
                 $orderReadiness = $this->paymentReadiness($channel, $routes, 'supports_order', $routing);
@@ -90,6 +91,9 @@ class AdminPaymentController
                     'id' => (int) $channel->id,
                     'code' => (string) $channel->code,
                     'method' => (string) $channel->method,
+                    'category_code' => (string) $channel->category_code,
+                    'category_name' => $channel->category?->name ?: 'Lainnya',
+                    'category_active' => (bool) $channel->category?->is_active,
                     'name' => (string) $channel->name,
                     'description' => $channel->description,
                     'logo_url' => $channel->getFirstMediaUrl('logo'),
@@ -178,6 +182,16 @@ class AdminPaymentController
             'isSuperAdmin' => $request->user('admin')?->role === 'SUPER_ADMIN',
             'gateways' => $gateways,
             'channels' => $channels,
+            'categories' => PaymentCategory::query()->withCount('channels')
+                ->orderBy('sort_order')->orderBy('code')->get()
+                ->map(fn (PaymentCategory $category): array => [
+                    'code' => $category->code,
+                    'name' => $category->name,
+                    'description' => $category->description,
+                    'sort_order' => $category->sort_order,
+                    'is_active' => $category->is_active,
+                    'channels_count' => $category->channels_count,
+                ]),
             'routes' => $routes,
             'transactions' => $transactions,
             'filters' => $filters,
@@ -270,6 +284,9 @@ class AdminPaymentController
         if (! $channel->is_active) {
             return ['ready' => false, 'reason' => 'Metode pembayaran nonaktif.'];
         }
+        if (! $channel->category?->is_active) {
+            return ['ready' => false, 'reason' => 'Kategori pembayaran nonaktif.'];
+        }
         if (! $channel->{$purpose}) {
             return ['ready' => false, 'reason' => 'Metode tidak diaktifkan untuk tujuan transaksi ini.'];
         }
@@ -312,10 +329,84 @@ class AdminPaymentController
         return ['ready' => true, 'reason' => null];
     }
 
+    private function defaultCategory(string $method): string
+    {
+        return match ($method) {
+            'WALLET' => 'wallet', 'QRIS' => 'qris', 'EWALLET' => 'ewallet',
+            'VIRTUAL_ACCOUNT' => 'va', 'RETAIL' => 'retail',
+            default => 'other',
+        };
+    }
+
+    private function applyCategory(Request $request, array &$data, ?PaymentChannel $channel = null): void
+    {
+        $requested = $request->validate([
+            'category_code' => ['sometimes', 'required', 'string', 'max:40', Rule::exists('payment_categories', 'code')],
+        ]);
+        $category = $requested['category_code'] ?? ($channel?->category_code ?: $this->defaultCategory($data['method']));
+        if (($data['method'] === 'WALLET' && $category !== 'wallet')
+            || ($data['method'] !== 'WALLET' && $category === 'wallet')) {
+            throw ValidationException::withMessages([
+                'category_code' => 'Kategori saldo hanya untuk metode saldo LFAMILIA.',
+            ]);
+        }
+        $data['category_code'] = $category;
+    }
+
+    private function categoryData(Request $request, bool $new, ?string $currentCode = null): array
+    {
+        return $request->validate([
+            'code' => $new
+                ? ['required', 'string', 'min:2', 'max:40', 'regex:/^[a-z][a-z0-9_]*$/', Rule::unique('payment_categories', 'code')]
+                : ['sometimes', 'required', Rule::in([$currentCode])],
+            'name' => ['required', 'string', 'min:2', 'max:100'],
+            'description' => ['nullable', 'string', 'max:160'],
+            'sort_order' => ['required', 'integer', 'min:0', 'max:9999'],
+            'is_active' => ['required', 'boolean'],
+        ]);
+    }
+
+    public function storeCategory(Request $request): RedirectResponse
+    {
+        $data = $this->categoryData($request, true);
+        $category = PaymentCategory::create($data);
+        $this->audit($request, 'payment.category.created', 'payment_category', $category->code, null, $category->toArray());
+
+        return back()->with('status', 'Kategori pembayaran ditambahkan.');
+    }
+
+    public function updateCategory(Request $request, string $code): RedirectResponse
+    {
+        $category = PaymentCategory::query()->findOrFail($code);
+        $data = $this->categoryData($request, false, $code);
+        unset($data['code']); // Stable technical grouping identifier.
+        $before = $category->toArray();
+        $category->update($data);
+        $this->audit($request, 'payment.category.updated', 'payment_category', $category->code, $before, $category->toArray());
+
+        return back()->with('status', 'Kategori pembayaran disimpan.');
+    }
+
+    public function destroyCategory(Request $request, string $code): RedirectResponse
+    {
+        $category = PaymentCategory::query()->findOrFail($code);
+        if (in_array((string) $category->code, PaymentCategory::SYSTEM_CODES, true) || $category->channels()->exists()) {
+            throw ValidationException::withMessages([
+                'category' => 'Kategori bawaan tidak dapat dihapus karena digunakan proses sinkronisasi. Kategori tambahan yang masih memiliki metode juga tidak dapat dihapus.',
+            ]);
+        }
+        $before = $category->toArray();
+        $category->delete();
+        $this->audit($request, 'payment.category.deleted', 'payment_category', $category->code, $before, []);
+
+        return back()->with('status', 'Kategori pembayaran dihapus.');
+    }
+
     public function storeChannel(Request $request): RedirectResponse
     {
         $data = $this->channelData($request);
         $data['code'] = strtolower(trim($data['code']));
+        $this->applyCategory($request, $data);
         $connection = $request->validate([
             'gateway_code' => ['required', Rule::in(['MIDTRANS', 'DOKU'])],
             'provider_method' => ['required', 'string', 'min:2', 'max:80'],
@@ -396,6 +487,7 @@ class AdminPaymentController
         $channel = PaymentChannel::findOrFail($id);
         $data = $this->channelData($request, $channel->id);
         $data['code'] = strtolower(trim($data['code']));
+        $this->applyCategory($request, $data, $channel);
 
         if ($channel->method !== $data['method']
             && DB::table('payment_routes')->where('payment_channel_id', $channel->id)->exists()) {
@@ -548,6 +640,7 @@ class AdminPaymentController
             }
             PaymentChannel::create([
                 ...$preset,
+                'category_code' => $this->defaultCategory((string) $preset['method']),
                 'fee_flat_idr' => 0,
                 'fee_percent_bps' => 0,
                 'is_active' => false,
@@ -1141,7 +1234,7 @@ class AdminPaymentController
         Request $request,
         string $action,
         string $type,
-        int $id,
+        string|int $id,
         ?array $before,
         array $after,
     ): void {

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 
@@ -13,6 +14,7 @@ class PaymentChannel extends Model implements HasMedia
     protected $fillable = [
         'code',
         'method',
+        'category_code',
         'name',
         'description',
         'fee_flat_idr',
@@ -33,6 +35,11 @@ class PaymentChannel extends Model implements HasMedia
             'sort_order' => 'integer',
             'is_active' => 'boolean',
         ];
+    }
+
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(PaymentCategory::class, 'category_code', 'code');
     }
 
     public function registerMediaCollections(): void
