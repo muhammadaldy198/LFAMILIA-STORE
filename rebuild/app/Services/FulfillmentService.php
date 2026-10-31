@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Jobs\SendFulfillmentJob;
 use App\Services\Fulfillment\DigiflazzClient;
+use App\Services\Fulfillment\DigiflazzDestinationTemplate;
 use App\Services\Fulfillment\FulfillmentTargetBuilder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -129,7 +130,7 @@ class FulfillmentService
                     $product = DB::table('product_packages')
                         ->join('products', 'products.id', '=', 'product_packages.product_id')
                         ->where('product_packages.id', $order->product_package_id)
-                        ->select('products.customer_no_template', 'products.id')
+                        ->select('products.customer_no_template', 'products.id', 'products.slug')
                         ->first();
                     if ($product) {
                         if (array_key_exists('customer_no_template', $snapshot['provider'] ?? [])) {
@@ -139,6 +140,12 @@ class FulfillmentService
                                 ?: ($config['customer_no_template'] ?? null);
                         }
                     }
+                    $keys = array_keys($this->json($order->customer_input));
+                    $config['customer_no_template'] = app(DigiflazzDestinationTemplate::class)->resolve(
+                        (string) ($product?->slug ?? data_get($snapshot, 'product.slug', '')),
+                        $config['customer_no_template'] ?? null,
+                        $keys
+                    );
                 }
                 if ($mapping->provider_code === 'VOUCHER_STOCK') {
                     $stockKey = trim((string) data_get($config, 'stock_key', ''));
