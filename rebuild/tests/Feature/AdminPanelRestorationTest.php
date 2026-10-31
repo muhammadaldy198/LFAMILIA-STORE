@@ -239,7 +239,7 @@ class AdminPanelRestorationTest extends TestCase
         $product = $this->product();
         $product->category->update(['is_active' => true]);
         $product->fields()->create(['field_key' => 'user_id', 'label' => 'ID pengguna', 'type' => 'text', 'is_required' => true, 'sort_order' => 0]);
-        $product->fields()->create(['field_key' => 'zone_id', 'label' => 'Zona', 'type' => 'text', 'is_required' => false, 'sort_order' => 1]);
+        $product->fields()->create(['field_key' => 'zone_id', 'label' => 'Zona', 'type' => 'text', 'is_required' => true, 'sort_order' => 1]);
         $product->update([
             'nickname_check_enabled' => true, 'nickname_game_code' => 'free-fire',
             'nickname_user_field_key' => 'user_id', 'nickname_server_field_key' => 'zone_id',
