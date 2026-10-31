@@ -545,8 +545,11 @@ class AdminCatalogController
         $data['package_tabs'] ??= $product->package_tabs ?? [];
 
         $tabs = collect($data['package_tabs'])->map(fn ($tab) => trim((string) $tab))
-            ->filter()->values();
-        if ($tabs->map(fn (string $tab): string => mb_strtolower($tab))->unique()->count() !== $tabs->count()) {
+            ->filter(fn (string $tab): bool => $tab !== '')->values();
+        // Inactive tab navigation stores group priority here too. Group labels
+        // that differ only by case are valid; reject them only for actual tabs.
+        if ($data['package_tabs_enabled']
+            && $tabs->map(fn (string $tab): string => mb_strtolower($tab))->unique()->count() !== $tabs->count()) {
             throw ValidationException::withMessages(['package_tabs' => 'Nama tab nominal tidak boleh duplikat.']);
         }
         $data['package_tabs'] = $tabs->all();
@@ -1411,9 +1414,13 @@ class AdminCatalogController
         ]);
         // No new database table: the existing package_tabs JSON keeps the
         // group priority, while package_tabs_enabled remains unchanged.
+        $normalizeGroup = static function ($name): string {
+            $name = trim((string) $name);
+            return $name === '' ? 'Umum' : $name;
+        };
         $current = $product->packages()->pluck('group_name')
-            ->map(fn ($name): string => trim((string) $name) ?: 'Umum')->unique()->values()->all();
-        $submitted = array_map(fn (string $name): string => trim($name) ?: 'Umum', $data['groups']);
+            ->map($normalizeGroup)->unique()->values()->all();
+        $submitted = array_map($normalizeGroup, $data['groups']);
         $expected = $current;
         $actual = $submitted;
         sort($expected, SORT_STRING);

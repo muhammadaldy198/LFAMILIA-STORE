@@ -1430,6 +1430,37 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertSame([$c->id, $b->id, $a->id], $sorted->pluck('id')->all());
     }
 
+    public function test_group_zero_and_case_variants_are_saved_without_blocking_product_edits(): void
+    {
+        $this->login();
+        $product = $this->product();
+        foreach (['Pass', 'pass', '0'] as $i => $group) {
+            $product->packages()->create([
+                'code' => 'CASE-'.($i + 1),
+                'name' => 'Nominal '.($i + 1),
+                'group_name' => $group,
+                'sort_order' => $i,
+            ]);
+        }
+
+        $this->put('/admin/catalog/products/'.$product->id.'/package-groups/reorder', [
+            'groups' => ['0', 'pass', 'Pass'],
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame(['0', 'pass', 'Pass'], $product->fresh()->package_tabs);
+
+        // Editing product details must not treat valid case-variant group labels
+        // as duplicates or filter the string "0" out of saved group priority.
+        $this->put('/admin/catalog/products/'.$product->id, [
+            'category_id' => $product->category_id,
+            'name' => 'Updated Group Product',
+            'slug' => $product->slug,
+            'fulfillment_mode' => 'AUTO_PROVIDER',
+            'sort_order' => 0,
+            'is_active' => true,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame(['0', 'pass', 'Pass'], $product->fresh()->package_tabs);
+    }
+
     public function test_catalog_nominal_sort_respects_manual_position_before_numeric_value(): void
     {
         $nominals = collect([

@@ -1,5 +1,8 @@
 // Group headings are independent of individual nominal order. An empty name is Umum.
-export const normalizePackageGroup = value => String(value || '').trim() || 'Umum';
+export const normalizePackageGroup = value => {
+    const name = String(value ?? '').trim();
+    return name === '' ? 'Umum' : name;
+};
 
 export const orderedPackageGroups = (packages = [], preferred = []) => {
     const grouped = new Map();
