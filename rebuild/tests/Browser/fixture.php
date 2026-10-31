@@ -315,6 +315,16 @@ IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
 ]);
 DB::table('payment_gateways')->whereIn('code', ['MIDTRANS', 'WALLET'])->update(['is_active' => true, 'is_maintenance' => false]);
 DB::table('payment_channels')->whereIn('code', ['saldo', 'ewallet', 'virtual_account'])->update(['is_active' => true, 'supports_order' => true]);
+
+// Fixture-only payment imagery: production logos remain merchant-managed.
+// The checkout browser assertions need non-null logo URLs for both categories.
+foreach (['ewallet', 'virtual_account'] as $code) {
+    $channel = \App\Models\PaymentChannel::where('code', $code)->firstOrFail();
+    if (! $channel->hasMedia('logo')) {
+        $channel->addMedia(__DIR__.'/reference/cover.png')->preservingOriginal()->toMediaCollection('logo');
+    }
+}
+
 foreach (['ewallet' => 'gopay', 'virtual_account' => 'bank_transfer'] as $code => $providerChannel) {
     DB::table('payment_routes')->updateOrInsert([
         'payment_channel_id' => DB::table('payment_channels')->where('code', $code)->value('id'),
