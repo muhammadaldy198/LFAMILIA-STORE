@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Product;
+use App\Models\ProductInputField;
 use App\Models\ProductPackage;
 use App\Models\Provider;
 use App\Models\ProviderMapping;
@@ -399,6 +400,22 @@ class AdminDigiflazzController
         DB::transaction(function () use ($request, $product, $service, $audit, $data): void {
             $product = $product->lockForUpdate()->findOrFail($product->id);
             $publish = (bool) ($data['publish'] ?? false);
+            if ($publish && ! $product->fields()->exists()) {
+                // A generic destination is valid for any Digiflazz product.
+                // Games needing combined IDs may enter the complete target
+                // (e.g. ID(Zone)) into this single field. Never rely on the
+                // optional nickname checker for fulfillment configuration.
+                $field = ProductInputField::create([
+                    'product_id' => $product->id,
+                    'field_key' => 'destination',
+                    'label' => 'ID Tujuan (sesuai game)',
+                    'placeholder' => 'ID atau ID(Zone)',
+                    'type' => 'text',
+                    'is_required' => true,
+                    'sort_order' => 0,
+                ]);
+                $audit->record($request, 'catalog.fields.import_default', 'product_input_field', $field->id, null, $field->toArray());
+            }
             // The product's destination format may be confirmed and saved in the
             // same atomic bulk-import request. No per-SKU destination setup.
             $templateSubmitted = array_key_exists('customer_no_template', $data);
