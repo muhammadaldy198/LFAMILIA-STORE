@@ -8,7 +8,7 @@ class DigiflazzDestinationTemplate
      * Infer only formats that are known for the specific game. An arbitrary
      * multi-field product must keep its administrator-confirmed template.
      *
-     * @param array<int, string> $keys
+     * @param  array<int, string>  $keys
      */
     public function resolve(string $productSlug, ?string $stored, array $keys): ?string
     {
