@@ -458,12 +458,12 @@ test('Digiflazz and local voucher nominals each keep their price controls', () =
 // markup per nominal dapat disimpan lagi tanpa me-refresh halaman.
 test('nominal Save button unlocks after successful and failed requests', () => {
     const catalog = read('Catalog.vue');
-    const handler = catalog.split('const saveNominal = () => {')[1]?.split('\\n};')[0];
+    const handler = catalog.split('const saveNominal = () => {')[1]?.split('\n};')[0];
     assert.ok(handler, 'penyimpanan nominal tersedia');
-    assert.match(handler, /saveBusy\\.value = 'nominal'/);
-    assert.match(handler, /const finish = \\(\\) => \\{ saveBusy\\.value = ''; \\}/);
+    assert.match(handler, /saveBusy\.value = 'nominal'/);
+    assert.match(handler, /const finish = \(\) => \{ saveBusy\.value = ''; \}/);
     for (const method of ['put', 'post']) {
-        const request = handler.split(`router.${method}(`)[1]?.split('\\n        });')[0];
+        const request = handler.split(`router.${method}(`)[1]?.split('\n        });')[0];
         assert.ok(request, `alur ${method.toUpperCase()} tersedia`);
         assert.match(request, /onError: handleErrors, onFinish: finish/,
             `${method.toUpperCase()} wajib membuka kunci saat berhasil maupun gagal`);
