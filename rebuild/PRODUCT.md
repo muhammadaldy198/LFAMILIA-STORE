@@ -22,7 +22,7 @@ Digiflazz SKU masuk melalui trusted catalog/import/sync flow. Customer tidak dap
 
 ## Pricing
 
-Untuk setiap nominal **Digiflazz**: harga jual = harga seller SKU tersinkron + markup nominal. Default setiap nominal baru hasil impor adalah **12%**; admin dapat memilih markup persen atau tambahan tetap **dalam rupiah**, bukan harga jual tetap. Harga seller tidak diedit dari panel, dan tidak ada tambahan modal toko sebagai lapisan perhitungan Digiflazz.
+Untuk setiap nominal **Digiflazz**: harga jual = harga seller SKU tersinkron + markup nominal. Default setiap nominal baru hasil impor adalah **10%**; admin dapat memilih markup persen atau tambahan tetap **dalam rupiah**, bukan harga jual tetap. Harga seller tidak diedit dari panel, dan tidak ada tambahan modal toko sebagai lapisan perhitungan Digiflazz.
 
 Harga seller dan SKU diperbarui melalui price-list Digiflazz setiap 15 menit. Sinkronisasi **tidak pernah mengganti nama produk atau nama nominal yang sudah ditata toko**, tidak menimpa markup masing-masing nominal, dan tidak memilih SKU cadangan. Setiap order menyimpan snapshot harga. Mapping cost lama tetap tersedia untuk kebutuhan kompatibilitas/fulfillment saja.
 
