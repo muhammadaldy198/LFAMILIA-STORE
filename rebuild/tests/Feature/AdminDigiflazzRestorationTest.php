@@ -1309,7 +1309,7 @@ class AdminDigiflazzRestorationTest extends TestCase
 
         $package = $product->packages()->firstOrFail();
         $mapping = $package->mappings()->firstOrFail();
-        // Impor menyimpan harga seller dan setiap nominal memiliki markup default 12%.
+        // Impor menyimpan harga seller dan setiap nominal memiliki markup default 10%.
         $this->assertSame(10000, (int) $mapping->store_cost_idr);
         $this->assertSame(10000, (int) $mapping->max_price_idr);
         $this->assertSame('PERCENT', $package->fresh()->pricing_mode);
@@ -1336,7 +1336,7 @@ class AdminDigiflazzRestorationTest extends TestCase
 
         $mapping = $product->packages()->firstOrFail()->mappings()->firstOrFail();
         $package = $product->packages()->firstOrFail();
-        // Harga seller 10.000 + markup nominal bawaan 12% = 11.200.
+        // Harga seller 10.000 + markup nominal bawaan 10% = 11.000.
         $this->assertSame(10000, (int) $mapping->store_cost_idr);
         $this->assertSame('PERCENT', $package->pricing_mode);
         $this->assertSame(10, (int) $product->margin_percent);
@@ -1345,7 +1345,7 @@ class AdminDigiflazzRestorationTest extends TestCase
         Provider::where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
         $package->update(['is_active' => true]);
         $package->mappings()->update(['is_active' => true]);
-        $this->assertSame(11200, (int) app(CheckoutPricing::class)->previewForPackage($package->id)['subtotal_idr']);
+        $this->assertSame(11000, (int) app(CheckoutPricing::class)->previewForPackage($package->id)['subtotal_idr']);
     }
 
     public function test_import_honours_a_different_cost_column_for_every_selected_sku(): void
