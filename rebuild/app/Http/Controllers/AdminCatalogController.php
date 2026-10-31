@@ -836,7 +836,7 @@ class AdminCatalogController
             if (! $group) {
                 throw ValidationException::withMessages(['group_id' => 'Pilih grup pada produk ini.']);
             }
-            $data['group_name'] = $group->name === 'Umum' ? null : $group->name;
+            $data['group_name'] = $group->name;
         }
         unset($data['group_id']);
         if ($product->package_tabs_enabled) {
@@ -947,7 +947,7 @@ class AdminCatalogController
             if (! $group) {
                 throw ValidationException::withMessages(['group_id' => 'Pilih grup pada produk ini.']);
             }
-            $data['group_name'] = $group->name === 'Umum' ? null : $group->name;
+            $data['group_name'] = $group->name;
         }
         unset($data['group_id']);
         if ($product->package_tabs_enabled) {
