@@ -461,7 +461,7 @@ class CheckoutTest extends TestCase
         $this->assertNotEmpty($snapshot['nickname']['warning']);
     }
 
-    public function test_verified_invalid_nickname_is_rejected(): void
+    public function test_invalid_kokinpay_nickname_is_advisory_and_order_is_created(): void
     {
         $catalog = $this->catalog([
             'nickname_check_enabled' => true,
@@ -484,9 +484,9 @@ class CheckoutTest extends TestCase
         $this->postJson('/checkout/orders', $this->guestPayload(
             $catalog['package_id'],
             'checkout-nickname-invalid-0001'
-        ))->assertUnprocessable()->assertJsonValidationErrors(['customer_input.user_id']);
+        ))->assertCreated();
 
-        $this->assertSame(0, DB::table('orders')
+        $this->assertSame(1, DB::table('orders')
             ->where('idempotency_key', 'checkout-nickname-invalid-0001')->count());
     }
 
