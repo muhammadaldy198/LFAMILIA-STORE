@@ -81,7 +81,14 @@ class DigiflazzAutoSources
         if ($package === null && $nominal !== null) {
             $matchingPackage = $product->packages()
                 ->where('nominal_value', $nominal)
-                ->where('group_name', $targetGroup !== null ? $destinationGroup : ($destinationGroup === 'Umum' ? null : $destinationGroup))
+                ->where(function ($query) use ($destinationGroup): void {
+                    if ($destinationGroup === 'Umum') {
+                        $query->whereNull('group_name')->orWhere('group_name', '')
+                            ->orWhere('group_name', 'Umum');
+                    } else {
+                        $query->where('group_name', $destinationGroup);
+                    }
+                })
                 ->lockForUpdate()->first();
             if ($matchingPackage !== null) {
                 if ($matchingPackage->mappings()->where('provider_id', $provider->id)->exists()) {
@@ -97,6 +104,12 @@ class DigiflazzAutoSources
             throw ValidationException::withMessages([
                 'group_id' => 'SKU sudah terhubung ke grup lain. Ubah grup dari editor nominal.',
             ]);
+        }
+        // A legacy refresh must retain the store-owned group rather than
+        // recreating the supplier's original label after an admin rename.
+        if ($package !== null && $targetGroup === null) {
+            $destinationGroup = trim((string) $package->group_name);
+            $destinationGroup = $destinationGroup === '' ? 'Umum' : $destinationGroup;
         }
         // Importing a draft Digiflazz SKU must never reprice a nominal that
         // currently sells voucher stock. Require a separate nominal (or an

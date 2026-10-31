@@ -209,7 +209,7 @@ const openNominal = (row = null) => {
     nominalEditing.value = row;
     Object.assign(nominal, {
         name: row?.name || '',
-        group_name: row?.group_name || product.value?.package_groups?.[0]?.name || '',
+        group_name: row ? (row.group_name || 'Umum') : (product.value?.package_groups?.[0]?.name || ''),
         sort_order: row?.sort_order ?? (product.value?.packages.length ?? 0),
         is_active: row ? Boolean(row.is_active) : true,
         price_mode: isDigiflazzNominal.value
