@@ -24,6 +24,20 @@ try{
    const page=await observedPage({viewport:{width,height}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
    await page.goto(url,{waitUntil:'networkidle',timeout:45000});await page.locator('.lfx').waitFor();
    item[name]=await inspect(page);await page.screenshot({path:`${output}/${name}-${width}.png`,fullPage:true});
+   if(name==='store'){
+    for(const category of ['E-Wallet','Virtual Account']){
+     const group=page.locator('.lf-payment-group-card').filter({hasText:category}).first();
+     const preview=group.locator('.lf-payment-brand-strip--logos');
+     await preview.waitFor();
+     if(!await preview.locator('img').count() || (await preview.textContent()).trim())throw Error(category+' closed summary must contain logos, not method names');
+     await group.locator('.lf-payment-group-main').click();
+     if(await group.locator('.lf-payment-brand-strip').count())throw Error(category+' opened summary must be removed');
+     const grid=group.locator('.lfx-payment-method-grid--compact');
+     if(await grid.evaluate(e=>getComputedStyle(e).gridTemplateColumns.split(' ').length)!==2)throw Error(category+' must use two card columns');
+     const card=grid.locator('.lfx-payment-method-card').first();
+     if(!await card.locator('.lfx-payment-method-name').textContent() || !await card.locator('.lfx-payment-method-total').textContent())throw Error(category+' must retain card names and prices');
+    }
+   }
    await page.locator('.lf-payment-group-main').filter({hasText:'E-Wallet'}).click();
    const methodCard=page.locator(name==='lab'?'.lab-payment-method-card':'.lfx-payment-method-card').first();
    await methodCard.waitFor();
