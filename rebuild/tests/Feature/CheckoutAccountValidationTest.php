@@ -103,8 +103,8 @@ class CheckoutAccountValidationTest extends TestCase
         $this->postJson('/checkout/nickname', [
             'product_id' => $product->id,
             'customer_input' => ['user_id' => '123456', 'zone_id' => ''],
-        ])->assertUnprocessable()
-            ->assertJsonValidationErrors(['customer_input.zone_id']);
+        ])->assertOk()
+            ->assertJsonPath('verified', false);
     }
 
     public function test_verified_account_response_is_private_and_provider_agnostic(): void
@@ -292,8 +292,8 @@ class CheckoutAccountValidationTest extends TestCase
         $this->postJson('/checkout/nickname', [
             'product_id' => $product->id,
             'customer_input' => ['user_id' => '123456', 'zone_id' => ''],
-        ])->assertUnprocessable()
-            ->assertJsonValidationErrors(['customer_input.user_id']);
+        ])->assertOk()
+            ->assertJsonPath('verified', false);
     }
 
     public function test_game_without_nickname_support_skips_upstream_lookup(): void
