@@ -423,7 +423,13 @@ class AdminDigiflazzController
                     ? $data['customer_no_template'] : $product->customer_no_template,
                 $product->fields()->orderBy('sort_order')->pluck('field_key')->all()
             );
-            $template = $this->importCustomerTemplate($product, $template, $publish);
+            // Draft imports must not weaken a destination shared by
+            // already-selling nominal mappings on this product.
+            $changingActiveTemplate = $template !== $product->customer_no_template
+                && $product->is_active
+                && $product->packages()->where('is_active', true)
+                    ->whereHas('mappings', fn ($query) => $query->where('is_active', true))->exists();
+            $template = $this->importCustomerTemplate($product, $template, $publish || $changingActiveTemplate);
             if ($template !== $product->customer_no_template) {
                 $product->update(['customer_no_template' => $template]);
             }
