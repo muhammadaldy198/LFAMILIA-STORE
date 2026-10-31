@@ -32,5 +32,7 @@ class PaymentStaticAssetTest extends TestCase
         $this->assertNotFalse($catalog);
         $this->assertStringContainsString('/assets/payment/lfamilia-cash.webp', $catalog);
         $this->assertStringNotContainsString("'/payment/lfamilia-cash.webp'", $catalog);
+        $this->assertStringContainsString("group.key==='qris' && groupChannel(group)?.logo_url", $catalog);
+        $this->assertStringContainsString(':src="groupChannel(group).logo_url"', $catalog);
     }
 }
