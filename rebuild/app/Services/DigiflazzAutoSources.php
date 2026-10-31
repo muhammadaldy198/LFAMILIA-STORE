@@ -81,7 +81,7 @@ class DigiflazzAutoSources
         if ($package === null && $nominal !== null) {
             $matchingPackage = $product->packages()
                 ->where('nominal_value', $nominal)
-                ->where('group_name', $destinationGroup === 'Umum' ? null : $destinationGroup)
+                ->where('group_name', $targetGroup !== null ? $destinationGroup : ($destinationGroup === 'Umum' ? null : $destinationGroup))
                 ->lockForUpdate()->first();
             if ($matchingPackage !== null) {
                 if ($matchingPackage->mappings()->where('provider_id', $provider->id)->exists()) {
@@ -124,7 +124,7 @@ class DigiflazzAutoSources
             $package = $product->packages()->create([
                 'code' => 'DF_'.substr(hash('sha256', $first->buyer_sku_code), 0, 20),
                 'name' => GameNamePrefix::strip($first->product_name, $first->brand, $product->name),
-                'group_name' => $destinationGroup === 'Umum' ? null : $destinationGroup,
+                'group_name' => $targetGroup !== null ? $destinationGroup : ($destinationGroup === 'Umum' ? null : $destinationGroup),
                 // Append temporarily, then orderProduct() inserts it by nominal
                 // without resetting a previously hand-customized order.
                 'nominal_value' => $nominal,
