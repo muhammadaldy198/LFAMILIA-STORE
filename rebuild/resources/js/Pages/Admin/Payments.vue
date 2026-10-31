@@ -377,17 +377,18 @@ const successRate = computed(() => {
                 </div>
                 <div class="adm-scroll">
                     <table class="adm-table">
-                        <thead><tr><th>Kategori</th><th>Urutan</th><th>Metode</th><th>Status</th><th>Tindakan</th></tr></thead>
+                        <thead><tr><th>Kategori dan tindakan</th><th>Urutan</th><th>Metode</th><th>Status</th></tr></thead>
                         <tbody>
                             <tr v-for="category in categories" :key="category.code">
-                                <td><strong>{{ category.name }}</strong><div class="adm-note">{{ category.description || category.code }}</div></td>
+                                <td><strong>{{ category.name }}</strong><div class="adm-note">{{ category.description || category.code }}</div>
+                                    <div v-if="isSuperAdmin" style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+                                        <button class="adm-btn sm" type="button" @click="openCategory(category)">Ubah kategori</button>
+                                        <button v-if="!['wallet','other'].includes(category.code) && !category.channels_count" class="adm-btn sm danger" type="button" @click="categoryPendingDelete = category">Hapus</button>
+                                    </div>
+                                </td>
                                 <td>{{ category.sort_order }}</td>
                                 <td>{{ category.channels_count }} metode</td>
                                 <td><span class="adm-tag" :class="category.is_active ? 'ok' : 'bad'">{{ category.is_active ? 'Aktif' : 'Nonaktif' }}</span></td>
-                                <td><div v-if="isSuperAdmin" style="display:flex;gap:6px">
-                                    <button class="adm-btn sm" type="button" @click="openCategory(category)">Ubah</button>
-                                    <button v-if="!['wallet','other'].includes(category.code) && !category.channels_count" class="adm-btn sm danger" type="button" @click="categoryPendingDelete = category">Hapus</button>
-                                </div></td>
                             </tr>
                         </tbody>
                     </table>
@@ -408,7 +409,7 @@ const successRate = computed(() => {
                 <div class="adm-scroll">
                     <table class="adm-table">
                         <thead>
-                            <tr><th>Metode</th><th>Kategori</th><th>Jenis teknis</th><th>Gateway terpilih</th><th>Biaya ditagih</th><th>Kesiapan</th><th>Status</th><th>Tindakan</th></tr>
+                            <tr><th>Metode dan tindakan</th><th>Kategori</th><th>Jenis teknis</th><th>Gateway terpilih</th><th>Biaya ditagih</th><th>Kesiapan</th><th>Status</th></tr>
                         </thead>
                         <tbody>
                             <tr v-for="channel in channels" :key="channel.id">
@@ -422,6 +423,10 @@ const successRate = computed(() => {
                                             <strong>{{ channel.name }}</strong>
                                             <div class="adm-note">Posisi {{ channel.sort_order }} di pilihan pembayaran</div>
                                             <div class="adm-note">{{ channel.description || channel.code }}</div>
+                                            <div v-if="isSuperAdmin" style="display:flex;gap:4px;margin-top:8px;flex-wrap:wrap">
+                                                <button type="button" class="adm-btn sm" @click="openEdit(channel)">Ubah metode</button>
+                                                <button type="button" class="adm-btn sm danger" @click="pendingChannel = channel">Hapus</button>
+                                            </div>
                                         </div>
                                     </div>
                                 </td>
@@ -459,13 +464,6 @@ const successRate = computed(() => {
                                     </div>
                                 </td>
                                 <td><span class="adm-tag" :class="channel.is_active ? 'ok' : 'bad'">{{ channel.is_active ? 'Aktif' : 'Nonaktif' }}</span></td>
-                                <td>
-                                    <div v-if="isSuperAdmin" style="display:flex;gap:4px">
-                                        <button type="button" class="adm-btn sm" @click="openEdit(channel)">Ubah</button>
-                                        <button type="button" class="adm-btn sm danger" @click="pendingChannel = channel">Hapus</button>
-                                    </div>
-                                    <span v-else class="adm-note">Lihat saja</span>
-                                </td>
                             </tr>
                         </tbody>
                     </table>
