@@ -137,9 +137,9 @@ async function createTopup() {
                             <span class="text-slate-400" aria-hidden="true">{{ openedPaymentGroup === group.code ? '▴' : '▾' }}</span>
                         </span>
                     </button>
-                    <div v-if="openedPaymentGroup !== group.code && ['va', 'ewallet'].includes(group.code)" class="flex flex-wrap items-center gap-2 border-t border-slate-700/80 px-3 py-2" aria-label="Logo metode pembayaran">
-                        <span v-for="channel in group.items.filter(item => item.logo_url)" :key="channel.code" class="flex h-7 w-14 items-center justify-center rounded bg-slate-800/80 px-1.5 py-1">
-                            <img :src="channel.logo_url" :alt="channel.name" loading="lazy" class="h-full w-full object-contain">
+                    <div v-if="openedPaymentGroup !== group.code && ['va', 'ewallet'].includes(group.code)" class="lf-wallet-logo-strip border-t border-slate-700/80" aria-label="Logo metode pembayaran">
+                        <span v-for="channel in group.items.filter(item => item.logo_url)" :key="channel.code" class="lf-wallet-logo">
+                            <img :src="channel.logo_url" :alt="channel.name" loading="lazy">
                         </span>
                     </div>
                     <div v-if="openedPaymentGroup === group.code" class="grid gap-2 border-t border-slate-700/80" :class="['va', 'ewallet'].includes(group.code) ? 'grid-cols-2 p-2' : 'grid-cols-1 p-3 sm:grid-cols-2'" role="radiogroup" :aria-label="'Metode '+group.title">
@@ -196,3 +196,37 @@ async function createTopup() {
         <CustomerPagination :links="entries.links || []" :label="customerText('pages.customer.wallet.attribute.aria-label.9d63c7d7', 'Halaman riwayat saldo')" />
     </AccountShell>
 </template>
+
+<style scoped>
+/* Keep every payment logo in one line, shrinking them as channels are added. */
+.lf-wallet-logo-strip {
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 4px;
+    min-width: 0;
+    width: 100%;
+    overflow: hidden;
+    padding: 8px 12px;
+}
+.lf-wallet-logo {
+    box-sizing: border-box;
+    display: flex;
+    flex: 0 1 56px;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    max-width: 56px;
+    aspect-ratio: 2 / 1;
+    padding: 2px 3px;
+    border-radius: 4px;
+    background: rgba(30, 41, 59, .8);
+}
+.lf-wallet-logo img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+</style>
