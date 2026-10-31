@@ -87,6 +87,7 @@ const voucherCode = ref('');
 const paymentChannelCode = ref('');
 const quote = ref(null);
 const nicknameResult = ref(null);
+const nicknameChecking = ref(false);
 const accountValidationSignature = ref('');
 let accountValidationRequest = 0;
 let quoteRequest = 0;
@@ -588,7 +589,7 @@ async function checkNickname() {
     const requestId = ++accountValidationRequest;
     errors.value = withoutAccountErrors();
     nicknameResult.value = null;
-    busy.value = 'nickname';
+    nicknameChecking.value = true;
 
     try {
         const result = await requestJson('/checkout/nickname', {
@@ -604,11 +605,11 @@ async function checkNickname() {
     } catch (error) {
         if (requestId !== accountValidationRequest || signature !== accountInputSignature()) return false;
 
-        accountValidationSignature.value = '';
-        errors.value = { ...withoutAccountErrors(), ...(error.validation || {}) };
-        return false;
+        accountValidationSignature.value = signature;
+        nicknameResult.value = { verified: false, warning: 'Nickname belum dapat diverifikasi. Pastikan ID tujuan benar.' };
+        return true;
     } finally {
-        if (requestId === accountValidationRequest && busy.value === 'nickname') busy.value = '';
+        if (requestId === accountValidationRequest) nicknameChecking.value = false;
     }
 }
 
@@ -722,10 +723,6 @@ async function prepareOrder() {
             return;
         }
 
-        if (accountValidationSignature.value !== accountInputSignature()) {
-            const valid = await checkNickname();
-            if (!valid) return;
-        }
     }
 
     if (!selectedPackage.value) {
@@ -896,7 +893,7 @@ watch(() => props.fields.map((field) => String(customerInput[field.field_key] ||
     selectedSavedId.value = '';
     invalidateConfirmation();
     errors.value = withoutAccountErrors();
-    if (busy.value === 'nickname') busy.value = '';
+    nicknameChecking.value = false;
     if (nicknameAutoTimer) window.clearTimeout(nicknameAutoTimer);
     if (isVoucherProduct.value || !props.product.nickname_check_enabled || !requiredFieldsComplete.value) return;
     nicknameAutoTimer = window.setTimeout(() => {
@@ -927,7 +924,7 @@ function closeReview() { summaryOpen.value = false; closeConfirmation(); }
       <div class="lfx-layout">
         <div class="lfx-sections">
           <template v-if="activeTab==='transaction'">
-            <section v-if="hasAccountStep" id="lfx-account" class="lfx-panel"><header class="lfx-panel-header"><span class="lfx-number">1</span><div><h2>{{customerText("checkout.account_title", "Data Akun")}}</h2></div></header><div class="lfx-panel-content"><label v-if="savedAccountItems.length" class="lfx-field lfx-saved-account"><span>Akun tersimpan</span><select v-model="selectedSavedId" @change="chooseSavedAccount(selectedSavedId)"><option value="">Isi manual</option><option v-for="saved in savedAccountItems" :key="saved.id" :value="String(saved.id)">{{saved.label}}{{saved.nickname?' · '+saved.nickname:''}}</option></select></label><div class="lfx-field-grid" :class="{single:fields.length===1}"><label v-for="field in fields" :key="field.field_key" class="lfx-field"><span>{{field.label}} <b v-if="field.is_required">*</b><i title="Pastikan data akun benar">ⓘ</i></span><input v-model="customerInput[field.field_key]" :placeholder="field.placeholder||'Masukkan '+field.label" :type="['email','tel'].includes(field.type)?field.type:'text'" :inputmode="field.type==='number'?'numeric':undefined" :required="field.is_required" maxlength="255" autocomplete="off"/></label></div><p v-for="field in fields.filter(x=>fieldError(x.field_key))" :key="field.field_key" class="lfx-error">{{fieldError(field.field_key)}}</p><div v-if="busy==='nickname'" class="lfx-hint">Memeriksa akun…</div><div v-else-if="nicknameResult?.verified" class="lfx-hint">✓ {{nicknameResult.nickname}}</div><div v-else-if="nicknameResult?.warning" class="lfx-hint">{{nicknameResult.warning}}</div><div class="lfx-hint"><span>i</span> {{customerText("checkout.account_hint", "Pastikan ID atau Server sudah sesuai sebelum memesan.")}}</div></div></section>
+            <section v-if="hasAccountStep" id="lfx-account" class="lfx-panel"><header class="lfx-panel-header"><span class="lfx-number">1</span><div><h2>{{customerText("checkout.account_title", "Data Akun")}}</h2></div></header><div class="lfx-panel-content"><label v-if="savedAccountItems.length" class="lfx-field lfx-saved-account"><span>Akun tersimpan</span><select v-model="selectedSavedId" @change="chooseSavedAccount(selectedSavedId)"><option value="">Isi manual</option><option v-for="saved in savedAccountItems" :key="saved.id" :value="String(saved.id)">{{saved.label}}{{saved.nickname?' · '+saved.nickname:''}}</option></select></label><div class="lfx-field-grid" :class="{single:fields.length===1}"><label v-for="field in fields" :key="field.field_key" class="lfx-field"><span>{{field.label}} <b v-if="field.is_required">*</b><i title="Pastikan data akun benar">ⓘ</i></span><input v-model="customerInput[field.field_key]" :placeholder="field.placeholder||'Masukkan '+field.label" :type="['email','tel'].includes(field.type)?field.type:'text'" :inputmode="field.type==='number'?'numeric':undefined" :required="field.is_required" maxlength="255" autocomplete="off"/></label></div><p v-for="field in fields.filter(x=>fieldError(x.field_key))" :key="field.field_key" class="lfx-error">{{fieldError(field.field_key)}}</p><div v-if="nicknameChecking" class="lfx-hint">Memeriksa akun…</div><div v-else-if="nicknameResult?.verified" class="lfx-hint">✓ {{nicknameResult.nickname}}</div><div v-else-if="nicknameResult?.warning" class="lfx-hint">{{nicknameResult.warning}}</div><div class="lfx-hint"><span>i</span> {{customerText("checkout.account_hint", "Pastikan ID atau Server sudah sesuai sebelum memesan.")}}</div></div></section>
             <section id="lfx-nominal" class="lfx-panel">
               <header class="lfx-panel-header"><span class="lfx-number">2</span><div><h2>{{customerText("checkout.nominal_title", "Pilih Nominal")}}</h2></div></header>
               <div class="lfx-panel-content">
