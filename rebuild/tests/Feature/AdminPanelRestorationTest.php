@@ -307,6 +307,7 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertSame('PERCENT', $package->fresh()->pricing_mode);
         $this->assertNull($product->fresh()->sell_markup_percent);
         // Seller price 10000 + new nominal's 10% markup = 11000.
+        $this->assertSame(10.0, (float) $package->fresh()->margin_percent);
         $this->assertSame(11000, app(CheckoutPricing::class)->forPackage($package->id)['subtotal_idr']);
         $response = $this->get('/catalog/'.$product->slug);
         $response->assertOk();
