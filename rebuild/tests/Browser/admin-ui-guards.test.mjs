@@ -454,6 +454,22 @@ test('Digiflazz and local voucher nominals each keep their price controls', () =
     assert.match(nominal, /margin_percent: form\.price_mode === 'MARKUP'/);
 });
 
+// Regresi: setelah simpan pertama, editor harus bisa dibuka kembali dan
+// markup per nominal dapat disimpan lagi tanpa me-refresh halaman.
+test('nominal Save button unlocks after successful and failed requests', () => {
+    const catalog = read('Catalog.vue');
+    const handler = catalog.split('const saveNominal = () => {')[1]?.split('\\n};')[0];
+    assert.ok(handler, 'penyimpanan nominal tersedia');
+    assert.match(handler, /saveBusy\\.value = 'nominal'/);
+    assert.match(handler, /const finish = \\(\\) => \\{ saveBusy\\.value = ''; \\}/);
+    for (const method of ['put', 'post']) {
+        const request = handler.split(`router.${method}(`)[1]?.split('\\n        });')[0];
+        assert.ok(request, `alur ${method.toUpperCase()} tersedia`);
+        assert.match(request, /onError: handleErrors, onFinish: finish/,
+            `${method.toUpperCase()} wajib membuka kunci saat berhasil maupun gagal`);
+    }
+});
+
 // CR-03: membuat akun admin baru (termasuk Super Admin) juga menanyakan kata
 // sandi di UI, bukan hanya perubahan peran/izin.
 test('creating an admin account asks for password confirmation', () => {
