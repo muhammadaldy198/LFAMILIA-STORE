@@ -754,7 +754,15 @@ class AdminCatalogController
             throw ValidationException::withMessages(['package' => 'Modal nominal manual belum tersedia.']);
         }
 
-        DB::transaction(function () use ($request, $product, $package, $sourceMapping, $audit): void {
+        DB::transaction(function () use ($request, $product, $package, $manualProviderId, $audit): void {
+            // A rename holds the same product lock. Refresh source after locking
+            // so Salin never revives an obsolete group name.
+            $product = Product::whereKey($product->id)->lockForUpdate()->firstOrFail();
+            $package = $product->packages()->whereKey($package->id)->lockForUpdate()->firstOrFail();
+            $sourceMapping = $package->mappings()->where('provider_id', $manualProviderId)->first();
+            if (! $sourceMapping) {
+                throw ValidationException::withMessages(['package' => 'Modal nominal manual sudah berubah.']);
+            }
             $baseCode = substr($package->code.'_COPY', 0, 70);
             $copyNumber = 1;
             do {

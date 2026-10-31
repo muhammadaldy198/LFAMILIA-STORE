@@ -12,12 +12,15 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class DigiflazzAutoSources
 {
     /** @var array<int, array<int, bool>> Newly imported nominal IDs, per product/batch. */
     private array $newPackagesByProduct = [];
+
+    private ?bool $hasPackageGroupTable = null;
 
     public function key(object $item): string
     {
@@ -166,7 +169,8 @@ class DigiflazzAutoSources
             app(AdminAuditService::class)->record($request, 'catalog.package.updated', 'product_package', $package->id, $before, $package->fresh()->toArray());
         }
         // Legacy import paths still register supplier groups in the product panel.
-        if (! $product->packageGroups()->where('name', $destinationGroup)->exists()) {
+        if (($this->hasPackageGroupTable ??= Schema::hasTable('product_package_groups'))
+            && ! $product->packageGroups()->where('name', $destinationGroup)->exists()) {
             $product->packageGroups()->create([
                 'name' => $destinationGroup,
                 'sort_order' => ((int) $product->packageGroups()->max('sort_order')) + 1,
