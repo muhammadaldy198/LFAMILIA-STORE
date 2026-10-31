@@ -545,11 +545,10 @@ class AdminCatalogController
         $data['package_tabs'] ??= $product->package_tabs ?? [];
 
         $tabs = collect($data['package_tabs'])->map(fn ($tab) => trim((string) $tab))
-            ->filter(fn (string $tab): bool => $tab !== '')->values();
+            ->filter(fn (string $tab): bool => strlen($tab) > 0)->values();
         // Inactive tab navigation stores group priority here too. Group labels
         // that differ only by case are valid; reject them only for actual tabs.
-        if ($data['package_tabs_enabled']
-            && $tabs->map(fn (string $tab): string => mb_strtolower($tab))->unique()->count() !== $tabs->count()) {
+        if ($data['package_tabs_enabled'] && $tabs->map(fn (string $tab): string => mb_strtolower($tab))->unique()->count() !== $tabs->count()) {
             throw ValidationException::withMessages(['package_tabs' => 'Nama tab nominal tidak boleh duplikat.']);
         }
         $data['package_tabs'] = $tabs->all();
@@ -1416,6 +1415,7 @@ class AdminCatalogController
         // group priority, while package_tabs_enabled remains unchanged.
         $normalizeGroup = static function ($name): string {
             $name = trim((string) $name);
+
             return $name === '' ? 'Umum' : $name;
         };
         $current = $product->packages()->pluck('group_name')
