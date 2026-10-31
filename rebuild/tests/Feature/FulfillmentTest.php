@@ -755,6 +755,29 @@ class FulfillmentTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_missing_optional_destination_value_never_rewrites_paid_snapshot(): void
+    {
+        Queue::fake();
+        $this->credentials();
+        $catalog = $this->automaticCatalog(template: '{{user_id}}-{{zone_id}}');
+        $orderId = $this->paidOrder($catalog);
+        // Optional checkout fields are intentionally absent in saved input.
+        // The paid snapshot still requires zone_id in its delivery format.
+        DB::table('orders')->where('id', $orderId)->update([
+            'customer_input' => json_encode(['user_id' => '123456'], JSON_THROW_ON_ERROR),
+        ]);
+
+        Http::fake();
+        $service = app(FulfillmentService::class);
+        $service->startOrder($orderId);
+        $attempt = DB::table('fulfillment_attempts')->where('order_id', $orderId)->firstOrFail();
+        $service->sendAttempt((int) $attempt->id);
+
+        $this->assertSame('BLOCKED', DB::table('fulfillment_attempts')
+            ->where('id', $attempt->id)->value('status'));
+        Http::assertNothingSent();
+    }
+
     public function test_signed_digiflazz_webhook_is_idempotent_and_fake_signature_is_rejected(): void
     {
         Queue::fake();
