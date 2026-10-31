@@ -5,7 +5,7 @@ import AdminLayout from '../../Components/Admin/AdminLayout.vue';
 import AdminModal from '../../Components/Admin/AdminModal.vue';
 import { rupiah } from '../../lib/adminFormat';
 import { nominalMode, nominalPayload, nominalPriceValue } from '../../lib/catalogNominal';
-import { orderedPackageGroups } from '../../lib/catalogGroups';
+
 import { canSyncMapping, mappingPayload, mappingStatusLabel, sortMappings } from '../../lib/catalogSources';
 
 const props = defineProps({
