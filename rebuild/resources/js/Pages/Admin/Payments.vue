@@ -371,7 +371,7 @@ const successRate = computed(() => {
                 <div class="adm-card-head">
                     <div>
                         <h2>Kategori Pembayaran</h2>
-                        <p>Atur judul kategori, deskripsi, urutan, dan visibilitas di checkout game maupun top up LFAMILIA Cash.</p>
+                        <p>Atur judul kategori, deskripsi, urutan, dan visibilitas di checkout game maupun top up LFAMILIA Coin.</p>
                     </div>
                     <button v-if="isSuperAdmin" type="button" class="adm-btn primary" @click="openCategory()">Tambah kategori</button>
                 </div>
