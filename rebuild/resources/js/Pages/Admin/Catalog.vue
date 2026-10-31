@@ -5,6 +5,7 @@ import AdminLayout from '../../Components/Admin/AdminLayout.vue';
 import AdminModal from '../../Components/Admin/AdminModal.vue';
 import { rupiah } from '../../lib/adminFormat';
 import { nominalMode, nominalPayload, nominalPriceValue } from '../../lib/catalogNominal';
+import { orderedPackageGroups, movePackageGroup } from '../../lib/catalogGroups';
 import { canSyncMapping, mappingPayload, mappingStatusLabel, sortMappings } from '../../lib/catalogSources';
 
 const props = defineProps({
@@ -106,6 +107,7 @@ const openEditor = (row) => {
     product.value = JSON.parse(JSON.stringify(row));
     editTab.value = 'info';
     editErrors.value = {};
+    groupOrderError.value = '';
     editorOpen.value = true;
 };
 
@@ -328,6 +330,31 @@ const confirmRemove = () => {
             }
         },
         onFinish: () => { removeBusy.value = false; },
+    });
+};
+
+// The saved group priority is independent of nominal position and does not enable tabs.
+const packageGroupNames = computed(() => orderedPackageGroups(
+    product.value?.packages || [], product.value?.package_tabs || [],
+).map(group => group.name));
+const groupOrderError = ref('');
+const moveGroup = (index, direction) => {
+    if (!product.value || saveBusy.value) return;
+    const before = packageGroupNames.value;
+    const next = movePackageGroup(before, index, direction);
+    if (JSON.stringify(next) === JSON.stringify(before)) return;
+    const previous = [...(product.value.package_tabs || [])];
+    const productId = product.value.id;
+    product.value.package_tabs = next;
+    groupOrderError.value = '';
+    saveBusy.value = 'group-order';
+    router.put('/admin/catalog/products/' + productId + '/package-groups/reorder', { groups: next }, {
+        preserveScroll: true,
+        onError: bag => {
+            if (product.value?.id === productId) product.value.package_tabs = previous;
+            groupOrderError.value = bag.groups || 'Gagal menyimpan urutan grup.';
+        },
+        onFinish: () => { saveBusy.value = ''; },
     });
 };
 
@@ -981,6 +1008,19 @@ onMounted(() => {
             </div>
 
             <div v-if="editTab === 'price'" style="padding-top:12px">
+                <div style="margin-bottom:16px">
+                    <strong>Urutan grup / tabel di checkout</strong>
+                    <p class="adm-note">Grup nomor 1 tampil paling atas. Atur urutan isi grup lewat tabel nominal di bawah.</p>
+                    <div v-for="(group, index) in packageGroupNames" :key="group" class="adm-list-row" style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+                        <span><strong>{{ index + 1 }}.</strong> {{ group }}</span>
+                        <div style="display:flex;gap:4px">
+                            <button type="button" class="adm-btn sm" :disabled="index === 0 || saveBusy === 'group-order'" :aria-label="'Naikkan grup ' + group" @click="moveGroup(index, -1)">↑</button>
+                            <button type="button" class="adm-btn sm" :disabled="index === packageGroupNames.length - 1 || saveBusy === 'group-order'" :aria-label="'Turunkan grup ' + group" @click="moveGroup(index, 1)">↓</button>
+                        </div>
+                    </div>
+                    <p v-if="!packageGroupNames.length" class="adm-note">Tambahkan nominal untuk membuat grup.</p>
+                    <p v-if="groupOrderError" class="err">{{ groupOrderError }}</p>
+                </div>
                 <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:8px">
                     <p class="adm-note">Urutan angka dari kecil ke besar. Bisa tetap diubah manual dengan geser atau panah.</p>
                     <div style="display:flex;gap:6px;flex-wrap:wrap">

@@ -21,14 +21,24 @@ class CatalogNominalOrder
 
     public function sort(Collection $items): Collection
     {
-        return $items->sort(function ($left, $right): int {
+        return $this->sortNaturally($items, true);
+    }
+
+    public function sortNaturally(Collection $items, bool $respectPosition = false): Collection
+    {
+        return $items->sort(function ($left, $right) use ($respectPosition): int {
             $leftName = (string) data_get($left, 'name', data_get($left, 'product_name', ''));
             $rightName = (string) data_get($right, 'name', data_get($right, 'product_name', ''));
             $leftValue = data_get($left, 'nominal_value') ?? $this->value($leftName, (string) data_get($left, 'brand', ''));
             $rightValue = data_get($right, 'nominal_value') ?? $this->value($rightName, (string) data_get($right, 'brand', ''));
+            // Manual Posisi (including drag/arrow reorders) must win. For
+            // previously imported rows with the same position use numeric order.
+            $position = $respectPosition
+                ? (int) (data_get($left, 'sort_order') ?? 0) <=> (int) (data_get($right, 'sort_order') ?? 0)
+                : 0;
             $numeric = ($leftValue ?? PHP_INT_MAX) <=> ($rightValue ?? PHP_INT_MAX);
 
-            return $numeric ?: strnatcasecmp($leftName, $rightName) ?: ((int) data_get($left, 'id', 0) <=> (int) data_get($right, 'id', 0));
+            return $position ?: $numeric ?: strnatcasecmp($leftName, $rightName) ?: ((int) data_get($left, 'id', 0) <=> (int) data_get($right, 'id', 0));
         })->values();
     }
 }

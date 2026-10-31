@@ -545,8 +545,10 @@ class AdminCatalogController
         $data['package_tabs'] ??= $product->package_tabs ?? [];
 
         $tabs = collect($data['package_tabs'])->map(fn ($tab) => trim((string) $tab))
-            ->filter()->values();
-        if ($tabs->map(fn (string $tab): string => mb_strtolower($tab))->unique()->count() !== $tabs->count()) {
+            ->filter(fn (string $tab): bool => strlen($tab) > 0)->values();
+        // Inactive tab navigation stores group priority here too. Group labels
+        // that differ only by case are valid; reject them only for actual tabs.
+        if ($data['package_tabs_enabled'] && $tabs->map(fn (string $tab): string => mb_strtolower($tab))->uniqueStrict()->count() !== $tabs->count()) {
             throw ValidationException::withMessages(['package_tabs' => 'Nama tab nominal tidak boleh duplikat.']);
         }
         $data['package_tabs'] = $tabs->all();
@@ -559,7 +561,7 @@ class AdminCatalogController
             if ($groups->contains('')) {
                 throw ValidationException::withMessages(['package_tabs' => 'Semua nominal harus memiliki grup sebelum tab nominal diaktifkan.']);
             }
-            $missing = $groups->filter(fn (string $group): bool => ! $tabs->contains($group))->unique()->values();
+            $missing = $groups->filter(fn (string $group): bool => ! $tabs->containsStrict($group))->uniqueStrict()->values();
             if ($missing->isNotEmpty()) {
                 throw ValidationException::withMessages([
                     'package_tabs' => 'Grup nominal belum tercantum sebagai tab: '.$missing->implode(', ').'.',
@@ -824,7 +826,7 @@ class AdminCatalogController
         if ($product->package_tabs_enabled) {
             $group = trim((string) ($data['group_name'] ?? ''));
             $tabs = collect($product->package_tabs ?? []);
-            if ($group === '' || ! $tabs->contains($group)) {
+            if ($group === '' || ! $tabs->containsStrict($group)) {
                 throw ValidationException::withMessages([
                     'group_name' => 'Pilih grup yang tersedia pada tab nominal produk.',
                 ]);
@@ -926,7 +928,7 @@ class AdminCatalogController
         if ($product->package_tabs_enabled) {
             $group = trim((string) ($data['group_name'] ?? $package->group_name ?? ''));
             $tabs = collect($product->package_tabs ?? []);
-            if ($group === '' || ! $tabs->contains($group)) {
+            if ($group === '' || ! $tabs->containsStrict($group)) {
                 throw ValidationException::withMessages([
                     'group_name' => 'Pilih grup yang tersedia pada tab nominal produk.',
                 ]);
@@ -1399,6 +1401,56 @@ class AdminCatalogController
             $audit->record($request, 'catalog.mapping.updated', 'provider_mapping', $mapping->id,
                 $before, $mapping->toArray());
         });
+
+        return back();
+    }
+
+    public function reorderPackageGroups(Request $request, Product $product, CatalogAudit $audit): RedirectResponse
+    {
+        $data = $request->validate([
+            'groups' => ['present', 'array', 'max:1000'],
+            'groups.*' => ['required', 'string', 'max:120'],
+        ]);
+        // No new database table: the existing package_tabs JSON keeps the
+        // group priority, while package_tabs_enabled remains unchanged.
+        $normalizeGroup = static function ($name): string {
+            $name = trim((string) $name);
+
+            return $name === '' ? 'Umum' : $name;
+        };
+        $current = $product->packages()->pluck('group_name')
+            ->map($normalizeGroup)->uniqueStrict()->values()->all();
+        $submitted = array_map($normalizeGroup, $data['groups']);
+        $expected = $current;
+        $actual = $submitted;
+        sort($expected, SORT_STRING);
+        sort($actual, SORT_STRING);
+        if ($expected !== $actual || count($submitted) !== count(array_unique($submitted))) {
+            throw ValidationException::withMessages([
+                'groups' => 'Daftar grup berubah atau tidak lengkap. Muat ulang halaman produk.',
+            ]);
+        }
+        $before = $product->package_tabs ?? [];
+        $stored = $submitted;
+        if ($product->package_tabs_enabled) {
+            // Legacy tabs without nominals are still valid future destinations.
+            // Keep their slots while reordering only the occupied group headings.
+            $remaining = $submitted;
+            $stored = [];
+            foreach ($before as $name) {
+                if (in_array(trim((string) $name), $current, true)) {
+                    if ($remaining !== []) {
+                        $stored[] = array_shift($remaining);
+                    }
+                } else {
+                    $stored[] = $name;
+                }
+            }
+            $stored = array_merge($stored, $remaining);
+        }
+        $product->update(['package_tabs' => $stored]);
+        $audit->record($request, 'catalog.package-groups.reordered', 'product', $product->id,
+            $before, $stored);
 
         return back();
     }

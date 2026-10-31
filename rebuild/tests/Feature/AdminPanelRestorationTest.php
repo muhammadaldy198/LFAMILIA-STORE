@@ -543,6 +543,81 @@ class AdminPanelRestorationTest extends TestCase
         Http::assertSentCount(1);
     }
 
+    public function test_separate_digiflazz_import_batches_keep_natural_order_without_overwriting_custom_positions(): void
+    {
+        $this->login();
+        $rows = [];
+        foreach ([5, 20, 10, 1100, 2000] as $number) {
+            $rows[] = $this->row([
+                'buyer_sku_code' => 'batch-order-'.$number,
+                'product_name' => 'Restore '.$number.' Diamonds',
+                'price' => 10000 + $number,
+            ]);
+        }
+        $this->fakeCatalog($rows);
+        app(DigiflazzCatalogService::class)->sync();
+        $product = $this->product();
+
+        $import = function (array $values) use ($product): void {
+            $codes = array_map(fn (int $n): string => 'batch-order-'.$n, $values);
+            $ids = DB::table('digiflazz_catalog_items')->whereIn('buyer_sku_code', $codes)->pluck('id')->all();
+            $this->post('/admin/catalog/products/'.$product->id.'/import', [
+                'item_ids' => $ids, 'publish' => false,
+            ])->assertRedirect()->assertSessionHasNoErrors();
+        };
+        $order = fn (): array => $product->packages()->orderBy('sort_order')
+            ->pluck('nominal_value')->map(fn ($n): int => (int) $n)->all();
+
+        $import([5, 20]);
+        $this->assertSame([5, 20], $order());
+        $import([1100]);
+        $this->assertSame([5, 20, 1100], $order());
+        $import([10]);
+        $this->assertSame([5, 10, 20, 1100], $order());
+
+        // Emulate the panel's saved custom order, and verify that a later
+        // import does not overwrite deliberate manual positions.
+        $ids = $product->packages()->orderBy('sort_order')->pluck('id')->all();
+        $this->put('/admin/catalog/products/'.$product->id.'/packages/reorder', [
+            'ids' => array_reverse($ids),
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame([1100, 20, 10, 5], $order());
+        $import([2000]);
+        $this->assertSame([1100, 20, 10, 5, 2000], $order());
+    }
+
+    public function test_incremental_import_respects_numeric_tiebreak_for_equal_legacy_positions(): void
+    {
+        $this->login();
+        $this->fakeCatalog([
+            $this->row([
+                'buyer_sku_code' => 'tie-batch-10',
+                'product_name' => 'Restore 10 Diamonds',
+                'price' => 10010,
+            ]),
+        ]);
+        app(DigiflazzCatalogService::class)->sync();
+        $product = $this->product();
+        // The older 20 nominal was created first, but both were saved with
+        // position 0; checkout already treats 5 as earlier than 20.
+        foreach ([20, 5] as $value) {
+            $product->packages()->create([
+                'code' => 'LEGACY-TIED-'.$value,
+                'name' => $value.' Diamonds',
+                'nominal_value' => $value,
+                'group_name' => 'Umum',
+                'sort_order' => 0,
+                'is_active' => false,
+            ]);
+        }
+        $id = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'tie-batch-10')->value('id');
+        $this->post('/admin/catalog/products/'.$product->id.'/import', [
+            'item_ids' => [$id], 'publish' => false,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame([5, 10, 20], $product->packages()
+            ->orderBy('sort_order')->pluck('nominal_value')->map(fn ($value): int => (int) $value)->all());
+    }
+
     public function test_customer_nominal_order_is_numeric_even_when_imported_values_are_missing(): void
     {
         $names = [100, 2000, 10, 200, 20, 7];
@@ -1396,6 +1471,148 @@ class AdminPanelRestorationTest extends TestCase
                     && (int) $mapping['store_cost_idr'] === 10200
                     && (int) $mapping['seller_reference_price_idr'] === 10000;
             }));
+    }
+
+    public function test_group_order_is_saved_independently_from_nominal_position(): void
+    {
+        $this->login();
+        $product = $this->product();
+        $a = $product->packages()->create([
+            'code' => 'GROUP-D', 'name' => '20 Diamond',
+            'group_name' => 'Diamonds', 'sort_order' => 2,
+        ]);
+        $b = $product->packages()->create([
+            'code' => 'GROUP-P', 'name' => 'Weekly Pass',
+            'group_name' => 'Pass', 'sort_order' => 1,
+        ]);
+        $c = $product->packages()->create([
+            'code' => 'GROUP-U', 'name' => '5 Diamond',
+            'group_name' => null, 'sort_order' => 0,
+        ]);
+
+        $route = '/admin/catalog/products/'.$product->id.'/package-groups/reorder';
+        $this->put($route, ['groups' => ['Pass', 'Umum', 'Diamonds']])
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame(['Pass', 'Umum', 'Diamonds'], $product->fresh()->package_tabs);
+        $this->assertFalse((bool) $product->fresh()->package_tabs_enabled);
+        $this->assertSame([0, 1, 2], $product->packages()->orderBy('sort_order')->pluck('sort_order')->all());
+
+        $this->put($route, ['groups' => ['Pass', 'Diamonds']])->assertSessionHasErrors('groups');
+        $this->put($route, ['groups' => ['Pass', 'Pass', 'Diamonds']])->assertSessionHasErrors('groups');
+        $this->assertSame(['Pass', 'Umum', 'Diamonds'], $product->fresh()->package_tabs);
+
+        $sorted = app(CatalogNominalOrder::class)->sort(collect([$a, $b, $c]));
+        $this->assertSame([$c->id, $b->id, $a->id], $sorted->pluck('id')->all());
+    }
+
+    public function test_group_zero_and_case_variants_are_saved_without_blocking_product_edits(): void
+    {
+        $this->login();
+        $product = $this->product();
+        foreach (['Pass', 'pass', '0', '00'] as $i => $group) {
+            $product->packages()->create([
+                'code' => 'CASE-'.($i + 1),
+                'name' => 'Nominal '.($i + 1),
+                'group_name' => $group,
+                'sort_order' => $i,
+            ]);
+        }
+
+        $this->put('/admin/catalog/products/'.$product->id.'/package-groups/reorder', [
+            'groups' => ['00', '0', 'pass', 'Pass'],
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame(['00', '0', 'pass', 'Pass'], $product->fresh()->package_tabs);
+
+        // Editing product details must not treat valid case-variant group labels
+        // as duplicates or filter the string "0" out of saved group priority.
+        $this->put('/admin/catalog/products/'.$product->id, [
+            'category_id' => $product->category_id,
+            'name' => 'Updated Group Product',
+            'slug' => $product->slug,
+            'fulfillment_mode' => 'AUTO_PROVIDER',
+            'sort_order' => 0,
+            'is_active' => true,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame(['00', '0', 'pass', 'Pass'], $product->fresh()->package_tabs);
+    }
+
+    public function test_active_tabs_keep_distinct_numeric_group_labels_after_reorder(): void
+    {
+        $this->login();
+        $product = $this->product();
+        foreach (['0', '00'] as $index => $group) {
+            $product->packages()->create([
+                'code' => 'NUM-TAB-'.($index + 1),
+                'name' => 'Nominal '.($index + 1),
+                'group_name' => $group,
+                'sort_order' => $index,
+            ]);
+        }
+        $product->update(['package_tabs_enabled' => true, 'package_tabs' => ['00', '0']]);
+
+        $this->put('/admin/catalog/products/'.$product->id.'/package-groups/reorder', [
+            'groups' => ['0', '00'],
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->put('/admin/catalog/products/'.$product->id, [
+            'category_id' => $product->category_id,
+            'name' => 'Updated Numeric Tabs',
+            'slug' => $product->slug,
+            'fulfillment_mode' => 'AUTO_PROVIDER',
+            'sort_order' => 0,
+            'is_active' => true,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame(['0', '00'], $product->fresh()->package_tabs);
+        $this->assertTrue((bool) $product->fresh()->package_tabs_enabled);
+    }
+
+    public function test_reorder_preserves_empty_configured_tabs_for_future_imports(): void
+    {
+        $this->login();
+        $product = $this->product();
+        foreach (['Diamonds', 'Pass'] as $index => $group) {
+            $product->packages()->create([
+                'code' => 'EMPTY-TAB-'.($index + 1),
+                'name' => 'Nominal '.($index + 1),
+                'group_name' => $group,
+                'sort_order' => $index,
+            ]);
+        }
+        $product->update([
+            'package_tabs_enabled' => true,
+            'package_tabs' => ['Diamonds', 'Weekly', 'Pass'],
+        ]);
+
+        $this->put('/admin/catalog/products/'.$product->id.'/package-groups/reorder', [
+            'groups' => ['Pass', 'Diamonds'],
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame(['Pass', 'Weekly', 'Diamonds'], $product->fresh()->package_tabs);
+
+        // A future nominal may still join a tab that had no packages.
+        $product->packages()->create([
+            'code' => 'EMPTY-TAB-3',
+            'name' => 'Weekly Pass',
+            'group_name' => 'Weekly',
+            'sort_order' => 2,
+        ]);
+        $this->put('/admin/catalog/products/'.$product->id, [
+            'category_id' => $product->category_id,
+            'name' => 'Tab Ready for Import',
+            'slug' => $product->slug,
+            'fulfillment_mode' => 'AUTO_PROVIDER',
+            'sort_order' => 0,
+            'is_active' => true,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+    }
+
+    public function test_catalog_nominal_sort_respects_manual_position_before_numeric_value(): void
+    {
+        $nominals = collect([
+            ['id' => 1, 'name' => '5 Diamonds', 'sort_order' => 3],
+            ['id' => 2, 'name' => '1100 Diamonds', 'sort_order' => 0],
+            ['id' => 3, 'name' => '20 Diamonds', 'sort_order' => 2],
+        ]);
+        $this->assertSame([2, 3, 1], app(CatalogNominalOrder::class)->sort($nominals)->pluck('id')->all());
     }
 
     public function test_catalog_nominal_sort_reads_numeric_values_in_natural_order(): void
