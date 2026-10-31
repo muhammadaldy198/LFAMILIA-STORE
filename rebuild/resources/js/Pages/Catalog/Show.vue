@@ -834,7 +834,13 @@ async function resendVerificationEmail() {
 onMounted(() => {
     checkoutClockTimer = window.setInterval(() => { checkoutClockTick.value = Date.now(); }, 1000);
 
-    const preferredGroups = paymentGroups.value.map(group => group.key);
+    // Keep the wallet as a fallback for default selection. An authenticated
+    // customer with zero balance should not land on wallet by default even if
+    // the category is positioned first in the admin-managed display order.
+    const preferredGroups = [
+        ...paymentGroups.value.filter(group => group.key !== 'wallet').map(group => group.key),
+        ...paymentGroups.value.filter(group => group.key === 'wallet').map(group => group.key),
+    ];
     if (!paymentChannelCode.value) {
         for (const key of preferredGroups) {
             const group = paymentGroups.value.find((item) => item.key === key);
