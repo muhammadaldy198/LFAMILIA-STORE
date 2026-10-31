@@ -413,11 +413,12 @@ test('editing a nominal keeps stored pricing and nominal_value', async () => {
 });
 
 // Harga Digiflazz dari SKU seller + markup nominal independen.
-test('import defaults new nominal markup to twelve percent without overwriting product names', () => {
+test('import defaults new nominal markup to ten percent without overwriting product names', () => {
     const catalog = read('Catalog.vue');
     assert.match(catalog, /Markup nominal baru/);
     assert.match(catalog, /Math\.ceil\(price \* percentage \/ 100\)/);
-    assert.match(catalog, /: 12;/);
+    assert.match(catalog, /: 10;/);
+    assert.match(catalog, /10% dari harga seller/);
     assert.doesNotMatch(catalog, /info\.price_markup_type|info\.price_markup_fixed_idr/);
     assert.match(catalog, /nama produk dan nama nominal lama tetap milik toko/i);
     assert.match(catalog, /seller Digiflazz/i);
@@ -452,6 +453,35 @@ test('Digiflazz and local voucher nominals each keep their price controls', () =
     const nominal = repo('resources/js/lib/catalogNominal.js');
     assert.match(nominal, /sell_price_idr: form\.price_mode === 'FIXED'/);
     assert.match(nominal, /margin_percent: form\.price_mode === 'MARKUP'/);
+});
+
+// Regresi: setelah simpan pertama, editor harus bisa dibuka kembali dan
+// markup per nominal dapat disimpan lagi tanpa me-refresh halaman.
+test('nominal Save button unlocks after successful and failed requests', () => {
+    const catalog = read('Catalog.vue');
+    const handler = catalog.split('const saveNominal = () => {')[1]?.split('\n};')[0];
+    assert.ok(handler, 'penyimpanan nominal tersedia');
+    assert.match(handler, /saveBusy\.value = 'nominal'/);
+    assert.match(handler, /const finish = \(\) => \{ saveBusy\.value = ''; \}/);
+    for (const method of ['put', 'post']) {
+        const request = handler.split(`router.${method}(`)[1]?.split('\n        });')[0];
+        assert.ok(request, `alur ${method.toUpperCase()} tersedia`);
+        assert.match(request, /onError: handleErrors, onFinish: finish/,
+            `${method.toUpperCase()} wajib membuka kunci saat berhasil maupun gagal`);
+    }
+});
+
+test('nominal delete guards repeat clicks and keeps the admin editor open on validation errors', () => {
+    const catalog = read('Catalog.vue');
+    const handler = catalog.split('const confirmRemove = () => {')[1]?.split('\n};')[0];
+    assert.ok(handler);
+    assert.match(handler, /if \(!row \|\| removeBusy\.value\) return/);
+    assert.match(handler, /removeBusy\.value = true/);
+    assert.match(handler, /onError: bag => \{ removeErrors\.value = bag; \}/);
+    assert.match(handler, /onSuccess: \(\) => \{/);
+    assert.match(handler, /onFinish: \(\) => \{ removeBusy\.value = false; \}/);
+    assert.match(catalog, /:disabled="removeBusy" @click="confirmRemove"/);
+    assert.match(catalog, /product\.value\.packages\.filter\(item => item\.id !== row\.id\)/);
 });
 
 // CR-03: membuat akun admin baru (termasuk Super Admin) juga menanyakan kata

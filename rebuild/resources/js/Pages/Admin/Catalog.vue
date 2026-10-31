@@ -264,19 +264,22 @@ const saveNominal = () => {
         }
     }
     saveBusy.value = 'nominal';
-    const finish = (bag) => { nominalErrors.value = bag; saveBusy.value = ''; };
+    const handleErrors = bag => { nominalErrors.value = bag; };
+    const finish = () => { saveBusy.value = ''; };
     if (nominalEditing.value) {
         // Modal nominal manual tersimpan di pemetaan provider, bukan di paket.
         if (product.value.fulfillment_mode === 'MANUAL') payload.store_cost_idr = Number(nominal.cost_idr || 0);
         router.put(`/admin/catalog/packages/${nominalEditing.value.id}`, payload, {
-            preserveScroll: true, onError: finish, onSuccess: () => { nominalOpen.value = false; uploadNominalImage(); },
+            preserveScroll: true, onError: handleErrors, onFinish: finish,
+            onSuccess: () => { nominalOpen.value = false; uploadNominalImage(); },
         });
     } else {
         router.post(`/admin/catalog/products/${product.value.id}/packages`, {
             ...payload,
             cost_idr: product.value.fulfillment_mode === 'MANUAL' ? Number(nominal.cost_idr || 0) : 0,
         }, {
-            preserveScroll: true, onError: finish, onSuccess: () => { nominalOpen.value = false; },
+            preserveScroll: true, onError: handleErrors, onFinish: finish,
+            onSuccess: () => { nominalOpen.value = false; },
         });
     }
 };
@@ -291,14 +294,41 @@ const uploadNominalImage = () => {
 
 const removeTarget = ref(null);
 const removeKind = ref('');
-const askRemove = (row, kind) => { removeTarget.value = row; removeKind.value = kind; };
+const removeBusy = ref(false);
+const removeErrors = ref({});
+const askRemove = (row, kind) => {
+    if (removeBusy.value) return;
+    removeErrors.value = {};
+    removeTarget.value = row;
+    removeKind.value = kind;
+};
 const confirmRemove = () => {
     const row = removeTarget.value;
-    if (!row) return;
-    const url = removeKind.value === 'notice' ? `/admin/catalog/notices/${row.id}`
-        : removeKind.value === 'product' ? `/admin/catalog/products/${row.id}`
+    if (!row || removeBusy.value) return;
+    removeBusy.value = true;
+    const kind = removeKind.value;
+    const url = kind === 'notice' ? `/admin/catalog/notices/${row.id}`
+        : kind === 'product' ? `/admin/catalog/products/${row.id}`
         : `/admin/catalog/packages/${row.id}`;
-    router.delete(url, { preserveScroll: true, onFinish: () => { removeTarget.value = null; } });
+    router.delete(url, {
+        preserveScroll: true,
+        onError: bag => { removeErrors.value = bag; },
+        onSuccess: () => {
+            removeTarget.value = null;
+            removeErrors.value = {};
+            if (kind === 'package') {
+                // Keep the editor in sync even if the parent product list is paginated.
+                if (nominalEditing.value?.id === row.id) nominalOpen.value = false;
+                if (product.value?.packages) {
+                    product.value.packages = product.value.packages.filter(item => item.id !== row.id);
+                }
+            } else if (kind === 'product' && product.value?.id === row.id) {
+                editorOpen.value = false;
+                product.value = null;
+            }
+        },
+        onFinish: () => { removeBusy.value = false; },
+    });
 };
 
 const dragIndex = ref(null);
@@ -670,7 +700,7 @@ const bulkClearImport = () => {
 const sellPriceOf = (seller, item) => {
     const price = Number(seller || 0);
     // The importer reuses an unmapped nominal when game/type and numeric
-    // nominal match. Preview its saved markup rather than inventing a new 12%.
+    // nominal match. Preview its saved markup; only newly imported nominals default to 10%.
     const existing = importProduct.value?.nominals?.find(nominal =>
         item?.nominal_value != null
         && Number(nominal.nominal_value) === Number(item.nominal_value)
@@ -679,7 +709,7 @@ const sellPriceOf = (seller, item) => {
     if (existing?.pricing_mode === 'FIXED') return price + Number(existing.margin_fixed_idr || 0);
     const percentage = existing?.pricing_mode === 'PERCENT'
         ? Number(existing.margin_percent ?? 12)
-        : 12;
+        : 10;
     return price + Math.ceil(price * percentage / 100);
 };
 
@@ -1172,8 +1202,8 @@ onMounted(() => {
                 </label>
                 <div class="adm-field">
                     <span>Markup nominal baru</span>
-                    <strong>12% dari harga seller</strong>
-                    <span class="hint">Nominal baru memakai 12%. Nominal lama tanpa SKU memakai markup tersimpan. Setiap nominal bisa diubah sendiri setelah impor.</span>
+                    <strong>10% dari harga seller</strong>
+                    <span class="hint">Nominal baru memakai 10%. Nominal lama tanpa SKU memakai markup tersimpan. Setiap nominal bisa diubah sendiri setelah impor.</span>
                 </div>
                 <label class="adm-field">
                     <span>Kategori</span>
@@ -1305,9 +1335,10 @@ onMounted(() => {
         </AdminModal>
         <AdminModal :open="!!removeTarget" :title="removeKind === 'notice' ? 'Hapus pemberitahuan' : removeKind === 'product' ? 'Hapus produk' : 'Hapus nominal'" :description="removeTarget?.name || removeTarget?.title || ''" @update:open="value => { if (!value) removeTarget = null; }">
             <p class="adm-note">{{ removeKind === 'notice' ? 'Pemberitahuan ini akan hilang dari halaman produk toko.' : removeKind === 'product' ? 'Produk beserta seluruh nominalnya dihapus permanen. Produk yang punya riwayat pesanan akan ditolak; nonaktifkan saja bila hanya ingin menghentikan penjualan.' : 'Nominal yang memiliki riwayat pesanan tidak dapat dihapus; nonaktifkan bila hanya ingin menghentikan penjualan.' }}</p>
+            <p v-for="(message, key) in removeErrors" :key="key" role="alert" class="err">{{ message }}</p>
             <template #footer>
-                <button type="button" class="adm-btn" @click="removeTarget = null">Batal</button>
-                <button type="button" class="adm-btn danger" @click="confirmRemove">Hapus</button>
+                <button type="button" class="adm-btn" :disabled="removeBusy" @click="removeTarget = null">Batal</button>
+                <button type="button" class="adm-btn danger" :disabled="removeBusy" @click="confirmRemove">{{ removeBusy ? 'Menghapus…' : 'Hapus' }}</button>
             </template>
         </AdminModal>
         <AdminModal v-model:open="stockOpen" title="Stok kode" :description="stockRow?.name || ''">

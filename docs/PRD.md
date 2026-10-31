@@ -106,7 +106,7 @@ Kategori → Produk → Nominal → Sumber (SKU penyedia)
 **Untuk setiap nominal Digiflazz, harga jual = harga seller SKU terpilih + markup nominal tersebut.**
 
 - Harga seller terbaru diambil dari daftar harga Digiflazz berkala, disimpan di database, dan menjadi harga dasar. Tidak ada biaya modal toko tambahan ataupun harga jual tetap khusus Digiflazz.
-- **Default markup setiap nominal baru hasil impor = 12%** atas harga seller. Admin dapat mengubah **setiap nominal secara terpisah** menjadi persentase (%) atau tambahan rupiah (Rp); tidak ada markup pada tingkat produk.
+- **Default markup setiap nominal baru hasil impor = 10%** atas harga seller. Admin dapat mengubah **setiap nominal secara terpisah** menjadi persentase (%) atau tambahan rupiah (Rp); tidak ada markup pada tingkat produk.
 - Perubahan harga seller otomatis memengaruhi harga jual katalog/checkout setelah sinkronisasi; pengaturan markup tidak ditimpa sinkronisasi. Pembulatan margin persen ke rupiah dilakukan ke atas.
 - Nama produk dan nominal yang sudah dimiliki toko tidak boleh diubah oleh impor/sinkronisasi Digiflazz. Proses tersebut hanya menghubungkan SKU dan memperbarui data seller; perubahan nama hanya melalui editor admin toko.
 - Satu nominal hanya memiliki satu SKU aktif terpilih, tanpa SKU cadangan/failover. Mesin DigiTools terpisah mengelola referensi seller dan pemilihan SKU; LFAMILIA STORE tidak menjalankan ulang mesin seller DigiTools.

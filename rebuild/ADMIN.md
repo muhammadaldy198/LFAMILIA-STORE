@@ -97,7 +97,7 @@ Filter Normal/Peringatan/Kritis memakai aritmetika desimal pada kolom harga unsi
 
 ## Harga Digiflazz: harga seller → harga jual per nominal
 
-Harga Digiflazz mengikuti harga seller SKU yang dipilih, tanpa harga modal toko terpisah untuk perhitungan checkout. Setiap **nominal** memiliki satu aturan tambah harga sendiri: **persentase (%)** atau **tambahan rupiah (Rp)**. Bawaan nominal baru hasil impor adalah 12%; pengaturan ini tidak ada di tingkat produk/game.
+Harga Digiflazz mengikuti harga seller SKU yang dipilih, tanpa harga modal toko terpisah untuk perhitungan checkout. Setiap **nominal** memiliki satu aturan tambah harga sendiri: **persentase (%)** atau **tambahan rupiah (Rp)**. Bawaan nominal baru hasil impor adalah 10%; pengaturan ini tidak ada di tingkat produk/game.
 
 Harga jual = harga seller SKU terkini + tambahan harga nominal. Persen dibulatkan ke atas ke satu rupiah. Sinkronisasi seller tidak mengubah aturan markup nominal, nama nominal, maupun snapshot harga pesanan yang sudah dibuat. SKU terpilih tetap satu per nominal, tanpa fallback.
 
@@ -107,7 +107,7 @@ Produk manual dan voucher lokal menggunakan perhitungan modal/harga terpisah yan
 
 Pemilih SKU menyediakan **Langsung jual setelah impor** (aktif secara default). Satu submit mengimpor SKU yang tersedia dan masih segar, menyimpan margin serta format ID tujuan, dan mengaktifkan nominal, sumber Digiflazz, serta produk. Kategori dan integrasi Digiflazz harus sudah aktif; pengaturan tersebut tidak diaktifkan diam-diam. Nonaktifkan pilihan ini untuk menyimpan draf.
 
-Impor tidak mengubah markup nominal yang sudah ada. Nominal baru mendapatkan markup awal 12% atas harga seller; admin dapat mengubah setiap nominal menjadi persentase lain atau tambahan Rp. Pratinjau impor menampilkan harga seller → harga jual dengan aturan efektif nominal tersebut. Tidak ada pengaturan markup Digiflazz di formulir produk dan tidak ada harga jual tetap Digiflazz.
+Impor tidak mengubah markup nominal yang sudah ada. Nominal baru mendapatkan markup awal 10% atas harga seller; admin dapat mengubah setiap nominal menjadi persentase lain atau tambahan Rp. Pratinjau impor menampilkan harga seller → harga jual dengan aturan efektif nominal tersebut. Tidak ada pengaturan markup Digiflazz di formulir produk dan tidak ada harga jual tetap Digiflazz.
 
 Format tujuan diisi dari konfigurasi sumber existing, satu kolom pelanggan, atau format Mobile Legends yang dikenal (User ID diikuti Zone ID). Produk lain dengan beberapa kolom harus menetapkan format di pemilih SKU. Backend menolak placeholder asing, format kosong, dan kolom wajib yang terlewat. Tidak ada request pembayaran atau topup provider saat impor.
 
