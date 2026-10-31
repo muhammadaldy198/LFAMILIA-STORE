@@ -1410,7 +1410,7 @@ class AdminCatalogController
     {
         $data = $request->validate([
             'groups' => ['present', 'array', 'max:1000'],
-            'groups.*' => ['required', 'string', 'max:120', 'distinct'],
+            'groups.*' => ['required', 'string', 'max:120'],
         ]);
         // No new database table: the existing package_tabs JSON keeps the
         // group priority, while package_tabs_enabled remains unchanged.
