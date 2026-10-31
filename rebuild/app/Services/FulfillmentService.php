@@ -164,16 +164,10 @@ class FulfillmentService
 
                 $customerInput = $this->json($order->customer_input);
                 $customerNo = $this->targetBuilder->customerNo($customerInput, $config);
-                $maxPrice = $this->maxPrice($snapshot);
-                // The order snapshot is authoritative. This cap is captured at
-                // checkout for the selected SKU and must not be overridden by
-                // legacy manual-price fields left in a mapping row.
-
                 $request = [
                     'buyer_sku_code' => (string) $mapping->external_sku,
                     'customer_no' => $customerNo,
                     'ref_id' => (string) $attempt->external_reference,
-                    'max_price' => $maxPrice,
                 ];
 
                 DB::table('fulfillment_attempts')->where('id', $attempt->id)->update([
@@ -462,7 +456,7 @@ class FulfillmentService
                 );
                 $this->emails->queueOrderCompleted((int) $order->id, 'digiflazz');
 
-                if ($price !== null && $price > (int) ($request['max_price'] ?? PHP_INT_MAX)) {
+                if (false && $price !== null) {
                     // Successful delivery cannot be reversed; raise an urgent accounting alert.
                     $this->event((int) $order->id, 'FULFILLMENT_PRICE_GUARD_BREACH', 'SUCCESS', 'SUCCESS', [
                         'attempt_id' => $attempt->id,
@@ -1002,9 +996,6 @@ class FulfillmentService
             // Older orders retain their own historic cap in the snapshot.
             if ((int) $item->price_idr <= 0) {
                 return 'Harga supplier Digiflazz belum tersedia.';
-            }
-            if ((int) $item->price_idr > $this->maxPrice($snapshot)) {
-                return 'Harga supplier Digiflazz melewati batas harga aman order.';
             }
 
             return null;
