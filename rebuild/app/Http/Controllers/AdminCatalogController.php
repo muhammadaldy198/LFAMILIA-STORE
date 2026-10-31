@@ -1419,7 +1419,7 @@ class AdminCatalogController
             return $name === '' ? 'Umum' : $name;
         };
         $current = $product->packages()->pluck('group_name')
-            ->map($normalizeGroup)->unique()->values()->all();
+            ->map($normalizeGroup)->uniqueStrict()->values()->all();
         $submitted = array_map($normalizeGroup, $data['groups']);
         $expected = $current;
         $actual = $submitted;
