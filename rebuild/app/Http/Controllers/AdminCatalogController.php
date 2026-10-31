@@ -548,7 +548,7 @@ class AdminCatalogController
             ->filter(fn (string $tab): bool => strlen($tab) > 0)->values();
         // Inactive tab navigation stores group priority here too. Group labels
         // that differ only by case are valid; reject them only for actual tabs.
-        if ($data['package_tabs_enabled'] && $tabs->map(fn (string $tab): string => mb_strtolower($tab))->unique()->count() !== $tabs->count()) {
+        if ($data['package_tabs_enabled'] && $tabs->map(fn (string $tab): string => mb_strtolower($tab))->uniqueStrict()->count() !== $tabs->count()) {
             throw ValidationException::withMessages(['package_tabs' => 'Nama tab nominal tidak boleh duplikat.']);
         }
         $data['package_tabs'] = $tabs->all();
@@ -561,7 +561,7 @@ class AdminCatalogController
             if ($groups->contains('')) {
                 throw ValidationException::withMessages(['package_tabs' => 'Semua nominal harus memiliki grup sebelum tab nominal diaktifkan.']);
             }
-            $missing = $groups->filter(fn (string $group): bool => ! $tabs->contains($group))->unique()->values();
+            $missing = $groups->filter(fn (string $group): bool => ! $tabs->containsStrict($group))->uniqueStrict()->values();
             if ($missing->isNotEmpty()) {
                 throw ValidationException::withMessages([
                     'package_tabs' => 'Grup nominal belum tercantum sebagai tab: '.$missing->implode(', ').'.',
@@ -826,7 +826,7 @@ class AdminCatalogController
         if ($product->package_tabs_enabled) {
             $group = trim((string) ($data['group_name'] ?? ''));
             $tabs = collect($product->package_tabs ?? []);
-            if ($group === '' || ! $tabs->contains($group)) {
+            if ($group === '' || ! $tabs->containsStrict($group)) {
                 throw ValidationException::withMessages([
                     'group_name' => 'Pilih grup yang tersedia pada tab nominal produk.',
                 ]);
@@ -928,7 +928,7 @@ class AdminCatalogController
         if ($product->package_tabs_enabled) {
             $group = trim((string) ($data['group_name'] ?? $package->group_name ?? ''));
             $tabs = collect($product->package_tabs ?? []);
-            if ($group === '' || ! $tabs->contains($group)) {
+            if ($group === '' || ! $tabs->containsStrict($group)) {
                 throw ValidationException::withMessages([
                     'group_name' => 'Pilih grup yang tersedia pada tab nominal produk.',
                 ]);

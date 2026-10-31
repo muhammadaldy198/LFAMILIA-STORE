@@ -1461,6 +1461,36 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertSame(['00', '0', 'pass', 'Pass'], $product->fresh()->package_tabs);
     }
 
+    public function test_active_tabs_keep_distinct_numeric_group_labels_after_reorder(): void
+    {
+        $this->login();
+        $product = $this->product();
+        foreach (['0', '00'] as $index => $group) {
+            $product->packages()->create([
+                'code' => 'NUM-TAB-'.($index + 1),
+                'name' => 'Nominal '.($index + 1),
+                'group_name' => $group,
+                'sort_order' => $index,
+            ]);
+        }
+        $product->update(['package_tabs_enabled' => true, 'package_tabs' => ['00', '0']]);
+
+        $this->put('/admin/catalog/products/'.$product->id.'/package-groups/reorder', [
+            'groups' => ['0', '00'],
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->put('/admin/catalog/products/'.$product->id, [
+            'category_id' => $product->category_id,
+            'name' => 'Updated Numeric Tabs',
+            'slug' => $product->slug,
+            'fulfillment_mode' => 'AUTO_PROVIDER',
+            'sort_order' => 0,
+            'is_active' => true,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame(['0', '00'], $product->fresh()->package_tabs);
+        $this->assertTrue((bool) $product->fresh()->package_tabs_enabled);
+    }
+
     public function test_catalog_nominal_sort_respects_manual_position_before_numeric_value(): void
     {
         $nominals = collect([
