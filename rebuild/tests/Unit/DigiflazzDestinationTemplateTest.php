@@ -26,5 +26,6 @@ class DigiflazzDestinationTemplateTest extends TestCase
             'genshin-impact', '{{user_id}}#{{zone_id}}', ['user_id', 'zone_id']
         ));
         $this->assertSame('{{destination}}', $resolver->resolve('other-game', null, ['destination']));
+        $this->assertSame('{{user_id}}', $resolver->resolve('other-game', '{{destination}}', ['user_id']));
     }
 }
