@@ -1132,7 +1132,11 @@ class AdminCatalogController
         if (preg_match('/\{(?!\{)|(?<!\})\}/', preg_replace('/\{\{[a-z][a-z0-9_]*\}\}/', '', $template) ?? $template)) {
             throw ValidationException::withMessages(['customer_no_template' => 'Format tujuan mengandung kurung kurawal yang tidak berpasangan.']);
         }
-        if ($template === '') {
+        // A newly submitted shared template supersedes stale legacy SKU
+        // templates; those legacy values are cleared in the same transaction.
+        // Only preserve references from SKU templates when no replacement was
+        // supplied, so an old SKU cannot block a valid product-wide edit.
+        if (! array_key_exists('customer_no_template', $data)) {
             $packageIds = $product->packages()->pluck('id');
             foreach (DB::table('provider_mappings as mappings')
                 ->join('providers', 'providers.id', '=', 'mappings.provider_id')
