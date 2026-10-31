@@ -308,7 +308,7 @@ const confirmRemove = () => {
     removeBusy.value = true;
     const kind = removeKind.value;
     const url = kind === 'notice' ? `/admin/catalog/notices/${row.id}`
-        : removeKind.value === 'product' ? `/admin/catalog/products/${row.id}`
+        : kind === 'product' ? `/admin/catalog/products/${row.id}`
         : `/admin/catalog/packages/${row.id}`;
     router.delete(url, {
         preserveScroll: true,
