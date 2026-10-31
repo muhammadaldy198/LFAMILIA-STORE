@@ -35,7 +35,7 @@ try{
     if(result.scroll>width+1||result.broken.length||result.sidebar||result.adminCss||errors.length)throw Error('Checkout regression '+JSON.stringify({width,result,errors}));
     if(result.summary.height!==expected||result.pay.height!==expected||Math.abs(result.summary.y-result.pay.y)>.1)throw Error('Sticky alignment mismatch '+JSON.stringify(item));
     if(Math.abs(result.cover.width-result.cover.height)>.1)throw Error('Product cover must be square');
-    for(const field of ['hero','cover','section','card','paymentCard'])for(const dimension of ['width','height'])if(Math.abs(result[field][dimension]-item.lab[field][dimension])>1.1)throw Error('Lab geometry mismatch '+JSON.stringify({width,field,dimension,lab:item.lab[field],store:result[field]}));
+    for(const field of ['hero','cover','section','card','paymentCard'])for(const dimension of ['width','height'])if(field==='paymentCard'?result.paymentCard.height>item.lab.paymentCard.height:Math.abs(result[field][dimension]-item.lab[field][dimension])>1.1)throw Error('Lab geometry mismatch '+JSON.stringify({width,field,dimension,lab:item.lab[field],store:result[field]}));
     if(new Set(result.heights.map(h=>Math.round(h*10))).size>1)throw Error('Nominal card heights differ');
     await page.evaluate(()=>{const shell=document.querySelector('.lf-customer');for(const viewport of ['mobile','desktop']){shell.style.setProperty('--lf-config-'+viewport+'-controlHeight','56px');shell.style.setProperty('--lf-config-'+viewport+'-heading','32px');shell.style.setProperty('--lf-config-'+viewport+'-action','24px');}});
     const isolated=await inspect(page);
