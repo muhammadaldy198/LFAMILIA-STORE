@@ -32,6 +32,14 @@ class Product extends Model implements HasMedia
         ];
     }
 
+    protected static function booted(): void
+    {
+        static::created(function (Product $product): void {
+            // Newly created products start with a selectable default group.
+            $product->packageGroups()->create(['name' => 'Umum', 'sort_order' => 0]);
+        });
+    }
+
     public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class);
