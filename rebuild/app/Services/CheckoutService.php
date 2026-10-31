@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Product;
 use App\Models\User;
+use App\Services\Fulfillment\DigiflazzDestinationTemplate;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -225,6 +226,13 @@ class CheckoutService
                         ? (json_decode($legacyConfig, true) ?: [])
                         : (array) $legacyConfig;
                     $customerNoTemplate = $legacyConfig['customer_no_template'] ?? null;
+                }
+                if ($price['provider_code'] === 'DIGIFLAZZ') {
+                    $customerNoTemplate = app(DigiflazzDestinationTemplate::class)->resolve(
+                        (string) $lockedProduct->slug,
+                        $customerNoTemplate,
+                        $lockedProduct->fields->pluck('field_key')->all()
+                    );
                 }
                 $snapshot = [
                     'checkout_fingerprint' => $fingerprint,
