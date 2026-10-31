@@ -1670,6 +1670,43 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertSame(0, $other->packages()->count());
     }
 
+    public function test_digiflazz_import_accepts_existing_numeric_zero_group_without_duplicating_nominal(): void
+    {
+        $this->login();
+        $this->fakeCatalog([$this->row([
+            'buyer_sku_code' => 'numeric-zero-group-10',
+            'product_name' => 'Restore 10 Diamonds',
+            'type' => 'Diamonds',
+        ])]);
+        app(DigiflazzCatalogService::class)->sync();
+        $product = $this->product();
+        $this->post('/admin/catalog/products/'.$product->id.'/package-groups', [
+            'name' => '0',
+        ])->assertSessionHasNoErrors();
+        $groupId = $product->packageGroups()->where('name', '0')->value('id');
+        $package = $product->packages()->create([
+            'code' => 'LOCAL-ZERO-GROUP-10',
+            'name' => 'Nominal dari toko',
+            'nominal_value' => 10,
+            'group_name' => '0',
+            'sort_order' => 0,
+            'is_active' => false,
+            'pricing_mode' => 'PERCENT',
+            'margin_percent' => 15,
+        ]);
+        $itemId = DB::table('digiflazz_catalog_items')
+            ->where('buyer_sku_code', 'numeric-zero-group-10')->value('id');
+
+        $this->post('/admin/catalog/products/'.$product->id.'/import', [
+            'item_ids' => [$itemId], 'group_id' => $groupId, 'publish' => false,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame(1, $product->packages()->count());
+        $this->assertSame('0', $package->fresh()->group_name);
+        $this->assertSame('Nominal dari toko', $package->fresh()->name);
+        $this->assertSame(15.0, (float) $package->fresh()->margin_percent);
+        $this->assertTrue($package->mappings()->where('external_sku', 'numeric-zero-group-10')->exists());
+    }
+
     public function test_catalog_nominal_sort_respects_manual_position_before_numeric_value(): void
     {
         $nominals = collect([

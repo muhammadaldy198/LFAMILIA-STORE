@@ -103,7 +103,7 @@ class DigiflazzAutoSources
             }
         }
         if ($package !== null && $targetGroup !== null
-            && (trim((string) $package->group_name) ?: 'Umum') !== $destinationGroup) {
+            && (trim((string) $package->group_name) === '' ? 'Umum' : trim((string) $package->group_name)) !== $destinationGroup) {
             throw ValidationException::withMessages([
                 'group_id' => 'SKU sudah terhubung ke grup lain. Ubah grup dari editor nominal.',
             ]);
