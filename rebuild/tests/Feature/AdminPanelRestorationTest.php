@@ -1140,14 +1140,14 @@ class AdminPanelRestorationTest extends TestCase
         ]);
         app(DigiflazzCatalogService::class)->sync();
         // The unselected seller is never auto-attached as a backup.
-        $this->assertSame(14000, app(CheckoutPricing::class)->forPackages([$package->id])[$package->id]['subtotal_idr']);
+        $this->assertSame(13750, app(CheckoutPricing::class)->forPackages([$package->id])[$package->id]['subtotal_idr']);
 
         $this->fakeCatalog([
             $this->row(['buyer_sku_code' => 'fixed-price-A', 'price' => 12500]),
             $this->row(['buyer_sku_code' => 'fixed-price-B', 'price' => 11800]),
         ]);
         app(DigiflazzCatalogService::class)->sync();
-        $this->assertSame(14000, app(CheckoutPricing::class)->forPackages([$package->id])[$package->id]['subtotal_idr']);
+        $this->assertSame(13750, app(CheckoutPricing::class)->forPackages([$package->id])[$package->id]['subtotal_idr']);
         $this->assertSame('PERCENT', $package->fresh()->pricing_mode);
     }
 

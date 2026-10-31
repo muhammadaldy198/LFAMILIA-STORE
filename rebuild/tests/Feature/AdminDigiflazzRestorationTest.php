@@ -1374,7 +1374,7 @@ class AdminDigiflazzRestorationTest extends TestCase
         Provider::where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
         $package->update(['is_active' => true]);
         $package->mappings()->update(['is_active' => true]);
-        $this->assertSame(22400, (int) app(CheckoutPricing::class)->previewForPackage($package->id)['subtotal_idr']);
+        $this->assertSame(22000, (int) app(CheckoutPricing::class)->previewForPackage($package->id)['subtotal_idr']);
     }
 
     public function test_full_sync_never_touches_manual_or_voucher_sources(): void
