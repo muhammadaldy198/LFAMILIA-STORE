@@ -838,6 +838,7 @@ class AdminCatalogController
             }
             $data['group_name'] = $group->name;
         }
+        $selectedGroupId = $data['group_id'] ?? null;
         unset($data['group_id']);
         if ($product->package_tabs_enabled) {
             $group = trim((string) ($data['group_name'] ?? ''));
@@ -849,7 +850,11 @@ class AdminCatalogController
             }
         }
 
-        DB::transaction(function () use ($request, $product, $data, $audit, $isActive, $pricing): void {
+        DB::transaction(function () use ($request, $product, $data, $audit, $isActive, $pricing, $selectedGroupId): void {
+            $lockedProduct = Product::whereKey($product->id)->lockForUpdate()->firstOrFail();
+            if ($selectedGroupId !== null) {
+                $data['group_name'] = $this->lockedPackageGroupName($lockedProduct, (int) $selectedGroupId);
+            }
             $package = $product->packages()->create([
                 'code' => $data['code'],
                 'name' => $data['name'],
@@ -949,6 +954,7 @@ class AdminCatalogController
             }
             $data['group_name'] = $group->name;
         }
+        $selectedGroupId = $data['group_id'] ?? null;
         unset($data['group_id']);
         if ($product->package_tabs_enabled) {
             $group = trim((string) ($data['group_name'] ?? $package->group_name ?? ''));
@@ -1045,7 +1051,11 @@ class AdminCatalogController
             unset($data['pricing_mode'], $data['sell_price_idr']);
         }
         $wasActive = (bool) $package->is_active;
-        DB::transaction(function () use ($request, $package, $product, $isActive, $data, $audit, $newCost, $wasActive, $editsVoucherPrice, $replacementVoucherPrice, $newDigiflazzPricing): void {
+        DB::transaction(function () use ($request, $package, $product, $isActive, $data, $audit, $newCost, $wasActive, $editsVoucherPrice, $replacementVoucherPrice, $newDigiflazzPricing, $selectedGroupId): void {
+            $lockedProduct = Product::whereKey($product->id)->lockForUpdate()->firstOrFail();
+            if ($selectedGroupId !== null) {
+                $data['group_name'] = $this->lockedPackageGroupName($lockedProduct, (int) $selectedGroupId);
+            }
             $before = $package->toArray();
             // is_active memakai hasil hitungan server: nominal tanpa modal
             // dimatikan walau klien mengirim true.
@@ -1428,6 +1438,23 @@ class AdminCatalogController
         });
 
         return back();
+    }
+
+    /**
+     * Called only while the transaction holds the same product lock as rename,
+     * so a concurrent rename or deletion cannot strand a nominal.
+     */
+    private function lockedPackageGroupName(Product $product, int $groupId): string
+    {
+        $group = $product->packageGroups()->whereKey($groupId)->first();
+        if (! $group) {
+            throw ValidationException::withMessages(['group_id' => 'Grup telah berubah atau dihapus. Muat ulang panel.']);
+        }
+        if ($product->package_tabs_enabled && ! in_array($group->name, $product->package_tabs ?? [], true)) {
+            throw ValidationException::withMessages(['group_id' => 'Grup tidak ada pada tab produk ini.']);
+        }
+
+        return $group->name;
     }
 
     public function reorderPackageGroups(Request $request, Product $product, CatalogAudit $audit): RedirectResponse
