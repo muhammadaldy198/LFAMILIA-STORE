@@ -176,7 +176,7 @@ class FulfillmentTest extends TestCase
             $this->assertSame('buyer-test', $payload['username']);
             $this->assertSame('DF-PRIMARY', $payload['buyer_sku_code']);
             $this->assertSame('1234567890', $payload['customer_no']);
-            $this->assertSame(12000, $payload['max_price']);
+            $this->assertArrayNotHasKey('max_price', $payload);
             $this->assertTrue($payload['testing']);
             $this->assertSame(
                 md5('buyer-test'.'api-secret'.$payload['ref_id']),
@@ -227,7 +227,7 @@ class FulfillmentTest extends TestCase
         ]);
         Http::fake(function ($request) {
             $this->assertSame('DF-LEGACY-LOCK', $request['buyer_sku_code']);
-            $this->assertSame(10000, $request['max_price']);
+            $this->assertArrayNotHasKey('max_price', $request->data());
 
             return Http::response(['data' => [
                 'ref_id' => $request['ref_id'],
@@ -250,7 +250,7 @@ class FulfillmentTest extends TestCase
         $this->assertSame('SUCCESS', DB::table('orders')->where('id', $orderId)->value('status'));
     }
 
-    public function test_old_order_snapshot_still_blocks_seller_price_above_its_cap(): void
+    public function test_old_digiflazz_snapshot_cap_does_not_block_selected_sku(): void
     {
         Queue::fake();
         $catalog = $this->automaticCatalog(10000, 10000, sku: 'DF-LEGACY-SPIKE');
@@ -262,8 +262,8 @@ class FulfillmentTest extends TestCase
         Http::fake();
         app(FulfillmentService::class)->startOrder($orderId);
         $attempt = DB::table('fulfillment_attempts')->where('order_id', $orderId)->firstOrFail();
-        $this->assertSame('BLOCKED', $attempt->status);
-        $this->assertSame('PAID', DB::table('orders')->where('id', $orderId)->value('status'));
+        $this->assertSame('CREATED', $attempt->status);
+        $this->assertSame('PROCESSING', DB::table('orders')->where('id', $orderId)->value('status'));
         Http::assertNothingSent();
     }
 
@@ -671,14 +671,13 @@ class FulfillmentTest extends TestCase
         Http::assertNothingSent();
     }
 
-    public function test_price_above_order_guard_blocks_before_provider_request(): void
+    public function test_digiflazz_seller_price_rise_no_longer_blocks_selected_sku(): void
     {
         Queue::fake();
         $this->credentials();
         $catalog = $this->automaticCatalog(cost: 10000, maxPrice: 15000);
         $orderId = $this->paidOrder($catalog, snapshotMaxPrice: 10000);
-        // Price protection uses the verified seller catalog, not a stale
-        // mapping cost, so simulate an actual supplier price increase.
+        // The selected SKU remains the same when the seller price increases.
         DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'DF-PRIMARY')
             ->update(['price_idr' => 11000, 'synced_at' => now()]);
 
@@ -686,8 +685,8 @@ class FulfillmentTest extends TestCase
         app(FulfillmentService::class)->startOrder($orderId);
 
         $attempt = DB::table('fulfillment_attempts')->where('order_id', $orderId)->first();
-        $this->assertSame('BLOCKED', $attempt->status);
-        $this->assertSame('PAID', DB::table('orders')->where('id', $orderId)->value('status'));
+        $this->assertSame('CREATED', $attempt->status);
+        $this->assertSame('PROCESSING', DB::table('orders')->where('id', $orderId)->value('status'));
         Http::assertNothingSent();
     }
 
