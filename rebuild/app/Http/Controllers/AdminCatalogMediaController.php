@@ -7,6 +7,7 @@ use App\Models\HomeBanner;
 use App\Models\NewsArticle;
 use App\Models\Product;
 use App\Models\ProductPackage;
+use App\Models\ProductPackageGroup;
 use App\Models\SitePopup;
 use App\Models\StoreAsset;
 use App\Services\AdminPermissionService;
@@ -25,6 +26,7 @@ class AdminCatalogMediaController
             'banner' => HomeBanner::findOrFail($id),
             'product' => Product::findOrFail($id),
             'package' => ProductPackage::findOrFail($id),
+            'package-group' => ProductPackageGroup::findOrFail($id),
             'asset' => StoreAsset::findOrFail($id),
             'news' => NewsArticle::findOrFail($id),
             'popup' => SitePopup::findOrFail($id),
@@ -32,7 +34,7 @@ class AdminCatalogMediaController
         };
     }
 
-    private const CATALOG_TYPES = ['category', 'product', 'package'];
+    private const CATALOG_TYPES = ['category', 'product', 'package', 'package-group'];
 
     private function authorizeType(Request $request, string $type, AdminPermissionService $permissions): void
     {

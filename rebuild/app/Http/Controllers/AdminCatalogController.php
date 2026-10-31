@@ -8,6 +8,7 @@ use App\Models\Product;
 use App\Models\ProductInputField;
 use App\Models\ProductNotice;
 use App\Models\ProductPackage;
+use App\Models\ProductPackageGroup;
 use App\Models\Provider;
 use App\Models\ProviderMapping;
 use App\Models\StoreAsset;
@@ -70,6 +71,10 @@ class AdminCatalogController
             'notices' => $product->notices->sortBy('sort_order')->values()->map(fn (ProductNotice $notice): array => [
                 ...$notice->only('id', 'title', 'body', 'sort_order', 'is_active'),
             ])->all(),
+            'package_groups' => $product->packageGroups->map(fn (ProductPackageGroup $group): array => [
+                ...$group->only('id', 'name', 'sort_order'),
+                'image_url' => $group->getFirstMediaUrl('image'),
+            ])->all(),
             'packages' => $product->packages->sortBy([
                 ['sort_order', 'asc'], ['nominal_value', 'asc'],
             ])->values()->map(fn (ProductPackage $package): array => [
@@ -106,7 +111,7 @@ class AdminCatalogController
             'per_page' => ['nullable', Rule::in([10, 25, 50, 100])],
             'page' => ['nullable', 'integer', 'min:1'],
         ]);
-        $products = Product::with(['category', 'media', 'packages.mappings', 'fields', 'notices'])
+        $products = Product::with(['category', 'media', 'packages.mappings', 'fields', 'notices', 'packageGroups.media'])
             ->when(($filters['tab'] ?? 'auto') === 'manual', fn ($query) => $query->where('fulfillment_mode', 'MANUAL'))
             ->when(($filters['tab'] ?? 'auto') !== 'manual', fn ($query) => $query->where('fulfillment_mode', '!=', 'MANUAL'))
             ->when(trim((string) ($filters['q'] ?? '')) !== '', function ($query) use ($filters): void {
@@ -126,7 +131,7 @@ class AdminCatalogController
                     ?: ($a->id <=> $b->id))->pluck('id')->values();
             $pageIds = $orderedIds->forPage($currentPage, $perPage)->all();
             $positions = array_flip($pageIds);
-            $pageProducts = Product::with(['category', 'media', 'packages.mappings', 'fields', 'notices'])
+            $pageProducts = Product::with(['category', 'media', 'packages.mappings', 'fields', 'notices', 'packageGroups.media'])
                 ->whereIn('id', $pageIds)->get()
                 ->sortBy(fn (Product $row): int => $positions[$row->id])->values();
             $products = new LengthAwarePaginator($pageProducts, $orderedIds->count(), $perPage, $currentPage, [
@@ -170,12 +175,14 @@ class AdminCatalogController
                 ->with(['packages' => fn ($query) => $query->select(
                     'id', 'product_id', 'nominal_value', 'group_name', 'pricing_mode', 'margin_percent', 'margin_fixed_idr'
                 ), 'packages.mappings' => fn ($query) => $query->select('id', 'product_package_id', 'provider_id'),
+                    'packageGroups',
                     'fields' => fn ($query) => $query->orderBy('sort_order')->select('id', 'product_id', 'field_key', 'is_required')])
                 ->get(['id', 'name', 'slug', 'customer_no_template'])
                 ->sort(fn (Product $a, Product $b): int => strnatcasecmp($a->name, $b->name) ?: ($a->id <=> $b->id))
                 ->values()->map(fn (Product $product): array => [
                     ...$product->only('id', 'name', 'slug', 'customer_no_template'),
                     'fields' => $product->fields->map(fn (ProductInputField $field): array => $field->only('field_key', 'is_required'))->all(),
+                    'package_groups' => $product->packageGroups->map(fn (ProductPackageGroup $group): array => $group->only('id', 'name', 'sort_order'))->all(),
                     'nominals' => $product->packages
                         ->filter(fn (ProductPackage $package): bool => $package->nominal_value !== null
                             && ! $package->mappings->contains('provider_id', $digiflazzProviderId))
@@ -796,6 +803,7 @@ class AdminCatalogController
             'name' => ['required', 'string', 'max:255'],
             'note' => ['nullable', 'string', 'max:80'],
             'group_name' => ['nullable', 'string', 'max:120'],
+            'group_id' => ['sometimes', 'nullable', 'integer'],
             'nominal_value' => ['nullable', 'integer', 'min:0'],
             'sort_order' => ['required', 'integer', 'min:0'],
             'cost_idr' => [$product->fulfillment_mode === 'MANUAL' ? 'required' : 'nullable',
@@ -823,6 +831,14 @@ class AdminCatalogController
             throw ValidationException::withMessages(['cost_idr' => 'Nominal aktif harus punya modal lebih dari Rp 0.']);
         }
 
+        if (isset($data['group_id'])) {
+            $group = $product->packageGroups()->find($data['group_id']);
+            if (! $group) {
+                throw ValidationException::withMessages(['group_id' => 'Pilih grup pada produk ini.']);
+            }
+            $data['group_name'] = $group->name === 'Umum' ? null : $group->name;
+        }
+        unset($data['group_id']);
         if ($product->package_tabs_enabled) {
             $group = trim((string) ($data['group_name'] ?? ''));
             $tabs = collect($product->package_tabs ?? []);
@@ -875,6 +891,7 @@ class AdminCatalogController
             'name' => ['required', 'string', 'max:255'],
             'note' => ['nullable', 'string', 'max:80'],
             'group_name' => ['nullable', 'string', 'max:120'],
+            'group_id' => ['sometimes', 'nullable', 'integer'],
             'nominal_value' => ['nullable', 'integer', 'min:0'],
             'sort_order' => ['required', 'integer', 'min:0'],
             'is_active' => ['required', 'boolean'],
@@ -925,6 +942,14 @@ class AdminCatalogController
                 'is_active' => 'Aktifkan sumber Digiflazz nominal ini sebelum menjualnya.',
             ]);
         }
+        if (isset($data['group_id'])) {
+            $group = $product->packageGroups()->find($data['group_id']);
+            if (! $group) {
+                throw ValidationException::withMessages(['group_id' => 'Pilih grup pada produk ini.']);
+            }
+            $data['group_name'] = $group->name === 'Umum' ? null : $group->name;
+        }
+        unset($data['group_id']);
         if ($product->package_tabs_enabled) {
             $group = trim((string) ($data['group_name'] ?? $package->group_name ?? ''));
             $tabs = collect($product->package_tabs ?? []);

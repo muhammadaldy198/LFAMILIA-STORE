@@ -42,6 +42,11 @@ class Product extends Model implements HasMedia
         return $this->hasMany(ProductPackage::class);
     }
 
+    public function packageGroups(): HasMany
+    {
+        return $this->hasMany(ProductPackageGroup::class)->orderBy('sort_order')->orderBy('id');
+    }
+
     public function fields(): HasMany
     {
         return $this->hasMany(ProductInputField::class);

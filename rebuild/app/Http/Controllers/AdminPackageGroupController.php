@@ -64,9 +64,8 @@ class AdminPackageGroupController
             $old = $group->name;
             $product->packages()->where('group_name', $old)->update(['group_name' => $name]);
             if ($old === 'Umum') {
-                $product->packages()->whereNull('group_name')->orWhere(function ($query) use ($product): void {
-                    $query->where('product_id', $product->id)->where('group_name', '');
-                })->update(['group_name' => $name]);
+                $product->packages()->where(fn ($query) => $query
+                    ->whereNull('group_name')->orWhere('group_name', ''))->update(['group_name' => $name]);
             }
             $product->update(['package_tabs' => array_map(
                 fn ($tab) => $tab === $old ? $name : $tab, $product->package_tabs ?? []
