@@ -559,16 +559,11 @@ const importCollator = new Intl.Collator('id-ID', { numeric: true, sensitivity: 
 const autoProducts = computed(() => props.autoProductOptions);
 const importProduct = computed(() => props.autoProductOptions.find(row => Number(row.id) === Number(importProductId.value))
     || props.products.find(row => Number(row.id) === Number(importProductId.value)) || null);
-// Mobile Legends' Digiflazz destination is user_id(zone_id). Supply the
-// familiar fields automatically when this product has not configured any.
-const importFields = computed(() => {
-    const fields = importProduct.value?.fields || [];
-    if (fields.length || importProduct.value?.slug !== 'mobile-legends') return fields;
-    return [
-        { field_key: 'user_id', is_required: true },
-        { field_key: 'zone_id', is_required: true },
-    ];
-});
+// All games share the same import flow. Existing product input fields are
+// authoritative; products without any fields use a single flexible ID tujuan.
+const importFields = computed(() => importProduct.value?.fields?.length
+    ? importProduct.value.fields
+    : [{ field_key: 'destination', is_required: true }]);
 const importReady = computed(() => {
     const fields = importFields.value;
     const format = importTemplate.value.trim();
