@@ -714,7 +714,9 @@ class AdminCatalogController
             // Serialize concurrent attempts on the same row. Only the first
             // request deletes files, mappings and writes an audit event.
             $locked = ProductPackage::query()->lockForUpdate()->find($nominal->id);
-            if ($locked === null) return;
+            if ($locked === null) {
+                return;
+            }
             $before = $locked->toArray();
             $id = $locked->id;
             $locked->clearMediaCollection('image');
