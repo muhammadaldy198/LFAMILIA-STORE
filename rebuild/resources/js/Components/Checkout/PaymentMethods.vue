@@ -312,6 +312,11 @@ function choosePayment(code) {
   border-radius: 4px;
   background: rgba(255,255,255,.10);
 }
+.lf-payment-brand-strip--logos > .lf-payment-brand-logo:only-child {
+  padding: 3px 5px;
+  background: rgba(255,255,255,.10);
+  max-width: none;
+}
 .lf-payment-brand-logo img {
   display: block;
   width: 100%;
