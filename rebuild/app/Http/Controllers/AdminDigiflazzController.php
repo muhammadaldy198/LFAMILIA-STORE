@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Product;
+use App\Models\ProductInputField;
 use App\Models\ProductPackage;
 use App\Models\Provider;
 use App\Models\ProviderMapping;
@@ -13,6 +14,7 @@ use App\Services\CatalogNominalOrder;
 use App\Services\DigiflazzAutoSources;
 use App\Services\DigiflazzCatalogImport;
 use App\Services\DigiflazzCatalogService;
+use App\Services\Fulfillment\DigiflazzDestinationTemplate;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -393,12 +395,38 @@ class AdminDigiflazzController
             'margin_percent' => ['prohibited'],
             'cost_uplift_percent' => ['prohibited'],
             'publish' => ['sometimes', 'boolean'],
+            'customer_no_template' => ['sometimes', 'nullable', 'string', 'max:500'],
             'auto_sources' => ['prohibited'],
         ]);
         DB::transaction(function () use ($request, $product, $service, $audit, $data): void {
             $product = $product->lockForUpdate()->findOrFail($product->id);
             $publish = (bool) ($data['publish'] ?? false);
-            $template = $this->importCustomerTemplate($product, $product->customer_no_template, $publish);
+            // Keep imports one-click: establish a product-wide input once,
+            // never a different destination for each SKU/nominal.
+            if ($publish && ! $product->fields()->exists()) {
+                $fieldDefs = app(DigiflazzDestinationTemplate::class)->isMobileLegends($product->slug)
+                    ? [
+                        ['field_key' => 'user_id', 'label' => 'User ID', 'placeholder' => 'Masukkan User ID'],
+                        ['field_key' => 'zone_id', 'label' => 'Zone ID', 'placeholder' => 'Masukkan Zone ID'],
+                    ]
+                    : [['field_key' => 'destination', 'label' => 'ID Tujuan', 'placeholder' => 'Masukkan ID tujuan sesuai produk']];
+                foreach ($fieldDefs as $index => $definition) {
+                    ProductInputField::create([
+                        ...$definition, 'product_id' => $product->id, 'type' => 'text',
+                        'is_required' => true, 'sort_order' => $index,
+                    ]);
+                }
+            }
+            $template = app(DigiflazzDestinationTemplate::class)->resolve(
+                (string) $product->slug,
+                array_key_exists('customer_no_template', $data)
+                    ? $data['customer_no_template'] : $product->customer_no_template,
+                $product->fields()->orderBy('sort_order')->pluck('field_key')->all()
+            );
+            $template = $this->importCustomerTemplate($product, $template, $publish);
+            if ($template !== $product->customer_no_template) {
+                $product->update(['customer_no_template' => $template]);
+            }
             if ($publish && (! $product->category->is_active || ! Provider::where('code', 'DIGIFLAZZ')->where('is_active', true)->exists())) {
                 throw ValidationException::withMessages(['publish' => 'Aktifkan kategori produk dan integrasi Digiflazz sebelum menjual.']);
             }
