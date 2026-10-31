@@ -543,6 +543,49 @@ class AdminPanelRestorationTest extends TestCase
         Http::assertSentCount(1);
     }
 
+    public function test_separate_digiflazz_import_batches_keep_natural_order_without_overwriting_custom_positions(): void
+    {
+        $this->login();
+        $rows = [];
+        foreach ([5, 20, 10, 1100, 2000] as $number) {
+            $rows[] = $this->row([
+                'buyer_sku_code' => 'batch-order-'.$number,
+                'product_name' => 'Restore '.$number.' Diamonds',
+                'price' => 10000 + $number,
+            ]);
+        }
+        $this->fakeCatalog($rows);
+        app(DigiflazzCatalogService::class)->sync();
+        $product = $this->product();
+
+        $import = function (array $values) use ($product): void {
+            $codes = array_map(fn (int $n): string => 'batch-order-'.$n, $values);
+            $ids = DB::table('digiflazz_catalog_items')->whereIn('buyer_sku_code', $codes)->pluck('id')->all();
+            $this->post('/admin/catalog/products/'.$product->id.'/import', [
+                'item_ids' => $ids, 'publish' => false,
+            ])->assertRedirect()->assertSessionHasNoErrors();
+        };
+        $order = fn (): array => $product->packages()->orderBy('sort_order')
+            ->pluck('nominal_value')->map(fn ($n): int => (int) $n)->all();
+
+        $import([5, 20]);
+        $this->assertSame([5, 20], $order());
+        $import([1100]);
+        $this->assertSame([5, 20, 1100], $order());
+        $import([10]);
+        $this->assertSame([5, 10, 20, 1100], $order());
+
+        // Emulate the panel's saved custom order, and verify that a later
+        // import does not overwrite deliberate manual positions.
+        $ids = $product->packages()->orderBy('sort_order')->pluck('id')->all();
+        $this->put('/admin/catalog/products/'.$product->id.'/packages/reorder', [
+            'ids' => array_reverse($ids),
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame([1100, 20, 10, 5], $order());
+        $import([2000]);
+        $this->assertSame([1100, 20, 10, 5, 2000], $order());
+    }
+
     public function test_customer_nominal_order_is_numeric_even_when_imported_values_are_missing(): void
     {
         $names = [100, 2000, 10, 200, 20, 7];

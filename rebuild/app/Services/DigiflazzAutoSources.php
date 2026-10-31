@@ -16,6 +16,9 @@ use Illuminate\Validation\ValidationException;
 
 class DigiflazzAutoSources
 {
+    /** @var array<int, array<int, bool>> Newly imported nominal IDs, per product/batch. */
+    private array $newPackagesByProduct = [];
+
     public function key(object $item): string
     {
         $identity = [];
@@ -114,12 +117,17 @@ class DigiflazzAutoSources
                 'code' => 'DF_'.substr(hash('sha256', $first->buyer_sku_code), 0, 20),
                 'name' => GameNamePrefix::strip($first->product_name, $first->brand, $product->name),
                 'group_name' => $first->type ?: null,
-                'nominal_value' => $nominal, 'sort_order' => 0, 'is_active' => $publish,
+                // Append temporarily, then orderProduct() inserts it by nominal
+                // without resetting a previously hand-customized order.
+                'nominal_value' => $nominal,
+                'sort_order' => ((int) $product->packages()->max('sort_order')) + 1,
+                'is_active' => $publish,
                 'pricing_mode' => 'PERCENT',
                 'margin_percent' => 10,
                 'margin_fixed_idr' => null,
                 'sell_price_idr' => null,
             ]);
+            $this->newPackagesByProduct[(int) $product->id][(int) $package->id] = true;
             app(AdminAuditService::class)->record($request, 'catalog.package.imported', 'product_package', $package->id, null, $package->toArray());
         } else {
             $before = $package->toArray();
@@ -201,15 +209,30 @@ class DigiflazzAutoSources
 
     public function orderProduct(Product $product): void
     {
-        DB::transaction(function () use ($product): void {
-            // Sync acquires package locks ascending by ID. Lock the entire
-            // product's set in the same order BEFORE sorting by nominal,
-            // which may otherwise update rows in the reverse order.
+        $newIds = $this->newPackagesByProduct[(int) $product->id] ?? [];
+        DB::transaction(function () use ($product, $newIds): void {
+            // Lock in stable ID order, as the sync path does.
             $packages = $product->packages()->orderBy('id')->lockForUpdate()->get();
-            foreach (app(CatalogNominalOrder::class)->sort($packages) as $order => $package) {
+            $ordering = app(CatalogNominalOrder::class);
+            $existing = $packages->reject(fn (ProductPackage $package): bool => isset($newIds[(int) $package->id]))
+                ->sortBy([['sort_order', 'asc'], ['id', 'asc']])->values();
+            $naturalExistingIds = $ordering->sortNaturally($existing)->pluck('id')->all();
+            if ($existing->pluck('id')->all() === $naturalExistingIds) {
+                // Previous order is numeric: insert any new batch naturally.
+                $ordered = $ordering->sortNaturally($packages);
+            } else {
+                // Admin had rearranged positions: preserve them and append new
+                // imports instead of undoing deliberate manual adjustments.
+                $added = $ordering->sortNaturally($packages->filter(
+                    fn (ProductPackage $package): bool => isset($newIds[(int) $package->id])
+                ));
+                $ordered = $existing->concat($added);
+            }
+            foreach ($ordered as $order => $package) {
                 $package->update(['sort_order' => $order]);
             }
         }, 3);
+        unset($this->newPackagesByProduct[(int) $product->id]);
     }
 
     public function enableProduct(Product $product, Request $request): int
