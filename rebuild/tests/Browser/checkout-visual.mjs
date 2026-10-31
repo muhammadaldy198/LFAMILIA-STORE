@@ -25,6 +25,9 @@ try{
    await page.goto(url,{waitUntil:'networkidle',timeout:45000});await page.locator('.lfx').waitFor();
    item[name]=await inspect(page);await page.screenshot({path:`${output}/${name}-${width}.png`,fullPage:true});
    if(name==='store'){
+    // Checkout picks a payment method on mount. Select VA first so the
+    // E-Wallet summary is guaranteed to be collapsed before checking it.
+    await page.locator('.lf-payment-group-main').filter({hasText:'Virtual Account'}).click();
     for(const category of ['E-Wallet','Virtual Account']){
      const group=page.locator('.lf-payment-group-card').filter({hasText:category}).first();
      const preview=group.locator('.lf-payment-brand-strip--logos');
