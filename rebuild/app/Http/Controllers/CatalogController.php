@@ -251,7 +251,7 @@ class CatalogController
         PaymentRoutingService $paymentRouting,
         StorefrontContentService $content,
     ): Response {
-        $product = Product::with(['category', 'media'])->where('slug', $slug)
+        $product = Product::with(['category', 'media', 'packageGroups.media'])->where('slug', $slug)
             ->where('is_active', true)
             ->whereHas('category', fn ($query) => $query->where('is_active', true))
             ->firstOrFail();
@@ -311,6 +311,11 @@ class CatalogController
                     : 'Pesanan diproses otomatis setelah pembayaran.',
             ],
             'packages' => $packages,
+            'packageGroups' => $product->packageGroups->map(fn ($group): array => [
+                'name' => $group->name,
+                'image_url' => $group->getFirstMediaUrl('image'),
+                'sort_order' => $group->sort_order,
+            ])->all(),
             'fields' => ProductInputField::where('product_id', $product->id)->orderBy('sort_order')
                 ->get(['field_key', 'label', 'placeholder', 'type', 'is_required']),
             'customer' => $user ? [

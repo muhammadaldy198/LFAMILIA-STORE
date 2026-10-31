@@ -15,6 +15,7 @@ import { orderedPackageGroups } from '../../lib/catalogGroups';
 const props = defineProps({
     product: Object,
     packages: Array,
+    packageGroups: { type: Array, default: () => [] },
     fields: Array,
     customer: Object,
     paymentChannels: Array,
@@ -193,7 +194,7 @@ const firstCheckoutError = computed(() => {
 });
 
 // Honor group priority independently from legacy tab navigation.
-const packageGroups = computed(() => orderedPackageGroups(props.packages || [], props.product?.package_tabs || []));
+const packageGroups = computed(() => orderedPackageGroups(props.packages || [], props.product?.package_tabs || [], props.packageGroups));
 const packageTabs = computed(() => props.product?.package_tabs_enabled
     ? (props.product?.package_tabs || []).filter((name) => packageGroups.value.some((group) => group.name === name))
     : []);
@@ -916,7 +917,7 @@ function closeReview() { summaryOpen.value = false; closeConfirmation(); }
               <div class="lfx-panel-content">
                 <div v-if="packageTabs.length" class="lfx-category-tabs" role="tablist" aria-label="Kategori dari LFAMILIA"><button v-for="item in packageTabs" :key="item" role="tab" :aria-selected="(activePackageTab||packageTabs[0])===item" :class="{active:(activePackageTab||packageTabs[0])===item}" @click="activePackageTab=item">{{item}}</button></div>
                 <section v-for="itemsGroup in visiblePackageGroups" :key="itemsGroup.name||'default'" class="lfx-nominal-group">
-                  <div v-if="itemsGroup.name" class="lfx-subtitle"><span class="lfx-mini-star">✦</span><h3>{{itemsGroup.name}}</h3><small>{{itemsGroup.items.length}} pilihan</small></div>
+                  <div v-if="itemsGroup.name" class="lfx-subtitle"><img v-if="itemsGroup.image_url" :src="itemsGroup.image_url" :alt="itemsGroup.name" style="width:34px;height:34px;object-fit:cover;border-radius:8px"><span v-else class="lfx-mini-star">✦</span><h3>{{itemsGroup.name}}</h3><small>{{itemsGroup.items.length}} pilihan</small></div>
                   <div class="lfx-nominal-grid" role="radiogroup" :aria-label="itemsGroup.name || 'Pilih nominal'">
                     <div v-for="item in itemsGroup.items" :key="item.id"
                       class="lfx-nominal" :class="{selected:String(selectedPackageId)===String(item.id),unavailable:item.is_available===false}"

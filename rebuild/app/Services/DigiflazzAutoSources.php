@@ -34,7 +34,7 @@ class DigiflazzAutoSources
         return DB::table('digiflazz_catalog_items')->where('is_present', true)->get()->groupBy(fn (object $item): string => $this->key($item));
     }
 
-    public function importGroup(Product $product, Collection $items, ?string $template, bool $publish, string $margin, bool $automatic, Request $request, ?string $costUplift = null): ProductPackage
+    public function importGroup(Product $product, Collection $items, ?string $template, bool $publish, string $margin, bool $automatic, Request $request, ?string $costUplift = null, ?string $targetGroup = null): ProductPackage
     {
         // Enforce one SKU per nominal for all import callers, not only UI.
         if ($items->count() !== 1) {
@@ -74,12 +74,14 @@ class DigiflazzAutoSources
             throw ValidationException::withMessages(['item_ids' => 'Tidak ada SKU Digiflazz yang aktif dan tersedia.']);
         }
         $nominal = app(CatalogNominalOrder::class)->value($first->product_name, $first->brand);
+        $destinationGroup = $targetGroup ?? trim((string) $first->type);
+        $destinationGroup = $destinationGroup === '' ? 'Umum' : $destinationGroup;
         // Connect an SKU to an existing, unmapped nominal WITHOUT changing
         // the store-owned product or nominal name. Never swap an existing SKU.
         if ($package === null && $nominal !== null) {
             $matchingPackage = $product->packages()
                 ->where('nominal_value', $nominal)
-                ->where('group_name', $first->type ?: null)
+                ->where('group_name', $destinationGroup === 'Umum' ? null : $destinationGroup)
                 ->lockForUpdate()->first();
             if ($matchingPackage !== null) {
                 if ($matchingPackage->mappings()->where('provider_id', $provider->id)->exists()) {
@@ -89,6 +91,12 @@ class DigiflazzAutoSources
                 }
                 $package = $matchingPackage;
             }
+        }
+        if ($package !== null && $targetGroup !== null
+            && (trim((string) $package->group_name) ?: 'Umum') !== $destinationGroup) {
+            throw ValidationException::withMessages([
+                'group_id' => 'SKU sudah terhubung ke grup lain. Ubah grup dari editor nominal.',
+            ]);
         }
         // Importing a draft Digiflazz SKU must never reprice a nominal that
         // currently sells voucher stock. Require a separate nominal (or an
@@ -116,7 +124,7 @@ class DigiflazzAutoSources
             $package = $product->packages()->create([
                 'code' => 'DF_'.substr(hash('sha256', $first->buyer_sku_code), 0, 20),
                 'name' => GameNamePrefix::strip($first->product_name, $first->brand, $product->name),
-                'group_name' => $first->type ?: null,
+                'group_name' => $destinationGroup === 'Umum' ? null : $destinationGroup,
                 // Append temporarily, then orderProduct() inserts it by nominal
                 // without resetting a previously hand-customized order.
                 'nominal_value' => $nominal,
@@ -143,6 +151,13 @@ class DigiflazzAutoSources
                 // Existing nominal name and explicit pricing are store-owned.
             ]);
             app(AdminAuditService::class)->record($request, 'catalog.package.updated', 'product_package', $package->id, $before, $package->fresh()->toArray());
+        }
+        // Legacy import paths still register supplier groups in the product panel.
+        if (! $product->packageGroups()->where('name', $destinationGroup)->exists()) {
+            $product->packageGroups()->create([
+                'name' => $destinationGroup,
+                'sort_order' => ((int) $product->packageGroups()->max('sort_order')) + 1,
+            ]);
         }
         foreach ($items as $item) {
             // Automatic grouping may never attach a second active source.
