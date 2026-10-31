@@ -551,6 +551,7 @@ const importType = ref('');
 const importSearch = ref('');
 const importPicked = ref([]);
 const importPublish = ref(true);
+const importTemplate = ref('');
 const importPage = ref(1);
 const IMPORT_PER_PAGE = 50;
 const importCollator = new Intl.Collator('id-ID', { numeric: true, sensitivity: 'base' });
@@ -558,6 +559,30 @@ const importCollator = new Intl.Collator('id-ID', { numeric: true, sensitivity: 
 const autoProducts = computed(() => props.autoProductOptions);
 const importProduct = computed(() => props.autoProductOptions.find(row => Number(row.id) === Number(importProductId.value))
     || props.products.find(row => Number(row.id) === Number(importProductId.value)) || null);
+const importFields = computed(() => importProduct.value?.fields || []);
+const importHasSavedTemplate = computed(() => Boolean(String(importProduct.value?.customer_no_template || '').trim()));
+const importReady = computed(() => {
+    const fields = importFields.value;
+    const format = importTemplate.value.trim();
+    if (!fields.length || !format) return false;
+    const keys = fields.map(row => row.field_key);
+    const used = [...format.matchAll(/\{\{([a-z][a-z0-9_]*)\}\}/g)].map(match => match[1]);
+    const remainder = format.replace(/\{\{([a-z][a-z0-9_]*)\}\}/g, '');
+    return used.length > 0 && !/[{}]/.test(remainder)
+        && used.every(key => keys.includes(key))
+        && fields.filter(row => row.is_required).every(row => used.includes(row.field_key));
+});
+watch(importProductId, () => {
+    const selected = importProduct.value;
+    const fields = selected?.fields || [];
+    // Same visible preview as Data Pelanggan; the owner can review the
+    // destination format here instead of leaving the bulk-import screen.
+    importTemplate.value = selected?.customer_no_template
+        || (fields.length === 1 ? `{{${fields[0].field_key}}}`
+            : fields.length === 2 ? `{{${fields[0].field_key}}}({{${fields[1].field_key}}})` : '');
+    importPublish.value = importReady.value;
+    importErrors.value = {};
+});
 const importAvailable = computed(() => props.digiflazzItems.filter(row => !row.mapped && row.available));
 const importCategories = computed(() => [...new Set(importAvailable.value.map(row => row.category).filter(Boolean))].sort(importCollator.compare));
 const importBrands = computed(() => [...new Set(importAvailable.value
@@ -648,7 +673,8 @@ const openImport = () => {
     importType.value = '';
     importPage.value = 1;
     importInfo.value = '';
-    importPublish.value = true;
+    importPublish.value = false;
+    importTemplate.value = '';
     importOpen.value = true;
 };
 const toggleImportRow = id => {
@@ -669,7 +695,9 @@ const submitImport = () => {
     importErrors.value = {};
     router.post(`/admin/catalog/products/${importProduct.value.id}/import`, {
         item_ids: importPicked.value,
-        publish: importPublish.value,
+        publish: importPublish.value && importReady.value,
+        ...(!importHasSavedTemplate.value && importReady.value
+            ? { customer_no_template: importTemplate.value.trim() } : {}),
     }, {
         preserveScroll: true,
         onError: bag => { importErrors.value = bag; },
@@ -1148,14 +1176,27 @@ onMounted(() => {
                     <span>Cari SKU</span>
                     <input v-model="importSearch" class="adm-input" placeholder="Nama nominal atau kode SKU">
                 </label>
+                <div v-if="importProduct" class="adm-field full">
+                    <template v-if="importFields.length">
+                        <label v-if="!importHasSavedTemplate" class="adm-field">
+                            <span>Format ID tujuan Digiflazz</span>
+                            <input v-model="importTemplate" class="adm-input" placeholder="{{user_id}}({{zone_id}})" maxlength="500">
+                            <span class="hint">Sudah diisi dari kolom produk. Periksa format untuk game ini sebelum langsung dijual; format disimpan sekali untuk semua nominal.</span>
+                        </label>
+                        <p v-else class="adm-note">Format ID tujuan produk sudah tersimpan untuk semua nominal.</p>
+                    </template>
+                    <p v-else class="adm-note">Produk belum memiliki kolom Data Pelanggan. Semua nominal tetap dapat diimpor sebagai draf. Atur kolom pelanggan satu kali dari editor produk sebelum dijual.</p>
+                    <p v-if="!importReady && importFields.length" class="adm-note">Format tujuan belum lengkap. Impor tetap bisa dilakukan sebagai draf, tanpa mengaktifkan checkout.</p>
+                </div>
                 <label class="adm-switch-row full">
-                    <button type="button" class="adm-switch" role="switch" :aria-checked="importPublish" @click="importPublish = !importPublish" />
+                    <button type="button" class="adm-switch" role="switch" :aria-checked="importPublish && importReady" :disabled="!importReady" @click="importPublish = !importPublish" />
                     Langsung aktif dijual
                 </label>
             </div>
 
             <p v-if="importErrors.item_ids" class="err">{{ importErrors.item_ids }}</p>
             <p v-if="importErrors.publish" class="err">{{ importErrors.publish }}</p>
+            <p v-if="importErrors.customer_no_template" class="err">{{ importErrors.customer_no_template }}</p>
 
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px">
                 <strong>{{ importMatches.length }} SKU cocok</strong>
@@ -1191,7 +1232,7 @@ onMounted(() => {
             <template #footer>
                 <button type="button" class="adm-btn" @click="importOpen = false">Batal</button>
                 <button type="button" class="adm-btn primary" :disabled="importBusy || !importPicked.length || !importProduct" @click="submitImport">
-                    {{ importBusy ? 'Mengimpor…' : `Impor ${importPicked.length} nominal` }}
+                    {{ importBusy ? 'Mengimpor…' : `Impor ${importPicked.length} nominal${importPublish && importReady ? ' & aktifkan' : ' sebagai draf'}` }}
                 </button>
             </template>
         </AdminModal>
