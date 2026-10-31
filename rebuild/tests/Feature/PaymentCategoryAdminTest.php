@@ -96,6 +96,14 @@ class PaymentCategoryAdminTest extends TestCase
             ->assertSessionHasErrors('category');
     }
 
+    public function test_default_wallet_uses_lfamilia_coin_display_name(): void
+    {
+        $this->assertSame('LFAMILIA Coin', DB::table('payment_categories')
+            ->where('code', 'wallet')->value('name'));
+        $this->assertSame('LFAMILIA Coin', DB::table('payment_channels')
+            ->where('code', 'saldo')->value('name'));
+    }
+
     public function test_wallet_category_cannot_be_deleted_or_reassigned(): void
     {
         $this->delete('/admin/payments/categories/wallet')->assertSessionHasErrors('category');
