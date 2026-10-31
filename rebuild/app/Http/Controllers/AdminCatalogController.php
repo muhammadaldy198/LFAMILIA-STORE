@@ -175,8 +175,7 @@ class AdminCatalogController
                 ->sort(fn (Product $a, Product $b): int => strnatcasecmp($a->name, $b->name) ?: ($a->id <=> $b->id))
                 ->values()->map(fn (Product $product): array => [
                     ...$product->only('id', 'name', 'slug', 'customer_no_template'),
-                    'fields' => $product->fields->map(fn (ProductInputField $field): array =>
-                        $field->only('field_key', 'is_required'))->all(),
+                    'fields' => $product->fields->map(fn (ProductInputField $field): array => $field->only('field_key', 'is_required'))->all(),
                     'nominals' => $product->packages
                         ->filter(fn (ProductPackage $package): bool => $package->nominal_value !== null
                             && ! $package->mappings->contains('provider_id', $digiflazzProviderId))
