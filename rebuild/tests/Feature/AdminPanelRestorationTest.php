@@ -1616,28 +1616,31 @@ class AdminPanelRestorationTest extends TestCase
             'name' => 'Weekly',
         ])->assertRedirect()->assertSessionHasNoErrors();
         $groups = $product->packageGroups()->orderBy('sort_order')->get();
-        $this->assertSame(['Diamonds', 'Weekly'], $groups->pluck('name')->all());
+        $this->assertSame(['Umum', 'Diamonds', 'Weekly'], $groups->pluck('name')->all());
+        $diamonds = $groups->firstWhere('name', 'Diamonds');
+        $weekly = $groups->firstWhere('name', 'Weekly');
+        $umum = $groups->firstWhere('name', 'Umum');
 
         $nominal = $product->packages()->create([
             'code' => 'GROUP-EDIT-10', 'name' => '10 Diamond',
             'group_name' => 'Diamonds', 'is_active' => false,
         ]);
-        $this->put('/admin/catalog/package-groups/'.$groups[0]->id, [
+        $this->put('/admin/catalog/package-groups/'.$diamonds->id, [
             'name' => 'Gems',
         ])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertSame('Gems', $nominal->fresh()->group_name);
 
         $this->put('/admin/catalog/products/'.$product->id.'/package-groups/ids/reorder', [
-            'ids' => [$groups[1]->id, $groups[0]->id],
+            'ids' => [$weekly->id, $umum->id, $diamonds->id],
         ])->assertRedirect()->assertSessionHasNoErrors();
-        $this->assertSame(['Weekly', 'Gems'], $product->fresh()->package_tabs);
-        $this->delete('/admin/catalog/package-groups/'.$groups[0]->id)
+        $this->assertSame(['Weekly', 'Umum', 'Gems'], $product->fresh()->package_tabs);
+        $this->delete('/admin/catalog/package-groups/'.$diamonds->id)
             ->assertSessionHasErrors('group');
-        $this->assertDatabaseHas('product_package_groups', ['id' => $groups[0]->id, 'name' => 'Gems']);
+        $this->assertDatabaseHas('product_package_groups', ['id' => $diamonds->id, 'name' => 'Gems']);
 
-        $this->delete('/admin/catalog/package-groups/'.$groups[1]->id)
+        $this->delete('/admin/catalog/package-groups/'.$weekly->id)
             ->assertRedirect()->assertSessionHasNoErrors();
-        $this->assertDatabaseMissing('product_package_groups', ['id' => $groups[1]->id]);
+        $this->assertDatabaseMissing('product_package_groups', ['id' => $weekly->id]);
     }
 
     public function test_digiflazz_import_uses_selected_destination_group_instead_of_supplier_type(): void
