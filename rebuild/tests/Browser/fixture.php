@@ -3,6 +3,7 @@
 use App\Models\AdminUser;
 use App\Models\Category;
 use App\Models\IntegrationCredential;
+use App\Models\PaymentChannel;
 use App\Models\Product;
 use App\Models\SupportTicket;
 use App\Models\User;
@@ -319,8 +320,8 @@ DB::table('payment_channels')->whereIn('code', ['saldo', 'ewallet', 'virtual_acc
 // Fixture-only payment imagery: production logos remain merchant-managed.
 // The checkout browser assertions need non-null logo URLs for both categories.
 foreach (['ewallet', 'virtual_account'] as $code) {
-    $channel = \App\Models\PaymentChannel::where('code', $code)->firstOrFail();
-    if (! $channel->hasMedia('logo')) {
+    $channel = PaymentChannel::where('code', $code)->firstOrFail();
+    if ($channel->hasMedia('logo') === false) {
         $channel->addMedia(__DIR__.'/reference/cover.png')->preservingOriginal()->toMediaCollection('logo');
     }
 }
