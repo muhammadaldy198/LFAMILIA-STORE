@@ -20,6 +20,7 @@ use App\Http\Controllers\AdminOperationalSettingsController;
 use App\Http\Controllers\AdminOrderCancellationController;
 use App\Http\Controllers\AdminOrderDetailController;
 use App\Http\Controllers\AdminOrdersController;
+use App\Http\Controllers\AdminPackageGroupController;
 use App\Http\Controllers\AdminPasswordConfirmController;
 use App\Http\Controllers\AdminPasswordResetController;
 use App\Http\Controllers\AdminPaymentController;
@@ -313,6 +314,10 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
             Route::put('/auto-sync', [AdminCatalogController::class, 'autoSync'])
                 ->middleware('throttle:admin-mutation')->name('auto-sync.update');
             Route::put('/products/{product}/packages/reorder', [AdminCatalogController::class, 'reorderPackages'])->middleware('throttle:admin-mutation')->name('packages.reorder');
+            Route::post('/products/{product}/package-groups', [AdminPackageGroupController::class, 'store'])->middleware('throttle:admin-mutation')->name('package-groups.store');
+            Route::put('/package-groups/{group}', [AdminPackageGroupController::class, 'update'])->middleware('throttle:admin-mutation')->name('package-groups.update');
+            Route::delete('/package-groups/{group}', [AdminPackageGroupController::class, 'destroy'])->middleware('throttle:admin-mutation')->name('package-groups.destroy');
+            Route::put('/products/{product}/package-groups/ids/reorder', [AdminPackageGroupController::class, 'reorder'])->middleware('throttle:admin-mutation')->name('package-groups.ids.reorder');
             Route::put('/products/{product}/package-groups/reorder', [AdminCatalogController::class, 'reorderPackageGroups'])->middleware('throttle:admin-mutation')->name('package-groups.reorder');
             Route::post('/products/{product}/import', [AdminDigiflazzController::class, 'import'])->name('products.import');
             Route::post('/packages/{package}/sources/digiflazz', [AdminDigiflazzController::class, 'attachSource'])->middleware('throttle:admin-sensitive')->name('packages.sources.attach');

@@ -5,7 +5,7 @@ import AdminLayout from '../../Components/Admin/AdminLayout.vue';
 import AdminModal from '../../Components/Admin/AdminModal.vue';
 import { rupiah } from '../../lib/adminFormat';
 import { nominalMode, nominalPayload, nominalPriceValue } from '../../lib/catalogNominal';
-import { orderedPackageGroups, movePackageGroup } from '../../lib/catalogGroups';
+
 import { canSyncMapping, mappingPayload, mappingStatusLabel, sortMappings } from '../../lib/catalogSources';
 
 const props = defineProps({
@@ -107,7 +107,7 @@ const openEditor = (row) => {
     product.value = JSON.parse(JSON.stringify(row));
     editTab.value = 'info';
     editErrors.value = {};
-    groupOrderError.value = '';
+    groupErrors.value = {};
     editorOpen.value = true;
 };
 
@@ -209,7 +209,7 @@ const openNominal = (row = null) => {
     nominalEditing.value = row;
     Object.assign(nominal, {
         name: row?.name || '',
-        group_name: row?.group_name || '',
+        group_name: row ? (String(row.group_name ?? '').trim() || 'Umum') : (product.value?.package_groups?.[0]?.name || ''),
         sort_order: row?.sort_order ?? (product.value?.packages.length ?? 0),
         is_active: row ? Boolean(row.is_active) : true,
         price_mode: isDigiflazzNominal.value
@@ -239,6 +239,12 @@ const saveNominal = () => {
             sell_price_idr: nominalEditing.value.legacy_voucher_sell_price_idr }
         : nominalEditing.value;
     const payload = nominalPayload(savedRow, nominal, nominalEditing.value?.code || `${slugCode(nominal.name)}-${Date.now().toString(36).slice(-4)}`);
+    const selectedGroup = product.value?.package_groups?.find(group => group.name === String(nominal.group_name ?? '').trim());
+    if (!selectedGroup) {
+        nominalErrors.value = { group_id: 'Buat atau pilih grup di tab Grup/Tabel dahulu.' };
+        return;
+    }
+    payload.group_id = selectedGroup.id;
     // Bind pricing to the source shown when the editor opened. If voucher
     // stock runs out before Save, the server rejects stale price edits
     // instead of silently changing Digiflazz's independent markup.
@@ -333,28 +339,63 @@ const confirmRemove = () => {
     });
 };
 
-// The saved group priority is independent of nominal position and does not enable tabs.
-const packageGroupNames = computed(() => orderedPackageGroups(
-    product.value?.packages || [], product.value?.package_tabs || [],
-).map(group => group.name));
-const groupOrderError = ref('');
-const moveGroup = (index, direction) => {
-    if (!product.value || saveBusy.value) return;
-    const before = packageGroupNames.value;
-    const next = movePackageGroup(before, index, direction);
-    if (JSON.stringify(next) === JSON.stringify(before)) return;
-    const previous = [...(product.value.package_tabs || [])];
-    const productId = product.value.id;
-    product.value.package_tabs = next;
-    groupOrderError.value = '';
-    saveBusy.value = 'group-order';
-    router.put('/admin/catalog/products/' + productId + '/package-groups/reorder', { groups: next }, {
+// Grup/Tabel are separate editable records for every product.
+const packageGroups = computed(() => product.value?.package_groups || []);
+const groupOpen = ref(false), groupEditing = ref(null), groupName = ref('');
+const groupImage = ref(null), groupBusy = ref(false), groupErrors = ref({});
+const openGroup = (row = null) => {
+    groupEditing.value = row;
+    groupName.value = row?.name || '';
+    groupImage.value = null;
+    groupErrors.value = {};
+    groupOpen.value = true;
+};
+const saveGroup = () => {
+    if (!product.value || !groupName.value.trim() || groupBusy.value) return;
+    groupBusy.value = true;
+    groupErrors.value = {};
+    const data = { name: groupName.value.trim(), ...(groupImage.value ? { image: groupImage.value } : {}) };
+    const url = groupEditing.value ? '/admin/catalog/package-groups/' + groupEditing.value.id
+        : '/admin/catalog/products/' + product.value.id + '/package-groups';
+    const options = {
         preserveScroll: true,
-        onError: bag => {
-            if (product.value?.id === productId) product.value.package_tabs = previous;
-            groupOrderError.value = bag.groups || 'Gagal menyimpan urutan grup.';
-        },
-        onFinish: () => { saveBusy.value = ''; },
+        onError: bag => { groupErrors.value = bag; },
+        onSuccess: () => { groupOpen.value = false; },
+        onFinish: () => { groupBusy.value = false; },
+    };
+    if (groupEditing.value && groupImage.value) router.post(url, { ...data, _method: 'PUT' }, { ...options, forceFormData: true });
+    else if (groupEditing.value) router.put(url, data, options);
+    else router.post(url, data, { ...options, forceFormData: Boolean(groupImage.value) });
+};
+const removeGroup = row => {
+    if (!product.value || groupBusy.value || !window.confirm('Hapus grup ' + row.name + '? Pindahkan nominalnya lebih dulu.')) return;
+    groupBusy.value = true;
+    groupErrors.value = {};
+    router.delete('/admin/catalog/package-groups/' + row.id, {
+        preserveScroll: true, onError: bag => { groupErrors.value = bag; },
+        onFinish: () => { groupBusy.value = false; },
+    });
+};
+const removeGroupImage = row => {
+    groupBusy.value = true;
+    router.delete('/admin/catalog/media/package-group/' + row.id, {
+        data: { collection: 'image' }, preserveScroll: true,
+        onError: bag => { groupErrors.value = bag; },
+        onFinish: () => { groupBusy.value = false; },
+    });
+};
+const moveGroup = (index, direction) => {
+    if (!product.value || groupBusy.value) return;
+    const target = index + direction;
+    if (target < 0 || target >= packageGroups.value.length) return;
+    const rows = [...packageGroups.value];
+    [rows[index], rows[target]] = [rows[target], rows[index]];
+    groupBusy.value = true;
+    router.put('/admin/catalog/products/' + product.value.id + '/package-groups/ids/reorder', {
+        ids: rows.map(group => group.id),
+    }, {
+        preserveScroll: true, onError: bag => { groupErrors.value = bag; },
+        onFinish: () => { groupBusy.value = false; },
     });
 };
 
@@ -625,6 +666,7 @@ const importBusy = ref(false);
 const importErrors = ref({});
 const importInfo = ref('');
 const importProductId = ref('');
+const importGroupId = ref('');
 const importCategory = ref('');
 const importBrand = ref('');
 const importType = ref('');
@@ -639,6 +681,8 @@ const importCollator = new Intl.Collator('id-ID', { numeric: true, sensitivity: 
 const autoProducts = computed(() => props.autoProductOptions);
 const importProduct = computed(() => props.autoProductOptions.find(row => Number(row.id) === Number(importProductId.value))
     || props.products.find(row => Number(row.id) === Number(importProductId.value)) || null);
+const importGroups = computed(() => importProduct.value?.package_groups || []);
+const selectedImportGroup = computed(() => importGroups.value.find(group => String(group.id) === String(importGroupId.value)));
 const importFields = computed(() => importProduct.value?.fields?.length
     ? importProduct.value.fields
     : isMobileLegends(importProduct.value?.slug)
@@ -656,6 +700,7 @@ const importTemplateReady = computed(() => {
         && importFields.value.filter(field => field.is_required).every(field => used.includes(field.field_key));
 });
 watch(importProductId, () => {
+    importGroupId.value = '';
     importDestination.value = importProduct.value?.customer_no_template || '';
     importPublish.value = importTemplateReady.value;
     importErrors.value = {};
@@ -731,7 +776,7 @@ const sellPriceOf = (seller, item) => {
     const existing = importProduct.value?.nominals?.find(nominal =>
         item?.nominal_value != null
         && Number(nominal.nominal_value) === Number(item.nominal_value)
-        && String(nominal.group_name || '') === String(item.type || '')
+        && (String(nominal.group_name ?? '').trim() || 'Umum') === (String(selectedImportGroup.value?.name ?? item.type ?? '').trim() || 'Umum')
     );
     if (existing?.pricing_mode === 'FIXED') return price + Number(existing.margin_fixed_idr || 0);
     const percentage = existing?.pricing_mode === 'PERCENT'
@@ -744,6 +789,7 @@ const openImport = () => {
     importErrors.value = {};
     importPicked.value = [];
     importProductId.value = '';
+    importGroupId.value = '';
     importSearch.value = '';
     importBrand.value = '';
     importCategory.value = '';
@@ -767,11 +813,15 @@ const toggleImportRow = id => {
     importInfo.value = '';
 };
 const submitImport = () => {
-    if (!importProduct.value || !importPicked.value.length) return;
+    if (!importProduct.value || !importPicked.value.length || !selectedImportGroup.value) {
+        importErrors.value = { group_id: 'Pilih grup tujuan dari produk ini.' };
+        return;
+    }
     importBusy.value = true;
     importErrors.value = {};
     router.post(`/admin/catalog/products/${importProduct.value.id}/import`, {
         item_ids: importPicked.value,
+        group_id: Number(importGroupId.value),
         publish: importPublish.value && importTemplateReady.value,
         ...(importTemplateReady.value ? { customer_no_template: importTemplate.value } : {}),
     }, {
@@ -938,6 +988,7 @@ onMounted(() => {
             <div class="adm-tabs" role="tablist">
                 <button type="button" role="tab" :aria-selected="editTab === 'info'" @click="editTab = 'info'">Informasi</button>
                 <button type="button" role="tab" :aria-selected="editTab === 'price'" @click="editTab = 'price'">Nominal &amp; Harga</button>
+                <button type="button" role="tab" :aria-selected="editTab === 'groups'" @click="editTab = 'groups'">Grup / Tabel</button>
                 <button type="button" role="tab" :aria-selected="editTab === 'sources'" @click="editTab = 'sources'">Sumber</button>
                 <button type="button" role="tab" :aria-selected="editTab === 'look'" @click="editTab = 'look'">Tampilan Produk</button>
                 <button type="button" role="tab" :aria-selected="editTab === 'fields'" @click="editTab = 'fields'">Data Pelanggan</button>
@@ -1007,20 +1058,29 @@ onMounted(() => {
                 </form>
             </div>
 
-            <div v-if="editTab === 'price'" style="padding-top:12px">
-                <div style="margin-bottom:16px">
-                    <strong>Urutan grup / tabel di checkout</strong>
-                    <p class="adm-note">Grup nomor 1 tampil paling atas. Atur urutan isi grup lewat tabel nominal di bawah.</p>
-                    <div v-for="(group, index) in packageGroupNames" :key="group" class="adm-list-row" style="display:flex;align-items:center;justify-content:space-between;gap:10px">
-                        <span><strong>{{ index + 1 }}.</strong> {{ group }}</span>
-                        <div style="display:flex;gap:4px">
-                            <button type="button" class="adm-btn sm" :disabled="index === 0 || saveBusy === 'group-order'" :aria-label="'Naikkan grup ' + group" @click="moveGroup(index, -1)">↑</button>
-                            <button type="button" class="adm-btn sm" :disabled="index === packageGroupNames.length - 1 || saveBusy === 'group-order'" :aria-label="'Turunkan grup ' + group" @click="moveGroup(index, 1)">↓</button>
-                        </div>
-                    </div>
-                    <p v-if="!packageGroupNames.length" class="adm-note">Tambahkan nominal untuk membuat grup.</p>
-                    <p v-if="groupOrderError" class="err">{{ groupOrderError }}</p>
+            <div v-if="editTab === 'groups'" style="padding-top:12px">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px">
+                    <div><strong>Kelola Grup / Tabel</strong><p class="adm-note">Nama, gambar dan urutan grup tampil di checkout. Tambahkan grup sebelum mengisi nominal.</p></div>
+                    <button type="button" class="adm-btn primary sm" @click="openGroup()">Tambah grup</button>
                 </div>
+                <p v-if="groupErrors.group || groupErrors.ids" class="err">{{ groupErrors.group || groupErrors.ids }}</p>
+                <div v-for="(group, index) in packageGroups" :key="group.id" class="adm-list-row" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                    <img v-if="group.image_url" :src="group.image_url" :alt="group.name" style="width:48px;height:48px;object-fit:cover;border-radius:8px">
+                    <span v-else style="width:48px;height:48px;display:grid;place-items:center;border:1px solid var(--a-line);border-radius:8px">▦</span>
+                    <div style="flex:1;min-width:90px">
+                        <strong>{{ index + 1 }}. {{ group.name }}</strong>
+                        <p class="adm-note">{{ (product?.packages || []).filter(row => (String(row.group_name ?? '').trim() || 'Umum') === group.name).length }} nominal</p>
+                    </div>
+                    <div style="display:flex;gap:4px;flex-wrap:wrap">
+                        <button type="button" class="adm-btn sm" :disabled="groupBusy || index === 0" @click="moveGroup(index, -1)">↑</button>
+                        <button type="button" class="adm-btn sm" :disabled="groupBusy || index === packageGroups.length - 1" @click="moveGroup(index, 1)">↓</button>
+                        <button type="button" class="adm-btn sm" @click="openGroup(group)">Ubah / Gambar</button>
+                        <button type="button" class="adm-btn sm danger" :disabled="groupBusy" @click="removeGroup(group)">Hapus</button>
+                    </div>
+                </div>
+                <p v-if="!packageGroups.length" class="adm-note">Belum ada grup. Buat grup pertama agar nominal bisa dipilih.</p>
+            </div>
+            <div v-if="editTab === 'price'" style="padding-top:12px">
                 <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:8px">
                     <p class="adm-note">Urutan angka dari kecil ke besar. Bisa tetap diubah manual dengan geser atau panah.</p>
                     <div style="display:flex;gap:6px;flex-wrap:wrap">
@@ -1240,6 +1300,15 @@ onMounted(() => {
                         <option v-for="row in autoProducts" :key="row.id" :value="String(row.id)">{{ row.name }}</option>
                     </select>
                 </label>
+                <label class="adm-field">
+                    <span>Grup / tabel tujuan <b class="req">*</b></span>
+                    <select v-model="importGroupId" class="adm-select" required :disabled="!importProduct">
+                        <option value="">Pilih grup tujuan</option>
+                        <option v-for="group in importGroups" :key="group.id" :value="String(group.id)">{{ group.name }}</option>
+                    </select>
+                    <span v-if="importErrors.group_id" class="err">{{ importErrors.group_id }}</span>
+                    <span v-if="importProduct && !importGroups.length" class="hint">Buat grup melalui editor produk → Grup/Tabel dahulu.</span>
+                </label>
                 <div class="adm-field">
                     <span>Markup nominal baru</span>
                     <strong>10% dari harga seller</strong>
@@ -1318,15 +1387,40 @@ onMounted(() => {
             </div>
             <template #footer>
                 <button type="button" class="adm-btn" @click="importOpen = false">Batal</button>
-                <button type="button" class="adm-btn primary" :disabled="importBusy || !importPicked.length || !importProduct" @click="submitImport">
+                <button type="button" class="adm-btn primary" :disabled="importBusy || !importPicked.length || !importProduct || !selectedImportGroup" @click="submitImport">
                     {{ importBusy ? 'Mengimpor…' : `Impor ${importPicked.length} nominal` }}
                 </button>
+            </template>
+        </AdminModal>
+        <AdminModal v-model:open="groupOpen" :title="groupEditing ? 'Ubah Grup/Tabel' : 'Tambah Grup/Tabel'" :description="product?.name || ''">
+            <form id="group-form" class="adm-grid" @submit.prevent="saveGroup">
+                <label class="adm-field"><span>Nama grup <b class="req">*</b></span>
+                    <input v-model="groupName" class="adm-input" maxlength="120" required placeholder="Contoh: Diamonds atau Weekly Pass">
+                    <span v-if="groupErrors.name" class="err">{{ groupErrors.name }}</span>
+                </label>
+                <label class="adm-field"><span>Gambar grup (opsional, maksimum 5 MB)</span>
+                    <img v-if="groupEditing?.image_url" :src="groupEditing.image_url" alt="Gambar grup" style="width:72px;height:72px;object-fit:cover;border-radius:8px">
+                    <input type="file" class="adm-input" accept="image/png,image/jpeg,image/webp" @change="groupImage = $event.target.files?.[0] || null">
+                    <span v-if="groupErrors.image" class="err">{{ groupErrors.image }}</span>
+                </label>
+            </form>
+            <template #footer>
+                <button type="button" class="adm-btn" @click="groupOpen = false">Batal</button>
+                <button v-if="groupEditing?.image_url" type="button" class="adm-btn danger" :disabled="groupBusy" @click="removeGroupImage(groupEditing)">Hapus gambar</button>
+                <button type="submit" form="group-form" class="adm-btn primary" :disabled="groupBusy || !groupName.trim()">Simpan grup</button>
             </template>
         </AdminModal>
         <AdminModal v-model:open="nominalOpen" :title="nominalEditing ? 'Ubah nominal' : 'Tambah nominal'" :description="product?.name || ''">
             <form id="nominal-form" class="adm-grid two" @submit.prevent="saveNominal">
                 <label class="adm-field"><span>Nama nominal <b class="req">*</b></span><input v-model="nominal.name" class="adm-input" maxlength="255" required><span v-if="nominalErrors.name" class="err">{{ nominalErrors.name }}</span></label>
-                <label class="adm-field"><span>Grup / tabel</span><input v-model="nominal.group_name" class="adm-input" placeholder="Umum" maxlength="120"><span class="hint">Kosong berarti Umum.</span></label>
+                <label class="adm-field"><span>Grup / tabel <b class="req">*</b></span>
+                    <select v-model="nominal.group_name" class="adm-select" required>
+                        <option value="" disabled>Pilih grup</option>
+                        <option v-for="group in packageGroups" :key="group.id" :value="group.name">{{ group.name }}</option>
+                    </select>
+                    <span v-if="nominalErrors.group_id" class="err">{{ nominalErrors.group_id }}</span>
+                    <span class="hint">Buat/edit grup melalui tab Grup / Tabel.</span>
+                </label>
                 <label class="adm-field"><span>Posisi</span><input v-model="nominal.sort_order" type="number" min="0" class="adm-input"></label>
                 <label class="adm-switch-row"><button type="button" class="adm-switch" role="switch" :aria-checked="nominal.is_active" @click="nominal.is_active = !nominal.is_active" />Nominal aktif</label>
                 <label class="adm-field">

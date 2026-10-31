@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Product;
 use App\Models\ProductInputField;
 use App\Models\ProductPackage;
+use App\Models\ProductPackageGroup;
 use App\Models\Provider;
 use App\Models\ProviderMapping;
 use App\Services\AdminAuditService;
@@ -391,6 +392,7 @@ class AdminDigiflazzController
         abort_unless($product->fulfillment_mode === 'AUTO_PROVIDER', 422);
         $data = $request->validate([
             'item_ids' => ['required', 'array', 'min:1', 'max:2000'],
+            'group_id' => ['sometimes', 'integer'],
             'item_ids.*' => ['required', 'integer', 'distinct', 'exists:digiflazz_catalog_items,id'],
             'margin_percent' => ['prohibited'],
             'cost_uplift_percent' => ['prohibited'],
@@ -401,6 +403,14 @@ class AdminDigiflazzController
         DB::transaction(function () use ($request, $product, $service, $audit, $data): void {
             $product = $product->lockForUpdate()->findOrFail($product->id);
             $publish = (bool) ($data['publish'] ?? false);
+            $targetGroup = null;
+            if (isset($data['group_id'])) {
+                $targetGroup = ProductPackageGroup::where('product_id', $product->id)
+                    ->whereKey($data['group_id'])->first();
+                if ($targetGroup === null) {
+                    throw ValidationException::withMessages(['group_id' => 'Grup tujuan tidak tersedia pada produk ini.']);
+                }
+            }
             // Keep imports one-click: establish a product-wide input once,
             // never a different destination for each SKU/nominal.
             if ($publish && ! $product->fields()->exists()) {
@@ -437,11 +447,11 @@ class AdminDigiflazzController
                 throw ValidationException::withMessages(['publish' => 'Aktifkan kategori produk dan integrasi Digiflazz sebelum menjual.']);
             }
             $selected = DB::table('digiflazz_catalog_items')->whereIn('id', $data['item_ids'])->lockForUpdate()->get();
-            $nominals = $selected->groupBy(function (object $item): string {
+            $nominals = $selected->groupBy(function (object $item) use ($targetGroup): string {
                 $nominal = app(CatalogNominalOrder::class)->value((string) $item->product_name, (string) $item->brand);
 
                 return $nominal === null ? 'sku:'.$item->buyer_sku_code
-                    : 'value:'.mb_strtolower((string) $item->type).':'.$nominal;
+                    : 'value:'.mb_strtolower((string) ($targetGroup?->name ?? $item->type)).':'.$nominal;
             });
             if ($nominals->contains(fn ($items): bool => $items->count() > 1)) {
                 throw ValidationException::withMessages([
@@ -452,7 +462,7 @@ class AdminDigiflazzController
                 if (! $service->sellable($item)) {
                     throw ValidationException::withMessages(['item_ids' => 'SKU tidak tersedia atau data lebih dari 24 jam. Sinkronkan dahulu.']);
                 }
-                if ($product->package_tabs_enabled && ! in_array(trim((string) $item->type), $product->package_tabs ?? [], true)) {
+                if ($product->package_tabs_enabled && in_array(trim((string) ($targetGroup?->name ?? $item->type)), $product->package_tabs ?? [], true) === false) {
                     throw ValidationException::withMessages(['item_ids' => 'Grup nominal belum tersedia pada tab produk. Tambahkan tab "'.$item->type.'" dahulu.']);
                 }
             }
@@ -466,6 +476,8 @@ class AdminDigiflazzController
                     '12',
                     false,
                     $request,
+                    null,
+                    $targetGroup?->name,
                 );
             }
             $sources->orderProduct($product);

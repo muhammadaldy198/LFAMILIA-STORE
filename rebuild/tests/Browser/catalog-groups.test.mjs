@@ -18,3 +18,20 @@ test('groups stay separate from nominal order and Umum absorbs empty labels', ()
     assert.deepEqual(movePackageGroup(['Pass', 'Umum', 'Diamonds'], 2, -1), ['Pass', 'Diamonds', 'Umum']);
     assert.deepEqual(movePackageGroup(['Pass', 'Umum'], 0, -1), ['Pass', 'Umum']);
 });
+
+test('registry order and group image metadata control headings independently of nominal grouping', () => {
+    const packages = [
+        { id: 1, name: '5 Diamonds', group_name: 'Diamonds' },
+        { id: 2, name: 'Weekly Pass', group_name: 'Pass' },
+    ];
+    const registry = [
+        { name: 'Pass', image_url: '/media/pass.webp' },
+        { name: 'Diamonds', image_url: '/media/diamonds.webp' },
+    ];
+    assert.deepEqual(orderedPackageGroups(packages, ['Diamonds', 'Pass'], registry).map(group => [
+        group.name, group.image_url, group.items.map(item => item.id),
+    ]), [
+        ['Pass', '/media/pass.webp', [2]],
+        ['Diamonds', '/media/diamonds.webp', [1]],
+    ]);
+});

@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Schema;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 
@@ -32,6 +33,16 @@ class Product extends Model implements HasMedia
         ];
     }
 
+    protected static function booted(): void
+    {
+        static::created(function (Product $product): void {
+            // Some historical migrations create products before the group table exists.
+            if (Schema::hasTable('product_package_groups')) {
+                $product->packageGroups()->create(['name' => 'Umum', 'sort_order' => 0]);
+            }
+        });
+    }
+
     public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class);
@@ -40,6 +51,11 @@ class Product extends Model implements HasMedia
     public function packages(): HasMany
     {
         return $this->hasMany(ProductPackage::class);
+    }
+
+    public function packageGroups(): HasMany
+    {
+        return $this->hasMany(ProductPackageGroup::class)->orderBy('sort_order')->orderBy('id');
     }
 
     public function fields(): HasMany
