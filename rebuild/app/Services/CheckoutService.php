@@ -17,7 +17,6 @@ class CheckoutService
     public function __construct(
         private readonly CheckoutPricing $pricing,
         private readonly CheckoutInputValidator $inputValidator,
-        private readonly NicknameService $nickname,
         private readonly GuestOrderAccess $guestAccess,
         private readonly PaymentRoutingService $paymentRouting,
         private readonly MembershipService $membership,
@@ -167,20 +166,15 @@ class CheckoutService
         $prePrice = $this->pricing->forPackage((int) $data['package_id']);
         $product = Product::with(['fields', 'category'])->findOrFail($prePrice['product_id']);
         $input = $this->inputValidator->validate($product, $data['customer_input']);
-        // The mandatory destination fields are validated above. Kokinpay is
-        // advisory only and must not prevent a paid, deliverable order.
-        try {
-            $nickname = $this->nickname->check($product, $input);
-        } catch (\Throwable $exception) {
-            report($exception);
-            $nickname = [
-                'supported' => false,
-                'verified' => false,
-                'nickname' => null,
-                'country' => null,
-                'warning' => 'Pengecekan nickname tidak tersedia. Pastikan ID tujuan sudah benar.',
-            ];
-        }
+        // Kokinpay is a UI-only helper. Never call (or charge) the
+        // external nickname service a second time while placing an order.
+        $nickname = [
+            'supported' => (bool) $product->nickname_check_enabled,
+            'verified' => false,
+            'nickname' => null,
+            'country' => null,
+            'warning' => null,
+        ];
 
         try {
             $result = DB::transaction(function () use ($data, $user, $fingerprint, $input, $nickname): array {
