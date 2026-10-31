@@ -393,12 +393,25 @@ class AdminDigiflazzController
             'margin_percent' => ['prohibited'],
             'cost_uplift_percent' => ['prohibited'],
             'publish' => ['sometimes', 'boolean'],
+            'customer_no_template' => ['sometimes', 'nullable', 'string', 'max:500'],
             'auto_sources' => ['prohibited'],
         ]);
         DB::transaction(function () use ($request, $product, $service, $audit, $data): void {
             $product = $product->lockForUpdate()->findOrFail($product->id);
             $publish = (bool) ($data['publish'] ?? false);
-            $template = $this->importCustomerTemplate($product, $product->customer_no_template, $publish);
+            // The product's destination format may be confirmed and saved in the
+            // same atomic bulk-import request. No per-SKU destination setup.
+            $templateSubmitted = array_key_exists('customer_no_template', $data);
+            $template = $this->importCustomerTemplate(
+                $product,
+                $templateSubmitted ? $data['customer_no_template'] : $product->customer_no_template,
+                $publish
+            );
+            if ($templateSubmitted && $template !== $product->customer_no_template) {
+                $before = $product->toArray();
+                $product->update(['customer_no_template' => $template]);
+                $audit->record($request, 'catalog.product.updated', 'product', $product->id, $before, $product->fresh()->toArray());
+            }
             if ($publish && (! $product->category->is_active || ! Provider::where('code', 'DIGIFLAZZ')->where('is_active', true)->exists())) {
                 throw ValidationException::withMessages(['publish' => 'Aktifkan kategori produk dan integrasi Digiflazz sebelum menjual.']);
             }
