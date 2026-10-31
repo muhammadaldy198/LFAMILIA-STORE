@@ -426,9 +426,19 @@ const resolveDestination = (slug, fields, saved = '') => {
         && (!stored || stored === '{{user_id}}({{zone_id}})')) {
         return '{{user_id}}{{zone_id}}';
     }
-    if (stored) return stored;
-    return keys.length === 1 ? `{{${keys[0]}}}` : '';
+    if (keys.length === 1) {
+        const referenced = [...stored.matchAll(/\{\{([^}]+)\}\}/g)].map(match => match[1]);
+        if (!stored || referenced.some(key => !keys.includes(key))) return `{{${keys[0]}}}`;
+    }
+    return stored;
 };
+const templateNeedsCorrection = computed(() => [...String(destinationFormat.value || '')
+    .matchAll(/\{\{([^}]+)\}\}/g)]
+    .some(match => !fieldRows.value.some(row => row.field_key === match[1])));
+const showTemplateEditor = computed(() => fieldRows.value.length > 1
+    && (!isMobileLegends(product.value?.slug) || templateNeedsCorrection.value
+        || !fieldRows.value.some(row => row.field_key === 'user_id')
+        || !fieldRows.value.some(row => row.field_key === 'zone_id')));
 const template = computed(() => resolveDestination(product.value?.slug, fieldRows.value, destinationFormat.value));
 
 // Contoh nilai per kode kolom, dipakai bila admin belum mengisi contoh isian.
@@ -1108,7 +1118,7 @@ onMounted(() => {
                 <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">
                     <button type="button" class="adm-btn sm" @click="addField">Tambah kolom</button>
                 </div>
-                <label v-if="fieldRows.length > 1 && !isMobileLegends(product?.slug)" class="adm-field">
+                <label v-if="showTemplateEditor" class="adm-field">
                     <span>Format ID pengiriman sesuai produk</span>
                     <input v-model="destinationFormat" class="adm-input" placeholder="Contoh: user_id + zone_id" maxlength="500">
                     <span class="hint">Diatur satu kali per game, bukan per nominal. Gunakan format yang disyaratkan Digiflazz.</span>
