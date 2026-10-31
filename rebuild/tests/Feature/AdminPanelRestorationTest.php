@@ -874,6 +874,26 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertNull(Product::find($product->id));
     }
 
+    public function test_deleting_a_nominal_twice_returns_to_catalog_without_an_inertia_404(): void
+    {
+        $this->login();
+        $product = $this->product('MANUAL');
+        $package = $product->packages()->create([
+            'code' => 'DELETE-ONCE', 'name' => 'Nominal untuk dihapus',
+            'sort_order' => 0, 'is_active' => false,
+        ]);
+
+        $this->withHeader('Referer', url('/admin/catalog?tab=manual'));
+        $this->delete('/admin/catalog/packages/'.$package->id)
+            ->assertRedirect(url('/admin/catalog?tab=manual'))->assertSessionHasNoErrors();
+        $this->assertNull(ProductPackage::find($package->id));
+
+        // Double tap / stale form: it is already gone, not a missing route.
+        $this->delete('/admin/catalog/packages/'.$package->id)
+            ->assertRedirect(route('admin.catalog.index'))->assertSessionHasNoErrors();
+        $this->assertSame(0, $product->packages()->count());
+    }
+
     public function test_product_display_controls_and_package_tabs_are_configurable_and_reach_customer_frontend(): void
     {
         $this->login();
