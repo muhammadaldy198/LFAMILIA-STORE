@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class PaymentRouteCatalogService
 {
@@ -16,7 +17,16 @@ class PaymentRouteCatalogService
      */
     public function sync(): array
     {
-        $result = ['created' => 0, 'updated' => 0, 'skipped' => 0, 'created_channels' => $this->ensureBankChannels() + $this->ensureEwalletChannels() + $this->ensureRetailChannels()];
+        // The route catalog is also used by historical migrations, before
+        // payment_categories/category_code exist. Only populate category_code
+        // once the migration adding it has run.
+        $hasCategories = Schema::hasColumn('payment_channels', 'category_code');
+        $result = [
+            'created' => 0, 'updated' => 0, 'skipped' => 0,
+            'created_channels' => $this->ensureBankChannels($hasCategories)
+                + $this->ensureEwalletChannels($hasCategories)
+                + $this->ensureRetailChannels($hasCategories),
+        ];
 
         foreach ((array) config('payment_routes', []) as $definition) {
             $channelId = DB::table('payment_channels')
@@ -77,7 +87,7 @@ class PaymentRouteCatalogService
     /**
      * Seed individual e-wallets only once; never overwrite admin fee or activation choices.
      */
-    private function ensureEwalletChannels(): int
+    private function ensureEwalletChannels(bool $hasCategories): int
     {
         $generic = DB::table('payment_channels')->where('code', 'ewallet')->first();
         if (! $generic) {
@@ -98,7 +108,7 @@ class PaymentRouteCatalogService
             DB::table('payment_channels')->insert([
                 'code' => $code,
                 'method' => 'EWALLET',
-                'category_code' => 'ewallet',
+                ...($hasCategories ? ['category_code' => 'ewallet'] : []),
                 'name' => (string) $wallet['name'],
                 'description' => 'Bayar langsung melalui '.(string) $wallet['name'].'.',
                 'fee_flat_idr' => 0,
@@ -119,7 +129,7 @@ class PaymentRouteCatalogService
     /**
      * Create retail channels without turning on a store method before merchant activation.
      */
-    private function ensureRetailChannels(): int
+    private function ensureRetailChannels(bool $hasCategories): int
     {
         $generic = DB::table('payment_channels')->where('code', 'ewallet')->first();
         if (! $generic) {
@@ -135,7 +145,7 @@ class PaymentRouteCatalogService
             DB::table('payment_channels')->insert([
                 'code' => $store['code'],
                 'method' => 'RETAIL',
-                'category_code' => 'retail',
+                ...($hasCategories ? ['category_code' => 'retail'] : []),
                 'name' => $store['name'],
                 'description' => 'Bayar melalui '.(string) $store['name'].'.',
                 'fee_flat_idr' => 0,
@@ -157,7 +167,7 @@ class PaymentRouteCatalogService
      * Provision bank choices without overwriting operator-edited fees, order,
      * visibility or support flags on subsequent catalog synchronizations.
      */
-    private function ensureBankChannels(): int
+    private function ensureBankChannels(bool $hasCategories): int
     {
         $generic = DB::table('payment_channels')->where('code', 'virtual_account')->first();
         if (! $generic) {
@@ -174,7 +184,7 @@ class PaymentRouteCatalogService
             DB::table('payment_channels')->insert([
                 'code' => $code,
                 'method' => 'VIRTUAL_ACCOUNT',
-                'category_code' => 'va',
+                ...($hasCategories ? ['category_code' => 'va'] : []),
                 'name' => (string) $bank['name'],
                 'description' => 'Transfer otomatis melalui '.(string) $bank['name'].'.',
                 'fee_flat_idr' => (int) $generic->fee_flat_idr,
