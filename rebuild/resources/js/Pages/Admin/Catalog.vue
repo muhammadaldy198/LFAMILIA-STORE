@@ -1335,6 +1335,7 @@ onMounted(() => {
         </AdminModal>
         <AdminModal :open="!!removeTarget" :title="removeKind === 'notice' ? 'Hapus pemberitahuan' : removeKind === 'product' ? 'Hapus produk' : 'Hapus nominal'" :description="removeTarget?.name || removeTarget?.title || ''" @update:open="value => { if (!value) removeTarget = null; }">
             <p class="adm-note">{{ removeKind === 'notice' ? 'Pemberitahuan ini akan hilang dari halaman produk toko.' : removeKind === 'product' ? 'Produk beserta seluruh nominalnya dihapus permanen. Produk yang punya riwayat pesanan akan ditolak; nonaktifkan saja bila hanya ingin menghentikan penjualan.' : 'Nominal yang memiliki riwayat pesanan tidak dapat dihapus; nonaktifkan bila hanya ingin menghentikan penjualan.' }}</p>
+            <p v-for="(message, key) in removeErrors" :key="key" role="alert" class="err">{{ message }}</p>
             <template #footer>
                 <button type="button" class="adm-btn" :disabled="removeBusy" @click="removeTarget = null">Batal</button>
                 <button type="button" class="adm-btn danger" :disabled="removeBusy" @click="confirmRemove">{{ removeBusy ? 'Menghapus…' : 'Hapus' }}</button>
