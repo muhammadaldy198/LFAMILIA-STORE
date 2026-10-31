@@ -136,7 +136,7 @@ try {
                 await click('Impor dari Digiflazz'); await inspectDialog(width + '-catalog-import'); await escape();
                 await evaluate(`(() => { const b = [...document.querySelectorAll('tbody tr button')].find(b => b.getBoundingClientRect().height > 0); b?.click(); })()`);
                 await pause(600);
-                for (const tab of ['Informasi', 'Nominal & Harga', 'Sumber', 'Tampilan Produk', 'Data Pelanggan']) {
+                for (const tab of ['Informasi', 'Nominal & Harga', 'Grup / Tabel', 'Sumber', 'Tampilan Produk', 'Data Pelanggan']) {
                     await click(tab); await inspectDialog(width + '-product-' + tab);
                 }
                 await escape();
@@ -149,6 +149,16 @@ try {
                             .find(element => [...element.options].some(option => option.textContent.trim() === 'Pilih produk tujuan'));
                         const option = select && [...select.options].find(option => option.value !== '');
                         if (!option) throw Error('No eligible destination product for Digiflazz import');
+                        select.value = option.value;
+                        select.dispatchEvent(new Event('change', { bubbles: true }));
+                    })()`);
+                    await pause(200);
+                    // Imported SKUs must target an actual group owned by the selected product.
+                    await evaluate(`(() => {
+                        const select = [...document.querySelectorAll('[role=dialog] select')]
+                            .find(element => [...element.options].some(option => option.textContent.trim() === 'Pilih grup tujuan'));
+                        const option = select && [...select.options].find(option => option.value !== '');
+                        if (!option) throw Error('No destination group configured for selected product');
                         select.value = option.value;
                         select.dispatchEvent(new Event('change', { bubbles: true }));
                     })()`);
