@@ -24,7 +24,10 @@ class AdminPackageGroupController
 
     public function store(Request $request, Product $product, CatalogAudit $audit): RedirectResponse
     {
-        $data = $request->validate(['name' => ['required', 'string', 'max:120']]);
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:120'],
+            'image' => ['sometimes', 'image', 'mimes:jpeg,png,webp', 'max:5120'],
+        ]);
         $name = trim($data['name']);
         if ($name === '') {
             throw ValidationException::withMessages(['name' => 'Nama grup wajib diisi.']);
@@ -40,6 +43,9 @@ class AdminPackageGroupController
                 $tabs[] = $name;
                 $product->update(['package_tabs' => $tabs]);
             }
+            if ($request->hasFile('image')) {
+                $group->addMediaFromRequest('image')->toMediaCollection('image', config('media-library.disk_name', 'public'));
+            }
             $audit->record($request, 'catalog.group.created', 'product_package_group', $group->id, null, $group->toArray());
         }, 3);
 
@@ -48,7 +54,10 @@ class AdminPackageGroupController
 
     public function update(Request $request, ProductPackageGroup $group, CatalogAudit $audit): RedirectResponse
     {
-        $data = $request->validate(['name' => ['required', 'string', 'max:120']]);
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:120'],
+            'image' => ['sometimes', 'image', 'mimes:jpeg,png,webp', 'max:5120'],
+        ]);
         $name = trim($data['name']);
         if ($name === '') {
             throw ValidationException::withMessages(['name' => 'Nama grup wajib diisi.']);
@@ -57,21 +66,26 @@ class AdminPackageGroupController
             $product = Product::whereKey($group->product_id)->lockForUpdate()->firstOrFail();
             $group = ProductPackageGroup::whereKey($group->id)->lockForUpdate()->firstOrFail();
             $this->uniqueName($product, $name, (int) $group->id);
-            if ($name === $group->name) {
-                return;
-            }
             $before = $group->toArray();
             $old = $group->name;
-            $product->packages()->where('group_name', $old)->update(['group_name' => $name]);
-            if ($old === 'Umum') {
-                $product->packages()->where(fn ($query) => $query
-                    ->whereNull('group_name')->orWhere('group_name', ''))->update(['group_name' => $name]);
+            if ($name !== $old) {
+                // Exact match protects legacy case-sensitive groups.
+                $ids = $product->packages()->get(['id', 'group_name'])
+                    ->filter(fn ($row): bool => $row->group_name === $old
+                        || ($old === 'Umum' && ($row->group_name === null || $row->group_name === '')))
+                    ->pluck('id')->all();
+                if ($ids !== []) {
+                    $product->packages()->whereIn('id', $ids)->update(['group_name' => $name]);
+                }
+                $product->update(['package_tabs' => array_map(
+                    fn ($tab) => $tab === $old ? $name : $tab, $product->package_tabs ?? []
+                )]);
+                $group->update(['name' => $name]);
             }
-            $product->update(['package_tabs' => array_map(
-                fn ($tab) => $tab === $old ? $name : $tab, $product->package_tabs ?? []
-            )]);
-            $group->update(['name' => $name]);
-            $audit->record($request, 'catalog.group.updated', 'product_package_group', $group->id, $before, $group->toArray());
+            if ($request->hasFile('image')) {
+                $group->addMediaFromRequest('image')->toMediaCollection('image', config('media-library.disk_name', 'public'));
+            }
+            $audit->record($request, 'catalog.group.updated', 'product_package_group', $group->id, $before, $group->fresh()->toArray());
         }, 3);
 
         return back();
