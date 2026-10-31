@@ -370,7 +370,7 @@ class AdminPaymentController
     {
         $data = $this->categoryData($request, true);
         $category = PaymentCategory::create($data);
-        $this->audit($request, 'payment.category.created', 'payment_category', 0, null, $category->toArray());
+        $this->audit($request, 'payment.category.created', 'payment_category', $category->code, null, $category->toArray());
 
         return back()->with('status', 'Kategori pembayaran ditambahkan.');
     }
@@ -382,7 +382,7 @@ class AdminPaymentController
         unset($data['code']); // Stable technical grouping identifier.
         $before = $category->toArray();
         $category->update($data);
-        $this->audit($request, 'payment.category.updated', 'payment_category', 0, $before, $category->toArray());
+        $this->audit($request, 'payment.category.updated', 'payment_category', $category->code, $before, $category->toArray());
 
         return back()->with('status', 'Kategori pembayaran disimpan.');
     }
@@ -397,7 +397,7 @@ class AdminPaymentController
         }
         $before = $category->toArray();
         $category->delete();
-        $this->audit($request, 'payment.category.deleted', 'payment_category', 0, $before, []);
+        $this->audit($request, 'payment.category.deleted', 'payment_category', $category->code, $before, []);
 
         return back()->with('status', 'Kategori pembayaran dihapus.');
     }
@@ -1233,7 +1233,7 @@ class AdminPaymentController
         Request $request,
         string $action,
         string $type,
-        int $id,
+        string|int $id,
         ?array $before,
         array $after,
     ): void {
