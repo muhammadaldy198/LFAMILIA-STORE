@@ -77,6 +77,11 @@ class PaymentCategoryAdminTest extends TestCase
             $this->delete('/admin/payments/categories/'.$code)
                 ->assertSessionHasErrors('category');
 
+            // Case-insensitive MySQL collations can resolve VA to va,
+            // so the guard must use the persisted code, not the URL case.
+            $this->delete('/admin/payments/categories/'.strtoupper($code))
+                ->assertSessionHasErrors('category');
+
             $this->assertDatabaseHas('payment_categories', ['code' => $code]);
         }
 
