@@ -107,7 +107,7 @@ class DigiflazzAutoSources
                 'item_ids' => 'Nominal ini sudah memiliki SKU Digiflazz lain.',
             ]);
         }
-        // New Digiflazz nominal gets its own 12% markup, not a product price.
+        // New Digiflazz nominal gets its own 10% markup, not a product price.
         // Existing explicit nominal pricing must never be overwritten by import/sync.
         if (! $package) {
             $package = $product->packages()->create([
@@ -116,7 +116,7 @@ class DigiflazzAutoSources
                 'group_name' => $first->type ?: null,
                 'nominal_value' => $nominal, 'sort_order' => 0, 'is_active' => $publish,
                 'pricing_mode' => 'PERCENT',
-                'margin_percent' => 12,
+                'margin_percent' => 10,
                 'margin_fixed_idr' => null,
                 'sell_price_idr' => null,
             ]);
@@ -125,7 +125,7 @@ class DigiflazzAutoSources
             $before = $package->toArray();
             $newPricing = ! $package->mappings()->where('provider_id', $provider->id)->exists()
                 && in_array($package->pricing_mode, ['PRODUCT_MARGIN', 'SELL_PRICE'], true)
-                ? ['pricing_mode' => 'PERCENT', 'margin_percent' => 12,
+                ? ['pricing_mode' => 'PERCENT', 'margin_percent' => 10,
                     'margin_fixed_idr' => null, 'sell_price_idr' => null, 'sell_markup_percent' => null]
                 : [];
             $package->update([
