@@ -471,6 +471,19 @@ test('nominal Save button unlocks after successful and failed requests', () => {
     }
 });
 
+test('nominal delete guards repeat clicks and keeps the admin editor open on validation errors', () => {
+    const catalog = read('Catalog.vue');
+    const handler = catalog.split('const confirmRemove = () => {')[1]?.split('\n};')[0];
+    assert.ok(handler);
+    assert.match(handler, /if \(!row \|\| removeBusy\.value\) return/);
+    assert.match(handler, /removeBusy\.value = true/);
+    assert.match(handler, /onError: bag => \{ removeErrors\.value = bag; \}/);
+    assert.match(handler, /onSuccess: \(\) => \{/);
+    assert.match(handler, /onFinish: \(\) => \{ removeBusy\.value = false; \}/);
+    assert.match(catalog, /:disabled="removeBusy" @click="confirmRemove"/);
+    assert.match(catalog, /product\.value\.packages\.filter\(item => item\.id !== row\.id\)/);
+});
+
 // CR-03: membuat akun admin baru (termasuk Super Admin) juga menanyakan kata
 // sandi di UI, bukan hanya perubahan peran/izin.
 test('creating an admin account asks for password confirmation', () => {
