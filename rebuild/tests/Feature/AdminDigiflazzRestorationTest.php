@@ -1298,8 +1298,8 @@ class AdminDigiflazzRestorationTest extends TestCase
             ->missing('defaultMargin'));
 
         // Impor sungguhan (bukan grep sumber): SKU tersedia, produk tanpa
-        // override. Klien sengaja mengirim 35 — server wajib memakai setting
-        // aktif (12), bukan angka kiriman peramban.
+        // override. Klien sengaja mengirim 35 — impor harus memakai default
+        // nominal baru 10%, bukan setting lama 12 atau input 35.
         $this->fakeCatalog([$this->row(['buyer_sku_code' => 'cr02-sku', 'product_name' => 'CR02 10', 'price' => 10000])]);
         $this->post('/admin/digiflazz/sync')->assertRedirect()->assertSessionHasNoErrors();
         $item = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'cr02-sku')->first();
@@ -1313,6 +1313,7 @@ class AdminDigiflazzRestorationTest extends TestCase
         $this->assertSame(10000, (int) $mapping->store_cost_idr);
         $this->assertSame(10000, (int) $mapping->max_price_idr);
         $this->assertSame('PERCENT', $package->fresh()->pricing_mode);
+        $this->assertSame(10.0, (float) $package->fresh()->margin_percent);
         $this->assertSame(10, (int) $product->fresh()->margin_percent);
         $this->assertNull($product->fresh()->sell_markup_percent);
     }
