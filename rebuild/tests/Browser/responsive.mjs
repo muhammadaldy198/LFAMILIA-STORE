@@ -82,6 +82,32 @@ try {
     for(const width of [390,1440]){
         await send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:width<640});
         for(const path of accountPages)await inspect(path,width);
+
+        // Real customer wallet interaction checks (both mobile and desktop).
+        await navigate('/account/wallet');
+        for(const category of ['E-Wallet','Virtual Account']){
+            const before=await evaluate(`(()=>{
+                const region=document.querySelector('[aria-label="Pilih metode pembayaran top up"]');
+                const button=[...(region?.querySelectorAll('button[aria-expanded]')||[])].find(b=>b.innerText.includes(${JSON.stringify(category)}));
+                const preview=button?.parentElement.querySelector('[aria-label="Logo metode pembayaran"]');
+                return {found:!!button,images:preview?.querySelectorAll('img').length||0,text:preview?.textContent?.trim()||''};
+            })()`);
+            if(!before.found||before.images<1||before.text)throw Error('Wallet collapsed logos invalid '+JSON.stringify({width,category,before}));
+            await evaluate(`(()=>{
+                const region=document.querySelector('[aria-label="Pilih metode pembayaran top up"]');
+                [...region.querySelectorAll('button[aria-expanded]')].find(b=>b.innerText.includes(${JSON.stringify(category)})).click();
+            })()`);
+            await pause(100);
+            const after=await evaluate(`(()=>{
+                const region=document.querySelector('[aria-label="Pilih metode pembayaran top up"]');
+                const button=[...region.querySelectorAll('button[aria-expanded]')].find(b=>b.innerText.includes(${JSON.stringify(category)}));
+                const grid=button?.parentElement.querySelector('[role="radiogroup"]');
+                const cols=grid?getComputedStyle(grid).gridTemplateColumns.split(' ').length:0;
+                return {expanded:button?.getAttribute('aria-expanded'),preview:!!button?.parentElement.querySelector('[aria-label="Logo metode pembayaran"]'),cols,method:!!grid?.querySelector('button[role="radio"] strong'),scroll:document.documentElement.scrollWidth};
+            })()`);
+            if(after.expanded!=='true'||after.preview||after.cols!==2||!after.method||after.scroll>width+2)throw Error('Wallet expanded grid invalid '+JSON.stringify({width,category,after}));
+            console.log('PASS wallet top-up '+category+' '+width);
+        }
     }
     await navigate('/admin/login');
     const adminLogin=await evaluate(`(async()=>{const token=document.querySelector('meta[name="csrf-token"]').content;const response=await fetch('/admin/login',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':token},body:JSON.stringify({email:'browser-admin@example.test',password:'Browser-admin-test-password-123'})});return response.status;})()`);
