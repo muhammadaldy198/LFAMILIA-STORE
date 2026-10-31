@@ -48,15 +48,16 @@ const paymentGroups = computed(() => {
         if (!map.has(key)) map.set(key, []);
         map.get(key).push(channel);
     }
-    const order = ['wallet', 'qris', 'ewallet', 'va', 'retail', 'other'];
+    // Category order is managed from the admin panel, not hardcoded.
     return [...map.entries()]
         .map(([key, items]) => ({
             key,
-            title: labels[key]?.[0] || labels.other[0],
-            description: labels[key]?.[1] || labels.other[1],
+            title: items[0]?.group_title || labels[key]?.[0] || labels.other[0],
+            description: items[0]?.group_description || labels[key]?.[1] || labels.other[1],
+            order: Number(items[0]?.group_order ?? 9999),
             items,
         }))
-        .sort((left, right) => order.indexOf(left.key) - order.indexOf(right.key));
+        .sort((left, right) => left.order - right.order || left.title.localeCompare(right.title, 'id'));
 });
 const hasExternalPaymentOption = computed(() => paymentGroups.value.some(group =>
   group.key !== 'wallet' && group.items.some(item => item.available !== false)));

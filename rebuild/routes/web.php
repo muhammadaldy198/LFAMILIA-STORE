@@ -271,6 +271,12 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
 
     Route::middleware(['admin.permission:payments.manage', 'admin.super'])->prefix('admin/payments')
         ->name('admin.payments.')->group(function (): void {
+            Route::post('/categories', [AdminPaymentController::class, 'storeCategory'])
+                ->middleware('throttle:admin-sensitive')->name('categories.store');
+            Route::put('/categories/{code}', [AdminPaymentController::class, 'updateCategory'])
+                ->middleware('throttle:admin-sensitive')->name('categories.update');
+            Route::delete('/categories/{code}', [AdminPaymentController::class, 'destroyCategory'])
+                ->middleware('throttle:admin-sensitive')->name('categories.destroy');
             Route::post('/channels/sync', [AdminPaymentController::class, 'syncChannels'])
                 ->middleware('throttle:admin-sensitive')->name('channels.sync');
             Route::post('/channels', [AdminPaymentController::class, 'storeChannel'])

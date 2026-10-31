@@ -18,6 +18,23 @@ const props = defineProps({
 
 const amountIdr = ref(props.minimumTopupIdr || 10000);
 const paymentChannelCode = ref('');
+const openedPaymentGroup = ref('');
+const paymentGroups = computed(() => {
+    const grouped = new Map();
+    for (const channel of props.paymentChannels || []) {
+        const code = channel.group || 'other';
+        if (!grouped.has(code)) grouped.set(code, { code, title: channel.group_title || 'Metode Lainnya',
+            description: channel.group_description || '', order: Number(channel.group_order ?? 9999), items: [] });
+        grouped.get(code).items.push(channel);
+    }
+    return [...grouped.values()].sort((a, b) => a.order - b.order || a.title.localeCompare(b.title, 'id'));
+});
+const choosePaymentGroup = group => {
+    openedPaymentGroup.value = openedPaymentGroup.value === group.code ? '' : group.code;
+    if (openedPaymentGroup.value && !group.items.some(channel => channel.code === paymentChannelCode.value)) {
+        paymentChannelCode.value = group.items[0]?.code || '';
+    }
+};
 const quote = ref(null);
 const result = ref(null);
 const errors = ref({});
@@ -103,28 +120,54 @@ async function createTopup() {
             </label>
             <span v-if="errors.amount_idr" class="text-xs text-red-300">{{ errors.amount_idr[0] }}</span>
 
-            <div class="grid gap-2 sm:grid-cols-2">
-                <button
-                    v-for="channel in paymentChannels"
-                    :key="channel.code"
-                    type="button"
-                    :disabled="Boolean(busy) || attemptLocked"
-                    class="rounded-lg border px-3 py-2 text-left text-sm"
-                    :class="paymentChannelCode === channel.code ? 'border-cyan-400 bg-cyan-400/10' : 'border-slate-700 bg-slate-950'"
-                    @click="paymentChannelCode = channel.code; quote = null"
-                ><span class="flex items-center gap-2"><img v-if="channel.logo_url" :src="channel.logo_url" :alt="channel.name" class="size-6 rounded object-contain"><span><strong class="block">{{ channel.name }}</strong><small v-if="channel.description" class="text-slate-400">{{ channel.description }}</small></span></span></button>
+            <div class="space-y-3" aria-label="Pilih metode pembayaran top up">
+                <h3 class="text-sm font-semibold text-slate-100">Metode pembayaran</h3>
+                <div v-for="group in paymentGroups" :key="group.code"
+                    class="overflow-hidden rounded-xl border transition-colors"
+                    :class="group.items.some(item => item.code === paymentChannelCode) ? 'border-cyan-400/70 bg-cyan-500/5' : 'border-slate-700 bg-slate-950/70'">
+                    <button type="button" class="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+                        :disabled="Boolean(busy) || attemptLocked" :aria-expanded="openedPaymentGroup === group.code"
+                        @click="choosePaymentGroup(group)">
+                        <span class="min-w-0"><strong class="block text-sm text-slate-100">{{ group.title }}</strong>
+                            <small v-if="group.description" class="mt-1 block text-xs leading-relaxed text-slate-400">{{ group.description }}</small>
+                            <small v-else class="mt-1 block text-xs text-slate-400">{{ group.items.length }} pilihan pembayaran</small>
+                        </span>
+                        <span class="flex shrink-0 items-center gap-2">
+                            <span v-if="group.items.some(item => item.code === paymentChannelCode)" class="rounded-full bg-cyan-400/15 px-2 py-1 text-[11px] font-semibold text-cyan-200">Dipilih</span>
+                            <span class="text-slate-400" aria-hidden="true">{{ openedPaymentGroup === group.code ? '▴' : '▾' }}</span>
+                        </span>
+                    </button>
+                    <div v-if="openedPaymentGroup === group.code" class="grid grid-cols-1 gap-2 border-t border-slate-700/80 p-3 sm:grid-cols-2" role="radiogroup" :aria-label="'Metode '+group.title">
+                        <button v-for="channel in group.items" :key="channel.code" type="button" role="radio"
+                            :aria-checked="paymentChannelCode === channel.code"
+                            :disabled="Boolean(busy) || attemptLocked"
+                            class="flex min-h-[64px] min-w-0 items-center gap-3 rounded-lg border px-3 py-3 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300 disabled:opacity-50"
+                            :class="paymentChannelCode === channel.code ? 'border-cyan-400 bg-cyan-400/10' : 'border-slate-700 bg-slate-900'"
+                            @click="paymentChannelCode = channel.code">
+                            <span class="flex size-10 shrink-0 items-center justify-center rounded-lg border border-slate-700 bg-slate-950">
+                                <img v-if="channel.logo_url" :src="channel.logo_url" :alt="channel.name" class="size-8 object-contain">
+                                <span v-else class="text-xs font-semibold text-cyan-300">{{ channel.name.slice(0,2).toUpperCase() }}</span>
+                            </span>
+                            <span class="min-w-0 flex-1"><strong class="block break-words text-sm text-slate-100">{{ channel.name }}</strong>
+                                <small v-if="channel.description" class="mt-0.5 block text-xs leading-snug text-slate-400">{{ channel.description }}</small></span>
+                            <span class="shrink-0 text-cyan-300" aria-hidden="true">{{ paymentChannelCode === channel.code ? '●' : '○' }}</span>
+                        </button>
+                    </div>
+                </div>
             </div>
             <span v-if="errors.payment_channel_code" class="text-xs text-red-300">{{ errors.payment_channel_code[0] }}</span>
 
             <div class="flex flex-wrap gap-2">
-                <button type="button" :disabled="busy || attemptLocked || !paymentChannelCode" class="rounded-lg bg-slate-700 px-4 py-2 disabled:opacity-50" @click="loadQuote">{{ customerText("pages.customer.wallet.60751a0", "Hitung total") }}</button>
+                <button type="button" :disabled="Boolean(busy) || attemptLocked || !paymentChannelCode" class="rounded-lg bg-slate-700 px-4 py-2 disabled:opacity-50" @click="loadQuote">{{ customerText("pages.customer.wallet.60751a0", "Hitung total") }}</button>
                 <button type="button" :disabled="busy || result || !quoteMatches" class="rounded-lg bg-cyan-300 px-4 py-2 font-semibold text-slate-950 disabled:opacity-50" @click="createTopup">{{busy === 'topup' ? 'Menyiapkan…' : attemptLocked ? 'Cek percobaan yang sama' : 'Top up'}}</button>
             </div>
             <p v-if="!paymentChannels?.length" class="text-sm text-slate-400">{{ customerText("pages.customer.wallet.8879a24e", "Metode top up belum tersedia. Hubungi bantuan.") }}</p>
             <p v-if="attemptLocked && !result" role="status" class="text-sm text-amber-200">{{ customerText("pages.customer.wallet.2d62f6cc", "Jika status belum pasti, coba cek percobaan yang sama. Jangan membuat top up baru.") }}</p>
-            <div v-if="quoteMatches" class="rounded-lg bg-slate-950 p-3 text-sm">
-                <div class="flex justify-between"><span>{{ customerText("pages.customer.wallet.dbcf71f5", "Saldo masuk") }}</span><span>{{ rupiah(quote.amount_idr) }}</span></div>
-                <div class="mt-2 flex justify-between border-t border-slate-800 pt-2 font-semibold"><span>{{ customerText("pages.customer.wallet.4cb761ce", "Total bayar") }}</span><span>{{ rupiah(quote.total_idr) }}</span></div>
+            <div v-if="quoteMatches" class="space-y-2 rounded-xl border border-cyan-400/30 bg-slate-950 p-4 text-sm" aria-live="polite">
+                <div class="flex items-center justify-between gap-3"><span class="text-slate-400">Metode</span><strong class="text-right">{{ paymentChannels?.find(channel => channel.code === paymentChannelCode)?.name || paymentChannelCode }}</strong></div>
+                <div class="flex items-center justify-between gap-3"><span>{{ customerText("pages.customer.wallet.dbcf71f5", "Saldo masuk") }}</span><span>{{ rupiah(quote.amount_idr) }}</span></div>
+                <div class="flex items-center justify-between gap-3 text-slate-300"><span>Biaya pembayaran</span><span>{{ rupiah(Math.max(0, Number(quote.total_idr || 0) - Number(quote.amount_idr || 0))) }}</span></div>
+                <div class="flex items-center justify-between gap-3 border-t border-slate-700 pt-3 text-base font-semibold"><span>{{ customerText("pages.customer.wallet.4cb761ce", "Total bayar") }}</span><strong class="text-cyan-300">{{ rupiah(quote.total_idr) }}</strong></div>
             </div>
             <div v-if="result?.payment" class="space-y-2 rounded-lg border border-cyan-500/30 bg-cyan-500/10 p-3 text-sm">
                 <p>{{ customerText("pages.customer.wallet.a86dd943", "Status pembayaran:") }} <strong>{{ statusLabel(result.payment.status) }}</strong></p>

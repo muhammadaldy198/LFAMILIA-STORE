@@ -10,6 +10,7 @@ const props = defineProps({
     isSuperAdmin: Boolean,
     gateways: { type: Array, default: () => [] },
     channels: { type: Array, default: () => [] },
+    categories: { type: Array, default: () => [] },
     routes: { type: Array, default: () => [] },
     transactions: { type: Object, default: () => ({ data: [], links: [] }) },
     filters: { type: Object, default: () => ({}) },
@@ -42,6 +43,7 @@ watch(() => props.routes, items => {
     })));
 }, { deep: true });
 
+const categoryLabel = code => props.categories.find(item => item.code === code)?.name || code;
 const methodLabel = value => ({
     QRIS: 'QRIS', VIRTUAL_ACCOUNT: 'Virtual Account', EWALLET: 'E-Wallet',
     RETAIL: 'Gerai Retail', WALLET: 'Saldo', OTHER: 'Lainnya',
@@ -85,6 +87,35 @@ const statusLabel = value => ({
 }[value] || value);
 
 // ---------- editor metode ----------
+const categoryEditor = ref(null);
+const categoryErrors = ref({});
+const categorySaving = ref(false);
+const categoryPendingDelete = ref(null);
+const openCategory = (category = null) => {
+    categoryEditor.value = category ? { ...category } : {
+        code: '', name: '', description: '', sort_order: (props.categories.length + 1) * 10, is_active: true,
+    };
+    categoryErrors.value = {};
+};
+const saveCategory = () => {
+    if (!categoryEditor.value || categorySaving.value) return;
+    const row = categoryEditor.value;
+    const payload = { code: row.code, name: row.name, description: row.description || null,
+        sort_order: Number(row.sort_order || 0), is_active: Boolean(row.is_active) };
+    categorySaving.value = true;
+    const url = row.channels_count === undefined ? '/admin/payments/categories' : '/admin/payments/categories/' + encodeURIComponent(row.code);
+    const method = row.channels_count === undefined ? 'post' : 'put';
+    router[method](url, payload, { preserveScroll: true, onSuccess: () => { categoryEditor.value = null; },
+        onError: errors => { categoryErrors.value = errors; }, onFinish: () => { categorySaving.value = false; } });
+};
+const deleteCategory = () => {
+    if (!categoryPendingDelete.value) return;
+    router.delete('/admin/payments/categories/' + encodeURIComponent(categoryPendingDelete.value.code), {
+        preserveScroll: true,
+        onSuccess: () => { categoryPendingDelete.value = null; },
+        onError: errors => { categoryErrors.value = errors; categoryPendingDelete.value = null; },
+    });
+};
 const editor = ref(null);
 const logoFile = ref(null);
 const logoPreview = ref('');
@@ -95,7 +126,7 @@ const advanced = ref(false);
 
 const openCreate = () => {
     editor.value = {
-        id: null, code: '', method: 'VIRTUAL_ACCOUNT', name: '', description: '',
+        id: null, code: '', method: 'VIRTUAL_ACCOUNT', category_code: 'va', name: '', description: '',
         gateway_code: 'MIDTRANS', provider_method: '',
         fee_flat_idr: 0, fee_percent: 0, supports_order: true, supports_wallet_topup: true,
         sort_order: props.channels.length ? Math.max(...props.channels.map(item => Number(item.sort_order || 0))) + 10 : 10,
@@ -105,6 +136,12 @@ const openCreate = () => {
     logoPreview.value = '';
     advanced.value = false;
     errors.value = {};
+};
+const onMethodChange = () => {
+    if (!editor.value || editor.value.id) return;
+    const defaultCodes = { WALLET: 'wallet', QRIS: 'qris', VIRTUAL_ACCOUNT: 'va', EWALLET: 'ewallet', RETAIL: 'retail', OTHER: 'other' };
+    editor.value.category_code = defaultCodes[editor.value.method] || 'other';
+    editor.value.provider_method = '';
 };
 const openEdit = channel => {
     editor.value = { ...channel, gateway_code: 'MIDTRANS', provider_method: '', fee_percent: Number(channel.fee_percent_bps || 0) / 100 };
@@ -136,6 +173,7 @@ const saveChannel = () => {
     const payload = {
         code: String(row.code || '').trim().toLowerCase(),
         method: row.method,
+        category_code: row.category_code,
         name: row.name,
         description: row.description || null,
         fee_flat_idr: free ? 0 : Number(row.fee_flat_idr || 0),
@@ -332,6 +370,33 @@ const successRate = computed(() => {
             <section class="adm-card">
                 <div class="adm-card-head">
                     <div>
+                        <h2>Kategori Pembayaran</h2>
+                        <p>Atur judul kategori, deskripsi, urutan, dan visibilitas di checkout game maupun top up LFAMILIA Cash.</p>
+                    </div>
+                    <button v-if="isSuperAdmin" type="button" class="adm-btn primary" @click="openCategory()">Tambah kategori</button>
+                </div>
+                <div class="adm-scroll">
+                    <table class="adm-table">
+                        <thead><tr><th>Kategori</th><th>Urutan</th><th>Metode</th><th>Status</th><th>Tindakan</th></tr></thead>
+                        <tbody>
+                            <tr v-for="category in categories" :key="category.code">
+                                <td><strong>{{ category.name }}</strong><div class="adm-note">{{ category.description || category.code }}</div></td>
+                                <td>{{ category.sort_order }}</td>
+                                <td>{{ category.channels_count }} metode</td>
+                                <td><span class="adm-tag" :class="category.is_active ? 'ok' : 'bad'">{{ category.is_active ? 'Aktif' : 'Nonaktif' }}</span></td>
+                                <td><div v-if="isSuperAdmin" style="display:flex;gap:6px">
+                                    <button class="adm-btn sm" type="button" @click="openCategory(category)">Ubah</button>
+                                    <button v-if="!['wallet','other'].includes(category.code) && !category.channels_count" class="adm-btn sm danger" type="button" @click="categoryPendingDelete = category">Hapus</button>
+                                </div></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="adm-card">
+                <div class="adm-card-head">
+                    <div>
                         <h2>Metode Pembayaran</h2>
                         <p>Admin dapat memilih gateway per metode untuk pesanan atau top up. Tidak ada gateway utama/cadangan atau perpindahan otomatis.</p>
                     </div>
@@ -343,7 +408,7 @@ const successRate = computed(() => {
                 <div class="adm-scroll">
                     <table class="adm-table">
                         <thead>
-                            <tr><th>Metode</th><th>Jenis</th><th>Gateway terpilih</th><th>Biaya ditagih</th><th>Kesiapan</th><th>Status</th><th>Tindakan</th></tr>
+                            <tr><th>Metode</th><th>Kategori</th><th>Jenis teknis</th><th>Gateway terpilih</th><th>Biaya ditagih</th><th>Kesiapan</th><th>Status</th><th>Tindakan</th></tr>
                         </thead>
                         <tbody>
                             <tr v-for="channel in channels" :key="channel.id">
@@ -360,6 +425,7 @@ const successRate = computed(() => {
                                         </div>
                                     </div>
                                 </td>
+                                <td><strong>{{ categoryLabel(channel.category_code) }}</strong></td>
                                 <td>{{ methodLabel(channel.method) }}</td>
                                 <td>
                                     <div v-if="gatewayRoutesFor(channel).length > 0" style="display:grid;gap:6px;min-width:160px">
@@ -673,6 +739,24 @@ const successRate = computed(() => {
             </section>
         </template>
 
+        <AdminModal :open="!!categoryEditor" :title="categoryEditor?.channels_count === undefined ? 'Tambah kategori pembayaran' : 'Ubah kategori pembayaran'"
+            @update:open="value => { if (!value) categoryEditor = null; }">
+            <div v-if="categoryEditor" class="adm-grid">
+                <label class="adm-field"><span>Nama kategori *</span><input class="adm-input" v-model="categoryEditor.name" maxlength="100"><span v-if="categoryErrors.name" class="err">{{ categoryErrors.name }}</span></label>
+                <label class="adm-field"><span>Kode tetap *</span><input class="adm-input mono" v-model="categoryEditor.code" maxlength="40" :disabled="categoryEditor.channels_count !== undefined" placeholder="contoh: transfer_bank"><span v-if="categoryErrors.code" class="err">{{ categoryErrors.code }}</span></label>
+                <label class="adm-field full"><span>Deskripsi di checkout</span><input class="adm-input" v-model="categoryEditor.description" maxlength="160"></label>
+                <label class="adm-field"><span>Urutan tampil</span><input type="number" min="0" max="9999" class="adm-input" v-model.number="categoryEditor.sort_order"></label>
+                <label class="adm-switch-row"><button type="button" role="switch" class="adm-switch" :aria-checked="categoryEditor.is_active" @click="categoryEditor.is_active = !categoryEditor.is_active" /> Tampilkan kategori</label>
+                <p class="adm-note full">Kategori nonaktif menyembunyikan seluruh metode di dalamnya dari checkout dan top up, tanpa mengubah konfigurasi gateway.</p>
+            </div>
+            <template #footer><button type="button" class="adm-btn" @click="categoryEditor = null">Batal</button><button type="button" class="adm-btn primary" :disabled="categorySaving" @click="saveCategory">Simpan kategori</button></template>
+        </AdminModal>
+        <AdminModal :open="!!categoryPendingDelete" title="Hapus kategori pembayaran" :description="'Kategori '+(categoryPendingDelete?.name || '')+' akan dihapus jika tidak digunakan.'"
+            @update:open="value => { if (!value) categoryPendingDelete = null; }">
+            <p>Metode pembayaran dan transaksi tidak akan dihapus.</p>
+            <template #footer><button type="button" class="adm-btn" @click="categoryPendingDelete = null">Batal</button><button type="button" class="adm-btn danger" @click="deleteCategory">Hapus kategori</button></template>
+        </AdminModal>
+
         <!-- pop-up metode -->
         <AdminModal :open="!!editor" :title="editor?.id ? 'Ubah metode pembayaran' : 'Tambah metode pembayaran'"
             description="Pilih metode bawaan yang sudah punya route gateway. Metode baru dengan kode bebas belum otomatis terhubung ke Midtrans atau DOKU."
@@ -691,11 +775,18 @@ const successRate = computed(() => {
                 </label>
                 <label class="adm-field">
                     <span>Kategori pembayaran</span>
-                    <select v-model="editor.method" class="adm-select">
+                    <select v-model="editor.method" class="adm-select" @change="onMethodChange">
                         <option value="QRIS">QRIS</option><option value="VIRTUAL_ACCOUNT">Virtual Account</option>
                         <option value="EWALLET">E-Wallet</option><option value="RETAIL">Gerai Retail</option>
                         <option value="WALLET">Saldo</option><option value="OTHER">Lainnya</option>
                     </select>
+                </label>
+                <label class="adm-field">
+                    <span>Kategori tampilan</span>
+                    <select v-model="editor.category_code" class="adm-select" :disabled="editor.method === 'WALLET'">
+                        <option v-for="category in categories.filter(item => item.code !== 'wallet' || editor.method === 'WALLET')" :key="category.code" :value="category.code">{{ category.name }}</option>
+                    </select>
+                    <span v-if="errors.category_code" class="err">{{ errors.category_code }}</span>
                 </label>
                 <label class="adm-field">
                     <span>Deskripsi pelanggan</span>
