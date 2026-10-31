@@ -456,23 +456,6 @@ class FulfillmentService
                 );
                 $this->emails->queueOrderCompleted((int) $order->id, 'digiflazz');
 
-                if (false && $price !== null) {
-                    // Successful delivery cannot be reversed; raise an urgent accounting alert.
-                    $this->event((int) $order->id, 'FULFILLMENT_PRICE_GUARD_BREACH', 'SUCCESS', 'SUCCESS', [
-                        'attempt_id' => $attempt->id,
-                        'provider_price_idr' => $price,
-                        'max_price_idr' => (int) $request['max_price'],
-                    ]);
-                    $this->notifications->record(
-                        'fulfillment.price_guard_breach',
-                        'PENTING: harga penyedia melebihi batas',
-                        'Pesanan '.$order->order_number.' sudah terkirim tetapi harga penyedia melebihi batas harga. Tinjau selisih biaya.',
-                        'ERROR',
-                        'order',
-                        $order->id
-                    );
-                }
-
                 return false;
             }
 
