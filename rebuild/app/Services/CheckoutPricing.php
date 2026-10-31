@@ -245,18 +245,6 @@ class CheckoutPricing
      */
     private function quoteForContext(object $context, Collection $eligibleMappings): array
     {
-        // Reject an expensive/missing live supplier SKU even if the admin
-        // deliberately keeps its accounting cost and per-source cap fixed.
-        $eligibleMappings = $eligibleMappings->filter(function (object $candidate): bool {
-            if ($candidate->provider_code !== 'DIGIFLAZZ' || ! $candidate->is_manual_price) {
-                return true;
-            }
-
-            return $candidate->live_cost_idr !== null
-                && (int) $candidate->live_cost_idr > 0
-                && (int) $candidate->live_cost_idr <= (int) $candidate->max_price_idr;
-        })->values();
-
         // Preserve the original SELL_PRICE voucher eligibility across a
         // Digiflazz nominal migration. A voucher that cost more than its
         // legacy fixed price must NOT take over checkout just because the
@@ -323,9 +311,10 @@ class CheckoutPricing
             throw ValidationException::withMessages(['package_id' => 'Harga jual nominal berada di bawah modal.']);
         }
 
-        // One selected SKU only. Provider max_price is its exact store cost.
+        // Digiflazz does not use an API max_price cap; retain the legacy
+        // snapshot field for non-Digiflazz provider compatibility only.
         $maxPrice = $mapping->provider_code === 'DIGIFLAZZ'
-            ? $cost
+            ? null
             : ($mapping->max_price_idr !== null ? (int) $mapping->max_price_idr : null);
 
         return [
