@@ -295,27 +295,23 @@ function choosePayment(code) {
 
 /* VA/E-Wallet: closed groups show logos only; expanded groups use compact cards. */
 .lf-payment-brand-strip--logos {
-  flex-wrap: wrap;
-  overflow: visible;
-  gap: 6px;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  min-width: 0;
+  gap: 4px;
   padding: 7px 10px;
-  white-space: normal;
 }
 .lf-payment-brand-strip--logos > .lf-payment-brand-logo {
   display: grid;
   place-items: center;
-  flex: 0 0 58px;
+  flex: 0 1 58px;
   box-sizing: border-box;
-  width: 58px;
-  height: 26px;
-  padding: 3px 5px;
+  min-width: 0;
+  max-width: 58px;
+  aspect-ratio: 58 / 26;
+  padding: 2px 3px;
   border-radius: 4px;
   background: rgba(255,255,255,.10);
-}
-.lf-payment-brand-strip--logos > .lf-payment-brand-logo:only-child {
-  padding: 3px 5px;
-  background: rgba(255,255,255,.10);
-  max-width: none;
 }
 .lf-payment-brand-logo img {
   display: block;
@@ -345,8 +341,8 @@ function choosePayment(code) {
   font-size: 12px;
 }
 @media (max-width: 390px) {
-  .lf-payment-brand-strip--logos { gap: 5px; padding: 6px 8px; }
-  .lf-payment-brand-strip--logos > .lf-payment-brand-logo { flex-basis: 52px; width: 52px; height: 24px; }
+  .lf-payment-brand-strip--logos { gap: 3px; padding: 6px 8px; }
+  .lf-payment-brand-strip--logos > .lf-payment-brand-logo { flex-basis: 52px; max-width: 52px; }
   .lfx-payment-method-grid--compact { gap: 7px; padding: 8px; }
   .lfx-payment-method-grid--compact .lfx-payment-method-card { padding: 8px; }
 }
