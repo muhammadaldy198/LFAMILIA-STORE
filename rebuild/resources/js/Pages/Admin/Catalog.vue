@@ -1110,7 +1110,7 @@ onMounted(() => {
                 </div>
                 <label v-if="fieldRows.length > 1 && !isMobileLegends(product?.slug)" class="adm-field">
                     <span>Format ID pengiriman sesuai produk</span>
-                    <input v-model="destinationFormat" class="adm-input" placeholder="Contoh: {{user_id}}{{zone_id}}" maxlength="500">
+                    <input v-model="destinationFormat" class="adm-input" placeholder="Contoh: user_id + zone_id" maxlength="500">
                     <span class="hint">Diatur satu kali per game, bukan per nominal. Gunakan format yang disyaratkan Digiflazz.</span>
                 </label>
                 <div class="adm-note adm-block">
@@ -1188,7 +1188,7 @@ onMounted(() => {
                 </label>
                 <label v-if="importFields.length > 1 && !isMobileLegends(importProduct?.slug)" class="adm-field full">
                     <span>Format ID tujuan Digiflazz (satu kali per game)</span>
-                    <input v-model="importDestination" class="adm-input" placeholder="Gunakan {{kode_kolom}} sesuai spesifikasi game" maxlength="500">
+                    <input v-model="importDestination" class="adm-input" placeholder="Gunakan kode kolom sesuai spesifikasi game" maxlength="500">
                 </label>
                 <label class="adm-switch-row full">
                     <button type="button" class="adm-switch" role="switch" :aria-checked="importPublish && importTemplateReady" :disabled="!importTemplateReady" @click="importPublish = !importPublish" />
