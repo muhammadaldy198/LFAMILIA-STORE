@@ -104,6 +104,42 @@ class PaymentCategoryAdminTest extends TestCase
             ->where('code', 'saldo')->value('name'));
     }
 
+    public function test_coin_migration_changes_only_exact_legacy_wallet_labels(): void
+    {
+        $legacyDescription = 'Bayar instan dari saldo LFAMILIA Cash tanpa biaya admin.';
+        DB::table('payment_categories')->where('code', 'wallet')->update(['name' => 'LFAMILIA Cash']);
+        DB::table('payment_channels')->where('code', 'saldo')->update([
+            'name' => 'LFAMILIA Cash',
+            'description' => $legacyDescription,
+        ]);
+
+        $migration = require database_path('migrations/2026_11_01_000002_rename_lfamilia_cash_to_coin.php');
+        $migration->up();
+
+        $this->assertSame('LFAMILIA Coin', DB::table('payment_categories')->where('code', 'wallet')->value('name'));
+        $this->assertSame('LFAMILIA Coin', DB::table('payment_channels')->where('code', 'saldo')->value('name'));
+        $this->assertSame('Bayar instan dari LFAMILIA Coin tanpa biaya admin.',
+            DB::table('payment_channels')->where('code', 'saldo')->value('description'));
+    }
+
+    public function test_coin_migration_preserves_admin_customized_casing(): void
+    {
+        $customDescription = 'Bayar instan dari saldo LFAMILIA CASH tanpa biaya admin.';
+        DB::table('payment_categories')->where('code', 'wallet')->update(['name' => 'Lfamilia Cash']);
+        DB::table('payment_channels')->where('code', 'saldo')->update([
+            'name' => 'LFAMILIA CASH',
+            'description' => $customDescription,
+        ]);
+
+        $migration = require database_path('migrations/2026_11_01_000002_rename_lfamilia_cash_to_coin.php');
+        $migration->up();
+
+        $this->assertSame('Lfamilia Cash', DB::table('payment_categories')->where('code', 'wallet')->value('name'));
+        $this->assertSame('LFAMILIA CASH', DB::table('payment_channels')->where('code', 'saldo')->value('name'));
+        $this->assertSame($customDescription,
+            DB::table('payment_channels')->where('code', 'saldo')->value('description'));
+    }
+
     public function test_wallet_category_cannot_be_deleted_or_reassigned(): void
     {
         $this->delete('/admin/payments/categories/wallet')->assertSessionHasErrors('category');
