@@ -559,8 +559,16 @@ const importCollator = new Intl.Collator('id-ID', { numeric: true, sensitivity: 
 const autoProducts = computed(() => props.autoProductOptions);
 const importProduct = computed(() => props.autoProductOptions.find(row => Number(row.id) === Number(importProductId.value))
     || props.products.find(row => Number(row.id) === Number(importProductId.value)) || null);
-const importFields = computed(() => importProduct.value?.fields || []);
-const importHasSavedTemplate = computed(() => Boolean(String(importProduct.value?.customer_no_template || '').trim()));
+// Mobile Legends' Digiflazz destination is user_id(zone_id). Supply the
+// familiar fields automatically when this product has not configured any.
+const importFields = computed(() => {
+    const fields = importProduct.value?.fields || [];
+    if (fields.length || importProduct.value?.slug !== 'mobile-legends') return fields;
+    return [
+        { field_key: 'user_id', is_required: true },
+        { field_key: 'zone_id', is_required: true },
+    ];
+});
 const importReady = computed(() => {
     const fields = importFields.value;
     const format = importTemplate.value.trim();
@@ -574,9 +582,9 @@ const importReady = computed(() => {
 });
 watch(importProductId, () => {
     const selected = importProduct.value;
-    const fields = selected?.fields || [];
-    // Same visible preview as Data Pelanggan; the owner can review the
-    // destination format here instead of leaving the bulk-import screen.
+    const fields = importFields.value;
+    // Preserve a verified existing format; otherwise derive the familiar
+    // one/two-field format without requiring a per-nominal setup.
     importTemplate.value = selected?.customer_no_template
         || (fields.length === 1 ? `{{${fields[0].field_key}}}`
             : fields.length === 2 ? `{{${fields[0].field_key}}}({{${fields[1].field_key}}})` : '');
@@ -696,7 +704,7 @@ const submitImport = () => {
     router.post(`/admin/catalog/products/${importProduct.value.id}/import`, {
         item_ids: importPicked.value,
         publish: importPublish.value && importReady.value,
-        ...(!importHasSavedTemplate.value && importReady.value
+        ...(importReady.value && importTemplate.value.trim() !== String(importProduct.value?.customer_no_template || '').trim()
             ? { customer_no_template: importTemplate.value.trim() } : {}),
     }, {
         preserveScroll: true,
@@ -1177,16 +1185,8 @@ onMounted(() => {
                     <input v-model="importSearch" class="adm-input" placeholder="Nama nominal atau kode SKU">
                 </label>
                 <div v-if="importProduct" class="adm-field full">
-                    <template v-if="importFields.length">
-                        <label v-if="!importHasSavedTemplate" class="adm-field">
-                            <span>Format ID tujuan Digiflazz</span>
-                            <input v-model="importTemplate" class="adm-input" placeholder="{{user_id}}({{zone_id}})" maxlength="500">
-                            <span class="hint">Sudah diisi dari kolom produk. Periksa format untuk game ini sebelum langsung dijual; format disimpan sekali untuk semua nominal.</span>
-                        </label>
-                        <p v-else class="adm-note">Format ID tujuan produk sudah tersimpan untuk semua nominal.</p>
-                    </template>
-                    <p v-else class="adm-note">Produk belum memiliki kolom Data Pelanggan. Semua nominal tetap dapat diimpor sebagai draf. Atur kolom pelanggan satu kali dari editor produk sebelum dijual.</p>
-                    <p v-if="!importReady && importFields.length" class="adm-note">Format tujuan belum lengkap. Impor tetap bisa dilakukan sebagai draf, tanpa mengaktifkan checkout.</p>
+                    <p v-if="importReady" class="adm-note">ID tujuan siap · {{ importTemplate.replaceAll('{{user_id}}', '12345678').replaceAll('{{zone_id}}', '1234').replaceAll('{{destination}}', '12345678') }}. Nominal yang diimpor bisa langsung dijual.</p>
+                    <p v-else class="adm-note">Data pelanggan game ini belum lengkap. Impor tetap bisa disimpan sebagai draf, lalu diaktifkan setelah data pelanggan tersedia.</p>
                 </div>
                 <label class="adm-switch-row full">
                     <button type="button" class="adm-switch" role="switch" :aria-checked="importPublish && importReady" :disabled="!importReady" @click="importPublish = !importPublish" />
