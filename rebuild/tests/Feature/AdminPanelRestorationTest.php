@@ -586,6 +586,38 @@ class AdminPanelRestorationTest extends TestCase
         $this->assertSame([1100, 20, 10, 5, 2000], $order());
     }
 
+    public function test_incremental_import_respects_numeric_tiebreak_for_equal_legacy_positions(): void
+    {
+        $this->login();
+        $this->fakeCatalog([
+            $this->row([
+                'buyer_sku_code' => 'tie-batch-10',
+                'product_name' => 'Restore 10 Diamonds',
+                'price' => 10010,
+            ]),
+        ]);
+        app(DigiflazzCatalogService::class)->sync();
+        $product = $this->product();
+        // The older 20 nominal was created first, but both were saved with
+        // position 0; checkout already treats 5 as earlier than 20.
+        foreach ([20, 5] as $value) {
+            $product->packages()->create([
+                'code' => 'LEGACY-TIED-'.$value,
+                'name' => $value.' Diamonds',
+                'nominal_value' => $value,
+                'group_name' => 'Umum',
+                'sort_order' => 0,
+                'is_active' => false,
+            ]);
+        }
+        $id = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'tie-batch-10')->value('id');
+        $this->post('/admin/catalog/products/'.$product->id.'/import', [
+            'item_ids' => [$id], 'publish' => false,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame([5, 10, 20], $product->packages()
+            ->orderBy('sort_order')->pluck('nominal_value')->map(fn ($value): int => (int) $value)->all());
+    }
+
     public function test_customer_nominal_order_is_numeric_even_when_imported_values_are_missing(): void
     {
         $names = [100, 2000, 10, 200, 20, 7];

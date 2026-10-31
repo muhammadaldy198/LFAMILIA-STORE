@@ -214,8 +214,11 @@ class DigiflazzAutoSources
             // Lock in stable ID order, as the sync path does.
             $packages = $product->packages()->orderBy('id')->lockForUpdate()->get();
             $ordering = app(CatalogNominalOrder::class);
-            $existing = $packages->reject(fn (ProductPackage $package): bool => isset($newIds[(int) $package->id]))
-                ->sortBy([['sort_order', 'asc'], ['id', 'asc']])->values();
+            // Follow checkout's effective order when legacy positions tie:
+            // sort_order, then numeric nominal, then name/ID.
+            $existing = $ordering->sort($packages->reject(
+                fn (ProductPackage $package): bool => isset($newIds[(int) $package->id])
+            ));
             $naturalExistingIds = $ordering->sortNaturally($existing)->pluck('id')->all();
             if ($existing->pluck('id')->all() === $naturalExistingIds) {
                 // Previous order is numeric: insert any new batch naturally.
