@@ -110,7 +110,7 @@ class AdminPackageGroupController
             $product->update(['package_tabs' => array_values(array_filter($product->package_tabs ?? [],
                 fn ($name): bool => $name !== $group->name))]);
             $group->delete();
-            $audit->record($request, 'catalog.group.deleted', 'product_package_group', $group->id, $before, null);
+            $audit->record($request, 'catalog.group.deleted', 'product_package_group', $group->id, $before, []);
         }, 3);
 
         return back();

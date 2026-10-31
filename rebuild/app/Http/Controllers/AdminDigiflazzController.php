@@ -3,9 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Product;
-use App\Models\ProductPackageGroup;
 use App\Models\ProductInputField;
 use App\Models\ProductPackage;
+use App\Models\ProductPackageGroup;
 use App\Models\Provider;
 use App\Models\ProviderMapping;
 use App\Services\AdminAuditService;
@@ -407,7 +407,7 @@ class AdminDigiflazzController
             if (isset($data['group_id'])) {
                 $targetGroup = ProductPackageGroup::where('product_id', $product->id)
                     ->whereKey($data['group_id'])->first();
-                if (! $targetGroup) {
+                if ($targetGroup === null) {
                     throw ValidationException::withMessages(['group_id' => 'Grup tujuan tidak tersedia pada produk ini.']);
                 }
             }
@@ -462,7 +462,7 @@ class AdminDigiflazzController
                 if (! $service->sellable($item)) {
                     throw ValidationException::withMessages(['item_ids' => 'SKU tidak tersedia atau data lebih dari 24 jam. Sinkronkan dahulu.']);
                 }
-                if ($product->package_tabs_enabled && ! in_array(trim((string) ($targetGroup?->name ?? $item->type)), $product->package_tabs ?? [], true)) {
+                if ($product->package_tabs_enabled && in_array(trim((string) ($targetGroup?->name ?? $item->type)), $product->package_tabs ?? [], true) === false) {
                     throw ValidationException::withMessages(['item_ids' => 'Grup nominal belum tersedia pada tab produk. Tambahkan tab "'.$item->type.'" dahulu.']);
                 }
             }
