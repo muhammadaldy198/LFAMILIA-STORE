@@ -439,3 +439,17 @@
   font-weight: 800;
   line-height: 1.4;
 }
+
+/* PR 6 F16: keep rating and review count visually distinct, even at 360px. */
+.lfx .lf-review-average {
+  display: grid;
+  grid-template-columns: max-content max-content;
+  align-items: baseline;
+  justify-content: start;
+  column-gap: 6px;
+  row-gap: 2px;
+}
+.lfx .lf-review-average > small {
+  grid-column: 1 / -1;
+  white-space: nowrap;
+}

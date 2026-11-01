@@ -325,3 +325,12 @@ test('F14 Keterangan remains one tab and separates description, reviews and FAQ'
     assert.match(css, /\.lfx \.lf-product-details > \.lf-product-faq-legacy/);
     assert.match(css, /border-top: 2px solid/);
 });
+
+
+test('F16 review count uses a separate line and supports zero reviews', () => {
+    const product = read('Pages/Catalog/Show.vue');
+    const css = readFileSync(new URL('../../resources/css/checkout.css', import.meta.url), 'utf8');
+    assert.match(product, /reviewStats\?\.total \|\| 0\}\} ulasan/);
+    assert.match(css, /\.lfx \.lf-review-average > small \{[^}]*grid-column: 1 \/ -1/s);
+    assert.match(css, /\.lfx \.lf-review-average \{[^}]*row-gap: 2px/s);
+});
