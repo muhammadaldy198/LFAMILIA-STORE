@@ -27,7 +27,7 @@ class DokuCheckoutGateway
         $config = $resolved['config'] ?? [];
         $environment = (string) ($resolved['environment'] ?? '');
         if (! is_array($config) || empty($config['client_id']) || empty($config['secret_key'])
-            || ! in_array($environment, ['sandbox', 'production'], true)) {
+            || $environment !== 'production') {
             throw new RuntimeException('DOKU_STATUS_UNAVAILABLE');
         }
 
@@ -78,7 +78,7 @@ class DokuCheckoutGateway
         if (! is_array($config)
             || empty($config['client_id'])
             || empty($config['secret_key'])
-            || ! in_array($environment, ['sandbox', 'production'], true)) {
+            || $environment !== 'production') {
             throw ValidationException::withMessages(['payment' => 'Metode pembayaran sedang tidak tersedia.']);
         }
 
