@@ -110,7 +110,7 @@ async function createTopup() {
             <strong class="mt-2 block text-3xl text-cyan-300">{{ rupiah(balanceIdr) }}</strong>
         </div>
 
-        <section v-if="topupEnabled" class="space-y-4 rounded-xl border border-slate-800 bg-slate-900 p-5">
+        <section v-if="topupEnabled" class="space-y-4 rounded-xl border border-slate-800 bg-slate-900 p-5 pb-32 sm:pb-5">
             <div>
                 <h2 class="text-xl font-semibold">{{ customerText("pages.customer.wallet.1b8225c4", "Top up saldo") }}</h2>
                 <p class="text-sm text-slate-400">Minimum {{ rupiah(minimumTopupIdr) }}. Total pembayaran ditampilkan sebelum top up.</p>
@@ -125,14 +125,14 @@ async function createTopup() {
                 <div v-for="group in paymentGroups" :key="group.code"
                     class="overflow-hidden rounded-xl border transition-colors"
                     :class="group.items.some(item => item.code === paymentChannelCode) ? 'border-cyan-400/70 bg-cyan-500/5' : 'border-slate-700 bg-slate-950/70'">
-                    <button type="button" class="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+                    <button type="button" class="grid w-full grid-cols-[minmax(0,1fr)_auto] items-start gap-2 px-3 py-3 text-left sm:gap-3 sm:px-4"
                         :disabled="Boolean(busy) || attemptLocked" :aria-expanded="openedPaymentGroup === group.code"
                         @click="choosePaymentGroup(group)">
-                        <span class="min-w-0"><strong class="block text-sm text-slate-100">{{ group.title }}</strong>
+                        <span class="min-w-0 break-words"><strong class="block text-sm leading-snug text-slate-100">{{ group.title }}</strong>
                             <small v-if="group.description" class="mt-1 block text-xs leading-relaxed text-slate-400">{{ group.description }}</small>
                             <small v-else class="mt-1 block text-xs text-slate-400">{{ group.items.length }} pilihan pembayaran</small>
                         </span>
-                        <span class="flex shrink-0 items-center gap-2">
+                        <span class="flex shrink-0 items-center gap-1.5 whitespace-nowrap sm:gap-2">
                             <span v-if="group.items.some(item => item.code === paymentChannelCode)" class="rounded-full bg-cyan-400/15 px-2 py-1 text-[11px] font-semibold text-cyan-200">Dipilih</span>
                             <span class="text-slate-400" aria-hidden="true">{{ openedPaymentGroup === group.code ? '▴' : '▾' }}</span>
                         </span>
@@ -164,10 +164,10 @@ async function createTopup() {
 
             <div class="flex flex-wrap gap-2">
                 <button type="button" :disabled="Boolean(busy) || attemptLocked || !paymentChannelCode" class="rounded-lg bg-slate-700 px-4 py-2 disabled:opacity-50" @click="loadQuote">{{ customerText("pages.customer.wallet.60751a0", "Hitung total") }}</button>
-                <button type="button" :disabled="busy || result || !quoteMatches" class="rounded-lg bg-cyan-300 px-4 py-2 font-semibold text-slate-950 disabled:opacity-50" @click="createTopup">{{busy === 'topup' ? 'Menyiapkan…' : attemptLocked ? 'Cek percobaan yang sama' : 'Top up'}}</button>
+                <button type="button" :disabled="busy || result || !quoteMatches" class="rounded-lg bg-cyan-300 px-4 py-2 font-semibold text-slate-950 disabled:opacity-50" @click="createTopup">{{busy === 'topup' ? 'Menyiapkan…' : attemptLocked ? 'Cek status top up' : 'Top up'}}</button>
             </div>
             <p v-if="!paymentChannels?.length" class="text-sm text-slate-400">{{ customerText("pages.customer.wallet.8879a24e", "Metode top up belum tersedia. Hubungi bantuan.") }}</p>
-            <p v-if="attemptLocked && !result" role="status" class="text-sm text-amber-200">{{ customerText("pages.customer.wallet.2d62f6cc", "Jika status belum pasti, coba cek percobaan yang sama. Jangan membuat top up baru.") }}</p>
+            <p v-if="attemptLocked && !result" role="status" class="text-sm text-amber-200">{{ customerText("pages.customer.wallet.2d62f6cc", "Top up sebelumnya masih diproses. Cek statusnya dulu — jangan membuat top up baru agar tidak terbayar dua kali.") }}</p>
             <div v-if="quoteMatches" class="space-y-2 rounded-xl border border-cyan-400/30 bg-slate-950 p-4 text-sm" aria-live="polite">
                 <div class="flex items-center justify-between gap-3"><span class="text-slate-400">Metode</span><strong class="text-right">{{ paymentChannels?.find(channel => channel.code === paymentChannelCode)?.name || paymentChannelCode }}</strong></div>
                 <div class="flex items-center justify-between gap-3"><span>{{ customerText("pages.customer.wallet.dbcf71f5", "Saldo masuk") }}</span><span>{{ rupiah(quote.amount_idr) }}</span></div>

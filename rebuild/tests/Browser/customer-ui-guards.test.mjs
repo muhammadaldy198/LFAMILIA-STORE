@@ -334,3 +334,15 @@ test('F16 review count uses a separate line and supports zero reviews', () => {
     assert.match(css, /\.lfx \.lf-review-average > small \{[^}]*grid-column: 1 \/ -1/s);
     assert.match(css, /\.lfx \.lf-review-average \{[^}]*row-gap: 2px/s);
 });
+
+
+test('F15 wallet uses customer language and protects the total from floating chat', () => {
+    const wallet = read('Pages/Customer/Wallet.vue');
+    assert.match(wallet, /Cek status top up/);
+    assert.match(wallet, /Top up sebelumnya masih diproses\. Cek statusnya dulu/);
+    assert.doesNotMatch(wallet, /Cek percobaan yang sama|coba cek percobaan yang sama/);
+    assert.match(wallet, /grid-cols-\[minmax\(0,1fr\)_auto\]/);
+    assert.match(wallet, /pb-32 sm:pb-5/);
+    assert.match(wallet, /:disabled="Boolean\(busy\) \|\| attemptLocked"/);
+    assert.match(wallet, /idempotency_key: idempotencyKey\.value/);
+});

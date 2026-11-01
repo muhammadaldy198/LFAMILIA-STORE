@@ -156,9 +156,12 @@ try {
     const login=await evaluate(`(async()=>{const token=document.querySelector('meta[name="csrf-token"]').content;const response=await fetch('/login',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':token},body:JSON.stringify({email:'browser-account@example.test',password:'Browser-test-password-123'})});return response.status;})()`);
     if(login!==200&&login!==204)throw Error('Fixture login failed: '+login);
     const accountPages=['/account','/account/wallet','/account/orders','/account/tickets','/account/profile','/account/membership','/account/game-accounts','/account/codes','/account/notifications'];
-    for(const width of [390,1440]){
+    for(const width of [360,390,1440]){
         await send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:width<640});
         for(const path of accountPages)await inspect(path,width);
+        await navigate('/account/profile');
+        const phoneAlignment=await evaluate(`(()=>{const root=document.querySelector('.lf-country-picker');const button=root?.querySelector('button');const input=root?.querySelector('input[type="tel"]');if(!button||!input)return null;const a=button.getBoundingClientRect(),b=input.getBoundingClientRect();return {top:Math.abs(a.top-b.top),height:Math.abs(a.height-b.height)};})()`);
+        if(!phoneAlignment||phoneAlignment.top>1||phoneAlignment.height>1)throw Error('F13 account phone alignment mismatch '+JSON.stringify({width,phoneAlignment}));
 
         // Real customer wallet interaction checks (both mobile and desktop).
         await navigate('/account/wallet');
@@ -186,6 +189,8 @@ try {
                 return {expanded:button?.getAttribute('aria-expanded'),preview:!!button?.parentElement.querySelector('[aria-label="Logo metode pembayaran"]'),cols,method:!!grid?.querySelector('button[role="radio"] strong'),scroll:document.documentElement.scrollWidth};
             })()`);
             if(after.expanded!=='true'||after.preview||after.cols!==2||!after.method||after.scroll>width+2)throw Error('Wallet expanded grid invalid '+JSON.stringify({width,category,after}));
+            const walletHeader=await evaluate(`(()=>{const region=document.querySelector('[aria-label="Pilih metode pembayaran top up"]');const button=[...(region?.querySelectorAll('button[aria-expanded]')||[])].find(b=>b.innerText.includes(${JSON.stringify(category)}));const badge=button?.querySelector('.rounded-full');const title=button?.querySelector('strong');if(!badge||!title)return null;const b=badge.getBoundingClientRect(),t=title.getBoundingClientRect(),h=button.getBoundingClientRect();return {badgeWithin:b.right<=h.right+1,badgeClear:b.left>=t.right-1,notClipped:title.scrollWidth<=title.clientWidth+1};})()`);
+            if(!walletHeader||!walletHeader.badgeWithin||!walletHeader.badgeClear||!walletHeader.notClipped)throw Error('F15 wallet header text clipped '+JSON.stringify({width,category,walletHeader}));
             await mkdir('checkout-visual-results',{recursive:true});
             const image=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});
             await writeFile('checkout-visual-results/wallet-'+(category==='E-Wallet'?'ewallet':'va')+'-'+width+'.png',Buffer.from(image.data,'base64'));
