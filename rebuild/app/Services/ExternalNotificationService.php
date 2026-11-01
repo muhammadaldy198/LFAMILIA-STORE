@@ -46,7 +46,7 @@ class ExternalNotificationService
         $config = $resolved['config'] ?? [];
         $environment = (string) ($resolved['environment'] ?? '');
         if (! is_array($config)
-            || ! in_array($environment, ['test', 'production'], true)
+            || $environment !== 'production'
             || empty($config['bot_token'])
             || empty($config['chat_id'])) {
             return null;
