@@ -130,7 +130,7 @@ class IntegrationConnectionService
      */
     private function midtrans(array $config, ?string $environment): array
     {
-        if (empty($config['server_key']) || $environment !== 'production') {
+        if (empty($config['server_key']) || ($environment !== 'production' && ! (app()->environment('testing') && $environment === 'sandbox'))) {
             return $this->notConfigured('Server Key/environment Midtrans belum lengkap.');
         }
 
@@ -169,8 +169,24 @@ class IntegrationConnectionService
     {
         $siteKey = trim((string) ($config['site_key'] ?? ''));
         $secret = trim((string) ($config['secret_key'] ?? ''));
-        if ($siteKey === '' || $secret === '' || $environment !== 'production') {
+        if ($siteKey === '' || $secret === '' || ($environment !== 'production' && ! (app()->environment('testing') && $environment === 'test'))) {
             return $this->notConfigured('Site Key/Secret Key/environment Turnstile belum lengkap.');
+        }
+
+        if ($environment === 'test' && app()->environment('testing')) {
+            $response = Http::asForm()->acceptJson()->connectTimeout(3)->timeout(8)
+                ->post('https://challenges.cloudflare.com/turnstile/v0/siteverify', [
+                    'secret' => $secret,
+                    'response' => 'XXXX.DUMMY.TOKEN.XXXX',
+                ]);
+            if ($this->isProviderUnavailable($response)) {
+                return $this->unavailable();
+            }
+            $payload = $response->json();
+
+            return $response->successful() && is_array($payload) && ($payload['success'] ?? false) === true
+                ? $this->verified('Credential Turnstile Test terverifikasi melalui Siteverify dengan dummy token resmi.')
+                : $this->invalidCredential('Credential Turnstile Test tidak valid atau tidak cocok dengan mode Test.');
         }
 
         return $this->unverified(
@@ -188,7 +204,7 @@ class IntegrationConnectionService
         if ($token === '') {
             return $this->notConfigured('Bot token Telegram belum diisi.');
         }
-        if ($environment !== 'production') {
+        if ($environment !== 'production' && ! (app()->environment('testing') && $environment === 'test')) {
             return $this->notConfigured('Environment Telegram belum valid.');
         }
 
