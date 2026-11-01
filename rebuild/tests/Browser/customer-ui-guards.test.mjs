@@ -303,3 +303,11 @@ test('F13 country controls stretch to match input instead of raising input heigh
     assert.match(checkout, /\.lfx \.lfx-phone-entry\{[^}]*align-items:stretch/);
     assert.match(checkout, /\.lfx \.lfx-country-trigger\{[^}]*height:auto;min-height:0;align-self:stretch/);
 });
+
+
+test('QRIS heading and channel explanation wrap without mid-word truncation', () => {
+    const methods = read('Components/Checkout/PaymentMethods.vue');
+    assert.match(methods, /lf-payment-brand-strip--qris/);
+    assert.match(methods, /lf-payment-group-card--qris/);
+    assert.match(methods, /white-space:normal;overflow:visible;text-overflow:clip/);
+});
