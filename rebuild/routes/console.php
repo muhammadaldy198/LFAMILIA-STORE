@@ -147,7 +147,7 @@ Artisan::command('lfamilia:reconcile-pending-payments', function (
                 $checked++;
                 try {
                     $verified = $midtrans->status((string) $payment->merchant_reference);
-                    if (! hash_equals((string) $payment->merchant_reference, (string) $verified['order_id'])
+                    if (hash_equals((string) $payment->merchant_reference, (string) $verified['order_id']) === false
                         || $verification->amount($verified['gross_amount']) !== (int) $payment->amount_idr) {
                         Log::warning('Scheduled payment verification rejected', [
                             'payment_transaction_id' => $payment->id,
