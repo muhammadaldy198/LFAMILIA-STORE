@@ -5,11 +5,11 @@ namespace App\Http\Controllers;
 use App\Models\NewsArticle;
 use App\Services\StorefrontContentService;
 use App\Support\OptimizedMedia;
+use App\Support\SeoMetadata;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redis;
 use Inertia\Response;
-use App\Support\SeoMetadata;
 
 class PublicContentController
 {
