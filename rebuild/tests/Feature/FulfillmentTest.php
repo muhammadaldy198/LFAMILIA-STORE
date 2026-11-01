@@ -1026,4 +1026,266 @@ class FulfillmentTest extends TestCase
         Queue::assertPushed(ReconcileFulfillmentJob::class);
         $this->assertSame(1, DB::table('fulfillment_attempts')->where('order_id', $processingOrderId)->count());
     }
+
+    public function test_reconciliation_accepts_lowercase_sku_and_marks_success(): void
+    {
+        Queue::fake();
+        $this->credentials();
+        $catalog = $this->automaticCatalog(sku: 'ML5_A');
+        $orderId = $this->paidOrder($catalog);
+        $calls = 0;
+        Http::fake(function ($request) use (&$calls) {
+            $calls++;
+            if ($calls === 1) {
+                return Http::response(['error' => 'provider timeout'], 503);
+            }
+
+            return Http::response(['data' => [
+                'ref_id' => $request['ref_id'],
+                'buyer_sku_code' => 'ml5_a',
+                'customer_no' => $request['customer_no'],
+                'status' => 'Sukses',
+                'rc' => '00',
+                'sn' => 'DELIVERED',
+                'price' => 10000,
+            ]]);
+        });
+
+        $service = app(FulfillmentService::class);
+        $service->startOrder($orderId);
+        $id = (int) DB::table('fulfillment_attempts')->where('order_id', $orderId)->value('id');
+        $service->sendAttempt($id);
+        $this->assertSame('UNKNOWN', DB::table('fulfillment_attempts')->where('id', $id)->value('status'));
+        $service->reconcileAttempt($id);
+
+        $this->assertSame('SUCCESS', DB::table('fulfillment_attempts')->where('id', $id)->value('status'));
+        $this->assertSame('SUCCESS', DB::table('orders')->where('id', $orderId)->value('status'));
+        $this->assertSame(1, DB::table('fulfillment_attempts')->where('order_id', $orderId)->count());
+        Http::assertSentCount(2);
+    }
+
+    public function test_reconciliation_accepts_lowercase_sku_failure_rc02_without_failover(): void
+    {
+        Queue::fake();
+        $this->credentials();
+        $catalog = $this->automaticCatalog(sku: 'ML5_A');
+        $orderId = $this->paidOrder($catalog);
+        $calls = 0;
+        Http::fake(function ($request) use (&$calls) {
+            $calls++;
+            if ($calls === 1) {
+                return Http::response(['error' => 'temporary'], 503);
+            }
+
+            return Http::response(['data' => [
+                'ref_id' => $request['ref_id'],
+                'buyer_sku_code' => 'ml5_a',
+                'customer_no' => $request['customer_no'],
+                'status' => 'Gagal',
+                'rc' => '02',
+                'message' => 'Transaksi Gagal',
+                'price' => 10000,
+            ]]);
+        });
+        $service = app(FulfillmentService::class);
+        $service->startOrder($orderId);
+        $id = (int) DB::table('fulfillment_attempts')->where('order_id', $orderId)->value('id');
+        $service->sendAttempt($id);
+        $service->reconcileAttempt($id);
+
+        $this->assertDatabaseHas('fulfillment_attempts', [
+            'id' => $id, 'status' => 'FAILED_CONFIRMED', 'provider_rc' => '02',
+        ]);
+        $this->assertSame('BLOCKED', DB::table('orders')->where('id', $orderId)->value('status'));
+        $this->assertSame(1, DB::table('fulfillment_attempts')->where('order_id', $orderId)->count());
+        Queue::assertNotPushed(\App\Jobs\SendFulfillmentJob::class);
+        Http::assertSentCount(2);
+    }
+
+    public function test_reconciliation_still_rejects_changed_ref_id_or_customer_no(): void
+    {
+        Queue::fake();
+        $this->credentials();
+        foreach (['ref_id', 'customer_no'] as $field) {
+            Http::swap(new \Illuminate\Http\Client\Factory);
+            $catalog = $this->automaticCatalog(sku: 'ML5_A');
+            $orderId = $this->paidOrder($catalog);
+            $calls = 0;
+            Http::fake(function ($request) use ($field, &$calls) {
+                $calls++;
+                if ($calls === 1) {
+                    return Http::response(['error' => 'temporary'], 503);
+                }
+                $response = [
+                    'ref_id' => $request['ref_id'],
+                    'buyer_sku_code' => 'ml5_a',
+                    'customer_no' => $request['customer_no'],
+                    'status' => 'Sukses',
+                    'rc' => '00',
+                    'price' => 10000,
+                ];
+                $response[$field] .= '-TAMPERED';
+
+                return Http::response(['data' => $response]);
+            });
+            $service = app(FulfillmentService::class);
+            $service->startOrder($orderId);
+            $id = (int) DB::table('fulfillment_attempts')->where('order_id', $orderId)->value('id');
+            $service->sendAttempt($id);
+            $service->reconcileAttempt($id);
+
+            $this->assertSame('UNKNOWN', DB::table('fulfillment_attempts')->where('id', $id)->value('status'));
+            $this->assertSame('PROCESSING', DB::table('orders')->where('id', $orderId)->value('status'));
+            Http::assertSentCount(2);
+        }
+    }
+
+    private function quarantinedPaidOrder(): array
+    {
+        $this->credentials();
+        $catalog = $this->automaticCatalog(sku: 'ML5_A');
+        $orderId = $this->paidOrder($catalog);
+        $service = app(FulfillmentService::class);
+        $service->startOrder($orderId);
+        $legacy = DB::table('fulfillment_attempts')->where('order_id', $orderId)->firstOrFail();
+        DB::table('fulfillment_attempts')->where('id', $legacy->id)->update([
+            'status' => 'BLOCKED',
+            'last_error' => 'LEGACY_ENV_QUARANTINED: Asal environment belum bisa diverifikasi.',
+        ]);
+        DB::table('orders')->where('id', $orderId)->update(['status' => 'BLOCKED']);
+
+        return [$orderId, $legacy];
+    }
+
+    public function test_superadmin_can_create_one_new_attempt_from_documented_failed_quarantine(): void
+    {
+        Queue::fake();
+        [$orderId, $legacy] = $this->quarantinedPaidOrder();
+        $admin = $this->createAdmin([
+            'name' => 'Quarantine supervisor',
+            'email' => bin2hex(random_bytes(8)).'@example.test',
+            'password' => bcrypt('test-password'),
+            'role' => 'SUPER_ADMIN',
+            'is_active' => true,
+        ]);
+        $this->actingAs($admin, 'admin');
+        $this->get('/admin/fulfillment?scope=action')
+            ->assertOk()
+            ->assertInertia(fn (\Inertia\Testing\AssertableInertia $page) => $page
+                ->component('Admin/Fulfillment')
+                ->where('attempts.data.0.can_resolve_quarantine', true)
+                ->where('attempts.data.0.resolution_destination', '1234567890')
+            );
+
+        $this->withSession(['admin.password_confirmed_at' => time()])->post(
+            '/admin/fulfillment/'.$legacy->id.'/resolve-quarantine',
+            [
+                'provider_ref_id' => $legacy->external_reference,
+                'provider_status' => 'Gagal',
+                'provider_rc' => '02',
+                'evidence_reference' => 'Digiflazz history - failed rc 02',
+                'note' => 'Diperiksa dalam riwayat transaksi dan sudah final Gagal.',
+                'confirmed_customer_no' => '1234567890',
+            ]
+        )->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertSame('PROCESSING', DB::table('orders')->where('id', $orderId)->value('status'));
+        $this->assertDatabaseHas('fulfillment_attempts', [
+            'id' => $legacy->id,
+            'status' => 'BLOCKED',
+            'last_error' => 'LEGACY_ENV_QUARANTINED: Asal environment belum bisa diverifikasi.',
+        ]);
+        $this->assertSame(2, DB::table('fulfillment_attempts')->where('order_id', $orderId)->count());
+        $new = DB::table('fulfillment_attempts')->where('order_id', $orderId)
+            ->orderByDesc('id')->firstOrFail();
+        $this->assertSame('CREATED', $new->status);
+        $this->assertSame(2, (int) $new->attempt_no);
+        $this->assertNotSame($legacy->external_reference, $new->external_reference);
+        $this->assertSame($legacy->provider_mapping_id, $new->provider_mapping_id);
+        $this->assertDatabaseHas('order_events', [
+            'order_id' => $orderId,
+            'event_type' => 'FULFILLMENT_QUARANTINE_MANUALLY_RESOLVED',
+        ]);
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'fulfillment.quarantine.resolved',
+            'target_id' => (string) $new->id,
+        ]);
+        Queue::assertPushed(SendFulfillmentJob::class, fn (SendFulfillmentJob $job): bool => $job->attemptId === (int) $new->id);
+        Queue::assertNotPushed(SendFulfillmentJob::class, fn (SendFulfillmentJob $job): bool => $job->attemptId === (int) $legacy->id);
+
+        $this->withSession(['admin.password_confirmed_at' => time()])->post(
+            '/admin/fulfillment/'.$legacy->id.'/resolve-quarantine',
+            [
+                'provider_ref_id' => $legacy->external_reference,
+                'provider_status' => 'Gagal',
+                'provider_rc' => '02',
+                'evidence_reference' => 'Duplicate click',
+                'note' => 'Duplicate must fail',
+                'confirmed_customer_no' => '1234567890',
+            ]
+        )->assertSessionHasErrors('fulfillment');
+        $this->assertSame(2, DB::table('fulfillment_attempts')->where('order_id', $orderId)->count());
+    }
+
+    public function test_quarantine_resolution_rejects_uncertain_evidence_and_wrong_destination(): void
+    {
+        Queue::fake();
+        [$orderId, $legacy] = $this->quarantinedPaidOrder();
+        $service = app(FulfillmentService::class);
+        foreach ([['01', '1234567890'], ['70', '1234567890'], ['02', '9999999999']] as [$rc, $destination]) {
+            try {
+                $service->resolveLegacyQuarantine(
+                    (int) $legacy->id, 1, $legacy->external_reference,
+                    $rc, 'Provider evidence', 'Manual check', $destination
+                );
+                $this->fail('Unverified quarantine resolution must be rejected.');
+            } catch (ValidationException $exception) {
+                $this->assertNotEmpty($exception->errors());
+            }
+        }
+        $this->assertSame('BLOCKED', DB::table('orders')->where('id', $orderId)->value('status'));
+        $this->assertSame(1, DB::table('fulfillment_attempts')->where('order_id', $orderId)->count());
+        Queue::assertNotPushed(SendFulfillmentJob::class);
+    }
+
+    public function test_quarantine_resolution_requires_superadmin_and_recent_password_confirmation(): void
+    {
+        Queue::fake();
+        [$orderId, $legacy] = $this->quarantinedPaidOrder();
+        $admin = $this->createAdmin([
+            'name' => 'Fulfillment staff',
+            'email' => bin2hex(random_bytes(8)).'@example.test',
+            'password' => bcrypt('test-password'),
+            'role' => 'ADMIN',
+            'permissions' => ['fulfillment.manage'],
+            'is_active' => true,
+        ]);
+        $payload = [
+            'provider_ref_id' => $legacy->external_reference,
+            'provider_status' => 'Gagal',
+            'provider_rc' => '02',
+            'evidence_reference' => 'Digiflazz history',
+            'note' => 'Failed transaction.',
+            'confirmed_customer_no' => '1234567890',
+        ];
+        $this->actingAs($admin, 'admin');
+        $this->withSession(['admin.password_confirmed_at' => time()])
+            ->post('/admin/fulfillment/'.$legacy->id.'/resolve-quarantine', $payload)
+            ->assertForbidden();
+
+        $super = $this->createAdmin([
+            'name' => 'Supervisor',
+            'email' => bin2hex(random_bytes(8)).'@example.test',
+            'password' => bcrypt('test-password'),
+            'role' => 'SUPER_ADMIN',
+            'is_active' => true,
+        ]);
+        $this->actingAs($super, 'admin');
+        $this->withSession(['admin.password_confirmed_at' => 0])
+            ->post('/admin/fulfillment/'.$legacy->id.'/resolve-quarantine', $payload)
+            ->assertRedirect(route('admin.password.confirm'));
+
+        $this->assertSame('BLOCKED', DB::table('orders')->where('id', $orderId)->value('status'));
+        Queue::assertNotPushed(SendFulfillmentJob::class);
+    }
 }
