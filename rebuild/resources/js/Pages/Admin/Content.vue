@@ -496,7 +496,7 @@ const modalTitle = computed(() => {
                     <div class="adm-field full">
                         <span>{{ ASSET_LABEL[editing.row.key] || 'Gambar' }}</span>
                         <AdminMedia type="asset" :id="editing.row.id" :asset-key="editing.row.key" :url="editing.row.image_url" wide />
-                        <span v-if="['footer_banner_desktop', 'footer_banner_mobile'].includes(editing.row.key)" class="hint">Rasio 3:1 — rekomendasi desktop 1920×640, mobile 1080×360</span>
+                        <span v-if="['footer_banner_desktop', 'footer_banner_mobile'].includes(editing.row.key)" class="hint">Rasio 5,5:1 — rekomendasi desktop 1980×360, mobile 1080×196</span>
                     </div>
                     <label class="adm-switch-row full"><button type="button" class="adm-switch" role="switch" :aria-checked="form.is_active" @click="form.is_active = !form.is_active" /> Aktif dipakai toko</label>
                 </template>

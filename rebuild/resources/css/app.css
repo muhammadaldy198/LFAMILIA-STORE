@@ -253,7 +253,7 @@ body:where(:not(.lfx, .lfx *)){margin:0;font-family:Inter,ui-sans-serif,system-u
 .lf-footer:where(:not(.lfx, .lfx *)){position:relative;background:var(--lf-color-background-alt);border-top:1px solid var(--lf-line)}
 .lf-footer-banner:where(:not(.lfx, .lfx *)){width:100%;overflow:hidden;border-bottom:1px solid var(--lf-line);background:var(--lf-color-background-alt)}
 .lf-footer-banner picture:where(:not(.lfx, .lfx *)){display:block}
-.lf-footer-banner img:where(:not(.lfx, .lfx *)){display:block;width:100%;height:auto;aspect-ratio:3/1;max-height:none;min-height:0;object-fit:cover;object-position:center}
+.lf-footer-banner img:where(:not(.lfx, .lfx *)){display:block;width:100%;height:auto;aspect-ratio:11/2;max-height:none;min-height:0;object-fit:cover;object-position:center}
 .lf-footer-grid:where(:not(.lfx, .lfx *)){display:grid;grid-template-columns:1.5fr repeat(3,1fr);gap:42px;padding:46px 0}
 .lf-footer-brand-column>p:where(:not(.lfx, .lfx *)){max-width:390px;margin:17px 0 0;color:var(--lf-color-muted);font-size:11px;line-height:1.8}
 .lf-footer h2:where(:not(.lfx, .lfx *)){margin:0;color:var(--lf-color-muted);font-size:10px;font-weight:950;letter-spacing:.2em;text-transform:uppercase}
