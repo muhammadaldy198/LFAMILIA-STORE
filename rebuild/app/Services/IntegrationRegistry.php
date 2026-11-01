@@ -16,20 +16,11 @@ class IntegrationRegistry
                 'description' => 'Kredensial transaksi dan sinkronisasi produk Digiflazz.',
                 'default_environment' => 'production',
                 'credential_scope' => 'per_environment',
-                'environments' => [
-                    ... (app()->environment('testing') ? [
-                        'test' => [
-                            'label' => 'Masa uji',
-                            'live' => false,
-                            'description' => 'Only used by isolated automated tests.',
-                        ],
-                    ] : []),
-                    'production' => [
+                'environments' => $this->availableEnvironments('test', [
                         'label' => 'Sungguhan — transaksi nyata',
                         'live' => true,
                         'description' => 'Request tanpa parameter testing; transaksi dapat diproses nyata oleh provider.',
-                    ],
-                ],
+                ]),
                 'fields' => [
                     'username' => [
                         'label' => 'Nama pengguna Digiflazz',
@@ -102,20 +93,11 @@ class IntegrationRegistry
                 'description' => 'Kredensial Midtrans untuk pembuatan pembayaran dan verifikasi notifikasi.',
                 'default_environment' => 'production',
                 'credential_scope' => 'per_environment',
-                'environments' => [
-                    ... (app()->environment('testing') ? [
-                        'sandbox' => [
-                            'label' => 'Masa uji',
-                            'live' => false,
-                            'description' => 'Only used by isolated automated tests.',
-                        ],
-                    ] : []),
-                    'production' => [
+                'environments' => $this->availableEnvironments('sandbox', [
                         'label' => 'Sungguhan — transaksi nyata',
                         'live' => true,
                         'description' => 'Menggunakan endpoint dan credential Production Midtrans.',
-                    ],
-                ],
+                ]),
                 'fields' => [
                     'server_key' => [
                         'label' => 'Kunci server',
@@ -142,20 +124,11 @@ class IntegrationRegistry
                 'description' => 'Kredensial DOKU Checkout untuk halaman pembayaran yang dihosting DOKU.',
                 'default_environment' => 'production',
                 'credential_scope' => 'per_environment',
-                'environments' => [
-                    ... (app()->environment('testing') ? [
-                        'sandbox' => [
-                            'label' => 'Masa uji',
-                            'live' => false,
-                            'description' => 'Only used by isolated automated tests.',
-                        ],
-                    ] : []),
-                    'production' => [
+                'environments' => $this->availableEnvironments('sandbox', [
                         'label' => 'Sungguhan — transaksi nyata',
                         'live' => true,
                         'description' => 'Menggunakan endpoint dan credential Production DOKU.',
-                    ],
-                ],
+                ]),
                 'fields' => [
                     'client_id' => [
                         'label' => 'ID aplikasi',
@@ -234,20 +207,11 @@ class IntegrationRegistry
                 'description' => 'Pengiriman notifikasi operasional Admin melalui bot Telegram.',
                 'default_environment' => 'production',
                 'credential_scope' => 'per_environment',
-                'environments' => [
-                    ... (app()->environment('testing') ? [
-                        'test' => [
-                            'label' => 'Masa uji',
-                            'live' => false,
-                            'description' => 'Only used by isolated automated tests.',
-                        ],
-                    ] : []),
-                    'production' => [
+                'environments' => $this->availableEnvironments('test', [
                         'label' => 'Sungguhan — data nyata',
                         'live' => true,
                         'description' => 'Menggunakan bot/token Telegram Production untuk notifikasi nyata.',
-                    ],
-                ],
+                ]),
                 'fields' => [
                     'bot_token' => [
                         'label' => 'Token bot Telegram',
@@ -344,20 +308,11 @@ class IntegrationRegistry
                 'description' => 'Proteksi bot untuk form publik dan login yang terdeteksi mencurigakan.',
                 'default_environment' => 'production',
                 'credential_scope' => 'per_environment',
-                'environments' => [
-                    ... (app()->environment('testing') ? [
-                        'test' => [
-                            'label' => 'Masa uji',
-                            'live' => false,
-                            'description' => 'Only used by isolated automated tests.',
-                        ],
-                    ] : []),
-                    'production' => [
+                'environments' => $this->availableEnvironments('test', [
                         'label' => 'Sungguhan — data nyata',
                         'live' => true,
                         'description' => 'Gunakan widget dan credential Turnstile milik hostname produksi.',
-                    ],
-                ],
+                ]),
                 'fields' => [
                     'site_key' => [
                         'label' => 'Site Key',
@@ -382,6 +337,29 @@ class IntegrationRegistry
                 'note' => 'Turnstile hanya memakai kredensial Production.',
             ],
         ];
+    }
+
+    /**
+     * Production is the only selectable profile in the real application.
+     * Legacy fixture modes remain accessible to the isolated CI test process.
+     *
+     * @param  array<string, mixed>  $production
+     * @return array<string, array<string, mixed>>
+     */
+    private function availableEnvironments(string $fixtureCode, array $production): array
+    {
+        if (app()->environment('testing')) {
+            return [
+                $fixtureCode => [
+                    'label' => 'Masa uji',
+                    'live' => false,
+                    'description' => 'Only used by isolated automated tests.',
+                ],
+                'production' => $production,
+            ];
+        }
+
+        return ['production' => $production];
     }
 
     public function get(string $code): ?array
