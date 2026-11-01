@@ -1232,10 +1232,17 @@ class FulfillmentTest extends TestCase
         Queue::fake();
         [$orderId, $legacy] = $this->quarantinedPaidOrder();
         $service = app(FulfillmentService::class);
+        $admin = $this->createAdmin([
+            'name' => 'Evidence reviewer',
+            'email' => bin2hex(random_bytes(8)).'@example.test',
+            'password' => bcrypt('test-password'),
+            'role' => 'SUPER_ADMIN',
+            'is_active' => true,
+        ]);
         foreach ([['01', '1234567890'], ['70', '1234567890'], ['02', '9999999999']] as [$rc, $destination]) {
             try {
                 $service->resolveLegacyQuarantine(
-                    (int) $legacy->id, 1, $legacy->external_reference,
+                    (int) $legacy->id, (int) $admin->id, $legacy->external_reference,
                     $rc, 'Provider evidence', 'Manual check', $destination
                 );
                 $this->fail('Unverified quarantine resolution must be rejected.');
