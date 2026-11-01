@@ -231,6 +231,8 @@ test('PR10 wallet reuses the single checkout payment picker without duplicating 
     const picker = read('Components/Checkout/PaymentMethods.vue');
     assert.match(wallet, /import CheckoutPaymentMethods from '\.\.\/\.\.\/Components\/Checkout\/PaymentMethods\.vue'/);
     assert.match(wallet, /<CheckoutPaymentMethods\s/);
+    // .lfx + display:contents preserves Checkout's cascade without creating a layout box.
+    assert.match(wallet, /<div class="lfx contents">\s*<CheckoutPaymentMethods/s);
     assert.match(wallet, /:payment-channels="paymentChannels"/);
     assert.match(wallet, /:selected-code="paymentChannelCode"/);
     assert.match(wallet, /:locked="Boolean\(busy\) \|\| attemptLocked"/);
