@@ -465,6 +465,9 @@ onBeforeUnmount(() => {
     align-items: center !important;
     justify-content: center;
     padding: 0 10px !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    line-height: 1.25 !important;
 }
 .lf-payment-actions > .lf-payment-check-action:hover {
     background: rgba(255, 255, 255, .09);
