@@ -430,7 +430,6 @@ class StorefrontParityTest extends TestCase
         $this->assertFalse((bool) $catalog['product']->fresh()->popular);
     }
 
-
     public function test_popular_payload_uses_real_publisher_or_null_without_category_fallback(): void
     {
         $catalog = $this->catalog();
