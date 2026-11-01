@@ -33,7 +33,7 @@ return new class extends Migration
                         }
 
                         $order = DB::table('orders')->where('id', $attempt->order_id)->lockForUpdate()->first();
-                        $reason = 'Attempt sebelum penguncian Production; asal environment belum bisa diverifikasi. Jangan kirim ulang otomatis.';
+                        $reason = 'LEGACY_ENV_QUARANTINED: Asal environment belum bisa diverifikasi. Jangan kirim ulang otomatis.';
                         DB::table('fulfillment_attempts')->where('id', $attempt->id)->update([
                             'status' => 'BLOCKED',
                             'safe_to_failover' => false,
