@@ -239,28 +239,33 @@ test('wallet top-up payment groups show only logos while collapsed and compact t
     assert.match(wallet, /await postJson\('\/account\/wallet\/topups'/);
 });
 
-test('payment F3/F11 uses a readable untruncated chip and shared 44px check action style', () => {
-    const page = read('Pages/Payment/Show.vue');
-    assert.match(page, /class="lf-payment-invoice-chip/);
-    assert.match(page, /class="lf-payment-invoice-number block font-mono/);
-    assert.doesNotMatch(page, /max-w-40 truncate/);
-    assert.match(page, /overflow-wrap: anywhere/);
-    assert.match(page, /lf-payment-actions > \\.lf-payment-check-action/);
-    assert.match(page, /height: 44px !important/);
-    assert.match(page, /:focus-visible/);
-    assert.match(page, /<button type="button" class="lf-payment-check-action"/);
-    assert.match(page, /<Link :href="statusUrl" class="lf-payment-check-action"/);
+test('payment F3/F11 uses an untruncated chip and paired 44px check buttons', () => {
+    const source = read('Pages/Payment/Show.vue');
+    for (const marker of [
+        'class="lf-payment-invoice-chip',
+        'class="lf-payment-invoice-number block font-mono',
+        'overflow-wrap: anywhere',
+        '.lf-payment-actions > .lf-payment-check-action',
+        'height: 44px !important',
+        ':focus-visible',
+        '<button type="button" class="lf-payment-check-action"',
+        '<Link :href="statusUrl" class="lf-payment-check-action"',
+    ]) assert.ok(source.includes(marker), 'Missing payment F3/F11 marker: ' + marker);
+    assert.ok(!source.includes('max-w-40 truncate'), 'Invoice number must not truncate');
 });
 
-test('manual payment status reuses existing Inertia polling without initiating payment', () => {
-    const page = read('Pages/Payment/Show.vue');
-    assert.match(page, /activeStatusReload/);
-    assert.match(page, /if \\(activeStatusReload\\) return activeStatusReload/);
-    assert.match(page, /only: \\['order', 'payment'\\]/);
-    assert.match(page, /manualChecking \\? 'Memeriksa…'/);
-    assert.match(page, /aria-live="polite"/);
-    assert.match(page, /Status belum berhasil diperiksa\\. Coba lagi/);
-    assert.match(page, /Terakhir diperiksa/);
-    assert.match(page, /3000\\)/);
-    assert.doesNotMatch(page.slice(page.indexOf('async function checkStatusManually()'), page.indexOf('async function resumePayment()')), /fetch\\(|payments\\/orders|checkout\\/orders/);
+test('manual check shares the 3-second Inertia status read and reports errors', () => {
+    const source = read('Pages/Payment/Show.vue');
+    for (const marker of [
+        'if (activeStatusReload) return activeStatusReload',
+        "only: ['order', 'payment']",
+        "manualChecking ? 'Memeriksa…'",
+        'aria-live="polite"',
+        'Status belum berhasil diperiksa. Coba lagi.',
+        'Terakhir diperiksa',
+        '}, 3000)',
+    ]) assert.ok(source.includes(marker), 'Missing payment feedback guard: ' + marker);
+    const checkMethod = source.slice(source.indexOf('async function checkStatusManually()'), source.indexOf('async function resumePayment()'));
+    assert.ok(!checkMethod.includes('fetch(') && !checkMethod.includes('payments/orders')
+        && !checkMethod.includes('checkout/orders'), 'Status check cannot create transactions');
 });
