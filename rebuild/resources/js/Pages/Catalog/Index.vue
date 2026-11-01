@@ -1,8 +1,9 @@
 <script setup>
+import SeoHead from '../../Components/SeoHead.js';
 import { useCustomerPresentation } from '../../Composables/customerPresentation';
 const { customerText, sectionEnabled } = useCustomerPresentation();
 
-import {Head,Link,usePage} from '@inertiajs/vue3';
+import {Link,usePage} from '@inertiajs/vue3';
 import {computed,onMounted,onUnmounted,ref} from 'vue';
 import CustomerShell from '../../Components/CustomerShell.vue';
 import ProductSearch from '../../Components/ProductSearch.vue';
@@ -64,7 +65,7 @@ onUnmounted(()=>{
 </script>
 
 <template>
-    <Head :title="customerText('pages.catalog.index.attribute.title.adae0b8b', 'LFAMILIA STORE')" />
+    <SeoHead />
     <CustomerShell :logo-url="logoUrl">
         <main>
             <section v-if="activeBanner" class="lf-container lf-home-banner-wrap">

@@ -1,8 +1,9 @@
 <script setup>
+import SeoHead from '../../Components/SeoHead.js';
 import { useCustomerPresentation } from '../../Composables/customerPresentation';
 const { customerText } = useCustomerPresentation();
 
-import {Head,Link} from '@inertiajs/vue3';
+import {Link} from '@inertiajs/vue3';
 import CustomerShell from '../../Components/CustomerShell.vue';
 defineProps({faqs:Array});
 const statuses=[
@@ -15,7 +16,7 @@ const statuses=[
 ];
 </script>
 <template>
-<Head :title="customerText('pages.content.faq.attribute.title.4c104caa', 'Pertanyaan Umum')"/>
+<SeoHead />
 <CustomerShell>
 <main class="lf-faq-page">
  <section class="lf-faq-hero">

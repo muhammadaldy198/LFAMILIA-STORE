@@ -1,8 +1,9 @@
 <script setup>
+import SeoHead from '../../Components/SeoHead.js';
 import { useCustomerPresentation } from '../../Composables/customerPresentation';
 const { customerText } = useCustomerPresentation();
 
-import {Head,Link} from '@inertiajs/vue3';
+import {Link} from '@inertiajs/vue3';
 import {computed,ref} from 'vue';
 import CustomerShell from '../../Components/CustomerShell.vue';
 const props=defineProps({tool:String});
@@ -20,7 +21,7 @@ const zodiac=computed(()=>{const points=Math.min(100,Math.max(0,Number(zodiacPoi
 const magic=computed(()=>{const points=Math.min(200,Math.max(0,Number(magicPoints.value)||0)),remaining=200-points,single=Math.max(0,Number(magicSingle.value)||0),five=Math.max(0,Number(magicFive.value)||0);let best=Infinity,sets=0,singles=0;for(let s=0;s<=Math.ceil(remaining/5);s++){const one=Math.max(0,remaining-s*5),total=s*five+one*single;if(total<best){best=total;sets=s;singles=one}}return{remaining,best:Number.isFinite(best)?best:0,sets,singles}});
 </script>
 <template>
-<Head :title="active.name+' Calculator'"/>
+<SeoHead />
 <CustomerShell>
 <main class="lf-tools-page">
  <section class="lf-tools-hero"><div class="lf-container"><p class="lf-eyebrow">{{ customerText("pages.content.tool.4b6166cb", "TOOLS LFAMILIA") }}</p><h1>{{ customerText("pages.content.tool.10394bed", "Kalkulator Game") }}</h1><p>{{ customerText("pages.content.tool.5ccd5c20", "Hitung kebutuhan game dengan rumus yang sama seperti tools LFAMILIA sebelumnya.") }}</p></div></section>

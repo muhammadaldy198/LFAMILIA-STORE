@@ -1,9 +1,10 @@
 <script setup>
+import SeoHead from '../../Components/SeoHead.js';
 import { useCustomerPresentation } from '../../Composables/customerPresentation';
 const { customerText } = useCustomerPresentation();
 
 import { computed } from 'vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { Link } from '@inertiajs/vue3';
 import CustomerShell from '../../Components/CustomerShell.vue';
 const props = defineProps({ page: Object });
 const blocks = computed(() => {
@@ -23,7 +24,7 @@ const headingNumber = text => text.match(/^(\d+)\./)?.[1] || '';
 const headingTitle = text => text.replace(/^\d+\.\s*/, '');
 </script>
 <template>
-<Head :title="page.title" />
+<SeoHead />
 <CustomerShell>
 <main class="lf-container lf-content-page lf-legal-page">
  <Link href="/" class="lf-legal-back">← {{ customerText("legal.back", "Kembali ke beranda") }}</Link>

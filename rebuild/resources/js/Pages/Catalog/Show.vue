@@ -1,8 +1,9 @@
 <script setup>
+import SeoHead from '../../Components/SeoHead.js';
 import { useCustomerPresentation } from '../../Composables/customerPresentation';
 const { customerText } = useCustomerPresentation();
 
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Link, router } from '@inertiajs/vue3';
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import CustomerShell from '../../Components/CustomerShell.vue';
 import CheckoutPaymentMethods from '../../Components/Checkout/PaymentMethods.vue';
@@ -903,7 +904,7 @@ function closeReview() { summaryOpen.value = false; closeConfirmation(); }
 
 <template>
 
-<Head :title="product.name" />
+<SeoHead />
 <CustomerShell checkout>
 <div class="lfx" data-checkout-boundary>
   <main>
