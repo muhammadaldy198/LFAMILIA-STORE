@@ -1,8 +1,9 @@
 <script setup>
+import SeoHead from '../../Components/SeoHead.js';
 import { useCustomerPresentation } from '../../Composables/customerPresentation';
 const { customerText } = useCustomerPresentation();
 
-import { Head, router } from '@inertiajs/vue3';
+import { router } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import CustomerShell from '../../Components/CustomerShell.vue';
 
@@ -21,7 +22,7 @@ function formatDate(value) {
 </script>
 
 <template>
-<Head :title="customerText('pages.content.status.attribute.title.cf6592b9', 'Status Layanan')" />
+<SeoHead />
 <CustomerShell>
 <main class="lf-container min-h-[70vh] py-10 sm:py-14">
     <p class="lf-eyebrow">{{ customerText("pages.content.status.beb73f55", "TRANSPARANSI LAYANAN") }}</p>

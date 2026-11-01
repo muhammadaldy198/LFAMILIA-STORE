@@ -1,8 +1,9 @@
 <script setup>
+import SeoHead from '../../Components/SeoHead.js';
 import { useCustomerPresentation } from '../../Composables/customerPresentation';
 const { customerText } = useCustomerPresentation();
 
-import { Head, Link } from '@inertiajs/vue3';
+import { Link } from '@inertiajs/vue3';
 import CustomerShell from '../../Components/CustomerShell.vue';
 
 const tools = [
@@ -13,7 +14,7 @@ const tools = [
 </script>
 
 <template>
-<Head :title="customerText('pages.content.tools.attribute.title.57d99b55', 'LFAMILIA Tools')"/>
+<SeoHead />
 <CustomerShell>
 <main class="lf-tools-index">
     <section class="lf-container">

@@ -5,17 +5,17 @@ namespace App\Http\Controllers;
 use App\Models\NewsArticle;
 use App\Services\StorefrontContentService;
 use App\Support\OptimizedMedia;
+use App\Support\SeoMetadata;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redis;
-use Inertia\Inertia;
 use Inertia\Response;
 
 class PublicContentController
 {
     public function news(StorefrontContentService $content): Response
     {
-        return Inertia::render('Content/News', ['articles' => $content->news(60)]);
+        return SeoMetadata::render('Content/News', ['articles' => $content->news(60)]);
     }
 
     public function article(string $slug): Response
@@ -24,7 +24,7 @@ class PublicContentController
             ->where(fn ($query) => $query->whereNull('published_at')->orWhere('published_at', '<=', now()))
             ->firstOrFail();
 
-        return Inertia::render('Content/Article', ['article' => [
+        return SeoMetadata::render('Content/Article', ['article' => [
             ...$article->only('slug', 'title', 'summary', 'body', 'source_label'),
             'published_at' => $article->published_at?->toIso8601String(),
             'cover_url' => OptimizedMedia::url($article, 'image', 'detail'),
@@ -33,12 +33,12 @@ class PublicContentController
 
     public function faq(StorefrontContentService $content): Response
     {
-        return Inertia::render('Content/Faq', ['faqs' => $content->faqs()]);
+        return SeoMetadata::render('Content/Faq', ['faqs' => $content->faqs()]);
     }
 
     public function contact(): Response
     {
-        return Inertia::render('Content/Contact');
+        return SeoMetadata::render('Content/Contact');
     }
 
     public function terms(): Response
@@ -58,7 +58,7 @@ class PublicContentController
 
     public function tools(): Response
     {
-        return Inertia::render('Content/Tools');
+        return SeoMetadata::render('Content/Tools');
     }
 
     private function legal(string $key): Response
@@ -67,7 +67,7 @@ class PublicContentController
         $page = DB::table('content_pages')->where('key', $key)->where('is_active', true)->first();
         abort_unless($page, 404);
 
-        return Inertia::render('Content/Legal', ['page' => $page]);
+        return SeoMetadata::render('Content/Legal', ['page' => $page]);
     }
 
     public function leaderboard(Request $request): Response
@@ -94,14 +94,14 @@ class PublicContentController
                 'total_spent' => (int) $row->total_spent,
             ]);
 
-        return Inertia::render('Content/Leaderboard', ['entries' => $query, 'period' => $period]);
+        return SeoMetadata::render('Content/Leaderboard', ['entries' => $query, 'period' => $period]);
     }
 
     public function tool(string $tool): Response
     {
         abort_unless(in_array($tool, ['win-rate', 'zodiac', 'magic-wheel'], true), 404);
 
-        return Inertia::render('Content/Tool', ['tool' => $tool]);
+        return SeoMetadata::render('Content/Tool', ['tool' => $tool]);
     }
 
     public function status(): Response
@@ -170,7 +170,7 @@ class PublicContentController
             $legalName = trim((string) ($settings['store.name'] ?? ''));
         }
 
-        return Inertia::render('Content/Status', [
+        return SeoMetadata::render('Content/Status', [
             'services' => $services,
             'merchant' => [
                 'legalName' => $legalName,
@@ -201,6 +201,6 @@ class PublicContentController
             ->orderByDesc('id')->limit(30)
             ->get(['code', 'discount_type', 'discount_value', 'minimum_total_idr', 'ends_at']);
 
-        return Inertia::render('Content/Promo', ['vouchers' => $vouchers]);
+        return SeoMetadata::render('Content/Promo', ['vouchers' => $vouchers]);
     }
 }

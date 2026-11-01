@@ -44,6 +44,13 @@ class HomeBanner extends Model implements HasMedia
             ->quality(50)
             ->nonQueued();
 
+        $this->addMediaConversion('og-share')
+            ->performOnCollections('desktop')
+            ->fit(Fit::Crop, 1200, 630)
+            ->format('webp')
+            ->quality(78)
+            ->nonQueued();
+
         $this->addMediaConversion('display')
             ->performOnCollections('desktop', 'mobile')
             ->fit(Fit::Max, 1440, 900)

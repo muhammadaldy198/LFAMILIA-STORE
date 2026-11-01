@@ -5,57 +5,34 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     @php
-        // Render essential metadata server-side so crawlers do not depend on Vue hydration.
         $seoIndexable = request()->routeIs(
             'catalog.index', 'catalog.show', 'content.news', 'content.article',
             'content.faq', 'content.contact', 'content.terms', 'content.refund',
-            'content.privacy', 'content.promo'
+            'content.privacy', 'content.promo', 'content.tools', 'content.tool',
+            'content.status', 'content.leaderboard'
         );
-        $seoProduct = request()->routeIs('catalog.show') ? ($page['props']['product'] ?? []) : [];
-        $seoArticle = request()->routeIs('content.article') ? ($page['props']['article'] ?? []) : [];
-        $seoStoreName = $page['props']['storefront']['storeName'] ?? 'LFAMILIA STORE';
-        $seoHomeTitle = $page['props']['storefront']['seoTitle'] ?? '';
-        $seoHomeDescription = $page['props']['storefront']['seoDescription'] ?? '';
-        $seoName = $seoProduct['name'] ?? $seoArticle['title'] ?? ($seoHomeTitle ?: $seoStoreName);
-        $seoDescription = $seoProduct['description'] ?? $seoArticle['summary']
-            ?? ($seoHomeDescription ?: ($seoStoreName.' menyediakan top up game, voucher digital, pulsa, paket data, dan layanan digital.'));
-        $seoDescription = mb_substr(trim(strip_tags((string) $seoDescription)), 0, 160);
-        $seoCanonical = request()->routeIs('catalog.index') ? route('catalog.index') : url()->current();
-        $seoImage = $seoProduct['image_url'] ?? $seoArticle['cover_url'] ?? null;
-        $seoStructuredData = [
-            '@context' => 'https://schema.org',
-            '@type' => 'WebSite',
-            'name' => $seoStoreName,
-            'url' => route('catalog.index'),
-            'inLanguage' => 'id-ID',
-            'potentialAction' => [
-                '@type' => 'SearchAction',
-                'target' => [
-                    '@type' => 'EntryPoint',
-                    'urlTemplate' => route('catalog.index').'?q={search_term_string}',
-                ],
-                'query-input' => 'required name=search_term_string',
-            ],
-        ];
+        $seo = $seoIndexable ? ($page['props']['seo'] ?? null) : null;
     @endphp
-    @if ($seoIndexable)
-        <meta name="robots" content="index,follow">
-        <meta name="description" content="{{ $seoDescription }}">
-        <link rel="canonical" href="{{ $seoCanonical }}">
-        <meta property="og:site_name" content="{{ $seoStoreName }}">
-        <meta property="og:locale" content="id_ID">
-        <meta property="og:type" content="{{ $seoArticle ? 'article' : 'website' }}">
-        <meta property="og:title" content="{{ $seoName }}">
-        <meta property="og:description" content="{{ $seoDescription }}">
-        <meta property="og:url" content="{{ $seoCanonical }}">
-        @if ($seoImage)
-            <meta property="og:image" content="{{ $seoImage }}">
+    @if ($seo)
+        {{-- Inertia v2 adopts these keyed tags during hydration. --}}
+        <title inertia>{{ $seo['title'] }}</title>
+        <meta inertia="seo-robots" name="robots" content="index,follow">
+        <meta inertia="seo-description" name="description" content="{{ $seo['description'] }}">
+        <link inertia="seo-canonical" rel="canonical" href="{{ $seo['canonical'] }}">
+        <meta inertia="seo-site" property="og:site_name" content="{{ $seo['siteName'] }}">
+        <meta inertia="seo-locale" property="og:locale" content="id_ID">
+        <meta inertia="seo-type" property="og:type" content="{{ $seo['type'] }}">
+        <meta inertia="seo-og-title" property="og:title" content="{{ $seo['title'] }}">
+        <meta inertia="seo-og-description" property="og:description" content="{{ $seo['description'] }}">
+        <meta inertia="seo-og-url" property="og:url" content="{{ $seo['canonical'] }}">
+        @if ($seo['image'])
+            <meta inertia="seo-og-image" property="og:image" content="{{ $seo['image'] }}">
         @endif
-        <meta name="twitter:card" content="{{ $seoImage ? 'summary_large_image' : 'summary' }}">
-        <meta name="twitter:title" content="{{ $seoName }}">
-        <meta name="twitter:description" content="{{ $seoDescription }}">
-        @if (request()->routeIs('catalog.index'))
-            <script type="application/ld+json">@json($seoStructuredData)</script>
+        <meta inertia="seo-twitter-card" name="twitter:card" content="{{ $seo['image'] ? 'summary_large_image' : 'summary' }}">
+        <meta inertia="seo-twitter-title" name="twitter:title" content="{{ $seo['title'] }}">
+        <meta inertia="seo-twitter-description" name="twitter:description" content="{{ $seo['description'] }}">
+        @if ($seo['structuredData'])
+            <script inertia="seo-jsonld" type="application/ld+json">@json($seo['structuredData'])</script>
         @endif
     @else
         <meta name="robots" content="noindex,nofollow">
