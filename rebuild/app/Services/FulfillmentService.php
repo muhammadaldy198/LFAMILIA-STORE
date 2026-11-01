@@ -570,6 +570,12 @@ class FulfillmentService
             }
             $this->ensureLatestAttempt($attempt);
 
+            if ($this->isLegacyQuarantined($attempt)) {
+                throw ValidationException::withMessages([
+                    'fulfillment' => 'Attempt dari sebelum peralihan Production tidak boleh dikirim ulang.',
+                ]);
+            }
+
             if ($attempt->status === 'FAILED_CONFIRMED' && $attempt->safe_to_failover) {
                 return null;
             }
