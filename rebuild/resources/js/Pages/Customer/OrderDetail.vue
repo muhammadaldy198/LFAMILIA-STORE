@@ -9,7 +9,7 @@ import AccountShell from '../../Components/AccountShell.vue';
 import { rupiah } from '../../lib/money';
 import { manualHelpMessage, nextOrderAction, customerOrderStatusInfo, paymentStatusLabel } from '../../lib/orderStatus';
 
-const props = defineProps({ order: Object, payment: Object, review: Object });
+const props = defineProps({ order: Object, payment: Object, review: Object, paymentUrl: { type: String, default: null } });
 
 const paymentState = ref(props.payment);
 const statusInfo = computed(() => visibleOrderStatus(props.order.status));
@@ -68,7 +68,7 @@ async function submitReview() {
             <p v-if="paymentState?.status === 'PENDING' && paymentState?.instructions?.va_number" class="text-sm">{{ customerText("pages.customer.orderdetail.d5aec755", "Nomor VA:") }} <strong>{{ paymentState.instructions.va_number }}</strong></p>
             <p v-if="paymentState?.status === 'PENDING' && paymentState?.instructions?.payment_code" class="text-sm">{{ customerText("pages.customer.orderdetail.6af68bec", "Kode pembayaran:") }} <strong>{{ paymentState.instructions.payment_code }}</strong></p>
             <p v-if="paymentState?.status === 'UNKNOWN'" class="text-sm text-amber-200">{{ customerText("pages.customer.orderdetail.2107d542", "Status pembayaran belum dapat dipastikan. Sistem tidak akan membuat pembayaran kedua otomatis.") }}</p>
-            <Link :href="'/payment?invoice=' + encodeURIComponent(order.order_number)" class="lf-primary">{{ customerText("pages.customer.orderdetail.a548f73b", "Lihat pembayaran") }}</Link>
+            <Link :href="paymentUrl || ('/payment?invoice=' + encodeURIComponent(order.order_number))" class="lf-primary">{{ customerText("pages.customer.orderdetail.a548f73b", "Lihat pembayaran") }}</Link>
             <p v-if="paymentIssue" role="alert" class="text-sm text-red-300">{{ paymentIssue === 'closed'
                 ? customerText('pages.customer.orderdetail.payment_closed', 'Percobaan pembayaran telah berakhir. Periksa status invoice untuk langkah berikutnya.')
                 : customerText('pages.customer.orderdetail.payment_rejected', 'Percobaan pembayaran gagal atau ditolak. Periksa status invoice sebelum mencoba lagi.') }}</p>

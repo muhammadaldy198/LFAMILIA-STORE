@@ -6,9 +6,11 @@ use App\Services\PaymentPresentationService;
 use App\Services\PaymentRoutingService;
 use App\Services\PublicOrderStatusService;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\URL;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -44,7 +46,7 @@ class CustomerOrderController
             ->join('product_packages', 'product_packages.id', '=', 'orders.product_package_id')
             ->where('orders.user_id', $request->user()->id)->where('orders.id', $order)
             ->select('orders.id', 'orders.order_number', 'orders.status', 'orders.total_idr',
-                'orders.created_at', 'orders.paid_at', 'orders.delivery_payload',
+                'orders.created_at', 'orders.paid_at', 'orders.expires_at', 'orders.delivery_payload',
                 'products.name as product_name', 'product_packages.name as package_name')->first();
 
         abort_unless($record, 404);
@@ -115,13 +117,24 @@ class CustomerOrderController
         // page access without requiring the original checkout session.
         // Never grant guest session access for member-owned orders.
         if ($record->user_id === null) {
-            $request->session()->put('guest_order_id', (int) $record->id);
+            $originalSession = (int) $request->session()->get('guest_order_id') === (int) $record->id
+                && (int) $request->session()->get('payment_signed_guest_order_id') !== (int) $record->id;
+            if (! $originalSession) {
+                $request->session()->put('guest_order_id', (int) $record->id);
+                $request->session()->put('payment_signed_guest_order_id', (int) $record->id);
+            }
         }
 
-        return $this->detail($record, $payments);
+        $paymentUrl = URL::temporarySignedRoute(
+            'payment.show',
+            $record->expires_at ? Carbon::parse($record->expires_at) : now()->subSecond(),
+            ['invoice' => $record->order_number],
+        );
+
+        return $this->detail($record, $payments, $paymentUrl);
     }
 
-    private function detail(object $record, PaymentPresentationService $payments): Response
+    private function detail(object $record, PaymentPresentationService $payments, ?string $paymentUrl = null): Response
     {
         $record->delivery = $record->status === 'SUCCESS' && is_string($record->delivery_payload)
             ? (json_decode($record->delivery_payload, true) ?: null) : null;
@@ -129,6 +142,7 @@ class CustomerOrderController
         $record->status = $this->statuses->value((string) $record->status);
 
         return Inertia::render('Customer/OrderDetail', [
+            'paymentUrl' => $paymentUrl,
             'order' => $record,
             'payment' => $payments->forOrder((int) $record->id),
             'review' => DB::table('product_reviews')->where('order_id', $record->id)->first(['rating', 'body']),

@@ -88,6 +88,14 @@ class PaymentRecoveryTest extends TestCase
                 ->where('order.order_number', 'LFRECOVERY-1')
                 ->where('payment.instructions.kind', 'manual_qris')
                 ->where('payment.instructions.qr_url', 'https://lfamilia.com/qr.png'));
+        // A signed visit is not equivalent to the original checkout session.
+        $this->get('/payment?invoice=LFRECOVERY-1')->assertForbidden();
+        $this->postJson('/payments/orders/LFRECOVERY-1', [
+            'idempotency_key' => 'recovery-signed-only-attempt-0001',
+        ])->assertForbidden();
+        // Its guest order status can still link back via a signed URL.
+        $page = $this->get('/orders/guest/LFRECOVERY-1')->assertOk()->viewData('page');
+        $this->assertStringContainsString('signature=', $page['props']['paymentUrl']);
     }
 
     public function test_bad_or_expired_signatures_and_missing_invoice_have_branded_errors(): void
@@ -106,7 +114,8 @@ class PaymentRecoveryTest extends TestCase
         ]);
         $this->get($expired)->assertForbidden()->assertSee('Cek pesanan');
         $this->withSession(['guest_order_id' => $id])->get($expired)->assertForbidden();
-        $this->get('/payment?invoice=LFRECOVERY-2')->assertOk();
+        $this->withSession(['guest_order_id' => $id, 'payment_signed_guest_order_id' => null])
+            ->get('/payment?invoice=LFRECOVERY-2')->assertOk();
         $this->get('/payment?invoice=LFUNKNOWN')->assertNotFound()->assertSee('Cek pesanan');
         $this->get('/nonexistent-recovery-path')->assertNotFound()->assertSee('Kembali ke beranda');
     }

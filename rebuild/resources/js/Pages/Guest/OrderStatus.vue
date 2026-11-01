@@ -9,7 +9,7 @@ import {rupiah} from '../../lib/money';
 import CustomerShell from '../../Components/CustomerShell.vue';
 import {isTerminalOrderStatus,customerOrderStatusInfo,paymentStatusLabel} from '../../lib/orderStatus';
 
-const props=defineProps({order:Object,payment:Object,events:Array,review:Object});
+const props=defineProps({order:Object,payment:Object,events:Array,review:Object,paymentUrl:{type:String,default:null}});
 const orderState=ref({...props.order});
 const paymentState=ref(props.payment);
 const timeline=ref([...(props.events||[])]);
@@ -115,7 +115,7 @@ onUnmounted(()=>{disposed=true;if(timer)clearInterval(timer);});
                         <strong class="text-[10px] text-amber-200">{{ customerText("pages.guest.orderstatus.666bb8c9", "Menunggu verifikasi QRIS manual") }}</strong>
                         <p class="mt-1 text-[9px] leading-4 text-white/45">{{ customerText("pages.guest.orderstatus.19bf8418", "Setelah membayar, status tetap Menunggu Pembayaran sampai Admin memverifikasi transaksi. Jangan melakukan pembayaran kedua untuk invoice yang sama.") }}</p>
                     </div>
-                    <Link :href="'/payment?invoice='+encodeURIComponent(orderState.order_number)" class="lf-primary mt-3">{{ customerText("pages.guest.orderstatus.a548f73b", "Lihat pembayaran") }}</Link>
+                    <Link :href="paymentUrl||('/payment?invoice='+encodeURIComponent(orderState.order_number))" class="lf-primary mt-3">{{ customerText("pages.guest.orderstatus.a548f73b", "Lihat pembayaran") }}</Link>
                     
                 </section>
 

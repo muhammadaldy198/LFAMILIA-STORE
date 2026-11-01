@@ -104,7 +104,7 @@ class PublicOrderTrackingController
 
         $paymentStatus = DB::table('payment_transactions')->where('order_id', $order->id)
             ->orderByDesc('id')->value('status');
-        if (! $this->canRecover($order, $paymentStatus)) {
+        if ($this->canRecover($order, $paymentStatus) === false) {
             return response()->json([
                 'message' => 'Pembayaran pesanan ini tidak dapat dilanjutkan. Periksa status atau buat pesanan baru.',
             ], 409)->header('Cache-Control', 'no-store, private');

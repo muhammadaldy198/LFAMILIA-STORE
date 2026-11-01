@@ -173,6 +173,7 @@ class CheckoutController
 
         if ($order->user_id === null) {
             $request->session()->put('guest_order_id', $order->id);
+            $request->session()->forget('payment_signed_guest_order_id');
             $statusUrl = route('guest.orders.show', $order->order_number);
         } else {
             $statusUrl = route('account.orders.show', $order->id);
