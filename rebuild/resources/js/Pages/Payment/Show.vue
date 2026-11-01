@@ -308,7 +308,7 @@ onBeforeUnmount(() => {
                         <small>{{ customerText("pages.payment.show.70515d8e", "STORE") }}</small>
                     </div>
                 </div>
-                <button type="button" class="lf-payment-invoice-chip rounded-lg border border-white/10 bg-black/20 text-right" @click="copyValue(order.order_number,'invoice')">
+                <button type="button" id="lf-payment-invoice-chip" class="lf-payment-invoice-chip rounded-lg border border-white/10 bg-black/20 text-right" @click="copyValue(order.order_number,'invoice')">
                     <span class="lf-payment-invoice-label block text-[8px] font-bold uppercase tracking-[0.16em] text-white/35">{{ customerText("pages.payment.show.71ec87b0", "Invoice") }}</span>
                     <span class="lf-payment-invoice-number block font-mono text-[10px] font-black" :style="{color:accent}">{{order.order_number}}</span>
                 </button>
@@ -396,8 +396,8 @@ onBeforeUnmount(() => {
             <Link v-if="canOrderAgain" href="/" class="lf-payment-primary mt-5 flex h-12 w-full items-center justify-center rounded-xl  font-black text-[#091006]" :style="{backgroundColor:accent}">Buat pesanan baru</Link>
 
             <div class="lf-payment-actions mt-3 grid grid-cols-2 gap-2">
-                <button type="button" class="lf-payment-check-action" :disabled="manualChecking || startingPayment" :aria-busy="manualChecking" @click="checkStatusManually">{{ manualChecking ? 'Memeriksa…' : (settings.checkStatusButtonText || 'Cek status') }}</button>
-                <Link :href="statusUrl" class="lf-payment-check-action">{{settings.checkInvoiceButtonText || 'Cek invoice'}}</Link>
+                <button type="button" class="lf-payment-check-action" id="lf-payment-check-status" :disabled="manualChecking || startingPayment" :aria-busy="manualChecking" @click="checkStatusManually">{{ manualChecking ? 'Memeriksa…' : (settings.checkStatusButtonText || 'Cek status') }}</button>
+                <Link :href="statusUrl" class="lf-payment-check-action" id="lf-payment-check-invoice">{{settings.checkInvoiceButtonText || 'Cek invoice'}}</Link>
             </div>
             <div v-if="settings.showSupport !== false" class="lf-payment-support"><a :href="settings.supportUrl || '/contact'">{{settings.supportText || 'Butuh bantuan pembayaran?'}}</a></div>
         </div>
@@ -408,16 +408,26 @@ onBeforeUnmount(() => {
 
 <style scoped>
 /* F3: never truncate the invoice; make room for two readable lines on phones. */
-.lf-payment-brand-row > .lf-payment-invoice-chip {
+.lf-payment-brand-row > #lf-payment-invoice-chip {
+    display: flex !important;
     flex: 0 1 58%;
+    flex-direction: column;
+    align-items: stretch !important;
+    justify-content: center;
+    box-sizing: border-box;
+    width: auto;
     min-width: 0;
     max-width: 230px;
-    padding: 8px 12px !important; /* Overrides the legacy mobile payment rule. */
+    height: auto !important;
+    min-height: 44px !important;
+    padding: 8px 12px !important; /* Override the legacy customer control geometry. */
     text-align: right;
 }
 .lf-payment-invoice-label { display: block; }
 .lf-payment-invoice-number {
     display: block;
+    min-width: 0;
+    max-width: 100%;
     overflow-wrap: anywhere;
     white-space: normal;
     line-height: 1.5;
@@ -445,6 +455,16 @@ onBeforeUnmount(() => {
     text-align: center;
     text-decoration: none;
     transition: background-color .15s ease, border-color .15s ease;
+}
+/* The generic customer button selector forces 36px/40px and inline-flex.
+   IDs keep this correction local to the payment checks, including the Link. */
+.lf-payment-actions > :is(#lf-payment-check-status, #lf-payment-check-invoice) {
+    display: flex !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    align-items: center !important;
+    justify-content: center;
+    padding: 0 10px !important;
 }
 .lf-payment-actions > .lf-payment-check-action:hover {
     background: rgba(255, 255, 255, .09);
