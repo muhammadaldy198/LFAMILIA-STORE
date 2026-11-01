@@ -40,7 +40,21 @@ class SecurityM10Test extends TestCase
         $response->assertHeader('X-Content-Type-Options', 'nosniff');
         $response->assertHeader('X-Frame-Options', 'DENY');
         $response->assertHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-        $this->assertStringContainsString("frame-ancestors 'none'", (string) $response->headers->get('Content-Security-Policy'));
+        // Lock the complete production CSP: only the official RUM hosts may be added.
+        $expectedCsp = implode(' ', [
+            "default-src 'self';",
+            "script-src 'self' https://challenges.cloudflare.com https://static.cloudflareinsights.com;",
+            "style-src 'self' 'unsafe-inline';",
+            "img-src 'self' data: https:;",
+            "font-src 'self' data:;",
+            "connect-src 'self' https://challenges.cloudflare.com https://cloudflareinsights.com;",
+            'frame-src https://challenges.cloudflare.com;',
+            "object-src 'none';",
+            "base-uri 'self';",
+            "frame-ancestors 'none';",
+            "form-action 'self'",
+        ]);
+        $this->assertSame($expectedCsp, (string) $response->headers->get('Content-Security-Policy'));
         $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
 
         $unsafe = $this->withHeader('X-Request-ID', "bad\nheader")->get('/login');
