@@ -220,7 +220,7 @@ function endSupportDrag(event) {
     <header class="lf-header">
         <div class="lf-container lf-header-inner">
             <Link href="/" class="lf-brand" :aria-label="customerText('components.customershell.attribute.aria-label.adae0b8b', 'LFAMILIA STORE')">
-                <img v-if="logo || logoUrl" :src="logo || logoUrl" :alt="customerText('components.customershell.attribute.alt.adae0b8b', 'LFAMILIA STORE')" class="lf-brand-logo">
+                <img v-if="logo || logoUrl" :src="logo || logoUrl" :alt="customerText('components.customershell.attribute.alt.adae0b8b', 'LFAMILIA STORE')" class="lf-brand-logo" width="42" height="42" loading="eager">
                 <span v-else class="lf-brand-mark">{{ customerText("components.customershell.6ae24f17", "LF") }}</span>
                 <span class="lf-brand-copy">
                     <strong class="lf-brand-name">{{ customerText("components.customershell.497f244e", "LFAMILIA") }}</strong>
@@ -321,14 +321,14 @@ function endSupportDrag(event) {
         <div v-if="(footerDesktop || footerMobile) && sectionEnabled('footerBanner')" class="lf-footer-banner">
             <picture>
                 <source v-if="footerMobile" media="(max-width:639px)" :srcset="footerMobile">
-                <img :src="footerDesktop || footerMobile" :alt="customerText('components.customershell.attribute.alt.adae0b8b', 'LFAMILIA STORE')">
+                <img :src="footerDesktop || footerMobile" :alt="customerText('components.customershell.attribute.alt.adae0b8b', 'LFAMILIA STORE')" width="1200" height="400" loading="lazy" decoding="async">
             </picture>
         </div>
 
         <div class="lf-container lf-footer-main">
             <div class="lf-footer-brand-column">
                 <Link href="/" class="lf-brand">
-                    <img v-if="logo || logoUrl" :src="logo || logoUrl" :alt="customerText('components.customershell.attribute.alt.adae0b8b', 'LFAMILIA STORE')" class="lf-footer-logo">
+                    <img v-if="logo || logoUrl" :src="logo || logoUrl" :alt="customerText('components.customershell.attribute.alt.adae0b8b', 'LFAMILIA STORE')" class="lf-footer-logo" width="128" height="128" loading="lazy" decoding="async">
                     <span v-else class="lf-brand-mark">{{ customerText("components.customershell.6ae24f17", "LF") }}</span>
                     <span class="lf-brand-copy"><strong class="lf-brand-name">{{ customerText("components.customershell.497f244e", "LFAMILIA") }}</strong><span class="lf-brand-sub">{{ customerText("components.customershell.70515d8e", "STORE") }}</span></span>
                 </Link>

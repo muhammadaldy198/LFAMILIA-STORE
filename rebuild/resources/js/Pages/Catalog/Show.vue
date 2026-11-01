@@ -907,9 +907,9 @@ function closeReview() { summaryOpen.value = false; closeConfirmation(); }
 <CustomerShell checkout>
 <div class="lfx" data-checkout-boundary>
   <main>
-    <div class="lfx-hero"><img v-if="product.banner_url" :src="product.banner_url" :alt="'Banner '+product.name"/><span class="lfx-hero-overlay"></span></div>
+    <div class="lfx-hero"><img v-if="product.banner_url" :src="product.banner_url" :alt="'Banner '+product.name" width="1440" height="900" loading="eager" fetchpriority="high"/><span class="lfx-hero-overlay"></span></div>
     <section class="lfx-product-header"><div class="lfx-container lfx-product-header-inner">
-      <div class="lfx-product-cover"><div class="lfx-cover-frame"><img v-if="product.image_url" :src="product.image_url" :alt="product.name"/><span v-else>LF</span></div></div>
+      <div class="lfx-product-cover"><div class="lfx-cover-frame"><img v-if="product.image_url" :src="product.image_url" :alt="product.name" width="720" height="960" loading="eager" decoding="async"/><span v-else>LF</span></div></div>
       <div class="lfx-product-intro"><div class="lfx-breadcrumb"><Link href="/">Beranda</Link><span>›</span><span>{{product.category_name}}</span><span>›</span><strong>{{product.name}}</strong></div><div class="lfx-overline">DIGITAL TOP UP · PREMIUM EXPERIENCE</div><h1>{{product.name}}</h1><p>{{product.publisher||'LFAMILIA STORE'}}</p></div><div class="lfx-trust"><span><b>⚡</b> Proses Cepat</span><span><b>✧</b> {{customerText("checkout.support_label", "Layanan Chat 24/7")}}</span><span><b>◷</b> Pembayaran Aman</span></div>
 
     </div></section>
@@ -924,7 +924,7 @@ function closeReview() { summaryOpen.value = false; closeConfirmation(); }
               <div class="lfx-panel-content">
                 <div v-if="packageTabs.length" class="lfx-category-tabs" role="tablist" aria-label="Kategori dari LFAMILIA"><button v-for="item in packageTabs" :key="item" role="tab" :aria-selected="(activePackageTab||packageTabs[0])===item" :class="{active:(activePackageTab||packageTabs[0])===item}" @click="activePackageTab=item">{{item}}</button></div>
                 <section v-for="itemsGroup in visiblePackageGroups" :key="itemsGroup.name||'default'" class="lfx-nominal-group">
-                  <div v-if="itemsGroup.name" class="lfx-subtitle"><img v-if="itemsGroup.image_url" :src="itemsGroup.image_url" :alt="itemsGroup.name" style="width:34px;height:34px;object-fit:cover;border-radius:8px"><span v-else class="lfx-mini-star">✦</span><h3>{{itemsGroup.name}}</h3><small>{{itemsGroup.items.length}} pilihan</small></div>
+                  <div v-if="itemsGroup.name" class="lfx-subtitle"><img v-if="itemsGroup.image_url" :src="itemsGroup.image_url" :alt="itemsGroup.name" width="34" height="34" loading="lazy" decoding="async" style="width:34px;height:34px;object-fit:cover;border-radius:8px"><span v-else class="lfx-mini-star">✦</span><h3>{{itemsGroup.name}}</h3><small>{{itemsGroup.items.length}} pilihan</small></div>
                   <div class="lfx-nominal-grid" role="radiogroup" :aria-label="itemsGroup.name || 'Pilih nominal'">
                     <div v-for="item in itemsGroup.items" :key="item.id"
                       class="lfx-nominal" :class="{selected:String(selectedPackageId)===String(item.id),unavailable:item.is_available===false}"
@@ -936,7 +936,7 @@ function closeReview() { summaryOpen.value = false; closeConfirmation(); }
                       <span class="lfx-check" aria-hidden="true">{{String(selectedPackageId)===String(item.id)?'✓':''}}</span>
                       <span class="lfx-nominal-top">
                         <span class="lfx-nominal-name"><strong>{{item.name}}</strong><small>{{item.group_name||product.name}}</small></span>
-                        <img v-if="item.image_url" class="lfx-item-art" :src="item.image_url" alt="" loading="lazy"/>
+                        <img v-if="item.image_url" class="lfx-item-art" :src="item.image_url" alt="" loading="lazy" decoding="async" width="128" height="128"/>
                         <span v-else class="lfx-diamond" aria-hidden="true">✦</span>
                       </span>
                       <span class="lfx-nominal-bottom"><b>{{item.is_available===false?'Tidak tersedia':formatIdr(item.price_idr)}}</b><small v-if="String(selectedPackageId)===String(item.id)">DIPILIH</small></span>
@@ -1048,7 +1048,7 @@ function closeReview() { summaryOpen.value = false; closeConfirmation(); }
   <div class="lfx-bottom-bar" role="region" aria-label="Ringkasan dan pembayaran">
     <div class="lfx-bottom-inner">
       <button id="lfx-bottom-summary" type="button" class="lfx-bottom-summary" @click="summaryOpen=true" aria-label="Lihat rincian ringkasan pesanan">
-        <span class="lfx-bottom-thumb" aria-hidden="true"><img v-if="selectedPackage?.image_url || product.image_url" :src="selectedPackage?.image_url || product.image_url" alt=""/><span v-else>✦</span></span>
+        <span class="lfx-bottom-thumb" aria-hidden="true"><img v-if="selectedPackage?.image_url || product.image_url" :src="selectedPackage?.image_url || product.image_card_url || product.image_url" alt="" width="56" height="56" loading="lazy" decoding="async"/><span v-else>✦</span></span>
         <span class="lfx-bottom-copy"><span class="lfx-bottom-caption">Ringkasan Pesanan · {{product.name}}</span><strong>{{selectedPackage?.name || 'Belum ada nominal dipilih'}}</strong></span>
         <span class="lfx-bottom-amount"><span>Total Bayar</span><strong>{{selectedPackage ? (displayTotal===null ? 'Menghitung…' : formatIdr(displayTotal)) : 'Rp 0'}}</strong></span>
         <span class="lfx-bottom-chevron" aria-hidden="true">⌃</span>

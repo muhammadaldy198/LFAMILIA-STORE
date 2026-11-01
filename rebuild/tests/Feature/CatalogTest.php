@@ -12,6 +12,7 @@ use App\Models\ProviderMapping;
 use App\Models\StoreAsset;
 use App\Services\CheckoutPricing;
 use App\Services\DigiflazzCatalogImport;
+use App\Support\OptimizedMedia;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -736,7 +737,11 @@ class CatalogTest extends TestCase
             $asset = StoreAsset::where('key', $key)->firstOrFail();
             $asset->update(['is_active' => true]);
             $asset->addMedia(UploadedFile::fake()->image($key.'.png'))->toMediaCollection('image', 'public');
-            $assets[$key] = $asset->getFirstMediaUrl('image');
+            $assets[$key] = match ($key) {
+                'logo' => OptimizedMedia::url($asset, 'image', 'icon'),
+                'banner_desktop', 'banner_mobile' => OptimizedMedia::url($asset, 'image', 'display'),
+                default => $asset->getFirstMediaUrl('image'),
+            };
         }
 
         $this->get('/')->assertInertia(fn (Assert $page) => $page
@@ -792,8 +797,8 @@ class CatalogTest extends TestCase
         $this->get('/')->assertInertia(fn (Assert $page) => $page
             ->component('Catalog/Index')
             ->where('banners.0.title', 'Promo Managed')
-            ->where('banners.0.desktop_url', $banner->fresh()->getFirstMediaUrl('desktop'))
-            ->where('banners.0.mobile_url', $banner->fresh()->getFirstMediaUrl('mobile'))
+            ->where('banners.0.desktop_url', OptimizedMedia::url($banner->fresh(), 'desktop', 'display'))
+            ->where('banners.0.mobile_url', OptimizedMedia::url($banner->fresh(), 'mobile', 'display'))
             ->where('popups.0.title', 'Popup Managed Updated')
             ->where('popups.0.body', 'Tetap satu record popup.')
             ->where('popups.0.dismiss_days', 5)
@@ -869,7 +874,7 @@ class CatalogTest extends TestCase
         $this->assertSame('favicon-new.png', $favicon->getFirstMedia('image')->file_name);
 
         $this->get('/')->assertInertia(fn (Assert $page) => $page
-            ->where('storefront.assets.favicon.url', $favicon->getFirstMediaUrl('image'))
+            ->where('storefront.assets.favicon.url', OptimizedMedia::url($favicon, 'image', 'icon'))
             ->etc());
     }
 

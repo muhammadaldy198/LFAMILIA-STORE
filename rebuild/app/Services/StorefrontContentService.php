@@ -8,6 +8,7 @@ use App\Models\NewsArticle;
 use App\Models\ProductReview;
 use App\Models\SitePopup;
 use App\Models\StoreAsset;
+use App\Support\OptimizedMedia;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -67,7 +68,11 @@ class StorefrontContentService
 
         return StoreAsset::where('is_active', true)->with('media')->get()->mapWithKeys(fn (StoreAsset $asset): array => [
             $asset->key => [
-                'url' => $asset->getFirstMediaUrl('image'),
+                'url' => OptimizedMedia::url($asset, 'image', match ($asset->key) {
+                    'logo' => 'icon',
+                    'footer_banner_desktop', 'footer_banner_mobile', 'banner_desktop', 'banner_mobile' => 'display',
+                    default => 'icon',
+                }),
                 'target' => $asset->target_url,
             ],
         ])->all();
@@ -87,8 +92,8 @@ class StorefrontContentService
                     'id', 'title', 'subtitle', 'cta_label', 'cta_href',
                     'show_desktop', 'show_mobile', 'sort_order'
                 ),
-                'desktop_url' => $banner->getFirstMediaUrl('desktop'),
-                'mobile_url' => $banner->getFirstMediaUrl('mobile'),
+                'desktop_url' => OptimizedMedia::url($banner, 'desktop', 'display'),
+                'mobile_url' => OptimizedMedia::url($banner, 'mobile', 'display'),
             ])
             ->filter(fn (array $banner): bool => $banner['desktop_url'] !== '' || $banner['mobile_url'] !== '')
             ->values();
@@ -108,7 +113,7 @@ class StorefrontContentService
                 'id', 'title', 'body', 'dismiss_days', 'sort_order',
             ])->map(fn (SitePopup $popup): array => [
                 ...$popup->only('id', 'title', 'body', 'dismiss_days', 'sort_order'),
-                'image_url' => $popup->getFirstMediaUrl('image'),
+                'image_url' => OptimizedMedia::url($popup, 'image', 'display'),
             ]);
     }
 
@@ -126,7 +131,7 @@ class StorefrontContentService
             ->map(fn (NewsArticle $article): array => [
                 ...$article->only('id', 'slug', 'title', 'summary', 'source_label'),
                 'published_at' => $article->published_at?->toIso8601String(),
-                'cover_url' => $article->getFirstMediaUrl('image'),
+                'cover_url' => OptimizedMedia::url($article, 'image', 'card'),
             ]);
     }
 

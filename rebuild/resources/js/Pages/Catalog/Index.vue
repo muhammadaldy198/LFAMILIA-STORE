@@ -72,12 +72,12 @@ onUnmounted(()=>{
                     <a v-if="activeBanner.cta_href" :href="activeBanner.cta_href" class="block">
                         <picture>
                             <source v-if="activeBanner.mobile_url" media="(max-width:639px)" :srcset="activeBanner.mobile_url">
-                            <img :src="activeBanner.desktop_url||activeBanner.mobile_url" :alt="activeBanner.title||'Banner LFAMILIA STORE'">
+                            <img :src="activeBanner.desktop_url||activeBanner.mobile_url" :alt="activeBanner.title||'Banner LFAMILIA STORE'" width="1600" height="500" loading="eager" fetchpriority="high" decoding="async">
                         </picture>
                     </a>
                     <picture v-else>
                         <source v-if="activeBanner.mobile_url" media="(max-width:639px)" :srcset="activeBanner.mobile_url">
-                        <img :src="activeBanner.desktop_url||activeBanner.mobile_url" :alt="activeBanner.title||'Banner LFAMILIA STORE'">
+                        <img :src="activeBanner.desktop_url||activeBanner.mobile_url" :alt="activeBanner.title||'Banner LFAMILIA STORE'" width="1600" height="500" loading="eager" fetchpriority="high" decoding="async">
                     </picture>
                     <template v-if="visibleBanners.length>1">
                         <button type="button" class="lf-banner-nav prev" :aria-label="customerText('pages.catalog.index.attribute.aria-label.d47450e2', 'Banner sebelumnya')" @click="bannerPrev">‹</button>
@@ -92,7 +92,7 @@ onUnmounted(()=>{
             <div v-if="popupOpen&&activePopup" class="lf-home-popup-backdrop" @click.self="closePopup">
                 <section class="lf-home-popup" role="dialog" aria-modal="true" :aria-label="activePopup.title">
                     <button type="button" class="lf-home-popup-close" :aria-label="customerText('pages.catalog.index.attribute.aria-label.7b2bdb3a', 'Tutup pop-up')" @click="closePopup">{{ customerText("pages.catalog.index.520b4356", "×") }}</button>
-                    <img v-if="activePopup.image_url" :src="activePopup.image_url" :alt="activePopup.title" class="lf-home-popup-image">
+                    <img v-if="activePopup.image_url" :src="activePopup.image_url" :alt="activePopup.title" class="lf-home-popup-image" width="900" height="900" decoding="async">
                     <div class="lf-home-popup-body">
                         <h2>{{activePopup.title}}</h2>
                         <p>{{activePopup.body}}</p>
@@ -110,7 +110,7 @@ onUnmounted(()=>{
                 <div class="lf-popular">
                     <Link v-for="(x,i) in popular" :key="x.slug" :href="'/catalog/'+x.slug" class="lf-popular-card" :class="'tone-'+(i%8)">
                         <span class="lf-popular-art">
-                            <img v-if="x.image_url" :src="x.image_url" :alt="x.name">
+                            <img v-if="x.image_url" :src="x.image_url" :alt="x.name" width="72" height="72" :loading="i < 2 ? 'eager' : 'lazy'" decoding="async">
                             <span v-else :style="x.accent_color?{background:x.accent_color}:undefined">{{x.initials||initial(x.name)}}</span>
                         </span>
                         <span class="lf-popular-copy"><strong class="lf-popular-title">{{x.name}}</strong><small v-if="x.publisher" class="lf-popular-publisher">{{x.publisher}}</small></span>
@@ -131,7 +131,7 @@ onUnmounted(()=>{
                 <nav class="lf-filters">
                     <Link :href="q({category:'',mode:''})" :only="listingProps" preserve-state preserve-scroll class="lf-chip" :class="{active:!filters.category&&!filters.mode}" :aria-current="!filters.category&&!filters.mode?'true':undefined">{{ customerText("pages.catalog.index.4b93aea2", "Semua") }}</Link>
                     <Link v-for="c in categories" :key="c.slug" :href="q({category:c.slug,mode:''})" :only="listingProps" preserve-state preserve-scroll class="lf-chip" :class="{active:filters.category===c.slug}" :aria-current="filters.category===c.slug?'true':undefined">
-                        <img v-if="c.image_url" :src="c.image_url" alt="">
+                        <img v-if="c.image_url" :src="c.image_url" alt="" width="24" height="24" loading="lazy" decoding="async">
                         <CategoryIcon v-else :name="c.icon" class="h-3.5 w-3.5 shrink-0" />
                         {{c.name}}
                     </Link>
@@ -139,7 +139,7 @@ onUnmounted(()=>{
 
                 <div v-if="products.data.length" class="lf-products">
                     <Link v-for="x in products.data" :key="x.slug" :href="'/catalog/'+x.slug" class="lf-product">
-                        <img v-if="x.image_url" :src="x.image_url" :alt="x.name">
+                        <img v-if="x.image_url" :src="x.image_url" :alt="x.name" width="288" height="432" loading="lazy" decoding="async">
                         <span v-else class="lf-product-fallback" :style="x.accent_color?{background:x.accent_color}:undefined"><strong>{{x.initials||x.name}}</strong><small>{{x.category_name}}</small></span>
                         <span v-if="x.instant" class="absolute right-2 top-2 z-10 rounded-full bg-black/70 px-2 py-1 text-[10px] font-semibold text-white">Instan</span>
                     </Link>
@@ -174,7 +174,7 @@ onUnmounted(()=>{
                     <div class="lf-news-grid mt-5">
                         <template v-for="a in p.news" :key="a.id">
                             <Link :href="'/news/'+a.slug" class="lf-news-card">
-                                <img v-if="a.cover_url" :src="a.cover_url" alt="">
+                                <img v-if="a.cover_url" :src="a.cover_url" alt="" width="600" height="400" loading="lazy" decoding="async">
                                 <div v-else class="lf-news-placeholder">{{ customerText("pages.catalog.index.6ae24f17", "LF") }}</div>
                                 <div class="lf-news-overlay"></div>
                                 <div class="lf-news-body">
