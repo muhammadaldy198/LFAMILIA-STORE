@@ -134,7 +134,9 @@ try {
                 await wallet.screenshot({ path: output + '/pr10-wallet-' + width + '.png', fullPage: true });
             }
             // Force an uncertain top-up response without sending a transaction.
+            const attemptedKeys = [];
             await wallet.route('**/account/wallet/topups', async route => {
+                attemptedKeys.push(route.request().postDataJSON().idempotency_key);
                 await route.fulfill({
                     status: 422, contentType: 'application/json',
                     body: JSON.stringify({ message: 'Status top up perlu diperiksa.' }),
@@ -146,8 +148,13 @@ try {
             assert.ok(await wallet.locator('.lfx-payment-method-card[aria-disabled=true]').count() > 0, 'Shared radio cards must lock');
             assert.ok(await wallet.locator('input[type=number]').isDisabled(), 'Wallet amount must lock');
             assert.ok(await wallet.getByRole('button', { name: 'Hitung total' }).isDisabled(), 'Quote action must lock');
-            assert.ok(await wallet.getByRole('button', { name: 'Cek status top up' }).isDisabled(), 'Top-up action must lock');
-            console.log('PASS PR10 picker parity, quote invalidation, attempt lock and screenshots at ' + width);
+            const retry = wallet.getByRole('button', { name: 'Cek status top up' });
+            assert.ok(await retry.isEnabled(), 'Same-key status recovery must remain accessible');
+            await retry.click();
+            await wallet.waitForTimeout(200);
+            assert.equal(attemptedKeys.length, 2, 'Uncertain top-up must permit one more idempotent status check');
+            assert.ok(attemptedKeys[0] && attemptedKeys[0] === attemptedKeys[1], 'Status check must reuse original idempotency key');
+            console.log('PASS PR10 picker parity, quote invalidation, locked inputs, and idempotent retry at ' + width);
         } finally {
             await checkout.close();
             await wallet.close();
