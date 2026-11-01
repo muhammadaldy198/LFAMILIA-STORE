@@ -432,6 +432,14 @@ jobs:
           path: rebuild/payment-visual-results
           if-no-files-found: warn
 
+      - name: Upload PR10 Wallet and Checkout parity screenshots
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: pr10-wallet-checkout-parity
+          path: rebuild/wallet-payment-parity-results
+          if-no-files-found: warn
+
   frontend-static:
     runs-on: ubuntu-24.04
     defaults:
