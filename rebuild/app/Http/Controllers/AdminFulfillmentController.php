@@ -6,8 +6,6 @@ use App\Jobs\ReconcileFulfillmentJob;
 use App\Services\AdminAuditService;
 use App\Services\AdminOrderPresentation;
 use App\Services\FulfillmentService;
-use App\Services\Fulfillment\DigiflazzDestinationTemplate;
-use App\Services\Fulfillment\FulfillmentTargetBuilder;
 use App\Services\OperationalSettings;
 use App\Support\ServiceHours;
 use Illuminate\Http\RedirectResponse;
@@ -151,14 +149,11 @@ class AdminFulfillmentController
             $resolutionDestination = null;
             if ($canResolveQuarantine) {
                 try {
-                    $template = app(DigiflazzDestinationTemplate::class)->resolve(
-                        (string) data_get($snapshot, 'product.slug', $attempt->product_slug),
-                        data_get($snapshot, 'provider.customer_no_template'),
-                        array_keys($input)
-                    );
-                    $resolutionDestination = app(FulfillmentTargetBuilder::class)
-                        ->customerNo($input, ['customer_no_template' => $template]);
-                } catch (ValidationException $exception) {
+                    $order = DB::table('orders')->where('id', $attempt->order_id)->firstOrFail();
+                    $mapping = DB::table('provider_mappings')->where('id', $order->provider_mapping_id)->firstOrFail();
+                    $resolutionDestination = app(FulfillmentService::class)
+                        ->digiflazzCustomerNo($order, $mapping, $snapshot);
+                } catch (\Throwable $exception) {
                     $canResolveQuarantine = false;
                 }
             }
