@@ -347,7 +347,7 @@ DB::transaction(function (): void {
     // F8 CI-only visible product: mirrors the currently featured Mobile Legends title.
     // Keep a buyable mapping so the real CatalogController renders the popular card.
     $popularProduct = Product::updateOrCreate(['slug' => 'browser-popular-mobile-legends'], [
-        'category_id' => $category->id,
+        'category_id' => Category::where('slug', 'game')->value('id'),
         'name' => 'Mobile Legends',
         'publisher' => 'Moonton',
         'fulfillment_mode' => 'AUTO_PROVIDER',
@@ -362,7 +362,7 @@ DB::transaction(function (): void {
         'is_active' => true,
     ]);
     DB::table('provider_mappings')->updateOrInsert([
-        'provider_id' => $providerId,
+        'provider_id' => DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id'),
         'external_sku' => 'BROWSER-POPULAR-SKU-5',
     ], [
         'product_package_id' => $popularPackage->id,
@@ -384,12 +384,17 @@ DB::transaction(function (): void {
     ]);
 
     // F7 UI-only fixture: modal can be measured, closed and dismissed in CI.
-    SitePopup::updateOrCreate(['title' => 'Browser UI Popup'], [
-        'body' => 'Pengumuman untuk pemeriksaan area sentuh.',
-        'dismiss_days' => 7,
-        'is_active' => true,
-        'sort_order' => -100,
-    ]);
+    $existingPopupId = SitePopup::query()->value('id');
+    SitePopup::updateOrCreate(
+        $existingPopupId ? ['id' => $existingPopupId] : ['title' => 'Browser UI Popup'],
+        [
+            'title' => 'Browser UI Popup',
+            'body' => 'Pengumuman untuk pemeriksaan area sentuh.',
+            'dismiss_days' => 7,
+            'is_active' => true,
+            'sort_order' => 0,
+        ]
+    );
 });
 
 // Disposable sandbox readiness for dropdown/quote coverage; browser tests never initiate payments.
