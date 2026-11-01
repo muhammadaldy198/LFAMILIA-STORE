@@ -86,7 +86,7 @@ class CustomerOrderController
             ->where('orders.order_number', strtoupper(trim($orderNumber)))
             ->select('orders.id', 'orders.order_number', 'orders.user_id', 'orders.payment_route_id',
                 'orders.status', 'orders.total_idr',
-                'orders.created_at', 'orders.paid_at', 'orders.delivery_payload',
+                'orders.created_at', 'orders.paid_at', 'orders.expires_at', 'orders.delivery_payload',
                 'products.name as product_name', 'product_packages.name as package_name')->first();
 
         abort_unless($record, 404);
