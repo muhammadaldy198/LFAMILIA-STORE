@@ -226,19 +226,17 @@ test('resend-verification control is not nested inside the login form', () => {
 });
 
 
-test('PR10 wallet reuses the single checkout payment picker without duplicating its markup or CSS', () => {
+test('PR10 wallet reuses the Checkout picker and original .lfx contents geometry', () => {
     const wallet = read('Pages/Customer/Wallet.vue');
     const picker = read('Components/Checkout/PaymentMethods.vue');
+    const checkout = read('Pages/Catalog/Show.vue');
     assert.match(wallet, /import CheckoutPaymentMethods from '\.\.\/\.\.\/Components\/Checkout\/PaymentMethods\.vue'/);
-    assert.match(wallet, /<CheckoutPaymentMethods\s/);
-    // .lfx + display:contents preserves Checkout's cascade without creating a layout box.
     assert.match(wallet, /<div class="lfx contents">\s*<CheckoutPaymentMethods/s);
+    assert.doesNotMatch(wallet, /import ['"].*checkout\.css|lf-wallet-logo|v-for="group in paymentGroups"/);
     assert.match(wallet, /:payment-channels="paymentChannels"/);
     assert.match(wallet, /:selected-code="paymentChannelCode"/);
     assert.match(wallet, /:locked="Boolean\(busy\) \|\| attemptLocked"/);
-    assert.match(wallet, /:disabled="busy \|\| result \|\| attemptLocked \|\| !quoteMatches"/);
-    assert.match(wallet, /@select="paymentChannelCode = \$event"/);
-    assert.doesNotMatch(wallet, /lf-wallet-logo|openedPaymentGroup|paymentGroups|choosePaymentGroup|lf-payment-group-main|lf-payment-brand-strip/);
+    assert.match(wallet, /@select="selectWalletPayment"/);
     assert.match(picker, /class="lf-payment-group-main"/);
     assert.match(picker, /class="lf-payment-brand-strip"/);
     assert.match(picker, /class="lf-payment-brand-logo"/);
@@ -250,6 +248,30 @@ test('PR10 wallet reuses the single checkout payment picker without duplicating 
     assert.match(wallet, /Biaya pembayaran/);
     assert.match(wallet, /await postJson\('\/account\/wallet\/topups\/quote'/);
     assert.match(wallet, /await postJson\('\/account\/wallet\/topups'/);
+    // Checkout uses the default (selection-driven) behavior; Wallet explicitly controls expansion.
+    assert.doesNotMatch(checkout, /:expanded-group=|@toggle-group=/);
+});
+
+test('PR11 wallet recovery uses the same key and keeps only the status button actionable during uncertainty', () => {
+    const wallet = read('Pages/Customer/Wallet.vue');
+    const picker = read('Components/Checkout/PaymentMethods.vue');
+    assert.match(wallet, /:disabled="busy \|\| result \|\| !quoteMatches"/);
+    assert.doesNotMatch(wallet, /:disabled="busy \|\| result \|\| attemptLocked \|\| !quoteMatches"/);
+    assert.match(wallet, /async function createTopup\(\)/);
+    assert.match(wallet, /idempotency_key: idempotencyKey\.value/);
+    assert.match(wallet, /:disabled="Boolean\(busy\) \|\| attemptLocked \|\| !paymentChannelCode"/);
+    assert.match(wallet, /type="number"[^>]*:disabled="Boolean\(busy\) \|\| attemptLocked"/);
+    assert.match(wallet, /:locked="Boolean\(busy\) \|\| attemptLocked"/);
+    assert.match(wallet, /:expanded-group="openedPaymentGroup"/);
+    assert.match(wallet, /@toggle-group="toggleWalletPaymentGroup"/);
+    assert.match(wallet, /:loading-quotes="busy === 'quote'"/);
+    assert.match(wallet, /:current-quote="quoteMatches \? quote : null"/);
+    assert.match(wallet, /quote\.value = null/);
+    assert.match(picker, /expandedGroup: \{ type: String, default: null \}/);
+    assert.match(picker, /defineEmits\(\['select', 'toggleGroup'\]\)/);
+    assert.match(picker, /props\.expandedGroup === null/);
+    assert.match(picker, /groupExpanded\(group\)/);
+    assert.match(picker, /emit\('toggleGroup', group\.key\)/);
 });
 
 test('payment F3/F11 uses an untruncated chip and paired 44px check buttons', () => {
