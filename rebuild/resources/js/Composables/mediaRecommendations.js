@@ -8,8 +8,8 @@ export function mediaRecommendation(type, collection = 'image', assetKey = '') {
         return ({
             logo: 'Logo: 256 × 256 px (1:1), PNG/WebP transparan. Area header 34–42 px dan footer 50 px.',
             favicon: 'Favicon: 512 × 512 px (1:1). Pastikan simbol terbaca pada tab browser 16–32 px.',
-            footer_banner_mobile: 'Footer mobile: 780 × 140 px. Patokan area 390 × 70 px; gambar dipotong dari tengah saat lebar layar berubah.',
-            footer_banner_desktop: 'Footer desktop: 3840 × 232 px. Patokan area 1920 × 116 px; tinggi area 72–116 px mengikuti layar. Simpan tulisan/logo dalam area tengah.',
+            footer_banner_mobile: 'Banner footer berasio 3:1 ditampilkan utuh pada semua ukuran layar. File dengan rasio berbeda dipotong terpusat.',
+            footer_banner_desktop: 'Banner footer berasio 3:1 ditampilkan utuh pada semua ukuran layar. File dengan rasio berbeda dipotong terpusat.',
         })[assetKey] || 'Gunakan gambar tajam; rekomendasi mengikuti tempat gambar ditampilkan di customer frontend.';
     }
     if (type === 'product') return collection === 'banner'
