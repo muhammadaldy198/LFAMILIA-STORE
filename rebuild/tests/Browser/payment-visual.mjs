@@ -109,12 +109,15 @@ try {
                 const chip = document.querySelector('.lf-payment-invoice-chip');
                 const label = chip.querySelector('.lf-payment-invoice-label');
                 const number = chip.querySelector('.lf-payment-invoice-number');
+                chip.removeAttribute('id');
                 chip.className = 'rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-right';
                 label.className = 'block text-[8px] font-bold uppercase tracking-[0.16em] text-white/35';
                 number.className = 'mt-0.5 block max-w-40 truncate font-mono text-[10px] font-black';
                 const status = document.querySelector('.lf-payment-actions > button');
                 const invoice = document.querySelector('.lf-payment-actions > a');
+                status.removeAttribute('id');
                 status.className = 'h-10 rounded-lg border border-white/10 bg-white/[0.03] text-[10px] font-bold text-white';
+                invoice.removeAttribute('id');
                 invoice.className = 'flex h-10 items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] text-[10px] font-bold text-white';
             });
             await beforePage.screenshot({ path: `${output}/before-reconstructed-pr1-390.png`, fullPage: true });
