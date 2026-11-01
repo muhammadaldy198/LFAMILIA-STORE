@@ -6330,9 +6330,11 @@ body:where(:not(.lfx, .lfx *)){margin:0;font-family:Inter,ui-sans-serif,system-u
   flex:1 1 0%;
 }
 .lf-customer .lf-popular-card .lf-popular-title:where(:not(.lfx, .lfx *)){
-  display:-webkit-box!important;
-  -webkit-box-orient:vertical;
-  -webkit-line-clamp:2;
+  display:block!important;
+  /* Line-clamp adds its own ellipsis even with text-overflow:clip. */
+  -webkit-line-clamp:unset!important;
+  -webkit-box-orient:initial!important;
+  max-height:2.7em;
   min-width:0;
   overflow:hidden;
   overflow-wrap:anywhere;

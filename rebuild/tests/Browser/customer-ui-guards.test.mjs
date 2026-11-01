@@ -278,7 +278,8 @@ test('popular cards show a two-line title and only a real publisher below it', (
     assert.match(source, /v-if="x\.publisher" class="lf-popular-publisher"/);
     const popularSection = source.split('<div class="lf-popular">')[1].split('</section>')[0];
     assert.doesNotMatch(popularSection, /<small>\{\{x\.category_name\}\}<\/small>/);
-    assert.match(css, /-webkit-line-clamp:2/);
+    assert.match(css, /-webkit-line-clamp:unset!important/);
+    assert.match(css, /max-height:2\.7em/);
     assert.match(css, /\.lf-popular-title:[^{]*\{[^}]*white-space:normal!important/s);
     assert.match(css, /@media\(min-width:901px\)\{[^}]*grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/s);
     assert.match(css, /@media\(max-width:900px\)\{[^}]*grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/s);

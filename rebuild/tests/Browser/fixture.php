@@ -383,6 +383,54 @@ DB::transaction(function (): void {
         'synced_at' => now(), 'created_at' => now(), 'updated_at' => now(),
     ]);
 
+    // PR5 browser regression: an empty publisher must not become a category label.
+    $noPublisherProduct = Product::updateOrCreate(['slug' => 'browser-popular-no-publisher'], [
+        'category_id' => Category::where('slug', 'game')->value('id'),
+        'name' => 'Produk Tanpa Penerbit',
+        'publisher' => null,
+        'fulfillment_mode' => 'AUTO_PROVIDER',
+        'popular' => true,
+        'sort_order' => 1,
+        'is_active' => true,
+    ]);
+    $noPublisherPackage = $noPublisherProduct->packages()->updateOrCreate(['code' => 'BROWSER-NO-PUBLISHER-5'], [
+        'name' => '5 Unit',
+        'nominal_value' => 5,
+        'sort_order' => 0,
+        'is_active' => true,
+    ]);
+    DB::table('provider_mappings')->updateOrInsert([
+        'provider_id' => DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id'),
+        'external_sku' => 'BROWSER-NO-PUBLISHER-SKU-5',
+    ], [
+        'product_package_id' => $noPublisherPackage->id,
+        'cost_idr' => 1500,
+        'max_price_idr' => 2000,
+        'priority' => 1,
+        'is_active' => true,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    DB::table('digiflazz_catalog_items')->updateOrInsert(['buyer_sku_code' => 'BROWSER-NO-PUBLISHER-SKU-5'], [
+        'product_name' => 'No Publisher 5 Unit',
+        'category' => 'Games',
+        'brand' => 'Browser',
+        'type' => 'Umum',
+        'seller_name' => 'Browser fixture',
+        'price_idr' => 1500,
+        'baseline_price_idr' => 1500,
+        'buyer_active' => true,
+        'seller_active' => true,
+        'unlimited_stock' => true,
+        'stock' => 0,
+        'multi' => false,
+        'start_cut_off' => '00:00',
+        'end_cut_off' => '00:00',
+        'synced_at' => now(),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
     // F7 UI-only fixture: modal can be measured, closed and dismissed in CI.
     $existingPopupId = SitePopup::query()->value('id');
     SitePopup::updateOrCreate(
