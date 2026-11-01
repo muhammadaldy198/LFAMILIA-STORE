@@ -42,5 +42,4 @@ class SitePopup extends Model implements HasMedia
             ->quality(58)
             ->nonQueued();
     }
-
 }

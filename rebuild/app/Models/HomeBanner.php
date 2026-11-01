@@ -51,5 +51,4 @@ class HomeBanner extends Model implements HasMedia
             ->quality(48)
             ->nonQueued();
     }
-
 }

@@ -34,5 +34,4 @@ class ProductPackageGroup extends Model implements HasMedia
             ->quality(60)
             ->nonQueued();
     }
-
 }

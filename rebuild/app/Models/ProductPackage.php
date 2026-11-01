@@ -45,5 +45,4 @@ class ProductPackage extends Model implements HasMedia
             ->quality(60)
             ->nonQueued();
     }
-
 }

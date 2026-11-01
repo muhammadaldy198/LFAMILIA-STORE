@@ -47,5 +47,4 @@ class StoreAsset extends Model implements HasMedia
             ->quality(65)
             ->nonQueued();
     }
-
 }

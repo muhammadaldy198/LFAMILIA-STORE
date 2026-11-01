@@ -42,5 +42,4 @@ class NewsArticle extends Model implements HasMedia
             ->quality(58)
             ->nonQueued();
     }
-
 }

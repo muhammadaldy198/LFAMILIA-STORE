@@ -39,5 +39,4 @@ class Category extends Model implements HasMedia
             ->quality(60)
             ->nonQueued();
     }
-
 }
