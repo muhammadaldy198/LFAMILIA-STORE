@@ -889,9 +889,9 @@ class FulfillmentService
         DB::table('fulfillment_attempts')->where('id', $attemptId)
             ->where('status', '<>', 'BLOCKED')->update([
                 'last_error' => substr($reason, 0, 4000),
-            'last_checked_at' => now(),
-            'updated_at' => now(),
-        ]);
+                'last_checked_at' => now(),
+                'updated_at' => now(),
+            ]);
     }
 
     /**
