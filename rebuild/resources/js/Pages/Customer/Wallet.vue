@@ -84,7 +84,7 @@ async function loadQuote() {
 }
 
 async function createTopup() {
-    if (busy.value || attemptLocked.value || result.value || !quoteMatches.value) return;
+    if (busy.value || result.value || !quoteMatches.value) return;
     attemptLocked.value = true;
     errors.value = {};
     busy.value = 'topup';
@@ -142,7 +142,7 @@ async function createTopup() {
 
             <div class="flex flex-wrap gap-2">
                 <button type="button" :disabled="Boolean(busy) || attemptLocked || !paymentChannelCode" class="rounded-lg bg-slate-700 px-4 py-2 disabled:opacity-50" @click="loadQuote">{{ customerText("pages.customer.wallet.60751a0", "Hitung total") }}</button>
-                <button type="button" :disabled="busy || attemptLocked || result || !quoteMatches" class="rounded-lg bg-cyan-300 px-4 py-2 font-semibold text-slate-950 disabled:opacity-50" @click="createTopup">{{busy === 'topup' ? 'Menyiapkan…' : attemptLocked ? 'Cek status top up' : 'Top up'}}</button>
+                <button type="button" :disabled="busy || result || !quoteMatches" class="rounded-lg bg-cyan-300 px-4 py-2 font-semibold text-slate-950 disabled:opacity-50" @click="createTopup">{{busy === 'topup' ? 'Menyiapkan…' : attemptLocked ? 'Cek status top up' : 'Top up'}}</button>
             </div>
             <p v-if="!paymentChannels?.length" class="text-sm text-slate-400">{{ customerText("pages.customer.wallet.8879a24e", "Metode top up belum tersedia. Hubungi bantuan.") }}</p>
             <p v-if="attemptLocked && !result" role="status" class="text-sm text-amber-200">{{ customerText("pages.customer.wallet.2d62f6cc", "Top up sebelumnya masih diproses. Cek statusnya dulu — jangan membuat top up baru agar tidak terbayar dua kali.") }}</p>
