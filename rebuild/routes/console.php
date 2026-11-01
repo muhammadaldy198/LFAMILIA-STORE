@@ -23,7 +23,6 @@ use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
-use Throwable;
 
 Artisan::command('lfamilia:bootstrap-super-admin', function (): int {
     if (AdminUser::where('role', 'SUPER_ADMIN')->exists()) {
