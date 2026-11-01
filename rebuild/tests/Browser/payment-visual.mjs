@@ -83,7 +83,7 @@ try {
             });
             await page.waitForFunction(() => document.querySelector('.lf-payment-actions > button')?.textContent.includes('Memeriksa…'));
             assert.equal(await page.locator('.lf-payment-actions > button').isDisabled(), true);
-            await page.waitForFunction(() => document.querySelector('.lf-payment-check-feedback')?.textContent.includes('Terakhir diperiksa'), { timeout: 10000 });
+            await page.waitForFunction(() => document.querySelector('.lf-payment-check-feedback')?.textContent.includes('Terakhir diperiksa'), null, { timeout: 10000 });
             assert.match(await page.locator('.lf-payment-check-feedback').textContent(), /WIB — masih menunggu pembayaran/);
             assert.equal(statusRequests, 1, 'Duplicate manual status reloads');
             const beforeAuto = statusRequests;
@@ -96,7 +96,7 @@ try {
                 else await route.continue();
             });
             await page.locator('.lf-payment-actions > button').click();
-            await page.waitForFunction(() => document.querySelector('.lf-payment-check-feedback')?.textContent.includes('Status belum berhasil diperiksa.'), { timeout: 10000 });
+            await page.waitForFunction(() => document.querySelector('.lf-payment-check-feedback')?.textContent.includes('Status belum berhasil diperiksa.'), null, { timeout: 10000 });
             assert.match(await page.locator('.lf-payment-check-feedback').textContent(), /Coba lagi/);
             await page.unroute('**/payment?**');
             // Reconstruct the exact old chip/action classes for a documented visual baseline.
