@@ -50,5 +50,5 @@ for (const root of syntaxRoots) {
     }
 }
 
-run('php', ['vendor/bin/pint', '--test']);
+run('php', ['vendor/bin/pint', '--test', '--diff']);
 console.log('Pre-push guard passed.');
