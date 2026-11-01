@@ -10,6 +10,8 @@ use App\Services\AdminNotificationService;
 use App\Services\CustomerCleanupService;
 use App\Services\DigiflazzCatalogService;
 use App\Services\ExternalNotificationService;
+use App\Services\MidtransStatusVerification;
+use App\Services\Payment\MidtransGateway;
 use App\Services\OperationalSettings;
 use App\Services\PaymentStateService;
 use Illuminate\Support\Carbon;
@@ -21,6 +23,7 @@ use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 Artisan::command('lfamilia:bootstrap-super-admin', function (): int {
     if (AdminUser::where('role', 'SUPER_ADMIN')->exists()) {
@@ -114,8 +117,8 @@ Artisan::command('lfamilia:recover-fulfillment', function (): void {
 Schedule::command('lfamilia:recover-fulfillment')->everyMinute()->withoutOverlapping();
 
 Artisan::command('lfamilia:reconcile-pending-payments', function (
-    \App\Services\Payment\MidtransGateway $midtrans,
-    \App\Services\MidtransStatusVerification $verification,
+    MidtransGateway $midtrans,
+    MidtransStatusVerification $verification,
     PaymentStateService $states,
 ): int {
     $checked = 0;
@@ -159,7 +162,7 @@ Artisan::command('lfamilia:reconcile-pending-payments', function (
                     if ($status !== 'PENDING') {
                         $resolved++;
                     }
-                } catch (\Throwable $exception) {
+                } catch (Throwable $exception) {
                     Log::warning('Scheduled payment status unavailable', [
                         'payment_transaction_id' => $payment->id,
                         'exception' => class_basename($exception),
