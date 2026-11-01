@@ -20,7 +20,7 @@ class MidtransGateway
         $config = $resolved['config'] ?? [];
         $environment = (string) ($resolved['environment'] ?? '');
 
-        if (! is_array($config) || empty($config['server_key']) || ! in_array($environment, ['sandbox', 'production'], true)) {
+        if (! is_array($config) || empty($config['server_key']) || ($environment !== 'production' && ! (app()->environment('testing') && $environment === 'sandbox'))) {
             throw new RuntimeException('MIDTRANS_STATUS_UNAVAILABLE');
         }
 
@@ -62,7 +62,7 @@ class MidtransGateway
         $config = $resolved['config'] ?? [];
         $environment = (string) ($resolved['environment'] ?? '');
 
-        if (! is_array($config) || empty($config['server_key']) || ! in_array($environment, ['sandbox', 'production'], true)) {
+        if (! is_array($config) || empty($config['server_key']) || ($environment !== 'production' && ! (app()->environment('testing') && $environment === 'sandbox'))) {
             throw ValidationException::withMessages(['payment' => 'Metode pembayaran sedang tidak tersedia.']);
         }
 

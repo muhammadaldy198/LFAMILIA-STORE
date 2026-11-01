@@ -234,6 +234,77 @@ class PaymentTest extends TestCase
             );
     }
 
+    public function test_scheduled_status_verification_recovers_settlement_after_invalid_webhook_signature(): void
+    {
+        $catalog = $this->catalog();
+        $this->route('qris', 'MIDTRANS', 0, 70, 'qris');
+        IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
+            'config_ciphertext' => ['server_key' => 'current-server-key', 'is_production' => false],
+            'is_active' => true,
+        ]);
+
+        Http::fake(function ($request) {
+            if ($request->url() === 'https://app.sandbox.midtrans.com/snap/v1/transactions') {
+                return Http::response([
+                    'token' => 'scheduled-status-token',
+                    'redirect_url' => 'https://example.test/checkout',
+                ]);
+            }
+
+            if (preg_match('#https://api\\.sandbox\\.midtrans\\.com/v2/(.+)/status$#', $request->url(), $matches)) {
+                return Http::response([
+                    'transaction_id' => 'scheduled-status-transaction',
+                    'transaction_status' => 'settlement',
+                    'status_code' => '200',
+                    'order_id' => rawurldecode($matches[1]),
+                    'gross_amount' => '11078.00',
+                    'fraud_status' => 'accept',
+                ]);
+            }
+
+            return Http::response([], 404);
+        });
+
+        $checkout = $this->postJson('/checkout/orders', $this->guestCheckout(
+            $catalog['package_id'], 'qris', 'scheduled-payment-order-unique'
+        ))->assertCreated();
+
+        $this->postJson('/payments/orders/'.$checkout->json('order_number'), [
+            'idempotency_key' => 'scheduled-payment-create-unique',
+            'access_code' => $checkout->json('access_code'),
+        ])->assertOk();
+
+        $payment = DB::table('payment_transactions')
+            ->where('idempotency_key', 'scheduled-payment-create-unique')->firstOrFail();
+
+        $this->postJson('/api/payments/midtrans/notification', [
+            'transaction_id' => 'scheduled-status-transaction',
+            'transaction_status' => 'settlement',
+            'status_code' => '200',
+            'order_id' => $payment->merchant_reference,
+            'gross_amount' => '11078.00',
+            'signature_key' => str_repeat('0', 128),
+        ])->assertUnauthorized();
+
+        $this->assertSame('PENDING_PAYMENT', DB::table('orders')->where('id', $payment->order_id)->value('status'));
+
+        DB::table('payment_transactions')->where('id', $payment->id)->update([
+            'created_at' => now()->subMinutes(5),
+            'updated_at' => now()->subMinutes(5),
+        ]);
+
+        Artisan::call('lfamilia:reconcile-pending-payments');
+
+        $this->assertSame('PAID', DB::table('orders')->where('id', $payment->order_id)->value('status'));
+        $this->assertSame('PAID', DB::table('payment_transactions')->where('id', $payment->id)->value('status'));
+        $this->assertSame(1, DB::table('order_events')
+            ->where('order_id', $payment->order_id)->where('event_type', 'PAYMENT_VERIFIED')->count());
+
+        Artisan::call('lfamilia:reconcile-pending-payments');
+        $this->assertSame(1, DB::table('order_events')
+            ->where('order_id', $payment->order_id)->where('event_type', 'PAYMENT_VERIFIED')->count());
+    }
+
     public function test_midtrans_settlement_is_verified_idempotent_and_stale_pending_cannot_downgrade_paid(): void
     {
         $catalog = $this->catalog();

@@ -97,7 +97,8 @@ Artisan::command('lfamilia:recover-fulfillment', function (): void {
 
     DB::table('fulfillment_attempts')
         ->whereIn('status', ['PENDING', 'UNKNOWN', 'SENDING'])
-        ->where('reconcile_checks', '<', 3)
+        // Continue checking the same provider reference until final or 24-hour safety limit.
+        ->where('created_at', '>=', now()->subDay())
         ->where('updated_at', '<=', now()->subMinutes(2))
         ->orderBy('id')
         ->chunkById(100, function ($attempts) use (&$queued): void {
@@ -111,6 +112,8 @@ Artisan::command('lfamilia:recover-fulfillment', function (): void {
 })->purpose('Recover paid orders and reconcile uncertain provider attempts without creating duplicate fulfillment');
 
 Schedule::command('lfamilia:recover-fulfillment')->everyMinute()->withoutOverlapping();
+
+require __DIR__.'/payment_reconciliation.php';
 
 Artisan::command('lfamilia:expire-unpaid-orders', function (PaymentStateService $states): int {
     $expired = 0;

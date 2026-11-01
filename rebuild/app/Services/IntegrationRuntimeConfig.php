@@ -54,14 +54,18 @@ class IntegrationRuntimeConfig
         }
 
         $storedEnvironment = strtolower(trim((string) ($stored['environment'] ?? '')));
-        if (array_key_exists($storedEnvironment, $environments)) {
-            return $storedEnvironment;
+        if ($storedEnvironment !== '') {
+            // Explicitly retired Test/Sandbox credentials must never become
+            // Production by falling through to the new default environment.
+            return array_key_exists($storedEnvironment, $environments) ? $storedEnvironment : null;
         }
 
         if ($this->hasLegacyConfiguration($definition, $stored)) {
             $legacy = $this->legacyEnvironment($code, $stored);
-            if ($legacy !== null && array_key_exists($legacy, $environments)) {
-                return $legacy;
+            if ($legacy !== null) {
+                // Legacy flags like testing=true/is_production=false are
+                // authoritative negative evidence, even after retiring modes.
+                return array_key_exists($legacy, $environments) ? $legacy : null;
             }
         }
 
@@ -131,23 +135,38 @@ class IntegrationRuntimeConfig
 
     public function telegramBotBase(string $environment, string $token): string
     {
-        $base = 'https://api.telegram.org/bot'.rawurlencode($token);
+        if ($environment === 'test' && app()->environment('testing')) {
+            return 'https://api.telegram.org/bot'.rawurlencode($token).'/test';
+        }
+        if ($environment !== 'production') {
+            throw new \RuntimeException('TELEGRAM_PRODUCTION_REQUIRED');
+        }
 
-        return $environment === 'test' ? $base.'/test' : $base;
+        return 'https://api.telegram.org/bot'.rawurlencode($token);
     }
 
     public function midtransApiBase(string $environment): string
     {
-        return $environment === 'production'
-            ? 'https://api.midtrans.com'
-            : 'https://api.sandbox.midtrans.com';
+        if ($environment === 'sandbox' && app()->environment('testing')) {
+            return 'https://api.sandbox.midtrans.com';
+        }
+        if ($environment !== 'production') {
+            throw new \RuntimeException('MIDTRANS_PRODUCTION_REQUIRED');
+        }
+
+        return 'https://api.midtrans.com';
     }
 
     public function midtransSnapBase(string $environment): string
     {
-        return $environment === 'production'
-            ? 'https://app.midtrans.com'
-            : 'https://app.sandbox.midtrans.com';
+        if ($environment === 'sandbox' && app()->environment('testing')) {
+            return 'https://app.sandbox.midtrans.com';
+        }
+        if ($environment !== 'production') {
+            throw new \RuntimeException('MIDTRANS_PRODUCTION_REQUIRED');
+        }
+
+        return 'https://app.midtrans.com';
     }
 
     /**
@@ -159,9 +178,14 @@ class IntegrationRuntimeConfig
             return rtrim((string) $config['base_url'], '/');
         }
 
-        return $environment === 'production'
-            ? 'https://api.doku.com'
-            : 'https://api-sandbox.doku.com';
+        if ($environment === 'sandbox' && app()->environment('testing')) {
+            return 'https://api-sandbox.doku.com';
+        }
+        if ($environment !== 'production') {
+            throw new \RuntimeException('DOKU_PRODUCTION_REQUIRED');
+        }
+
+        return 'https://api.doku.com';
     }
 
     /**
@@ -206,8 +230,9 @@ class IntegrationRuntimeConfig
     private function legacyEnvironment(string $code, array $stored): ?string
     {
         $storedEnvironment = strtolower(trim((string) ($stored['environment'] ?? '')));
-        $environments = $this->registry->environments($code);
-        if ($storedEnvironment !== '' && array_key_exists($storedEnvironment, $environments)) {
+        if ($storedEnvironment !== '') {
+            // Preserve an explicit legacy environment even if retired.
+            // A retired Test credential must never be exposed as Production.
             return $storedEnvironment;
         }
 

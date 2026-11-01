@@ -129,6 +129,43 @@ class AdminIntegrationsRestorationTest extends TestCase
         $this->assertFalse(app(PaymentRoutingService::class)->gatewayReady('MIDTRANS'));
     }
 
+    public function test_explicit_legacy_test_credentials_are_never_promoted_to_production(): void
+    {
+        $this->clearIntegrationState();
+        $legacyProfiles = [
+            'digiflazz' => ['environment' => 'test', 'username' => 'legacy-buyer', 'api_key' => 'legacy-test-key'],
+            'telegram' => ['environment' => 'test', 'bot_token' => 'legacy-test-token', 'chat_id' => 'legacy-chat'],
+            'turnstile' => ['environment' => 'test', 'site_key' => 'legacy-site', 'secret_key' => 'legacy-test-secret'],
+            'midtrans' => ['environment' => 'sandbox', 'server_key' => 'legacy-sandbox-key'],
+            'doku' => ['environment' => 'sandbox', 'client_id' => 'legacy-id', 'secret_key' => 'legacy-secret'],
+        ];
+        foreach ($legacyProfiles as $code => $config) {
+            IntegrationCredential::create([
+                'code' => $code,
+                'is_active' => true,
+                'config_ciphertext' => $config,
+            ]);
+        }
+
+        $originalEnvironment = $this->app->environment();
+        $this->app->detectEnvironment(fn (): string => 'production');
+        try {
+            $runtime = app(IntegrationRuntimeConfig::class);
+            foreach (array_keys($legacyProfiles) as $code) {
+                $resolved = $runtime->resolve($code);
+                $this->assertNull($resolved['environment'], $code.' must fail closed');
+                $this->assertSame([], $resolved['config'], $code.' must not expose test credentials');
+                $this->assertSame([], $runtime->profile($code, $legacyProfiles[$code], 'production'),
+                    $code.' production profile must be empty for retired test secrets');
+            }
+
+            $this->assertFalse(app(PaymentRoutingService::class)->gatewayReady('MIDTRANS'));
+            $this->assertFalse(app(PaymentRoutingService::class)->gatewayReady('DOKU'));
+        } finally {
+            $this->app->detectEnvironment(fn (): string => $originalEnvironment);
+        }
+    }
+
     public function test_midtrans_backend_uses_endpoint_and_credential_from_selected_environment(): void
     {
         $this->clearIntegrationState();

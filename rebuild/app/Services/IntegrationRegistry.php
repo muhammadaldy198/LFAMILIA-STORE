@@ -14,20 +14,13 @@ class IntegrationRegistry
                 'name' => 'Digiflazz',
                 'group' => 'Pemasok produk',
                 'description' => 'Kredensial transaksi dan sinkronisasi produk Digiflazz.',
-                'default_environment' => 'test',
+                'default_environment' => 'production',
                 'credential_scope' => 'per_environment',
-                'environments' => [
-                    'test' => [
-                        'label' => 'Masa uji',
-                        'live' => false,
-                        'description' => 'Menggunakan parameter testing resmi Digiflazz pada endpoint API yang sama.',
-                    ],
-                    'production' => [
-                        'label' => 'Sungguhan — transaksi nyata',
-                        'live' => true,
-                        'description' => 'Request tanpa parameter testing; transaksi dapat diproses nyata oleh provider.',
-                    ],
-                ],
+                'environments' => $this->availableEnvironments('test', [
+                    'label' => 'Sungguhan — transaksi nyata',
+                    'live' => true,
+                    'description' => 'Request tanpa parameter testing; transaksi dapat diproses nyata oleh provider.',
+                ]),
                 'fields' => [
                     'username' => [
                         'label' => 'Nama pengguna Digiflazz',
@@ -39,7 +32,7 @@ class IntegrationRegistry
                         'label' => 'Kunci akses',
                         'secret' => true,
                         'required' => true,
-                        'help' => 'Kunci akses untuk mode layanan yang sedang dipilih. Mode uji dan mode sungguhan disimpan terpisah.',
+                        'help' => 'Kunci akses Digiflazz Production.',
                     ],
                     'webhook_secret' => [
                         'label' => 'Rahasia webhook',
@@ -53,13 +46,13 @@ class IntegrationRegistry
                     'route' => 'api.fulfillment.digiflazz.webhook',
                     'required_fields' => ['webhook_secret'],
                 ],
-                'note' => 'Digiflazz memakai endpoint API yang sama, tetapi Development dan Production menggunakan API key terpisah. Mode Development/Test juga menerapkan parameter testing resmi pada request transaksi.',
+                'note' => 'Khusus transaksi Digiflazz Production menggunakan API key yang aktif.',
             ],
             'kokinpay' => [
                 'name' => 'Validasi Akun',
                 'group' => 'Pengecekan akun',
                 'description' => 'API pengecekan nickname, region MLBB, dan pelanggan PLN.',
-                'environment_note' => 'Environment terpisah tidak diaktifkan karena capability sandbox/test resmi untuk API yang digunakan belum terverifikasi.',
+                'environment_note' => 'Integrasi hanya memakai endpoint layanan yang aktif.',
                 'fields' => [
                     'api_key' => [
                         'label' => 'Kunci akses',
@@ -98,32 +91,25 @@ class IntegrationRegistry
                 'name' => 'Midtrans Snap',
                 'group' => 'Pembayaran',
                 'description' => 'Kredensial Midtrans untuk pembuatan pembayaran dan verifikasi notifikasi.',
-                'default_environment' => 'sandbox',
+                'default_environment' => 'production',
                 'credential_scope' => 'per_environment',
-                'environments' => [
-                    'sandbox' => [
-                        'label' => 'Masa uji',
-                        'live' => false,
-                        'description' => 'Menggunakan endpoint dan credential Sandbox Midtrans.',
-                    ],
-                    'production' => [
-                        'label' => 'Sungguhan — transaksi nyata',
-                        'live' => true,
-                        'description' => 'Menggunakan endpoint dan credential Production Midtrans.',
-                    ],
-                ],
+                'environments' => $this->availableEnvironments('sandbox', [
+                    'label' => 'Sungguhan — transaksi nyata',
+                    'live' => true,
+                    'description' => 'Menggunakan endpoint dan credential Production Midtrans.',
+                ]),
                 'fields' => [
                     'server_key' => [
                         'label' => 'Kunci server',
                         'secret' => true,
                         'required' => true,
-                        'help' => 'Kunci server untuk environment yang sedang dipilih. Hanya digunakan backend.',
+                        'help' => 'Kunci server Midtrans Production, hanya digunakan backend.',
                     ],
                     'client_key' => [
                         'label' => 'Kunci aplikasi',
                         'secret' => true,
                         'required' => false,
-                        'help' => 'Kunci client untuk environment yang sedang dipilih bila dibutuhkan oleh flow Snap.',
+                        'help' => 'Kunci aplikasi Midtrans Production untuk flow Snap.',
                     ],
                 ],
                 'callback' => [
@@ -136,32 +122,25 @@ class IntegrationRegistry
                 'name' => 'DOKU Checkout',
                 'group' => 'Pembayaran',
                 'description' => 'Kredensial DOKU Checkout untuk halaman pembayaran yang dihosting DOKU.',
-                'default_environment' => 'sandbox',
+                'default_environment' => 'production',
                 'credential_scope' => 'per_environment',
-                'environments' => [
-                    'sandbox' => [
-                        'label' => 'Masa uji',
-                        'live' => false,
-                        'description' => 'Menggunakan endpoint dan credential Sandbox DOKU.',
-                    ],
-                    'production' => [
-                        'label' => 'Sungguhan — transaksi nyata',
-                        'live' => true,
-                        'description' => 'Menggunakan endpoint dan credential Production DOKU.',
-                    ],
-                ],
+                'environments' => $this->availableEnvironments('sandbox', [
+                    'label' => 'Sungguhan — transaksi nyata',
+                    'live' => true,
+                    'description' => 'Menggunakan endpoint dan credential Production DOKU.',
+                ]),
                 'fields' => [
                     'client_id' => [
                         'label' => 'ID aplikasi',
                         'secret' => true,
                         'required' => true,
-                        'help' => 'Identitas merchant untuk environment yang sedang dipilih.',
+                        'help' => 'Identitas merchant DOKU Production.',
                     ],
                     'secret_key' => [
                         'label' => 'Kunci rahasia',
                         'secret' => true,
                         'required' => true,
-                        'help' => 'Kunci penandatanganan request untuk environment yang sedang dipilih.',
+                        'help' => 'Kunci penandatanganan request DOKU Production.',
                     ],
                 ],
                 'callback' => [
@@ -174,7 +153,7 @@ class IntegrationRegistry
                 'name' => 'Resend Email',
                 'group' => 'Email',
                 'description' => 'Pengiriman email transaksi dan notifikasi operasional.',
-                'environment_note' => 'Resend tidak memakai endpoint Sandbox/Production terpisah pada integrasi ini. Pisahkan domain/team atau credential bila diperlukan secara operasional.',
+                'environment_note' => 'Resend memakai kredensial layanan aktif.',
                 'fields' => [
                     'api_key' => [
                         'label' => 'Kunci akses',
@@ -226,41 +205,34 @@ class IntegrationRegistry
                 'name' => 'Notifikasi Telegram',
                 'group' => 'Pemberitahuan',
                 'description' => 'Pengiriman notifikasi operasional Admin melalui bot Telegram.',
-                'default_environment' => 'test',
+                'default_environment' => 'production',
                 'credential_scope' => 'per_environment',
-                'environments' => [
-                    'test' => [
-                        'label' => 'Masa uji',
-                        'live' => false,
-                        'description' => 'Menggunakan bot/token Telegram Test Environment dan path Bot API /test/.',
-                    ],
-                    'production' => [
-                        'label' => 'Sungguhan — data nyata',
-                        'live' => true,
-                        'description' => 'Menggunakan bot/token Telegram Production untuk notifikasi nyata.',
-                    ],
-                ],
+                'environments' => $this->availableEnvironments('test', [
+                    'label' => 'Sungguhan — data nyata',
+                    'live' => true,
+                    'description' => 'Menggunakan bot/token Telegram Production untuk notifikasi nyata.',
+                ]),
                 'fields' => [
                     'bot_token' => [
                         'label' => 'Token bot Telegram',
                         'secret' => true,
                         'required' => true,
-                        'help' => 'Token bot untuk environment yang sedang dipilih.',
+                        'help' => 'Token bot Telegram Production.',
                     ],
                     'chat_id' => [
                         'label' => 'ID ruang obrolan',
                         'secret' => true,
                         'required' => true,
-                        'help' => 'ID chat tujuan pada environment yang sedang dipilih.',
+                        'help' => 'ID chat tujuan Telegram Production.',
                     ],
                 ],
-                'note' => 'Telegram Test Environment terpisah dari Production sehingga bot, token, user, dan chat tidak boleh saling fallback.',
+                'note' => 'Notifikasi Telegram hanya memakai bot Production.',
             ],
             'discord' => [
                 'name' => 'Notifikasi Discord',
                 'group' => 'Pemberitahuan',
                 'description' => 'Pengiriman notifikasi operasional Admin melalui webhook Discord.',
-                'environment_note' => 'Webhook Discord yang digunakan tidak mempunyai selector Sandbox/Production terpisah.',
+                'environment_note' => 'Webhook Discord memakai alamat webhook aktif.',
                 'fields' => [
                     'webhook_url' => [
                         'label' => 'Alamat pemberitahuan utama',
@@ -334,44 +306,60 @@ class IntegrationRegistry
                 'name' => 'Cloudflare Turnstile',
                 'group' => 'Keamanan',
                 'description' => 'Proteksi bot untuk form publik dan login yang terdeteksi mencurigakan.',
-                'default_environment' => 'test',
+                'default_environment' => 'production',
                 'credential_scope' => 'per_environment',
-                'environments' => [
-                    'test' => [
-                        'label' => 'Masa uji',
-                        'live' => false,
-                        'description' => 'Gunakan site key dan secret key pengujian Turnstile.',
-                    ],
-                    'production' => [
-                        'label' => 'Sungguhan — data nyata',
-                        'live' => true,
-                        'description' => 'Gunakan widget dan credential Turnstile milik hostname produksi.',
-                    ],
-                ],
+                'environments' => $this->availableEnvironments('test', [
+                    'label' => 'Sungguhan — data nyata',
+                    'live' => true,
+                    'description' => 'Gunakan widget dan credential Turnstile milik hostname produksi.',
+                ]),
                 'fields' => [
                     'site_key' => [
                         'label' => 'Site Key',
                         'secret' => false,
                         'required' => true,
-                        'help' => 'Kunci publik widget Turnstile untuk environment yang sedang dipilih.',
+                        'help' => 'Kunci publik widget Turnstile Production.',
                     ],
                     'secret_key' => [
                         'label' => 'Kunci rahasia',
                         'secret' => true,
                         'required' => true,
-                        'help' => 'Kunci verifikasi server Turnstile untuk environment yang sedang dipilih.',
+                        'help' => 'Kunci verifikasi server Turnstile Production.',
                     ],
                     'allowed_hostnames' => [
                         'label' => 'Hostname yang diizinkan',
                         'secret' => false,
                         'required' => false,
                         'type' => 'csv',
-                        'help' => 'Untuk website LFAMILIA, gunakan lfamilia.com. Pisahkan hostname dengan koma, tanpa http:// atau https://. Isi profil environment Turnstile yang sedang aktif.',
+                        'help' => 'Untuk website LFAMILIA, gunakan lfamilia.com. Pisahkan hostname dengan koma, tanpa http:// atau https://.',
                     ],
                 ],
-                'note' => 'Test dan Production memakai credential terpisah. Backend hanya membaca profile dari environment yang dipilih.',
+                'note' => 'Turnstile hanya memakai kredensial Production.',
             ],
         ];
+    }
+
+    /**
+     * Production is the only selectable profile in the real application.
+     * Legacy fixture modes remain accessible to the isolated CI test process.
+     *
+     * @param  array<string, mixed>  $production
+     * @return array<string, array<string, mixed>>
+     */
+    private function availableEnvironments(string $fixtureCode, array $production): array
+    {
+        if (app()->environment('testing')) {
+            return [
+                $fixtureCode => [
+                    'label' => 'Masa uji',
+                    'live' => false,
+                    'description' => 'Only used by isolated automated tests.',
+                ],
+                'production' => $production,
+            ];
+        }
+
+        return ['production' => $production];
     }
 
     public function get(string $code): ?array

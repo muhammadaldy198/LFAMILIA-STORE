@@ -12,6 +12,7 @@ use App\Models\Product;
 use App\Services\DigiflazzAutoSources;
 use App\Services\FulfillmentService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
@@ -474,7 +475,82 @@ class FulfillmentTest extends TestCase
         Http::assertSentCount(1);
     }
 
-    public function test_uncertain_sku_uses_three_automatic_status_checks_without_failover(): void
+    public function test_late_success_response_cannot_unblock_attempt_quarantined_mid_request(): void
+    {
+        Queue::fake();
+        $this->credentials();
+        $catalog = $this->automaticCatalog();
+        $orderId = $this->paidOrder($catalog);
+        $service = app(FulfillmentService::class);
+        $service->startOrder($orderId);
+        $attempt = DB::table('fulfillment_attempts')->where('order_id', $orderId)->firstOrFail();
+
+        Http::fake(function ($request) {
+            // A worker already sent a Test request; cutover occurs while the
+            // HTTP call is in flight, before the worker handles its reply.
+            $migration = require database_path('migrations/2026_11_01_000000_remove_nonproduction_integration_profiles.php');
+            $migration->up();
+
+            return Http::response(['data' => [
+                'ref_id' => $request['ref_id'],
+                'buyer_sku_code' => $request['buyer_sku_code'],
+                'customer_no' => $request['customer_no'],
+                'status' => 'Sukses',
+                'rc' => '00',
+                'sn' => 'LATE-TEST-RESULT',
+                'price' => 10000,
+            ]]);
+        });
+
+        $service->sendAttempt((int) $attempt->id);
+
+        $this->assertSame('BLOCKED', DB::table('fulfillment_attempts')->where('id', $attempt->id)->value('status'));
+        $this->assertSame('BLOCKED', DB::table('orders')->where('id', $orderId)->value('status'));
+        $this->assertDatabaseHas('admin_notifications', [
+            'event_type' => 'fulfillment.environment.quarantined',
+            'target_type' => 'fulfillment_attempt',
+            'target_id' => (string) $attempt->id,
+        ]);
+        Queue::assertNotPushed(SendTransactionalEmailJob::class, fn (SendTransactionalEmailJob $job): bool => str_contains($job->subject, 'berhasil'));
+        Http::assertSentCount(1);
+    }
+
+    public function test_production_cutover_quarantines_old_digiflazz_attempts_before_scheduler_can_replay(): void
+    {
+        Queue::fake();
+        $this->credentials();
+        $catalog = $this->automaticCatalog();
+        $orderId = $this->paidOrder($catalog);
+
+        $service = app(FulfillmentService::class);
+        $service->startOrder($orderId);
+        $attempt = DB::table('fulfillment_attempts')->where('order_id', $orderId)->firstOrFail();
+        DB::table('fulfillment_attempts')->where('id', $attempt->id)->update([
+            'status' => 'PENDING',
+            'updated_at' => now()->subMinutes(10),
+        ]);
+
+        $migration = require database_path('migrations/2026_11_01_000000_remove_nonproduction_integration_profiles.php');
+        $migration->up();
+
+        $this->assertSame('BLOCKED', DB::table('fulfillment_attempts')
+            ->where('id', $attempt->id)->value('status'));
+        $this->assertSame('BLOCKED', DB::table('orders')
+            ->where('id', $orderId)->value('status'));
+        $this->assertDatabaseHas('admin_notifications', [
+            'event_type' => 'fulfillment.environment.quarantined',
+            'target_type' => 'fulfillment_attempt',
+            'target_id' => (string) $attempt->id,
+        ]);
+
+        Artisan::call('lfamilia:recover-fulfillment');
+        Queue::assertNotPushed(ReconcileFulfillmentJob::class, fn (ReconcileFulfillmentJob $job): bool => $job->attemptId === (int) $attempt->id);
+
+        $this->expectException(ValidationException::class);
+        $service->retrySafeAttempt((int) $attempt->id);
+    }
+
+    public function test_uncertain_sku_keeps_checking_beyond_three_attempts_without_failover(): void
     {
         Queue::fake();
         $this->credentials();
@@ -503,10 +579,10 @@ class FulfillmentTest extends TestCase
         }
         $this->assertSame('PENDING', DB::table('fulfillment_attempts')
             ->where('id', $attempt->id)->value('status'));
-        $this->assertSame(3, (int) DB::table('fulfillment_attempts')
+        $this->assertSame(5, (int) DB::table('fulfillment_attempts')
             ->where('id', $attempt->id)->value('reconcile_checks'));
         $this->assertSame(1, DB::table('fulfillment_attempts')->where('order_id', $orderId)->count());
-        Http::assertSentCount(4);
+        Http::assertSentCount(6);
     }
 
     public function test_pending_never_failovers_before_confirmed_failure(): void

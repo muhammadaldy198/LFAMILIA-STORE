@@ -56,6 +56,11 @@ class AdminIntegrationController
             $stored = is_array($storedConfig) ? $storedConfig : [];
             $environment = $runtime->selectedEnvironment($code, $stored);
             $environments = $registry->environments($code);
+            // Show an empty Production form when old credentials are retired.
+            // Do not reuse or silently activate the old Test/Sandbox key.
+            if ($environment === null && count($environments) === 1 && isset($environments['production'])) {
+                $environment = 'production';
+            }
 
             $profiles = [];
             if ($environments !== []) {
@@ -237,6 +242,9 @@ class AdminIntegrationController
             $environment = strtolower(trim((string) ($data['environment'] ?? '')));
             if ($environment === '') {
                 $environment = $runtime->selectedEnvironment($code, $existing);
+                if ($environment === null && count($environments) === 1 && isset($environments['production'])) {
+                    $environment = 'production';
+                }
             }
             if ($environment === null || ! array_key_exists($environment, $environments)) {
                 throw ValidationException::withMessages([

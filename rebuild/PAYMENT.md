@@ -44,9 +44,9 @@ Server-owned Snap `enabled_payments` restrictions:
   actually enables BCA.
 
 Before taking live orders, validate Midtrans production credentials and its
-HTTP notification URL shown under the Gateway tab; check the actual eligible
-methods using a non-charging sandbox session, and confirm a controlled live
-payment only with owner approval. Do not assume a healthy integration means
+HTTP notification URL shown under the Gateway tab; check eligible
+methods in the merchant dashboard. Automated tests must fake provider responses;
+never use live payment requests for test runs. Do not assume a healthy integration means
 production-activated payment methods. Store wallet payments stay free; wallet
 topups using external methods use the same configured payment fees as orders.
 

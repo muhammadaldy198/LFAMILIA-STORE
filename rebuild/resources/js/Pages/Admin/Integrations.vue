@@ -74,24 +74,6 @@ const readinessTone = item => {
 
 const callbackTone = status => ({ READY: 'ok', NOT_READY: 'bad', NOT_REQUIRED: 'plain' }[status] || 'plain');
 
-const switchEnvironment = (item, event) => {
-    const next = event.target.value;
-    if (!next || next === item.environment) return;
-    if (item.credential_scope === 'per_environment') {
-        item.profiles[item.environment] = {
-            fields: item.fields, config: { ...item.config }, clear_secrets: [...item.clear_secrets],
-        };
-        const target = item.profiles[next];
-        if (target) {
-            item.fields = target.fields.map(field => ({ ...field }));
-            item.config = { ...target.config };
-            item.clear_secrets = [...target.clear_secrets];
-        }
-    }
-    item.environment = next;
-    delete result[item.code];
-};
-
 const toggleClearSecret = (item, key) => {
     const index = item.clear_secrets.indexOf(key);
     if (index >= 0) {
@@ -256,14 +238,6 @@ const sendTestEmail = async () => {
                             {{ current.callback.status === 'READY' ? 'Siap' : current.callback.status === 'NOT_READY' ? 'Belum siap' : 'Tidak perlu' }}
                         </span>
                     </div>
-                </div>
-
-                <div v-if="current.environment_options?.length" class="adm-field" style="max-width:320px;margin-top:10px">
-                    <span>Mode layanan</span>
-                    <select :value="current.environment" class="adm-select" @change="switchEnvironment(current, $event)">
-                        <option v-for="option in current.environment_options" :key="option.value" :value="option.value">{{ option.label }}</option>
-                    </select>
-                    <span class="hint">{{ current.environment_note || 'Data akses disimpan terpisah untuk setiap mode.' }}</span>
                 </div>
 
                 <div class="adm-grid" style="margin-top:10px">
