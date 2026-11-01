@@ -120,5 +120,7 @@ if has_stage checkout; then
   fi
   echo "Running payment page F3/F11 smoke (360, 390, desktop)"
   timeout --signal=TERM --kill-after=10s 3m node tests/Browser/payment-visual.mjs "$CHROME_BIN"
+  echo "Running wallet/checkout shared picker geometry and screenshot smoke (390, 768, 1440)"
+  timeout --signal=TERM --kill-after=10s 3m node tests/Browser/wallet-payment-parity.mjs "$CHROME_BIN"
 fi
 echo "M11 browser smoke passed."
