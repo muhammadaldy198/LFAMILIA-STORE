@@ -17,6 +17,13 @@ class IntegrationRegistry
                 'default_environment' => 'production',
                 'credential_scope' => 'per_environment',
                 'environments' => [
+                    ...(app()->environment('testing') ? [
+                        'test' => [
+                        'label' => 'Masa uji',
+                        'live' => false,
+                        'description' => 'Only used by isolated automated tests.',
+                        ],
+                    ] : []),
                     'production' => [
                         'label' => 'Sungguhan — transaksi nyata',
                         'live' => true,
@@ -96,6 +103,13 @@ class IntegrationRegistry
                 'default_environment' => 'production',
                 'credential_scope' => 'per_environment',
                 'environments' => [
+                    ...(app()->environment('testing') ? [
+                        'sandbox' => [
+                        'label' => 'Masa uji',
+                        'live' => false,
+                        'description' => 'Only used by isolated automated tests.',
+                        ],
+                    ] : []),
                     'production' => [
                         'label' => 'Sungguhan — transaksi nyata',
                         'live' => true,
@@ -129,6 +143,13 @@ class IntegrationRegistry
                 'default_environment' => 'production',
                 'credential_scope' => 'per_environment',
                 'environments' => [
+                    ...(app()->environment('testing') ? [
+                        'sandbox' => [
+                        'label' => 'Masa uji',
+                        'live' => false,
+                        'description' => 'Only used by isolated automated tests.',
+                        ],
+                    ] : []),
                     'production' => [
                         'label' => 'Sungguhan — transaksi nyata',
                         'live' => true,
@@ -214,6 +235,13 @@ class IntegrationRegistry
                 'default_environment' => 'production',
                 'credential_scope' => 'per_environment',
                 'environments' => [
+                    ...(app()->environment('testing') ? [
+                        'test' => [
+                        'label' => 'Masa uji',
+                        'live' => false,
+                        'description' => 'Only used by isolated automated tests.',
+                        ],
+                    ] : []),
                     'production' => [
                         'label' => 'Sungguhan — data nyata',
                         'live' => true,
@@ -317,6 +345,13 @@ class IntegrationRegistry
                 'default_environment' => 'production',
                 'credential_scope' => 'per_environment',
                 'environments' => [
+                    ...(app()->environment('testing') ? [
+                        'test' => [
+                        'label' => 'Masa uji',
+                        'live' => false,
+                        'description' => 'Only used by isolated automated tests.',
+                        ],
+                    ] : []),
                     'production' => [
                         'label' => 'Sungguhan — data nyata',
                         'live' => true,
