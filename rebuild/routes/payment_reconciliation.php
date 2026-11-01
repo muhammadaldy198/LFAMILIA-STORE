@@ -47,6 +47,7 @@ Artisan::command('lfamilia:reconcile-pending-payments', function (
                             'payment_transaction_id' => $payment->id,
                             'reason' => 'IDENTITY_OR_AMOUNT_MISMATCH',
                         ]);
+
                         continue;
                     }
 
