@@ -12,7 +12,6 @@ export default {
             if (!seo) return null;
 
             const tags = [
-                h('title', {}, seo.title),
                 h('meta', { 'head-key': 'seo-description', name: 'description', content: seo.description }),
                 h('meta', { 'head-key': 'seo-robots', name: 'robots', content: 'index,follow' }),
                 h('link', { 'head-key': 'seo-canonical', rel: 'canonical', href: seo.canonical }),
@@ -33,7 +32,8 @@ export default {
                 tags.push(h('script', { 'head-key': 'seo-jsonld', type: 'application/ld+json' },
                     JSON.stringify(seo.structuredData).replace(/</g, '\\u003c')));
             }
-            return h(Head, null, { default: () => tags });
+            // Head's title prop escapes user-controlled text before serialization.
+            return h(Head, { title: '@@LFSEO@@' + seo.title }, { default: () => tags });
         };
     },
 };
