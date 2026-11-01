@@ -131,23 +131,29 @@ class IntegrationRuntimeConfig
 
     public function telegramBotBase(string $environment, string $token): string
     {
-        $base = 'https://api.telegram.org/bot'.rawurlencode($token);
+        if ($environment !== 'production') {
+            throw new \RuntimeException('TELEGRAM_PRODUCTION_REQUIRED');
+        }
 
-        return $environment === 'test' ? $base.'/test' : $base;
+        return 'https://api.telegram.org/bot'.rawurlencode($token);
     }
 
     public function midtransApiBase(string $environment): string
     {
-        return $environment === 'production'
-            ? 'https://api.midtrans.com'
-            : 'https://api.sandbox.midtrans.com';
+        if ($environment !== 'production') {
+            throw new \RuntimeException('MIDTRANS_PRODUCTION_REQUIRED');
+        }
+
+        return 'https://api.midtrans.com';
     }
 
     public function midtransSnapBase(string $environment): string
     {
-        return $environment === 'production'
-            ? 'https://app.midtrans.com'
-            : 'https://app.sandbox.midtrans.com';
+        if ($environment !== 'production') {
+            throw new \RuntimeException('MIDTRANS_PRODUCTION_REQUIRED');
+        }
+
+        return 'https://app.midtrans.com';
     }
 
     /**
@@ -159,9 +165,11 @@ class IntegrationRuntimeConfig
             return rtrim((string) $config['base_url'], '/');
         }
 
-        return $environment === 'production'
-            ? 'https://api.doku.com'
-            : 'https://api-sandbox.doku.com';
+        if ($environment !== 'production') {
+            throw new \RuntimeException('DOKU_PRODUCTION_REQUIRED');
+        }
+
+        return 'https://api.doku.com';
     }
 
     /**
