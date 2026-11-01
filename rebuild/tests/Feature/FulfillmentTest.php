@@ -474,7 +474,7 @@ class FulfillmentTest extends TestCase
         Http::assertSentCount(1);
     }
 
-    public function test_uncertain_sku_uses_three_automatic_status_checks_without_failover(): void
+    public function test_uncertain_sku_keeps_checking_beyond_three_attempts_without_failover(): void
     {
         Queue::fake();
         $this->credentials();
@@ -503,10 +503,10 @@ class FulfillmentTest extends TestCase
         }
         $this->assertSame('PENDING', DB::table('fulfillment_attempts')
             ->where('id', $attempt->id)->value('status'));
-        $this->assertSame(3, (int) DB::table('fulfillment_attempts')
+        $this->assertSame(5, (int) DB::table('fulfillment_attempts')
             ->where('id', $attempt->id)->value('reconcile_checks'));
         $this->assertSame(1, DB::table('fulfillment_attempts')->where('order_id', $orderId)->count());
-        Http::assertSentCount(4);
+        Http::assertSentCount(6);
     }
 
     public function test_pending_never_failovers_before_confirmed_failure(): void
