@@ -17,11 +17,11 @@ class IntegrationRegistry
                 'default_environment' => 'production',
                 'credential_scope' => 'per_environment',
                 'environments' => [
-                    ...(app()->environment('testing') ? [
+                    ... (app()->environment('testing') ? [
                         'test' => [
-                        'label' => 'Masa uji',
-                        'live' => false,
-                        'description' => 'Only used by isolated automated tests.',
+                            'label' => 'Masa uji',
+                            'live' => false,
+                            'description' => 'Only used by isolated automated tests.',
                         ],
                     ] : []),
                     'production' => [
@@ -103,11 +103,11 @@ class IntegrationRegistry
                 'default_environment' => 'production',
                 'credential_scope' => 'per_environment',
                 'environments' => [
-                    ...(app()->environment('testing') ? [
+                    ... (app()->environment('testing') ? [
                         'sandbox' => [
-                        'label' => 'Masa uji',
-                        'live' => false,
-                        'description' => 'Only used by isolated automated tests.',
+                            'label' => 'Masa uji',
+                            'live' => false,
+                            'description' => 'Only used by isolated automated tests.',
                         ],
                     ] : []),
                     'production' => [
@@ -143,11 +143,11 @@ class IntegrationRegistry
                 'default_environment' => 'production',
                 'credential_scope' => 'per_environment',
                 'environments' => [
-                    ...(app()->environment('testing') ? [
+                    ... (app()->environment('testing') ? [
                         'sandbox' => [
-                        'label' => 'Masa uji',
-                        'live' => false,
-                        'description' => 'Only used by isolated automated tests.',
+                            'label' => 'Masa uji',
+                            'live' => false,
+                            'description' => 'Only used by isolated automated tests.',
                         ],
                     ] : []),
                     'production' => [
@@ -235,11 +235,11 @@ class IntegrationRegistry
                 'default_environment' => 'production',
                 'credential_scope' => 'per_environment',
                 'environments' => [
-                    ...(app()->environment('testing') ? [
+                    ... (app()->environment('testing') ? [
                         'test' => [
-                        'label' => 'Masa uji',
-                        'live' => false,
-                        'description' => 'Only used by isolated automated tests.',
+                            'label' => 'Masa uji',
+                            'live' => false,
+                            'description' => 'Only used by isolated automated tests.',
                         ],
                     ] : []),
                     'production' => [
@@ -345,11 +345,11 @@ class IntegrationRegistry
                 'default_environment' => 'production',
                 'credential_scope' => 'per_environment',
                 'environments' => [
-                    ...(app()->environment('testing') ? [
+                    ... (app()->environment('testing') ? [
                         'test' => [
-                        'label' => 'Masa uji',
-                        'live' => false,
-                        'description' => 'Only used by isolated automated tests.',
+                            'label' => 'Masa uji',
+                            'live' => false,
+                            'description' => 'Only used by isolated automated tests.',
                         ],
                     ] : []),
                     'production' => [
