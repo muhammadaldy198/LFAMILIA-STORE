@@ -17,9 +17,9 @@ class IntegrationRegistry
                 'default_environment' => 'production',
                 'credential_scope' => 'per_environment',
                 'environments' => $this->availableEnvironments('test', [
-                        'label' => 'Sungguhan — transaksi nyata',
-                        'live' => true,
-                        'description' => 'Request tanpa parameter testing; transaksi dapat diproses nyata oleh provider.',
+                    'label' => 'Sungguhan — transaksi nyata',
+                    'live' => true,
+                    'description' => 'Request tanpa parameter testing; transaksi dapat diproses nyata oleh provider.',
                 ]),
                 'fields' => [
                     'username' => [
@@ -94,9 +94,9 @@ class IntegrationRegistry
                 'default_environment' => 'production',
                 'credential_scope' => 'per_environment',
                 'environments' => $this->availableEnvironments('sandbox', [
-                        'label' => 'Sungguhan — transaksi nyata',
-                        'live' => true,
-                        'description' => 'Menggunakan endpoint dan credential Production Midtrans.',
+                    'label' => 'Sungguhan — transaksi nyata',
+                    'live' => true,
+                    'description' => 'Menggunakan endpoint dan credential Production Midtrans.',
                 ]),
                 'fields' => [
                     'server_key' => [
@@ -125,9 +125,9 @@ class IntegrationRegistry
                 'default_environment' => 'production',
                 'credential_scope' => 'per_environment',
                 'environments' => $this->availableEnvironments('sandbox', [
-                        'label' => 'Sungguhan — transaksi nyata',
-                        'live' => true,
-                        'description' => 'Menggunakan endpoint dan credential Production DOKU.',
+                    'label' => 'Sungguhan — transaksi nyata',
+                    'live' => true,
+                    'description' => 'Menggunakan endpoint dan credential Production DOKU.',
                 ]),
                 'fields' => [
                     'client_id' => [
@@ -208,9 +208,9 @@ class IntegrationRegistry
                 'default_environment' => 'production',
                 'credential_scope' => 'per_environment',
                 'environments' => $this->availableEnvironments('test', [
-                        'label' => 'Sungguhan — data nyata',
-                        'live' => true,
-                        'description' => 'Menggunakan bot/token Telegram Production untuk notifikasi nyata.',
+                    'label' => 'Sungguhan — data nyata',
+                    'live' => true,
+                    'description' => 'Menggunakan bot/token Telegram Production untuk notifikasi nyata.',
                 ]),
                 'fields' => [
                     'bot_token' => [
@@ -309,9 +309,9 @@ class IntegrationRegistry
                 'default_environment' => 'production',
                 'credential_scope' => 'per_environment',
                 'environments' => $this->availableEnvironments('test', [
-                        'label' => 'Sungguhan — data nyata',
-                        'live' => true,
-                        'description' => 'Gunakan widget dan credential Turnstile milik hostname produksi.',
+                    'label' => 'Sungguhan — data nyata',
+                    'live' => true,
+                    'description' => 'Gunakan widget dan credential Turnstile milik hostname produksi.',
                 ]),
                 'fields' => [
                     'site_key' => [
