@@ -171,11 +171,12 @@ onUnmounted(()=>{disposed=true;selectionVersion++;stopDetailPolling();if(feedTim
        <p v-if="recoveryError" role="alert" class="text-sm text-red-300">{{recoveryError}}</p>
        <a v-if="recoveryUrl" :href="recoveryUrl" class="lf-primary">Lanjut Bayar</a>
      </div>
-     <div v-else-if="detail.paymentExpired" class="mb-4 space-y-3 rounded-xl border border-white/10 p-4">
+     <div v-else-if="detail.paymentExpired && nextAction!=='support'" class="mb-4 space-y-3 rounded-xl border border-white/10 p-4">
        <p class="text-sm">Batas waktu pembayaran pesanan ini sudah berakhir. Pembayaran tidak dapat dilanjutkan.</p>
        <Link href="/" class="lf-primary">Buat pesanan baru</Link>
      </div>
-     <div v-if="nextAction && !detail.paymentExpired" class="mb-4 space-y-3 rounded-xl border border-white/10 p-4">
+     <div v-if="nextAction && (!detail.paymentExpired || nextAction==='support')" class="mb-4 space-y-3 rounded-xl border border-white/10 p-4">
+       <p v-if="detail.paymentExpired && nextAction==='support'" class="text-sm">Pesanan telah berakhir, tetapi pembayaran terdeteksi. Hubungi admin untuk pemeriksaan sebelum membuat pesanan baru.</p>
       <p v-if="nextAction==='support'" class="text-sm">{{ customerText('order.status.manualHelp', manualHelpMessage) }}</p>
       <Link v-if="nextAction==='support'" href="/contact" class="lf-primary">Hubungi admin</Link>
       <Link v-else href="/" class="lf-primary">Buat pesanan baru</Link>
