@@ -3,8 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\NewsArticle;
-use App\Support\OptimizedMedia;
 use App\Services\StorefrontContentService;
+use App\Support\OptimizedMedia;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redis;

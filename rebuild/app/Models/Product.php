@@ -6,10 +6,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Schema;
+use Spatie\Image\Enums\Fit;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
-use Spatie\Image\Enums\Fit;
 
 class Product extends Model implements HasMedia
 {
@@ -80,6 +80,7 @@ class Product extends Model implements HasMedia
         $this->addMediaCollection('image')->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])->singleFile();
         $this->addMediaCollection('banner')->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/webp'])->singleFile();
     }
+
     public function registerMediaConversions(?Media $media = null): void
     {
         $this->addMediaConversion('card')

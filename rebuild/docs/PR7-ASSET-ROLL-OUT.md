@@ -27,7 +27,17 @@ Do not delete original uploads or run `media-library:clean`. Verify every previo
 
 ## Frontend build evidence
 
-Baseline reported by production audit (2026-11-01): CSS 336 KB, JS 285 KB (these are **not** claimed to be freshly measured Vite outputs). Collect **before and after** exact Vite `npm run build` asset/chunk sizes from the CI build logs at the same revision parameters; where prior build logs are unavailable, explicitly record `unavailable` rather than inventing a delta. This PR does not modify bundling logic because per-page dynamic splitting already exists. Keep frontend CSS/JS comparisons separate from image payload savings.
+Reproducible Vite 7.3.7 GitHub Actions builds at PR6 HEAD `861e8a29` (job `124843295894`) and PR7 first commit `fe560b2e` (job `124847884268`) both transformed 3,337 modules.
+
+| Asset (Vite output, uncompressed) | Before | After | Delta |
+|---|---:|---:|---:|
+| Main `app.css` | 341.29 kB | 341.29 kB | 0.00 kB |
+| Main `app.js` | 284.95 kB | 284.95 kB | 0.00 kB |
+| Homepage `Index.js` dynamic chunk | 15.85 kB | 16.30 kB | +0.45 kB |
+| CustomerShell dynamic chunk | 28.49 kB | 28.70 kB | +0.21 kB |
+| Product page `Show.js` dynamic chunk | 48.66 kB | 48.96 kB | +0.30 kB |
+
+Main CSS gzip stays 45.31 kB; main JS gzip changes 99.58 → 99.57 kB. These are **actual CI build log values**, distinct from 2026-11-01 production audit estimates (336 KB CSS / 285 KB JS). The extra view markup changes chunk output slightly. Vite's `import.meta.glob` already splits rarely-used pages. No blind bundling changes without demonstrated startup benefit. Keep byte savings on network images separate from JS/CSS sizes.
 
 ## Cache ownership
 

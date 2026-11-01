@@ -3,10 +3,10 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Spatie\Image\Enums\Fit;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
-use Spatie\Image\Enums\Fit;
 
 class SitePopup extends Model implements HasMedia
 {
@@ -32,6 +32,7 @@ class SitePopup extends Model implements HasMedia
             'is_active' => 'boolean',
         ];
     }
+
     public function registerMediaConversions(?Media $media = null): void
     {
         $this->addMediaConversion('display')

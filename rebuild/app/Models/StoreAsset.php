@@ -3,10 +3,10 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Spatie\Image\Enums\Fit;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
-use Spatie\Image\Enums\Fit;
 
 class StoreAsset extends Model implements HasMedia
 {
@@ -23,6 +23,7 @@ class StoreAsset extends Model implements HasMedia
     {
         $this->addMediaCollection('image')->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])->singleFile();
     }
+
     public function registerMediaConversions(?Media $media = null): void
     {
         $this->addMediaConversion('card')
