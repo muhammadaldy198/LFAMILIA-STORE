@@ -6,6 +6,7 @@ import { Head } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
 import AccountShell from '../../Components/AccountShell.vue';
 import CustomerPagination from '../../Components/CustomerPagination.vue';
+import CheckoutPaymentMethods from '../../Components/Checkout/PaymentMethods.vue';
 import { rupiah } from '../../lib/money';
 
 const props = defineProps({
@@ -18,23 +19,6 @@ const props = defineProps({
 
 const amountIdr = ref(props.minimumTopupIdr || 10000);
 const paymentChannelCode = ref('');
-const openedPaymentGroup = ref('');
-const paymentGroups = computed(() => {
-    const grouped = new Map();
-    for (const channel of props.paymentChannels || []) {
-        const code = channel.group || 'other';
-        if (!grouped.has(code)) grouped.set(code, { code, title: channel.group_title || 'Metode Lainnya',
-            description: channel.group_description || '', order: Number(channel.group_order ?? 9999), items: [] });
-        grouped.get(code).items.push(channel);
-    }
-    return [...grouped.values()].sort((a, b) => a.order - b.order || a.title.localeCompare(b.title, 'id'));
-});
-const choosePaymentGroup = group => {
-    openedPaymentGroup.value = openedPaymentGroup.value === group.code ? '' : group.code;
-    if (openedPaymentGroup.value && !group.items.some(channel => channel.code === paymentChannelCode.value)) {
-        paymentChannelCode.value = group.items[0]?.code || '';
-    }
-};
 const quote = ref(null);
 const result = ref(null);
 const errors = ref({});
@@ -122,43 +106,14 @@ async function createTopup() {
 
             <div class="space-y-3" aria-label="Pilih metode pembayaran top up">
                 <h3 class="text-sm font-semibold text-slate-100">Metode pembayaran</h3>
-                <div v-for="group in paymentGroups" :key="group.code"
-                    class="overflow-hidden rounded-xl border transition-colors"
-                    :class="group.items.some(item => item.code === paymentChannelCode) ? 'border-cyan-400/70 bg-cyan-500/5' : 'border-slate-700 bg-slate-950/70'">
-                    <button type="button" class="grid w-full grid-cols-[minmax(0,1fr)_auto] items-start gap-2 px-3 py-3 text-left sm:gap-3 sm:px-4"
-                        :disabled="Boolean(busy) || attemptLocked" :aria-expanded="openedPaymentGroup === group.code"
-                        @click="choosePaymentGroup(group)">
-                        <span class="min-w-0 break-words"><strong class="block text-sm leading-snug text-slate-100">{{ group.title }}</strong>
-                            <small v-if="group.description" class="mt-1 block text-xs leading-relaxed text-slate-400">{{ group.description }}</small>
-                            <small v-else class="mt-1 block text-xs text-slate-400">{{ group.items.length }} pilihan pembayaran</small>
-                        </span>
-                        <span class="flex shrink-0 items-center gap-1.5 whitespace-nowrap sm:gap-2">
-                            <span v-if="group.items.some(item => item.code === paymentChannelCode)" class="rounded-full bg-cyan-400/15 px-2 py-1 text-[11px] font-semibold text-cyan-200">Dipilih</span>
-                            <span class="text-slate-400" aria-hidden="true">{{ openedPaymentGroup === group.code ? '▴' : '▾' }}</span>
-                        </span>
-                    </button>
-                    <div v-if="openedPaymentGroup !== group.code && ['va', 'ewallet'].includes(group.code)" class="lf-wallet-logo-strip border-t border-slate-700/80" aria-label="Logo metode pembayaran">
-                        <span v-for="channel in group.items.filter(item => item.logo_url)" :key="channel.code" class="lf-wallet-logo">
-                            <img :src="channel.logo_url" :alt="channel.name" loading="lazy">
-                        </span>
-                    </div>
-                    <div v-if="openedPaymentGroup === group.code" class="grid gap-2 border-t border-slate-700/80" :class="['va', 'ewallet'].includes(group.code) ? 'grid-cols-2 p-2' : 'grid-cols-1 p-3 sm:grid-cols-2'" role="radiogroup" :aria-label="'Metode '+group.title">
-                        <button v-for="channel in group.items" :key="channel.code" type="button" role="radio"
-                            :aria-checked="paymentChannelCode === channel.code"
-                            :disabled="Boolean(busy) || attemptLocked"
-                            class="flex min-w-0 rounded-lg border text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300 disabled:opacity-50"
-                            :class="[paymentChannelCode === channel.code ? 'border-cyan-400 bg-cyan-400/10' : 'border-slate-700 bg-slate-900', ['va', 'ewallet'].includes(group.code) ? 'min-h-[94px] flex-col items-start justify-between gap-2 p-2.5' : 'min-h-[64px] items-center gap-3 px-3 py-3']"
-                            @click="paymentChannelCode = channel.code">
-                            <span class="flex shrink-0 items-center justify-center rounded-lg border border-slate-700 bg-slate-950" :class="['va', 'ewallet'].includes(group.code) ? 'h-7 w-16 px-1' : 'size-10'">
-                                <img v-if="channel.logo_url" :src="channel.logo_url" :alt="channel.name" class="max-h-full max-w-full object-contain">
-                                <span v-else class="text-xs font-semibold text-cyan-300">{{ channel.name.slice(0,2).toUpperCase() }}</span>
-                            </span>
-                            <span class="min-w-0 w-full flex-1"><strong class="block break-words text-xs leading-snug text-slate-100">{{ channel.name }}</strong>
-                                <small v-if="channel.description && !['va', 'ewallet'].includes(group.code)" class="mt-0.5 block text-xs leading-snug text-slate-400">{{ channel.description }}</small></span>
-                            <span class="shrink-0 text-cyan-300" aria-hidden="true">{{ paymentChannelCode === channel.code ? '●' : '○' }}</span>
-                        </button>
-                    </div>
-                </div>
+                <CheckoutPaymentMethods
+                    :payment-channels="paymentChannels"
+                    :selected-code="paymentChannelCode"
+                    :current-quote="quoteMatches ? quote : null"
+                    :has-package="true"
+                    :locked="Boolean(busy) || attemptLocked"
+                    @select="paymentChannelCode = $event"
+                />
             </div>
             <span v-if="errors.payment_channel_code" class="text-xs text-red-300">{{ errors.payment_channel_code[0] }}</span>
 
@@ -197,36 +152,3 @@ async function createTopup() {
     </AccountShell>
 </template>
 
-<style scoped>
-/* Keep every payment logo in one line, shrinking them as channels are added. */
-.lf-wallet-logo-strip {
-    box-sizing: border-box;
-    display: flex;
-    align-items: center;
-    flex-wrap: nowrap;
-    gap: 4px;
-    min-width: 0;
-    width: 100%;
-    overflow: hidden;
-    padding: 8px 12px;
-}
-.lf-wallet-logo {
-    box-sizing: border-box;
-    display: flex;
-    flex: 0 1 56px;
-    align-items: center;
-    justify-content: center;
-    min-width: 0;
-    max-width: 56px;
-    aspect-ratio: 2 / 1;
-    padding: 2px 3px;
-    border-radius: 4px;
-    background: rgba(30, 41, 59, .8);
-}
-.lf-wallet-logo img {
-    display: block;
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-}
-</style>
