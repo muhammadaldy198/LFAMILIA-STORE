@@ -49,7 +49,7 @@ class ServerSeoMetadataTest extends TestCase
         foreach ([$home, $detail, $faq] as $html) {
             $this->assertSame(1, preg_match_all('/<title\b[^>]*>/i', $html));
             $this->assertSame(1, preg_match_all('/<meta\b[^>]*name="description"/i', $html));
-            $this->assertSame(1, preg_match_all('/<meta\b[^>]*rel="canonical"/i', $html));
+            $this->assertSame(1, preg_match_all('/<link\b[^>]*rel="canonical"/i', $html));
             $this->assertStringContainsString('name="robots" content="index,follow"', $html);
         }
         $this->assertSame('LFAMILIA STORE', $this->title($home));
