@@ -1111,7 +1111,7 @@ class FulfillmentTest extends TestCase
         $this->credentials();
         foreach (['ref_id', 'customer_no'] as $field) {
             Http::swap(new Factory);
-            $catalog = $this->automaticCatalog(sku: 'ML5_A');
+            $catalog = $this->automaticCatalog(sku: 'ML5_A-'.strtoupper($field));
             $orderId = $this->paidOrder($catalog);
             $calls = 0;
             Http::fake(function ($request) use ($field, &$calls) {
@@ -1121,7 +1121,7 @@ class FulfillmentTest extends TestCase
                 }
                 $response = [
                     'ref_id' => $request['ref_id'],
-                    'buyer_sku_code' => 'ml5_a',
+                    'buyer_sku_code' => strtolower($request['buyer_sku_code']),
                     'customer_no' => $request['customer_no'],
                     'status' => 'Sukses',
                     'rc' => '00',
