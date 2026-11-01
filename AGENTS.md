@@ -110,7 +110,7 @@ Tidak semua tugas sampai DEPLOY. Pekerjaan dokumen boleh berhenti setelah merge.
 - **Tidak ada failover otomatis** ke sumber kedua. Penyedia konfirmasi gagal → pesanan jadi "perlu tindakan superadmin", berhenti.
 - **Saldo tidak boleh minus.** Semua mutasi lewat ledger, tidak bisa dihapus atau diubah.
 - **Harga pesanan tidak pernah berubah setelah pesanan dibuat.**
-- **Uji pembayaran hanya simulasi/sandbox.** Tidak ada transaksi uang nyata tanpa izin pemilik.
+- **Uji pembayaran memakai respons tiruan yang terisolasi.** Tidak ada transaksi uang nyata tanpa izin pemilik; aplikasi normal hanya memakai Production.
 
 ### Digiflazz
 
