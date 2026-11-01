@@ -32,6 +32,9 @@ const geometry = async (page, title) => page.evaluate(name => {
             borderStyle: style.borderStyle,
             maxHeight: style.maxHeight,
             objectFit: style.objectFit,
+            minHeight: style.minHeight,
+            gap: style.gap,
+            boxSizing: style.boxSizing,
         };
     };
     const header = group.querySelector('.lf-payment-group-main');
@@ -92,9 +95,14 @@ const assertParity = (wallet, checkout, label) => {
             throw Error(label + ' expanded channel grid differs: ' + JSON.stringify({ wallet, checkout }));
         }
         if (wallet.firstCard && checkout.firstCard) {
-            near(wallet.firstCard.height, checkout.firstCard.height, label + ' channel card height');
-            if (wallet.firstCard.style.padding !== checkout.firstCard.style.padding) {
-                throw Error(label + ' channel card padding differs');
+            // Card content is data-dependent (different channel names/prices may wrap).
+            // Match CSS geometry, not the auto-height of two different contents.
+            for (const key of ['padding', 'border', 'borderStyle', 'minHeight', 'gap', 'boxSizing']) {
+                if (wallet.firstCard.style[key] !== checkout.firstCard.style[key]) {
+                    throw Error(label + ' channel card ' + key + ' differs: ' + JSON.stringify({
+                        wallet: wallet.firstCard.style[key], checkout: checkout.firstCard.style[key],
+                    }));
+                }
             }
         }
     }
