@@ -1243,7 +1243,7 @@ class FulfillmentTest extends TestCase
             'role' => 'SUPER_ADMIN',
             'is_active' => true,
         ]);
-        foreach ([['01', '1234567890'], ['70', '1234567890'], ['02', '9999999999']] as [$rc, $destination]) {
+        foreach ([['01', '1234567890'], ['70', '1234567890'], ['49', '1234567890'], ['50', '1234567890'], ['02', '9999999999']] as [$rc, $destination]) {
             try {
                 $service->resolveLegacyQuarantine(
                     (int) $legacy->id, (int) $admin->id, $legacy->external_reference,
