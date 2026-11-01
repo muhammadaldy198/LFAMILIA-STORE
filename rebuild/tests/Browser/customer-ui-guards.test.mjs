@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { manualHelpMessage, nextOrderAction, orderStatusInfo, paymentStatusLabel } from '../../resources/js/lib/orderStatus.js';
+import { formatTicketDate, ticketStatusLabel } from '../../resources/js/lib/ticketPresentation.js';
 
 const read = path => readFileSync(new URL('../../resources/js/' + path, import.meta.url), 'utf8');
 
@@ -345,4 +346,21 @@ test('F15 wallet uses customer language and protects the total from floating cha
     assert.match(wallet, /pb-32 sm:pb-5/);
     assert.match(wallet, /:disabled="Boolean\(busy\) \|\| attemptLocked"/);
     assert.match(wallet, /idempotency_key: idempotencyKey\.value/);
+});
+
+
+test('F17 ticket list, detail and messages use Indonesian local dates and statuses', () => {
+    assert.equal(formatTicketDate('2026-10-25T07:00:50.000000Z'), '25 Okt 2026, 14.00');
+    assert.equal(formatTicketDate('not-a-date'), '–');
+    assert.equal(ticketStatusLabel('OPEN'), 'Terbuka');
+    assert.equal(ticketStatusLabel('IN_PROGRESS'), 'Sedang ditangani');
+    assert.equal(ticketStatusLabel('RESOLVED'), 'Selesai');
+    assert.equal(ticketStatusLabel('CLOSED'), 'Ditutup');
+    for (const page of ['Pages/Customer/Tickets.vue', 'Pages/Customer/TicketDetail.vue']) {
+        const source = read(page);
+        assert.match(source, /ticketStatusLabel\(ticket\.status\)/);
+        assert.match(source, /formatTicketDate\(ticket\.created_at\)/);
+        assert.doesNotMatch(source, /\{\{\s*ticket\.(status|created_at)\s*\}\}/);
+    }
+    assert.match(read('Pages/Customer/TicketDetail.vue'), /formatTicketDate\(message\.created_at\)/);
 });

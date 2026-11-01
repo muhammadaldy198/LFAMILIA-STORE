@@ -4,6 +4,7 @@ const { customerText } = useCustomerPresentation();
 
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import AccountShell from '../../Components/AccountShell.vue';
+import { formatTicketDate, ticketStatusLabel } from '../../lib/ticketPresentation';
 
 const props = defineProps({ ticket: Object, messages: Array });
 const form = useForm({ message: '' });
@@ -21,7 +22,7 @@ function reply() {
     <AccountShell>
         <Link href="/account/tickets" class="text-sm text-cyan-300">{{ customerText("pages.customer.ticketdetail.13da208b", "← Semua tiket") }}</Link>
         <div class="mt-2 flex flex-wrap items-center justify-between gap-3">
-            <div><h1 class="text-3xl font-semibold">Tiket #{{ ticket.id }}</h1><p class="mt-1 text-sm text-slate-400">{{ticket.status}} · {{ticket.created_at}}</p></div>
+            <div><h1 class="text-3xl font-semibold">Tiket #{{ ticket.id }}</h1><p class="mt-1 text-sm text-slate-400">{{ ticketStatusLabel(ticket.status) }} · {{ formatTicketDate(ticket.created_at) }}</p></div>
         </div>
 
         <section class="mt-5 space-y-3">
@@ -34,7 +35,7 @@ function reply() {
             <article v-for="message in messages" :key="message.id" class="rounded-xl border p-4" :class="message.sender_type==='ADMIN' ? 'border-cyan-900/60 bg-cyan-950/20' : 'border-slate-800 bg-slate-900'">
                 <div class="flex justify-between gap-3 text-[10px] text-slate-500">
                     <strong>{{message.sender_type==='ADMIN' ? (message.admin_name || 'Tim LFAMILIA') : (message.customer_name || 'Kamu')}}</strong>
-                    <span>{{message.created_at}}</span>
+                    <span>{{ formatTicketDate(message.created_at) }}</span>
                 </div>
                 <p class="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-300">{{message.message}}</p>
             </article>

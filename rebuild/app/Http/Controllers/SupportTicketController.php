@@ -7,6 +7,7 @@ use App\Services\AdminNotificationService;
 use App\Services\TransactionalEmailService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -79,7 +80,14 @@ class SupportTicketController
                 ->get([
                     'messages.id', 'messages.sender_type', 'messages.message', 'messages.created_at',
                     'users.name as customer_name', 'admin_users.name as admin_name',
-                ]),
+                ])
+                ->map(function (object $message): object {
+                    $message->created_at = $message->created_at
+                        ? Carbon::parse($message->created_at, config('app.timezone'))->toIso8601String()
+                        : null;
+
+                    return $message;
+                }),
         ]);
     }
 
