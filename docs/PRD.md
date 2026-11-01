@@ -194,14 +194,15 @@ Kanal yang tampil ke pembeli hanya kanal yang aktif. Kanal dalam perawatan tidak
 
 **Tidak ada perpindahan gateway otomatis.** Midtrans dan DOKU berdiri sendiri, setara, dan tidak saling menjadi cadangan. Admin/Superadmin memilih provider secara manual untuk masing-masing metode; provider lain tidak mengambil alih ketika pilihan tidak tersedia.
 
+**Integrasi toko hanya memakai Production.** Panel tidak menyediakan pilihan Sandbox/Development untuk Midtrans, DOKU, Digiflazz, Telegram, atau Turnstile. Pengujian otomatis tetap dilakukan secara terisolasi dengan respons tiruan, tidak membuat pembayaran atau pengiriman nyata.
+
 ### 7.2 Aturan "lunas"
 
 Sebuah pembayaran dianggap **LUNAS** hanya jika:
 
-- Notifikasi masuk dari gateway,
-- Tanda tangan notifikasi valid,
-- Nominal cocok dengan total pesanan,
-- Status transaksi = `settlement` (atau `capture` dengan `fraud_status = accept`).
+- Status berasal dari notifikasi gateway dengan tanda tangan valid **atau** hasil pengecekan langsung ke API status gateway memakai kredensial Production.
+- Identitas transaksi dan nominal cocok dengan pesanan di database.
+- Status transaksi Midtrans = `settlement` (atau `capture` dengan `fraud_status = accept`) dan kode keberhasilan valid.
 
 Selain itu **bukan lunas**. `pending`, `deny`, `cancel`, `expire`, `failure` bukan lunas.
 
@@ -278,7 +279,7 @@ Aturan turunan:
 
 - **Tidak ada pengiriman ganda.** Satu pesanan dikirim sekali. Percobaan ulang harus aman.
 - **Tidak ada failover otomatis.** Kalau penyedia **mengonfirmasi gagal**, pesanan menjadi "perlu tindakan superadmin" dan berhenti. Tidak ada pengiriman otomatis ke sumber kedua. Admin boleh mengirim ulang secara **manual** ke sumber lain hanya setelah kegagalan dikonfirmasi penyedia (bukan saat hasilnya tidak pasti), dan tindakan itu tercatat.
-- **Hasil tidak pasti bukan alasan kirim ulang.** Status "belum pasti"/"sedang dikirim" harus dicek ulang dulu sampai ada kepastian, karena pelanggan mungkin sudah menerima produk.
+- **Hasil tidak pasti bukan alasan kirim ulang.** Status "belum pasti"/"sedang dikirim" harus dicek ulang dulu sampai ada kepastian, karena pelanggan mungkin sudah menerima produk. Pengecekan Digiflazz menggunakan SKU, nomor tujuan dan `ref_id` yang sama, berjeda minimal 1 menit, berulang sampai final atau batas aman maksimal 24 jam. Setelah tiga cek tanpa hasil, admin diberi peringatan tetapi pengecekan tidak berhenti. Jika belum final setelah 24 jam, admin menangani secara manual, tanpa pengiriman ulang otomatis.
 - **Tidak ada pengiriman sebelum lunas.**
 - **Tidak ada perubahan data tujuan** setelah pesanan dikirim.
 
