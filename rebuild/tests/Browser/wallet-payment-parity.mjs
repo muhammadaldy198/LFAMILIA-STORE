@@ -191,6 +191,85 @@ try {
             await wallet.unroute('**/account/wallet/topups/quote');
         }
 
+
+        // PR11: real browser interaction, with every quote/top-up POST intercepted.
+        // Selecting another group invalidates the previous channel quote.
+        const quoteRequests = [];
+        await wallet.route('**/account/wallet/topups/quote', async route => {
+            const request = route.request().postDataJSON();
+            quoteRequests.push(request);
+            await route.fulfill({
+                status: 200, contentType: 'application/json',
+                body: JSON.stringify({
+                    amount_idr: request.amount_idr,
+                    payment_channel_code: request.payment_channel_code,
+                    total_idr: request.amount_idr + 500,
+                }),
+            });
+        });
+        const calculate = wallet.getByRole('button', { name: 'Hitung total' });
+        await calculate.click();
+        await wallet.getByText('Biaya pembayaran').waitFor();
+        if (quoteRequests.length !== 1) throw Error('Initial wallet quote was not requested');
+        const formattedTotal = 'Rp ' + Number(quoteRequests[0].amount_idr + 500).toLocaleString('id-ID');
+        const pickerTotal = await wallet.locator('.lf-payment-group-card.selected .lfx-payment-amount').first().textContent();
+        if (pickerTotal?.trim() !== formattedTotal)
+            throw Error('Wallet quote total not shown in selected Checkout channel: ' + JSON.stringify({ pickerTotal, formattedTotal }));
+
+        const nextTitle = shared.find(title => title !== shared[shared.length - 1]);
+        if (!nextTitle) throw Error('No alternate wallet payment group to test invalidation');
+        await wallet.locator('.lf-payment-group-card').filter({ hasText: nextTitle }).first()
+            .locator('.lf-payment-group-main').click();
+        await wallet.getByText('Biaya pembayaran').waitFor({ state: 'detached' });
+        if (!(await wallet.getByRole('button', { name: 'Top up', exact: true }).isDisabled()))
+            throw Error('Changing payment channel must invalidate the old quote');
+        await calculate.click();
+        await wallet.getByText('Biaya pembayaran').waitFor();
+        if (quoteRequests.length !== 2 || quoteRequests[0].payment_channel_code === quoteRequests[1].payment_channel_code)
+            throw Error('Wallet must quote the newly selected payment channel');
+
+        // recovery reuses original top-up idempotency key
+        // 422 mimics an uncertain response; no POST reaches the financial backend.
+        const attemptedKeys = [];
+        await wallet.route('**/account/wallet/topups', async route => {
+            attemptedKeys.push(route.request().postDataJSON().idempotency_key);
+            await route.fulfill({
+                status: 422, contentType: 'application/json',
+                body: JSON.stringify({ message: 'Status top up perlu diperiksa.' }),
+            });
+        });
+        const initialAttempt = wallet.waitForResponse(response =>
+            response.url().endsWith('/account/wallet/topups') && response.request().method() === 'POST');
+        await wallet.getByRole('button', { name: 'Top up', exact: true }).click();
+        await initialAttempt;
+        await wallet.getByText('Top up sebelumnya masih diproses.', { exact: false }).waitFor();
+        const lockedState = await wallet.evaluate(() => {
+            const headers = [...document.querySelectorAll('[aria-label="Pilih metode pembayaran top up"] .lf-payment-group-main')];
+            const radios = [...document.querySelectorAll('[aria-label="Pilih metode pembayaran top up"] .lfx-payment-method-card')];
+            return { headers: headers.length > 0 && headers.every(header => header.disabled),
+                radios: radios.every(radio => radio.getAttribute('aria-disabled') === 'true' && radio.tabIndex === -1) };
+        });
+        if (!lockedState.headers || !lockedState.radios) throw Error('Wallet picker must stay locked during uncertain top-up');
+        if (!(await wallet.locator('input[type=number]').isDisabled()) || !(await calculate.isDisabled()))
+            throw Error('Wallet amount and quote calculator must remain locked');
+        // A synthetic click on a locked radio must never change the selected channel.
+        const selectedBefore = await wallet.locator('.lf-payment-group-card.selected .lf-payment-group-copy strong').first().textContent();
+        await wallet.locator('.lfx-payment-method-card:not(.is-selected)').first().evaluate(element => element.click()).catch(() => {});
+        const selectedAfter = await wallet.locator('.lf-payment-group-card.selected .lf-payment-group-copy strong').first().textContent();
+        if (selectedBefore !== selectedAfter || quoteRequests.length !== 2)
+            throw Error('Locked picker changed payment channel or requested a fresh quote');
+        const retry = wallet.getByRole('button', { name: 'Cek status top up' });
+        if (!(await retry.isEnabled())) throw Error('Status recovery action disabled while attempt is locked');
+        const recoveryResponse = wallet.waitForResponse(response =>
+            response.url().endsWith('/account/wallet/topups') && response.request().method() === 'POST');
+        await retry.click();
+        await recoveryResponse;
+        if (attemptedKeys.length !== 2 || !attemptedKeys[0] || attemptedKeys[0] !== attemptedKeys[1])
+            throw Error('Status recovery did not reuse original top-up idempotency key: ' + JSON.stringify(attemptedKeys));
+        await wallet.unroute('**/account/wallet/topups');
+        await wallet.unroute('**/account/wallet/topups/quote');
+        console.log('PASS PR11 wallet quote invalidation, channel total, locks and idempotent recovery ' + width);
+
         // Never create top ups or execute a payment in browser tests.
         report.push({ width, sharedGroups: shared, initial, financialActions: false });
         await wallet.close();
