@@ -155,6 +155,8 @@ class AdminIntegrationsRestorationTest extends TestCase
                 $resolved = $runtime->resolve($code);
                 $this->assertNull($resolved['environment'], $code.' must fail closed');
                 $this->assertSame([], $resolved['config'], $code.' must not expose test credentials');
+                $this->assertSame([], $runtime->profile($code, $legacyProfiles[$code], 'production'),
+                    $code.' production profile must be empty for retired test secrets');
             }
 
             $this->assertFalse(app(PaymentRoutingService::class)->gatewayReady('MIDTRANS'));
