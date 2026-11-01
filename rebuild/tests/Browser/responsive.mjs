@@ -41,7 +41,7 @@ try {
         for(const path of publicPages)await inspect(path,width);
     }
 
-    // PR 8: footer artwork must keep a 3:1 element box at every breakpoint.
+    // PR 12: footer image always uses a short 11:2 ribbon at every breakpoint.
     // Insert a test asset only when the fixture has no configured footer image.
     // Pixel assertions use actual Chromium screenshots, not just CSS declarations.
     const pr8Svg = (kind) => {
@@ -74,13 +74,13 @@ try {
                 'layoutPosition:style.position,transform:style.transform,inlineHeight:img.style.height};' +
                 '})()');
             if (Math.abs(geometry.rect.width - geometry.containerWidth) > 1 ||
-                Math.abs(geometry.rect.height - geometry.rect.width / 3) > 1 ||
-                Math.abs(geometry.parentHeight - geometry.rect.width / 3) > 2 ||
+                Math.abs(geometry.rect.height - geometry.rect.width / 5.5) > 1 ||
+                Math.abs(geometry.parentHeight - geometry.rect.width / 5.5) > 2 ||
                 geometry.maxHeight !== 'none' || geometry.minHeight !== '0px' ||
                 geometry.fit !== 'cover' || !['50% 50%', 'center'].includes(geometry.position) ||
                 geometry.layoutPosition !== 'static' || geometry.transform !== 'none' ||
                 geometry.inlineHeight !== '') {
-                throw Error('PR8 footer ratio/style failed ' + JSON.stringify({width, kind, geometry}));
+                throw Error('PR12 footer ratio/style failed ' + JSON.stringify({width, kind, geometry}));
             }
             const shot = (await send('Page.captureScreenshot', {format:'png', captureBeyondViewport:false})).data;
             const pixels = await evaluate('(async()=>{' +
@@ -95,16 +95,82 @@ try {
                 '})()');
             const red = [224,32,32], blue = [34,85,216];
             const expected = kind === 'edge'
-                ? {left:red,right:red,top:red,bottom:red,center:blue}
+                ? {left:red,right:red,top:blue,bottom:blue,center:blue}
                 : {left:blue,right:blue,top:blue,bottom:blue,center:blue};
             for (const [place, rgb] of Object.entries(expected)) {
                 if (!pr8SameColor(pixels[place], rgb)) {
                     throw Error('PR8 cropped/misaligned footer artwork ' + JSON.stringify({width, kind, place, pixels, geometry}));
                 }
             }
-            console.log('PASS PR8 footer 3:1 no-crop and centered fallback ' + width + ' ' + kind);
+            console.log('PASS PR12 footer 5.5:1 short ribbon and centered artwork ' + width + ' ' + kind);
         }
     }
+
+    // Real production art: capture both source files before (old 3:1 box)
+    // and after (11:2 ribbon) at the owner's mobile and desktop sizes.
+    // Download bytes on CI, never mutate production or use customer data.
+    const pr12Folder = 'pr12-visual-results';
+    await mkdir(pr12Folder, { recursive: true });
+    const liveFooterArt = [
+        ['desktop', 'https://lfamilia.com/storage/129/1001075444.png'],
+        ['mobile', 'https://lfamilia.com/storage/127/1001075427.png'],
+    ];
+    for (const [kind, url] of liveFooterArt) {
+        const response = await fetch(url, { signal: AbortSignal.timeout(20000) });
+        if (!response.ok) throw Error('PR12 cannot download original footer '+kind+': '+response.status);
+        const dataUrl = 'data:image/png;base64,'+Buffer.from(await response.arrayBuffer()).toString('base64');
+        for (const width of [390, 1440]) {
+            await send('Emulation.setDeviceMetricsOverride', {width,height:900,deviceScaleFactor:1,mobile:width===390});
+            await navigate('/');
+            const setup = await evaluate('(async()=>{' +
+                'const footer=document.querySelector(".lf-footer");let slot=footer.querySelector(".lf-footer-banner");' +
+                'if(!slot){slot=document.createElement("div");slot.className="lf-footer-banner";const picture=document.createElement("picture");picture.append(document.createElement("img"));slot.append(picture);footer.prepend(slot);}' +
+                'slot.querySelectorAll("source").forEach(s=>s.remove());const img=slot.querySelector("img");' +
+                'img.removeAttribute("width");img.removeAttribute("height");img.src='+JSON.stringify(dataUrl)+';await img.decode();' +
+                'document.querySelector(".lf-home-popup-close")?.click();img.scrollIntoView({block:"center"});' +
+                'return {natural:[img.naturalWidth,img.naturalHeight],slot:!!slot};})()');
+            if (!setup.slot || !setup.natural.every(Boolean)) throw Error('PR12 production footer art missing '+kind);
+            await evaluate('document.querySelector(".lf-footer-banner img").style.aspectRatio="3 / 1"');
+            await pause(80);
+            const before = (await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false})).data;
+            await writeFile(pr12Folder+'/footer-'+kind+'-before-'+width+'.png',Buffer.from(before,'base64'));
+            const measurement=await evaluate('(()=>{const img=document.querySelector(".lf-footer-banner img");img.style.removeProperty("aspect-ratio");const r=img.getBoundingClientRect();return {width:r.width,height:r.height,fit:getComputedStyle(img).objectFit}})()');
+            if(Math.abs(measurement.height-measurement.width/5.5)>1||measurement.fit!=='cover')throw Error('PR12 production footer box '+JSON.stringify({kind,width,measurement}));
+            await pause(80);
+            const after = (await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false})).data;
+            await writeFile(pr12Folder+'/footer-'+kind+'-after-'+width+'.png',Buffer.from(after,'base64'));
+        }
+    }
+
+    // PR12: recent transactions may never force the entire 390px page wide.
+    // The fixture is local and may have no public feed yet; add synthetic rows
+    // to exercise the exact production markup with several transactions.
+    await send('Emulation.setDeviceMetricsOverride',{width:390,height:900,deviceScaleFactor:1,mobile:true});
+    await navigate('/orders/check');
+    const seeded=await evaluate('(()=>{const table=document.querySelector(".lf-feed-table");if(!table)return {ok:false};' +
+      'const row=table.querySelector(".lf-feed-row:not(.lf-feed-head)");' +
+      'for(let i=table.querySelectorAll(".lf-feed-row:not(.lf-feed-head)").length;i<3;i++){' +
+      'const copy=row?row.cloneNode(true):document.createElement("div");copy.className="lf-feed-row";' +
+      'copy.innerHTML="<strong data-mobile-label=\\\"Invoice\\\">LF26****1234</strong><span data-mobile-label=\\\"Produk\\\">Mobile Legends<small>86 Diamonds</small></span><b data-mobile-label=\\\"Total\\\">Rp 99.000</b><em data-mobile-label=\\\"Status\\\">Berhasil</em><time data-mobile-label=\\\"Waktu\\\">01 Nov 2026 22:50</time>";' +
+      'table.append(copy);}' +
+      'return {ok:true,rows:table.querySelectorAll(".lf-feed-row:not(.lf-feed-head)").length};})()');
+    if(!seeded.ok||seeded.rows<3)throw Error('PR12 local feed fixture incomplete '+JSON.stringify(seeded));
+    await evaluate('(()=>{const style=document.createElement("style");style.id="pr12-feed-before";style.textContent="@media(max-width:640px){.lf-track-feed .lf-feed-row:not(.lf-feed-head){min-width:690px!important;display:grid!important;grid-template-columns:150px minmax(190px,1fr) 110px 120px 150px!important}.lf-track-feed .lf-feed-head{display:grid!important}.lf-track-feed .lf-feed-table{overflow:visible!important}}";document.head.append(style);})()');
+    const feedBefore=(await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true})).data;
+    await writeFile(pr12Folder+'/transactions-before-390.png',Buffer.from(feedBefore,'base64'));
+    await evaluate('document.querySelector("#pr12-feed-before")?.remove()');
+    const feedMetric=await evaluate('(()=>{const table=document.querySelector(".lf-feed-table");const rect=table.getBoundingClientRect();' +
+      'const rows=[...table.querySelectorAll(".lf-feed-row:not(.lf-feed-head)")];' +
+      'const boxes=rows.map(row=>({width:row.getBoundingClientRect().width,columns:[...row.children].map(el=>{const r=el.getBoundingClientRect();return {left:r.left,right:r.right,width:r.width,visible:getComputedStyle(el).display!=="none"};})}));' +
+      'return {viewport:innerWidth,doc:document.documentElement.scrollWidth,tableLeft:rect.left,tableRight:rect.right,rows:boxes};})()');
+    if(feedMetric.doc>feedMetric.viewport||feedMetric.tableRight>feedMetric.viewport+1||
+       feedMetric.rows.some(r=>r.width>feedMetric.viewport||r.columns.length!==5||
+           r.columns.some(c=>!c.visible||c.left<feedMetric.tableLeft-1||c.right>feedMetric.tableRight+1))) {
+        throw Error('PR12 transactions overflow mobile viewport '+JSON.stringify(feedMetric));
+    }
+    const feedAfter=(await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true})).data;
+    await writeFile(pr12Folder+'/transactions-after-390.png',Buffer.from(feedAfter,'base64'));
+    console.log('PASS PR12 /orders/check mobile five-field stacked feed '+JSON.stringify({rows:feedMetric.rows.length,doc:feedMetric.doc}));
     // PR 3 F7/F8: actual DOM hit targets, header interactions, and popular title.
     // "before" PNGs reconstruct the pre-PR CSS measurements; "after" is actual CSS.
     const pr3Folder = 'ergonomics-visual-results';
@@ -220,6 +286,44 @@ try {
     await navigate('/login');
     const login=await evaluate(`(async()=>{const token=document.querySelector('meta[name="csrf-token"]').content;const response=await fetch('/login',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':token},body:JSON.stringify({email:'browser-account@example.test',password:'Browser-test-password-123'})});return response.status;})()`);
     if(login!==200&&login!==204)throw Error('Fixture login failed: '+login);
+
+    // Test real artwork from the three production channel files, not just icon-shaped fixtures.
+    // Fixture payment records stay local; replace only the rendered image src on the page.
+    const pr12ChannelArt = {};
+    for (const [name, url] of [
+        ['gopay', 'https://lfamilia.com/storage/248/1001094793.png'],
+        ['bni', 'https://lfamilia.com/storage/244/1001094769.webp'],
+        ['qris', 'https://lfamilia.com/storage/237/1001094762.png'],
+    ]) {
+        const response=await fetch(url,{signal:AbortSignal.timeout(20000)});
+        if(!response.ok)throw Error('PR12 original payment logo '+name+' HTTP '+response.status);
+        const mime=name==='bni'?'image/webp':'image/png';
+        pr12ChannelArt[name]='data:'+mime+';base64,'+Buffer.from(await response.arrayBuffer()).toString('base64');
+    }
+    // Real QRIS square logo, tested in the shared compact payment chip.
+    // Fixture doesn't always expose QRIS as an enabled checkout group; no route is changed.
+    await send('Emulation.setDeviceMetricsOverride',{width:390,height:900,deviceScaleFactor:1,mobile:true});
+    await navigate('/account/wallet');
+    const qrisInstalled=await evaluate(`(async()=>{
+      const region=document.querySelector('[aria-label="Pilih metode pembayaran top up"]');
+      const group=[...region.querySelectorAll('.lf-payment-group-card')].find(g=>g.querySelector('.lf-payment-group-copy strong')?.textContent.trim()==='Virtual Account');
+      if(!group)return false;
+      group.querySelector('.lf-payment-group-main').click();
+      await new Promise(resolve=>setTimeout(resolve,150));
+      const img=group.querySelector('.lfx-payment-method-grid--compact .lfx-payment-logo');
+      if(!img)return false;
+      img.src=${JSON.stringify(pr12ChannelArt.qris)};await img.decode();img.scrollIntoView({block:'center'});return true;
+    })()`);
+    if(!qrisInstalled)throw Error('PR12 QRIS square-image fixture lacks compact VA card');
+    await evaluate('(()=>{const style=document.createElement("style");style.id="pr12-qris-before";style.textContent=".lfx-payment-logo-box{width:100%!important;height:auto!important;padding:0!important;border:0!important;background:transparent!important}.lfx-payment-logo-box img{width:100%!important;max-width:none!important;height:auto!important;max-height:none!important}";document.head.append(style);})()');
+    const qrisBefore=(await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false})).data;
+    await writeFile(pr12Folder+'/logo-qris-before-390.png',Buffer.from(qrisBefore,'base64'));
+    await evaluate('document.querySelector("#pr12-qris-before")?.remove()');
+    const qrisSize=await evaluate('(()=>{const img=document.querySelector(".lfx-payment-method-grid--compact .lfx-payment-logo");const r=img.getBoundingClientRect();const card=img.closest(".lfx-payment-method-card").getBoundingClientRect();return {width:r.width,height:r.height,cardWidth:card.width,fit:getComputedStyle(img).objectFit};})()');
+    if(qrisSize.width>72.5||qrisSize.height>21.5||qrisSize.width>=qrisSize.cardWidth||qrisSize.fit!=='contain')throw Error('PR12 QRIS logo full bleed: '+JSON.stringify(qrisSize));
+    const qrisAfter=(await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false})).data;
+    await writeFile(pr12Folder+'/logo-qris-after-390.png',Buffer.from(qrisAfter,'base64'));
+
     const accountPages=['/account','/account/wallet','/account/orders','/account/tickets','/account/profile','/account/membership','/account/game-accounts','/account/codes','/account/notifications'];
     for(const width of [360,390,1440]){
         await send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:width<640});
@@ -262,6 +366,27 @@ try {
                 return {selected:group?.classList.contains('selected'),preview:!!group?.querySelector('.lf-payment-brand-strip--logos'),cols,method:!!grid?.querySelector('.lfx-payment-method-card strong'),scroll:document.documentElement.scrollWidth,descriptionInside:!!description&&description.getBoundingClientRect().bottom<=h.bottom+1,titleInside:!!title&&title.getBoundingClientRect().left>=h.left-1};
             })()`);
             if(!after.selected||after.preview||after.cols!==2||!after.method||!after.descriptionInside||!after.titleInside||after.scroll>width+2)throw Error('Wallet shared picker geometry invalid '+JSON.stringify({width,category,after}));
+
+            if (width===390) {
+                const art = category==='E-Wallet' ? pr12ChannelArt.gopay : pr12ChannelArt.bni;
+                const installed=await evaluate(`(()=>{
+                  const region=document.querySelector('[aria-label="Pilih metode pembayaran top up"]');
+                  const group=[...region.querySelectorAll('.lf-payment-group-card')].find(g=>g.querySelector('.lf-payment-group-copy strong')?.textContent.trim()===${JSON.stringify(category)});
+                  const img=group?.querySelector('.lfx-payment-logo');if(!img)return false;
+                  img.src=${JSON.stringify(art)};return true;
+                })()`);
+                if(!installed)throw Error('PR12 '+category+' logo fixture missing');
+                await pause(100);
+                // Reconstruct the old full-bleed card logo, then capture the fixed chip.
+                await evaluate('(()=>{const style=document.createElement("style");style.id="pr12-logo-before";style.textContent=".lfx-payment-logo-box{width:100%!important;height:auto!important;padding:0!important;border:0!important;background:transparent!important}.lfx-payment-logo-box img{width:100%!important;max-width:none!important;height:auto!important;max-height:none!important}";document.head.append(style);})()');
+                const beforeShot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});
+                await writeFile(pr12Folder+'/logo-'+(category==='E-Wallet'?'gopay':'bni')+'-before-390.png',Buffer.from(beforeShot.data,'base64'));
+                await evaluate('document.querySelector("#pr12-logo-before")?.remove()');
+                const boxes=await evaluate('(()=>{const img=document.querySelector(".lfx-payment-method-grid--compact .lfx-payment-logo");const card=img?.closest(".lfx-payment-method-card");const box=img?.closest(".lfx-payment-logo-box");const a=img?.getBoundingClientRect(),b=box?.getBoundingClientRect(),c=card?.getBoundingClientRect();return {image:a&&{width:a.width,height:a.height},chip:b&&{width:b.width,height:b.height},card:c&&{width:c.width,height:c.height}};})()');
+                if(!boxes.image||boxes.image.width>72.5||boxes.image.height>21.5||boxes.chip.width>=boxes.card.width)throw Error('PR12 authentic '+category+' logo full-bleed: '+JSON.stringify(boxes));
+                const afterShot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});
+                await writeFile(pr12Folder+'/logo-'+(category==='E-Wallet'?'gopay':'bni')+'-after-390.png',Buffer.from(afterShot.data,'base64'));
+            }
             await mkdir('checkout-visual-results',{recursive:true});
             const screenshot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});
             await writeFile('checkout-visual-results/wallet-'+(category==='E-Wallet'?'ewallet':'va')+'-'+width+'.png',Buffer.from(screenshot.data,'base64'));

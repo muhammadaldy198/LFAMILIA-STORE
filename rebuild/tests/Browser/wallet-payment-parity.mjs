@@ -44,6 +44,8 @@ const geometry = async (page, title) => page.evaluate(name => {
     const image = logo?.querySelector('img');
     const grid = group.querySelector('.lfx-payment-method-grid');
     const first = grid?.querySelector('.lfx-payment-method-card');
+    const firstLogo = first?.querySelector('.lfx-payment-logo');
+    const firstLogoBox = first?.querySelector('.lfx-payment-logo-box');
     const inner = rect(group);
     const headerBox = rect(header);
     const titleBox = rect(titleNode);
@@ -59,6 +61,8 @@ const geometry = async (page, title) => page.evaluate(name => {
         selected: group.classList.contains('selected'),
         firstCardSelected: Boolean(first?.classList.contains('is-selected')),
         firstCard: first ? { ...rect(first), style: css(first) } : null,
+        firstLogo: firstLogo ? { ...rect(firstLogo), style: css(firstLogo) } : null,
+        firstLogoBox: firstLogoBox ? { ...rect(firstLogoBox), style: css(firstLogoBox) } : null,
     };
 }, title);
 
@@ -93,6 +97,19 @@ const assertParity = (wallet, checkout, label) => {
         if (wallet.compact !== checkout.compact || wallet.columns !== checkout.columns ||
             wallet.firstCardSelected !== checkout.firstCardSelected) {
             throw Error(label + ' expanded channel grid differs: ' + JSON.stringify({ wallet, checkout }));
+        }
+        for (const [side, data] of [['wallet', wallet], ['checkout', checkout]]) {
+            if (data.firstLogo) {
+                const limit = data.compact ? 21 : 24;
+                if (data.firstLogo.width > 72.5 || data.firstLogo.height > limit + .5 ||
+                    !data.firstLogoBox || data.firstLogoBox.width >= data.firstCard.width ||
+                    data.firstLogo.style.objectFit !== 'contain') {
+                    throw Error(label + ' '+side+' logo must stay contained in the VA-style chip: ' + JSON.stringify(data));
+                }
+            }
+        }
+        if (wallet.firstLogo && checkout.firstLogo) {
+            for (const key of ['width', 'height']) near(wallet.firstLogoBox[key], checkout.firstLogoBox[key], label+' logo chip '+key);
         }
         if (wallet.firstCard && checkout.firstCard) {
             // Card content is data-dependent (different channel names/prices may wrap).
