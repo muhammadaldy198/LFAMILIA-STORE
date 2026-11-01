@@ -158,6 +158,31 @@ try {
         await capture(wallet, 'wallet-expanded-' + width);
         await capture(checkout, 'checkout-expanded-' + width);
 
+        // Make a quote request remain pending: busy must lock the shared header and radios.
+        // The request is intercepted; no payment/top-up is ever created.
+        if (width === 390) {
+            let releaseQuote;
+            await wallet.route('**/account/wallet/topups/quote', async route => {
+                await new Promise(resolve => { releaseQuote = resolve; });
+                await route.fulfill({ status: 503, contentType: 'application/json', body: '{"message":"Unavailable"}' });
+            });
+            await wallet.getByRole('button', { name: 'Hitung total' }).click();
+            await wallet.waitForFunction(() => [...document.querySelectorAll('[aria-label="Pilih metode pembayaran top up"] .lf-payment-group-main')]
+                .length > 0 && [...document.querySelectorAll('[aria-label="Pilih metode pembayaran top up"] .lf-payment-group-main')]
+                .every(button => button.disabled));
+            const locked = await wallet.evaluate(() => ({
+                headers: [...document.querySelectorAll('[aria-label="Pilih metode pembayaran top up"] .lf-payment-group-main')]
+                    .every(button => button.disabled),
+                radios: [...document.querySelectorAll('[aria-label="Pilih metode pembayaran top up"] .lfx-payment-method-card')]
+                    .every(radio => radio.getAttribute('aria-disabled') === 'true' && radio.tabIndex === -1),
+            }));
+            if (!locked.headers || !locked.radios) throw Error('Shared picker not disabled during wallet busy state: ' + JSON.stringify(locked));
+            if (releaseQuote) releaseQuote();
+            await wallet.waitForFunction(() => [...document.querySelectorAll('[aria-label="Pilih metode pembayaran top up"] .lf-payment-group-main')]
+                .some(button => !button.disabled));
+            await wallet.unroute('**/account/wallet/topups/quote');
+        }
+
         // Never create top ups or execute a payment in browser tests.
         report.push({ width, sharedGroups: shared, initial, financialActions: false });
         await wallet.close();
