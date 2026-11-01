@@ -1093,6 +1093,7 @@ class FulfillmentTest extends TestCase
         $service->startOrder($orderId);
         $id = (int) DB::table('fulfillment_attempts')->where('order_id', $orderId)->value('id');
         $service->sendAttempt($id);
+        Queue::fake(); // Ignore the original enqueue; only reconciliation's actions count.
         $service->reconcileAttempt($id);
 
         $this->assertDatabaseHas('fulfillment_attempts', [
@@ -1155,6 +1156,7 @@ class FulfillmentTest extends TestCase
             'last_error' => 'LEGACY_ENV_QUARANTINED: Asal environment belum bisa diverifikasi.',
         ]);
         DB::table('orders')->where('id', $orderId)->update(['status' => 'BLOCKED']);
+        Queue::fake(); // The legacy enqueue precedes the behavior under test.
 
         return [$orderId, $legacy];
     }
@@ -1296,5 +1298,61 @@ class FulfillmentTest extends TestCase
 
         $this->assertSame('BLOCKED', DB::table('orders')->where('id', $orderId)->value('status'));
         Queue::assertNotPushed(SendFulfillmentJob::class);
+    }
+
+    public function test_quarantine_confirmation_freezes_exact_customer_no_after_template_changes(): void
+    {
+        Queue::fake();
+        [$orderId, $legacy] = $this->quarantinedPaidOrder();
+        $order = DB::table('orders')->where('id', $orderId)->firstOrFail();
+        $snapshot = json_decode((string) $order->snapshot, true);
+        unset($snapshot['provider']['customer_no_template']);
+        DB::table('orders')->where('id', $orderId)->update([
+            'snapshot' => json_encode($snapshot, JSON_THROW_ON_ERROR),
+        ]);
+        DB::table('products')->where('id', $order->product_id)->update([
+            'customer_no_template' => 'ID-{{user_id}}',
+        ]);
+        $admin = $this->createAdmin([
+            'name' => 'Frozen target reviewer',
+            'email' => bin2hex(random_bytes(8)).'@example.test',
+            'password' => bcrypt('test-password'),
+            'role' => 'SUPER_ADMIN',
+            'is_active' => true,
+        ]);
+
+        $service = app(FulfillmentService::class);
+        $newId = $service->resolveLegacyQuarantine(
+            (int) $legacy->id, (int) $admin->id, $legacy->external_reference,
+            '02', 'Digiflazz historical final failure', 'Checked original reference',
+            'ID-123456'
+        );
+        $new = DB::table('fulfillment_attempts')->where('id', $newId)->firstOrFail();
+        $request = json_decode((string) $new->request_payload, true);
+        $this->assertSame('ID-123456', $request['customer_no']);
+        $this->assertSame($new->external_reference, $request['ref_id']);
+
+        // Between approval and the worker send, an admin edits the product template.
+        DB::table('products')->where('id', $order->product_id)->update([
+            'customer_no_template' => 'CHANGED-{{zone_id}}',
+        ]);
+        Http::fake(function ($httpRequest) use ($request) {
+            $this->assertSame($request['customer_no'], $httpRequest['customer_no']);
+            $this->assertSame($request['ref_id'], $httpRequest['ref_id']);
+
+            return Http::response(['data' => [
+                'ref_id' => $httpRequest['ref_id'],
+                'buyer_sku_code' => strtolower($httpRequest['buyer_sku_code']),
+                'customer_no' => $httpRequest['customer_no'],
+                'status' => 'Pending',
+                'rc' => '03',
+                'price' => 10000,
+            ]]);
+        });
+        $service->sendAttempt($newId);
+
+        Http::assertSentCount(1);
+        $this->assertSame('PENDING', DB::table('fulfillment_attempts')->where('id', $newId)->value('status'));
+        $this->assertSame('BLOCKED', DB::table('fulfillment_attempts')->where('id', $legacy->id)->value('status'));
     }
 }
