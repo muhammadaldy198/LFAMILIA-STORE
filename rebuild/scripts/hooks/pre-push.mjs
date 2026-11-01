@@ -50,7 +50,5 @@ for (const root of syntaxRoots) {
     }
 }
 
-run('php', ['vendor/bin/pint']);
-run('git', ['diff', '--', 'app/Http/Controllers/PublicOrderTrackingController.php', 'app/Http/Controllers/GuestOrderController.php', 'app/Http/Controllers/CustomerOrderController.php']);
-process.exit(1); // diagnostic only; MUST revert this temporary hook
+run('php', ['vendor/bin/pint', '--test']);
 console.log('Pre-push guard passed.');
