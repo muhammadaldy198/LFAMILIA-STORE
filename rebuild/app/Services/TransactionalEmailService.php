@@ -419,7 +419,7 @@ class TransactionalEmailService
      * member: belum login) — persis keluhan Codex: link dari email
      * tidak jalan saat dibuka di browser/HP lain. Signature kedaluwarsa
      * mengikuti expires_at order; order yang sudah kedaluwarsa
-     * mendapat jendela 30 menit (keputusan user: SEMUA link
+     * tidak mendapat perpanjangan; expiry selalu mengikuti deadline order (SEMUA link
      * bertanda tangan WAJIB berexpiry, tanpa fallback tanpa expiry).
      */
     private function payUrl(string $invoice, ?string $expiresAt): string
@@ -428,7 +428,7 @@ class TransactionalEmailService
 
         return URL::temporarySignedRoute(
             'payment.show',
-            $expires !== null && $expires->isFuture() ? $expires : now()->addMinutes(30),
+            $expires ?? now()->subSecond(),
             ['invoice' => $invoice],
         );
     }

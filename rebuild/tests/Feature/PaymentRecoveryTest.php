@@ -74,6 +74,11 @@ class PaymentRecoveryTest extends TestCase
             ->json('payment_url');
         $this->assertStringContainsString('expires=', $url);
         $this->assertStringContainsString('signature=', $url);
+        parse_str((string) parse_url($url, PHP_URL_QUERY), $params);
+        $this->assertSame(
+            \Illuminate\Support\Carbon::parse(DB::table('orders')->where('id', $id)->value('expires_at'))->getTimestamp(),
+            (int) $params['expires'],
+        );
         $this->withSession(['guest_order_id' => null])->get($url)
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
@@ -91,7 +96,7 @@ class PaymentRecoveryTest extends TestCase
 
         $valid = $this->recover('LFRECOVERY-2')->assertOk()->json('payment_url');
         $this->get(str_replace('LFRECOVERY-2', 'LFOTHER-ORDER', $valid))
-            ->assertForbidden()->assertSee('Cek pesanan');
+            ->assertNotFound()->assertSee('Cek pesanan');
         $this->get($valid.'&signature=WRONG')->assertForbidden();
 
         $expired = URL::temporarySignedRoute('payment.show', now()->subMinute(), [

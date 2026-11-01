@@ -216,7 +216,7 @@ class PaymentPageController
 
         return URL::temporarySignedRoute(
             'payments.orders.create',
-            $expires !== null && $expires->isFuture() ? $expires : now()->addMinutes(30),
+            $expires ?? now()->subSecond(),
             ['orderNumber' => $order->order_number],
         );
     }
