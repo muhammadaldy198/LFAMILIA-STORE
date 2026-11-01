@@ -40,6 +40,83 @@ try {
         await send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:width<640});
         for(const path of publicPages)await inspect(path,width);
     }
+    // PR 3 F7/F8: actual DOM hit targets, header interactions, and popular title.
+    // "before" PNGs reconstruct the pre-PR CSS measurements; "after" is actual CSS.
+    const pr3Folder = 'ergonomics-visual-results';
+    await mkdir(pr3Folder,{recursive:true});
+    const shotPr3=async label=>{
+        const screenshot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
+        await writeFile(pr3Folder+'/'+label+'.png',Buffer.from(screenshot.data,'base64'));
+    };
+    const prePr3Css=[
+        '.lf-customer .lf-header .lf-nav a{min-height:0!important;display:inline!important;padding-block:8px!important}',
+        '@media(max-width:900px){',
+        '.lf-customer .lf-header .lf-header-actions .lf-search-mobile,.lf-customer .lf-header .lf-header-actions .lf-menu{width:31px!important;height:31px!important;min-width:0!important;min-height:0!important;flex:0 0 31px!important;border:1px solid rgba(255,255,255,.09)!important;background:var(--lf-color-background)!important}',
+        '.lf-customer .lf-header .lf-header-actions .lf-search-mobile::before,.lf-customer .lf-header .lf-header-actions .lf-menu::before{display:none!important}',
+        '}',
+        '@media(max-width:640px){',
+        '.lf-customer .lf-home-popup-close{width:38px!important;height:38px!important;min-height:0!important;min-width:0!important;border:2px solid rgba(220,183,131,.72)!important}',
+        '.lf-customer .lf-home-popup-close::before{display:none!important}',
+        '.lf-customer .lf-popular-card strong{display:-webkit-box!important;font-size:13px!important}',
+        '}'
+    ].join('\n');
+    const showBeforePr3=()=>evaluate('(()=>{const node=document.createElement("style");node.id="pr3-reconstructed-before";node.textContent='+JSON.stringify(prePr3Css)+';document.head.append(node)})()');
+    const showAfterPr3=()=>evaluate('document.querySelector("#pr3-reconstructed-before")?.remove()');
+    for(const width of [360,390,1440]){
+        await send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:width<640});
+        await navigate('/');
+        const metrics=await evaluate('(()=>{const box=s=>{const el=document.querySelector(s);if(!el||getComputedStyle(el).display==="none")return null;const r=el.getBoundingClientRect();return {width:r.width,height:r.height}};const links=[...document.querySelectorAll(".lf-nav a")].filter(el=>getComputedStyle(el).display!=="none").map(el=>({height:el.getBoundingClientRect().height,href:el.getAttribute("href")}));const title=[...document.querySelectorAll(".lf-popular-card strong")].find(el=>el.textContent.trim()==="Mobile Legends");return {popup:box(".lf-home-popup-close"),search:box(".lf-search-mobile"),menu:box(".lf-menu"),links,hasPopular:!!title,clipped:!title||title.scrollWidth>title.clientWidth+1,titleFont:title?getComputedStyle(title).fontSize:null,overflow:document.documentElement.scrollWidth-innerWidth}})()');
+        if(width<640){
+            for(const key of ['popup','search','menu']){
+                const size=metrics[key];
+                if(!size||size.width<44||size.height<44)throw Error('PR3 F7 undersized '+key+': '+JSON.stringify({width,metrics}));
+            }
+            if(!metrics.hasPopular||metrics.clipped)throw Error('PR3 F8 Mobile Legends clipped: '+JSON.stringify({width,metrics}));
+            if(!metrics.titleFont||parseFloat(metrics.titleFont)>=13)throw Error('PR3 F8 title font did not shrink: '+JSON.stringify({width,metrics}));
+            if(width===390){
+                await showBeforePr3(); await shotPr3('popup-before-reconstructed-390'); await showAfterPr3();
+                await shotPr3('popup-after-390');
+            }
+            // Popup dismissal must retain its "do not show again" option.
+            if(width===390){
+                const dismissed=await evaluate('(()=>{const checkbox=document.querySelector(".lf-home-popup-dismiss input");const close=document.querySelector(".lf-home-popup-close");if(!checkbox||!close)return false;checkbox.click();close.click();return Object.keys(localStorage).some(key=>key.startsWith("lfamilia-home-popup:")&&Number(localStorage.getItem(key))>Date.now())})()');
+                if(!dismissed)throw Error('PR3 popup persisted dismissal failed');
+            }else{
+                await evaluate('document.querySelector(".lf-home-popup-close")?.click()');
+            }
+            // Search, focus return, and mobile drawer use existing handlers.
+            await evaluate('document.querySelector(".lf-search-mobile").click()');
+            const searchOpened=await evaluate('Boolean(document.querySelector(".lf-search-dialog[role=dialog]"))');
+            if(!searchOpened)throw Error('PR3 mobile search did not open '+width);
+            await evaluate('document.querySelector(".lf-search-dialog-close").click()');
+            await pause(60);
+            const searchClosed=await evaluate('!document.querySelector(".lf-search-dialog")&&document.activeElement===document.querySelector(".lf-search-mobile")');
+            if(!searchClosed)throw Error('PR3 mobile search failed to close/restore focus '+width);
+            await evaluate('document.querySelector(".lf-menu").click()');
+            if(!await evaluate('Boolean(document.querySelector(".lf-drawer.open"))'))throw Error('PR3 mobile drawer did not open '+width);
+            await evaluate('document.querySelector(".lf-overlay").click()');
+            await pause(60);
+            if(await evaluate('Boolean(document.querySelector(".lf-drawer.open"))'))throw Error('PR3 mobile drawer did not close '+width);
+        }else{
+            if(metrics.links.length<3||metrics.links.some(link=>link.height<44||!link.href||link.href==="#")){
+                throw Error('PR3 desktop navigation is inaccessible: '+JSON.stringify(metrics.links));
+            }
+            // Keep the backdrop from obscuring the desktop header/popular screenshots.
+            await evaluate('document.querySelector(".lf-home-popup-close")?.click()');
+        }
+        // Capture header and visible popular pill together (sticky header).
+        await evaluate('(()=>{const el=document.querySelector(".lf-popular");if(el)window.scrollTo(0,Math.max(0,window.scrollY+el.getBoundingClientRect().top-100))})()');
+        await pause(120);
+        await showBeforePr3(); await shotPr3('header-popular-before-reconstructed-'+width);
+        await showAfterPr3(); await shotPr3('header-popular-after-'+width);
+        const overflow=await evaluate('document.documentElement.scrollWidth-innerWidth');
+        if(overflow>2||metrics.overflow>2)throw Error('PR3 horizontal overflow '+JSON.stringify({width,overflow,metrics}));
+        if(width===390){
+            // Keep the fixture available to the subsequent responsive smoke.
+            await evaluate('Object.keys(localStorage).filter(key=>key.startsWith("lfamilia-home-popup:")).forEach(key=>localStorage.removeItem(key))');
+        }
+        console.log('PASS PR3 F7/F8 geometry interactions and screenshot '+width);
+    }
     // Regression: customer homepage category switching must not remount or scroll to the top.
     for (const width of [390, 1440]) {
         await send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:width<640});
