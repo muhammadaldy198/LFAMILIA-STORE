@@ -3,6 +3,7 @@
 namespace App\Services\Fulfillment;
 
 use App\Services\IntegrationRuntimeConfig;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
@@ -15,7 +16,7 @@ class DigiflazzClient
      * @param  array<string, mixed>  $request
      * @return array<string, mixed>
      */
-    public function transact(array $request): array
+    public function transact(array $request, ?int $attemptId = null): array
     {
         $resolved = $this->resolved();
         $config = $resolved['config'];
@@ -37,6 +38,22 @@ class DigiflazzClient
 
         if ($environment === 'test' && app()->environment('testing')) {
             $payload['testing'] = true;
+        }
+
+        // Resolve credentials first, then recheck the attempt. If a migration
+        // quarantines it between these operations, no HTTP request is sent.
+        // If migration runs after the check, this request still holds the
+        // pre-cutover credentials already resolved above.
+        if ($attemptId === null && ! app()->environment('testing')) {
+            throw ValidationException::withMessages(['fulfillment' => 'Attempt wajib ditentukan sebelum menghubungi provider.']);
+        }
+        if ($attemptId !== null) {
+            $attempt = DB::table('fulfillment_attempts')->where('id', $attemptId)->first();
+            if (! $attempt
+                || ! in_array($attempt->status, ['SENDING', 'PENDING', 'UNKNOWN'], true)
+                || ! hash_equals((string) $attempt->external_reference, (string) $request['ref_id'])) {
+                throw ValidationException::withMessages(['fulfillment' => 'Attempt sudah tidak layak dikirim ke provider.']);
+            }
         }
 
         try {
