@@ -40,6 +40,71 @@ try {
         await send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:width<640});
         for(const path of publicPages)await inspect(path,width);
     }
+
+    // PR 8: footer artwork must keep a 3:1 element box at every breakpoint.
+    // Insert a test asset only when the fixture has no configured footer image.
+    // Pixel assertions use actual Chromium screenshots, not just CSS declarations.
+    const pr8Svg = (kind) => {
+        const square = kind === 'crop';
+        const artwork = square
+            ? '<rect width="1200" height="400" fill="#e02020"/><rect y="400" width="1200" height="400" fill="#2255d8"/><rect y="800" width="1200" height="400" fill="#20df20"/>'
+            : '<rect width="1200" height="400" fill="#e02020"/><rect x="32" y="32" width="1136" height="336" fill="#2255d8"/>';
+        return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(
+            '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="' + (square ? 1200 : 400) + '">' + artwork + '</svg>'
+        );
+    };
+    const pr8SameColor = (sample, expected) => sample.every((component, i) => Math.abs(component - expected[i]) < 18);
+    for (const width of [390, 768, 1440]) {
+        await send('Emulation.setDeviceMetricsOverride', {width, height:900, deviceScaleFactor:1, mobile:width<640});
+        for (const kind of ['edge', 'crop']) {
+            await navigate('/');
+            const geometry = await evaluate('(async()=>{' +
+                'const footer=document.querySelector(".lf-footer");if(!footer)throw Error("Missing customer footer");' +
+                'let slot=footer.querySelector(".lf-footer-banner");' +
+                'if(!slot){slot=document.createElement("div");slot.className="lf-footer-banner";' +
+                'const picture=document.createElement("picture");picture.appendChild(document.createElement("img"));slot.appendChild(picture);footer.prepend(slot);}' +
+                'slot.querySelectorAll("source").forEach(source=>source.remove());' +
+                'const img=slot.querySelector("img");img.setAttribute("width","1200");img.setAttribute("height","400");' +
+                'img.src=' + JSON.stringify(pr8Svg(kind)) + ';await img.decode();' +
+                'document.querySelector(".lf-home-popup-close")?.click();' +
+                'img.scrollIntoView({block:"center"});await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));' +
+                'const r=img.getBoundingClientRect(), p=slot.getBoundingClientRect(), style=getComputedStyle(img);' +
+                'return {rect:{x:r.x,y:r.y,width:r.width,height:r.height},parentHeight:p.height,' +
+                'maxHeight:style.maxHeight,minHeight:style.minHeight,fit:style.objectFit,position:style.objectPosition,' +
+                'layoutPosition:style.position,transform:style.transform,inlineHeight:img.style.height};' +
+                '})()');
+            if (Math.abs(geometry.rect.width - width) > 1 ||
+                Math.abs(geometry.rect.height - width / 3) > 1 ||
+                Math.abs(geometry.parentHeight - width / 3) > 2 ||
+                geometry.maxHeight !== 'none' || geometry.minHeight !== '0px' ||
+                geometry.fit !== 'cover' || !['50% 50%', 'center'].includes(geometry.position) ||
+                geometry.layoutPosition !== 'static' || geometry.transform !== 'none' ||
+                geometry.inlineHeight !== '') {
+                throw Error('PR8 footer ratio/style failed ' + JSON.stringify({width, kind, geometry}));
+            }
+            const shot = (await send('Page.captureScreenshot', {format:'png', captureBeyondViewport:false})).data;
+            const pixels = await evaluate('(async()=>{' +
+                'const image=new Image();image.src="data:image/png;base64,' + shot + '";await image.decode();' +
+                'const canvas=document.createElement("canvas");canvas.width=image.naturalWidth;canvas.height=image.naturalHeight;' +
+                'const ctx=canvas.getContext("2d");ctx.drawImage(image,0,0);' +
+                'const r=' + JSON.stringify(geometry.rect) + ';' +
+                'const pixel=(x,y)=>Array.from(ctx.getImageData(Math.round(x),Math.round(y),1,1).data).slice(0,3);' +
+                'return {left:pixel(r.x+3,r.y+r.height/2),right:pixel(r.x+r.width-4,r.y+r.height/2),' +
+                'top:pixel(r.x+r.width/2,r.y+3),bottom:pixel(r.x+r.width/2,r.y+r.height-4),' +
+                'center:pixel(r.x+r.width/2,r.y+r.height/2)};' +
+                '})()');
+            const red = [224,32,32], blue = [34,85,216];
+            const expected = kind === 'edge'
+                ? {left:red,right:red,top:red,bottom:red,center:blue}
+                : {left:blue,right:blue,top:blue,bottom:blue,center:blue};
+            for (const [place, rgb] of Object.entries(expected)) {
+                if (!pr8SameColor(pixels[place], rgb)) {
+                    throw Error('PR8 cropped/misaligned footer artwork ' + JSON.stringify({width, kind, place, pixels, geometry}));
+                }
+            }
+            console.log('PASS PR8 footer 3:1 no-crop and centered fallback ' + width + ' ' + kind);
+        }
+    }
     // PR 3 F7/F8: actual DOM hit targets, header interactions, and popular title.
     // "before" PNGs reconstruct the pre-PR CSS measurements; "after" is actual CSS.
     const pr3Folder = 'ergonomics-visual-results';
