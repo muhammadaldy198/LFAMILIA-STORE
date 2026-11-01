@@ -214,6 +214,28 @@ class PaymentTest extends TestCase
             ->where('event_type', 'payment.manual_qris.pending')->count());
     }
 
+    public function test_checkout_quote_and_original_payment_session_remain_accessible(): void
+    {
+        $catalog = $this->catalog();
+        $this->route('manual_qris', 'MANUAL_QRIS');
+
+        $this->postJson('/checkout/quote', [
+            'package_id' => $catalog['package_id'],
+            'payment_channel_code' => 'manual_qris',
+            'voucher_code' => null,
+            'guest_email' => 'pay@example.test',
+            'guest_phone' => '081234567890',
+        ])->assertOk();
+
+        $checkout = $this->postJson('/checkout/orders', $this->guestCheckout(
+            $catalog['package_id'], 'manual_qris', 'payment-recovery-regression-0001'
+        ))->assertCreated();
+
+        $this->get('/payment?invoice='.urlencode((string) $checkout->json('order_number')))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->component('Payment/Show'));
+    }
+
     public function test_payment_page_ignores_redirect_status_query_and_uses_server_state(): void
     {
         $catalog = $this->catalog();

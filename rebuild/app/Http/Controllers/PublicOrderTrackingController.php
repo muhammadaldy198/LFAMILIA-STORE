@@ -6,8 +6,10 @@ use App\Services\PublicOrderStatusService;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\URL;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -69,6 +71,63 @@ class PublicOrderTrackingController
             ->header('Cache-Control', 'no-store, private');
     }
 
+    /**
+     * A public tracking result alone cannot authorize payment. Both the
+     * complete invoice and the WhatsApp number from checkout must match.
+     */
+    public function recover(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'invoice' => ['required', 'string', 'max:80'],
+            'whatsapp' => ['required', 'string', 'max:32'],
+        ]);
+        $digits = preg_replace('/\\D+/', '', (string) $data['whatsapp']) ?: '';
+        $phones = $this->phoneVariants((string) $data['whatsapp']);
+        if (strlen($digits) < 10 || strlen($digits) > 15 || $phones === []) {
+            return response()->json(['message' => 'Nomor WhatsApp tidak valid.'], 422)
+                ->header('Cache-Control', 'no-store, private');
+        }
+
+        $order = DB::table('orders')
+            ->leftJoin('users', 'users.id', '=', 'orders.user_id')
+            ->where('orders.order_number', strtoupper(trim((string) $data['invoice'])))
+            ->where(function ($builder) use ($phones): void {
+                $builder->whereIn('orders.guest_phone_normalized', $phones)
+                    ->orWhereIn('users.phone_normalized', $phones);
+            })
+            ->first(['orders.id', 'orders.order_number', 'orders.status', 'orders.paid_at', 'orders.expires_at']);
+
+        if (! $order) {
+            return response()->json(['message' => 'Invoice atau nomor WhatsApp tidak cocok.'], 404)
+                ->header('Cache-Control', 'no-store, private');
+        }
+
+        $paymentStatus = DB::table('payment_transactions')->where('order_id', $order->id)
+            ->orderByDesc('id')->value('status');
+        if ($this->canRecover($order, $paymentStatus) === false) {
+            return response()->json([
+                'message' => 'Pembayaran pesanan ini tidak dapat dilanjutkan. Periksa status atau buat pesanan baru.',
+            ], 409)->header('Cache-Control', 'no-store, private');
+        }
+
+        return response()->json([
+            'payment_url' => URL::temporarySignedRoute(
+                'payment.show',
+                Carbon::parse($order->expires_at),
+                ['invoice' => $order->order_number],
+            ),
+        ])->header('Cache-Control', 'no-store, private');
+    }
+
+    private function canRecover(object $order, ?string $paymentStatus): bool
+    {
+        return strtoupper((string) $order->status) === 'PENDING_PAYMENT'
+            && $order->paid_at === null
+            && $order->expires_at !== null
+            && Carbon::parse($order->expires_at)->isFuture()
+            && in_array(strtoupper((string) $paymentStatus), ['PAID', 'SETTLEMENT', 'CAPTURE', 'SUCCESS'], true) === false;
+    }
+
     public function status(Request $request): JsonResponse
     {
         $data = $request->validate([
@@ -100,7 +159,7 @@ class PublicOrderTrackingController
             ->where('orders.order_number', $orderNumber)
             ->select(
                 'orders.id', 'orders.order_number', 'orders.status', 'orders.customer_input',
-                'orders.total_idr', 'orders.paid_at', 'orders.created_at', 'orders.updated_at',
+                'orders.total_idr', 'orders.paid_at', 'orders.expires_at', 'orders.created_at', 'orders.updated_at',
                 'products.name as product_name', 'product_packages.name as package_name',
                 'payment_channels.name as payment_channel_name'
             )->first();
@@ -115,7 +174,7 @@ class PublicOrderTrackingController
             ->where('orders.id', $orderId)
             ->select(
                 'orders.id', 'orders.order_number', 'orders.status', 'orders.customer_input',
-                'orders.total_idr', 'orders.paid_at', 'orders.created_at', 'orders.updated_at',
+                'orders.total_idr', 'orders.paid_at', 'orders.expires_at', 'orders.created_at', 'orders.updated_at',
                 'products.name as product_name', 'product_packages.name as package_name',
                 'payment_channels.name as payment_channel_name'
             )->first();
@@ -148,6 +207,10 @@ class PublicOrderTrackingController
             'paymentMethod' => $order->payment_channel_name ?: 'Pembayaran',
             'paymentStatus' => $this->paymentStatus((string) ($payment?->status ?? ''), (string) $order->status, $order->paid_at !== null),
             'wasPaid' => $order->paid_at !== null,
+            'paymentRecoverable' => $this->canRecover($order, $payment?->status),
+            'paymentExpired' => strtoupper((string) $order->status) === 'EXPIRED'
+                || (strtoupper((string) $order->status) === 'PENDING_PAYMENT'
+                    && $order->expires_at !== null && Carbon::parse($order->expires_at)->isPast()),
             'fulfillmentStatus' => $this->statuses->slug((string) $order->status),
             'events' => $events,
             'createdAt' => $order->created_at,

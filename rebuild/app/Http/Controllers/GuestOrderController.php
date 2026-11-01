@@ -8,7 +8,9 @@ use App\Services\PublicOrderStatusService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\URL;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -31,6 +33,7 @@ class GuestOrderController
 
         $request->session()->regenerate();
         $request->session()->put('guest_order_id', $order->id);
+        $request->session()->forget('payment_signed_guest_order_id');
 
         return redirect()->route('guest.orders.show', $order->order_number);
     }
@@ -45,7 +48,7 @@ class GuestOrderController
             ->whereNull('orders.user_id')->where('orders.order_number', $orderNumber)
             ->where('orders.id', $request->session()->get('guest_order_id'))
             ->select('orders.id', 'orders.order_number', 'orders.status', 'orders.total_idr',
-                'orders.created_at', 'orders.delivery_payload', 'products.name as product_name', 'products.slug as product_slug')->first();
+                'orders.created_at', 'orders.expires_at', 'orders.delivery_payload', 'products.name as product_name', 'products.slug as product_slug')->first();
 
         abort_unless($order, 404);
         $order->delivery = $order->status === 'SUCCESS' && is_string($order->delivery_payload)
@@ -53,7 +56,14 @@ class GuestOrderController
         unset($order->delivery_payload);
         $order->status = $this->statuses->value((string) $order->status);
 
+        $signedOnly = (int) $request->session()->get('payment_signed_guest_order_id') === (int) $order->id;
+        $paymentUrl = $signedOnly
+            ? URL::temporarySignedRoute('payment.show', $order->expires_at
+                ? Carbon::parse($order->expires_at) : now()->subSecond(), ['invoice' => $order->order_number])
+            : null;
+
         return Inertia::render('Guest/OrderStatus', [
+            'paymentUrl' => $paymentUrl,
             'order' => $order,
             'payment' => $payments->forOrder((int) $order->id),
             'events' => $this->publicEvents((int) $order->id),

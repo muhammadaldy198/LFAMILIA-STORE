@@ -35,11 +35,15 @@ class PaymentController
         // halaman (signed / owner / sesi guest) bisa menyiapkan
         // pembayaran, yang tidak bisa melihat tetap ditolak.
         $signed = $request->hasValidSignature();
+        if ($request->query->has('signature') || $request->query->has('expires')) {
+            abort_unless($signed, 403);
+        }
 
         if ($order->user_id !== null) {
             abort_unless($signed || ($user && (int) $order->user_id === (int) $user->id), 403);
         } else {
-            $sessionMatch = (int) $request->session()->get('guest_order_id') === (int) $order->id;
+            $sessionMatch = (int) $request->session()->get('guest_order_id') === (int) $order->id
+                && (int) $request->session()->get('payment_signed_guest_order_id') !== (int) $order->id;
             $tokenMatch = isset($data['access_code'])
                 && $guestAccess->matches((int) $order->id, $data['access_code']);
             abort_unless($sessionMatch || $tokenMatch || $signed, 403);

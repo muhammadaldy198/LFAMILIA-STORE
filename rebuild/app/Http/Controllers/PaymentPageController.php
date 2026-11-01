@@ -111,11 +111,21 @@ class PaymentPageController
         $signed = $request->hasValidSignature()
             || $request->hasValidSignatureWhileIgnoring(self::GATEWAY_RESULT_PARAMS);
 
+        // Invalid signed links must not fall back to the checkout-session permission.
+        if ($request->query->has('signature') || $request->query->has('expires')) {
+            abort_unless($signed, 403);
+        }
+
         if ($order->user_id === null) {
-            if ($signed) {
+            $originalSession = (int) $request->session()->get('guest_order_id') === (int) $order->id
+                && (int) $request->session()->get('payment_signed_guest_order_id') !== (int) $order->id;
+            if ($signed && ! $originalSession) {
+                // Preserve guest status access but do not turn a signed link into
+                // permanent invoice-only payment access after its expiry.
                 $request->session()->put('guest_order_id', $order->id);
-            } else {
-                abort_unless((int) $request->session()->get('guest_order_id') === (int) $order->id, 403);
+                $request->session()->put('payment_signed_guest_order_id', $order->id);
+            } elseif (! $signed) {
+                abort_unless($originalSession, 403);
             }
             $statusUrl = route('guest.orders.show', $order->order_number);
         } else {
@@ -211,7 +221,7 @@ class PaymentPageController
 
         return URL::temporarySignedRoute(
             'payments.orders.create',
-            $expires !== null && $expires->isFuture() ? $expires : now()->addMinutes(30),
+            $expires ?? now()->subSecond(),
             ['orderNumber' => $order->order_number],
         );
     }
