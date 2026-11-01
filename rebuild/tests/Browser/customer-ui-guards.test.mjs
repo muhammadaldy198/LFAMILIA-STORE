@@ -293,3 +293,13 @@ test('F12 checkout VA and e-wallet logos share padded, contained chips', () => {
     assert.match(source, /padding: 4px 6px;/);
     assert.match(source, /object-fit: contain;/);
 });
+
+
+test('F13 country controls stretch to match input instead of raising input height', () => {
+    const picker = read('Components/PhoneCountryPicker.vue');
+    const checkout = readFileSync(new URL('../../resources/css/checkout.css', import.meta.url), 'utf8');
+    assert.match(picker, /lf-country-picker flex flex-wrap items-stretch/);
+    assert.match(picker, /shrink-0 self-stretch items-center/);
+    assert.match(checkout, /\.lfx \.lfx-phone-entry\{[^}]*align-items:stretch/);
+    assert.match(checkout, /\.lfx \.lfx-country-trigger\{[^}]*height:auto;min-height:0;align-self:stretch/);
+});
