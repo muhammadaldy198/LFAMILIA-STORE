@@ -111,6 +111,11 @@ class PaymentPageController
         $signed = $request->hasValidSignature()
             || $request->hasValidSignatureWhileIgnoring(self::GATEWAY_RESULT_PARAMS);
 
+        // Invalid signed links must not fall back to the checkout-session permission.
+        if ($request->query->has('signature') || $request->query->has('expires')) {
+            abort_unless($signed, 403);
+        }
+
         if ($order->user_id === null) {
             if ($signed) {
                 $request->session()->put('guest_order_id', $order->id);

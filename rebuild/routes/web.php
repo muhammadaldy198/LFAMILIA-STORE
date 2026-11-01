@@ -113,6 +113,7 @@ Route::middleware('throttle:guest-order')->group(function (): void {
     Route::get('/orders/check', [PublicOrderTrackingController::class, 'index'])->name('guest.orders.lookup');
     Route::post('/orders/check', [GuestOrderController::class, 'verify'])->name('guest.orders.verify');
     Route::post('/orders/track/search', [PublicOrderTrackingController::class, 'search'])->name('guest.orders.track.search');
+    Route::post('/orders/track/recover', [PublicOrderTrackingController::class, 'recover'])->name('guest.orders.track.recover');
     Route::get('/orders/track/feed', [PublicOrderTrackingController::class, 'feed'])->name('guest.orders.track.feed');
     Route::post('/orders/track/status', [PublicOrderTrackingController::class, 'status'])->name('guest.orders.track.status');
     Route::post('/reviews', [ProductReviewController::class, 'store'])->name('reviews.store');
