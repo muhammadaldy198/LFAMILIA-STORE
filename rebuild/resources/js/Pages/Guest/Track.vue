@@ -15,6 +15,12 @@ const error=ref('');
 const mode=ref('');
 const orders=ref([]);
 const detail=ref(null);
+const recoveryPhone=ref('');
+const recoveryInvoice=ref('');
+const recoveryUrl=ref('');
+const recoveryError=ref('');
+const recoveryLoading=ref(false);
+const resetRecovery=()=>{recoveryPhone.value='';recoveryInvoice.value='';recoveryUrl.value='';recoveryError.value='';};
 const feed=ref([...(props.transactions||[])]);
 const copied=ref(false);
 let detailTimer=null,feedTimer=null;
@@ -39,7 +45,7 @@ async function json(url,options={}){
 async function search(){
  if(loading.value)return;
  const value=query.value.trim();
- stopDetailPolling();selectionVersion++;detail.value=null;orders.value=[];mode.value='';copied.value=false;
+ stopDetailPolling();selectionVersion++;detail.value=null;orders.value=[];mode.value='';copied.value=false;resetRecovery();
  if(!value){error.value='Masukkan nomor invoice atau nomor WhatsApp.';return;}
  loading.value=true;error.value='';
  const version=selectionVersion;
@@ -54,7 +60,7 @@ async function search(){
 }
 async function openOrder(trackingToken){
  if(loading.value)return;
- stopDetailPolling();selectionVersion++;detail.value=null;copied.value=false;
+ stopDetailPolling();selectionVersion++;detail.value=null;copied.value=false;resetRecovery();
  const version=selectionVersion;
  loading.value=true;error.value='';
  try{
@@ -72,8 +78,23 @@ async function refreshDetail(){
  try{
   const data=await json('/orders/track/status',{method:'POST',body:JSON.stringify({tracking_token:token})});
   if(disposed||version!==selectionVersion||detail.value?.trackingToken!==token)return;
-  detail.value=data.order;if(terminal.value)stopDetailPolling();
+  detail.value=data.order;if(!data.order.paymentRecoverable)recoveryUrl.value='';if(terminal.value)stopDetailPolling();
  }catch{}finally{detailRefreshing.value=false;}
+}
+async function verifyRecovery(){
+ if(!detail.value?.paymentRecoverable||recoveryLoading.value)return;
+ const invoice=(detail.value.referenceMasked?recoveryInvoice.value:detail.value.referenceId).trim();
+ const whatsapp=recoveryPhone.value.trim();
+ recoveryUrl.value='';recoveryError.value='';
+ if(!invoice||!whatsapp){recoveryError.value='Isi nomor invoice lengkap dan WhatsApp checkout.';return;}
+ const version=selectionVersion;
+ recoveryLoading.value=true;
+ try{
+  const data=await json('/orders/track/recover',{method:'POST',body:JSON.stringify({invoice,whatsapp})});
+  if(disposed||version!==selectionVersion||!detail.value?.paymentRecoverable)return;
+  recoveryUrl.value=data.payment_url||'';
+ }catch(e){if(!disposed&&version===selectionVersion)recoveryError.value=e.message||'Verifikasi pembayaran gagal.';}
+ finally{recoveryLoading.value=false;}
 }
 async function refreshFeed(){
  if(disposed||document.hidden)return;
@@ -141,7 +162,20 @@ onUnmounted(()=>{disposed=true;selectionVersion++;stopDetailPolling();if(feedTim
      <div><dt>{{ customerText("pages.guest.track.e378eb96", "Dibuat") }}</dt><dd>{{date(detail.createdAt)}}</dd></div>
      <div><dt>{{ customerText("pages.guest.track.6e230e94", "Update") }}</dt><dd>{{date(detail.updatedAt)}}</dd></div>
     </dl>
-    <div v-if="nextAction" class="mb-4 space-y-3 rounded-xl border border-white/10 p-4">
+    <div v-if="detail.paymentRecoverable" class="mb-4 space-y-3 rounded-xl border border-white/10 p-4">
+       <strong class="text-sm">Lanjutkan pembayaran</strong>
+       <p class="text-sm text-white/70">Verifikasi invoice dan nomor WhatsApp saat checkout untuk mendapatkan tautan pembayaran yang aman.</p>
+       <input v-if="detail.referenceMasked" v-model="recoveryInvoice" maxlength="80" autocomplete="off" placeholder="Nomor invoice lengkap" aria-label="Nomor invoice lengkap" class="w-full rounded-lg border border-white/20 bg-white/5 p-3 text-sm" @input="recoveryUrl=''">
+       <input v-model="recoveryPhone" maxlength="32" inputmode="tel" autocomplete="tel" placeholder="Nomor WhatsApp checkout" aria-label="Nomor WhatsApp checkout" class="w-full rounded-lg border border-white/20 bg-white/5 p-3 text-sm" @input="recoveryUrl=''">
+       <button :disabled="recoveryLoading" class="lf-secondary" @click="verifyRecovery">{{recoveryLoading?'Memverifikasi...':'Verifikasi WhatsApp'}}</button>
+       <p v-if="recoveryError" role="alert" class="text-sm text-red-300">{{recoveryError}}</p>
+       <a v-if="recoveryUrl" :href="recoveryUrl" class="lf-primary">Lanjut Bayar</a>
+     </div>
+     <div v-else-if="detail.paymentExpired" class="mb-4 space-y-3 rounded-xl border border-white/10 p-4">
+       <p class="text-sm">Batas waktu pembayaran pesanan ini sudah berakhir. Pembayaran tidak dapat dilanjutkan.</p>
+       <Link href="/" class="lf-primary">Buat pesanan baru</Link>
+     </div>
+     <div v-if="nextAction && !detail.paymentExpired" class="mb-4 space-y-3 rounded-xl border border-white/10 p-4">
       <p v-if="nextAction==='support'" class="text-sm">{{ customerText('order.status.manualHelp', manualHelpMessage) }}</p>
       <Link v-if="nextAction==='support'" href="/contact" class="lf-primary">Hubungi admin</Link>
       <Link v-else href="/" class="lf-primary">Buat pesanan baru</Link>
