@@ -254,7 +254,8 @@ try {
             throw Error('Wallet amount and quote calculator must remain locked');
         // A synthetic click on a locked radio must never change the selected channel.
         const selectedBefore = await wallet.locator('.lf-payment-group-card.selected .lf-payment-group-copy strong').first().textContent();
-        await wallet.locator('.lfx-payment-method-card:not(.is-selected)').first().evaluate(element => element.click()).catch(() => {});
+        const alternateRadio = wallet.locator('.lfx-payment-method-card:not(.is-selected)').first();
+        if (await alternateRadio.count()) await alternateRadio.evaluate(element => element.click());
         const selectedAfter = await wallet.locator('.lf-payment-group-card.selected .lf-payment-group-copy strong').first().textContent();
         if (selectedBefore !== selectedAfter || quoteRequests.length !== 2)
             throw Error('Locked picker changed payment channel or requested a fresh quote');
