@@ -5,6 +5,7 @@ use App\Models\Category;
 use App\Models\IntegrationCredential;
 use App\Models\PaymentChannel;
 use App\Models\Product;
+use App\Models\SitePopup;
 use App\Models\SupportTicket;
 use App\Models\User;
 use App\Services\AdminManualOrderService;
@@ -311,7 +312,7 @@ DB::transaction(function (): void {
 
     $product = Product::updateOrCreate(['slug' => 'checkout-lab-reference'], [
         'category_id' => Category::where('slug', 'game')->value('id'),
-        'name' => 'Mobile Legends', 'publisher' => 'Moonton',
+        'name' => 'Mobile Legends', 'publisher' => 'Moonton', 'popular' => true,
         'description' => 'Fixture visual Checkout Lab. Tidak ada transaksi nyata.',
         'margin_percent' => 0, 'fulfillment_mode' => 'AUTO_PROVIDER',
         'nickname_check_enabled' => false, 'is_active' => true,
@@ -342,6 +343,14 @@ DB::transaction(function (): void {
             'synced_at' => now(), 'created_at' => now(), 'updated_at' => now(),
         ]);
     }
+
+    // F7 UI-only fixture: modal can be measured, closed and dismissed in CI.
+    SitePopup::updateOrCreate(['title' => 'Browser UI Popup'], [
+        'body' => 'Pengumuman untuk pemeriksaan area sentuh.',
+        'dismiss_days' => 7,
+        'is_active' => true,
+        'sort_order' => -100,
+    ]);
 });
 
 // Disposable sandbox readiness for dropdown/quote coverage; browser tests never initiate payments.

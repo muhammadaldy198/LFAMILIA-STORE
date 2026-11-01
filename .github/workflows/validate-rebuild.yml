@@ -408,6 +408,14 @@ jobs:
       - name: Run M11 browser smoke
         run: bash tests/Browser/smoke.sh
 
+      - name: Upload PR3 F7/F8 before-after customer UI screenshots
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: pr3-f7-f8-customer-ergonomics
+          path: rebuild/ergonomics-visual-results
+          if-no-files-found: warn
+
       - name: Upload checkout visual comparison
         if: always()
         uses: actions/upload-artifact@v6
