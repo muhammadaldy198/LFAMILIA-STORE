@@ -19,8 +19,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
-use Inertia\Inertia;
 use Inertia\Response;
+use App\Support\SeoMetadata;
 
 class CatalogController
 {
@@ -201,7 +201,7 @@ class CatalogController
             }
         }
 
-        return Inertia::render('Catalog/Index', [
+        return SeoMetadata::render('Catalog/Index', [
             'categories' => $categories,
             'products' => $products,
             'popularProducts' => $popularProducts,
@@ -300,7 +300,7 @@ class CatalogController
                 'customer_input' => $saved->customer_input,
             ])->values() : collect();
 
-        return Inertia::render('Catalog/Show', [
+        return SeoMetadata::render('Catalog/Show', [
             'product' => [
                 ...$product->only('id', 'name', 'publisher', 'slug', 'description', 'nickname_check_enabled',
                     'package_tabs_enabled', 'package_tabs'),
