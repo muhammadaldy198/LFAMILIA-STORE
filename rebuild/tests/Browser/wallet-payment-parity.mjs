@@ -148,8 +148,8 @@ try {
         await capture(checkout, 'checkout-' + width);
 
         for (const title of shared) {
-            await wallet.locator('.lf-payment-group-card').filter({ has: wallet.locator('.lf-payment-group-copy strong').getByText(title, { exact: true }) }).locator('.lf-payment-group-main').click();
-            await checkout.locator('.lf-payment-group-card').filter({ has: checkout.locator('.lf-payment-group-copy strong').getByText(title, { exact: true }) }).locator('.lf-payment-group-main').click();
+            await wallet.locator('.lf-payment-group-card').filter({ hasText: title }).first().locator('.lf-payment-group-main').click();
+            await checkout.locator('.lf-payment-group-card').filter({ hasText: title }).first().locator('.lf-payment-group-main').click();
             const w = await geometry(wallet, title);
             const c = await geometry(checkout, title);
             assertParity(w, c, width + ' ' + title + ' selected');
