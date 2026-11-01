@@ -86,7 +86,7 @@ class AdminFulfillmentController
         $attempts = $query
             ->orderByDesc('attempts.id')
             ->select([
-                'attempts.id', 'attempts.order_id', 'attempts.attempt_no', 'attempts.external_reference',
+                'attempts.id', 'attempts.order_id', 'attempts.provider_mapping_id', 'attempts.attempt_no', 'attempts.external_reference',
                 'attempts.status', 'attempts.provider_status', 'attempts.provider_rc',
                 'attempts.serial_number', 'attempts.price_idr', 'attempts.safe_to_failover',
                 'attempts.last_error', 'attempts.last_checked_at', 'attempts.created_at', 'attempts.completed_at',
@@ -150,7 +150,7 @@ class AdminFulfillmentController
             if ($canResolveQuarantine) {
                 try {
                     $order = DB::table('orders')->where('id', $attempt->order_id)->firstOrFail();
-                    $mapping = DB::table('provider_mappings')->where('id', $order->provider_mapping_id)->firstOrFail();
+                    $mapping = DB::table('provider_mappings')->where('id', $attempt->provider_mapping_id)->firstOrFail();
                     $resolutionDestination = app(FulfillmentService::class)
                         ->digiflazzCustomerNo($order, $mapping, $snapshot);
                 } catch (\Throwable $exception) {
