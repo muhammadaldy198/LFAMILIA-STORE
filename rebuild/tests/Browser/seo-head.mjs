@@ -40,6 +40,8 @@ for (const path of ['/', '/catalog/browser-checkout-game', '/faq']) {
         '--disable-gpu', '--virtual-time-budget=3000',
         '--dump-dom', base + path,
     ], { timeout: 35000, maxBuffer: 15 * 1024 * 1024 }).toString();
+    // The initial Blade document has no <main>; this proves Vue actually mounted.
+    assert.match(hydrated, /<main\b/i, path + ' Vue page mounted');
     assert.equal(all(head(hydrated), /<title\b[^>]*>/gi).length, 1, path + ' one hydrated title');
     assert.equal(description(hydrated).length, 1, path + ' one hydrated description');
     assert.equal(title(hydrated), title(initial), path + ' same server and client title');
