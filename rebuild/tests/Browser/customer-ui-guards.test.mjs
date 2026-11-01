@@ -236,6 +236,7 @@ test('PR10 wallet reuses the single checkout payment picker without duplicating 
     assert.match(wallet, /:payment-channels="paymentChannels"/);
     assert.match(wallet, /:selected-code="paymentChannelCode"/);
     assert.match(wallet, /:locked="Boolean\(busy\) \|\| attemptLocked"/);
+    assert.match(wallet, /:disabled="busy \|\| result \|\| attemptLocked \|\| !quoteMatches"/);
     assert.match(wallet, /@select="paymentChannelCode = \$event"/);
     assert.doesNotMatch(wallet, /lf-wallet-logo|openedPaymentGroup|paymentGroups|choosePaymentGroup|lf-payment-group-main|lf-payment-brand-strip/);
     assert.match(picker, /class="lf-payment-group-main"/);
