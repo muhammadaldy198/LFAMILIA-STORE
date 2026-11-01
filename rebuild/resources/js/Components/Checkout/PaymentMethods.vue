@@ -309,14 +309,17 @@ function choosePayment(code) {
   min-width: 0;
   max-width: 58px;
   aspect-ratio: 58 / 26;
-  padding: 2px 3px;
+  padding: 4px 6px;
+  border: 1px solid rgba(255,255,255,.10);
   border-radius: 4px;
   background: rgba(255,255,255,.10);
 }
 .lf-payment-brand-logo img {
   display: block;
-  width: 100%;
-  height: 100%;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 18px;
   object-fit: contain;
 }
 .lfx-payment-method-grid--compact {

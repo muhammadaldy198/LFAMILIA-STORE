@@ -284,3 +284,12 @@ test('popular cards show a two-line title and only a real publisher below it', (
     assert.match(css, /@media\(min-width:901px\)\{[^}]*grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/s);
     assert.match(css, /@media\(max-width:900px\)\{[^}]*grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/s);
 });
+
+
+test('F12 checkout VA and e-wallet logos share padded, contained chips', () => {
+    const source = read('Components/Checkout/PaymentMethods.vue');
+    assert.match(source, /\.lf-payment-brand-logo img \{/);
+    assert.match(source, /max-height: 18px;/);
+    assert.match(source, /padding: 4px 6px;/);
+    assert.match(source, /object-fit: contain;/);
+});
