@@ -113,10 +113,10 @@ function choosePayment(code) {
                                 :disabled="locked || group.items.every(x=>!usable(x))"
                                 @click="chooseGroup(group)"
                             >
-                                <span v-if="group.key==='wallet'" class="lf-payment-wallet-art">
+                                <span v-if="group.key==='wallet'" class="lf-payment-wallet-art lf-payment-logo-chip">
                                     <img :src="groupChannel(group)?.logo_url || '/assets/payment/lfamilia-cash.webp'" alt="LFAMILIA Coin">
                                 </span>
-                                <span v-else-if="group.key==='qris' && groupChannel(group)?.logo_url" class="lf-payment-qris-art">
+                                <span v-else-if="group.key==='qris' && groupChannel(group)?.logo_url" class="lf-payment-qris-art lf-payment-logo-chip">
                                     <img :src="groupChannel(group).logo_url" :alt="groupChannel(group).name || 'QRIS'">
                                 </span>
                                 <span class="lf-payment-group-copy">
@@ -136,9 +136,9 @@ function choosePayment(code) {
                             >
                                 <span v-if="group.key==='qris'">{{group.items.length > 1 ? 'Pilih QRIS Otomatis atau QRIS Manual' : (groupChannel(group)?.description || group.title)}}</span>
                                 <template v-else-if="['va', 'ewallet'].includes(group.key)">
-                                    <span v-for="channel in group.items.filter(item=>item.logo_url)" :key="channel.code" class="lf-payment-brand-logo">
+                                    <div v-for="channel in group.items.filter(item=>item.logo_url)" :key="channel.code" class="lf-payment-brand-logo">
                                         <img :src="channel.logo_url" :alt="channel.name" loading="lazy">
-                                    </span>
+                                    </div>
                                 </template>
                                 <template v-else>
                                     <span v-for="channel in group.items.slice(0,7)" :key="channel.code">{{channel.name}}</span>
@@ -165,7 +165,7 @@ function choosePayment(code) {
                                     @keydown.enter.prevent="choosePayment(channel.code)"
                                     @keydown.space.prevent="choosePayment(channel.code)"
                                 >
-                                    <img v-if="channel.logo_url" class="lfx-payment-logo" :src="channel.logo_url" alt=""/><strong class="lfx-payment-method-name">{{channel.name}}</strong>
+                                    <span v-if="channel.logo_url" class="lfx-payment-logo-box lf-payment-logo-chip"><img class="lfx-payment-logo" :src="channel.logo_url" alt=""/></span><strong class="lfx-payment-method-name">{{channel.name}}</strong>
                                     <span class="lfx-payment-method-total">{{amount(channel)}}</span>
                                 </div>
                             </div>
@@ -179,10 +179,10 @@ function choosePayment(code) {
 .lf-payment-group-card{overflow:hidden;border:1px solid rgba(255,255,255,.09);border-radius:6.4px;background:rgba(255,255,255,.025);transition:border-color .18s,background .18s}
 .lf-payment-group-card.selected{border-color:var(--lf-color-highlight);background:color-mix(in srgb,var(--lf-color-highlight) 6%,transparent)}
 .lf-payment-group-main{font-size:13px;line-height:1.5;width:100%;min-height:48px;display:flex;align-items:center;gap:8px;padding:8px 10px;border:0;background:transparent;color:var(--lf-color-text);text-align:left;cursor:pointer}
-.lf-payment-wallet-art{display:block;overflow:hidden;border:1px solid rgba(255,255,255,.1);background:#000}
-.lf-payment-wallet-art img{display:block;width:100%;height:100%;object-fit:cover}
+.lf-payment-wallet-art{display:grid;place-items:center;overflow:hidden;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.10)}
+.lf-payment-wallet-art img{display:block;width:auto;height:auto;max-width:100%;max-height:24px;object-fit:contain}
 .lf-payment-qris-art{display:grid;place-items:center;flex:0 0 48px;width:48px;height:48px;padding:6px;box-sizing:border-box;border:1px solid rgba(255,255,255,.1);border-radius:11px;background:rgba(255,255,255,.055)}
-.lf-payment-qris-art img{display:block;max-width:100%;max-height:100%;object-fit:contain}
+.lf-payment-qris-art img{display:block;width:auto;height:auto;max-width:100%;max-height:24px;object-fit:contain}
 .lf-payment-group-copy{min-width:0;flex:1}
 .lf-payment-group-copy strong{display:block;font-size:11px;line-height:1.2}
 .lf-payment-group-copy small{display:block;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--lf-color-muted);font-size:9px}
@@ -319,6 +319,30 @@ function choosePayment(code) {
   gap: 4px;
   padding: 7px 10px;
 }
+.lf-payment-logo-chip, .lf-payment-brand-logo {
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  border: 1px solid rgba(255,255,255,.10);
+  border-radius: 6px;
+  background: rgba(255,255,255,.10);
+  overflow: hidden;
+}
+.lfx-payment-logo-box {
+  flex: 0 0 auto;
+  width: 82px;
+  height: 34px;
+  padding: 4px;
+  margin: 0;
+}
+.lfx-payment-logo-box > .lfx-payment-logo {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 72px;
+  max-height: 24px;
+  object-fit: contain;
+}
 .lf-payment-brand-strip--logos > .lf-payment-brand-logo {
   display: grid;
   place-items: center;
@@ -328,9 +352,6 @@ function choosePayment(code) {
   max-width: 58px;
   aspect-ratio: 58 / 26;
   padding: 4px 6px;
-  border: 1px solid rgba(255,255,255,.10);
-  border-radius: 4px;
-  background: rgba(255,255,255,.10);
 }
 .lf-payment-brand-logo img {
   display: block;
@@ -349,9 +370,12 @@ function choosePayment(code) {
   gap: 7px;
   padding: 9px 10px;
 }
-.lfx-payment-method-grid--compact .lfx-payment-logo {
-  height: 21px;
+.lfx-payment-method-grid--compact .lfx-payment-logo-box {
+  height: 29px;
+}
+.lfx-payment-method-grid--compact .lfx-payment-logo-box > .lfx-payment-logo {
   max-width: 72px;
+  max-height: 21px;
 }
 .lfx-payment-method-grid--compact .lfx-payment-method-name {
   font-size: 11px;

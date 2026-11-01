@@ -256,6 +256,20 @@ try {
     await navigate('/login');
     const login=await evaluate(`(async()=>{const token=document.querySelector('meta[name="csrf-token"]').content;const response=await fetch('/login',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':token},body:JSON.stringify({email:'browser-account@example.test',password:'Browser-test-password-123'})});return response.status;})()`);
     if(login!==200&&login!==204)throw Error('Fixture login failed: '+login);
+
+    // Test real artwork from the three production channel files, not just icon-shaped fixtures.
+    // Fixture payment records stay local; replace only the rendered image src on the page.
+    const pr12ChannelArt = {};
+    for (const [name, url] of [
+        ['gopay', 'https://lfamilia.com/storage/248/1001094793.png'],
+        ['bni', 'https://lfamilia.com/storage/244/1001094769.webp'],
+        ['qris', 'https://lfamilia.com/storage/237/1001094762.png'],
+    ]) {
+        const response=await fetch(url,{signal:AbortSignal.timeout(20000)});
+        if(!response.ok)throw Error('PR12 original payment logo '+name+' HTTP '+response.status);
+        const mime=name==='bni'?'image/webp':'image/png';
+        pr12ChannelArt[name]='data:'+mime+';base64,'+Buffer.from(await response.arrayBuffer()).toString('base64');
+    }
     const accountPages=['/account','/account/wallet','/account/orders','/account/tickets','/account/profile','/account/membership','/account/game-accounts','/account/codes','/account/notifications'];
     for(const width of [360,390,1440]){
         await send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:width<640});
@@ -298,6 +312,24 @@ try {
                 return {selected:group?.classList.contains('selected'),preview:!!group?.querySelector('.lf-payment-brand-strip--logos'),cols,method:!!grid?.querySelector('.lfx-payment-method-card strong'),scroll:document.documentElement.scrollWidth,descriptionInside:!!description&&description.getBoundingClientRect().bottom<=h.bottom+1,titleInside:!!title&&title.getBoundingClientRect().left>=h.left-1};
             })()`);
             if(!after.selected||after.preview||after.cols!==2||!after.method||!after.descriptionInside||!after.titleInside||after.scroll>width+2)throw Error('Wallet shared picker geometry invalid '+JSON.stringify({width,category,after}));
+
+            if (width===390) {
+                const art = category==='E-Wallet' ? pr12ChannelArt.gopay : pr12ChannelArt.bni;
+                const installed=await evaluate('(()=>{const region=document.querySelector("[aria-label=\\\"Pilih metode pembayaran top up\\\"]");' +
+                  'const group=[...region.querySelectorAll(".lf-payment-group-card")].find(g=>g.querySelector(".lf-payment-group-copy strong")?.textContent.trim()==='+JSON.stringify(category)+');' +
+                  'const img=group?.querySelector(".lfx-payment-logo");if(!img)return false;img.src='+JSON.stringify(art)+';return true;})()');
+                if(!installed)throw Error('PR12 '+category+' logo fixture missing');
+                await pause(100);
+                // Reconstruct the old full-bleed card logo, then capture the fixed chip.
+                await evaluate('(()=>{const style=document.createElement("style");style.id="pr12-logo-before";style.textContent=".lfx-payment-logo-box{width:100%!important;height:auto!important;padding:0!important;border:0!important;background:transparent!important}.lfx-payment-logo-box img{width:100%!important;max-width:none!important;height:auto!important;max-height:none!important}";document.head.append(style);})()');
+                const beforeShot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});
+                await writeFile(pr12Folder+'/logo-'+(category==='E-Wallet'?'gopay':'bni')+'-before-390.png',Buffer.from(beforeShot.data,'base64'));
+                await evaluate('document.querySelector("#pr12-logo-before")?.remove()');
+                const boxes=await evaluate('(()=>{const img=document.querySelector(".lfx-payment-method-grid--compact .lfx-payment-logo");const card=img?.closest(".lfx-payment-method-card");const box=img?.closest(".lfx-payment-logo-box");const a=img?.getBoundingClientRect(),b=box?.getBoundingClientRect(),c=card?.getBoundingClientRect();return {image:a&&{width:a.width,height:a.height},chip:b&&{width:b.width,height:b.height},card:c&&{width:c.width,height:c.height}};})()');
+                if(!boxes.image||boxes.image.width>72.5||boxes.image.height>21.5||boxes.chip.width>=boxes.card.width)throw Error('PR12 authentic '+category+' logo full-bleed: '+JSON.stringify(boxes));
+                const afterShot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});
+                await writeFile(pr12Folder+'/logo-'+(category==='E-Wallet'?'gopay':'bni')+'-after-390.png',Buffer.from(afterShot.data,'base64'));
+            }
             await mkdir('checkout-visual-results',{recursive:true});
             const screenshot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});
             await writeFile('checkout-visual-results/wallet-'+(category==='E-Wallet'?'ewallet':'va')+'-'+width+'.png',Buffer.from(screenshot.data,'base64'));
