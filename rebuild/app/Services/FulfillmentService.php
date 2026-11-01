@@ -8,6 +8,7 @@ use App\Services\Fulfillment\DigiflazzDestinationTemplate;
 use App\Services\Fulfillment\FulfillmentTargetBuilder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
@@ -231,6 +232,10 @@ class FulfillmentService
         try {
             $this->applyProviderResult($attemptId, $response, 'provider_response');
         } catch (ValidationException $exception) {
+            Log::warning('Digiflazz initial response rejected', [
+                'fulfillment_attempt_id' => $attemptId,
+                'reason' => $exception->getMessage(),
+            ]);
             $this->markUnknown($attemptId, 'Response provider tidak dapat diverifikasi.');
         }
     }
@@ -260,7 +265,7 @@ class FulfillmentService
                 }
             }
 
-            if ($manual === false && (int) $attempt->reconcile_checks >= 3) {
+            if (! $manual && Carbon::parse($attempt->created_at)->lte(now()->subDay())) {
                 $this->escalateStalledReconciliation($attempt, $order);
 
                 return null;
@@ -320,6 +325,10 @@ class FulfillmentService
             try {
                 $this->applyProviderResult($attemptId, $response, 'reconciliation');
             } catch (ValidationException $exception) {
+                Log::warning('Digiflazz reconciliation response rejected', [
+                    'fulfillment_attempt_id' => $attemptId,
+                    'reason' => $exception->getMessage(),
+                ]);
                 $this->markUnknown($attemptId, 'Hasil reconciliation tidak dapat diverifikasi.');
             }
         } finally {
@@ -327,16 +336,9 @@ class FulfillmentService
                 'reconcile_claimed_at' => null,
             ]);
 
-            // Escalation point (D5.3): the scheduler only queues attempts
-            // with reconcile_checks < 3, so the top-of-function branch
-            // (checks >= 3) is never reached from production — the 3rd
-            // check is the last one that runs. If that check completes
-            // without a terminal result, escalate HERE instead of waiting
-            // for a 4th call that never comes. This MUST live in the
-            // finally: every check path ends in an early `return` inside
-            // the try, and a return skips code placed after try/finally.
-            // Manual reconciles never escalate (an admin is already
-            // looking at the attempt).
+            // Notify once after the third unresolved check, but keep
+            // reconciling using the same ref_id until status is final or
+            // the 24-hour upper limit is reached. A manual check does not alert.
             if (! $manual) {
                 $this->escalateIfStalled($attemptId);
             }
@@ -344,8 +346,8 @@ class FulfillmentService
     }
 
     /**
-     * Escalate an attempt that exhausted its automatic checks without
-     * a terminal result. Deduped inside escalateStalledReconciliation.
+     * Alert admin about unresolved attempts without terminating scheduled checks.
+     * Deduped inside escalateStalledReconciliation.
      */
     private function escalateIfStalled(int $attemptId): void
     {
@@ -870,9 +872,8 @@ class FulfillmentService
     }
 
     /**
-     * Automatic reconciliation stopped after 3 checks without a result.
-     * Escalate to admin exactly once per attempt (deduped on the stored
-     * notification); the scheduler may call reconcileAttempt repeatedly.
+     * Alert admin after 3 inconclusive checks, without interrupting retries.
+     * The scheduler keeps probing within the 24-hour limit.
      */
     private function escalateStalledReconciliation(object $attempt, object $order): void
     {
@@ -891,8 +892,8 @@ class FulfillmentService
         ]);
         $this->notifications->record(
             'fulfillment.reconcile.stalled',
-            'Pemeriksaan ulang berhenti - perlu penanganan manual',
-            'Pesanan '.$order->order_number.' sudah dicek otomatis 3 kali tanpa hasil dan tidak lagi dicek otomatis. Tangani manual dari menu Pemenuhan.',
+            'Hasil pengiriman belum pasti - perlu perhatian',
+            'Pesanan '.$order->order_number.' sudah dicek otomatis berulang tanpa hasil final. Pengecekan otomatis tetap berjalan maksimal 24 jam; periksa dari menu Pemenuhan.',
             'ERROR',
             'fulfillment_attempt',
             $attempt->id,
@@ -1047,7 +1048,7 @@ class FulfillmentService
         foreach (['ref_id', 'buyer_sku_code', 'customer_no', 'status'] as $key) {
             if (! isset($response[$key]) || ! is_scalar($response[$key])) {
                 throw ValidationException::withMessages([
-                    'fulfillment' => 'Response provider tidak lengkap.',
+                    'fulfillment' => 'Response provider tidak lengkap: '.$key.'.',
                 ]);
             }
         }
@@ -1056,7 +1057,10 @@ class FulfillmentService
             || ! hash_equals((string) $request['buyer_sku_code'], (string) $response['buyer_sku_code'])
             || ! hash_equals((string) $request['customer_no'], (string) $response['customer_no'])) {
             throw ValidationException::withMessages([
-                'fulfillment' => 'Identitas transaksi provider tidak cocok.',
+                'fulfillment' => 'Identitas transaksi provider tidak cocok: '.(string) (
+                    ! hash_equals((string) $request['ref_id'], (string) $response['ref_id']) ? 'ref_id'
+                    : (! hash_equals((string) $request['buyer_sku_code'], (string) $response['buyer_sku_code']) ? 'buyer_sku_code' : 'customer_no')
+                ).'.',
             ]);
         }
     }
