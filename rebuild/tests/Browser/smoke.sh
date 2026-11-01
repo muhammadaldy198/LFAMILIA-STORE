@@ -98,6 +98,8 @@ assert_page "/catalog/browser-checkout-game" "Ringkasan Pesanan" 390 844
 assert_page "/catalog/browser-checkout-game" "Lihat voucher" 390 844
 
 if has_stage responsive; then
+  echo "Checking server SEO and hydrated head in Chromium"
+  timeout --signal=TERM --kill-after=10s 3m node tests/Browser/seo-head.mjs "$CHROME_BIN"
   echo "Running responsive browser smoke (maximum 5 minutes)"
   timeout --signal=TERM --kill-after=10s 5m node tests/Browser/responsive.mjs "$CHROME_BIN"
 fi
