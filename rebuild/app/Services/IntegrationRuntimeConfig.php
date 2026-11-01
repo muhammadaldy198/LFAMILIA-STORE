@@ -230,8 +230,9 @@ class IntegrationRuntimeConfig
     private function legacyEnvironment(string $code, array $stored): ?string
     {
         $storedEnvironment = strtolower(trim((string) ($stored['environment'] ?? '')));
-        $environments = $this->registry->environments($code);
-        if ($storedEnvironment !== '' && array_key_exists($storedEnvironment, $environments)) {
+        if ($storedEnvironment !== '') {
+            // Preserve an explicit legacy environment even if retired.
+            // A retired Test credential must never be exposed as Production.
             return $storedEnvironment;
         }
 
