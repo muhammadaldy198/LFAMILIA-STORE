@@ -9,6 +9,7 @@ use App\Models\ProductPackage;
 use App\Models\ProductReview;
 use App\Models\SavedGameAccount;
 use App\Models\StoreAsset;
+use App\Support\OptimizedMedia;
 use App\Services\CatalogNominalOrder;
 use App\Services\CheckoutPricing;
 use App\Services\OperationalSettings;
@@ -126,7 +127,7 @@ class CatalogController
         $categories = Category::with('media')->where('is_active', true)->orderBy('sort_order')->get()
             ->map(fn (Category $category): array => [
                 ...$category->only('name', 'slug', 'icon'),
-                'image_url' => $category->getFirstMediaUrl('image'),
+                'image_url' => OptimizedMedia::url($category, 'image', 'card'),
             ]);
 
         $baseProducts = Product::with(['category', 'media'])->where('is_active', true)
@@ -155,7 +156,7 @@ class CatalogController
             ...$product->only('name', 'slug', 'initials', 'accent_color', 'instant'),
             'category_name' => $product->category->name,
             'category_slug' => $product->category->slug,
-            'image_url' => $product->getFirstMediaUrl('image'),
+            'image_url' => OptimizedMedia::url($product, 'image', 'card'),
         ]);
 
         $basePopular = Product::with(['category', 'media'])
@@ -176,7 +177,7 @@ class CatalogController
                 'publisher' => trim((string) $product->publisher) ?: null,
                 'category_name' => $product->category->name,
                 'category_slug' => $product->category->slug,
-                'image_url' => $product->getFirstMediaUrl('image'),
+                'image_url' => OptimizedMedia::url($product, 'image', 'card'),
             ]);
 
         $assets = StoreAsset::with('media')->where('is_active', true)->get()->keyBy('key');
@@ -194,8 +195,8 @@ class CatalogController
                     'show_desktop' => true,
                     'show_mobile' => true,
                     'sort_order' => 0,
-                    'desktop_url' => $desktop?->getFirstMediaUrl('image') ?: $mobile?->getFirstMediaUrl('image'),
-                    'mobile_url' => $mobile?->getFirstMediaUrl('image') ?: $desktop?->getFirstMediaUrl('image'),
+                    'desktop_url' => ($desktop ? OptimizedMedia::url($desktop, 'image', 'display') : '') ?: ($mobile ? OptimizedMedia::url($mobile, 'image', 'display') : ''),
+                    'mobile_url' => ($mobile ? OptimizedMedia::url($mobile, 'image', 'display') : '') ?: ($desktop ? OptimizedMedia::url($desktop, 'image', 'display') : ''),
                 ]]);
             }
         }
@@ -205,7 +206,7 @@ class CatalogController
             'products' => $products,
             'popularProducts' => $popularProducts,
             'filters' => $filters,
-            'logoUrl' => $assets->get('logo')?->getFirstMediaUrl('image'),
+            'logoUrl' => ($assets->get('logo') ? OptimizedMedia::url($assets->get('logo'), 'image', 'icon') : ''),
             'faviconUrl' => $assets->get('favicon')?->getFirstMediaUrl('image'),
             'banners' => $banners,
             'popups' => $content->popups(),
@@ -238,7 +239,7 @@ class CatalogController
                 'name' => $product->name,
                 'slug' => $product->slug,
                 'category_name' => $product->category->name,
-                'image_url' => $product->getFirstMediaUrl('image'),
+                'image_url' => OptimizedMedia::url($product, 'image', 'card'),
             ])
             ->values();
 
@@ -270,7 +271,7 @@ class CatalogController
 
                 return [
                     ...$package->only('id', 'name', 'note', 'group_name', 'nominal_value'),
-                    'image_url' => $package->getFirstMediaUrl('image'),
+                    'image_url' => OptimizedMedia::url($package, 'image', 'card'),
                     'is_available' => $available,
                     'price_idr' => $price,
                 ];
@@ -305,8 +306,9 @@ class CatalogController
                     'package_tabs_enabled', 'package_tabs'),
                 'category_name' => $product->category->name,
                 'category_slug' => $product->category->slug,
-                'image_url' => $product->getFirstMediaUrl('image'),
-                'banner_url' => $product->getFirstMediaUrl('banner'),
+                'image_url' => OptimizedMedia::url($product, 'image', 'detail'),
+                'image_card_url' => OptimizedMedia::url($product, 'image', 'card'),
+                'banner_url' => OptimizedMedia::url($product, 'banner', 'banner-display'),
                 'checkout_nominal_description' => $product->fulfillment_mode === 'MANUAL'
                     ? 'Pesanan diproses admin setelah pembayaran.'
                     : 'Pesanan diproses otomatis setelah pembayaran.',
@@ -314,7 +316,7 @@ class CatalogController
             'packages' => $packages,
             'packageGroups' => $product->packageGroups->map(fn ($group): array => [
                 'name' => $group->name,
-                'image_url' => $group->getFirstMediaUrl('image'),
+                'image_url' => OptimizedMedia::url($group, 'image', 'card'),
                 'sort_order' => $group->sort_order,
             ])->all(),
             'fields' => ProductInputField::where('product_id', $product->id)->orderBy('sort_order')

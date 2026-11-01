@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\NewsArticle;
+use App\Support\OptimizedMedia;
 use App\Services\StorefrontContentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -26,7 +27,7 @@ class PublicContentController
         return Inertia::render('Content/Article', ['article' => [
             ...$article->only('slug', 'title', 'summary', 'body', 'source_label'),
             'published_at' => $article->published_at?->toIso8601String(),
-            'cover_url' => $article->getFirstMediaUrl('image'),
+            'cover_url' => OptimizedMedia::url($article, 'image', 'detail'),
         ]]);
     }
 

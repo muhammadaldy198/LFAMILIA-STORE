@@ -157,7 +157,7 @@ onUnmounted(() => { ++serial; cancelPending(); });
                     @pointerdown.prevent
                     @click="focused=false"
                 >
-                    <img v-if="product.image_url" :src="product.image_url" :alt="product.name">
+                    <img v-if="product.image_url" :src="product.image_url" :alt="product.name" width="40" height="40" loading="lazy" decoding="async">
                     <span v-else class="lf-product-search-fallback" aria-hidden="true">LF</span>
                     <span class="lf-product-search-result-text"><strong>{{ product.name }}</strong><small>{{ product.category_name }}</small></span>
                     <span aria-hidden="true">›</span>
