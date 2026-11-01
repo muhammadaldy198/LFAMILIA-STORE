@@ -106,14 +106,17 @@ async function createTopup() {
 
             <div class="space-y-3" aria-label="Pilih metode pembayaran top up">
                 <h3 class="text-sm font-semibold text-slate-100">Metode pembayaran</h3>
-                <CheckoutPaymentMethods
-                    :payment-channels="paymentChannels"
-                    :selected-code="paymentChannelCode"
-                    :current-quote="quoteMatches ? quote : null"
-                    :has-package="true"
-                    :locked="Boolean(busy) || attemptLocked"
-                    @select="paymentChannelCode = $event"
-                />
+                <!-- Same no-box .lfx CSS boundary as Checkout: bypasses legacy global customer button rules. -->
+                <div class="lfx contents">
+                    <CheckoutPaymentMethods
+                        :payment-channels="paymentChannels"
+                        :selected-code="paymentChannelCode"
+                        :current-quote="quoteMatches ? quote : null"
+                        :has-package="true"
+                        :locked="Boolean(busy) || attemptLocked"
+                        @select="paymentChannelCode = $event"
+                    />
+                </div>
             </div>
             <span v-if="errors.payment_channel_code" class="text-xs text-red-300">{{ errors.payment_channel_code[0] }}</span>
 
