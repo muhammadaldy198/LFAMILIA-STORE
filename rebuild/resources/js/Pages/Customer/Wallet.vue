@@ -19,6 +19,25 @@ const props = defineProps({
 
 const amountIdr = ref(props.minimumTopupIdr || 10000);
 const paymentChannelCode = ref('');
+const openedPaymentGroup = ref('');
+// Keep Wallet expansion separate from Checkout's selection-driven default.
+const selectWalletPayment = code => {
+    if (busy.value || attemptLocked.value) return;
+    const channel = (props.paymentChannels || []).find(item => item.code === code && item.available !== false);
+    if (!channel) return;
+    paymentChannelCode.value = channel.code;
+    openedPaymentGroup.value = channel.group || 'other';
+};
+const toggleWalletPaymentGroup = groupKey => {
+    if (busy.value || attemptLocked.value) return;
+    openedPaymentGroup.value = openedPaymentGroup.value === groupKey ? '' : groupKey;
+    if (openedPaymentGroup.value && !(props.paymentChannels || []).some(channel =>
+        (channel.group || 'other') === groupKey && channel.code === paymentChannelCode.value)) {
+        const first = (props.paymentChannels || []).find(channel =>
+            (channel.group || 'other') === groupKey && channel.available !== false);
+        if (first) paymentChannelCode.value = first.code;
+    }
+};
 const quote = ref(null);
 const result = ref(null);
 const errors = ref({});
@@ -111,10 +130,13 @@ async function createTopup() {
                     <CheckoutPaymentMethods
                         :payment-channels="paymentChannels"
                         :selected-code="paymentChannelCode"
+                        :expanded-group="openedPaymentGroup"
                         :current-quote="quoteMatches ? quote : null"
                         :has-package="true"
+                        :loading-quotes="busy === 'quote'"
                         :locked="Boolean(busy) || attemptLocked"
-                        @select="paymentChannelCode = $event"
+                        @select="selectWalletPayment"
+                        @toggle-group="toggleWalletPaymentGroup"
                     />
                 </div>
             </div>
@@ -122,7 +144,7 @@ async function createTopup() {
 
             <div class="flex flex-wrap gap-2">
                 <button type="button" :disabled="Boolean(busy) || attemptLocked || !paymentChannelCode" class="rounded-lg bg-slate-700 px-4 py-2 disabled:opacity-50" @click="loadQuote">{{ customerText("pages.customer.wallet.60751a0", "Hitung total") }}</button>
-                <button type="button" :disabled="busy || result || attemptLocked || !quoteMatches" class="rounded-lg bg-cyan-300 px-4 py-2 font-semibold text-slate-950 disabled:opacity-50" @click="createTopup">{{busy === 'topup' ? 'Menyiapkan…' : attemptLocked ? 'Cek status top up' : 'Top up'}}</button>
+                <button type="button" :disabled="busy || result || !quoteMatches" class="rounded-lg bg-cyan-300 px-4 py-2 font-semibold text-slate-950 disabled:opacity-50" @click="createTopup">{{busy === 'topup' ? 'Menyiapkan…' : attemptLocked ? 'Cek status top up' : 'Top up'}}</button>
             </div>
             <p v-if="!paymentChannels?.length" class="text-sm text-slate-400">{{ customerText("pages.customer.wallet.8879a24e", "Metode top up belum tersedia. Hubungi bantuan.") }}</p>
             <p v-if="attemptLocked && !result" role="status" class="text-sm text-amber-200">{{ customerText("pages.customer.wallet.2d62f6cc", "Top up sebelumnya masih diproses. Cek statusnya dulu — jangan membuat top up baru agar tidak terbayar dua kali.") }}</p>

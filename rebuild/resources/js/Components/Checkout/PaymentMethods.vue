@@ -11,9 +11,11 @@ const props = defineProps({
   hasPackage: {type:Boolean, default:false},
   loadingQuotes: {type:Boolean, default:false},
   locked: Boolean,
+  // Null preserves the current Checkout interaction; Wallet can control expansion.
+  expandedGroup: { type: String, default: null },
   customer: { type: Object, default: null },
 });
-const emit = defineEmits(['select']);
+const emit = defineEmits(['select', 'toggleGroup']);
 const paymentChannels = computed(() => props.paymentChannels || []);
 const paymentChannelCode = computed(() => props.selectedCode);
 const customer = computed(() => props.customer);
@@ -70,6 +72,18 @@ function usable(channel) {
     if (value?.error) return false;
     return channel.group !== 'wallet' || !props.customer || value?.total_idr == null || value.total_idr <= Number(props.customer.balance_idr || 0);
 }
+const groupExpanded = group => props.expandedGroup === null
+    ? group.items.some(channel => channel.code === paymentChannelCode.value)
+    : props.expandedGroup === group.key;
+function chooseGroup(group) {
+    if (props.locked) return;
+    if (props.expandedGroup !== null) {
+        emit('toggleGroup', group.key);
+        return;
+    }
+    choosePayment(group.items.find(channel => channel.code === paymentChannelCode.value)?.code
+        || group.items.find(channel => usable(channel))?.code);
+}
 function choosePayment(code) {
     if (props.locked) return;
     const channel = (props.paymentChannels || []).find(item => item.code === code && item.available !== false);
@@ -97,7 +111,7 @@ function choosePayment(code) {
                                 type="button"
                                 class="lf-payment-group-main"
                                 :disabled="locked || group.items.every(x=>!usable(x))"
-                                @click="choosePayment(group.items.find(x=>x.code===paymentChannelCode)?.code || group.items.find(x=>usable(x))?.code)"
+                                @click="chooseGroup(group)"
                             >
                                 <span v-if="group.key==='wallet'" class="lf-payment-wallet-art">
                                     <img :src="groupChannel(group)?.logo_url || '/assets/payment/lfamilia-cash.webp'" alt="LFAMILIA Coin">
@@ -116,7 +130,7 @@ function choosePayment(code) {
                             </button>
 
                             <div
-                                v-if="group.key!=='wallet' && !( ['va', 'ewallet'].includes(group.key) && group.items.some(x=>x.code===paymentChannelCode))"
+                                v-if="group.key!=='wallet' && !( ['va', 'ewallet'].includes(group.key) && groupExpanded(group))"
                                 class="lf-payment-brand-strip"
                                 :class="{ 'lf-payment-brand-strip--logos': ['va', 'ewallet'].includes(group.key), 'lf-payment-brand-strip--qris': group.key === 'qris' }"
                             >
@@ -132,7 +146,7 @@ function choosePayment(code) {
                             </div>
 
                             <div
-                                v-if="group.key!=='wallet' && (group.key!=='qris' || group.items.length > 1) && group.items.some(x=>x.code===paymentChannelCode)"
+                                v-if="group.key!=='wallet' && (group.key!=='qris' || group.items.length > 1) && groupExpanded(group)"
                                 class="lfx-payment-method-grid"
                                 :class="{ 'lfx-payment-method-grid--compact': ['va', 'ewallet'].includes(group.key) }"
                                 role="radiogroup"
