@@ -35,10 +35,6 @@ class DigiflazzClient
             'cb_url' => rtrim((string) config('app.url'), '/').'/api/fulfillment/digiflazz/webhook',
         ];
 
-        if ($environment === 'test') {
-            $payload['testing'] = true;
-        }
-
         try {
             $response = Http::acceptJson()
                 ->timeout(15)
@@ -85,7 +81,7 @@ class DigiflazzClient
         $environment = (string) ($resolved['environment'] ?? '');
 
         if (! is_array($config)
-            || ! in_array($environment, ['test', 'production'], true)
+            || $environment !== 'production'
             || trim((string) ($config['username'] ?? '')) === ''
             || trim((string) ($config['api_key'] ?? '')) === '') {
             throw ValidationException::withMessages([
