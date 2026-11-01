@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Category;
 use App\Models\Product;
+use App\Support\SeoMetadata;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -98,7 +99,7 @@ class ServerSeoMetadataTest extends TestCase
         $this->assertStringContainsString('property="og:description" content="Deskripsi beranda khusus', $home);
 
         $text = implode(' ', array_fill(0, 30, 'panjangkalimat'));
-        $seo = \App\Support\SeoMetadata::forPage('Catalog/Show', [
+        $seo = SeoMetadata::forPage('Catalog/Show', [
             'product' => ['name' => 'Game Panjang', 'description' => $text],
             'packages' => [
                 ['is_available' => true, 'price_idr' => 2000],
