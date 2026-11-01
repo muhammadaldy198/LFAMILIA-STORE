@@ -12,11 +12,13 @@ use App\Models\Product;
 use App\Services\DigiflazzAutoSources;
 use App\Services\FulfillmentService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Http\Client\Factory;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Validation\ValidationException;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class FulfillmentTest extends TestCase
@@ -1098,7 +1100,7 @@ class FulfillmentTest extends TestCase
         ]);
         $this->assertSame('BLOCKED', DB::table('orders')->where('id', $orderId)->value('status'));
         $this->assertSame(1, DB::table('fulfillment_attempts')->where('order_id', $orderId)->count());
-        Queue::assertNotPushed(\App\Jobs\SendFulfillmentJob::class);
+        Queue::assertNotPushed(SendFulfillmentJob::class);
         Http::assertSentCount(2);
     }
 
@@ -1107,7 +1109,7 @@ class FulfillmentTest extends TestCase
         Queue::fake();
         $this->credentials();
         foreach (['ref_id', 'customer_no'] as $field) {
-            Http::swap(new \Illuminate\Http\Client\Factory);
+            Http::swap(new Factory);
             $catalog = $this->automaticCatalog(sku: 'ML5_A');
             $orderId = $this->paidOrder($catalog);
             $calls = 0;
@@ -1171,7 +1173,7 @@ class FulfillmentTest extends TestCase
         $this->actingAs($admin, 'admin');
         $this->get('/admin/fulfillment?scope=action')
             ->assertOk()
-            ->assertInertia(fn (\Inertia\Testing\AssertableInertia $page) => $page
+            ->assertInertia(fn (Assert $page) => $page
                 ->component('Admin/Fulfillment')
                 ->where('attempts.data.0.can_resolve_quarantine', true)
                 ->where('attempts.data.0.resolution_destination', '1234567890')
