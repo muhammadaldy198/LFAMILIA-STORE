@@ -38,6 +38,7 @@ Artisan::command('lfamilia:reconcile-pending-payments', function (
                 }
 
                 $checked++;
+
                 try {
                     $verified = $midtrans->status((string) $payment->merchant_reference);
                     if (hash_equals((string) $payment->merchant_reference, (string) $verified['order_id']) === false
@@ -69,4 +70,3 @@ Artisan::command('lfamilia:reconcile-pending-payments', function (
 })->purpose('Recover payment settlements missed by callbacks using verified Midtrans status');
 
 Schedule::command('lfamilia:reconcile-pending-payments')->everyMinute()->withoutOverlapping(10);
-
