@@ -226,18 +226,28 @@ test('resend-verification control is not nested inside the login form', () => {
 });
 
 
-test('wallet top-up payment groups show only logos while collapsed and compact two-column cards while expanded', () => {
+test('PR10 wallet and checkout render one payment picker with quote invalidation and locking', () => {
     const wallet = read('Pages/Customer/Wallet.vue');
-    assert.match(wallet, /openedPaymentGroup !== group\.code && \['va', 'ewallet'\]\.includes\(group\.code\)/);
-    assert.match(wallet, /v-for="channel in group\.items\.filter\(item => item\.logo_url\)"/);
-    assert.match(wallet, /:alt="channel\.name" loading="lazy"/);
-    assert.match(wallet, /openedPaymentGroup === group\.code/);
-    assert.match(wallet, /'grid-cols-2 p-2'/);
-    assert.match(wallet, /\{\{ channel\.name \}\}/);
-    assert.match(wallet, /quote\.total_idr/);
-    assert.match(wallet, /Biaya pembayaran/);
+    const checkout = read('Pages/Catalog/Show.vue');
+    const methods = read('Components/Checkout/PaymentMethods.vue');
+    assert.match(checkout, /import CheckoutPaymentMethods from/);
+    assert.match(wallet, /import CheckoutPaymentMethods from/);
+    assert.match(wallet, /<CheckoutPaymentMethods\b/);
+    assert.match(wallet, /:payment-channels="paymentChannels"/);
+    assert.match(wallet, /:selected-code="paymentChannelCode"/);
+    assert.match(wallet, /:locked="Boolean\(busy\) \|\| attemptLocked"/);
+    assert.match(wallet, /@select="selectWalletPayment"/);
+    assert.match(wallet, /watch\(\[amountIdr, paymentChannelCode\],/);
+    assert.match(wallet, /quote\.value = null/);
     assert.match(wallet, /await postJson\('\/account\/wallet\/topups\/quote'/);
     assert.match(wallet, /await postJson\('\/account\/wallet\/topups'/);
+    assert.doesNotMatch(wallet, /lf-wallet-logo(?:-strip)?|v-for="group in paymentGroups"|lfx-payment-method-card/);
+    assert.match(methods, /class="lf-payment-group-main"/);
+    assert.match(methods, /class="lf-payment-brand-strip"/);
+    assert.match(methods, /class="lf-payment-brand-logo"/);
+    assert.match(methods, /class="lfx-payment-method-card"/);
+    assert.match(methods, /:aria-disabled="locked \|\| !usable\(channel\)"/);
+    assert.match(methods, /if \(props\.locked\) return/);
 });
 
 test('payment F3/F11 uses an untruncated chip and paired 44px check buttons', () => {
@@ -342,7 +352,7 @@ test('F15 wallet uses customer language and protects the total from floating cha
     assert.match(wallet, /Cek status top up/);
     assert.match(wallet, /Top up sebelumnya masih diproses\. Cek statusnya dulu/);
     assert.doesNotMatch(wallet, /Cek percobaan yang sama|coba cek percobaan yang sama/);
-    assert.match(wallet, /grid-cols-\[minmax\(0,1fr\)_auto\]/);
+    assert.match(wallet, /<CheckoutPaymentMethods\b/);
     assert.match(wallet, /pb-32 sm:pb-5/);
     assert.match(wallet, /:disabled="Boolean\(busy\) \|\| attemptLocked"/);
     assert.match(wallet, /idempotency_key: idempotencyKey\.value/);
