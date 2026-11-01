@@ -15,12 +15,12 @@ use App\Services\OperationalSettings;
 use App\Services\PaymentRoutingService;
 use App\Services\StorefrontContentService;
 use App\Support\OptimizedMedia;
+use App\Support\SeoMetadata;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Inertia\Response;
-use App\Support\SeoMetadata;
 
 class CatalogController
 {
