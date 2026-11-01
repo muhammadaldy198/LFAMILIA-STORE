@@ -33,6 +33,13 @@ class StoreAsset extends Model implements HasMedia
             ->quality(50)
             ->nonQueued();
 
+        $this->addMediaConversion('og-share')
+            ->performOnCollections('image')
+            ->fit(Fit::Crop, 1200, 630)
+            ->format('webp')
+            ->quality(78)
+            ->nonQueued();
+
         $this->addMediaConversion('display')
             ->performOnCollections('image')
             ->fit(Fit::Max, 1440, 900)
