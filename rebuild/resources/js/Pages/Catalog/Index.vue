@@ -113,7 +113,7 @@ onUnmounted(()=>{
                             <img v-if="x.image_url" :src="x.image_url" :alt="x.name">
                             <span v-else :style="x.accent_color?{background:x.accent_color}:undefined">{{x.initials||initial(x.name)}}</span>
                         </span>
-                        <span class="min-w-0"><strong>{{x.name}}</strong><small>{{x.category_name}}</small></span>
+                        <span class="lf-popular-copy"><strong class="lf-popular-title">{{x.name}}</strong><small v-if="x.publisher" class="lf-popular-publisher">{{x.publisher}}</small></span>
                     </Link>
                 </div>
             </section>

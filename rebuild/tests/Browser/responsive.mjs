@@ -62,17 +62,16 @@ try {
     ].join('\n');
     const showBeforePr3=()=>evaluate('(()=>{const node=document.createElement("style");node.id="pr3-reconstructed-before";node.textContent='+JSON.stringify(prePr3Css)+';document.head.append(node)})()');
     const showAfterPr3=()=>evaluate('document.querySelector("#pr3-reconstructed-before")?.remove()');
-    for(const width of [360,390,1440]){
+    for(const width of [360,390,1024,1440]){
         await send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:width<640});
         await navigate('/');
-        const metrics=await evaluate('(()=>{const box=s=>{const el=document.querySelector(s);if(!el||getComputedStyle(el).display==="none")return null;const r=el.getBoundingClientRect();return {width:r.width,height:r.height}};const links=[...document.querySelectorAll(".lf-nav a")].filter(el=>getComputedStyle(el).display!=="none").map(el=>({height:el.getBoundingClientRect().height,href:el.getAttribute("href")}));const title=[...document.querySelectorAll(".lf-popular-card strong")].find(el=>el.textContent.trim()==="Mobile Legends");return {popup:box(".lf-home-popup-close"),search:box(".lf-search-mobile"),menu:box(".lf-menu"),links,hasPopular:!!title,clipped:!title||title.scrollWidth>title.clientWidth+1,titleFont:title?getComputedStyle(title).fontSize:null,overflow:document.documentElement.scrollWidth-innerWidth}})()');
+        const metrics=await evaluate('(()=>{const box=s=>{const el=document.querySelector(s);if(!el||getComputedStyle(el).display==="none")return null;const r=el.getBoundingClientRect();return {width:r.width,height:r.height}};const links=[...document.querySelectorAll(".lf-nav a")].filter(el=>getComputedStyle(el).display!=="none").map(el=>({height:el.getBoundingClientRect().height,href:el.getAttribute("href")}));const title=[...document.querySelectorAll(".lf-popular-card strong")].find(el=>el.textContent.trim()==="Mobile Legends");const style=title&&getComputedStyle(title);const card=title?.closest(".lf-popular-card");const grid=document.querySelector(".lf-popular");return {popup:box(".lf-home-popup-close"),search:box(".lf-search-mobile"),menu:box(".lf-menu"),links,hasPopular:!!title,clipped:!title||title.scrollHeight>title.clientHeight+1,titleFont:style?.fontSize,titleWhiteSpace:style?.whiteSpace,titleOverflow:style?.textOverflow,titleLines:title&&style?Math.round(title.getBoundingClientRect().height/parseFloat(style.lineHeight)):0,publisher:card?.querySelector(".lf-popular-publisher")?.textContent.trim(),categoryDisplayed:card?.innerText.includes("Game")||false,gridColumns:grid?getComputedStyle(grid).gridTemplateColumns.split(" ").length:0,overflow:document.documentElement.scrollWidth-innerWidth}})()');
         if(width<640){
             for(const key of ['popup','search','menu']){
                 const size=metrics[key];
                 if(!size||size.width<44||size.height<44)throw Error('PR3 F7 undersized '+key+': '+JSON.stringify({width,metrics}));
             }
-            if(!metrics.hasPopular||metrics.clipped)throw Error('PR3 F8 Mobile Legends clipped: '+JSON.stringify({width,metrics}));
-            if(!metrics.titleFont||parseFloat(metrics.titleFont)>=13)throw Error('PR3 F8 title font did not shrink: '+JSON.stringify({width,metrics}));
+            if(!metrics.hasPopular||metrics.clipped||metrics.titleWhiteSpace!=='normal'||metrics.titleOverflow==='ellipsis'||metrics.titleLines>2)throw Error('PR5 popular title must wrap within two unclipped lines: '+JSON.stringify({width,metrics}));
             if(width===390){
                 await showBeforePr3(); await shotPr3('popup-before-reconstructed-390'); await showAfterPr3();
                 await shotPr3('popup-after-390');
@@ -104,6 +103,7 @@ try {
             // Keep the backdrop from obscuring the desktop header/popular screenshots.
             await evaluate('document.querySelector(".lf-home-popup-close")?.click()');
         }
+        if(metrics.gridColumns!==(width<901?2:4)||metrics.publisher!=='Moonton'||metrics.categoryDisplayed)throw Error('PR5 popular grid/publisher mismatch: '+JSON.stringify({width,metrics}));
         // Capture header and visible popular pill together (sticky header).
         await evaluate('(()=>{const el=document.querySelector(".lf-popular");if(el)window.scrollTo(0,Math.max(0,window.scrollY+el.getBoundingClientRect().top-100))})()');
         await pause(120);

@@ -173,6 +173,7 @@ class CatalogController
             ->get()
             ->map(fn (Product $product): array => [
                 ...$product->only('name', 'slug', 'popular', 'initials', 'accent_color', 'instant'),
+                'publisher' => trim((string) $product->publisher) ?: null,
                 'category_name' => $product->category->name,
                 'category_slug' => $product->category->slug,
                 'image_url' => $product->getFirstMediaUrl('image'),

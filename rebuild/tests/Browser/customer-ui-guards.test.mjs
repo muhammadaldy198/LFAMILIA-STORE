@@ -269,3 +269,16 @@ test('manual check shares the 3-second Inertia status read and reports errors', 
     assert.ok(!checkMethod.includes('fetch(') && !checkMethod.includes('payments/orders')
         && !checkMethod.includes('checkout/orders'), 'Status check cannot create transactions');
 });
+
+
+test('popular cards show a two-line title and only a real publisher below it', () => {
+    const source = read('Pages/Catalog/Index.vue');
+    const css = readFileSync(new URL('../../resources/css/app.css', import.meta.url), 'utf8');
+    assert.match(source, /class="lf-popular-title"/);
+    assert.match(source, /v-if="x\.publisher" class="lf-popular-publisher"/);
+    assert.doesNotMatch(source, /<small>\{\{x\.category_name\}\}<\/small>/);
+    assert.match(css, /-webkit-line-clamp:2/);
+    assert.match(css, /\.lf-popular-title:[^{]*\{[^}]*white-space:normal!important/s);
+    assert.match(css, /@media\(min-width:901px\)\{[^}]*grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/s);
+    assert.match(css, /@media\(max-width:900px\)\{[^}]*grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/s);
+});

@@ -6322,13 +6322,30 @@ body:where(:not(.lfx, .lfx *)){margin:0;font-family:Inter,ui-sans-serif,system-u
     outline:2px solid var(--lf-blue-2);
     outline-offset:2px;
   }
-  /* Only typography changes: grid, pill size, spacing and image are preserved. */
-  .lf-customer .lf-popular-card strong:where(:not(.lfx, .lfx *)){
-    display:block!important;
-    font-size:clamp(9px,2.5vw,11px)!important;
-    line-height:1.35!important;
-    white-space:nowrap!important;
-    overflow:hidden;
-    text-overflow:ellipsis;
-  }
+}
+
+/* PR 5: popular cards retain LFAMILIA tone-0..7, with two-line names and publisher only. */
+.lf-customer .lf-popular-card .lf-popular-copy:where(:not(.lfx, .lfx *)){
+  min-width:0;
+  flex:1 1 0%;
+}
+.lf-customer .lf-popular-card .lf-popular-title:where(:not(.lfx, .lfx *)){
+  display:-webkit-box!important;
+  -webkit-box-orient:vertical;
+  -webkit-line-clamp:2;
+  min-width:0;
+  overflow:hidden;
+  overflow-wrap:anywhere;
+  white-space:normal!important;
+  text-overflow:clip!important;
+  line-height:1.35!important;
+}
+@media(min-width:901px){
+  .lf-popular:where(:not(.lfx, .lfx *)){grid-template-columns:repeat(4,minmax(0,1fr))}
+}
+@media(max-width:900px){
+  .lf-popular:where(:not(.lfx, .lfx *)){grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:640px){
+  .lf-customer .lf-popular-card .lf-popular-title:where(:not(.lfx, .lfx *)){font-size:12px!important}
 }
