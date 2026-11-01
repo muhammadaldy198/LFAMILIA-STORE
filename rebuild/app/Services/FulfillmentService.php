@@ -127,32 +127,6 @@ class FulfillmentService
                 }
 
                 $config = $this->json($mapping->fulfillment_config);
-                if ($mapping->provider_code === 'DIGIFLAZZ') {
-                    $product = DB::table('product_packages')
-                        ->join('products', 'products.id', '=', 'product_packages.product_id')
-                        ->where('product_packages.id', $order->product_package_id)
-                        ->select('products.customer_no_template', 'products.id', 'products.slug')
-                        ->first();
-                    if ($product) {
-                        if (array_key_exists('customer_no_template', $snapshot['provider'] ?? [])) {
-                            $config['customer_no_template'] = $snapshot['provider']['customer_no_template'];
-                        } else {
-                            $config['customer_no_template'] = $product->customer_no_template
-                                ?: ($config['customer_no_template'] ?? null);
-                        }
-                    }
-                    $snapshotTemplate = (string) ($config['customer_no_template'] ?? '');
-                    // A checkout snapshot is immutable. Empty optional values
-                    // may be omitted from customer_input; that must NOT make
-                    // fulfillment rewrite a multi-field destination format.
-                    preg_match_all('/\{\{([a-z][a-z0-9_]*)\}\}/', $snapshotTemplate, $templateMatches);
-                    $keys = $templateMatches[1] ?: array_keys($this->json($order->customer_input));
-                    $config['customer_no_template'] = app(DigiflazzDestinationTemplate::class)->resolve(
-                        (string) data_get($snapshot, 'product.slug', $product?->slug ?? ''),
-                        $snapshotTemplate !== '' ? $snapshotTemplate : null,
-                        $keys
-                    );
-                }
                 if ($mapping->provider_code === 'VOUCHER_STOCK') {
                     $stockKey = trim((string) data_get($config, 'stock_key', ''));
                     $request = [
@@ -175,13 +149,33 @@ class FulfillmentService
                     ];
                 }
 
-                $customerInput = $this->json($order->customer_input);
-                $customerNo = $this->targetBuilder->customerNo($customerInput, $config);
-                $request = [
-                    'buyer_sku_code' => (string) $mapping->external_sku,
-                    'customer_no' => $customerNo,
-                    'ref_id' => (string) $attempt->external_reference,
-                ];
+                // Recovery attempts freeze a superadmin-confirmed destination
+                // before enqueueing. Never silently rebuild it from editable
+                // product/mapping templates after that confirmation.
+                if ($attempt->request_payload !== null) {
+                    $stored = $this->json($attempt->request_payload);
+                    foreach (['buyer_sku_code', 'customer_no', 'ref_id'] as $key) {
+                        if (! isset($stored[$key]) || ! is_string($stored[$key]) || $stored[$key] === '') {
+                            throw ValidationException::withMessages(['fulfillment' => 'Payload attempt tersimpan tidak valid.']);
+                        }
+                    }
+                    if (! hash_equals((string) $attempt->external_reference, $stored['ref_id'])
+                        || strcasecmp((string) $mapping->external_sku, $stored['buyer_sku_code']) !== 0
+                        || strcasecmp((string) data_get($snapshot, 'provider.sku', ''), $stored['buyer_sku_code']) !== 0) {
+                        throw ValidationException::withMessages(['fulfillment' => 'Identitas request attempt tidak cocok dengan SKU dan referensi order.']);
+                    }
+                    $request = [
+                        'buyer_sku_code' => $stored['buyer_sku_code'],
+                        'customer_no' => $stored['customer_no'],
+                        'ref_id' => $stored['ref_id'],
+                    ];
+                } else {
+                    $request = [
+                        'buyer_sku_code' => (string) $mapping->external_sku,
+                        'customer_no' => $this->digiflazzCustomerNo($order, $mapping, $snapshot),
+                        'ref_id' => (string) $attempt->external_reference,
+                    ];
+                }
 
                 DB::table('fulfillment_attempts')->where('id', $attempt->id)->update([
                     'status' => 'SENDING',
@@ -558,6 +552,152 @@ class FulfillmentService
 
         // Automatic failover is permanently disabled per PRD §47 (no auto-switch).
         // Orders with FAILED_CONFIRMED remain BLOCKED for manual resolution.
+    }
+
+    /**
+     * Open a NEW production attempt after a SUPER_ADMIN verifies a quarantined
+     * historical reference failed. The historical attempt is never reactivated.
+     */
+    public function resolveLegacyQuarantine(
+        int $attemptId,
+        int $adminId,
+        string $providerRefId,
+        string $providerRc,
+        string $evidenceReference,
+        string $note,
+        string $confirmedCustomerNo,
+    ): int {
+        // Only known final results of a transaction that WAS created
+        // may authorize reissue after a superadmin verifies the history.
+        // Reject 01/70 (timeouts), 49 (duplicate ref_id), 50 (not found)
+        // and request-validation errors: none establishes the old result.
+        $definitiveFailureCodes = [
+            '02', '51', '52', '53', '54', '55', '57', '58',
+            '59', '60', '71', '72', '73', '74', '84',
+        ];
+        if (! in_array($providerRc, $definitiveFailureCodes, true)) {
+            throw ValidationException::withMessages([
+                'provider_rc' => 'Kode respons bukan kegagalan final yang aman untuk pengiriman baru.',
+            ]);
+        }
+
+        $newAttemptId = DB::transaction(function () use (
+            $attemptId, $adminId, $providerRefId, $providerRc,
+            $evidenceReference, $note, $confirmedCustomerNo
+        ): int {
+            $admin = DB::table('admin_users')->where('id', $adminId)->first();
+            if (! $admin || ! $admin->is_active || $admin->role !== 'SUPER_ADMIN') {
+                throw ValidationException::withMessages(['fulfillment' => 'Hanya superadmin aktif yang dapat menyelesaikan karantina.']);
+            }
+
+            $legacy = DB::table('fulfillment_attempts')->where('id', $attemptId)->lockForUpdate()->first();
+            if (! $legacy || ! $this->isLegacyQuarantined($legacy)) {
+                throw ValidationException::withMessages(['fulfillment' => 'Attempt bukan karantina aktif yang bisa diselesaikan.']);
+            }
+            $order = DB::table('orders')->where('id', $legacy->order_id)->lockForUpdate()->first();
+            if (! $order || $order->status !== 'BLOCKED' || $order->paid_at === null) {
+                throw ValidationException::withMessages(['fulfillment' => 'Pesanan karantina harus telah dibayar dan masih BLOCKED.']);
+            }
+            $latestId = DB::table('fulfillment_attempts')->where('order_id', $order->id)->max('id');
+            if ((int) $latestId !== (int) $legacy->id) {
+                throw ValidationException::withMessages(['fulfillment' => 'Sudah terdapat attempt yang lebih baru. Muat ulang halaman.']);
+            }
+            if (! hash_equals((string) $legacy->external_reference, $providerRefId)) {
+                throw ValidationException::withMessages(['provider_ref_id' => 'Referensi bukti harus cocok persis dengan attempt warisan.']);
+            }
+
+            $snapshot = $this->json($order->snapshot);
+            if (data_get($snapshot, 'product.fulfillment_mode') !== 'AUTO_PROVIDER') {
+                throw ValidationException::withMessages(['fulfillment' => 'Hanya pesanan pengiriman Digiflazz otomatis yang dapat dipulihkan.']);
+            }
+            $mapping = $this->mapping((int) $legacy->provider_mapping_id);
+            if (! $mapping || $mapping->provider_code !== 'DIGIFLAZZ'
+                || (int) $mapping->product_package_id !== (int) $order->product_package_id) {
+                throw ValidationException::withMessages(['fulfillment' => 'Mapping Digiflazz warisan tidak tersedia.']);
+            }
+            $snapshotSku = (string) data_get($snapshot, 'provider.sku', '');
+            if ($snapshotSku === '' || strcasecmp($snapshotSku, (string) $mapping->external_sku) !== 0) {
+                throw ValidationException::withMessages(['fulfillment' => 'SKU pesanan berbeda dari mapping sekarang; tidak boleh mengganti SKU diam-diam.']);
+            }
+            $blockReason = $this->mappingBlockReason($mapping, $snapshot, (int) $order->id);
+            if ($blockReason !== null) {
+                throw ValidationException::withMessages(['fulfillment' => $blockReason]);
+            }
+
+            $target = $this->digiflazzCustomerNo($order, $mapping, $snapshot);
+            if (! hash_equals($target, $confirmedCustomerNo)) {
+                throw ValidationException::withMessages(['confirmed_customer_no' => 'Nomor tujuan tidak cocok dengan data pesanan.']);
+            }
+
+            $newAttempt = $this->createAttempt($order, $mapping, 'CREATED');
+            DB::table('fulfillment_attempts')->where('id', $newAttempt->id)->update([
+                'request_payload' => json_encode([
+                    'buyer_sku_code' => $snapshotSku,
+                    'customer_no' => $confirmedCustomerNo,
+                    'ref_id' => $newAttempt->external_reference,
+                ], JSON_THROW_ON_ERROR),
+                'updated_at' => now(),
+            ]);
+            DB::table('orders')->where('id', $order->id)->update([
+                'status' => 'PROCESSING',
+                'updated_at' => now(),
+            ]);
+            $this->event((int) $order->id, 'FULFILLMENT_QUARANTINE_MANUALLY_RESOLVED', 'BLOCKED', 'PROCESSING', [
+                'legacy_attempt_id' => (int) $legacy->id,
+                'new_attempt_id' => (int) $newAttempt->id,
+                'admin_id' => $adminId,
+                'provider_ref_id' => $providerRefId,
+                'provider_status' => 'Gagal',
+                'provider_rc' => $providerRc,
+                'evidence_reference' => $evidenceReference,
+                'evidence_note' => $note,
+                'destination_confirmed' => true,
+                'legacy_attempt_unchanged' => true,
+            ]);
+
+            return (int) $newAttempt->id;
+        }, 3);
+
+        // A NEW ref_id is used; neither the quarantined ref_id nor its request
+        // payload is ever submitted to the Production API.
+        SendFulfillmentJob::dispatch($newAttemptId)->afterCommit();
+
+        return $newAttemptId;
+    }
+
+    /**
+     * Compute the exact Digiflazz destination used by normal sends and
+     * quarantine approval, including the historical mapping fallback.
+     *
+     * @param  array<string, mixed>  $snapshot
+     */
+    public function digiflazzCustomerNo(object $order, object $mapping, array $snapshot): string
+    {
+        $config = $this->json($mapping->fulfillment_config);
+        $product = DB::table('products')->where('id', $order->product_id)
+            ->first(['slug', 'customer_no_template']);
+
+        if ($product) {
+            if (array_key_exists('customer_no_template', $snapshot['provider'] ?? [])) {
+                $config['customer_no_template'] = $snapshot['provider']['customer_no_template'];
+            } else {
+                $config['customer_no_template'] = $product->customer_no_template
+                    ?: ($config['customer_no_template'] ?? null);
+            }
+        }
+
+        $snapshotTemplate = (string) ($config['customer_no_template'] ?? '');
+        // Prefer the frozen template's fields when optional input is empty.
+        preg_match_all('/\{\{([a-z][a-z0-9_]*)\}\}/', $snapshotTemplate, $matches);
+        $input = $this->json($order->customer_input);
+        $keys = $matches[1] ?: array_keys($input);
+        $config['customer_no_template'] = app(DigiflazzDestinationTemplate::class)->resolve(
+            (string) data_get($snapshot, 'product.slug', $product?->slug ?? ''),
+            $snapshotTemplate !== '' ? $snapshotTemplate : null,
+            $keys
+        );
+
+        return $this->targetBuilder->customerNo($input, $config);
     }
 
     public function retrySafeAttempt(int $attemptId): void
@@ -1082,13 +1222,19 @@ class FulfillmentService
             }
         }
 
+        // Digiflazz may lowercase a SKU when checking status, but the other
+        // transaction identities must remain byte-for-byte identical.
+        $skuMatches = hash_equals(
+            strtolower((string) $request['buyer_sku_code']),
+            strtolower((string) $response['buyer_sku_code'])
+        );
         if (! hash_equals((string) $request['ref_id'], (string) $response['ref_id'])
-            || ! hash_equals((string) $request['buyer_sku_code'], (string) $response['buyer_sku_code'])
+            || ! $skuMatches
             || ! hash_equals((string) $request['customer_no'], (string) $response['customer_no'])) {
             throw ValidationException::withMessages([
                 'fulfillment' => 'Identitas transaksi provider tidak cocok: '.(string) (
                     ! hash_equals((string) $request['ref_id'], (string) $response['ref_id']) ? 'ref_id'
-                    : (! hash_equals((string) $request['buyer_sku_code'], (string) $response['buyer_sku_code']) ? 'buyer_sku_code' : 'customer_no')
+                    : (! $skuMatches ? 'buyer_sku_code' : 'customer_no')
                 ).'.',
             ]);
         }

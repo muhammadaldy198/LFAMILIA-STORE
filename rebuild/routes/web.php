@@ -305,6 +305,9 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
                 ->middleware('throttle:admin-sensitive')->name('reconcile');
             Route::post('/{attemptId}/retry', [AdminFulfillmentController::class, 'retry'])
                 ->middleware('throttle:admin-sensitive')->name('retry');
+            Route::post('/{attemptId}/resolve-quarantine', [AdminFulfillmentController::class, 'resolveQuarantine'])
+                ->middleware(['admin.super', 'admin.password.confirm', 'throttle:admin-sensitive'])
+                ->name('resolve-quarantine');
         });
 
     Route::get('/admin/catalog', [AdminCatalogController::class, 'index'])

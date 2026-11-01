@@ -32,7 +32,7 @@ const reset = () => { Object.assign(current, { q: '', scope: 'action', status: '
 const reload = () => router.reload({ only: ['attempts', 'metrics', 'updatedAt'], preserveScroll: true, onSuccess: () => { lastUpdated.value = props.updatedAt || new Date().toISOString(); } });
 
 let timer;
-onMounted(() => { timer = setInterval(() => { if (auto.value && !busy.value) reload(); }, 30000); });
+onMounted(() => { timer = setInterval(() => { if (auto.value && !busy.value && !modal.value) reload(); }, 30000); });
 onUnmounted(() => clearInterval(timer));
 
 const copied = ref('');
@@ -44,13 +44,22 @@ const copy = async (text) => {
 
 const modal = ref('');
 const selected = ref(null);
-const form = reactive({ delivery_code: '', note: '', reason: '' });
+const form = reactive({
+    delivery_code: '', note: '', reason: '', provider_ref_id: '', provider_status: 'Gagal',
+    provider_rc: '02', evidence_reference: '', confirmed_customer_no: '', acknowledge: false,
+});
 const openModal = (kind, row) => {
     selected.value = row;
     modal.value = kind;
     form.delivery_code = '';
     form.note = '';
     form.reason = '';
+    form.provider_ref_id = row.process_reference || '';
+    form.provider_status = 'Gagal';
+    form.provider_rc = '02';
+    form.evidence_reference = '';
+    form.confirmed_customer_no = '';
+    form.acknowledge = false;
 };
 const run = (action) => {
     const row = selected.value;
@@ -58,9 +67,21 @@ const run = (action) => {
     const url = `/admin/fulfillment/${row.id}/${action}`;
     const body = action === 'complete'
         ? { delivery_code: form.delivery_code, note: form.note }
-        : action === 'fail' ? { reason: form.reason } : {};
+        : action === 'fail' ? { reason: form.reason }
+            : action === 'resolve-quarantine' ? {
+                provider_ref_id: form.provider_ref_id,
+                provider_status: form.provider_status,
+                provider_rc: form.provider_rc,
+                evidence_reference: form.evidence_reference,
+                note: form.note,
+                confirmed_customer_no: form.confirmed_customer_no,
+            } : {};
     busy.value = true;
-    router.post(url, body, { preserveScroll: true, onFinish: () => { busy.value = false; modal.value = ''; } });
+    router.post(url, body, {
+        preserveScroll: true,
+        onSuccess: () => { modal.value = ''; },
+        onFinish: () => { busy.value = false; },
+    });
 };
 
 const rowStatus = row => row.status_label || label(row.status);
@@ -167,6 +188,7 @@ const runOn = (action, row) => {
                                 <button v-if="row.can_complete" type="button" class="adm-btn sm" @click="openModal('complete', row)">Tangani</button>
                                 <button v-if="row.can_reconcile" type="button" class="adm-btn sm" :disabled="busy" @click="runOn('reconcile', row)">Periksa status</button>
                                 <button v-if="row.can_retry" type="button" class="adm-btn sm" :disabled="busy" @click="runOn('retry', row)">Proses ulang</button>
+                                <button v-if="row.can_resolve_quarantine" type="button" class="adm-btn sm" :disabled="busy" @click="openModal('resolve-quarantine', row)">Resolusi karantina</button>
                                 <button v-if="row.can_fail" type="button" class="adm-btn sm danger" @click="openModal('fail', row)">Gagalkan</button>
                                 <Link :href="`/admin/orders/${row.order_id}`" class="adm-btn sm">Lihat</Link>
                             </td>
@@ -186,11 +208,22 @@ const runOn = (action, row) => {
             </div>
         </section>
 
-        <AdminModal v-model:open="modal" :title="modal === 'fail' ? 'Nyatakan proses gagal' : 'Selesaikan penanganan manual'" :description="selected ? `${selected.order_number} · penanganan ke-${selected.attempt_no}` : ''">
+        <AdminModal v-model:open="modal" :title="modal === 'resolve-quarantine' ? 'Resolusi karantina Digiflazz' : modal === 'fail' ? 'Nyatakan proses gagal' : 'Selesaikan penanganan manual'" :description="selected ? `${selected.order_number} · penanganan ke-${selected.attempt_no}` : ''">
             <div v-if="modal === 'complete'" class="adm-grid">
                 <label class="adm-field"><span>Hasil / kode pengiriman</span><textarea v-model="form.delivery_code" class="adm-textarea" maxlength="2000" /></label>
                 <label class="adm-field"><span>Catatan</span><textarea v-model="form.note" class="adm-textarea" maxlength="4000" /></label>
                 <p v-if="selected?.manual_instructions" class="adm-note full">{{ selected.manual_instructions }}</p>
+            </div>
+            <div v-else-if="modal === 'resolve-quarantine'" class="adm-grid">
+                <p class="adm-note full">Hanya untuk transaksi lama yang terbukti GAGAL di riwayat Digiflazz. Attempt karantina tetap BLOCKED. Pengiriman baru menggunakan referensi baru dan SKU yang sama. Jangan lanjutkan jika hasil masih Pending, Sukses, atau tidak pasti.</p>
+                <label class="adm-field"><span>Ref ID transaksi lama (harus persis)</span><input v-model="form.provider_ref_id" class="adm-input mono" maxlength="120" readonly></label>
+                <label class="adm-field"><span>Status yang terverifikasi</span><input v-model="form.provider_status" class="adm-input" readonly></label>
+                <label class="adm-field"><span>Response code Digiflazz <b class="req">*</b></span><input v-model="form.provider_rc" class="adm-input mono" maxlength="2" placeholder="02"></label>
+                <label class="adm-field full"><span>Referensi bukti (ID riwayat atau lokasi tangkapan layar) <b class="req">*</b></span><input v-model="form.evidence_reference" class="adm-input" maxlength="500" placeholder="Catat bukti status gagal dari riwayat Digiflazz"></label>
+                <p class="adm-note full">Nomor tujuan dari snapshot pesanan: <strong class="mono">{{ selected?.resolution_destination || 'Format tujuan tidak tersedia' }}</strong>. Periksa kecocokannya dengan akun pembeli sebelum membuat attempt baru.</p>
+                <label class="adm-field full"><span>Ketik ulang nomor tujuan persis untuk konfirmasi <b class="req">*</b></span><input v-model="form.confirmed_customer_no" class="adm-input mono" maxlength="100" autocomplete="off"></label>
+                <label class="adm-field full"><span>Catatan verifikasi admin <b class="req">*</b></span><textarea v-model="form.note" class="adm-textarea" maxlength="2000" placeholder="Jelaskan sumber pemeriksaan dan mengapa transaksi lama sudah pasti gagal" /></label>
+                <label class="adm-field full"><input v-model="form.acknowledge" type="checkbox"> Saya memastikan bukti ini untuk ref ID yang sama, status final Gagal, pembayaran sudah diterima, dan memahami transaksi baru berpotensi mengirim saldo/game item.</label>
             </div>
             <div v-else class="adm-grid">
                 <label class="adm-field"><span>Alasan <b class="req">*</b></span><textarea v-model="form.reason" class="adm-textarea" maxlength="4000" /></label>
@@ -198,6 +231,7 @@ const runOn = (action, row) => {
             <template #footer>
                 <button type="button" class="adm-btn" @click="modal = ''">Batal</button>
                 <button v-if="modal === 'fail'" type="button" class="adm-btn danger" :disabled="busy || !form.reason.trim()" @click="run('fail')">Nyatakan gagal</button>
+                <button v-else-if="modal === 'resolve-quarantine'" type="button" class="adm-btn primary" :disabled="busy || !form.acknowledge || !form.evidence_reference.trim() || !form.note.trim() || !form.provider_rc.trim() || !form.confirmed_customer_no.trim() || form.confirmed_customer_no !== selected?.resolution_destination" @click="run('resolve-quarantine')">Buat attempt Production baru</button>
                 <button v-else type="button" class="adm-btn primary" :disabled="busy || (!form.delivery_code.trim() && !form.note.trim())" @click="run('complete')">Tandai berhasil</button>
             </template>
         </AdminModal>

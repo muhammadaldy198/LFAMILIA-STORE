@@ -86,13 +86,13 @@ class AdminFulfillmentController
         $attempts = $query
             ->orderByDesc('attempts.id')
             ->select([
-                'attempts.id', 'attempts.order_id', 'attempts.attempt_no', 'attempts.external_reference',
+                'attempts.id', 'attempts.order_id', 'attempts.provider_mapping_id', 'attempts.attempt_no', 'attempts.external_reference',
                 'attempts.status', 'attempts.provider_status', 'attempts.provider_rc',
                 'attempts.serial_number', 'attempts.price_idr', 'attempts.safe_to_failover',
                 'attempts.last_error', 'attempts.last_checked_at', 'attempts.created_at', 'attempts.completed_at',
-                'orders.order_number', 'orders.status as order_status', 'orders.customer_input',
+                'orders.order_number', 'orders.status as order_status', 'orders.paid_at as order_paid_at', 'orders.customer_input',
                 'orders.snapshot', 'orders.delivery_payload', 'orders.guest_email', 'orders.guest_phone',
-                'orders.user_id', 'products.id as product_id', 'products.name as product_name',
+                'orders.user_id', 'products.id as product_id', 'products.slug as product_slug', 'products.name as product_name',
                 'products.manual_instructions', 'products.manual_open_time', 'products.manual_close_time',
                 'products.manual_timezone', 'product_packages.name as package_name',
                 'providers.code as provider_code', 'users.name as user_name',
@@ -117,7 +117,8 @@ class AdminFulfillmentController
         ];
 
         $manualOverdueMinutes = app(OperationalSettings::class)->value('manual_overdue_minutes');
-        $attempts->through(function (object $attempt) use ($presentation, $fieldLabels, $knownLabels, $manualOverdueMinutes): array {
+        $isSuperAdmin = $request->user('admin')?->role === 'SUPER_ADMIN';
+        $attempts->through(function (object $attempt) use ($presentation, $fieldLabels, $knownLabels, $manualOverdueMinutes, $isSuperAdmin): array {
             $input = $presentation->json($attempt->customer_input);
             $snapshot = $presentation->json($attempt->snapshot);
             $delivery = $presentation->json($attempt->delivery_payload);
@@ -138,7 +139,24 @@ class AdminFulfillmentController
                 'DIGIFLAZZ' => 'Digiflazz',
                 default => $attempt->provider_code ?: 'Belum ditentukan',
             };
-            $terminal = ! in_array($attempt->order_status, ['PAID', 'PROCESSING'], true);
+            $terminal = in_array($attempt->order_status, ['PAID', 'PROCESSING'], true) === false;
+            $quarantined = $attempt->provider_code === 'DIGIFLAZZ'
+                && $attempt->status === 'BLOCKED'
+                && str_starts_with((string) ($attempt->last_error ?? ''), 'LEGACY_ENV_QUARANTINED:');
+            $canResolveQuarantine = $quarantined && $isSuperAdmin
+                && $attempt->order_status === 'BLOCKED' && $attempt->order_paid_at !== null
+                && data_get($snapshot, 'product.fulfillment_mode') === 'AUTO_PROVIDER';
+            $resolutionDestination = null;
+            if ($canResolveQuarantine) {
+                try {
+                    $order = DB::table('orders')->where('id', $attempt->order_id)->firstOrFail();
+                    $mapping = DB::table('provider_mappings')->where('id', $attempt->provider_mapping_id)->firstOrFail();
+                    $resolutionDestination = app(FulfillmentService::class)
+                        ->digiflazzCustomerNo($order, $mapping, $snapshot);
+                } catch (\Throwable $exception) {
+                    $canResolveQuarantine = false;
+                }
+            }
             $manualAge = $attempt->status === 'MANUAL_PENDING'
                 ? ServiceHours::elapsedMinutes(
                     $attempt->created_at, now(),
@@ -176,14 +194,16 @@ class AdminFulfillmentController
                 'manual_age_minutes' => $manualAge,
                 'is_overdue' => $attempt->status === 'MANUAL_PENDING'
                     && $manualAge > $manualOverdueMinutes,
-                'can_complete' => ! $terminal && $attempt->status === 'MANUAL_PENDING'
+                'can_resolve_quarantine' => $canResolveQuarantine,
+                'resolution_destination' => $resolutionDestination,
+                'can_complete' => $terminal === false && $attempt->status === 'MANUAL_PENDING'
                     && in_array($attempt->order_status, ['PAID', 'PROCESSING'], true),
-                'can_fail' => ! $terminal && $attempt->status === 'MANUAL_PENDING',
-                'can_reconcile' => ! $terminal && in_array($attempt->status, ['SENDING', 'PENDING', 'UNKNOWN'], true),
-                'can_retry' => ! $terminal && (
-                    ($attempt->status === 'BLOCKED' && $attempt->last_error !== 'Semua SKU yang diizinkan telah gagal. Hubungi superadmin.')
-                    || ($attempt->status === 'FAILED_CONFIRMED' && (bool) $attempt->safe_to_failover)
-                ),
+                'can_fail' => $terminal === false && $attempt->status === 'MANUAL_PENDING',
+                'can_reconcile' => $terminal === false && in_array($attempt->status, ['SENDING', 'PENDING', 'UNKNOWN'], true),
+                'can_retry' => ($terminal || $quarantined)
+                    ? false
+                    : ($attempt->status === 'BLOCKED'
+                        && $attempt->last_error !== 'Semua SKU yang diizinkan telah gagal. Hubungi superadmin.'),
                 'retry_label' => $attempt->status === 'FAILED_CONFIRMED'
                     ? 'Coba sumber berikutnya' : 'Coba proses lagi',
             ];
@@ -269,6 +289,42 @@ class AdminFulfillmentController
         return back()->with('status', 'Proses ulang dimasukkan ke antrean dengan pengaman transaksi ganda.');
     }
 
+    public function resolveQuarantine(
+        Request $request,
+        int $attemptId,
+        FulfillmentService $fulfillment,
+    ): RedirectResponse {
+        $data = $request->validate([
+            'provider_ref_id' => ['required', 'string', 'max:120'],
+            'provider_status' => ['required', Rule::in(['Gagal'])],
+            'provider_rc' => ['required', 'string', 'max:2'],
+            'evidence_reference' => ['required', 'string', 'max:500'],
+            'note' => ['required', 'string', 'max:2000'],
+            'confirmed_customer_no' => ['required', 'string', 'max:100'],
+        ]);
+        $admin = $request->user('admin');
+        $before = DB::table('fulfillment_attempts')->where('id', $attemptId)->firstOrFail();
+        $newAttemptId = $fulfillment->resolveLegacyQuarantine(
+            $attemptId,
+            (int) $admin->id,
+            trim($data['provider_ref_id']),
+            trim($data['provider_rc']),
+            trim($data['evidence_reference']),
+            trim($data['note']),
+            $data['confirmed_customer_no']
+        );
+        app(AdminAuditService::class)->record(
+            $request,
+            'fulfillment.quarantine.resolved',
+            'fulfillment_attempt',
+            $newAttemptId,
+            ['legacy_attempt_id' => $attemptId, 'legacy_status' => $before->status],
+            ['new_attempt_id' => $newAttemptId, 'provider_rc' => $data['provider_rc'], 'provider_status' => 'Gagal']
+        );
+
+        return back()->with('status', 'Attempt Production baru dibuat; attempt karantina tetap diblokir.');
+    }
+
     private function latestAttempt(int $attemptId, array $allowedStatuses): object
     {
         $attempt = DB::table('fulfillment_attempts')->where('id', $attemptId)->firstOrFail();
@@ -278,14 +334,14 @@ class AdminFulfillmentController
                 'fulfillment' => 'Proses ini sudah memiliki pembaruan yang lebih baru. Muat ulang halaman.',
             ]);
         }
-        if (! in_array($attempt->status, $allowedStatuses, true)) {
+        if (in_array($attempt->status, $allowedStatuses, true) === false) {
             throw ValidationException::withMessages([
                 'fulfillment' => 'Status proses ini tidak dapat menjalankan tindakan tersebut.',
             ]);
         }
 
         $orderStatus = DB::table('orders')->where('id', $attempt->order_id)->value('status');
-        if (! in_array($orderStatus, ['PAID', 'PROCESSING'], true)) {
+        if (in_array($orderStatus, ['PAID', 'PROCESSING'], true) === false) {
             throw ValidationException::withMessages([
                 'fulfillment' => 'Pesanan ini sudah selesai dan tidak dapat diproses ulang.',
             ]);

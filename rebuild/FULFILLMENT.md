@@ -58,6 +58,17 @@ Attempt uncertain direconcile menggunakan request/reference attempt yang sama. H
 
 Status provider sukses menjadi `SUCCESS`; kegagalan definitive menjadi `FAILED_CONFIRMED`; pending tetap `PENDING`; hasil yang tidak dapat dipastikan menjadi `UNKNOWN`.
 
+## Identitas transaksi dan format tujuan Digiflazz
+
+- `ref_id` dan `customer_no` harus sama persis dengan request yang disimpan. Hanya `buyer_sku_code` yang dinormalisasi ke huruf kecil untuk membandingkan respons status (mis. `ML5_A` = `ml5_a`).
+- Kode status Digiflazz `Gagal` dengan `rc=02` adalah kegagalan final; `rc=01` dan `rc=70` adalah timeout/tidak pasti sehingga tidak mengizinkan pengiriman baru.
+- Mobile Legends yang memakai field `user_id` + `zone_id` mengirim `customer_no` gabungan tanpa pemisah. Format game lainnya memakai template produk masing-masing dan **tidak** boleh disamakan secara global. Pertahankan angka nol di depan ID.
+- Jangan pernah membuat cek status pada attempt warisan yang dikarantina dengan kredensial Production. Operator memverifikasi referensi lama melalui riwayat Digiflazz dan mencatat bukti manual.
+
+## Resolusi karantina peralihan Production
+
+Khusus `LEGACY_ENV_QUARANTINED` yang masih merupakan attempt terbaru pada order `BLOCKED` dengan `paid_at` terisi: superadmin yang telah mengonfirmasi ulang kata sandinya dapat membuat attempt Production **baru** melalui Antrean Pesanan, setelah mencatat `ref_id` lama, status final **Gagal**, `rc` final, referensi bukti, catatan, dan mengonfirmasi nomor tujuan. Sistem memvalidasi SKU tetap sama dengan snapshot, mapping sehat, serta mencegah pengiriman bersamaan/ulang. Attempt lama tetap `BLOCKED`, bukan diaktifkan ulang; attempt baru memiliki `ref_id` berbeda dan tercatat dalam `order_events`/audit. Bila bukti `Pending`, `Sukses`, timeout, atau tidak pasti, jangan membuka resolusi. Tidak ada auto-failover maupun refund otomatis.
+
 ## Penanganan definitive failure dan kebijakan no auto-switch
 
 Sesuai keputusan PRD v1.1 §47, **automatic failover / auto-switch dinonaktifkan**. Toko tidak menggunakan SKU cadangan otomatis (`_B`), sehingga kegagalan pengiriman tidak otomatis memicu provider/mapping kedua.
