@@ -416,6 +416,14 @@ jobs:
           path: rebuild/checkout-visual-results
           if-no-files-found: warn
 
+      - name: Upload payment-page F3/F11 screenshots
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: payment-page-f3-f11
+          path: rebuild/payment-visual-results
+          if-no-files-found: warn
+
   frontend-static:
     runs-on: ubuntu-24.04
     defaults:

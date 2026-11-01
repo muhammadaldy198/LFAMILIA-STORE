@@ -118,5 +118,7 @@ if has_stage checkout; then
     grep -n -E '404|Not Found' "$LOG_FILE" || true
     exit 1
   fi
+  echo "Running payment page F3/F11 smoke (360, 390, desktop)"
+  timeout --signal=TERM --kill-after=10s 3m node tests/Browser/payment-visual.mjs "$CHROME_BIN"
 fi
 echo "M11 browser smoke passed."

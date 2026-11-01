@@ -238,3 +238,34 @@ test('wallet top-up payment groups show only logos while collapsed and compact t
     assert.match(wallet, /await postJson\('\/account\/wallet\/topups\/quote'/);
     assert.match(wallet, /await postJson\('\/account\/wallet\/topups'/);
 });
+
+test('payment F3/F11 uses an untruncated chip and paired 44px check buttons', () => {
+    const source = read('Pages/Payment/Show.vue');
+    for (const marker of [
+        'class="lf-payment-invoice-chip',
+        'class="lf-payment-invoice-number block font-mono',
+        'overflow-wrap: anywhere',
+        '.lf-payment-actions > .lf-payment-check-action',
+        'height: 44px !important',
+        ':focus-visible',
+        '<button type="button" class="lf-payment-check-action"',
+        '<Link :href="statusUrl" class="lf-payment-check-action"',
+    ]) assert.ok(source.includes(marker), 'Missing payment F3/F11 marker: ' + marker);
+    assert.ok(!source.includes('max-w-40 truncate'), 'Invoice number must not truncate');
+});
+
+test('manual check shares the 3-second Inertia status read and reports errors', () => {
+    const source = read('Pages/Payment/Show.vue');
+    for (const marker of [
+        'if (activeStatusReload) return activeStatusReload',
+        "only: ['order', 'payment']",
+        "manualChecking ? 'Memeriksa…'",
+        'aria-live="polite"',
+        'Status belum berhasil diperiksa. Coba lagi.',
+        'Terakhir diperiksa',
+        '}, 3000)',
+    ]) assert.ok(source.includes(marker), 'Missing payment feedback guard: ' + marker);
+    const checkMethod = source.slice(source.indexOf('async function checkStatusManually()'), source.indexOf('async function resumePayment()'));
+    assert.ok(!checkMethod.includes('fetch(') && !checkMethod.includes('payments/orders')
+        && !checkMethod.includes('checkout/orders'), 'Status check cannot create transactions');
+});

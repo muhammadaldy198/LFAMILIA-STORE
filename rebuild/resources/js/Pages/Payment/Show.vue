@@ -151,16 +151,62 @@ function paymentAttemptKey() {
 }
 
 const refreshingStatus = ref(false);
+const manualChecking = ref(false);
+const manualCheckMessage = ref('');
+const manualCheckFailed = ref(false);
+let activeStatusReload = null;
 let disposed = false;
+
+// One status read for both 3-second polling and the manual button.
+// Sharing an in-flight read prevents overlapping requests; it never creates a payment.
 function refreshStatus() {
-    if (disposed || refreshingStatus.value) return Promise.resolve();
+    if (disposed) return Promise.resolve(false);
+    if (activeStatusReload) return activeStatusReload;
     refreshingStatus.value = true;
-    return new Promise(resolve => {
+    activeStatusReload = new Promise(resolve => {
+        let succeeded = false;
         router.reload({
             only: ['order', 'payment'], preserveScroll: true, preserveState: true,
-            onFinish: () => { refreshingStatus.value = false; resolve(); },
+            onSuccess: () => { succeeded = true; },
+            onError: () => { succeeded = false; },
+            onFinish: () => {
+                refreshingStatus.value = false;
+                activeStatusReload = null;
+                resolve(succeeded);
+            },
         });
     });
+    return activeStatusReload;
+}
+
+function checkedStatusDescription() {
+    if (refunded.value || requiresSupport.value || latePaid.value) return 'status membutuhkan peninjauan admin.';
+    if (paid.value) return 'pembayaran sudah diterima.';
+    if (expired.value) return 'pembayaran sudah kedaluwarsa.';
+    if (cancelled.value) return 'pesanan dibatalkan.';
+    if (failed.value) return 'pembayaran gagal.';
+    if (uncertain.value) return 'status pembayaran masih dalam peninjauan.';
+    if (retryRejected.value) return 'pembayaran belum tersedia.';
+    return 'masih menunggu pembayaran.';
+}
+
+async function checkStatusManually() {
+    if (disposed || manualChecking.value || startingPayment.value) return;
+    manualChecking.value = true;
+    manualCheckMessage.value = '';
+    manualCheckFailed.value = false;
+    const succeeded = await refreshStatus();
+    if (disposed) return;
+    if (succeeded) {
+        const time = new Intl.DateTimeFormat('id-ID', {
+            timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+        }).format(new Date());
+        manualCheckMessage.value = 'Terakhir diperiksa ' + time + ' WIB — ' + checkedStatusDescription();
+    } else {
+        manualCheckFailed.value = true;
+        manualCheckMessage.value = 'Status belum berhasil diperiksa. Coba lagi.';
+    }
+    manualChecking.value = false;
 }
 
 async function resumePayment() {
@@ -262,9 +308,9 @@ onBeforeUnmount(() => {
                         <small>{{ customerText("pages.payment.show.70515d8e", "STORE") }}</small>
                     </div>
                 </div>
-                <button type="button" class="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-right" @click="copyValue(order.order_number,'invoice')">
-                    <span class="block text-[8px] font-bold uppercase tracking-[0.16em] text-white/35">{{ customerText("pages.payment.show.71ec87b0", "Invoice") }}</span>
-                    <span class="mt-0.5 block max-w-40 truncate font-mono text-[10px] font-black " :style="{color:accent}">{{order.order_number}}</span>
+                <button type="button" id="lf-payment-invoice-chip" class="lf-payment-invoice-chip rounded-lg border border-white/10 bg-black/20 text-right" @click="copyValue(order.order_number,'invoice')">
+                    <span class="lf-payment-invoice-label block text-[8px] font-bold uppercase tracking-[0.16em] text-white/35">{{ customerText("pages.payment.show.71ec87b0", "Invoice") }}</span>
+                    <span class="lf-payment-invoice-number block font-mono text-[10px] font-black" :style="{color:accent}">{{order.order_number}}</span>
                 </button>
             </div>
 
@@ -341,6 +387,7 @@ onBeforeUnmount(() => {
                 <svg v-else viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
                 <span>{{statusText}}</span>
             </div>
+            <p class="lf-payment-check-feedback" :class="{ 'lf-payment-check-feedback--error': manualCheckFailed }" aria-live="polite" aria-atomic="true" v-show="manualChecking || manualCheckMessage">{{ manualChecking ? 'Sedang memeriksa status pembayaran…' : manualCheckMessage }}</p>
             <p v-if="paymentError" role="alert" class="mt-3 text-center text-[10px] font-semibold text-rose-300">{{paymentError}}</p>
 
             <button v-if="canResume" type="button" :disabled="startingPayment || refreshingStatus" class="lf-payment-primary mt-5 flex h-12 w-full items-center justify-center rounded-xl  font-black text-[#091006] disabled:opacity-50" :style="{backgroundColor:accent}" @click="resumePayment">{{startingPayment ? 'Menyiapkan…' : 'Siapkan pembayaran'}}</button>
@@ -349,8 +396,8 @@ onBeforeUnmount(() => {
             <Link v-if="canOrderAgain" href="/" class="lf-payment-primary mt-5 flex h-12 w-full items-center justify-center rounded-xl  font-black text-[#091006]" :style="{backgroundColor:accent}">Buat pesanan baru</Link>
 
             <div class="lf-payment-actions mt-3 grid grid-cols-2 gap-2">
-                <button type="button" class="h-10 rounded-lg border border-white/10 bg-white/[0.03] text-[10px] font-bold text-white" :disabled="refreshingStatus || startingPayment" @click="refreshStatus">{{settings.checkStatusButtonText || 'Cek status'}}</button>
-                <Link :href="statusUrl" class="flex h-10 items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] text-[10px] font-bold text-white">{{settings.checkInvoiceButtonText || 'Cek invoice'}}</Link>
+                <button type="button" class="lf-payment-check-action" id="lf-payment-check-status" :disabled="manualChecking || startingPayment" :aria-busy="manualChecking" @click="checkStatusManually">{{ manualChecking ? 'Memeriksa…' : (settings.checkStatusButtonText || 'Cek status') }}</button>
+                <Link :href="statusUrl" class="lf-payment-check-action" id="lf-payment-check-invoice">{{settings.checkInvoiceButtonText || 'Cek invoice'}}</Link>
             </div>
             <div v-if="settings.showSupport !== false" class="lf-payment-support"><a :href="settings.supportUrl || '/contact'">{{settings.supportText || 'Butuh bantuan pembayaran?'}}</a></div>
         </div>
@@ -358,3 +405,91 @@ onBeforeUnmount(() => {
 </main>
 </CustomerShell>
 </template>
+
+<style scoped>
+/* F3: never truncate the invoice; make room for two readable lines on phones. */
+.lf-payment-brand-row > #lf-payment-invoice-chip {
+    display: flex !important;
+    flex: 0 1 58%;
+    flex-direction: column;
+    align-items: stretch !important;
+    justify-content: center;
+    box-sizing: border-box;
+    width: auto;
+    min-width: 0;
+    max-width: 230px;
+    height: auto !important;
+    min-height: 44px !important;
+    padding: 8px 12px !important; /* Override the legacy customer control geometry. */
+    text-align: right;
+}
+.lf-payment-invoice-label { display: block; }
+.lf-payment-invoice-number {
+    display: block;
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    white-space: normal;
+    line-height: 1.5;
+}
+/* The old mobile rule uses !important on span:last-child; override only this chip. */
+.lf-payment-brand-row .lf-payment-invoice-number {
+    margin-top: 5px !important;
+}
+.lf-payment-actions > .lf-payment-check-action {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    height: 44px !important;
+    min-height: 44px !important;
+    align-items: center;
+    justify-content: center;
+    padding: 0 10px;
+    border: 1px solid rgba(255, 255, 255, .13);
+    border-radius: 9px !important;
+    background: rgba(255, 255, 255, .03);
+    color: #fff;
+    font-size: 12px !important;
+    font-weight: 700;
+    line-height: 1.25;
+    text-align: center;
+    text-decoration: none;
+    transition: background-color .15s ease, border-color .15s ease;
+}
+/* The generic customer button selector forces 36px/40px and inline-flex.
+   IDs keep this correction local to the payment checks, including the Link. */
+.lf-payment-actions > :is(#lf-payment-check-status, #lf-payment-check-invoice) {
+    display: flex !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    align-items: center !important;
+    justify-content: center;
+    padding: 0 10px !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    line-height: 1.25 !important;
+}
+.lf-payment-actions > .lf-payment-check-action:hover {
+    background: rgba(255, 255, 255, .09);
+    border-color: rgba(255, 255, 255, .25);
+}
+.lf-payment-actions > .lf-payment-check-action:focus-visible {
+    outline: 2px solid var(--payment-accent);
+    outline-offset: 2px;
+}
+.lf-payment-actions > .lf-payment-check-action:active {
+    background: rgba(255, 255, 255, .13);
+}
+.lf-payment-actions > .lf-payment-check-action:disabled {
+    cursor: wait;
+    opacity: .65;
+}
+.lf-payment-check-feedback {
+    margin-top: 9px;
+    color: #cbd5e1;
+    font-size: 11px;
+    line-height: 1.6;
+    text-align: center;
+}
+.lf-payment-check-feedback--error { color: #fda4af; }
+</style>
