@@ -13,7 +13,6 @@ const props = defineProps({
   locked: Boolean,
   // Null retains the checkout's selection-driven expansion semantics.
   expandedGroup: { type: String, default: null },
-  showAmounts: { type: Boolean, default: true },
   customer: { type: Object, default: null },
 });
 const emit = defineEmits(['select', 'toggleGroup']);
@@ -167,7 +166,7 @@ function choosePayment(code) {
                                     @keydown.space.prevent="choosePayment(channel.code)"
                                 >
                                     <img v-if="channel.logo_url" class="lfx-payment-logo" :src="channel.logo_url" alt=""/><strong class="lfx-payment-method-name">{{channel.name}}</strong>
-                                    <span v-if="showAmounts" class="lfx-payment-method-total">{{amount(channel)}}</span>
+                                    <span class="lfx-payment-method-total">{{amount(channel)}}</span>
                                 </div>
                             </div>
                         </div>
