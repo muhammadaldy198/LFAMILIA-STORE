@@ -131,6 +131,9 @@ class IntegrationRuntimeConfig
 
     public function telegramBotBase(string $environment, string $token): string
     {
+        if ($environment === 'test' && app()->environment('testing')) {
+            return 'https://api.telegram.org/bot'.rawurlencode($token).'/test';
+        }
         if ($environment !== 'production') {
             throw new \RuntimeException('TELEGRAM_PRODUCTION_REQUIRED');
         }
@@ -140,6 +143,9 @@ class IntegrationRuntimeConfig
 
     public function midtransApiBase(string $environment): string
     {
+        if ($environment === 'sandbox' && app()->environment('testing')) {
+            return 'https://api.sandbox.midtrans.com';
+        }
         if ($environment !== 'production') {
             throw new \RuntimeException('MIDTRANS_PRODUCTION_REQUIRED');
         }
@@ -149,6 +155,9 @@ class IntegrationRuntimeConfig
 
     public function midtransSnapBase(string $environment): string
     {
+        if ($environment === 'sandbox' && app()->environment('testing')) {
+            return 'https://app.sandbox.midtrans.com';
+        }
         if ($environment !== 'production') {
             throw new \RuntimeException('MIDTRANS_PRODUCTION_REQUIRED');
         }
@@ -165,6 +174,9 @@ class IntegrationRuntimeConfig
             return rtrim((string) $config['base_url'], '/');
         }
 
+        if ($environment === 'sandbox' && app()->environment('testing')) {
+            return 'https://api-sandbox.doku.com';
+        }
         if ($environment !== 'production') {
             throw new \RuntimeException('DOKU_PRODUCTION_REQUIRED');
         }
