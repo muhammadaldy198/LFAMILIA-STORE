@@ -424,3 +424,18 @@
 @media(max-width:420px){.lfx .lfx-country-trigger{padding:0 8px;font-size:11px}}
 
 @media(max-width:767px){.lfx #lfx-contact .lfx-field-grid{grid-template-columns:1fr}.lfx #lfx-contact .lfx-phone-entry{flex-direction:row;flex-wrap:wrap;align-items:stretch;gap:8px}.lfx #lfx-contact .lfx-country-control{flex:0 0 auto;width:auto}.lfx #lfx-contact .lfx-phone-entry>input{flex:1 1 0;width:auto;min-width:0}.lfx #lfx-contact .lfx-country-trigger{width:auto;justify-content:flex-start;padding:0 12px;font-size:14px}.lfx #lfx-contact .lfx-country-menu{flex:0 0 100%;width:100%}}
+
+/* PR 6 F14: Keterangan stays one tab, with three visually distinct sections. */
+.lfx .lf-product-details > .lf-product-review-section,
+.lfx .lf-product-details > .lf-product-faq-legacy {
+  margin-top: 16px;
+  padding-top: 18px;
+  border-top: 2px solid rgba(112, 160, 255, .42);
+}
+.lfx .lf-product-details > .lf-product-description { padding-bottom: 4px; }
+.lfx .lf-product-details .lf-review-legacy-head h2,
+.lfx .lf-product-details .lf-product-faq-legacy h2 {
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.4;
+}

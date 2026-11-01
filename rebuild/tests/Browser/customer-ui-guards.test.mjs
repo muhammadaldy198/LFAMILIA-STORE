@@ -311,3 +311,17 @@ test('QRIS heading and channel explanation wrap without mid-word truncation', ()
     assert.match(methods, /lf-payment-group-card--qris/);
     assert.match(methods, /white-space:normal;overflow:visible;text-overflow:clip/);
 });
+
+
+test('F14 Keterangan remains one tab and separates description, reviews and FAQ', () => {
+    const product = read('Pages/Catalog/Show.vue');
+    const css = readFileSync(new URL('../../resources/css/checkout.css', import.meta.url), 'utf8');
+    assert.match(product, /v-else class="lfx-panel lfx-details lf-product-details"/);
+    const description = product.indexOf('lf-product-description-legacy');
+    const reviews = product.indexOf('lf-product-review-section lf-review-legacy');
+    const faq = product.indexOf('lf-product-faq lf-product-faq-legacy');
+    assert.ok(description >= 0 && reviews > description && faq > reviews);
+    assert.match(css, /\.lfx \.lf-product-details > \.lf-product-review-section/);
+    assert.match(css, /\.lfx \.lf-product-details > \.lf-product-faq-legacy/);
+    assert.match(css, /border-top: 2px solid/);
+});
