@@ -162,6 +162,9 @@ try {
         await navigate('/account/profile');
         const phoneAlignment=await evaluate(`(()=>{const root=document.querySelector('.lf-country-picker');const button=root?.querySelector('button');const input=root?.querySelector('input[type="tel"]');if(!button||!input)return null;const a=button.getBoundingClientRect(),b=input.getBoundingClientRect();return {top:Math.abs(a.top-b.top),height:Math.abs(a.height-b.height)};})()`);
         if(!phoneAlignment||phoneAlignment.top>1||phoneAlignment.height>1)throw Error('F13 account phone alignment mismatch '+JSON.stringify({width,phoneAlignment}));
+        await navigate('/account/game-accounts');
+        const gameActions=await evaluate(`(()=>[...document.querySelectorAll('.lf-account-card-head button[aria-label^="Edit "], .lf-account-card-head button[aria-label^="Hapus "]')].map(el=>({height:el.getBoundingClientRect().height,visible:getComputedStyle(el).display!=='none'})))()`);
+        if(gameActions.length<2||gameActions.some(action=>action.visible&&action.height<40))throw Error('F18 game account action missing or below 40px '+JSON.stringify({width,gameActions}));
 
         // Real customer wallet interaction checks (both mobile and desktop).
         await navigate('/account/wallet');

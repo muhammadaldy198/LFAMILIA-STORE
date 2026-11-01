@@ -364,3 +364,14 @@ test('F17 ticket list, detail and messages use Indonesian local dates and status
     }
     assert.match(read('Pages/Customer/TicketDetail.vue'), /formatTicketDate\(message\.created_at\)/);
 });
+
+
+test('F18 saved game accounts provide real accessible 40px edit and danger buttons', () => {
+    const game = read('Pages/Customer/GameAccounts.vue');
+    assert.match(game, /min-h-10 items-center justify-center/);
+    assert.match(game, /border-red-400\/40 bg-red-400\/10/);
+    assert.match(game, /:aria-label="'Edit '\+account\.label"/);
+    assert.match(game, /:aria-label="'Hapus '\+account\.label"/);
+    assert.match(game, /@click="edit\(account\)"/);
+    assert.match(game, /@click="remove\(account\)"/);
+});
