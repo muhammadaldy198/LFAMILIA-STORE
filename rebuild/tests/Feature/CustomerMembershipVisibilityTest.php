@@ -41,7 +41,7 @@ class CustomerMembershipVisibilityTest extends TestCase
                 ->where('currentCode', 'BASIC')
                 ->where('tiers', fn ($tiers) => collect($tiers)->pluck('code')->last() === 'PLATINUM'
                     && ! collect($tiers)->pluck('code')->contains('MAFIA'))
-                ->where('profile.next_code', 'SILVER')
+                ->where('profile.next_code', fn ($code) => $code !== 'MAFIA')
                 ->etc());
     }
 
