@@ -351,7 +351,7 @@ test('F15 wallet uses customer language and protects the total from floating cha
     assert.match(wallet, /Cek status top up/);
     assert.match(wallet, /Top up sebelumnya masih diproses\. Cek statusnya dulu/);
     assert.doesNotMatch(wallet, /Cek percobaan yang sama|coba cek percobaan yang sama/);
-    assert.match(wallet, /grid-cols-\[minmax\(0,1fr\)_auto\]/);
+    assert.match(wallet, /<CheckoutPaymentMethods\s/);
     assert.match(wallet, /pb-32 sm:pb-5/);
     assert.match(wallet, /:disabled="Boolean\(busy\) \|\| attemptLocked"/);
     assert.match(wallet, /idempotency_key: idempotencyKey\.value/);
