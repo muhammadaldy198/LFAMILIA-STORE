@@ -141,6 +141,36 @@ try {
             await writeFile(pr12Folder+'/footer-'+kind+'-after-'+width+'.png',Buffer.from(after,'base64'));
         }
     }
+
+    // PR12: recent transactions may never force the entire 390px page wide.
+    // The fixture is local and may have no public feed yet; add synthetic rows
+    // to exercise the exact production markup with several transactions.
+    await send('Emulation.setDeviceMetricsOverride',{width:390,height:900,deviceScaleFactor:1,mobile:true});
+    await navigate('/orders/check');
+    const seeded=await evaluate('(()=>{const table=document.querySelector(".lf-feed-table");if(!table)return {ok:false};' +
+      'const row=table.querySelector(".lf-feed-row:not(.lf-feed-head)");' +
+      'for(let i=table.querySelectorAll(".lf-feed-row:not(.lf-feed-head)").length;i<3;i++){' +
+      'const copy=row?row.cloneNode(true):document.createElement("div");copy.className="lf-feed-row";' +
+      'copy.innerHTML="<strong data-mobile-label=\\\"Invoice\\\">LF26****1234</strong><span data-mobile-label=\\\"Produk\\\">Mobile Legends<small>86 Diamonds</small></span><b data-mobile-label=\\\"Total\\\">Rp 99.000</b><em data-mobile-label=\\\"Status\\\">Berhasil</em><time data-mobile-label=\\\"Waktu\\\">01 Nov 2026 22:50</time>";' +
+      'table.append(copy);}' +
+      'return {ok:true,rows:table.querySelectorAll(".lf-feed-row:not(.lf-feed-head)").length};})()');
+    if(!seeded.ok||seeded.rows<3)throw Error('PR12 local feed fixture incomplete '+JSON.stringify(seeded));
+    await evaluate('(()=>{const style=document.createElement("style");style.id="pr12-feed-before";style.textContent="@media(max-width:640px){.lf-track-feed .lf-feed-row:not(.lf-feed-head){min-width:690px!important;display:grid!important;grid-template-columns:150px minmax(190px,1fr) 110px 120px 150px!important}.lf-track-feed .lf-feed-head{display:grid!important}.lf-track-feed .lf-feed-table{overflow:visible!important}}";document.head.append(style);})()');
+    const feedBefore=(await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true})).data;
+    await writeFile(pr12Folder+'/transactions-before-390.png',Buffer.from(feedBefore,'base64'));
+    await evaluate('document.querySelector("#pr12-feed-before")?.remove()');
+    const feedMetric=await evaluate('(()=>{const table=document.querySelector(".lf-feed-table");const rect=table.getBoundingClientRect();' +
+      'const rows=[...table.querySelectorAll(".lf-feed-row:not(.lf-feed-head)")];' +
+      'const boxes=rows.map(row=>({width:row.getBoundingClientRect().width,columns:[...row.children].map(el=>{const r=el.getBoundingClientRect();return {left:r.left,right:r.right,width:r.width,visible:getComputedStyle(el).display!=="none"};})}));' +
+      'return {viewport:innerWidth,doc:document.documentElement.scrollWidth,tableLeft:rect.left,tableRight:rect.right,rows:boxes};})()');
+    if(feedMetric.doc>feedMetric.viewport||feedMetric.tableRight>feedMetric.viewport+1||
+       feedMetric.rows.some(r=>r.width>feedMetric.viewport||r.columns.length!==5||
+           r.columns.some(c=>!c.visible||c.left<feedMetric.tableLeft-1||c.right>feedMetric.tableRight+1))) {
+        throw Error('PR12 transactions overflow mobile viewport '+JSON.stringify(feedMetric));
+    }
+    const feedAfter=(await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true})).data;
+    await writeFile(pr12Folder+'/transactions-after-390.png',Buffer.from(feedAfter,'base64'));
+    console.log('PASS PR12 /orders/check mobile five-field stacked feed '+JSON.stringify({rows:feedMetric.rows.length,doc:feedMetric.doc}));
     // PR 3 F7/F8: actual DOM hit targets, header interactions, and popular title.
     // "before" PNGs reconstruct the pre-PR CSS measurements; "after" is actual CSS.
     const pr3Folder = 'ergonomics-visual-results';
@@ -270,6 +300,30 @@ try {
         const mime=name==='bni'?'image/webp':'image/png';
         pr12ChannelArt[name]='data:'+mime+';base64,'+Buffer.from(await response.arrayBuffer()).toString('base64');
     }
+    // Real QRIS square logo, tested in the shared compact payment chip.
+    // Fixture doesn't always expose QRIS as an enabled checkout group; no route is changed.
+    await send('Emulation.setDeviceMetricsOverride',{width:390,height:900,deviceScaleFactor:1,mobile:true});
+    await navigate('/account/wallet');
+    const qrisInstalled=await evaluate(`(async()=>{
+      const region=document.querySelector('[aria-label="Pilih metode pembayaran top up"]');
+      const group=[...region.querySelectorAll('.lf-payment-group-card')].find(g=>g.querySelector('.lf-payment-group-copy strong')?.textContent.trim()==='Virtual Account');
+      if(!group)return false;
+      group.querySelector('.lf-payment-group-main').click();
+      await new Promise(resolve=>setTimeout(resolve,150));
+      const img=group.querySelector('.lfx-payment-method-grid--compact .lfx-payment-logo');
+      if(!img)return false;
+      img.src=${JSON.stringify(pr12ChannelArt.qris)};await img.decode();img.scrollIntoView({block:'center'});return true;
+    })()`);
+    if(!qrisInstalled)throw Error('PR12 QRIS square-image fixture lacks compact VA card');
+    await evaluate('(()=>{const style=document.createElement("style");style.id="pr12-qris-before";style.textContent=".lfx-payment-logo-box{width:100%!important;height:auto!important;padding:0!important;border:0!important;background:transparent!important}.lfx-payment-logo-box img{width:100%!important;max-width:none!important;height:auto!important;max-height:none!important}";document.head.append(style);})()');
+    const qrisBefore=(await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false})).data;
+    await writeFile(pr12Folder+'/logo-qris-before-390.png',Buffer.from(qrisBefore,'base64'));
+    await evaluate('document.querySelector("#pr12-qris-before")?.remove()');
+    const qrisSize=await evaluate('(()=>{const img=document.querySelector(".lfx-payment-method-grid--compact .lfx-payment-logo");const r=img.getBoundingClientRect();const card=img.closest(".lfx-payment-method-card").getBoundingClientRect();return {width:r.width,height:r.height,cardWidth:card.width,fit:getComputedStyle(img).objectFit};})()');
+    if(qrisSize.width>72.5||qrisSize.height>21.5||qrisSize.width>=qrisSize.cardWidth||qrisSize.fit!=='contain')throw Error('PR12 QRIS logo full bleed: '+JSON.stringify(qrisSize));
+    const qrisAfter=(await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false})).data;
+    await writeFile(pr12Folder+'/logo-qris-after-390.png',Buffer.from(qrisAfter,'base64'));
+
     const accountPages=['/account','/account/wallet','/account/orders','/account/tickets','/account/profile','/account/membership','/account/game-accounts','/account/codes','/account/notifications'];
     for(const width of [360,390,1440]){
         await send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:width<640});
@@ -315,9 +369,12 @@ try {
 
             if (width===390) {
                 const art = category==='E-Wallet' ? pr12ChannelArt.gopay : pr12ChannelArt.bni;
-                const installed=await evaluate('(()=>{const region=document.querySelector("[aria-label=\\\"Pilih metode pembayaran top up\\\"]");' +
-                  'const group=[...region.querySelectorAll(".lf-payment-group-card")].find(g=>g.querySelector(".lf-payment-group-copy strong")?.textContent.trim()==='+JSON.stringify(category)+');' +
-                  'const img=group?.querySelector(".lfx-payment-logo");if(!img)return false;img.src='+JSON.stringify(art)+';return true;})()');
+                const installed=await evaluate(`(()=>{
+                  const region=document.querySelector('[aria-label="Pilih metode pembayaran top up"]');
+                  const group=[...region.querySelectorAll('.lf-payment-group-card')].find(g=>g.querySelector('.lf-payment-group-copy strong')?.textContent.trim()===${JSON.stringify(category)});
+                  const img=group?.querySelector('.lfx-payment-logo');if(!img)return false;
+                  img.src=${JSON.stringify(art)};return true;
+                })()`);
                 if(!installed)throw Error('PR12 '+category+' logo fixture missing');
                 await pause(100);
                 // Reconstruct the old full-bleed card logo, then capture the fixed chip.

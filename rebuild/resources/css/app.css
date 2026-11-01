@@ -751,6 +751,55 @@ body:where(:not(.lfx, .lfx *)){margin:0;font-family:Inter,ui-sans-serif,system-u
 .status-pending:where(:not(.lfx, .lfx *)){color:#ffd06d!important}
 .status-failed:where(:not(.lfx, .lfx *)),.status-cancelled:where(:not(.lfx, .lfx *)),.status-expired:where(:not(.lfx, .lfx *)){color:#ff8e96!important}
 .status-refunded:where(:not(.lfx, .lfx *)){color:#ffc564!important}
+
+/* PR12: transaction feed becomes readable stacked rows on phones.
+   Keep the desktop five-column table untouched. */
+@media (max-width: 640px) {
+  .lf-track-feed .lf-feed-table {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+  .lf-track-feed .lf-feed-head { display: none; }
+  .lf-track-feed .lf-feed-row:not(.lf-feed-head) {
+    box-sizing: border-box;
+    min-width: 0;
+    width: 100%;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, auto);
+    align-items: start;
+    gap: 7px 10px;
+    padding: 12px;
+  }
+  .lf-track-feed .lf-feed-row:not(.lf-feed-head) > * {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .lf-track-feed .lf-feed-row > strong { grid-column: 1; grid-row: 1; }
+  .lf-track-feed .lf-feed-row > span { grid-column: 1 / -1; grid-row: 2; }
+  .lf-track-feed .lf-feed-row > b { grid-column: 1; grid-row: 3; }
+  .lf-track-feed .lf-feed-row > em {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+    text-align: right;
+  }
+  .lf-track-feed .lf-feed-row > time {
+    grid-column: 2;
+    grid-row: 3;
+    justify-self: end;
+    text-align: right;
+  }
+  .lf-track-feed .lf-feed-row [data-mobile-label]::before {
+    display: block;
+    content: attr(data-mobile-label);
+    margin-bottom: 3px;
+    color: var(--lf-color-muted);
+    font-size: 7px;
+    font-weight: 600;
+  }
+}
 /* FAQ parity */
 .lf-faq-hero:where(:not(.lfx, .lfx *)){padding:58px 0 52px;border-bottom:1px solid var(--lf-line);background:radial-gradient(circle at 25% 10%,rgba(24,119,255,.13),transparent 34%),var(--lf-color-background-alt)}
 .lf-faq-kicker:where(:not(.lfx, .lfx *)){display:inline-flex;padding:5px 8px;border:1px solid rgba(var(--lf-primary-rgb),.19);border-radius:999px;background:rgba(var(--lf-primary-rgb),.05);color:var(--lf-lime);font-size:7px;font-weight:950;letter-spacing:.12em}
