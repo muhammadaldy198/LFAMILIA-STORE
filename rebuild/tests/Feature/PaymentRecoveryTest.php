@@ -3,8 +3,10 @@
 namespace Tests\Feature;
 
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Testing\TestResponse;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -50,7 +52,7 @@ class PaymentRecoveryTest extends TestCase
         ], $overrides));
     }
 
-    private function recover(string $number, string $phone = '081234567890'): \Illuminate\Testing\TestResponse
+    private function recover(string $number, string $phone = '081234567890'): TestResponse
     {
         return $this->postJson('/orders/track/recover', ['invoice' => $number, 'whatsapp' => $phone]);
     }
@@ -76,7 +78,7 @@ class PaymentRecoveryTest extends TestCase
         $this->assertStringContainsString('signature=', $url);
         parse_str((string) parse_url($url, PHP_URL_QUERY), $params);
         $this->assertSame(
-            \Illuminate\Support\Carbon::parse(DB::table('orders')->where('id', $id)->value('expires_at'))->getTimestamp(),
+            Carbon::parse(DB::table('orders')->where('id', $id)->value('expires_at'))->getTimestamp(),
             (int) $params['expires'],
         );
         $this->withSession(['guest_order_id' => null])->get($url)

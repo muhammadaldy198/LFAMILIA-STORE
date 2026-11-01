@@ -125,7 +125,7 @@ class PublicOrderTrackingController
             && $order->paid_at === null
             && $order->expires_at !== null
             && Carbon::parse($order->expires_at)->isFuture()
-            && ! in_array(strtoupper((string) $paymentStatus), ['PAID', 'SETTLEMENT', 'CAPTURE', 'SUCCESS'], true);
+            && in_array(strtoupper((string) $paymentStatus), ['PAID', 'SETTLEMENT', 'CAPTURE', 'SUCCESS'], true) === false;
     }
 
     public function status(Request $request): JsonResponse
