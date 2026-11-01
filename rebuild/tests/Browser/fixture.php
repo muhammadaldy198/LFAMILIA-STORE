@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\URL;
 
 require __DIR__.'/../../vendor/autoload.php';
 
@@ -294,7 +295,7 @@ DB::table('orders')->updateOrInsert(
 );
 file_put_contents(
     '/tmp/lfamilia-browser-payment-url.txt',
-    \Illuminate\Support\Facades\URL::temporarySignedRoute(
+    URL::temporarySignedRoute(
         'payment.show', now()->addMinutes(30), ['invoice' => $paymentInvoice]
     )
 );
