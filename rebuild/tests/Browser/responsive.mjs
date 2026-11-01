@@ -69,13 +69,13 @@ try {
                 'document.querySelector(".lf-home-popup-close")?.click();' +
                 'img.scrollIntoView({block:"center"});await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));' +
                 'const r=img.getBoundingClientRect(), p=slot.getBoundingClientRect(), style=getComputedStyle(img);' +
-                'return {rect:{x:r.x,y:r.y,width:r.width,height:r.height},parentHeight:p.height,' +
+                'return {rect:{x:r.x,y:r.y,width:r.width,height:r.height},containerWidth:document.documentElement.clientWidth,parentHeight:p.height,' +
                 'maxHeight:style.maxHeight,minHeight:style.minHeight,fit:style.objectFit,position:style.objectPosition,' +
                 'layoutPosition:style.position,transform:style.transform,inlineHeight:img.style.height};' +
                 '})()');
-            if (Math.abs(geometry.rect.width - width) > 1 ||
-                Math.abs(geometry.rect.height - width / 3) > 1 ||
-                Math.abs(geometry.parentHeight - width / 3) > 2 ||
+            if (Math.abs(geometry.rect.width - geometry.containerWidth) > 1 ||
+                Math.abs(geometry.rect.height - geometry.rect.width / 3) > 1 ||
+                Math.abs(geometry.parentHeight - geometry.rect.width / 3) > 2 ||
                 geometry.maxHeight !== 'none' || geometry.minHeight !== '0px' ||
                 geometry.fit !== 'cover' || !['50% 50%', 'center'].includes(geometry.position) ||
                 geometry.layoutPosition !== 'static' || geometry.transform !== 'none' ||
