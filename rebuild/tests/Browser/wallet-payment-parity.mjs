@@ -61,9 +61,19 @@ try {
         try {
             await checkout.goto(base + '/catalog/browser-checkout-game', { waitUntil: 'networkidle' });
             await wallet.goto(base + '/login', { waitUntil: 'domcontentloaded' });
-            await wallet.locator('input[name=email]').fill('browser-account@example.test');
-            await wallet.locator('input[name=password]').fill('Browser-test-password-123');
-            await wallet.locator('form.lf-auth-card button[type=submit]').click();
+            const loginStatus = await wallet.evaluate(async () => {
+                const response = await fetch('/login', {
+                    method: 'POST',
+                    headers: {
+                        Accept: 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                    },
+                    body: JSON.stringify({ email: 'browser-account@example.test', password: 'Browser-test-password-123' }),
+                });
+                return response.status;
+            });
+            assert.ok([200, 204].includes(loginStatus), 'Fixture customer login failed: ' + loginStatus);
             await wallet.goto(base + '/account/wallet', { waitUntil: 'networkidle' });
             await wallet.locator('.lf-payment-group-main').first().waitFor();
             const baseline = await inspect(checkout);
@@ -98,11 +108,46 @@ try {
                 }
             }
             assert.equal(await wallet.locator('.lf-wallet-logo-strip,.lf-wallet-logo').count(), 0);
+            // Intercept both requests before any click; no money-moving endpoint is reached.
+            await wallet.route('**/account/wallet/topups/quote', async route => {
+                const request = route.request().postDataJSON();
+                await route.fulfill({
+                    status: 200, contentType: 'application/json',
+                    body: JSON.stringify({
+                        amount_idr: request.amount_idr,
+                        payment_channel_code: request.payment_channel_code,
+                        total_idr: request.amount_idr + 500,
+                    }),
+                });
+            });
+            await wallet.getByRole('button', { name: 'Hitung total' }).click();
+            await wallet.getByText('Biaya pembayaran').waitFor();
+            // A different payment selection must invalidate the old quote.
+            const currentGroup = candidates[candidates.length - 1];
+            const nextGroup = candidates.find(title => title !== currentGroup);
+            await wallet.locator('.lf-payment-group-main').filter({ hasText: nextGroup }).first().click();
+            await wallet.getByText('Biaya pembayaran').waitFor({ state: 'detached' });
+            await wallet.getByRole('button', { name: 'Hitung total' }).click();
+            await wallet.getByText('Biaya pembayaran').waitFor();
             if (width !== 768) {
                 await checkout.screenshot({ path: output + '/pr10-checkout-' + width + '.png', fullPage: true });
                 await wallet.screenshot({ path: output + '/pr10-wallet-' + width + '.png', fullPage: true });
             }
-            console.log('PASS PR10 payment picker DOM parity and screenshots at ' + width);
+            // Force an uncertain top-up response without sending a transaction.
+            await wallet.route('**/account/wallet/topups', async route => {
+                await route.fulfill({
+                    status: 422, contentType: 'application/json',
+                    body: JSON.stringify({ message: 'Status top up perlu diperiksa.' }),
+                });
+            });
+            await wallet.getByRole('button', { name: 'Top up', exact: true }).click();
+            await wallet.getByText('Top up sebelumnya masih diproses.', { exact: false }).waitFor();
+            assert.ok(await wallet.locator('.lf-payment-group-main').first().isDisabled(), 'Shared group header must lock');
+            assert.ok(await wallet.locator('.lfx-payment-method-card[aria-disabled=true]').count() > 0, 'Shared radio cards must lock');
+            assert.ok(await wallet.locator('input[type=number]').isDisabled(), 'Wallet amount must lock');
+            assert.ok(await wallet.getByRole('button', { name: 'Hitung total' }).isDisabled(), 'Quote action must lock');
+            assert.ok(await wallet.getByRole('button', { name: 'Cek status top up' }).isDisabled(), 'Top-up action must lock');
+            console.log('PASS PR10 picker parity, quote invalidation, attempt lock and screenshots at ' + width);
         } finally {
             await checkout.close();
             await wallet.close();
