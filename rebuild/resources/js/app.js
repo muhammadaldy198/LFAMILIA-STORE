@@ -4,7 +4,7 @@ import { createInertiaApp, usePage } from '@inertiajs/vue3';
 const pages = import.meta.glob('./Pages/**/*.vue');
 
 createInertiaApp({
-    title: (title) => !title ? 'LFAMILIA STORE' : (title === 'LFAMILIA STORE' || title.endsWith(' — LFAMILIA STORE') ? title : `${title} — LFAMILIA STORE`),
+    title: (title) => title?.startsWith('@@LFSEO@@') ? title.slice('@@LFSEO@@'.length) : (title ? `${title} — LFAMILIA STORE` : 'LFAMILIA STORE'),
     resolve: (name) => {
         const page = pages[`./Pages/${name}.vue`];
 
