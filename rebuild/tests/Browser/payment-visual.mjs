@@ -99,9 +99,13 @@ try {
             await page.waitForFunction(() => document.querySelector('.lf-payment-check-feedback')?.textContent.includes('Status belum berhasil diperiksa.'), null, { timeout: 10000 });
             assert.match(await page.locator('.lf-payment-check-feedback').textContent(), /Coba lagi/);
             await page.unroute('**/payment?**');
+            // Fresh page prevents a simulated network error overlay from entering the baseline capture.
+            const beforePage = await browser.newPage({ viewport: { width: 390, height: 844 } });
+            await beforePage.goto(url, { waitUntil: 'networkidle' });
+            await beforePage.locator('.lf-payment-invoice-chip').waitFor();
             // Reconstruct the exact old chip/action classes for a documented visual baseline.
             // This is not a production 'before' capture: it reuses the unchanged PR1 markup/styling.
-            await page.evaluate(() => {
+            await beforePage.evaluate(() => {
                 const chip = document.querySelector('.lf-payment-invoice-chip');
                 const label = chip.querySelector('.lf-payment-invoice-label');
                 const number = chip.querySelector('.lf-payment-invoice-number');
@@ -113,7 +117,8 @@ try {
                 status.className = 'h-10 rounded-lg border border-white/10 bg-white/[0.03] text-[10px] font-bold text-white';
                 invoice.className = 'flex h-10 items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] text-[10px] font-bold text-white';
             });
-            await page.screenshot({ path: `${output}/before-reconstructed-pr1-390.png`, fullPage: true });
+            await beforePage.screenshot({ path: `${output}/before-reconstructed-pr1-390.png`, fullPage: true });
+            await beforePage.close();
         }
         await page.close();
         console.log('PASS payment page F3/F11 ' + width);
