@@ -493,7 +493,11 @@ const modalTitle = computed(() => {
 
                 <template v-else-if="editing?.type === 'asset'">
                     <label class="adm-field full"><span>Tautan saat gambar ditekan</span><input v-model="form.target_url" class="adm-input" placeholder="https://..."></label>
-                    <div class="adm-field full"><span>Gambar</span><AdminMedia type="asset" :id="editing.row.id" :asset-key="editing.row.key" :url="editing.row.image_url" wide /></div>
+                    <div class="adm-field full">
+                        <span>{{ ASSET_LABEL[editing.row.key] || 'Gambar' }}</span>
+                        <AdminMedia type="asset" :id="editing.row.id" :asset-key="editing.row.key" :url="editing.row.image_url" wide />
+                        <span v-if="['footer_banner_desktop', 'footer_banner_mobile'].includes(editing.row.key)" class="hint">Rasio 3:1 — rekomendasi desktop 1920×640, mobile 1080×360</span>
+                    </div>
                     <label class="adm-switch-row full"><button type="button" class="adm-switch" role="switch" :aria-checked="form.is_active" @click="form.is_active = !form.is_active" /> Aktif dipakai toko</label>
                 </template>
 

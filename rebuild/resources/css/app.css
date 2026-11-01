@@ -253,7 +253,7 @@ body:where(:not(.lfx, .lfx *)){margin:0;font-family:Inter,ui-sans-serif,system-u
 .lf-footer:where(:not(.lfx, .lfx *)){position:relative;background:var(--lf-color-background-alt);border-top:1px solid var(--lf-line)}
 .lf-footer-banner:where(:not(.lfx, .lfx *)){width:100%;overflow:hidden;border-bottom:1px solid var(--lf-line);background:var(--lf-color-background-alt)}
 .lf-footer-banner picture:where(:not(.lfx, .lfx *)){display:block}
-.lf-footer-banner img:where(:not(.lfx, .lfx *)){display:block;width:100%;height:auto;max-height:190px;object-fit:cover;object-position:center}
+.lf-footer-banner img:where(:not(.lfx, .lfx *)){display:block;width:100%;height:auto;aspect-ratio:3/1;max-height:none;min-height:0;object-fit:cover;object-position:center}
 .lf-footer-grid:where(:not(.lfx, .lfx *)){display:grid;grid-template-columns:1.5fr repeat(3,1fr);gap:42px;padding:46px 0}
 .lf-footer-brand-column>p:where(:not(.lfx, .lfx *)){max-width:390px;margin:17px 0 0;color:var(--lf-color-muted);font-size:11px;line-height:1.8}
 .lf-footer h2:where(:not(.lfx, .lfx *)){margin:0;color:var(--lf-color-muted);font-size:10px;font-weight:950;letter-spacing:.2em;text-transform:uppercase}
@@ -470,7 +470,7 @@ body:where(:not(.lfx, .lfx *)){margin:0;font-family:Inter,ui-sans-serif,system-u
   .lf-products:where(:not(.lfx, .lfx *)){grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}.lf-product:where(:not(.lfx, .lfx *)){border-radius:14px}
   .lf-news-grid:where(:not(.lfx, .lfx *)){grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.lf-news-card:where(:not(.lfx, .lfx *)){height:235px;border-radius:14px}.lf-news-body:where(:not(.lfx, .lfx *)){padding:12px}.lf-news-body h2:where(:not(.lfx, .lfx *)),.lf-news-body h3:where(:not(.lfx, .lfx *)){font-size:14px}.lf-news-body p:where(:not(.lfx, .lfx *)){font-size:9px}
   .lf-step-grid:where(:not(.lfx, .lfx *)){grid-template-columns:repeat(2,minmax(0,1fr))}.lf-help:where(:not(.lfx, .lfx *)){align-items:flex-start;flex-direction:column}
-  .lf-footer-banner img:where(:not(.lfx, .lfx *)){min-height:72px;object-fit:cover}.lf-footer-grid:where(:not(.lfx, .lfx *)){grid-template-columns:1fr 1fr;gap:28px 18px;padding:36px 0}.lf-footer-brand-column:where(:not(.lfx, .lfx *)){grid-column:1/-1}.lf-footer ul:where(:not(.lfx, .lfx *)){gap:14px}
+  .lf-footer-grid:where(:not(.lfx, .lfx *)){grid-template-columns:1fr 1fr;gap:28px 18px;padding:36px 0}.lf-footer-brand-column:where(:not(.lfx, .lfx *)){grid-column:1/-1}.lf-footer ul:where(:not(.lfx, .lfx *)){gap:14px}
   .lf-live-support:where(:not(.lfx, .lfx *)){right:14px;bottom:76px}.lf-support-trigger:where(:not(.lfx, .lfx *)){width:51px;height:51px}
   .lf-content-page:where(:not(.lfx, .lfx *)){padding-top:32px;padding-bottom:48px}.lf-content-hero:where(:not(.lfx, .lfx *)){padding:18px}.lf-content-hero>span:where(:not(.lfx, .lfx *)){width:42px;height:42px}.lf-article h1:where(:not(.lfx, .lfx *)),.lf-legal h1:where(:not(.lfx, .lfx *)){font-size:27px}.lf-contact-grid:where(:not(.lfx, .lfx *)){grid-template-columns:1fr}.lf-contact-grid>a:where(:not(.lfx, .lfx *)){flex-direction:column;align-items:flex-start;gap:10px}.lf-contact-grid>a>div:where(:not(.lfx, .lfx *)){min-width:0;width:100%}.lf-contact-grid small:where(:not(.lfx, .lfx *)){overflow-wrap:anywhere}.lf-tool-fields:where(:not(.lfx, .lfx *)){grid-template-columns:1fr}.lf-promo-grid:where(:not(.lfx, .lfx *)){grid-template-columns:1fr}
   .lf-product-hero:where(:not(.lfx, .lfx *)){height:210px}
@@ -520,8 +520,6 @@ body:where(:not(.lfx, .lfx *)){margin:0;font-family:Inter,ui-sans-serif,system-u
 .lf-socials:where(:not(.lfx, .lfx *)){display:flex;gap:7px;margin-top:16px}
 .lf-socials a:where(:not(.lfx, .lfx *)){width:31px;height:31px;display:grid;place-items:center;border:1px solid rgba(255,255,255,.09);border-radius:8px;background:var(--lf-color-background);color:var(--lf-color-muted)}
 .lf-socials svg:where(:not(.lfx, .lfx *)){width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8}
-.lf-footer-banner picture:where(:not(.lfx, .lfx *)),.lf-footer-banner img:where(:not(.lfx, .lfx *)){display:block;width:100%}
-.lf-footer-banner img:where(:not(.lfx, .lfx *)){aspect-ratio:3/1;max-height:310px;object-fit:cover;object-position:center}
 .lf-support-panel>div>a:where(:not(.lfx, .lfx *)){display:flex!important;align-items:center!important;gap:10px!important}
 .lf-support-panel>div>a>svg:where(:not(.lfx, .lfx *)){width:27px;height:27px;fill:none;stroke:currentColor;stroke-width:1.7;flex:0 0 auto}
 .lf-support-panel>div>a>span:where(:not(.lfx, .lfx *)){display:grid}
@@ -832,7 +830,7 @@ body:where(:not(.lfx, .lfx *)){margin:0;font-family:Inter,ui-sans-serif,system-u
  .lf-header-inner:where(:not(.lfx, .lfx *)){height:62px;gap:8px}.lf-brand-logo:where(:not(.lfx, .lfx *)){width:38px;height:38px}.lf-brand-name:where(:not(.lfx, .lfx *)){font-size:11px}.lf-brand-sub:where(:not(.lfx, .lfx *)){font-size:7px}.lf-action:where(:not(.lfx, .lfx *)){height:32px;padding:0 8px;font-size:9px}.lf-search-mobile:where(:not(.lfx, .lfx *)),.lf-menu:where(:not(.lfx, .lfx *)){width:32px;height:32px}
  .lf-home-banner img:where(:not(.lfx, .lfx *)){aspect-ratio:1/1;min-height:0;max-height:none;object-position:center}
  .lf-popular:where(:not(.lfx, .lfx *)){grid-template-columns:repeat(2,minmax(0,1fr))}.lf-popular-card:where(:not(.lfx, .lfx *)){min-height:70px}.lf-popular-art:where(:not(.lfx, .lfx *)){width:52px;height:52px;flex-basis:52px}
- .lf-footer-main:where(:not(.lfx, .lfx *)){grid-template-columns:1fr 1fr;gap:26px 18px;padding:34px 0}.lf-footer-brand-column:where(:not(.lfx, .lfx *)){grid-column:1/-1}.lf-footer-banner img:where(:not(.lfx, .lfx *)){aspect-ratio:3/1;min-height:0}
+ .lf-footer-main:where(:not(.lfx, .lfx *)){grid-template-columns:1fr 1fr;gap:26px 18px;padding:34px 0}.lf-footer-brand-column:where(:not(.lfx, .lfx *)){grid-column:1/-1}
  .lf-product-hero:where(:not(.lfx, .lfx *)){height:190px}.lf-product-identity-inner:where(:not(.lfx, .lfx *)){min-height:158px;grid-template-columns:105px 1fr;grid-template-rows:85px 55px;column-gap:7px}.lf-product-cover-3d:where(:not(.lfx, .lfx *)){left:2px;top:-36px;width:96px;height:122px;border-radius:15px}.lf-product-title h1:where(:not(.lfx, .lfx *)){font-size:15px}.lf-product-title p:where(:not(.lfx, .lfx *)){font-size:9px}.lf-product-rating:where(:not(.lfx, .lfx *)){margin-top:5px}.lf-product-perks>div:where(:not(.lfx, .lfx *)){gap:3px;font-size:7px}.lf-product-perks span:where(:not(.lfx, .lfx *)){font-size:12px}
  .lf-checkout-tabs:where(:not(.lfx, .lfx *)){margin-top:10px}.lf-checkout-grid:where(:not(.lfx, .lfx *)){padding-bottom:96px}.lf-checkout-panel>header:where(:not(.lfx, .lfx *)){padding:10px}.lf-checkout-panel>header>span:where(:not(.lfx, .lfx *)){width:28px;height:28px}.lf-panel-body:where(:not(.lfx, .lfx *)){padding:10px}.lf-account-fields:where(:not(.lfx, .lfx *)){grid-template-columns:1fr 1fr;gap:7px}.lf-account-fields input:where(:not(.lfx, .lfx *)){height:38px}.lf-nominal-grid:where(:not(.lfx, .lfx *)){grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.lf-nominal-grid button:where(:not(.lfx, .lfx *)){min-height:66px;grid-template-columns:34px 1fr;padding:7px}.lf-nominal-grid img:where(:not(.lfx, .lfx *)),.lf-nominal-fallback:where(:not(.lfx, .lfx *)){width:34px;height:34px}.lf-payment-groups summary:where(:not(.lfx, .lfx *)){grid-template-columns:32px 1fr auto;padding:9px}.lf-payment-group-icon:where(:not(.lfx, .lfx *)){width:31px;height:31px}
  .lf-order-summary:where(:not(.lfx, .lfx *)){display:none}.lf-mobile-checkout-bar:where(:not(.lfx, .lfx *)){grid-template-columns:minmax(0,1fr) auto}.lf-mobile-total button:where(:not(.lfx, .lfx *)){height:39px;padding:0 13px;font-size:9px}
@@ -966,13 +964,6 @@ body:where(:not(.lfx, .lfx *)){margin:0;font-family:Inter,ui-sans-serif,system-u
   .lf-support-panel>div>a strong:where(:not(.lfx, .lfx *)){font-size:9px}
   .lf-support-panel>div>a small:where(:not(.lfx, .lfx *)){font-size:7px}
 
-  .lf-footer-banner img:where(:not(.lfx, .lfx *)){
-    width:100%;
-    aspect-ratio:3/1;
-    max-height:none;
-    object-fit:cover;
-    object-position:center;
-  }
   .lf-footer-main:where(:not(.lfx, .lfx *)){
     grid-template-columns:1fr 1fr;
     gap:20px 14px;
@@ -1103,26 +1094,6 @@ body:where(:not(.lfx, .lfx *)){margin:0;font-family:Inter,ui-sans-serif,system-u
     line-height:1.35;
   }
 
-  /* Footer banner: match the compact legacy mobile treatment. */
-  .lf-footer-banner:where(:not(.lfx, .lfx *)){
-    height:70px;
-  }
-  .lf-footer-banner picture:where(:not(.lfx, .lfx *)){
-    display:block;
-    width:100%;
-    height:100%;
-  }
-  .lf-footer-banner img:where(:not(.lfx, .lfx *)){
-    display:block;
-    width:100%;
-    height:70px!important;
-    min-height:0!important;
-    max-height:70px!important;
-    aspect-ratio:auto!important;
-    object-fit:cover;
-    object-position:center;
-  }
-
   .lf-footer-main:where(:not(.lfx, .lfx *)){
     grid-template-columns:1fr 1fr!important;
     gap:24px 20px!important;
@@ -1218,25 +1189,6 @@ body:where(:not(.lfx, .lfx *)){margin:0;font-family:Inter,ui-sans-serif,system-u
   .lf-footer-column a:where(:not(.lfx, .lfx *)){font-size:11px!important}
   .lf-footer-copy:where(:not(.lfx, .lfx *)){font-size:9px!important}
 
-  /* Keep footer artwork ratio identical to Admin guidance: 3:1.
-     The viewport is deliberately short, but crop/ratio remains consistent. */
-  .lf-footer-banner:where(:not(.lfx, .lfx *)){
-    height:72px!important;
-    aspect-ratio:3/1;
-  }
-  .lf-footer-banner picture:where(:not(.lfx, .lfx *)){
-    width:100%;
-    height:100%;
-  }
-  .lf-footer-banner img:where(:not(.lfx, .lfx *)){
-    width:100%!important;
-    height:100%!important;
-    min-height:0!important;
-    max-height:none!important;
-    aspect-ratio:3/1!important;
-    object-fit:cover!important;
-    object-position:center!important;
-  }
 }
 /* =========================================================
    MOBILE PASS 2 — HOMEPAGE ONLY
@@ -5370,32 +5322,6 @@ body:where(:not(.lfx, .lfx *)){margin:0;font-family:Inter,ui-sans-serif,system-u
   stroke-linecap:round!important;
   stroke-linejoin:round!important;
 }
-.lf-footer-banner:where(:not(.lfx, .lfx *)){
-  position:relative!important;
-  height:70px!important;
-  overflow:hidden!important;
-}
-.lf-footer-banner picture:where(:not(.lfx, .lfx *)){
-  display:block!important;
-  width:100%!important;
-  height:100%!important;
-}
-.lf-footer-banner img:where(:not(.lfx, .lfx *)){
-  position:absolute!important;
-  left:50%!important;
-  top:50%!important;
-  width:100%!important;
-  height:auto!important;
-  min-height:100%!important;
-  max-height:none!important;
-  transform:translate(-50%,-50%)!important;
-  object-fit:cover!important;
-  object-position:center!important;
-}
-@media(min-width:520px){.lf-footer-banner:where(:not(.lfx, .lfx *)){height:84px!important}}
-@media(min-width:640px){.lf-footer-banner:where(:not(.lfx, .lfx *)){height:72px!important}}
-@media(min-width:1024px){.lf-footer-banner:where(:not(.lfx, .lfx *)){height:88px!important}}
-@media(min-width:1280px){.lf-footer-banner:where(:not(.lfx, .lfx *)){height:116px!important}}
 @media(max-width:639px){
   .lf-customer:has(.lf-mobile-checkout-bar:not(.is-hidden)) .lf-live-support:where(:not(.lfx, .lfx *)){
     bottom:112px!important;
@@ -6017,13 +5943,6 @@ body:where(:not(.lfx, .lfx *)){margin:0;font-family:Inter,ui-sans-serif,system-u
 .lf-customer.lf-customer.lf-customer.lf-customer .lf-footer a:where(:not(.lfx, .lfx *)),.lf-customer.lf-customer.lf-customer.lf-customer .lf-footer-brand-column>p:where(:not(.lfx, .lfx *)){font-size:var(--lf-presentation-footer-body)!important}
 .lf-customer.lf-customer.lf-customer.lf-customer .lf-footer-copy:where(:not(.lfx, .lfx *)){font-size:var(--lf-presentation-footer-note)!important}
 /* Admin parity: the primary site's navy sidebar and white operational workspace. */
-/* Footer artwork follows the visible customer slot, independent of source dimensions. */
-.lf-customer .lf-footer-banner img:where(:not(.lfx, .lfx *)){
-  left:0!important;top:0!important;transform:none!important;
-  width:100%!important;height:100%!important;min-height:0!important;
-  max-height:none!important;aspect-ratio:auto!important;
-  object-fit:cover!important;object-position:center!important;
-}
 /* shadcn-vue tokens are scoped to admin, including its portal navigation. */
 /* Keep mobile admin controls readable inside horizontally scrolling tables. */
 /* Desktop UX parity: draggable support + clear first-open popup close control. */
