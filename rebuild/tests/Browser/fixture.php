@@ -265,6 +265,40 @@ DB::transaction(function (): void {
     );
 });
 
+// Read-only payment-page browser fixture: no gateway calls or payment creation.
+$paymentInvoice = 'LF-BROWSER-INVOICE-20261101';
+$paymentProduct = Product::where('slug', 'browser-checkout-game')->firstOrFail();
+$paymentPackage = $paymentProduct->packages()->where('code', 'BROWSER100')->firstOrFail();
+DB::table('orders')->updateOrInsert(
+    ['order_number' => $paymentInvoice],
+    [
+        'user_id' => null,
+        'guest_email' => 'payment-browser@example.test',
+        'guest_phone' => '081200000001',
+        'product_id' => $paymentProduct->id,
+        'product_package_id' => $paymentPackage->id,
+        'status' => 'PENDING_PAYMENT',
+        'currency' => 'IDR',
+        'customer_input' => json_encode(['user_id' => '12345678']),
+        'snapshot' => '{}',
+        'cost_idr' => 10000,
+        'margin_idr' => 1000,
+        'discount_idr' => 0,
+        'fee_idr' => 0,
+        'total_idr' => 11000,
+        'idempotency_key' => 'browser-payment-page-fixture',
+        'expires_at' => now()->addMinutes(30),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]
+);
+file_put_contents(
+    '/tmp/lfamilia-browser-payment-url.txt',
+    \Illuminate\Support\Facades\URL::temporarySignedRoute(
+        'payment.show', now()->addMinutes(30), ['invoice' => $paymentInvoice]
+    )
+);
+
 echo "browser-checkout-game\n";
 
 // Comparable Lab visual data, confined to this local/testing fixture database.
