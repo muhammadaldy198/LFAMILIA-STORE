@@ -352,7 +352,7 @@ DB::transaction(function (): void {
         'publisher' => 'Moonton',
         'fulfillment_mode' => 'AUTO_PROVIDER',
         'popular' => true,
-        'sort_order' => -100,
+        'sort_order' => 0,
         'is_active' => true,
     ]);
     $popularPackage = $popularProduct->packages()->updateOrCreate(['code' => 'BROWSER-POPULAR-5'], [
