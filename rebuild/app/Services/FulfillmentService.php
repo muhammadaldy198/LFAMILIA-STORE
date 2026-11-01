@@ -631,8 +631,10 @@ class FulfillmentService
             }
 
             $input = $this->json($order->customer_input);
+            $productSlug = (string) (data_get($snapshot, 'product.slug')
+                ?: DB::table('products')->where('id', $order->product_id)->value('slug'));
             $template = app(DigiflazzDestinationTemplate::class)->resolve(
-                (string) data_get($snapshot, 'product.slug', ''),
+                $productSlug,
                 data_get($snapshot, 'provider.customer_no_template'),
                 array_keys($input)
             );
