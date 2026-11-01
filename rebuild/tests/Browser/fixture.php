@@ -312,7 +312,7 @@ DB::transaction(function (): void {
 
     $product = Product::updateOrCreate(['slug' => 'checkout-lab-reference'], [
         'category_id' => Category::where('slug', 'game')->value('id'),
-        'name' => 'Mobile Legends', 'publisher' => 'Moonton', 'popular' => true,
+        'name' => 'Mobile Legends', 'publisher' => 'Moonton',
         'description' => 'Fixture visual Checkout Lab. Tidak ada transaksi nyata.',
         'margin_percent' => 0, 'fulfillment_mode' => 'AUTO_PROVIDER',
         'nickname_check_enabled' => false, 'is_active' => true,
@@ -343,6 +343,45 @@ DB::transaction(function (): void {
             'synced_at' => now(), 'created_at' => now(), 'updated_at' => now(),
         ]);
     }
+
+    // F8 CI-only visible product: mirrors the currently featured Mobile Legends title.
+    // Keep a buyable mapping so the real CatalogController renders the popular card.
+    $popularProduct = Product::updateOrCreate(['slug' => 'browser-popular-mobile-legends'], [
+        'category_id' => $category->id,
+        'name' => 'Mobile Legends',
+        'publisher' => 'Moonton',
+        'fulfillment_mode' => 'AUTO_PROVIDER',
+        'popular' => true,
+        'sort_order' => -100,
+        'is_active' => true,
+    ]);
+    $popularPackage = $popularProduct->packages()->updateOrCreate(['code' => 'BROWSER-POPULAR-5'], [
+        'name' => '5 Diamonds',
+        'nominal_value' => 5,
+        'sort_order' => 0,
+        'is_active' => true,
+    ]);
+    DB::table('provider_mappings')->updateOrInsert([
+        'provider_id' => $providerId,
+        'external_sku' => 'BROWSER-POPULAR-SKU-5',
+    ], [
+        'product_package_id' => $popularPackage->id,
+        'cost_idr' => 1500,
+        'max_price_idr' => 2000,
+        'priority' => 1,
+        'is_active' => true,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    DB::table('digiflazz_catalog_items')->updateOrInsert(['buyer_sku_code' => 'BROWSER-POPULAR-SKU-5'], [
+        'product_name' => 'Mobile Legends 5 Diamonds',
+        'category' => 'Games', 'brand' => 'Moonton', 'type' => 'Umum',
+        'seller_name' => 'Browser fixture',
+        'price_idr' => 1500, 'baseline_price_idr' => 1500,
+        'buyer_active' => true, 'seller_active' => true, 'unlimited_stock' => true,
+        'stock' => 0, 'multi' => false, 'start_cut_off' => '00:00', 'end_cut_off' => '00:00',
+        'synced_at' => now(), 'created_at' => now(), 'updated_at' => now(),
+    ]);
 
     // F7 UI-only fixture: modal can be measured, closed and dismissed in CI.
     SitePopup::updateOrCreate(['title' => 'Browser UI Popup'], [
