@@ -136,8 +136,8 @@ watch(() => props.modelValue, (value) => {
 </script>
 
 <template>
-    <div class="lf-country-picker flex flex-wrap items-start gap-2">
-        <button type="button" class="flex h-9 shrink-0 items-center gap-1 rounded border border-white/10 bg-white/5 px-2 text-xs font-semibold text-slate-100 hover:border-white/25 disabled:opacity-50" :disabled="disabled" :aria-expanded="open" aria-label="Pilih kode negara" @click="toggle">
+    <div class="lf-country-picker flex flex-wrap items-stretch gap-2">
+        <button type="button" class="flex shrink-0 self-stretch items-center gap-1 rounded border border-white/10 bg-white/5 px-2 text-xs font-semibold text-slate-100 hover:border-white/25 disabled:opacity-50" :disabled="disabled" :aria-expanded="open" aria-label="Pilih kode negara" @click="toggle">
             <img :src="flag(country)" :alt="country.iso" class="lf-flag" width="20" height="14">
             <span>+{{ country.dial }}</span>
             <span aria-hidden="true" class="text-[9px] text-slate-400">⌄</span>

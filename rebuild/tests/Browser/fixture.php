@@ -5,6 +5,7 @@ use App\Models\Category;
 use App\Models\IntegrationCredential;
 use App\Models\PaymentChannel;
 use App\Models\Product;
+use App\Models\SavedGameAccount;
 use App\Models\SitePopup;
 use App\Models\SupportTicket;
 use App\Models\User;
@@ -205,6 +206,12 @@ DB::transaction(function (): void {
 
     $admin = AdminUser::where('email', 'browser-admin@example.test')->firstOrFail();
     $customer = User::where('email', 'browser-account@example.test')->firstOrFail();
+
+    // F18: always exercise Edit/Hapus with a real saved account in browser CI.
+    SavedGameAccount::updateOrCreate(
+        ['user_id' => $customer->id, 'product_id' => $product->id, 'label' => 'Browser Game Account'],
+        ['customer_input' => ['user_id' => '12345678', 'zone_id' => '1234'], 'nickname' => null]
+    );
     $orderId = app(AdminManualOrderService::class)->create([
         'customer_name' => 'Pelanggan fixture dengan nama panjang untuk pemeriksaan tampilan',
         'phone' => '081200000001', 'email' => 'browser-account@example.test',

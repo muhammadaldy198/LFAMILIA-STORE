@@ -8,6 +8,7 @@ use App\Models\SupportTicket;
 use App\Models\User;
 use App\Services\PublicOrderStatusService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Queue;
@@ -237,5 +238,32 @@ class CustomerAreaTest extends TestCase
         $this->assertNotNull(User::withTrashed()->findOrFail($empty->id)->deleted_at);
         $this->assertNull($funded->fresh()->deleted_at);
         $this->assertSame(500, (int) DB::table('wallets')->where('user_id', $funded->id)->value('balance_idr'));
+    }
+
+    public function test_ticket_message_timestamp_has_explicit_timezone(): void
+    {
+        $user = $this->customer('timestamp-ticket@example.test');
+        $ticket = SupportTicket::create([
+            'user_id' => $user->id,
+            'subject' => 'Waktu pesan',
+            'message' => 'Tanggal tiket',
+        ]);
+        $timestamp = '2026-10-25 14:00:50';
+
+        DB::table('support_ticket_messages')->insert([
+            'support_ticket_id' => $ticket->id,
+            'sender_type' => 'CUSTOMER',
+            'user_id' => $user->id,
+            'admin_user_id' => null,
+            'message' => 'Tanggal pesan',
+            'created_at' => $timestamp,
+            'updated_at' => $timestamp,
+        ]);
+
+        $this->actingAs($user, 'web')->get('/account/tickets/'.$ticket->id)
+            ->assertOk()->assertInertia(fn ($page) => $page->where(
+                'messages.0.created_at',
+                Carbon::parse($timestamp, config('app.timezone'))->toIso8601String()
+            ));
     }
 }

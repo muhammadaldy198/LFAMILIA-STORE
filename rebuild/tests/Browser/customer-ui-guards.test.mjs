@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { manualHelpMessage, nextOrderAction, orderStatusInfo, paymentStatusLabel } from '../../resources/js/lib/orderStatus.js';
+import { formatTicketDate, ticketStatusLabel } from '../../resources/js/lib/ticketPresentation.js';
 
 const read = path => readFileSync(new URL('../../resources/js/' + path, import.meta.url), 'utf8');
 
@@ -283,4 +284,94 @@ test('popular cards show a two-line title and only a real publisher below it', (
     assert.match(css, /\.lf-popular-title:[^{]*\{[^}]*white-space:normal!important/s);
     assert.match(css, /@media\(min-width:901px\)\{[^}]*grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/s);
     assert.match(css, /@media\(max-width:900px\)\{[^}]*grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/s);
+});
+
+
+test('F12 checkout VA and e-wallet logos share padded, contained chips', () => {
+    const source = read('Components/Checkout/PaymentMethods.vue');
+    assert.match(source, /\.lf-payment-brand-logo img \{/);
+    assert.match(source, /max-height: 18px;/);
+    assert.match(source, /padding: 4px 6px;/);
+    assert.match(source, /object-fit: contain;/);
+});
+
+
+test('F13 country controls stretch to match input instead of raising input height', () => {
+    const picker = read('Components/PhoneCountryPicker.vue');
+    const checkout = readFileSync(new URL('../../resources/css/checkout.css', import.meta.url), 'utf8');
+    assert.match(picker, /lf-country-picker flex flex-wrap items-stretch/);
+    assert.match(picker, /shrink-0 self-stretch items-center/);
+    assert.match(checkout, /\.lfx \.lfx-phone-entry\{[^}]*align-items:stretch/);
+    assert.match(checkout, /\.lfx \.lfx-country-trigger\{[^}]*height:auto;min-height:0;align-self:stretch/);
+});
+
+
+test('QRIS heading and channel explanation wrap without mid-word truncation', () => {
+    const methods = read('Components/Checkout/PaymentMethods.vue');
+    assert.match(methods, /lf-payment-brand-strip--qris/);
+    assert.match(methods, /lf-payment-group-card--qris/);
+    assert.match(methods, /white-space:normal;overflow:visible;text-overflow:clip/);
+});
+
+
+test('F14 Keterangan remains one tab and separates description, reviews and FAQ', () => {
+    const product = read('Pages/Catalog/Show.vue');
+    const css = readFileSync(new URL('../../resources/css/checkout.css', import.meta.url), 'utf8');
+    assert.match(product, /v-else class="lfx-panel lfx-details lf-product-details"/);
+    const description = product.indexOf('lf-product-description-legacy');
+    const reviews = product.indexOf('lf-product-review-section lf-review-legacy');
+    const faq = product.indexOf('lf-product-faq lf-product-faq-legacy');
+    assert.ok(description >= 0 && reviews > description && faq > reviews);
+    assert.match(css, /\.lfx \.lf-product-details > \.lf-product-review-section/);
+    assert.match(css, /\.lfx \.lf-product-details > \.lf-product-faq-legacy/);
+    assert.match(css, /border-top: 2px solid/);
+});
+
+
+test('F16 review count uses a separate line and supports zero reviews', () => {
+    const product = read('Pages/Catalog/Show.vue');
+    const css = readFileSync(new URL('../../resources/css/checkout.css', import.meta.url), 'utf8');
+    assert.match(product, /reviewStats\?\.total \|\| 0\}\} ulasan/);
+    assert.match(css, /\.lfx \.lf-review-average > small \{[^}]*grid-column: 1 \/ -1/s);
+    assert.match(css, /\.lfx \.lf-review-average \{[^}]*row-gap: 2px/s);
+});
+
+
+test('F15 wallet uses customer language and protects the total from floating chat', () => {
+    const wallet = read('Pages/Customer/Wallet.vue');
+    assert.match(wallet, /Cek status top up/);
+    assert.match(wallet, /Top up sebelumnya masih diproses\. Cek statusnya dulu/);
+    assert.doesNotMatch(wallet, /Cek percobaan yang sama|coba cek percobaan yang sama/);
+    assert.match(wallet, /grid-cols-\[minmax\(0,1fr\)_auto\]/);
+    assert.match(wallet, /pb-32 sm:pb-5/);
+    assert.match(wallet, /:disabled="Boolean\(busy\) \|\| attemptLocked"/);
+    assert.match(wallet, /idempotency_key: idempotencyKey\.value/);
+});
+
+
+test('F17 ticket list, detail and messages use Indonesian local dates and statuses', () => {
+    assert.equal(formatTicketDate('2026-10-25T07:00:50.000000Z'), '25 Okt 2026, 14.00');
+    assert.equal(formatTicketDate('not-a-date'), '–');
+    assert.equal(ticketStatusLabel('OPEN'), 'Terbuka');
+    assert.equal(ticketStatusLabel('IN_PROGRESS'), 'Sedang ditangani');
+    assert.equal(ticketStatusLabel('RESOLVED'), 'Selesai');
+    assert.equal(ticketStatusLabel('CLOSED'), 'Ditutup');
+    for (const page of ['Pages/Customer/Tickets.vue', 'Pages/Customer/TicketDetail.vue']) {
+        const source = read(page);
+        assert.match(source, /ticketStatusLabel\(ticket\.status\)/);
+        assert.match(source, /formatTicketDate\(ticket\.created_at\)/);
+        assert.doesNotMatch(source, /\{\{\s*ticket\.(status|created_at)\s*\}\}/);
+    }
+    assert.match(read('Pages/Customer/TicketDetail.vue'), /formatTicketDate\(message\.created_at\)/);
+});
+
+
+test('F18 saved game accounts provide real accessible 40px edit and danger buttons', () => {
+    const game = read('Pages/Customer/GameAccounts.vue');
+    assert.match(game, /min-h-10 items-center justify-center/);
+    assert.match(game, /border-red-400\/40 bg-red-400\/10/);
+    assert.match(game, /:aria-label="'Edit '\+account\.label"/);
+    assert.match(game, /:aria-label="'Hapus '\+account\.label"/);
+    assert.match(game, /@click="edit\(account\)"/);
+    assert.match(game, /@click="remove\(account\)"/);
 });

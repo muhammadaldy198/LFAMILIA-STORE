@@ -6,6 +6,7 @@ import SupportMessageActions from '../../Components/SupportMessageActions.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import AccountShell from '../../Components/AccountShell.vue';
 import CustomerPagination from '../../Components/CustomerPagination.vue';
+import { formatTicketDate, ticketStatusLabel } from '../../lib/ticketPresentation';
 
 const props = defineProps({ tickets: Object, orders: Array });
 const form = useForm({ subject: '', message: '', order_id: '' });
@@ -40,7 +41,7 @@ const submit = () => { if (!form.processing) form.post('/account/tickets', { onS
         <p v-if="!tickets.data.length" class="text-slate-400">{{ customerText("pages.customer.tickets.8efc1b8b", "Belum ada tiket.") }}</p>
         <div v-for="ticket in tickets.data" :key="ticket.id" class="rounded-xl border border-slate-800 bg-slate-900 p-4">
             <Link :href="'/account/tickets/' + ticket.id" class="font-semibold text-cyan-300 hover:underline">#{{ ticket.id }} · {{ ticket.subject }}</Link>
-            <p class="mt-1 text-sm text-slate-400">{{ ticket.status }} · {{ ticket.created_at }}</p>
+            <p class="mt-1 text-sm text-slate-400">{{ ticketStatusLabel(ticket.status) }} · {{ formatTicketDate(ticket.created_at) }}</p>
         </div>
         <CustomerPagination :links="tickets.links || []" :label="customerText('pages.customer.tickets.attribute.aria-label.a837ddc2', 'Halaman tiket')" />
     </AccountShell>

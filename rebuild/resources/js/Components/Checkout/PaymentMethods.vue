@@ -91,7 +91,7 @@ function choosePayment(code) {
                             v-for="group in paymentGroups"
                             :key="group.key"
                             class="lf-payment-group-card"
-                            :class="{selected:group.items.some(x=>x.code===paymentChannelCode)}"
+                            :class="{selected:group.items.some(x=>x.code===paymentChannelCode), 'lf-payment-group-card--qris':group.key==='qris'}"
                         >
                             <button
                                 type="button"
@@ -118,7 +118,7 @@ function choosePayment(code) {
                             <div
                                 v-if="group.key!=='wallet' && !( ['va', 'ewallet'].includes(group.key) && group.items.some(x=>x.code===paymentChannelCode))"
                                 class="lf-payment-brand-strip"
-                                :class="{ 'lf-payment-brand-strip--logos': ['va', 'ewallet'].includes(group.key) }"
+                                :class="{ 'lf-payment-brand-strip--logos': ['va', 'ewallet'].includes(group.key), 'lf-payment-brand-strip--qris': group.key === 'qris' }"
                             >
                                 <span v-if="group.key==='qris'">{{group.items.length > 1 ? 'Pilih QRIS Otomatis atau QRIS Manual' : (groupChannel(group)?.description || group.title)}}</span>
                                 <template v-else-if="['va', 'ewallet'].includes(group.key)">
@@ -177,6 +177,10 @@ function choosePayment(code) {
 .lf-payment-brand-strip{min-height:32px;display:flex;align-items:center;gap:8px;overflow:hidden;padding:6px 12px;border-top:1px solid rgba(255,255,255,.08);background:rgba(0,0,0,.1);white-space:nowrap}
 .lf-payment-brand-strip>span{flex:0 0 auto;border-radius:4px;background:rgba(255,255,255,.08);padding:2px 6px;color:var(--lf-color-muted);font-size:7px;font-weight:700}
 .lf-payment-brand-strip>span:only-child{overflow:hidden;max-width:100%;padding:0;background:transparent;text-overflow:ellipsis;font-size:9px}
+/* QRIS copy must wrap at word boundaries, never disappear behind an ellipsis. */
+.lf-payment-group-card--qris .lf-payment-group-copy small,
+.lf-payment-brand-strip--qris,
+.lf-payment-brand-strip--qris>span:only-child{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:normal}
 .lf-payment-unavailable{padding:12px;color:var(--lf-color-muted);font-size:12px}
 @media(max-width:639px){.lf-payment-groups{gap:5.6px;padding:16px}.lf-payment-group-main{font-size:12px;min-height:43.2px;gap:5.6px;padding:5.6px 10px}.lf-payment-group-copy strong{font-size:12px}.lf-payment-group-copy small{font-size:10px}.lf-payment-brand-strip{gap:5.6px;padding:6px 8px}.lf-payment-brand-strip>span{font-size:8px}.lf-payment-brand-strip>span:only-child{font-size:10px}}
 
@@ -309,14 +313,17 @@ function choosePayment(code) {
   min-width: 0;
   max-width: 58px;
   aspect-ratio: 58 / 26;
-  padding: 2px 3px;
+  padding: 4px 6px;
+  border: 1px solid rgba(255,255,255,.10);
   border-radius: 4px;
   background: rgba(255,255,255,.10);
 }
 .lf-payment-brand-logo img {
   display: block;
-  width: 100%;
-  height: 100%;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 18px;
   object-fit: contain;
 }
 .lfx-payment-method-grid--compact {
