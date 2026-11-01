@@ -205,9 +205,10 @@ class AdminFulfillmentController
                     && in_array($attempt->order_status, ['PAID', 'PROCESSING'], true),
                 'can_fail' => ! $terminal && $attempt->status === 'MANUAL_PENDING',
                 'can_reconcile' => ! $terminal && in_array($attempt->status, ['SENDING', 'PENDING', 'UNKNOWN'], true),
-                'can_retry' => ! $terminal && ! $quarantined
-                    && $attempt->status === 'BLOCKED'
-                    && $attempt->last_error !== 'Semua SKU yang diizinkan telah gagal. Hubungi superadmin.',
+                'can_retry' => ($terminal || $quarantined)
+                    ? false
+                    : ($attempt->status === 'BLOCKED'
+                        && $attempt->last_error !== 'Semua SKU yang diizinkan telah gagal. Hubungi superadmin.'),
                 'retry_label' => $attempt->status === 'FAILED_CONFIRMED'
                     ? 'Coba sumber berikutnya' : 'Coba proses lagi',
             ];
