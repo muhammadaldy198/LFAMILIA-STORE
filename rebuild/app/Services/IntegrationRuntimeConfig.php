@@ -54,14 +54,18 @@ class IntegrationRuntimeConfig
         }
 
         $storedEnvironment = strtolower(trim((string) ($stored['environment'] ?? '')));
-        if (array_key_exists($storedEnvironment, $environments)) {
-            return $storedEnvironment;
+        if ($storedEnvironment !== '') {
+            // Explicitly retired Test/Sandbox credentials must never become
+            // Production by falling through to the new default environment.
+            return array_key_exists($storedEnvironment, $environments) ? $storedEnvironment : null;
         }
 
         if ($this->hasLegacyConfiguration($definition, $stored)) {
             $legacy = $this->legacyEnvironment($code, $stored);
-            if ($legacy !== null && array_key_exists($legacy, $environments)) {
-                return $legacy;
+            if ($legacy !== null) {
+                // Legacy flags like testing=true/is_production=false are
+                // authoritative negative evidence, even after retiring modes.
+                return array_key_exists($legacy, $environments) ? $legacy : null;
             }
         }
 
