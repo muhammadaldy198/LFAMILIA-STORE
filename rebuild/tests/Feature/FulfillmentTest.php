@@ -545,6 +545,9 @@ class FulfillmentTest extends TestCase
 
         Artisan::call('lfamilia:recover-fulfillment');
         Queue::assertNotPushed(ReconcileFulfillmentJob::class, fn (ReconcileFulfillmentJob $job): bool => $job->attemptId === (int) $attempt->id);
+
+        $this->expectException(ValidationException::class);
+        $service->retrySafeAttempt((int) $attempt->id);
     }
 
     public function test_uncertain_sku_keeps_checking_beyond_three_attempts_without_failover(): void
