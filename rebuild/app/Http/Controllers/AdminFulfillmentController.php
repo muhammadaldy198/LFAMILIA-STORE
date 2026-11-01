@@ -139,7 +139,7 @@ class AdminFulfillmentController
                 'DIGIFLAZZ' => 'Digiflazz',
                 default => $attempt->provider_code ?: 'Belum ditentukan',
             };
-            $terminal = ! in_array($attempt->order_status, ['PAID', 'PROCESSING'], true);
+            $terminal = in_array($attempt->order_status, ['PAID', 'PROCESSING'], true) === false;
             $quarantined = $attempt->provider_code === 'DIGIFLAZZ'
                 && $attempt->status === 'BLOCKED'
                 && str_starts_with((string) ($attempt->last_error ?? ''), 'LEGACY_ENV_QUARANTINED:');
@@ -196,10 +196,10 @@ class AdminFulfillmentController
                     && $manualAge > $manualOverdueMinutes,
                 'can_resolve_quarantine' => $canResolveQuarantine,
                 'resolution_destination' => $resolutionDestination,
-                'can_complete' => ! $terminal && $attempt->status === 'MANUAL_PENDING'
+                'can_complete' => $terminal === false && $attempt->status === 'MANUAL_PENDING'
                     && in_array($attempt->order_status, ['PAID', 'PROCESSING'], true),
-                'can_fail' => ! $terminal && $attempt->status === 'MANUAL_PENDING',
-                'can_reconcile' => ! $terminal && in_array($attempt->status, ['SENDING', 'PENDING', 'UNKNOWN'], true),
+                'can_fail' => $terminal === false && $attempt->status === 'MANUAL_PENDING',
+                'can_reconcile' => $terminal === false && in_array($attempt->status, ['SENDING', 'PENDING', 'UNKNOWN'], true),
                 'can_retry' => ($terminal || $quarantined)
                     ? false
                     : ($attempt->status === 'BLOCKED'
@@ -334,14 +334,14 @@ class AdminFulfillmentController
                 'fulfillment' => 'Proses ini sudah memiliki pembaruan yang lebih baru. Muat ulang halaman.',
             ]);
         }
-        if (! in_array($attempt->status, $allowedStatuses, true)) {
+        if (in_array($attempt->status, $allowedStatuses, true) === false) {
             throw ValidationException::withMessages([
                 'fulfillment' => 'Status proses ini tidak dapat menjalankan tindakan tersebut.',
             ]);
         }
 
         $orderStatus = DB::table('orders')->where('id', $attempt->order_id)->value('status');
-        if (! in_array($orderStatus, ['PAID', 'PROCESSING'], true)) {
+        if (in_array($orderStatus, ['PAID', 'PROCESSING'], true) === false) {
             throw ValidationException::withMessages([
                 'fulfillment' => 'Pesanan ini sudah selesai dan tidak dapat diproses ulang.',
             ]);
