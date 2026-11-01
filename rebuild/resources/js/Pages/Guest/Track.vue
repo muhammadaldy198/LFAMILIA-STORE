@@ -92,7 +92,8 @@ async function verifyRecovery(){
  try{
   const data=await json('/orders/track/recover',{method:'POST',body:JSON.stringify({invoice,whatsapp})});
   if(disposed||version!==selectionVersion||!detail.value?.paymentRecoverable)return;
-  recoveryUrl.value=data.payment_url||'';
+  if(data.payment_url)window.location.assign(data.payment_url);
+  else recoveryError.value='Tautan pembayaran tidak tersedia.';
  }catch(e){if(!disposed&&version===selectionVersion)recoveryError.value=e.message||'Verifikasi pembayaran gagal.';}
  finally{recoveryLoading.value=false;}
 }
@@ -167,9 +168,8 @@ onUnmounted(()=>{disposed=true;selectionVersion++;stopDetailPolling();if(feedTim
        <p class="text-sm text-white/70">Verifikasi invoice dan nomor WhatsApp saat checkout untuk mendapatkan tautan pembayaran yang aman.</p>
        <input v-if="detail.referenceMasked" v-model="recoveryInvoice" maxlength="80" autocomplete="off" placeholder="Nomor invoice lengkap" aria-label="Nomor invoice lengkap" class="w-full rounded-lg border border-white/20 bg-white/5 p-3 text-sm" @input="recoveryUrl=''">
        <input v-model="recoveryPhone" maxlength="32" inputmode="tel" autocomplete="tel" placeholder="Nomor WhatsApp checkout" aria-label="Nomor WhatsApp checkout" class="w-full rounded-lg border border-white/20 bg-white/5 p-3 text-sm" @input="recoveryUrl=''">
-       <button :disabled="recoveryLoading" class="lf-secondary" @click="verifyRecovery">{{recoveryLoading?'Memverifikasi...':'Verifikasi WhatsApp'}}</button>
+       <button :disabled="recoveryLoading" class="lf-primary" @click="verifyRecovery">{{recoveryLoading?'Memverifikasi...':'Lanjut Bayar'}}</button>
        <p v-if="recoveryError" role="alert" class="text-sm text-red-300">{{recoveryError}}</p>
-       <a v-if="recoveryUrl" :href="recoveryUrl" class="lf-primary">Lanjut Bayar</a>
      </div>
      <div v-else-if="detail.paymentExpired && nextAction!=='support'" class="mb-4 space-y-3 rounded-xl border border-white/10 p-4">
        <p class="text-sm">Batas waktu pembayaran pesanan ini sudah berakhir. Pembayaran tidak dapat dilanjutkan.</p>
