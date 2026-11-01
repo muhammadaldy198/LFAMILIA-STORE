@@ -12,6 +12,7 @@ use App\Models\Product;
 use App\Services\DigiflazzAutoSources;
 use App\Services\FulfillmentService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
@@ -472,6 +473,38 @@ class FulfillmentTest extends TestCase
         $service->startOrder($orderId);
         $service->reconcileAttempt((int) $attempt->id);
         Http::assertSentCount(1);
+    }
+
+    public function test_production_cutover_quarantines_old_digiflazz_attempts_before_scheduler_can_replay(): void
+    {
+        Queue::fake();
+        $this->credentials();
+        $catalog = $this->automaticCatalog();
+        $orderId = $this->paidOrder($catalog);
+
+        $service = app(FulfillmentService::class);
+        $service->startOrder($orderId);
+        $attempt = DB::table('fulfillment_attempts')->where('order_id', $orderId)->firstOrFail();
+        DB::table('fulfillment_attempts')->where('id', $attempt->id)->update([
+            'status' => 'PENDING',
+            'updated_at' => now()->subMinutes(10),
+        ]);
+
+        $migration = require database_path('migrations/2026_11_01_000000_remove_nonproduction_integration_profiles.php');
+        $migration->up();
+
+        $this->assertSame('BLOCKED', DB::table('fulfillment_attempts')
+            ->where('id', $attempt->id)->value('status'));
+        $this->assertSame('BLOCKED', DB::table('orders')
+            ->where('id', $orderId)->value('status'));
+        $this->assertDatabaseHas('admin_notifications', [
+            'event_type' => 'fulfillment.environment.quarantined',
+            'target_type' => 'fulfillment_attempt',
+            'target_id' => (string) $attempt->id,
+        ]);
+
+        Artisan::call('lfamilia:recover-fulfillment');
+        Queue::assertNotPushed(ReconcileFulfillmentJob::class, fn (ReconcileFulfillmentJob $job): bool => $job->attemptId === (int) $attempt->id);
     }
 
     public function test_uncertain_sku_keeps_checking_beyond_three_attempts_without_failover(): void
