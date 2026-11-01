@@ -226,14 +226,23 @@ test('resend-verification control is not nested inside the login form', () => {
 });
 
 
-test('wallet top-up payment groups show only logos while collapsed and compact two-column cards while expanded', () => {
+test('PR10 wallet reuses the single checkout payment picker without duplicating its markup or CSS', () => {
     const wallet = read('Pages/Customer/Wallet.vue');
-    assert.match(wallet, /openedPaymentGroup !== group\.code && \['va', 'ewallet'\]\.includes\(group\.code\)/);
-    assert.match(wallet, /v-for="channel in group\.items\.filter\(item => item\.logo_url\)"/);
-    assert.match(wallet, /:alt="channel\.name" loading="lazy"/);
-    assert.match(wallet, /openedPaymentGroup === group\.code/);
-    assert.match(wallet, /'grid-cols-2 p-2'/);
-    assert.match(wallet, /\{\{ channel\.name \}\}/);
+    const picker = read('Components/Checkout/PaymentMethods.vue');
+    assert.match(wallet, /import CheckoutPaymentMethods from '\.\.\/\.\.\/Components\/Checkout\/PaymentMethods\.vue'/);
+    assert.match(wallet, /<CheckoutPaymentMethods\s/);
+    assert.match(wallet, /:payment-channels="paymentChannels"/);
+    assert.match(wallet, /:selected-code="paymentChannelCode"/);
+    assert.match(wallet, /:locked="Boolean\(busy\) \|\| attemptLocked"/);
+    assert.match(wallet, /@select="paymentChannelCode = \$event"/);
+    assert.doesNotMatch(wallet, /lf-wallet-logo|openedPaymentGroup|paymentGroups|choosePaymentGroup|lf-payment-group-main|lf-payment-brand-strip/);
+    assert.match(picker, /class="lf-payment-group-main"/);
+    assert.match(picker, /class="lf-payment-brand-strip"/);
+    assert.match(picker, /class="lf-payment-brand-logo"/);
+    assert.match(picker, /class="lfx-payment-method-grid"/);
+    assert.match(picker, /v-for="channel in group\.items"/);
+    assert.match(picker, /if \(props\.locked\) return/);
+    assert.match(wallet, /watch\(\[amountIdr, paymentChannelCode\], \(\) => \{ quote\.value = null/);
     assert.match(wallet, /quote\.total_idr/);
     assert.match(wallet, /Biaya pembayaran/);
     assert.match(wallet, /await postJson\('\/account\/wallet\/topups\/quote'/);
