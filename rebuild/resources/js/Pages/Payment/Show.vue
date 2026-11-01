@@ -418,10 +418,13 @@ onBeforeUnmount(() => {
 .lf-payment-invoice-label { display: block; }
 .lf-payment-invoice-number {
     display: block;
-    margin-top: 5px;
     overflow-wrap: anywhere;
     white-space: normal;
     line-height: 1.5;
+}
+/* The old mobile rule uses !important on span:last-child; override only this chip. */
+.lf-payment-brand-row .lf-payment-invoice-number {
+    margin-top: 5px !important;
 }
 .lf-payment-actions > .lf-payment-check-action {
     display: flex;
