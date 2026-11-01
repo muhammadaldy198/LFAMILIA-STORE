@@ -97,8 +97,12 @@ try {
             await evaluate('document.querySelector(".lf-overlay").click()');
             await pause(60);
             if(await evaluate('Boolean(document.querySelector(".lf-drawer.open"))'))throw Error('PR3 mobile drawer did not close '+width);
-        }else if(metrics.links.length<3||metrics.links.some(link=>link.height<44||!link.href||link.href==="#")){
-            throw Error('PR3 desktop navigation is inaccessible: '+JSON.stringify(metrics.links));
+        }else{
+            if(metrics.links.length<3||metrics.links.some(link=>link.height<44||!link.href||link.href==="#")){
+                throw Error('PR3 desktop navigation is inaccessible: '+JSON.stringify(metrics.links));
+            }
+            // Keep the backdrop from obscuring the desktop header/popular screenshots.
+            await evaluate('document.querySelector(".lf-home-popup-close")?.click()');
         }
         // Capture header and visible popular pill together (sticky header).
         await evaluate('(()=>{const el=document.querySelector(".lf-popular");if(el)window.scrollTo(0,Math.max(0,window.scrollY+el.getBoundingClientRect().top-100))})()');
