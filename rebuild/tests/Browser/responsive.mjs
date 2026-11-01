@@ -166,38 +166,54 @@ try {
         const gameActions=await evaluate(`(()=>[...document.querySelectorAll('.lf-account-card-head button[aria-label^="Edit "], .lf-account-card-head button[aria-label^="Hapus "]')].map(el=>({height:el.getBoundingClientRect().height,visible:getComputedStyle(el).display!=='none'})))()`);
         if(gameActions.length<2||gameActions.some(action=>action.visible&&action.height<40))throw Error('F18 game account action missing or below 40px '+JSON.stringify({width,gameActions}));
 
-        // Real customer wallet interaction checks (both mobile and desktop).
+        // Real wallet smoke: shared checkout selector uses the same logo row and radio cards.
         await navigate('/account/wallet');
         for(const category of ['E-Wallet','Virtual Account']){
             const before=await evaluate(`(()=>{
-                const region=document.querySelector('[aria-label="Pilih metode pembayaran top up"]');
-                const button=[...(region?.querySelectorAll('button[aria-expanded]')||[])].find(b=>b.innerText.includes(${JSON.stringify(category)}));
-                const preview=button?.parentElement.querySelector('[aria-label="Logo metode pembayaran"]');
+                const card=[...document.querySelectorAll('.lf-payment-group-card')]
+                    .find(card=>card.querySelector('.lf-payment-group-copy strong')?.textContent.trim()===${JSON.stringify(category)});
+                const button=card?.querySelector('.lf-payment-group-main');
+                const preview=card?.querySelector('.lf-payment-brand-strip--logos');
                 const style=preview&&getComputedStyle(preview);
-                const item=preview?.querySelector('.lf-wallet-logo');
-                const itemStyle=item&&getComputedStyle(item);
-                return {found:!!button,images:preview?.querySelectorAll('img').length||0,text:preview?.textContent?.trim()||'',wrap:style?.flexWrap,overflow:style?.overflow,shrink:itemStyle?.flexShrink,minWidth:itemStyle?.minWidth};
+                const logo=preview?.querySelector('.lf-payment-brand-logo');
+                const logoStyle=logo&&getComputedStyle(logo);
+                return {found:!!button,images:preview?.querySelectorAll('img').length||0,
+                    text:preview?.textContent?.trim()||'',wrap:style?.flexWrap,
+                    overflow:style?.overflow,shrink:logoStyle?.flexShrink,minWidth:logoStyle?.minWidth};
             })()`);
-            if(!before.found||before.images<1||before.text||before.wrap!=='nowrap'||before.overflow!=='hidden'||Number(before.shrink)!==1||before.minWidth!=='0px')throw Error('Wallet logo row must stay shrinkable on one line '+JSON.stringify({width,category,before}));
+            if(!before.found||before.images<1||before.text||before.wrap!=='nowrap'||before.overflow!=='hidden'||Number(before.shrink)!==1||before.minWidth!=='0px')
+                throw Error('Shared wallet logo row must stay shrinkable on one line '+JSON.stringify({width,category,before}));
             await evaluate(`(()=>{
-                const region=document.querySelector('[aria-label="Pilih metode pembayaran top up"]');
-                [...region.querySelectorAll('button[aria-expanded]')].find(b=>b.innerText.includes(${JSON.stringify(category)})).click();
+                [...document.querySelectorAll('.lf-payment-group-card')]
+                    .find(card=>card.querySelector('.lf-payment-group-copy strong')?.textContent.trim()===${JSON.stringify(category)})
+                    .querySelector('.lf-payment-group-main').click();
             })()`);
             await pause(100);
             const after=await evaluate(`(()=>{
-                const region=document.querySelector('[aria-label="Pilih metode pembayaran top up"]');
-                const button=[...region.querySelectorAll('button[aria-expanded]')].find(b=>b.innerText.includes(${JSON.stringify(category)}));
-                const grid=button?.parentElement.querySelector('[role="radiogroup"]');
+                const card=[...document.querySelectorAll('.lf-payment-group-card')]
+                    .find(card=>card.querySelector('.lf-payment-group-copy strong')?.textContent.trim()===${JSON.stringify(category)});
+                const button=card?.querySelector('.lf-payment-group-main');
+                const grid=card?.querySelector('.lfx-payment-method-grid--compact');
                 const cols=grid?getComputedStyle(grid).gridTemplateColumns.split(' ').length:0;
-                return {expanded:button?.getAttribute('aria-expanded'),preview:!!button?.parentElement.querySelector('[aria-label="Logo metode pembayaran"]'),cols,method:!!grid?.querySelector('button[role="radio"] strong'),scroll:document.documentElement.scrollWidth};
+                const title=card?.querySelector('.lf-payment-group-copy strong');
+                const description=card?.querySelector('.lf-payment-group-copy small');
+                const header=button?.getBoundingClientRect(),label=title?.getBoundingClientRect(),desc=description?.getBoundingClientRect();
+                const badge=card?.querySelector('.lf-payment-check')?.getBoundingClientRect();
+                return {selected:card?.classList.contains('selected'),preview:!!card?.querySelector('.lf-payment-brand-strip--logos'),
+                    cols,method:!!grid?.querySelector('.lfx-payment-method-card .lfx-payment-method-name'),
+                    badgeWithin:!!badge&&badge.right<=header.right+1,
+                    descWithin:!!desc&&desc.bottom<=header.bottom+1,
+                    titleLeft:label?.left-header?.left,titleFits:title?.scrollWidth<=title?.clientWidth+1,
+                    scroll:document.documentElement.scrollWidth};
             })()`);
-            if(after.expanded!=='true'||after.preview||after.cols!==2||!after.method||after.scroll>width+2)throw Error('Wallet expanded grid invalid '+JSON.stringify({width,category,after}));
-            const walletHeader=await evaluate(`(()=>{const region=document.querySelector('[aria-label="Pilih metode pembayaran top up"]');const button=[...(region?.querySelectorAll('button[aria-expanded]')||[])].find(b=>b.innerText.includes(${JSON.stringify(category)}));const badge=button?.querySelector('.rounded-full');const title=button?.querySelector('strong');if(!badge||!title)return null;const b=badge.getBoundingClientRect(),t=title.getBoundingClientRect(),h=button.getBoundingClientRect();return {badgeWithin:b.right<=h.right+1,badgeClear:b.left>=t.right-1,notClipped:title.scrollWidth<=title.clientWidth+1};})()`);
-            if(!walletHeader||!walletHeader.badgeWithin||!walletHeader.badgeClear||!walletHeader.notClipped)throw Error('F15 wallet header text clipped '+JSON.stringify({width,category,walletHeader}));
+            if(!after.selected||after.preview||after.cols!==2||!after.method||after.scroll>width+2)
+                throw Error('Shared wallet expanded grid invalid '+JSON.stringify({width,category,after}));
+            if(!after.badgeWithin||!after.descWithin||!after.titleFits||after.titleLeft<0)
+                throw Error('Shared wallet header text clipped '+JSON.stringify({width,category,after}));
             await mkdir('checkout-visual-results',{recursive:true});
             const image=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});
             await writeFile('checkout-visual-results/wallet-'+(category==='E-Wallet'?'ewallet':'va')+'-'+width+'.png',Buffer.from(image.data,'base64'));
-            console.log('PASS wallet top-up '+category+' '+width);
+            console.log('PASS shared wallet top-up '+category+' '+width);
         }
     }
     await navigate('/admin/login');
