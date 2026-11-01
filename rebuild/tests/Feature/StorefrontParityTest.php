@@ -430,6 +430,33 @@ class StorefrontParityTest extends TestCase
         $this->assertFalse((bool) $catalog['product']->fresh()->popular);
     }
 
+    public function test_popular_payload_uses_real_publisher_or_null_without_category_fallback(): void
+    {
+        $catalog = $this->catalog();
+        $product = $catalog['product'];
+        $product->update(['popular' => true, 'name' => 'Mobile Legends Bang Bang']);
+
+        $this->get('/')->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Catalog/Index')
+                ->where('popularProducts', fn ($items) => collect($items)
+                    ->contains(fn ($row) => $row['slug'] === $product->slug
+                        && $row['name'] === 'Mobile Legends Bang Bang'
+                        && $row['publisher'] === 'Parity Publisher'))
+                ->etc());
+
+        $product->update(['publisher' => null]);
+
+        $this->get('/')->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Catalog/Index')
+                ->where('popularProducts', fn ($items) => collect($items)
+                    ->contains(fn ($row) => $row['slug'] === $product->slug
+                        && $row['publisher'] === null
+                        && filled($row['category_name'])))
+                ->etc());
+    }
+
     public function test_super_admin_can_manage_product_notice_group_publisher_and_review_visibility(): void
     {
         $catalog = $this->catalog();
