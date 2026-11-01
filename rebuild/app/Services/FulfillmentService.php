@@ -567,13 +567,13 @@ class FulfillmentService
         string $note,
         string $confirmedCustomerNo,
     ): int {
-        // Codes 01/70 are uncertain even when Digiflazz labels them "Gagal".
-        // Only documented conclusive buyer failures may authorize a NEW send.
+        // Only known final results of a transaction that WAS created
+        // may authorize reissue after a superadmin verifies the history.
+        // Reject 01/70 (timeouts), 49 (duplicate ref_id), 50 (not found)
+        // and request-validation errors: none establishes the old result.
         $definitiveFailureCodes = [
-            '02', '40', '41', '42', '43', '44', '45', '47', '49',
-            '50', '51', '52', '53', '54', '55', '56', '57', '58',
-            '59', '60', '61', '62', '63', '64', '65', '66', '67',
-            '68', '69', '71', '72', '73', '74', '80', '81', '82',
+            '02', '51', '52', '53', '54', '55', '57', '58',
+            '59', '60', '71', '72', '73', '74', '84',
         ];
         if (! in_array($providerRc, $definitiveFailureCodes, true)) {
             throw ValidationException::withMessages([
