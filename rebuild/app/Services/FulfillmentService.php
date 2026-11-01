@@ -218,7 +218,7 @@ class FulfillmentService
         }
 
         try {
-            $response = $this->digiflazz->transact($context['request']);
+            $response = $this->digiflazz->transact($context['request'], $attemptId);
         } catch (ValidationException $exception) {
             $this->markBlocked($attemptId, $exception->getMessage());
 
@@ -306,7 +306,7 @@ class FulfillmentService
             }
 
             try {
-                $response = $this->digiflazz->transact($request);
+                $response = $this->digiflazz->transact($request, $attemptId);
             } catch (ValidationException $exception) {
                 $this->recordReconciliationError($attemptId, 'Integrasi provider belum siap untuk reconciliation.');
 
@@ -376,6 +376,12 @@ class FulfillmentService
                 ->lockForUpdate()->first();
             if (! $attempt) {
                 throw ValidationException::withMessages(['fulfillment' => 'Fulfillment attempt tidak ditemukan.']);
+            }
+
+            // A pre-cutover response must never undo a quarantined attempt,
+            // including an authenticated webhook arriving after migration.
+            if ($this->isLegacyQuarantined($attempt)) {
+                return false;
             }
 
             $order = DB::table('orders')->where('id', $attempt->order_id)->lockForUpdate()->first();
@@ -783,6 +789,9 @@ class FulfillmentService
             if (! $attempt || in_array($attempt->status, ['SUCCESS', 'FAILED_CONFIRMED', 'CANCELLED'], true)) {
                 return;
             }
+            if ($this->isLegacyQuarantined($attempt)) {
+                return;
+            }
 
             $order = DB::table('orders')->where('id', $attempt->order_id)->lockForUpdate()->first();
             if ($order?->status === 'CANCELLED') {
@@ -835,6 +844,9 @@ class FulfillmentService
             if (! $attempt || in_array($attempt->status, ['SUCCESS', 'FAILED_CONFIRMED', 'CANCELLED'], true)) {
                 return;
             }
+            if ($this->isLegacyQuarantined($attempt)) {
+                return;
+            }
 
             $order = DB::table('orders')->where('id', $attempt->order_id)->lockForUpdate()->first();
             if ($order?->status === 'CANCELLED') {
@@ -862,10 +874,21 @@ class FulfillmentService
         }, 3);
     }
 
+    /**
+     * Persisted cutover quarantine must survive late queue responses and
+     * callbacks without ever marking an unverified delivery as successful.
+     */
+    private function isLegacyQuarantined(object $attempt): bool
+    {
+        return $attempt->status === 'BLOCKED'
+            && str_starts_with((string) ($attempt->last_error ?? ''), 'LEGACY_ENV_QUARANTINED:');
+    }
+
     private function recordReconciliationError(int $attemptId, string $reason): void
     {
-        DB::table('fulfillment_attempts')->where('id', $attemptId)->update([
-            'last_error' => substr($reason, 0, 4000),
+        DB::table('fulfillment_attempts')->where('id', $attemptId)
+            ->where('status', '<>', 'BLOCKED')->update([
+                'last_error' => substr($reason, 0, 4000),
             'last_checked_at' => now(),
             'updated_at' => now(),
         ]);
