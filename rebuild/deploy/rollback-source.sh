@@ -44,9 +44,16 @@ GIT_CONFIG_VALUE_0="${REPO_DIR}" \
 "${PHP_BIN}" artisan route:clear
 "${PHP_BIN}" artisan config:clear
 "${PHP_BIN}" artisan config:cache
-# Source rollback must not silently restore an old UTC app configuration.
-"${PHP_BIN}" -r '$config = require "bootstrap/cache/config.php"; exit(($config["app"]["timezone"] ?? null) === "Asia/Jakarta" ? 0 : 1);' \
-  || { echo "Cached app timezone must be Asia/Jakarta; aborting rollback." >&2; exit 1; }
+# The target source controls the timezone: older LFAMILIA releases without
+# config/app.php use Laravel's UTC default. Newer releases require WIB.
+# Keep this check after checkout/config:cache so it validates the target code,
+# not the deploy script version that started the rollback.
+rollback_timezone="UTC"
+if [[ -f config/app.php ]]; then
+  rollback_timezone="Asia/Jakarta"
+fi
+ROLLBACK_EXPECTED_TIMEZONE="${rollback_timezone}" "${PHP_BIN}" -r '$config = require "bootstrap/cache/config.php"; exit(($config["app"]["timezone"] ?? null) === getenv("ROLLBACK_EXPECTED_TIMEZONE") ? 0 : 1);' \
+  || { echo "Cached app timezone does not match rollback target (${rollback_timezone}); aborting rollback." >&2; exit 1; }
 "${PHP_BIN}" artisan view:cache
 "${PHP_BIN}" artisan queue:restart
 systemctl restart "${PHP_FPM_SERVICE}"
