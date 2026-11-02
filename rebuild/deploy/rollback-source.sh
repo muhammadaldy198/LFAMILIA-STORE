@@ -44,6 +44,9 @@ GIT_CONFIG_VALUE_0="${REPO_DIR}" \
 "${PHP_BIN}" artisan route:clear
 "${PHP_BIN}" artisan config:clear
 "${PHP_BIN}" artisan config:cache
+# Source rollback must not silently restore an old UTC app configuration.
+"${PHP_BIN}" -r '$config = require "bootstrap/cache/config.php"; exit(($config["app"]["timezone"] ?? null) === "Asia/Jakarta" ? 0 : 1);' \
+  || { echo "Cached app timezone must be Asia/Jakarta; aborting rollback." >&2; exit 1; }
 "${PHP_BIN}" artisan view:cache
 "${PHP_BIN}" artisan queue:restart
 systemctl restart "${PHP_FPM_SERVICE}"
