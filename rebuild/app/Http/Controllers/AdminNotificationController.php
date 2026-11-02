@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -22,7 +23,19 @@ class AdminNotificationController
                 })
                 ->orderByDesc('notifications.id')
                 ->select('notifications.*', 'reads.read_at')
-                ->paginate(30),
+                ->paginate(30)
+                ->through(static function (object $notification): object {
+                    // MySQL DATETIME has no offset; historical notification values
+                    // represent UTC instants, not local wall-clock time.
+                    $notification->created_at = CarbonImmutable::parse($notification->created_at, 'UTC')
+                        ->toIso8601String();
+                    if ($notification->read_at !== null) {
+                        $notification->read_at = CarbonImmutable::parse($notification->read_at, 'UTC')
+                            ->toIso8601String();
+                    }
+
+                    return $notification;
+                }),
         ]);
     }
 
@@ -33,7 +46,7 @@ class AdminNotificationController
         DB::table('admin_notification_reads')->insertOrIgnore([
             'admin_notification_id' => $id,
             'admin_user_id' => $request->user('admin')->id,
-            'read_at' => now(),
+            'read_at' => now('UTC'),
         ]);
 
         return back();
@@ -47,7 +60,7 @@ class AdminNotificationController
                 $notifications->map(fn (object $notification): array => [
                     'admin_notification_id' => $notification->id,
                     'admin_user_id' => $adminId,
-                    'read_at' => now(),
+                    'read_at' => now('UTC'),
                 ])->all()
             );
         });

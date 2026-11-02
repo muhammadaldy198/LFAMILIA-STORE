@@ -263,7 +263,7 @@ class CustomerAreaTest extends TestCase
         $this->actingAs($user, 'web')->get('/account/tickets/'.$ticket->id)
             ->assertOk()->assertInertia(fn ($page) => $page->where(
                 'messages.0.created_at',
-                Carbon::parse($timestamp, config('app.timezone'))->toIso8601String()
+                Carbon::parse($timestamp, 'UTC')->toIso8601String()
             ));
     }
 }

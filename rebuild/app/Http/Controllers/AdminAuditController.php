@@ -140,7 +140,7 @@ class AdminAuditController
                 'ip_address' => $row->ip_address,
                 'user_agent' => $row->user_agent ? mb_substr((string) $row->user_agent, 0, 500) : null,
                 'correlation_id' => (string) $row->correlation_id,
-                'created_at' => Carbon::parse($row->created_at, config('app.timezone', 'UTC'))->toIso8601String(),
+                'created_at' => Carbon::parse($row->created_at, 'UTC')->toIso8601String(),
             ];
         });
 
@@ -214,7 +214,7 @@ class AdminAuditController
     /** Samakan batas tanggal dengan zona waktu yang dipakai saat baris audit ditulis. */
     private function storageTime(Carbon $moment): Carbon
     {
-        return $moment->setTimezone(config('app.timezone', 'UTC'));
+        return $moment->setTimezone('UTC');
     }
 
     private function safeState(mixed $value, AdminAuditService $audit): mixed

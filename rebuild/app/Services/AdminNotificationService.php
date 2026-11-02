@@ -66,7 +66,8 @@ class AdminNotificationService
             'target_type' => $targetType,
             'target_id' => $targetId === null ? null : (string) $targetId,
             'data' => $data === [] ? null : json_encode($data, JSON_THROW_ON_ERROR),
-            'created_at' => now(),
+            // Keep raw SQL notification timestamps in UTC even when app.timezone is WIB.
+            'created_at' => now('UTC'),
         ]);
 
         if ($dispatchJob) {

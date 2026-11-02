@@ -30,6 +30,35 @@ class DeploymentM12Test extends TestCase
             ]);
     }
 
+    public function test_application_uses_wib_and_deployment_guards_its_cached_configuration(): void
+    {
+        $this->assertSame('Asia/Jakarta', config('app.timezone'));
+        // The SQL storage clock stays UTC so historical order expiries are
+        // not reinterpreted seven hours early when the UI timezone is WIB.
+        $this->assertSame('UTC', date_default_timezone_get());
+        $this->assertSame('Asia/Jakarta', app('log')->getLogger()->getTimezone()->getName());
+
+        $beforeExpiryUtc = new \DateTimeImmutable('2026-11-02 05:00:00', new \DateTimeZone('UTC'));
+        $expiresAt = new \DateTimeImmutable('2026-11-02 05:30:00');
+        $this->assertLessThan($expiresAt, $beforeExpiryUtc);
+
+        $config = file_get_contents(base_path('config/app.php'));
+        $preflight = file_get_contents(base_path('deploy/preflight.sh'));
+        $deploy = file_get_contents(base_path('deploy/deploy.sh'));
+        $rollback = file_get_contents(base_path('deploy/rollback-source.sh'));
+
+        $this->assertStringContainsString("env('APP_TIMEZONE', 'Asia/Jakarta')", $config);
+        $this->assertStringContainsString("'APP_TIMEZONE=Asia/Jakarta'", $preflight);
+        $this->assertStringContainsString('artisan config:cache', $deploy);
+        $this->assertStringContainsString('bootstrap/cache/config.php', $deploy);
+        $this->assertStringContainsString('=== "Asia/Jakarta"', $deploy);
+        $this->assertStringContainsString('bootstrap/cache/config.php', $rollback);
+        $this->assertStringContainsString('rollback_timezone="UTC"', $rollback);
+        $this->assertStringContainsString('[[ -f config/app.php ]]', $rollback);
+        $this->assertStringContainsString('rollback_timezone="Asia/Jakarta"', $rollback);
+        $this->assertStringContainsString('getenv("ROLLBACK_EXPECTED_TIMEZONE")', $rollback);
+    }
+
     public function test_m12_production_templates_keep_secrets_out_of_git(): void
     {
         $production = file_get_contents(base_path('deploy/production.env.example'));

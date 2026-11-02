@@ -3,9 +3,11 @@
 namespace App\Providers;
 
 use App\Services\PublicOrderStatusService;
+use DateTimeZone;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Middleware\TrustProxies;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use LogicException;
@@ -20,6 +22,14 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // Configuration and panel presentation use Asia/Jakarta (WIB), but
+        // the database has years of offset-less UTC timestamps. Keep PHP's
+        // default clock in UTC so now(), comparisons with legacy SQL dates,
+        // and all new persisted timestamps remain on the same timeline.
+        // Change the Monolog output timezone instead of moving the DB clock.
+        date_default_timezone_set('UTC');
+        Log::getLogger()->setTimezone(new DateTimeZone('Asia/Jakarta'));
+
         TrustProxies::flushState();
         $trustedProxies = config('lfamilia.trusted_proxies', []);
         if ($trustedProxies !== [] && $trustedProxies !== '') {

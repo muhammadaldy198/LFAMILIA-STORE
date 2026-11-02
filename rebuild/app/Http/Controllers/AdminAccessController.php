@@ -58,9 +58,9 @@ class AdminAccessController
                 'role' => (string) $admin->role,
                 'permissions' => $admin->role === 'ADMIN' ? array_values($admin->permissions ?? []) : [],
                 'is_active' => (bool) $admin->is_active,
-                'last_login_at' => $admin->last_login_at ? Carbon::parse($admin->last_login_at, config('app.timezone'))->toIso8601String() : null,
-                'created_at' => Carbon::parse($admin->created_at, config('app.timezone'))->toIso8601String(),
-                'updated_at' => Carbon::parse($admin->updated_at, config('app.timezone'))->toIso8601String(),
+                'last_login_at' => $admin->last_login_at ? Carbon::parse($admin->last_login_at, 'UTC')->toIso8601String() : null,
+                'created_at' => Carbon::parse($admin->created_at, 'UTC')->toIso8601String(),
+                'updated_at' => Carbon::parse($admin->updated_at, 'UTC')->toIso8601String(),
             ]);
 
         $supportedAdmins = AdminUser::query()->whereIn('role', ['SUPER_ADMIN', 'ADMIN']);
@@ -103,7 +103,7 @@ class AdminAccessController
             'action' => (string) $row->action,
             'action_label' => $labels->actionLabel((string) $row->action),
             'target_id' => $row->target_id,
-            'created_at' => Carbon::parse($row->created_at, config('app.timezone'))->toIso8601String(),
+            'created_at' => Carbon::parse($row->created_at, 'UTC')->toIso8601String(),
         ])->values();
 
         return Inertia::render('Admin/Access', [

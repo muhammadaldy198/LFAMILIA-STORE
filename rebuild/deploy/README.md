@@ -61,6 +61,53 @@ Script:
 
 Deployment gagal meninggalkan aplikasi dalam maintenance mode agar half-upgraded runtime tidak disajikan.
 
+## Jam notifikasi panel — WIB (2 November 2026)
+
+Laravel 12 dalam repo ini sebelumnya tidak punya `config/app.php`, sehingga
+`APP_TIMEZONE=Asia/Jakarta` di `.env` tidak digunakan dan cache bisa
+menyimpan nilai bawaan framework `UTC`. File `config/app.php` sekarang
+membaca `APP_TIMEZONE` dan memiliki fallback `Asia/Jakarta`.
+
+**Pemisahan jam yang disengaja:** `config('app.timezone')` adalah
+`Asia/Jakarta`, tetapi default clock PHP dikembalikan ke `UTC` pada
+`AppServiceProvider` untuk mempertahankan perbandingan waktu pesanan dan
+penyimpanan timestamp historis yang tidak memiliki offset. Logger Monolog
+secara khusus memakai `Asia/Jakarta` supaya baris log berwaktu WIB.
+Jangan menghapus pemisahan ini tanpa memigrasikan/meninjau seluruh
+timestamp dan alur kedaluwarsa pembayaran.
+
+- Preflight mewajibkan baris `APP_TIMEZONE=Asia/Jakarta` pada `.env` produksi.
+- Deploy memvalidasi `bootstrap/cache/config.php` setelah
+  `artisan config:cache` dan hanya menerima `Asia/Jakarta` sebelum restart.
+- Rollback memvalidasi timezone berdasarkan **source yang dituju**: rilis
+  lama yang belum memiliki `config/app.php` menerima default Laravel
+  `UTC`, sedangkan rilis baru yang memilikinya wajib `Asia/Jakarta`.
+  Hal ini mencegah rollback aman terhenti di maintenance mode hanya karena
+  rilis lama memang memakai UTC.
+- Jangan mencetak seluruh cache: isinya dapat memuat rahasia.
+- Catatan: script deploy yang **sedang dieksekusi** adalah versi yang
+  dipanggil pada awal deploy. Pada deploy pertama yang mengambil perubahan
+  script dari GitHub, pengamanan tambahan tersebut baru efektif pada
+  eksekusi berikutnya; verifikasi manual cache wajib pada deploy pertama.
+- Tanpa migrasi atau mengubah timestamp historis. Nilai lama pada tabel
+  `admin_notifications` ditafsirkan sebagai waktu UTC ketika dirender;
+  notifikasi baru pun disimpan sebagai UTC agar tidak mencampur dua format
+  dalam satu tabel.
+
+Pemeriksaan operator **sesudah deploy** dari direktori `rebuild/`
+(menampilkan timezone saja, tidak mengeluarkan rahasia):
+
+```bash
+php -r '$c = require "bootstrap/cache/config.php"; echo $c["app"]["timezone"] ?? "missing", PHP_EOL;'
+```
+
+Pastikan hasilnya `Asia/Jakarta`, buka notifikasi historis di panel dan
+konfirmasi contoh `05:20 UTC` tampil `12:20 WIB`; buat/cek notifikasi
+baru sesuai kejadian serta periksa zona waktu pada baris log Laravel.
+Periksa juga worker queue/scheduler dan jalur kedaluwarsa pembayaran karena
+mengubah timezone aplikasi bisa memengaruhi penafsiran timestamp lama di
+bagian lain. Jangan ubah data historis untuk menyamarkan masalah timezone.
+
 ## Preflight
 
 `deploy/preflight.sh` memverifikasi file ops/env, executable yang diperlukan, PHP 8.4+, PHP extensions, production Laravel settings, Composer config, MySQL connectivity/version, Redis localhost connectivity, backup prerequisites, dan service PHP-FPM.

@@ -154,7 +154,7 @@ class AdminReportController
             '90d' => [Carbon::parse($today, 'Asia/Jakarta')->subDays(89)->toDateString(), $today],
             'all' => [
                 DB::table('orders')->min('created_at')
-                    ? Carbon::parse((string) DB::table('orders')->min('created_at'), config('app.timezone', 'UTC'))->setTimezone('Asia/Jakarta')->toDateString()
+                    ? Carbon::parse((string) DB::table('orders')->min('created_at'), 'UTC')->setTimezone('Asia/Jakarta')->toDateString()
                     : $today,
                 $today,
             ],
@@ -176,13 +176,13 @@ class AdminReportController
     private function wibStart(string $date): Carbon
     {
         return Carbon::createFromFormat('Y-m-d', $date, 'Asia/Jakarta')->startOfDay()
-            ->setTimezone(config('app.timezone', 'UTC'));
+            ->setTimezone('UTC');
     }
 
     private function wibEnd(string $date): Carbon
     {
         return Carbon::createFromFormat('Y-m-d', $date, 'Asia/Jakarta')->endOfDay()
-            ->setTimezone(config('app.timezone', 'UTC'));
+            ->setTimezone('UTC');
     }
 
     /**
@@ -205,7 +205,7 @@ class AdminReportController
         }
 
         // Kelompokkan per tanggal WIB, bukan tanggal zona penyimpanan.
-        $offset = Carbon::now(config('app.timezone', 'UTC'))->format('P');
+        $offset = Carbon::now('UTC')->format('P');
         $day = "DATE(CONVERT_TZ(created_at, '".$offset."', '+07:00'))";
         $select[0] = $day.' as day';
 
