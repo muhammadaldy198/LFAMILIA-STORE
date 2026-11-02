@@ -30,6 +30,25 @@ class DeploymentM12Test extends TestCase
             ]);
     }
 
+    public function test_application_uses_wib_and_deployment_guards_its_cached_configuration(): void
+    {
+        $this->assertSame('Asia/Jakarta', config('app.timezone'));
+        $this->assertSame('Asia/Jakarta', date_default_timezone_get());
+
+        $config = file_get_contents(base_path('config/app.php'));
+        $preflight = file_get_contents(base_path('deploy/preflight.sh'));
+        $deploy = file_get_contents(base_path('deploy/deploy.sh'));
+        $rollback = file_get_contents(base_path('deploy/rollback-source.sh'));
+
+        $this->assertStringContainsString("env('APP_TIMEZONE', 'Asia/Jakarta')", $config);
+        $this->assertStringContainsString("'APP_TIMEZONE=Asia/Jakarta'", $preflight);
+        $this->assertStringContainsString('artisan config:cache', $deploy);
+        $this->assertStringContainsString('bootstrap/cache/config.php', $deploy);
+        $this->assertStringContainsString('=== "Asia/Jakarta"', $deploy);
+        $this->assertStringContainsString('bootstrap/cache/config.php', $rollback);
+        $this->assertStringContainsString('=== "Asia/Jakarta"', $rollback);
+    }
+
     public function test_m12_production_templates_keep_secrets_out_of_git(): void
     {
         $production = file_get_contents(base_path('deploy/production.env.example'));
