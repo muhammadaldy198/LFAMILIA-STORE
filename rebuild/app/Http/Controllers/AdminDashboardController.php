@@ -129,7 +129,7 @@ class AdminDashboardController
                         'payment_channel' => $order->payment_channel_name_db
                             ?: ($order->payment_channel_db ? strtoupper(str_replace('_', ' ', $order->payment_channel_db)) : '—'),
                         'payment_status' => $order->payment_status_db ?: ($order->paid_at ? 'PAID' : 'PENDING'),
-                        'created_at' => Carbon::parse($order->created_at, config('app.timezone'))->toIso8601String(),
+                        'created_at' => Carbon::parse($order->created_at, 'UTC')->toIso8601String(),
                         ...($finance ? ['total_idr' => (int) $order->total_idr] : []),
                     ];
                 })->all();
