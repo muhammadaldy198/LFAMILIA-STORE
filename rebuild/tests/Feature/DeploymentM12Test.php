@@ -33,7 +33,14 @@ class DeploymentM12Test extends TestCase
     public function test_application_uses_wib_and_deployment_guards_its_cached_configuration(): void
     {
         $this->assertSame('Asia/Jakarta', config('app.timezone'));
-        $this->assertSame('Asia/Jakarta', date_default_timezone_get());
+        // The SQL storage clock stays UTC so historical order expiries are
+        // not reinterpreted seven hours early when the UI timezone is WIB.
+        $this->assertSame('UTC', date_default_timezone_get());
+        $this->assertSame('Asia/Jakarta', app('log')->getLogger()->getTimezone()->getName());
+
+        $beforeExpiryUtc = new \DateTimeImmutable('2026-11-02 05:00:00', new \DateTimeZone('UTC'));
+        $expiresAt = new \DateTimeImmutable('2026-11-02 05:30:00');
+        $this->assertLessThan($expiresAt, $beforeExpiryUtc);
 
         $config = file_get_contents(base_path('config/app.php'));
         $preflight = file_get_contents(base_path('deploy/preflight.sh'));
