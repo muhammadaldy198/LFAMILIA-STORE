@@ -138,11 +138,12 @@ class CatalogController
             ->when(($filters['mode'] ?? null) === 'manual', fn ($query) => $query->where('fulfillment_mode', 'MANUAL'))
             ->when($search !== '', fn ($query) => $this->searchScope($query, $search));
 
-        // Natural name order is calculated before pagination so numbered names
-        // (5, 20, 1100) do not move between pages in SQL string order.
+        // Admin sort_order takes precedence; natural name and id break ties before
+        // pagination so numbered names (5, 20, 1100) stay stable across pages.
         $buyable = $baseProducts->whereIn('id', $this->buyableProductIds());
-        $orderedIds = (clone $buyable)->withoutEagerLoads()->reorder()->get(['id', 'name'])
-            ->sort(fn (Product $a, Product $b): int => strnatcasecmp($a->name, $b->name)
+        $orderedIds = (clone $buyable)->withoutEagerLoads()->reorder()->get(['id', 'name', 'sort_order'])
+            ->sort(fn (Product $a, Product $b): int => ((int) $a->sort_order <=> (int) $b->sort_order)
+                ?: strnatcasecmp($a->name, $b->name)
                 ?: ($a->id <=> $b->id))->pluck('id')->values();
         $perPage = 24;
         $currentPage = max(1, (int) $request->query('page', 1));
