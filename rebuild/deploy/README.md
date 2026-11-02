@@ -68,6 +68,14 @@ Laravel 12 dalam repo ini sebelumnya tidak punya `config/app.php`, sehingga
 menyimpan nilai bawaan framework `UTC`. File `config/app.php` sekarang
 membaca `APP_TIMEZONE` dan memiliki fallback `Asia/Jakarta`.
 
+**Pemisahan jam yang disengaja:** `config('app.timezone')` adalah
+`Asia/Jakarta`, tetapi default clock PHP dikembalikan ke `UTC` pada
+`AppServiceProvider` untuk mempertahankan perbandingan waktu pesanan dan
+penyimpanan timestamp historis yang tidak memiliki offset. Logger Monolog
+secara khusus memakai `Asia/Jakarta` supaya baris log berwaktu WIB.
+Jangan menghapus pemisahan ini tanpa memigrasikan/meninjau seluruh
+timestamp dan alur kedaluwarsa pembayaran.
+
 - Preflight mewajibkan baris `APP_TIMEZONE=Asia/Jakarta` pada `.env` produksi.
 - Deploy dan rollback memvalidasi `bootstrap/cache/config.php` setelah
   `artisan config:cache`. Nilai selain `Asia/Jakarta` menghentikan proses
