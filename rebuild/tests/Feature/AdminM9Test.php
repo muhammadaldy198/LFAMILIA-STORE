@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Services\AdminNotificationService;
 use App\Services\AdminPermissionService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Queue;
@@ -224,6 +225,40 @@ class AdminM9Test extends TestCase
             'admin_notification_id' => $notificationId,
             'admin_user_id' => $second->id,
         ]);
+    }
+
+    public function test_admin_notifications_keep_utc_in_database_and_render_historical_utc_instants(): void
+    {
+        // 12:21 WIB is 05:21 UTC. Do not shift persisted SQL timestamps
+        // when Laravel's application timezone changes to Asia/Jakarta.
+        Carbon::setTestNow(Carbon::parse('2026-11-02 12:21:00', 'Asia/Jakarta'));
+
+        try {
+            $id = app(AdminNotificationService::class)->record(
+                'digiflazz.sync.failed',
+                'Sinkronisasi Digiflazz gagal',
+                'Pemeriksaan status',
+                dispatchJob: false,
+            );
+
+            $this->assertSame('2026-11-02 05:21:00',
+                (string) DB::table('admin_notifications')->where('id', $id)->value('created_at'));
+
+            // Simulates an existing notification written under the old UTC runtime.
+            DB::table('admin_notifications')->where('id', $id)->update([
+                'created_at' => '2026-11-02 05:20:00',
+            ]);
+
+            $this->actingAs($this->admin(['notifications.view']), 'admin')
+                ->get('/admin/notifications')->assertOk()
+                ->assertInertia(fn ($page) => $page
+                    ->component('Admin/Notifications')
+                    ->where('notifications.data.0.id', $id)
+                    ->where('notifications.data.0.created_at', '2026-11-02T05:20:00+00:00')
+                    ->etc());
+        } finally {
+            Carbon::setTestNow();
+        }
     }
 
     public function test_last_active_super_admin_cannot_be_disabled(): void
