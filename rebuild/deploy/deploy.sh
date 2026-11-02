@@ -55,6 +55,10 @@ HUSKY=0 "${NPM_BIN}" ci
 "${PHP_BIN}" artisan migrate --force --no-interaction
 "${PHP_BIN}" artisan storage:link --no-interaction || true
 "${PHP_BIN}" artisan config:cache
+# Fail before restarting PHP-FPM/workers if an invalid timezone was frozen
+# into the cached config. Never print cached configuration (contains secrets).
+"${PHP_BIN}" -r '$config = require "bootstrap/cache/config.php"; exit(($config["app"]["timezone"] ?? null) === "Asia/Jakarta" ? 0 : 1);' \
+  || { echo "Cached app timezone must be Asia/Jakarta; aborting deployment." >&2; exit 1; }
 "${PHP_BIN}" artisan view:cache
 "${PHP_BIN}" artisan queue:restart
 
