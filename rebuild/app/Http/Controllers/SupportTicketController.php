@@ -83,7 +83,7 @@ class SupportTicketController
                 ])
                 ->map(function (object $message): object {
                     $message->created_at = $message->created_at
-                        ? Carbon::parse($message->created_at, config('app.timezone'))->toIso8601String()
+                        ? Carbon::parse($message->created_at, 'UTC')->toIso8601String()
                         : null;
 
                     return $message;
