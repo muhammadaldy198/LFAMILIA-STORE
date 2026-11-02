@@ -142,8 +142,8 @@ class AdminCustomerController
                     && (int) ($tickets?->ticket_count ?? 0) === 0
                     && (int) ($topups?->topup_count ?? 0) === 0
                     && (int) ($ledger?->ledger_count ?? 0) === 0,
-                'last_active_at' => $row->last_active_at ? Carbon::parse($row->last_active_at, config('app.timezone'))->toIso8601String() : null,
-                'created_at' => Carbon::parse($row->created_at, config('app.timezone'))->toIso8601String(),
+                'last_active_at' => $row->last_active_at ? Carbon::parse($row->last_active_at, 'UTC')->toIso8601String() : null,
+                'created_at' => Carbon::parse($row->created_at, 'UTC')->toIso8601String(),
             ];
         });
 
