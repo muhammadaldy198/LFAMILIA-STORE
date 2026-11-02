@@ -53,7 +53,10 @@ class DeploymentM12Test extends TestCase
         $this->assertStringContainsString('bootstrap/cache/config.php', $deploy);
         $this->assertStringContainsString('=== "Asia/Jakarta"', $deploy);
         $this->assertStringContainsString('bootstrap/cache/config.php', $rollback);
-        $this->assertStringContainsString('=== "Asia/Jakarta"', $rollback);
+        $this->assertStringContainsString('rollback_timezone="UTC"', $rollback);
+        $this->assertStringContainsString('[[ -f config/app.php ]]', $rollback);
+        $this->assertStringContainsString('rollback_timezone="Asia/Jakarta"', $rollback);
+        $this->assertStringContainsString('getenv("ROLLBACK_EXPECTED_TIMEZONE")', $rollback);
     }
 
     public function test_m12_production_templates_keep_secrets_out_of_git(): void
