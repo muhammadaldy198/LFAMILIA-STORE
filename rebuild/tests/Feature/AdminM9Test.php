@@ -249,12 +249,19 @@ class AdminM9Test extends TestCase
                 'created_at' => '2026-11-02 05:20:00',
             ]);
 
-            $this->actingAs($this->admin(['notifications.view']), 'admin')
+            $this->actingAs($this->admin(['dashboard.view', 'notifications.view']), 'admin')
                 ->get('/admin/notifications')->assertOk()
                 ->assertInertia(fn ($page) => $page
                     ->component('Admin/Notifications')
                     ->where('notifications.data.0.id', $id)
                     ->where('notifications.data.0.created_at', '2026-11-02T05:20:00+00:00')
+                    ->etc());
+
+            $this->get('/admin/panel')->assertOk()
+                ->assertInertia(fn ($page) => $page
+                    ->component('Admin/Dashboard')
+                    ->where('notifications.0.id', $id)
+                    ->where('notifications.0.created_at', '2026-11-02T05:20:00+00:00')
                     ->etc());
         } finally {
             Carbon::setTestNow();
