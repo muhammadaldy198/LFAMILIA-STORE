@@ -46,7 +46,7 @@ class AdminNotificationController
         DB::table('admin_notification_reads')->insertOrIgnore([
             'admin_notification_id' => $id,
             'admin_user_id' => $request->user('admin')->id,
-            'read_at' => now(),
+            'read_at' => now('UTC'),
         ]);
 
         return back();
@@ -60,7 +60,7 @@ class AdminNotificationController
                 $notifications->map(fn (object $notification): array => [
                     'admin_notification_id' => $notification->id,
                     'admin_user_id' => $adminId,
-                    'read_at' => now(),
+                    'read_at' => now('UTC'),
                 ])->all()
             );
         });
