@@ -28,7 +28,8 @@ class AdminDashboardController
         $days = ['today' => 1, '7d' => 7, '30d' => 30, '90d' => 90][$range];
         $now = Carbon::now('Asia/Jakarta');
         $first = $now->copy()->startOfDay()->subDays($days - 1);
-        $dbZone = config('app.timezone', 'UTC');
+        // Persisted timestamps are UTC even though the admin UI uses WIB.
+        $dbZone = 'UTC';
         $from = $first->copy()->timezone($dbZone);
         $until = $now->copy()->addDay()->startOfDay()->timezone($dbZone);
         $today = $now->copy()->startOfDay()->timezone($dbZone);
@@ -178,7 +179,8 @@ class AdminDashboardController
 
     private function timestamp(?string $value): ?string
     {
-        return $value ? Carbon::parse($value, config('app.timezone', 'UTC'))->toIso8601String() : null;
+        // Raw MySQL timestamps have no offset; they represent UTC instants.
+        return $value ? Carbon::parse($value, 'UTC')->toIso8601String() : null;
     }
 
     private function balance(): array
