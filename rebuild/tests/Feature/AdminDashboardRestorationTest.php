@@ -61,6 +61,7 @@ class AdminDashboardRestorationTest extends TestCase
             ->has('chart', 1)->where('chart.0.day', '2026-10-02')
             ->where('chart.0.orders', 2)->where('chart.0.revenue_idr', 12000)
             ->has('recentOrders', 2)->where('recentOrders.1.id', $today)
+            ->where('recentOrders.1.created_at', '2026-10-01T17:00:00+00:00')
             ->where('recentOrders.1.product_name', 'Snapshot Game')
             ->where('recentOrders.1.package_name', 'Snapshot Diamonds')
             ->where('recentOrders.1.buyer_name', 'Dashboard Guest')
