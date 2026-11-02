@@ -47,6 +47,7 @@ done
 for pair in \
   'APP_ENV=production' \
   'APP_DEBUG=false' \
+  'APP_TIMEZONE=Asia/Jakarta' \
   'DB_CONNECTION=mysql' \
   'CACHE_STORE=redis' \
   'QUEUE_CONNECTION=redis' \
