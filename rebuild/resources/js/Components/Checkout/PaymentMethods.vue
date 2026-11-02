@@ -180,9 +180,9 @@ function choosePayment(code) {
 .lf-payment-group-card.selected{border-color:var(--lf-color-highlight);background:color-mix(in srgb,var(--lf-color-highlight) 6%,transparent)}
 .lf-payment-group-main{font-size:13px;line-height:1.5;width:100%;min-height:48px;display:flex;align-items:center;gap:8px;padding:8px 10px;border:0;background:transparent;color:var(--lf-color-text);text-align:left;cursor:pointer}
 .lf-payment-wallet-art{display:grid;place-items:center;overflow:hidden;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.10)}
-.lf-payment-wallet-art img{display:block;width:auto;height:auto;max-width:100%;max-height:24px;object-fit:contain}
-.lf-payment-qris-art{display:grid;place-items:center;flex:0 0 48px;width:48px;height:48px;padding:6px;box-sizing:border-box;border:1px solid rgba(255,255,255,.1);border-radius:11px;background:rgba(255,255,255,.055)}
-.lf-payment-qris-art img{display:block;width:auto;height:auto;max-width:100%;max-height:24px;object-fit:contain}
+.lf-payment-wallet-art img{display:block;width:100%;height:100%;max-width:none;max-height:none;object-fit:cover}
+.lf-payment-qris-art{display:grid;place-items:center;flex:0 0 48px;width:48px;height:48px;padding:0;box-sizing:border-box;border:1px solid rgba(255,255,255,.1);border-radius:11px;background:rgba(255,255,255,.055)}
+.lf-payment-qris-art img{display:block;width:100%;height:100%;max-width:none;max-height:none;object-fit:cover}
 .lf-payment-group-copy{min-width:0;flex:1}
 .lf-payment-group-copy strong{display:block;font-size:11px;line-height:1.2}
 .lf-payment-group-copy small{display:block;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--lf-color-muted);font-size:9px}
@@ -198,10 +198,13 @@ function choosePayment(code) {
 .lf-payment-unavailable{padding:12px;color:var(--lf-color-muted);font-size:12px}
 @media(max-width:639px){.lf-payment-groups{gap:5.6px;padding:16px}.lf-payment-group-main{font-size:12px;min-height:43.2px;gap:5.6px;padding:5.6px 10px}.lf-payment-group-copy strong{font-size:12px}.lf-payment-group-copy small{font-size:10px}.lf-payment-brand-strip{gap:5.6px;padding:6px 8px}.lf-payment-brand-strip>span{font-size:8px}.lf-payment-brand-strip>span:only-child{font-size:10px}}
 
+/* Only the square Coin and QRIS group artwork fills its entire 48px tile.
+   The VA/E-Wallet logo strip intentionally keeps its own contain treatment. */
 .lf-payment-wallet-art {
   width: 48px;
   height: 48px;
   flex: 0 0 48px;
+  padding: 0;
   border-radius: 11px;
 }
 
@@ -329,19 +332,25 @@ function choosePayment(code) {
   overflow: hidden;
 }
 .lfx-payment-logo-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex: 0 0 auto;
   width: 82px;
   height: 34px;
   padding: 4px;
   margin: 0;
+  line-height: 0;
 }
 .lfx-payment-logo-box > .lfx-payment-logo {
   display: block;
-  width: auto;
-  height: auto;
+  width: 100%;
+  height: 100%;
   max-width: 72px;
   max-height: 24px;
+  margin: 0;
   object-fit: contain;
+  object-position: center;
 }
 .lf-payment-brand-strip--logos > .lf-payment-brand-logo {
   display: grid;

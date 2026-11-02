@@ -163,6 +163,68 @@ class CatalogTest extends TestCase
                 ->etc());
     }
 
+    public function test_storefront_product_order_uses_admin_order_then_natural_name_then_id(): void
+    {
+        $category = Category::where('slug', 'game')->firstOrFail();
+        DB::table('providers')->where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
+        $providerId = DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
+        $token = bin2hex(random_bytes(3));
+        $prefix = 'Sorting Scenario '.$token;
+        $products = [];
+
+        // The first product is alphabetically last but must come after sort_order=0.
+        // Identical names (indices 2 and 4) must stay ordered by id.
+        foreach ([['1100', 1], ['5', 1], ['20', 1], ['2', 0], ['20', 1]] as $index => [$nominal, $sortOrder]) {
+            $product = Product::create([
+                'category_id' => $category->id,
+                'name' => $prefix.' '.$nominal,
+                'slug' => 'sorting-scenario-'.$token.'-'.$index,
+                'fulfillment_mode' => 'AUTO_PROVIDER',
+                'margin_percent' => 10,
+                'sort_order' => $sortOrder,
+                'is_active' => true,
+            ]);
+            $package = $product->packages()->create([
+                'code' => 'SORT'.$token.$index,
+                'name' => 'Nominal',
+                'is_active' => true,
+            ]);
+            DB::table('provider_mappings')->insert([
+                'product_package_id' => $package->id,
+                'provider_id' => $providerId,
+                'external_sku' => 'SORT-SKU-'.$token.'-'.$index,
+                'cost_idr' => 10000,
+                'max_price_idr' => 12000,
+                'priority' => 1,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->seedCheckoutDigiflazzCatalog($package->id);
+            $products[] = $product;
+        }
+
+        $url = '/?q='.rawurlencode($prefix);
+        $this->get($url)->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->component('Catalog/Index')
+            ->where('products.data', fn ($items): bool => collect($items)->pluck('slug')->all() === [
+                $products[3]->slug, $products[1]->slug, $products[2]->slug,
+                $products[4]->slug, $products[0]->slug,
+            ])
+            ->etc());
+
+        // Changing the admin's order must change the next storefront response.
+        $products[0]->update(['sort_order' => 0]);
+        $products[3]->update(['sort_order' => 3]);
+        $this->get($url)->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->component('Catalog/Index')
+            ->where('products.data', fn ($items): bool => collect($items)->pluck('slug')->all() === [
+                $products[0]->slug, $products[1]->slug, $products[2]->slug,
+                $products[4]->slug, $products[3]->slug,
+            ])
+            ->etc());
+    }
+
     public function test_search_matches_category_description_and_package_name_and_hides_unbuyable(): void
     {
         DB::table('providers')->where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
