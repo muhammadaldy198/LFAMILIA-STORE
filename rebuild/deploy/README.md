@@ -77,9 +77,14 @@ Jangan menghapus pemisahan ini tanpa memigrasikan/meninjau seluruh
 timestamp dan alur kedaluwarsa pembayaran.
 
 - Preflight mewajibkan baris `APP_TIMEZONE=Asia/Jakarta` pada `.env` produksi.
-- Deploy dan rollback memvalidasi `bootstrap/cache/config.php` setelah
-  `artisan config:cache`. Nilai selain `Asia/Jakarta` menghentikan proses
-  sebelum restart service. Jangan mencetak seluruh cache: berisi rahasia.
+- Deploy memvalidasi `bootstrap/cache/config.php` setelah
+  `artisan config:cache` dan hanya menerima `Asia/Jakarta` sebelum restart.
+- Rollback memvalidasi timezone berdasarkan **source yang dituju**: rilis
+  lama yang belum memiliki `config/app.php` menerima default Laravel
+  `UTC`, sedangkan rilis baru yang memilikinya wajib `Asia/Jakarta`.
+  Hal ini mencegah rollback aman terhenti di maintenance mode hanya karena
+  rilis lama memang memakai UTC.
+- Jangan mencetak seluruh cache: isinya dapat memuat rahasia.
 - Catatan: script deploy yang **sedang dieksekusi** adalah versi yang
   dipanggil pada awal deploy. Pada deploy pertama yang mengambil perubahan
   script dari GitHub, pengamanan tambahan tersebut baru efektif pada
