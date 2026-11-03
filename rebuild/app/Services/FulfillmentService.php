@@ -758,6 +758,12 @@ class FulfillmentService
      * Open one new attempt after a provider-confirmed failure. Never switch
      * SKUs or retry any reference whose outcome is still uncertain.
      */
+    public static function isDefinitiveProviderFailure(?string $status, ?string $rc): bool
+    {
+        return strcasecmp(trim((string) $status), 'Gagal') === 0
+            && in_array(trim((string) $rc), self::DEFINITIVE_DIGIFLAZZ_FAILURE_CODES, true);
+    }
+
     public function resendAfterConfirmedFailure(int $orderId, int $adminId): int
     {
         $newAttemptId = DB::transaction(function () use ($orderId, $adminId): int {
@@ -775,8 +781,7 @@ class FulfillmentService
                     'fulfillment' => 'Attempt terakhir belum terkonfirmasi gagal. Muat ulang halaman.',
                 ]);
             }
-            if (! in_array(trim((string) $latest->provider_rc), self::DEFINITIVE_DIGIFLAZZ_FAILURE_CODES, true)
-                || strcasecmp(trim((string) $latest->provider_status), 'Gagal') !== 0) {
+            if (! self::isDefinitiveProviderFailure($latest->provider_status, $latest->provider_rc)) {
                 throw ValidationException::withMessages([
                     'fulfillment' => 'Kode respons atau status penyedia tidak membuktikan kegagalan final. Periksa riwayat Digiflazz terlebih dahulu.',
                 ]);

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Services\AdminChoiceSettings;
 use App\Services\AdminOrderPresentation;
 use App\Services\AdminPermissionService;
+use App\Services\FulfillmentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -25,7 +26,7 @@ class AdminOrderDetailController
             ->leftJoin('providers', 'providers.id', '=', 'attempts.provider_id')
             ->where('attempts.order_id', $id)->orderByDesc('attempts.id')
             ->get(['attempts.id', 'attempts.status', 'attempts.attempt_no', 'attempts.serial_number',
-                'attempts.last_error', 'attempts.response_payload', 'attempts.external_reference', 'attempts.provider_rc', 'attempts.price_idr', 'attempts.created_at', 'attempts.last_checked_at', 'attempts.safe_to_failover', 'providers.code'])
+                'attempts.last_error', 'attempts.response_payload', 'attempts.external_reference', 'attempts.provider_status', 'attempts.provider_rc', 'attempts.price_idr', 'attempts.created_at', 'attempts.last_checked_at', 'attempts.safe_to_failover', 'providers.code'])
             ->map(fn (object $attempt): array => [
                 'id' => $attempt->id, 'attempt_no' => $attempt->attempt_no, 'status' => $attempt->status,
                 'status_label' => $presentation->status($attempt->status),
@@ -33,6 +34,7 @@ class AdminOrderDetailController
                 'serial_number' => $attempt->serial_number,
                 'note' => $presentation->note($attempt->last_error ?: data_get($presentation->json($attempt->response_payload), 'message')),
                 'reference' => $attempt->external_reference, 'result_code' => $attempt->provider_rc,
+                'provider_status' => $attempt->provider_status,
                 'price_idr' => $attempt->price_idr !== null ? (int) $attempt->price_idr : null,
                 'created_at' => $presentation->date($attempt->created_at), 'checked_at' => $presentation->date($attempt->last_checked_at),
                 'can_manual' => $canFulfill && $attempt->status === 'MANUAL_PENDING' && in_array($row->status, ['PAID', 'PROCESSING'], true),
@@ -46,6 +48,7 @@ class AdminOrderDetailController
             'can_resend' => $index === 0 && $canFulfill && $row->status === 'BLOCKED'
                 && $row->paid_at !== null && $attempt['status'] === 'FAILED_CONFIRMED'
                 && $attempt['provider'] === 'Digiflazz'
+                && FulfillmentService::isDefinitiveProviderFailure($attempt['provider_status'], $attempt['result_code'])
                 && ! DB::table('fulfillment_attempts')->where('order_id', $id)
                     ->whereIn('status', ['CREATED', 'QUEUED', 'SENDING', 'PENDING', 'UNKNOWN', 'SUCCESS'])->exists()]);
         $order = $presentation->row($row);

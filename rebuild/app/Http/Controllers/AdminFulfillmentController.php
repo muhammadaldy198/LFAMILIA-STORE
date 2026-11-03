@@ -200,6 +200,7 @@ class AdminFulfillmentController
                     && $attempt->order_paid_at !== null
                     && $attempt->status === 'FAILED_CONFIRMED'
                     && $attempt->provider_code === 'DIGIFLAZZ'
+                    && FulfillmentService::isDefinitiveProviderFailure($attempt->provider_status, $attempt->provider_rc)
                     && ! DB::table('fulfillment_attempts')->where('order_id', $attempt->order_id)
                         ->whereIn('status', ['CREATED', 'QUEUED', 'SENDING', 'PENDING', 'UNKNOWN', 'SUCCESS'])->exists(),
                 'resolution_destination' => $resolutionDestination,
