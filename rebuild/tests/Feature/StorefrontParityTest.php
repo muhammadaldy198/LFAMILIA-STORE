@@ -410,6 +410,55 @@ class StorefrontParityTest extends TestCase
             ])->assertUnprocessable();
     }
 
+    public function test_login_can_immediately_save_game_account_and_quote_checkout_without_reload(): void
+    {
+        $this->withServerVariables(['REMOTE_ADDR' => '192.0.2.182']);
+        $catalog = $this->catalog();
+        $password = 'VeryStrongPassword123!';
+        $user = User::create([
+            'name' => 'Session Rotation User',
+            'email' => 'session-rotation-'.bin2hex(random_bytes(4)).'@example.test',
+            'email_verified_at' => now(),
+            'phone' => '081234567890',
+            'password' => Hash::make($password),
+            'membership_tier_code' => 'BASIC',
+        ]);
+
+        DB::table('payment_gateways')->where('code', 'MIDTRANS')->update([
+            'is_active' => true, 'is_maintenance' => false,
+        ]);
+        DB::table('payment_channels')->where('code', 'qris')->update(['is_active' => true]);
+        $gatewayId = DB::table('payment_gateways')->where('code', 'MIDTRANS')->value('id');
+        $channelId = DB::table('payment_channels')->where('code', 'qris')->value('id');
+        DB::table('payment_routes')->updateOrInsert(
+            ['payment_channel_id' => $channelId, 'payment_gateway_id' => $gatewayId],
+            [
+                'provider_channel' => 'qris', 'configuration' => null,
+                'priority' => 0, 'is_active' => true,
+                'created_at' => now(), 'updated_at' => now(),
+            ]
+        );
+
+        $this->get('/login')->assertOk();
+        $this->post('/login', [
+            'email' => $user->email,
+            'password' => $password,
+        ])->assertRedirect();
+        $this->assertAuthenticatedAs($user, 'web');
+
+        // Neither a document reload nor a second login is needed here.
+        $this->postJson('/account/game-accounts', [
+            'product_id' => $catalog['product']->id,
+            'label' => 'Login Langsung',
+            'customer_input' => ['user_id' => '123456'],
+        ])->assertCreated();
+
+        $this->postJson('/checkout/quote', [
+            'package_id' => $catalog['package_id'],
+            'payment_channel_code' => 'qris',
+        ])->assertOk()->assertJsonStructure(['total_idr']);
+    }
+
     public function test_popular_now_restores_legacy_priority_and_can_be_controlled_from_promo(): void
     {
         $catalog = $this->catalog();
