@@ -11,6 +11,7 @@ use App\Models\StoreAsset;
 use App\Models\User;
 use App\Services\CheckoutPricing;
 use App\Services\PaymentRoutingService;
+use Illuminate\Cookie\CookieValuePrefix;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\UploadedFile;
@@ -452,6 +453,8 @@ class StorefrontParityTest extends TestCase
         $this->withCredentials();
 
         $loginPage = $this->get('/login')->assertOk();
+        $this->assertSame(1, preg_match('/<meta name="csrf-token" content="([^"]+)"/', $loginPage->getContent(), $meta));
+        $staleMetaToken = $meta[1];
         $cookieValue = function ($response, string $name): string {
             foreach ($response->headers->getCookies() as $cookie) {
                 if ($cookie->getName() === $name) {
@@ -471,7 +474,11 @@ class StorefrontParityTest extends TestCase
         $this->assertAuthenticatedAs($user, 'web');
 
         $newXsrf = $cookieValue($login, 'XSRF-TOKEN');
-        $this->assertNotSame($oldXsrf, $newXsrf, 'Login must rotate the CSRF cookie.');
+        $this->assertNotSame(
+            CookieValuePrefix::remove(app('encrypter')->decrypt($oldXsrf, false)),
+            CookieValuePrefix::remove(app('encrypter')->decrypt($newXsrf, false)),
+            'Login must rotate the CSRF token, not just re-encrypt the same value.'
+        );
         $this->withUnencryptedCookie($sessionCookieName, $cookieValue($login, $sessionCookieName));
 
         $account = [
@@ -485,7 +492,7 @@ class StorefrontParityTest extends TestCase
         ];
 
         // The token from the original meta/cookie must be rejected on BOTH flows.
-        $this->withHeader('X-CSRF-TOKEN', $oldXsrf)
+        $this->withHeader('X-CSRF-TOKEN', $staleMetaToken)
             ->postJson('/account/game-accounts', $account)->assertStatus(419);
         $this->postJson('/checkout/quote', $quote)->assertStatus(419);
 
