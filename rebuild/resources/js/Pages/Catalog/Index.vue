@@ -31,7 +31,7 @@ const q=(x={})=>{const a={...p.filters,...x};Object.keys(a).forEach(k=>{if(!a[k]
 const listingProps=['products','filters'];
 const initial=n=>(n||'L').slice(0,1).toUpperCase();
 const label=l=>String(l).includes('Previous')?'‹':String(l).includes('Next')?'›':String(l).replace(/&laquo;|&raquo;/g,'').trim();
-const newsDate=v=>v?new Date(v).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}):'LFAMILIA News';
+const newsDate=v=>v?new Date(v).toLocaleDateString('id-ID',{timeZone:'Asia/Jakarta',day:'numeric',month:'short',year:'numeric'}):'LFAMILIA News';
 const bannerPrev=()=>{const n=visibleBanners.value.length;if(n)bannerIndex.value=(bannerIndex.value-1+n)%n};
 const bannerNext=()=>{const n=visibleBanners.value.length;if(n)bannerIndex.value=(bannerIndex.value+1)%n};
 const popupKey=(item)=>'lfamilia-home-popup:'+String(item.id??'fallback')+':'+String(item.title||'').slice(0,24);

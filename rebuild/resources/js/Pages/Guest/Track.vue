@@ -31,7 +31,7 @@ let selectionVersion=0;
 const money=v=>'Rp '+Number(v||0).toLocaleString('id-ID');
 const statusMeta=s=>{const {label,description,tone}=visibleOrderStatus(s);return [label,description,tone];};
 const sourceLabel=s=>({payment:'Pembayaran',processing:'Proses Pesanan',delivery:'Pengiriman',admin:'Admin',system:'Sistem'}[s]||'Sistem');
-const date=v=>v?new Date(v).toLocaleString('id-ID',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'}):'-';
+const date=v=>v?new Date(v).toLocaleString('id-ID',{timeZone:'Asia/Jakarta',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'}):'-';
 const terminal=computed(()=>detail.value&&isTerminalOrderStatus(detail.value.fulfillmentStatus));
 const nextAction=computed(()=>detail.value?nextOrderAction(detail.value.fulfillmentStatus,detail.value.paymentStatus,detail.value.wasPaid):null);
 

@@ -40,7 +40,7 @@ const eventLabel=e=>{
     };
     return map[e.event_type]||'Status pesanan diperbarui';
 };
-const eventTime=v=>v?new Date(v).toLocaleString('id-ID',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',second:'2-digit'}):'-';
+const eventTime=v=>v?new Date(v).toLocaleString('id-ID',{timeZone:'Asia/Jakarta',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',second:'2-digit'}):'-';
 
 async function refreshStatus(){
     if(disposed||refreshing.value||document.hidden)return;
