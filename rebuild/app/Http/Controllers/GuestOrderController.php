@@ -48,13 +48,16 @@ class GuestOrderController
             ->whereNull('orders.user_id')->where('orders.order_number', $orderNumber)
             ->where('orders.id', $request->session()->get('guest_order_id'))
             ->select('orders.id', 'orders.order_number', 'orders.status', 'orders.total_idr',
-                'orders.created_at', 'orders.expires_at', 'orders.delivery_payload', 'products.name as product_name', 'products.slug as product_slug')->first();
+                'orders.created_at', 'orders.paid_at', 'orders.expires_at', 'orders.delivery_payload', 'products.name as product_name', 'products.slug as product_slug')->first();
 
         abort_unless($order, 404);
         $order->delivery = $order->status === 'SUCCESS' && is_string($order->delivery_payload)
             ? (json_decode($order->delivery_payload, true) ?: null) : null;
         unset($order->delivery_payload);
+        $order->status_note = $this->statuses->note((string) $order->status, $order->paid_at !== null);
         $order->status = $this->statuses->value((string) $order->status);
+        $order->created_at = Carbon::parse($order->created_at, 'UTC')->toIso8601String();
+        $order->expires_at = $order->expires_at ? Carbon::parse($order->expires_at, 'UTC')->toIso8601String() : null;
 
         $signedOnly = (int) $request->session()->get('payment_signed_guest_order_id') === (int) $order->id;
         $paymentUrl = $signedOnly
@@ -81,7 +84,7 @@ class GuestOrderController
             ->whereNull('orders.user_id')->where('orders.order_number', $orderNumber)
             ->where('orders.id', $request->session()->get('guest_order_id'))
             ->select('orders.id', 'orders.order_number', 'orders.status', 'orders.total_idr',
-                'orders.created_at', 'orders.delivery_payload', 'products.name as product_name', 'products.slug as product_slug')->first();
+                'orders.created_at', 'orders.paid_at', 'orders.delivery_payload', 'products.name as product_name', 'products.slug as product_slug')->first();
 
         abort_unless($order, 404);
         $delivery = is_string($order->delivery_payload)
@@ -91,8 +94,9 @@ class GuestOrderController
             'order' => [
                 'order_number' => $order->order_number,
                 'status' => $this->statuses->value((string) $order->status),
+                'status_note' => $this->statuses->note((string) $order->status, $order->paid_at !== null),
                 'total_idr' => (int) $order->total_idr,
-                'created_at' => $order->created_at,
+                'created_at' => Carbon::parse($order->created_at, 'UTC')->toIso8601String(),
                 'product_name' => $order->product_name,
                 'product_slug' => $order->product_slug,
                 'delivery' => $order->status === 'SUCCESS' ? $delivery : null,
@@ -111,7 +115,7 @@ class GuestOrderController
                 'event_type' => $event->event_type,
                 'from_status' => $event->from_status ? $this->statuses->value((string) $event->from_status) : null,
                 'to_status' => $event->to_status ? $this->statuses->value((string) $event->to_status) : null,
-                'created_at' => $event->created_at,
+                'created_at' => Carbon::parse($event->created_at, 'UTC')->toIso8601String(),
             ])->all();
     }
 }

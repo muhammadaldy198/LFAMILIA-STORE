@@ -26,10 +26,13 @@ class CustomerOrderController
                 ->where('orders.user_id', $request->user()->id)
                 ->orderByDesc('orders.id')
                 ->select('orders.id', 'orders.order_number', 'orders.status', 'orders.total_idr',
-                    'orders.created_at', 'products.name as product_name')
+                    'orders.created_at', 'orders.paid_at', 'products.name as product_name')
                 ->paginate(10)
                 ->through(function (object $order): object {
+                    $order->status_note = $this->statuses->note((string) $order->status, $order->paid_at !== null);
                     $order->status = $this->statuses->value((string) $order->status);
+                    $order->created_at = Carbon::parse($order->created_at, 'UTC')->toIso8601String();
+                    $order->paid_at = $order->paid_at ? Carbon::parse($order->paid_at, 'UTC')->toIso8601String() : null;
 
                     return $order;
                 }),
@@ -139,7 +142,12 @@ class CustomerOrderController
         $record->delivery = $record->status === 'SUCCESS' && is_string($record->delivery_payload)
             ? (json_decode($record->delivery_payload, true) ?: null) : null;
         unset($record->delivery_payload);
+        $record->status_note = $this->statuses->note((string) $record->status, $record->paid_at !== null);
         $record->status = $this->statuses->value((string) $record->status);
+        foreach (['created_at', 'paid_at', 'expires_at'] as $field) {
+            $record->{$field} = $record->{$field}
+                ? Carbon::parse($record->{$field}, 'UTC')->toIso8601String() : null;
+        }
 
         return Inertia::render('Customer/OrderDetail', [
             'paymentUrl' => $paymentUrl,

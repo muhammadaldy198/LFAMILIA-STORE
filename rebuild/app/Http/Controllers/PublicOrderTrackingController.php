@@ -55,7 +55,7 @@ class PublicOrderTrackingController
             })
             ->orderByDesc('orders.id')->limit(25)
             ->get([
-                'orders.id', 'orders.order_number', 'orders.status', 'orders.total_idr', 'orders.created_at',
+                'orders.id', 'orders.order_number', 'orders.status', 'orders.paid_at', 'orders.total_idr', 'orders.created_at',
                 'products.name as product_name', 'product_packages.name as package_name',
             ])->map(fn (object $order): array => [
                 'trackingToken' => $this->trackingToken((int) $order->id, false),
@@ -64,7 +64,8 @@ class PublicOrderTrackingController
                 'packageLabel' => $order->package_name,
                 'total' => (int) $order->total_idr,
                 'status' => $this->statuses->slug((string) $order->status),
-                'createdAt' => $order->created_at,
+                'statusNote' => $this->statuses->note((string) $order->status, $order->paid_at !== null),
+                'createdAt' => $this->utcIso($order->created_at),
             ])->values();
 
         return response()->json(['mode' => 'phone', 'orders' => $orders])
@@ -191,7 +192,7 @@ class PublicOrderTrackingController
                 'source' => $this->eventSource((string) $event->event_type),
                 'status' => $event->to_status ? $this->statuses->slug((string) $event->to_status) : null,
                 'label' => $this->eventLabel((string) $event->event_type, $event->to_status),
-                'createdAt' => $event->created_at,
+                'createdAt' => $this->utcIso($event->created_at),
             ])->values()->all();
 
         return [
@@ -212,9 +213,10 @@ class PublicOrderTrackingController
                 || (strtoupper((string) $order->status) === 'PENDING_PAYMENT'
                     && $order->expires_at !== null && Carbon::parse($order->expires_at)->isPast()),
             'fulfillmentStatus' => $this->statuses->slug((string) $order->status),
+            'statusNote' => $this->statuses->note((string) $order->status, $order->paid_at !== null),
             'events' => $events,
-            'createdAt' => $order->created_at,
-            'updatedAt' => $order->updated_at,
+            'createdAt' => $this->utcIso($order->created_at),
+            'updatedAt' => $this->utcIso($order->updated_at),
         ];
     }
 
@@ -225,7 +227,7 @@ class PublicOrderTrackingController
             ->join('product_packages', 'product_packages.id', '=', 'orders.product_package_id')
             ->orderByDesc('orders.id')->limit(20)
             ->get([
-                'orders.order_number', 'orders.status', 'orders.total_idr', 'orders.created_at',
+                'orders.order_number', 'orders.status', 'orders.paid_at', 'orders.total_idr', 'orders.created_at',
                 'products.name as product_name', 'product_packages.name as package_name',
             ])->map(fn (object $order): array => [
                 'referenceId' => null,
@@ -234,8 +236,14 @@ class PublicOrderTrackingController
                 'packageLabel' => $order->package_name,
                 'total' => (int) $order->total_idr,
                 'status' => $this->statuses->slug((string) $order->status),
-                'createdAt' => $order->created_at,
+                'statusNote' => $this->statuses->note((string) $order->status, $order->paid_at !== null),
+                'createdAt' => $this->utcIso($order->created_at),
             ])->values()->all();
+    }
+
+    private function utcIso(?string $value): ?string
+    {
+        return $value ? Carbon::parse($value, 'UTC')->toIso8601String() : null;
     }
 
     private function looksLikeInvoice(string $value): bool
