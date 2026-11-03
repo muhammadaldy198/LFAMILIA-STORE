@@ -472,6 +472,9 @@ jobs:
       - name: Test ordering and customer/admin UI regressions
         run: node --test tests/Browser/customer-ui-guards.test.mjs tests/Browser/admin-ui-guards.test.mjs
 
+      - name: Test CSRF rotation after login
+        run: node --test tests/Unit/currentXsrfHeaders.test.mjs
+
       - name: Lint Vue and JavaScript
         run: npm run lint
 
