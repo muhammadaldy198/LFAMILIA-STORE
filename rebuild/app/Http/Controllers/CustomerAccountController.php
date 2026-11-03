@@ -15,6 +15,7 @@ use App\Services\TransactionalEmailService;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -188,7 +189,11 @@ class CustomerAccountController
             'paymentChannels' => $topupEnabled ? $paymentRouting->publicTopupChannels() : [],
             'entries' => DB::table('wallet_ledger')->where('wallet_id', $wallet->id)
                 ->orderByDesc('id')->select('id', 'amount_idr', 'balance_after_idr', 'source', 'created_at')
-                ->paginate(10),
+                ->paginate(10)
+                ->through(function (object $entry): object {
+                    $entry->created_at = Carbon::parse($entry->created_at, 'UTC')->toIso8601String();
+                    return $entry;
+                }),
         ]);
     }
 
@@ -221,7 +226,7 @@ class CustomerAccountController
                     'package_name' => $order->package_name,
                     'code' => $code,
                     'note' => isset($delivery['note']) ? (string) $delivery['note'] : null,
-                    'delivered_at' => $order->updated_at,
+                    'delivered_at' => Carbon::parse($order->updated_at, 'UTC')->toIso8601String(),
                 ];
             })->filter()->values();
 
@@ -263,7 +268,7 @@ class CustomerAccountController
                     'nickname' => $row->nickname,
                     'customer_input' => is_string($row->customer_input)
                         ? (json_decode($row->customer_input, true) ?: []) : (array) $row->customer_input,
-                    'created_at' => $row->created_at,
+                    'created_at' => Carbon::parse($row->created_at, 'UTC')->toIso8601String(),
                 ]),
         ]);
     }
@@ -287,7 +292,7 @@ class CustomerAccountController
                     ? 'Status berubah menjadi '.app(PublicOrderStatusService::class)->label((string) $event->to_status)
                     : str_replace(['_', '.'], ' ', (string) $event->event_type),
                 'type' => 'ORDER',
-                'at' => $event->created_at,
+                'at' => Carbon::parse($event->created_at, 'UTC')->toIso8601String(),
             ]);
 
         $walletItems = DB::table('wallet_topups')
@@ -300,7 +305,7 @@ class CustomerAccountController
                 'title' => 'Top up saldo',
                 'detail' => 'Rp'.number_format((int) $topup->amount_idr, 0, ',', '.').' · '.str_replace('_', ' ', (string) $topup->status),
                 'type' => 'WALLET',
-                'at' => $topup->created_at,
+                'at' => Carbon::parse($topup->created_at, 'UTC')->toIso8601String(),
             ]);
 
         $items = $orderItems->concat($walletItems)

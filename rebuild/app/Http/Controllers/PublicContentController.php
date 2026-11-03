@@ -7,6 +7,7 @@ use App\Services\StorefrontContentService;
 use App\Support\OptimizedMedia;
 use App\Support\SeoMetadata;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redis;
 use Inertia\Response;
@@ -199,7 +200,12 @@ class PublicContentController
             ->where(fn ($q) => $q->whereNull('starts_at')->orWhere('starts_at', '<=', $now))
             ->where(fn ($q) => $q->whereNull('ends_at')->orWhere('ends_at', '>=', $now))
             ->orderByDesc('id')->limit(30)
-            ->get(['code', 'discount_type', 'discount_value', 'minimum_total_idr', 'ends_at']);
+            ->get(['code', 'discount_type', 'discount_value', 'minimum_total_idr', 'ends_at'])
+            ->map(function (object $voucher): object {
+                $voucher->ends_at = $voucher->ends_at
+                    ? Carbon::parse($voucher->ends_at, 'UTC')->toIso8601String() : null;
+                return $voucher;
+            });
 
         return SeoMetadata::render('Content/Promo', ['vouchers' => $vouchers]);
     }
