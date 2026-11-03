@@ -3,8 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\AdminUser;
-use App\Models\IntegrationCredential;
 use App\Models\Category;
+use App\Models\IntegrationCredential;
 use App\Models\Product;
 use App\Models\ProductReview;
 use App\Models\StoreAsset;
