@@ -276,7 +276,7 @@ class StorefrontParityTest extends TestCase
         $this->assertStringContainsString('12', (string) $invoice->json('order.destination'));
     }
 
-    public function test_public_tracker_keeps_cancelled_distinct_from_failed_and_expired(): void
+    public function test_public_tracker_maps_unpaid_cancelled_to_failed_with_expiry_note(): void
     {
         $catalog = $this->catalog();
         $orderId = $this->guestOrder($catalog['product'], $catalog['package_id'], 'LF260930-CANCEL01');
@@ -288,7 +288,8 @@ class StorefrontParityTest extends TestCase
         $response = $this->postJson('/orders/track/search', ['query' => 'LF260930-CANCEL01'])
             ->assertOk()
             ->assertJsonPath('mode', 'order')
-            ->assertJsonPath('order.fulfillmentStatus', 'cancelled')
+            ->assertJsonPath('order.fulfillmentStatus', 'failed')
+            ->assertJsonPath('order.statusNote', 'Kedaluwarsa')
             ->assertJsonPath('order.paymentStatus', 'cancelled');
 
         $this->assertStringNotContainsString('DIGIFLAZZ', $response->getContent());

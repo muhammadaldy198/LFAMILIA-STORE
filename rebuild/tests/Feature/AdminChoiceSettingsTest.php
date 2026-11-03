@@ -66,7 +66,7 @@ class AdminChoiceSettingsTest extends TestCase
         $this->put('/admin/choice-settings', app(AdminChoiceSettings::class)->all())->assertForbidden();
     }
 
-    public function test_status_labels_read_customer_presentation_only_once_per_request(): void
+    public function test_public_status_labels_do_not_read_legacy_customer_presentation(): void
     {
         $status = app(PublicOrderStatusService::class);
         DB::enableQueryLog();
@@ -77,20 +77,20 @@ class AdminChoiceSettingsTest extends TestCase
             }
             $settingsReads = array_filter(DB::getQueryLog(),
                 fn (array $query): bool => str_contains(strtolower((string) $query['query']), 'system_settings'));
-            $this->assertCount(1, $settingsReads);
+            $this->assertCount(0, $settingsReads);
         } finally {
             DB::disableQueryLog();
             DB::flushQueryLog();
         }
     }
 
-    public function test_public_status_label_reads_existing_customer_text_editor(): void
+    public function test_public_status_label_ignores_legacy_customer_text_editor_override(): void
     {
         DB::table('system_settings')->updateOrInsert(['key' => 'store.customer_presentation'], [
             'value' => json_encode(['text' => ['order.status.SUCCESS.label' => 'Pesanan sudah terkirim']], JSON_THROW_ON_ERROR),
             'updated_at' => now(),
             'created_at' => now(),
         ]);
-        $this->assertSame('Pesanan sudah terkirim', app(PublicOrderStatusService::class)->label('SUCCESS'));
+        $this->assertSame('Terkirim', app(PublicOrderStatusService::class)->label('SUCCESS'));
     }
 }

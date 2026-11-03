@@ -1662,7 +1662,8 @@ class PaymentTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Customer/OrderDetail')
                 ->where('order.order_number', $orderNumber)
-                ->where('order.status', 'EXPIRED'));
+                ->where('order.status', 'FAILED')
+                ->where('order.status_note', 'Kedaluwarsa'));
 
         // Sesudah jendela 30 menit, link yang sama → 403.
         Carbon::setTestNow(now()->addMinutes(31));
