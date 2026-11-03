@@ -5,6 +5,7 @@ const { customerText } = useCustomerPresentation();
 import { Head } from '@inertiajs/vue3';
 import { computed, reactive, ref } from 'vue';
 import AccountShell from '../../Components/AccountShell.vue';
+import { currentXsrfHeaders } from '../../lib/currentXsrfHeaders';
 
 const props = defineProps({ accounts: Array, products: Array });
 const selectedProductId = ref('');
@@ -18,9 +19,6 @@ const error = ref('');
 const selectedProduct = computed(() => (props.products || []).find((item) => String(item.id) === String(selectedProductId.value)) || null);
 const fields = computed(() => selectedProduct.value?.fields || []);
 
-function csrf() {
-    return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-}
 function reset() {
     if (busy.value) return;
     editingId.value = null;
@@ -53,7 +51,8 @@ async function save() {
         const url = editingId.value ? '/account/game-accounts/' + editingId.value : '/account/game-accounts';
         const response = await fetch(url, {
             method: editingId.value ? 'PUT' : 'POST',
-            headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf() },
+            credentials: 'same-origin',
+            headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...currentXsrfHeaders() },
             body: JSON.stringify({
                 product_id: Number(selectedProductId.value),
                 label: label.value.trim(),
@@ -78,7 +77,8 @@ async function remove(account) {
     try {
         const response = await fetch('/account/game-accounts/' + account.id, {
             method:'DELETE',
-            headers:{ Accept:'application/json', 'X-CSRF-TOKEN':csrf() },
+            credentials: 'same-origin',
+            headers:{ Accept:'application/json', ...currentXsrfHeaders() },
         });
         if (!response.ok) {
             const data = await response.json().catch(() => ({}));
