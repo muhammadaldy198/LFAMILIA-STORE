@@ -282,6 +282,7 @@ class StorefrontParityTest extends TestCase
         $orderId = $this->guestOrder($catalog['product'], $catalog['package_id'], 'LF260930-CANCEL01');
         DB::table('orders')->where('id', $orderId)->update([
             'status' => 'CANCELLED',
+            'paid_at' => null,
             'updated_at' => now(),
         ]);
 
