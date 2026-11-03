@@ -15,6 +15,11 @@ use RuntimeException;
 
 class FulfillmentService
 {
+    private const DEFINITIVE_DIGIFLAZZ_FAILURE_CODES = [
+        '02', '51', '52', '53', '54', '55', '57', '58',
+        '59', '60', '71', '72', '73', '74', '84',
+    ];
+
     public function __construct(
         private readonly DigiflazzClient $digiflazz,
         private readonly DigiflazzCatalogService $digiflazzCatalog,
@@ -571,11 +576,7 @@ class FulfillmentService
         // may authorize reissue after a superadmin verifies the history.
         // Reject 01/70 (timeouts), 49 (duplicate ref_id), 50 (not found)
         // and request-validation errors: none establishes the old result.
-        $definitiveFailureCodes = [
-            '02', '51', '52', '53', '54', '55', '57', '58',
-            '59', '60', '71', '72', '73', '74', '84',
-        ];
-        if (! in_array($providerRc, $definitiveFailureCodes, true)) {
+        if (! in_array($providerRc, self::DEFINITIVE_DIGIFLAZZ_FAILURE_CODES, true)) {
             throw ValidationException::withMessages([
                 'provider_rc' => 'Kode respons bukan kegagalan final yang aman untuk pengiriman baru.',
             ]);
@@ -772,6 +773,12 @@ class FulfillmentService
             if (! $latest || $latest->status !== 'FAILED_CONFIRMED') {
                 throw ValidationException::withMessages([
                     'fulfillment' => 'Attempt terakhir belum terkonfirmasi gagal. Muat ulang halaman.',
+                ]);
+            }
+            if (! in_array(trim((string) $latest->provider_rc), self::DEFINITIVE_DIGIFLAZZ_FAILURE_CODES, true)
+                || strcasecmp(trim((string) $latest->provider_status), 'Gagal') !== 0) {
+                throw ValidationException::withMessages([
+                    'fulfillment' => 'Kode respons atau status penyedia tidak membuktikan kegagalan final. Periksa riwayat Digiflazz terlebih dahulu.',
                 ]);
             }
             if ($this->isLegacyQuarantined($latest)) {

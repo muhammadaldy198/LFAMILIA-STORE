@@ -192,6 +192,30 @@ class FulfillmentTest extends TestCase
         }
     }
 
+    public function test_manual_resend_rejects_non_definitive_digiflazz_codes(): void
+    {
+        Queue::fake();
+        $catalog = $this->automaticCatalog(sku: 'DF-AMBIGUOUS-RESEND');
+        $orderId = $this->paidOrder($catalog);
+        $service = app(FulfillmentService::class);
+        $service->startOrder($orderId);
+        $first = DB::table('fulfillment_attempts')->where('order_id', $orderId)->firstOrFail();
+        DB::table('orders')->where('id', $orderId)->update(['status' => 'BLOCKED']);
+
+        foreach (['49', '50', '01', '70', '', '999'] as $rc) {
+            DB::table('fulfillment_attempts')->where('id', $first->id)->update([
+                'status' => 'FAILED_CONFIRMED', 'provider_status' => 'Gagal', 'provider_rc' => $rc,
+            ]);
+            try {
+                $service->resendAfterConfirmedFailure($orderId, 1);
+                $this->fail('RC '.$rc.' must not create a new transaction.');
+            } catch (ValidationException) {
+                $this->assertSame(1, DB::table('fulfillment_attempts')->where('order_id', $orderId)->count());
+                $this->assertSame('BLOCKED', DB::table('orders')->where('id', $orderId)->value('status'));
+            }
+        }
+    }
+
     public function test_manual_resend_rejects_newer_pending_attempt(): void
     {
         Queue::fake();
