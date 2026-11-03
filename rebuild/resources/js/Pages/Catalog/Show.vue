@@ -12,6 +12,7 @@ import '../../../css/checkout.css';
 import { phoneCountries, LEADING_ZERO_PRESERVED_DIALS } from '../../Data/phoneCountries';
 import { flagUrl } from '../../lib/flags';
 import { orderedPackageGroups } from '../../lib/catalogGroups';
+import { currentXsrfHeaders } from '../../lib/currentXsrfHeaders';
 
 const props = defineProps({
     product: Object,
@@ -511,17 +512,18 @@ async function submitReview() {
 }
 
 async function requestJson(url, options = {}) {
-    const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    const { headers: additionalHeaders, ...requestOptions } = options;
     const response = await fetch(url, {
         signal: AbortSignal.timeout(20000),
         cache: 'no-store',
+        credentials: 'same-origin',
+        ...requestOptions,
         headers: {
             Accept: 'application/json',
             'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': token,
-            ...(options.headers || {}),
+            ...currentXsrfHeaders(),
+            ...(additionalHeaders || {}),
         },
-        ...options,
     }).catch(error => {
         const message = ['TimeoutError', 'AbortError'].includes(error.name)
             ? 'Koneksi terlalu lama. Periksa jaringan lalu coba lagi.'
