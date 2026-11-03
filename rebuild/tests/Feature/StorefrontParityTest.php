@@ -11,6 +11,7 @@ use App\Models\StoreAsset;
 use App\Models\User;
 use App\Services\CheckoutPricing;
 use App\Services\PaymentRoutingService;
+use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Crypt;
@@ -445,24 +446,56 @@ class StorefrontParityTest extends TestCase
             'is_active' => true,
         ]);
 
-        $this->get('/login')->assertOk();
-        $this->post('/login', [
+        // Laravel skips CSRF checks in test mode by default; explicitly restore
+        // validation so the 419 regression cannot silently pass.
+        $this->app->bind(ValidateCsrfToken::class, StrictCsrfValidationMiddleware::class);
+        $this->withCredentials();
+
+        $loginPage = $this->get('/login')->assertOk();
+        $cookieValue = function ($response, string $name): string {
+            foreach ($response->headers->getCookies() as $cookie) {
+                if ($cookie->getName() === $name) {
+                    return $cookie->getValue();
+                }
+            }
+
+            $this->fail('Expected cookie '.$name.' in response.');
+        };
+        $sessionCookieName = config('session.cookie');
+        $oldXsrf = $cookieValue($loginPage, 'XSRF-TOKEN');
+        $this->withUnencryptedCookie($sessionCookieName, $cookieValue($loginPage, $sessionCookieName));
+        $login = $this->withHeader('X-XSRF-TOKEN', $oldXsrf)->post('/login', [
             'email' => $user->email,
             'password' => $password,
         ])->assertRedirect();
         $this->assertAuthenticatedAs($user, 'web');
 
-        // Neither a document reload nor a second login is needed here.
-        $this->postJson('/account/game-accounts', [
+        $newXsrf = $cookieValue($login, 'XSRF-TOKEN');
+        $this->assertNotSame($oldXsrf, $newXsrf, 'Login must rotate the CSRF cookie.');
+        $this->withUnencryptedCookie($sessionCookieName, $cookieValue($login, $sessionCookieName));
+
+        $account = [
             'product_id' => $catalog['product']->id,
             'label' => 'Login Langsung',
             'customer_input' => ['user_id' => '123456'],
-        ])->assertCreated();
-
-        $this->postJson('/checkout/quote', [
+        ];
+        $quote = [
             'package_id' => $catalog['package_id'],
             'payment_channel_code' => 'qris',
-        ])->assertOk()->assertJsonStructure(['total_idr']);
+        ];
+
+        // The token from the original meta/cookie must be rejected on BOTH flows.
+        $this->withHeader('X-CSRF-TOKEN', $oldXsrf)
+            ->postJson('/account/game-accounts', $account)->assertStatus(419);
+        $this->postJson('/checkout/quote', $quote)->assertStatus(419);
+
+        // Same logged-in browser session, no page reload: use the new XSRF
+        // cookie as the frontend helper does, not the stale meta token.
+        $this->withoutHeader('X-CSRF-TOKEN');
+        $this->withHeader('X-XSRF-TOKEN', $newXsrf);
+        $this->postJson('/account/game-accounts', $account)->assertCreated();
+        $this->postJson('/checkout/quote', $quote)->assertOk()
+            ->assertJsonStructure(['total_idr']);
     }
 
     public function test_popular_now_restores_legacy_priority_and_can_be_controlled_from_promo(): void
@@ -576,5 +609,16 @@ class StorefrontParityTest extends TestCase
             'is_active' => false,
             'body' => '[Ulasan dihapus oleh admin]',
         ]);
+    }
+}
+
+/**
+ * Exercise real CSRF enforcement; Laravel otherwise bypasses it in testing.
+ */
+class StrictCsrfValidationMiddleware extends ValidateCsrfToken
+{
+    protected function runningUnitTests(): bool
+    {
+        return false;
     }
 }
