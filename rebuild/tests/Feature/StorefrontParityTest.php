@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\AdminUser;
+use App\Models\IntegrationCredential;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductReview;
@@ -438,6 +439,11 @@ class StorefrontParityTest extends TestCase
                 'created_at' => now(), 'updated_at' => now(),
             ]
         );
+
+        IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
+            'config_ciphertext' => ['server_key' => 'session-rotation-test-key', 'is_production' => true],
+            'is_active' => true,
+        ]);
 
         $this->get('/login')->assertOk();
         $this->post('/login', [
