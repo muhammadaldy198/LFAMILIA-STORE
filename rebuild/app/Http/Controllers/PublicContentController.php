@@ -204,6 +204,7 @@ class PublicContentController
             ->map(function (object $voucher): object {
                 $voucher->ends_at = $voucher->ends_at
                     ? Carbon::parse($voucher->ends_at, 'UTC')->toIso8601String() : null;
+
                 return $voucher;
             });
 

@@ -2,8 +2,8 @@
 
 namespace App\Services;
 
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class PaymentPresentationService
 {
@@ -40,8 +40,7 @@ class PaymentPresentationService
             'channel_code' => (string) $payment->channel_code,
             'channel_name' => $payment->channel_name ?: (string) $payment->channel_code,
             'amount_idr' => (int) $payment->amount_idr,
-            'expires_at' => $payment->expires_at
-                ? Carbon::parse($payment->expires_at, 'UTC')->toIso8601String() : null,
+            'expires_at' => $payment->expires_at ? Carbon::parse($payment->expires_at, 'UTC')->toIso8601String() : null,
             'instructions' => $instructions,
         ];
     }

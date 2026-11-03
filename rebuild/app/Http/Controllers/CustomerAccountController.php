@@ -192,6 +192,7 @@ class CustomerAccountController
                 ->paginate(10)
                 ->through(function (object $entry): object {
                     $entry->created_at = Carbon::parse($entry->created_at, 'UTC')->toIso8601String();
+
                     return $entry;
                 }),
         ]);

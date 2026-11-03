@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Services\GuestOrderAccess;
+use App\Services\PublicOrderStatusService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -112,7 +113,7 @@ class GuestOrderTest extends TestCase
 
     public function test_public_status_has_only_four_labels_and_unpaid_expiry_note(): void
     {
-        $statuses = app(\App\Services\PublicOrderStatusService::class);
+        $statuses = app(PublicOrderStatusService::class);
         $this->assertSame('Terkirim', $statuses->label('SUCCESS'));
         $this->assertSame('Diproses', $statuses->label('PAID'));
         $this->assertSame('Menunggu Pembayaran', $statuses->label('PENDING_PAYMENT'));
@@ -152,13 +153,16 @@ class GuestOrderTest extends TestCase
             ->assertJsonPath('order.events.0.createdAt', $isoEvent);
 
         $this->get('/orders/track/feed')
-            ->assertOk()->assertJsonPath('transactions.0.createdAt', $isoCreated);
+            ->assertOk()
+            ->assertJsonPath('transactions.0.createdAt', $isoCreated);
         $this->withSession(['guest_order_id' => $orderId])->get('/orders/guest/LFTRACK-UTC-100/events')
-            ->assertOk()->assertJsonPath('order.created_at', $isoCreated)
+            ->assertOk()
+            ->assertJsonPath('order.created_at', $isoCreated)
             ->assertJsonPath('order.status_note', 'Kedaluwarsa')
             ->assertJsonPath('events.0.created_at', $isoEvent);
         $this->get('/orders/guest/LFTRACK-UTC-100')
-            ->assertOk()->assertInertia(fn ($page) => $page
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
                 ->where('order.status', 'FAILED')
                 ->where('order.status_note', 'Kedaluwarsa')
                 ->where('order.created_at', $isoCreated));
