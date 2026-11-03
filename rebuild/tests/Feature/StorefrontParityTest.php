@@ -421,11 +421,11 @@ class StorefrontParityTest extends TestCase
         $user = User::create([
             'name' => 'Session Rotation User',
             'email' => 'session-rotation-'.bin2hex(random_bytes(4)).'@example.test',
-            'email_verified_at' => now(),
             'phone' => '081234567890',
             'password' => Hash::make($password),
-            'membership_tier_code' => 'BASIC',
         ]);
+        // email_verified_at is guarded, so mass assignment silently drops it.
+        $user->forceFill(['email_verified_at' => now()])->save();
 
         DB::table('payment_gateways')->where('code', 'MIDTRANS')->update([
             'is_active' => true, 'is_maintenance' => false,
