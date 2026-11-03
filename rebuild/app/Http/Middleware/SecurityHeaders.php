@@ -6,6 +6,9 @@ use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
+// Canonical source for application security headers. Cloudflare's HSTS and
+// response-header transform rules are disabled for lfamilia.com; do not add
+// these headers in CloudPanel/nginx (see docs/BUG-HUNTER-2026-11-04.md).
 class SecurityHeaders
 {
     public function handle(Request $request, Closure $next): Response
