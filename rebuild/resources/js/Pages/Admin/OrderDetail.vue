@@ -57,6 +57,12 @@ const fail = () => {
     modal.value = '';
 };
 
+const resendFulfillmentOpen = ref(false);
+const resendFulfillment = () => {
+    if (!latest.value?.can_resend) return;
+    post(`/admin/fulfillment/orders/${props.order.id}/resend`, {}, 'fulfillment-resend');
+    resendFulfillmentOpen.value = false;
+};
 const resendOpen = ref(false);
 const resend = () => {
     post(`/admin/orders/${props.order.id}/resend-delivery`, {}, 'resend');
@@ -119,6 +125,7 @@ const whatsapp = computed(() => {
                     <button v-if="latest?.can_manual" type="button" class="adm-btn primary" @click="openModal('complete')">Selesaikan pesanan</button>
                     <button v-if="latest?.can_manual" type="button" class="adm-btn danger" @click="openModal('fail')">Nyatakan gagal</button>
                     <button v-if="latest?.can_retry" type="button" class="adm-btn" :disabled="busy === 'retry'" @click="post(`/admin/fulfillment/${latest.id}/retry`, {}, 'retry')">Lanjutkan pengiriman</button>
+                    <button v-if="latest?.status === 'FAILED_CONFIRMED'" type="button" class="adm-btn primary" :disabled="!!busy || !latest.can_resend" :title="latest.can_resend ? 'Kirim ulang manual' : 'Belum memenuhi syarat kirim ulang'" @click="resendFulfillmentOpen = true">Kirim Ulang</button>
                 </div>
             </div>
         </section>
@@ -236,6 +243,7 @@ const whatsapp = computed(() => {
                                         <button v-if="attempt.can_manual" type="button" class="adm-btn sm" @click="openModal('complete')">Selesaikan</button>
                                         <button v-if="attempt.can_manual" type="button" class="adm-btn sm danger" @click="openModal('fail')">Gagal</button>
                                         <button v-if="attempt.can_retry" type="button" class="adm-btn sm" :disabled="busy === 'retry'" @click="post(`/admin/fulfillment/${attempt.id}/retry`, {}, 'retry')">Lanjutkan</button>
+                                        <button v-if="attempt.status === 'FAILED_CONFIRMED'" type="button" class="adm-btn sm primary" :disabled="!!busy || !attempt.can_resend" :title="attempt.can_resend ? 'Kirim ulang manual' : 'Belum memenuhi syarat kirim ulang'" @click="resendFulfillmentOpen = true">Kirim Ulang</button>
                                         <span v-if="!attempt.can_manual && !attempt.can_retry" class="adm-note">—</span>
                                     </template>
                                     <span v-else class="adm-note">Riwayat</span>
@@ -260,6 +268,18 @@ const whatsapp = computed(() => {
                 <button type="button" class="adm-btn" @click="modal = ''">Batal</button>
                 <button v-if="modal === 'complete'" type="button" class="adm-btn primary" :disabled="busy === 'complete' || (!form.delivery_code.trim() && !form.note.trim())" @click="finish">Selesaikan pesanan</button>
                 <button v-else type="button" class="adm-btn danger" :disabled="busy === 'fail' || !form.reason.trim()" @click="fail">Nyatakan gagal</button>
+            </template>
+        </AdminModal>
+
+        <AdminModal v-model:open="resendFulfillmentOpen" title="Kirim Ulang Pesanan" description="Membuat transaksi Digiflazz baru secara manual.">
+            <p class="adm-note">{{ order.order_number }} · {{ order.product_name }} · {{ order.package_name }}</p>
+            <p class="adm-note">SKU Digiflazz: {{ order.provider_sku || '—' }}</p>
+            <p v-for="destination in order.destinations" :key="destination.label" class="adm-note">{{ destination.label }}: {{ destination.value }}</p>
+            <p class="adm-note">Proses terakhir: {{ latest?.status_label }} · RC {{ latest?.result_code || '—' }} · {{ latest?.price_idr != null ? rupiah(latest.price_idr) : 'Harga tidak tersedia' }}</p>
+            <p class="adm-note"><strong>Pastikan seller untuk SKU ini sudah dipindah di Digiflazz bila kegagalan berasal dari seller. Tombol ini tidak memindahkan seller.</strong></p>
+            <template #footer>
+                <button type="button" class="adm-btn" @click="resendFulfillmentOpen = false">Batal</button>
+                <button type="button" class="adm-btn primary" :disabled="!!busy" @click="resendFulfillment">Konfirmasi Kirim Ulang</button>
             </template>
         </AdminModal>
 

@@ -17,7 +17,7 @@ const allOperational = computed(() => props.services.every((item) => item.state 
 
 function formatDate(value) {
     if (!value) return '';
-    return new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
+    return new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
 }
 </script>
 

@@ -88,7 +88,8 @@ class CheckoutService
                 'discount_value' => (int) $candidate->discount_value,
                 'discount_idr' => (int) $resolved['discount_idr'],
                 'minimum_total_idr' => (int) $candidate->minimum_total_idr,
-                'ends_at' => $candidate->ends_at,
+                'ends_at' => $candidate->ends_at
+                    ? Carbon::parse($candidate->ends_at, 'UTC')->toIso8601String() : null,
             ];
         }
 

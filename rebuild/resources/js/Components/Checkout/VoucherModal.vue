@@ -36,7 +36,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
             <div class="lfx-offer-icon" aria-hidden="true">%</div>
             <div class="lfx-offer-copy">
               <strong>Hemat Rp {{Number(item.discount_idr || 0).toLocaleString('id-ID')}}</strong>
-              <span>Minimum Rp {{Number(item.minimum_total_idr || 0).toLocaleString('id-ID')}}<template v-if="item.ends_at"> · Berlaku hingga {{new Date(item.ends_at).toLocaleDateString('id-ID')}}</template></span>
+              <span>Minimum Rp {{Number(item.minimum_total_idr || 0).toLocaleString('id-ID')}}<template v-if="item.ends_at"> · Berlaku hingga {{new Date(item.ends_at).toLocaleDateString('id-ID',{timeZone:'Asia/Jakarta'})}}</template></span>
               <code>{{ item.code }}</code>
             </div>
             <button type="button" class="lfx-offer-apply" :aria-label="'Pakai voucher '+item.code" @click="emit('apply',item.code)">Pakai <span aria-hidden="true">→</span></button>

@@ -64,7 +64,9 @@ const openModal = (kind, row) => {
 const run = (action) => {
     const row = selected.value;
     if (!row) return;
-    const url = `/admin/fulfillment/${row.id}/${action}`;
+    const url = action === 'resend'
+        ? `/admin/fulfillment/orders/${row.order_id}/resend`
+        : `/admin/fulfillment/${row.id}/${action}`;
     const body = action === 'complete'
         ? { delivery_code: form.delivery_code, note: form.note }
         : action === 'fail' ? { reason: form.reason }
@@ -188,6 +190,7 @@ const runOn = (action, row) => {
                                 <button v-if="row.can_complete" type="button" class="adm-btn sm" @click="openModal('complete', row)">Tangani</button>
                                 <button v-if="row.can_reconcile" type="button" class="adm-btn sm" :disabled="busy" @click="runOn('reconcile', row)">Periksa status</button>
                                 <button v-if="row.can_retry" type="button" class="adm-btn sm" :disabled="busy" @click="runOn('retry', row)">Proses ulang</button>
+                                <button v-if="row.status === 'FAILED_CONFIRMED'" type="button" class="adm-btn sm primary" :disabled="busy || !row.can_resend" :title="row.can_resend ? 'Buat attempt baru setelah gagal final' : 'Hanya pesanan dibayar, BLOCKED, dan tanpa pengiriman aktif yang dapat dikirim ulang'" @click="openModal('resend', row)">Kirim Ulang</button>
                                 <button v-if="row.can_resolve_quarantine" type="button" class="adm-btn sm" :disabled="busy" @click="openModal('resolve-quarantine', row)">Resolusi karantina</button>
                                 <button v-if="row.can_fail" type="button" class="adm-btn sm danger" @click="openModal('fail', row)">Gagalkan</button>
                                 <Link :href="`/admin/orders/${row.order_id}`" class="adm-btn sm">Lihat</Link>
@@ -208,8 +211,17 @@ const runOn = (action, row) => {
             </div>
         </section>
 
-        <AdminModal v-model:open="modal" :title="modal === 'resolve-quarantine' ? 'Resolusi karantina Digiflazz' : modal === 'fail' ? 'Nyatakan proses gagal' : 'Selesaikan penanganan manual'" :description="selected ? `${selected.order_number} · penanganan ke-${selected.attempt_no}` : ''">
-            <div v-if="modal === 'complete'" class="adm-grid">
+        <AdminModal v-model:open="modal" :title="modal === 'resend' ? 'Kirim Ulang Pesanan' : modal === 'resolve-quarantine' ? 'Resolusi karantina Digiflazz' : modal === 'fail' ? 'Nyatakan proses gagal' : 'Selesaikan penanganan manual'" :description="selected ? `${selected.order_number} · penanganan ke-${selected.attempt_no}` : ''">
+            <div v-if="modal === 'resend'" class="adm-grid">
+                <p class="adm-note full"><strong>Pesanan:</strong> {{ selected?.order_number }}</p>
+                <p class="adm-note full"><strong>Produk:</strong> {{ selected?.product_name }} · {{ selected?.package_name }}</p>
+                <p class="adm-note full"><strong>SKU Digiflazz:</strong> {{ selected?.provider_sku || '—' }}</p>
+                <p v-for="destination in selected?.destinations || []" :key="destination.label" class="adm-note full">{{ destination.label }}: {{ destination.value }}</p>
+                <p class="adm-note full"><strong>Hasil sebelumnya:</strong> {{ selected?.provider_status || selected?.status }} · RC {{ selected?.response_code || '—' }} · {{ selected?.price_idr != null ? rupiah(selected.price_idr) : 'Harga tidak tersedia' }}</p>
+                <p class="adm-note full"><strong>Pastikan seller untuk SKU ini sudah dipindah di Digiflazz bila kegagalan berasal dari seller. Tombol ini tidak memindahkan seller.</strong></p>
+                <label class="adm-field full"><input v-model="form.acknowledge" type="checkbox"> Saya sudah memeriksa kegagalan sebelumnya dan memahami bahwa ini membuat transaksi baru.</label>
+            </div>
+            <div v-else-if="modal === 'complete'" class="adm-grid">
                 <label class="adm-field"><span>Hasil / kode pengiriman</span><textarea v-model="form.delivery_code" class="adm-textarea" maxlength="2000" /></label>
                 <label class="adm-field"><span>Catatan</span><textarea v-model="form.note" class="adm-textarea" maxlength="4000" /></label>
                 <p v-if="selected?.manual_instructions" class="adm-note full">{{ selected.manual_instructions }}</p>
@@ -230,7 +242,8 @@ const runOn = (action, row) => {
             </div>
             <template #footer>
                 <button type="button" class="adm-btn" @click="modal = ''">Batal</button>
-                <button v-if="modal === 'fail'" type="button" class="adm-btn danger" :disabled="busy || !form.reason.trim()" @click="run('fail')">Nyatakan gagal</button>
+                <button v-if="modal === 'resend'" type="button" class="adm-btn primary" :disabled="busy || !form.acknowledge" @click="run('resend')">Konfirmasi Kirim Ulang</button>
+                <button v-else-if="modal === 'fail'" type="button" class="adm-btn danger" :disabled="busy || !form.reason.trim()" @click="run('fail')">Nyatakan gagal</button>
                 <button v-else-if="modal === 'resolve-quarantine'" type="button" class="adm-btn primary" :disabled="busy || !form.acknowledge || !form.evidence_reference.trim() || !form.note.trim() || !form.provider_rc.trim() || !form.confirmed_customer_no.trim() || form.confirmed_customer_no !== selected?.resolution_destination" @click="run('resolve-quarantine')">Buat attempt Production baru</button>
                 <button v-else type="button" class="adm-btn primary" :disabled="busy || (!form.delivery_code.trim() && !form.note.trim())" @click="run('complete')">Tandai berhasil</button>
             </template>

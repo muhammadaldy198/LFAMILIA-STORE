@@ -50,6 +50,16 @@ class AdminAccessRestorationTest extends TestCase
         return $this->withSession(['admin.password_confirmed_at' => time()]);
     }
 
+    public function test_fulfillment_resend_requires_fulfillment_permission(): void
+    {
+        $admin = $this->admin('ADMIN', [
+            'permissions' => ['dashboard.view', 'orders.view'],
+        ]);
+        $this->actingAs($admin, 'admin')
+            ->post('/admin/fulfillment/orders/123/resend')
+            ->assertForbidden();
+    }
+
     public function test_admin_navigation_uses_grouped_server_menu_and_never_exposes_ungranted_links(): void
     {
         $permissions = app(AdminPermissionService::class);

@@ -5,7 +5,7 @@ const { customerText } = useCustomerPresentation();
 import { Head } from '@inertiajs/vue3';
 import AccountShell from '../../Components/AccountShell.vue';
 defineProps({ items: Array });
-const when=v=>v?new Date(v).toLocaleString('id-ID',{dateStyle:'medium',timeStyle:'short'}):'-';
+const when=v=>v?new Date(v).toLocaleString('id-ID',{timeZone:'Asia/Jakarta',dateStyle:'medium',timeStyle:'short'}):'-';
 </script>
 <template>
 <Head :title="customerText('pages.customer.notifications.attribute.title.b4d63cec', 'Notifikasi')" />

@@ -304,6 +304,8 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
                 ->middleware('throttle:admin-sensitive')->name('fail');
             Route::post('/{attemptId}/reconcile', [AdminFulfillmentController::class, 'reconcile'])
                 ->middleware('throttle:admin-sensitive')->name('reconcile');
+            Route::post('/orders/{order}/resend', [AdminFulfillmentController::class, 'resend'])
+                ->middleware('throttle:admin-sensitive')->name('orders.resend');
             Route::post('/{attemptId}/retry', [AdminFulfillmentController::class, 'retry'])
                 ->middleware('throttle:admin-sensitive')->name('retry');
             Route::post('/{attemptId}/resolve-quarantine', [AdminFulfillmentController::class, 'resolveQuarantine'])

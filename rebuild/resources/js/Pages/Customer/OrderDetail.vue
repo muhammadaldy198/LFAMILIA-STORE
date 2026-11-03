@@ -7,6 +7,7 @@ import { Head, Link } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import AccountShell from '../../Components/AccountShell.vue';
 import { rupiah } from '../../lib/money';
+import { wibDateTime } from '../../lib/adminFormat';
 import { manualHelpMessage, nextOrderAction, customerOrderStatusInfo, paymentStatusLabel } from '../../lib/orderStatus';
 
 const props = defineProps({ order: Object, payment: Object, review: Object, paymentUrl: { type: String, default: null } });
@@ -55,10 +56,10 @@ async function submitReview() {
         <h1 class="text-3xl font-semibold">Pesanan {{ order.order_number }}</h1>
         <dl class="grid gap-4 rounded-xl border border-slate-800 bg-slate-900 p-5 sm:grid-cols-2">
             <div><dt class="text-sm text-slate-400">{{ customerText("pages.customer.orderdetail.ceb4d888", "Produk") }}</dt><dd>{{ order.product_name }} · {{ order.package_name }}</dd></div>
-            <div><dt class="text-sm text-slate-400">{{ customerText("pages.customer.orderdetail.5ef20f", "Status") }}</dt><dd><strong>{{ statusInfo.label }}</strong><p class="mt-1 text-sm text-slate-400">{{ statusInfo.description }}</p></dd></div>
+            <div><dt class="text-sm text-slate-400">{{ customerText("pages.customer.orderdetail.5ef20f", "Status") }}</dt><dd><strong>{{ statusInfo.label }}</strong><p v-if="order.status_note" class="mt-1 text-sm text-slate-400">{{ order.status_note }}</p><p class="mt-1 text-sm text-slate-400">{{ statusInfo.description }}</p></dd></div>
             <div><dt class="text-sm text-slate-400">{{ customerText("pages.customer.orderdetail.ad066d9d", "Total") }}</dt><dd>{{ rupiah(order.total_idr) }}</dd></div>
-            <div><dt class="text-sm text-slate-400">{{ customerText("pages.customer.orderdetail.e378eb96", "Dibuat") }}</dt><dd>{{ order.created_at }}</dd></div>
-            <div v-if="order.paid_at"><dt class="text-sm text-slate-400">{{ customerText("pages.customer.orderdetail.144e2781", "Dibayar") }}</dt><dd>{{ order.paid_at }}</dd></div>
+            <div><dt class="text-sm text-slate-400">{{ customerText("pages.customer.orderdetail.e378eb96", "Dibuat") }}</dt><dd>{{ wibDateTime(order.created_at) }}</dd></div>
+            <div v-if="order.paid_at"><dt class="text-sm text-slate-400">{{ customerText("pages.customer.orderdetail.144e2781", "Dibayar") }}</dt><dd>{{ wibDateTime(order.paid_at) }}</dd></div>
         </dl>
 
         <section v-if="order.status === 'PENDING_PAYMENT'" class="space-y-3 rounded-xl border border-cyan-500/30 bg-cyan-500/10 p-5">

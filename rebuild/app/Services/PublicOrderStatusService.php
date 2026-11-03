@@ -4,17 +4,12 @@ namespace App\Services;
 
 final class PublicOrderStatusService
 {
-    /** Per-request cache: the service is scoped in AppServiceProvider. */
-    private ?array $customLabels = null;
-
     public function value(string $status): string
     {
         return match (strtoupper($status)) {
             'PENDING_PAYMENT' => 'PENDING_PAYMENT',
             'PAID', 'PROCESSING' => 'PROCESSING',
             'SUCCESS' => 'SUCCESS',
-            'EXPIRED' => 'EXPIRED',
-            'CANCELLED' => 'CANCELLED',
             default => 'FAILED',
         };
     }
@@ -25,27 +20,26 @@ final class PublicOrderStatusService
             'PENDING_PAYMENT' => 'pending',
             'PROCESSING' => 'processing',
             'SUCCESS' => 'success',
-            'EXPIRED' => 'expired',
-            'CANCELLED' => 'cancelled',
             default => 'failed',
         };
     }
 
     public function label(string $status): string
     {
-        $code = $this->value($status);
-        $default = match ($code) {
+        // Four canonical customer labels; legacy presentation overrides
+        // cannot silently resurrect old status buckets.
+        return match ($this->value($status)) {
             'PENDING_PAYMENT' => 'Menunggu Pembayaran',
-            'PROCESSING' => 'Sedang Diproses',
-            'SUCCESS' => 'Berhasil',
-            'EXPIRED' => 'Kedaluwarsa',
-            'CANCELLED' => 'Dibatalkan',
+            'PROCESSING' => 'Diproses',
+            'SUCCESS' => 'Terkirim',
             default => 'Gagal',
         };
+    }
 
-        $this->customLabels ??= app(CustomerPresentationService::class)->saved()['text'];
-        $custom = $this->customLabels['order.status.'.$code.'.label'] ?? null;
-
-        return is_string($custom) && trim($custom) !== '' ? $custom : $default;
+    public function note(string $status, bool $wasPaid): ?string
+    {
+        return ! $wasPaid && in_array(strtoupper($status), ['EXPIRED', 'CANCELLED'], true)
+            ? 'Kedaluwarsa'
+            : null;
     }
 }
