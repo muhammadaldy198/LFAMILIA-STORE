@@ -110,6 +110,60 @@ class GuestOrderTest extends TestCase
         }
     }
 
+    public function test_public_status_has_only_four_labels_and_unpaid_expiry_note(): void
+    {
+        $statuses = app(\App\Services\PublicOrderStatusService::class);
+        $this->assertSame('Terkirim', $statuses->label('SUCCESS'));
+        $this->assertSame('Diproses', $statuses->label('PAID'));
+        $this->assertSame('Menunggu Pembayaran', $statuses->label('PENDING_PAYMENT'));
+        foreach (['FAILED', 'BLOCKED', 'EXPIRED', 'CANCELLED'] as $code) {
+            $this->assertSame('FAILED', $statuses->value($code));
+            $this->assertSame('failed', $statuses->slug($code));
+            $this->assertSame('Gagal', $statuses->label($code));
+        }
+        $this->assertSame('Kedaluwarsa', $statuses->note('EXPIRED', false));
+        $this->assertSame('Kedaluwarsa', $statuses->note('CANCELLED', false));
+        $this->assertNull($statuses->note('FAILED', true));
+        $this->assertNull($statuses->note('EXPIRED', true));
+    }
+
+    public function test_public_tracking_and_guest_events_emit_utc_iso_timestamps_for_wib_rendering(): void
+    {
+        $orderId = $this->guestOrder('LFTRACK-UTC-100');
+        DB::table('orders')->where('id', $orderId)->update([
+            'status' => 'EXPIRED', 'paid_at' => null,
+            'created_at' => '2026-11-03 06:45:46',
+            'updated_at' => '2026-11-03 07:19:17',
+        ]);
+        DB::table('order_events')->insert([
+            'order_id' => $orderId, 'event_type' => 'PAYMENT_EXPIRED',
+            'correlation_id' => 'test-iso-timestamp',
+            'from_status' => 'PENDING_PAYMENT', 'to_status' => 'EXPIRED',
+            'created_at' => '2026-11-03 06:48:02',
+        ]);
+        $isoCreated = '2026-11-03T06:45:46+00:00';
+        $isoEvent = '2026-11-03T06:48:02+00:00';
+
+        $this->postJson('/orders/track/search', ['query' => 'LFTRACK-UTC-100'])
+            ->assertOk()
+            ->assertJsonPath('order.fulfillmentStatus', 'failed')
+            ->assertJsonPath('order.statusNote', 'Kedaluwarsa')
+            ->assertJsonPath('order.createdAt', $isoCreated)
+            ->assertJsonPath('order.events.0.createdAt', $isoEvent);
+
+        $this->get('/orders/track/feed')
+            ->assertOk()->assertJsonPath('transactions.0.createdAt', $isoCreated);
+        $this->withSession(['guest_order_id' => $orderId])->get('/orders/guest/LFTRACK-UTC-100/events')
+            ->assertOk()->assertJsonPath('order.created_at', $isoCreated)
+            ->assertJsonPath('order.status_note', 'Kedaluwarsa')
+            ->assertJsonPath('events.0.created_at', $isoEvent);
+        $this->get('/orders/guest/LFTRACK-UTC-100')
+            ->assertOk()->assertInertia(fn ($page) => $page
+                ->where('order.status', 'FAILED')
+                ->where('order.status_note', 'Kedaluwarsa')
+                ->where('order.created_at', $isoCreated));
+    }
+
     public function test_reissuing_code_invalidates_old_code(): void
     {
         $id = $this->guestOrder('GUEST-300');

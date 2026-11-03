@@ -153,6 +153,89 @@ class FulfillmentTest extends TestCase
         ]);
     }
 
+    public function test_admin_can_resend_once_after_confirmed_failure_without_switching_sku(): void
+    {
+        Queue::fake();
+        $catalog = $this->automaticCatalog(sku: 'DF-MANUAL-RESEND');
+        $orderId = $this->paidOrder($catalog);
+        $service = app(FulfillmentService::class);
+        $service->startOrder($orderId);
+        $first = DB::table('fulfillment_attempts')->where('order_id', $orderId)->firstOrFail();
+        DB::table('fulfillment_attempts')->where('id', $first->id)->update([
+            'status' => 'FAILED_CONFIRMED', 'provider_status' => 'Gagal',
+            'provider_rc' => '02', 'price_idr' => 10000,
+        ]);
+        DB::table('orders')->where('id', $orderId)->update(['status' => 'BLOCKED']);
+
+        $newId = $service->resendAfterConfirmedFailure($orderId, 1);
+        $second = DB::table('fulfillment_attempts')->where('id', $newId)->firstOrFail();
+        $this->assertSame(2, (int) $second->attempt_no);
+        $this->assertSame('CREATED', $second->status);
+        $this->assertSame('FUL-'.DB::table('orders')->where('id', $orderId)->value('order_number').'-2', $second->external_reference);
+        $this->assertSame((int) $first->provider_mapping_id, (int) $second->provider_mapping_id);
+        $this->assertSame((int) $first->provider_id, (int) $second->provider_id);
+        $this->assertNull($second->request_payload);
+        $this->assertNull($second->response_payload);
+        $this->assertNull($second->provider_status);
+        $this->assertNull($second->provider_rc);
+        $this->assertFalse((bool) $second->safe_to_failover);
+        $this->assertSame('FAILED_CONFIRMED', DB::table('fulfillment_attempts')->where('id', $first->id)->value('status'));
+        $this->assertSame('PROCESSING', DB::table('orders')->where('id', $orderId)->value('status'));
+        $this->assertSame(1, DB::table('order_events')->where('order_id', $orderId)->where('event_type', 'FULFILLMENT_MANUAL_RESEND_QUEUED')->count());
+        Queue::assertPushed(SendFulfillmentJob::class);
+
+        try {
+            $service->resendAfterConfirmedFailure($orderId, 1);
+            $this->fail('Double submit must be rejected.');
+        } catch (ValidationException) {
+            $this->assertSame(2, DB::table('fulfillment_attempts')->where('order_id', $orderId)->count());
+        }
+    }
+
+    public function test_manual_resend_rejects_newer_pending_attempt(): void
+    {
+        Queue::fake();
+        $catalog = $this->automaticCatalog(sku: 'DF-MANUAL-PENDING');
+        $orderId = $this->paidOrder($catalog);
+        $service = app(FulfillmentService::class);
+        $service->startOrder($orderId);
+        $first = DB::table('fulfillment_attempts')->where('order_id', $orderId)->firstOrFail();
+        DB::table('orders')->where('id', $orderId)->update(['status' => 'BLOCKED']);
+        DB::table('fulfillment_attempts')->where('id', $first->id)->update(['status' => 'PENDING']);
+
+        $this->expectException(ValidationException::class);
+        $service->resendAfterConfirmedFailure($orderId, 1);
+    }
+
+    public function test_manual_resend_rejects_successful_attempt(): void
+    {
+        Queue::fake();
+        $catalog = $this->automaticCatalog(sku: 'DF-MANUAL-SUCCESS');
+        $orderId = $this->paidOrder($catalog);
+        $service = app(FulfillmentService::class);
+        $service->startOrder($orderId);
+        $first = DB::table('fulfillment_attempts')->where('order_id', $orderId)->firstOrFail();
+        DB::table('orders')->where('id', $orderId)->update(['status' => 'BLOCKED']);
+        DB::table('fulfillment_attempts')->where('id', $first->id)->update(['status' => 'SUCCESS']);
+
+        $this->expectException(ValidationException::class);
+        $service->resendAfterConfirmedFailure($orderId, 1);
+    }
+
+    public function test_manual_resend_rejects_unpaid_or_non_blocked_order(): void
+    {
+        Queue::fake();
+        $catalog = $this->automaticCatalog(sku: 'DF-MANUAL-NOBLOCK');
+        $orderId = $this->paidOrder($catalog);
+        $service = app(FulfillmentService::class);
+        $service->startOrder($orderId);
+        $first = DB::table('fulfillment_attempts')->where('order_id', $orderId)->firstOrFail();
+        DB::table('fulfillment_attempts')->where('id', $first->id)->update(['status' => 'FAILED_CONFIRMED']);
+
+        $this->expectException(ValidationException::class);
+        $service->resendAfterConfirmedFailure($orderId, 1);
+    }
+
     private function credentials(): void
     {
         IntegrationCredential::updateOrCreate(['code' => 'digiflazz'], [
