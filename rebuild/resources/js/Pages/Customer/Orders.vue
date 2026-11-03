@@ -21,7 +21,7 @@ const statusLabel = status => visibleOrderStatus(status).label;
         <div v-for="order in orders.data" :key="order.id" class="rounded-xl border border-slate-800 bg-slate-900 p-4">
             <Link :href="'/account/orders/' + order.id" class="font-semibold text-cyan-300 hover:underline">{{ order.order_number }}</Link>
             <p class="mt-1">{{ order.product_name }} · {{ rupiah(order.total_idr) }}</p>
-            <p class="mt-1 text-sm text-slate-400">{{ statusLabel(order.status) }} · {{ order.created_at }}</p>
+            <p class="mt-1 text-sm text-slate-400">{{ statusLabel(order.status) }}<template v-if="order.status_note"> · {{ order.status_note }}</template> · {{ order.created_at }}</p>
         </div>
         <CustomerPagination :links="orders.links || []" :label="customerText('pages.customer.orders.attribute.aria-label.5819e517', 'Halaman pesanan')" />
     </AccountShell>

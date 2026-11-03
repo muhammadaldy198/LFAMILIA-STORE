@@ -99,9 +99,9 @@ onUnmounted(()=>{disposed=true;if(timer)clearInterval(timer);});
             <div class="space-y-3">
                 <section class="lf-order-info">
                     <div><small>{{ customerText("pages.guest.orderstatus.ceb4d888", "Produk") }}</small><strong>{{orderState.product_name}}</strong></div>
-                    <div><small>{{ customerText("pages.guest.orderstatus.5ef20f", "Status") }}</small><strong>{{statusLabel(orderState.status)}}</strong></div>
+                    <div><small>{{ customerText("pages.guest.orderstatus.5ef20f", "Status") }}</small><strong>{{statusLabel(orderState.status)}}</strong><small v-if="orderState.status_note"> · {{ orderState.status_note }}</small></div>
                     <div><small>{{ customerText("pages.guest.orderstatus.ad066d9d", "Total") }}</small><strong>{{rupiah(orderState.total_idr)}}</strong></div>
-                    <div><small>{{ customerText("pages.guest.orderstatus.e378eb96", "Dibuat") }}</small><strong>{{orderState.created_at}}</strong></div>
+                    <div><small>{{ customerText("pages.guest.orderstatus.e378eb96", "Dibuat") }}</small><strong>{{eventTime(orderState.created_at)}}</strong></div>
                 </section>
 
                 <section v-if="orderState.status==='PENDING_PAYMENT'" class="lf-order-payment">

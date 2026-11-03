@@ -133,7 +133,7 @@ onUnmounted(()=>{disposed=true;selectionVersion++;stopDetailPolling();if(feedTim
   <div class="lf-track-order-list">
    <button v-for="item in orders" :key="item.trackingToken" :disabled="loading" @click="openOrder(item.trackingToken)">
     <div><strong>{{item.maskedReferenceId}}</strong><small>{{item.productName}} · {{item.packageLabel}}</small></div>
-    <div><b>{{money(item.total)}}</b><span :class="'status-'+item.status">{{statusMeta(item.status)[0]}}</span></div>
+    <div><b>{{money(item.total)}}</b><span :class="'status-'+item.status">{{statusMeta(item.status)[0]}}<small v-if="item.statusNote"> · {{ item.statusNote }}</small></span></div>
    </button>
   </div>
  </section>
@@ -151,7 +151,7 @@ onUnmounted(()=>{disposed=true;selectionVersion++;stopDetailPolling();if(feedTim
      <button v-if="!detail.referenceMasked" @click="copyInvoice">{{copied?'Tersalin':'Salin'}}</button><span v-else class="text-[8px] font-bold uppercase tracking-[0.08em] text-white/35">{{ customerText("pages.guest.track.cbd3ad32", "Terlindungi") }}</span>
     </div>
     <div class="lf-track-status-card" :class="'tone-'+statusMeta(detail.fulfillmentStatus)[2]">
-     <span></span><div><small>{{ customerText("pages.guest.track.a17f89cb", "Status Pesanan") }}</small><strong>{{statusMeta(detail.fulfillmentStatus)[0]}}</strong><p>{{statusMeta(detail.fulfillmentStatus)[1]}}</p></div>
+     <span></span><div><small>{{ customerText("pages.guest.track.a17f89cb", "Status Pesanan") }}</small><strong>{{statusMeta(detail.fulfillmentStatus)[0]}}</strong><p v-if="detail.statusNote">{{ detail.statusNote }}</p><p>{{statusMeta(detail.fulfillmentStatus)[1]}}</p></div>
     </div>
     <dl class="lf-track-meta">
      <div><dt>{{ customerText("pages.guest.track.ceb4d888", "Produk") }}</dt><dd>{{detail.productName}}</dd></div>
@@ -206,7 +206,7 @@ onUnmounted(()=>{disposed=true;selectionVersion++;stopDetailPolling();if(feedTim
    <div class="lf-feed-table">
     <div class="lf-feed-row lf-feed-head"><span>{{ customerText("pages.guest.track.71ec87b0", "Invoice") }}</span><span>{{ customerText("pages.guest.track.ceb4d888", "Produk") }}</span><span>{{ customerText("pages.guest.track.ad066d9d", "Total") }}</span><span>{{ customerText("pages.guest.track.5ef20f", "Status") }}</span><span>{{ customerText("pages.guest.track.4293eacd", "Waktu") }}</span></div>
     <div v-for="item in feed" :key="item.maskedReferenceId+item.createdAt" class="lf-feed-row">
-     <strong :data-mobile-label="customerText('pages.guest.track.71ec87b0', 'Invoice')">{{item.maskedReferenceId}}</strong><span :data-mobile-label="customerText('pages.guest.track.ceb4d888', 'Produk')">{{item.productName}}<small>{{item.packageLabel}}</small></span><b :data-mobile-label="customerText('pages.guest.track.ad066d9d', 'Total')">{{money(item.total)}}</b><em :class="'status-'+item.status" :data-mobile-label="customerText('pages.guest.track.5ef20f', 'Status')">{{statusMeta(item.status)[0]}}</em><time :data-mobile-label="customerText('pages.guest.track.4293eacd', 'Waktu')">{{date(item.createdAt)}}</time>
+     <strong :data-mobile-label="customerText('pages.guest.track.71ec87b0', 'Invoice')">{{item.maskedReferenceId}}</strong><span :data-mobile-label="customerText('pages.guest.track.ceb4d888', 'Produk')">{{item.productName}}<small>{{item.packageLabel}}</small></span><b :data-mobile-label="customerText('pages.guest.track.ad066d9d', 'Total')">{{money(item.total)}}</b><em :class="'status-'+item.status" :data-mobile-label="customerText('pages.guest.track.5ef20f', 'Status')">{{statusMeta(item.status)[0]}}<small v-if="item.statusNote"> · {{ item.statusNote }}</small></em><time :data-mobile-label="customerText('pages.guest.track.4293eacd', 'Waktu')">{{date(item.createdAt)}}</time>
     </div>
     <div v-if="!feed.length" class="lf-empty">{{ customerText("pages.guest.track.faa60eef", "Belum ada transaksi untuk ditampilkan.") }}</div>
    </div>

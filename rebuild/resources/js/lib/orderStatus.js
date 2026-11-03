@@ -2,31 +2,33 @@
 export const manualHelpMessage = 'Sudah bayar tapi barang belum masuk? Hubungi admin, pesanan diselesaikan manual. Sertakan ID order dan bukti bayar.';
 const publicStatuses = {
     PENDING_PAYMENT: ['Menunggu Pembayaran', 'Selesaikan pembayaran sesuai petunjuk invoice.', 'amber', false],
-    PROCESSING: ['Sedang Diproses', 'Pesanan sedang diproses. Periksa akun game secara berkala.', 'blue', false],
-    SUCCESS: ['Berhasil', 'Pesanan selesai. Periksa akun game untuk hasilnya.', 'green', true],
+    PROCESSING: ['Diproses', 'Pesanan sedang diproses. Periksa akun game secara berkala.', 'blue', false],
+    SUCCESS: ['Terkirim', 'Pesanan selesai. Periksa akun game untuk hasilnya.', 'green', true],
     FAILED: ['Gagal', 'Pesanan tidak berhasil diproses. Hubungi admin jika pembayaran sudah dilakukan.', 'red', true],
-    EXPIRED: ['Kedaluwarsa', 'Waktu pembayaran telah berakhir.', 'gray', true],
-    CANCELLED: ['Dibatalkan', 'Pesanan dibatalkan dan tidak akan diproses lagi.', 'red', true],
 };
 const internalToPublic = {
     PENDING: 'PENDING_PAYMENT', PENDING_PAYMENT: 'PENDING_PAYMENT', CREATING: 'PENDING_PAYMENT',
     PAID: 'PROCESSING', SETTLEMENT: 'PROCESSING', CAPTURE: 'PROCESSING', PROCESSING: 'PROCESSING',
     SUCCESS: 'SUCCESS', FAILED: 'FAILED', REJECTED: 'FAILED', DENIED: 'FAILED', DENY: 'FAILED',
-    EXPIRED: 'EXPIRED', EXPIRE: 'EXPIRED', CANCELLED: 'CANCELLED', CANCEL: 'CANCELLED',
+    EXPIRED: 'FAILED', EXPIRE: 'FAILED', CANCELLED: 'FAILED', CANCEL: 'FAILED',
 };
-export function orderStatusInfo(status) {
-    const key = internalToPublic[String(status || '').toUpperCase()] || 'FAILED';
+export function orderStatusInfo(status, wasPaid = null) {
+    const raw = String(status || '').toUpperCase();
+    const key = internalToPublic[raw] || 'FAILED';
     const [label, description, tone, terminal] = publicStatuses[key];
-    return { key, label, description, tone, terminal };
+    const note = wasPaid !== true && ['EXPIRED', 'EXPIRE', 'CANCELLED', 'CANCEL'].includes(raw)
+        ? 'Kedaluwarsa' : null;
+    return { key, label, description, tone, terminal, note };
 }
 
 // Only display copy is editable. Terminal flags and status mapping stay code-owned.
-export function customerOrderStatusInfo(status, customerText) {
-    const info = orderStatusInfo(status);
+export function customerOrderStatusInfo(status, customerText, wasPaid = null) {
+    const info = orderStatusInfo(status, wasPaid);
     if (typeof customerText !== 'function') return info;
     return {
         ...info,
-        label: customerText('order.status.' + info.key + '.label', info.label),
+        // Canonical status names are not editable; older saved labels must
+        // not revive extra public status categories.
         description: customerText('order.status.' + info.key + '.description', info.description),
     };
 }
@@ -51,7 +53,7 @@ export function nextOrderAction(orderStatus, paymentStatus = null, paidAt = null
     const order = String(orderStatus || '').toUpperCase();
     const payment = String(paymentStatus || '').toUpperCase();
     if (!internalToPublic[order] || ['REFUND', 'REFUNDED'].includes(order)) return 'support';
-    if (!['FAILED', 'EXPIRED', 'CANCELLED'].includes(internalToPublic[order])) return null;
+    if (internalToPublic[order] !== 'FAILED') return null;
     if (paidAt || ['PAID', 'SETTLEMENT', 'CAPTURE', 'SUCCESS', 'REFUNDED', 'REFUND'].includes(payment)) return 'support';
     if (['PENDING', 'PENDING_PAYMENT', 'CREATING', 'UNKNOWN', 'PROCESSING'].includes(payment)) return null;
     if (!payment || ['FAILED', 'REJECTED', 'DENIED', 'DENY', 'EXPIRED', 'EXPIRE', 'CANCELLED', 'CANCEL'].includes(payment)) return 'new';
