@@ -25,7 +25,7 @@ class AdminOrderDetailController
             ->leftJoin('providers', 'providers.id', '=', 'attempts.provider_id')
             ->where('attempts.order_id', $id)->orderByDesc('attempts.id')
             ->get(['attempts.id', 'attempts.status', 'attempts.attempt_no', 'attempts.serial_number',
-                'attempts.last_error', 'attempts.response_payload', 'attempts.external_reference', 'attempts.provider_rc', 'attempts.created_at', 'attempts.last_checked_at', 'attempts.safe_to_failover', 'providers.code'])
+                'attempts.last_error', 'attempts.response_payload', 'attempts.external_reference', 'attempts.provider_rc', 'attempts.price_idr', 'attempts.created_at', 'attempts.last_checked_at', 'attempts.safe_to_failover', 'providers.code'])
             ->map(fn (object $attempt): array => [
                 'id' => $attempt->id, 'attempt_no' => $attempt->attempt_no, 'status' => $attempt->status,
                 'status_label' => $presentation->status($attempt->status),
@@ -33,6 +33,7 @@ class AdminOrderDetailController
                 'serial_number' => $attempt->serial_number,
                 'note' => $presentation->note($attempt->last_error ?: data_get($presentation->json($attempt->response_payload), 'message')),
                 'reference' => $attempt->external_reference, 'result_code' => $attempt->provider_rc,
+                'price_idr' => $attempt->price_idr !== null ? (int) $attempt->price_idr : null,
                 'created_at' => $presentation->date($attempt->created_at), 'checked_at' => $presentation->date($attempt->last_checked_at),
                 'can_manual' => $canFulfill && $attempt->status === 'MANUAL_PENDING' && in_array($row->status, ['PAID', 'PROCESSING'], true),
                 'can_retry' => $canFulfill && in_array($row->status, ['PAID', 'PROCESSING'], true)
@@ -41,7 +42,12 @@ class AdminOrderDetailController
             ]);
         // Only the newest attempt can be acted upon.
         $attempts = $attempts->map(fn (array $attempt, int $index): array => [...$attempt,
-            'can_manual' => $index === 0 && $attempt['can_manual'], 'can_retry' => $index === 0 && $attempt['can_retry']]);
+            'can_manual' => $index === 0 && $attempt['can_manual'], 'can_retry' => $index === 0 && $attempt['can_retry'],
+            'can_resend' => $index === 0 && $canFulfill && $row->status === 'BLOCKED'
+                && $row->paid_at !== null && $attempt['status'] === 'FAILED_CONFIRMED'
+                && $attempt['provider'] === 'Digiflazz'
+                && ! DB::table('fulfillment_attempts')->where('order_id', $id)
+                    ->whereIn('status', ['CREATED', 'QUEUED', 'SENDING', 'PENDING', 'UNKNOWN', 'SUCCESS'])->exists()]);
         $order = $presentation->row($row);
         $deliveryCode = trim((string) ($order['delivery']['code'] ?? $order['delivery']['serial_number'] ?? ''));
         $deliveryNote = trim((string) ($order['delivery']['note'] ?? ''));

@@ -67,7 +67,7 @@ class AdminFulfillmentController
         $open = (clone $base)->where('orders.status', '<>', 'CANCELLED');
         $metrics = [
             ['label' => 'Menunggu manual', 'value' => (clone $open)->where('attempts.status', 'MANUAL_PENDING')->count()],
-            ['label' => 'Perlu perhatian', 'value' => (clone $open)->whereIn('attempts.status', ['MANUAL_FAILED', 'BLOCKED', 'UNKNOWN'])->count()],
+            ['label' => 'Perlu perhatian', 'value' => (clone $open)->whereIn('attempts.status', ['MANUAL_FAILED', 'FAILED_CONFIRMED', 'BLOCKED', 'UNKNOWN'])->count()],
             ['label' => 'Menunggu kepastian', 'value' => (clone $open)->whereIn('attempts.status', ['SENDING', 'PENDING'])->count()],
             ['label' => 'Berhasil', 'value' => (clone $base)->where('attempts.status', 'SUCCESS')->count()],
         ];
@@ -75,7 +75,7 @@ class AdminFulfillmentController
         $query = clone $base;
         if ($filters['scope'] === 'action') {
             $query->where('orders.status', '<>', 'CANCELLED')
-                ->whereIn('attempts.status', ['MANUAL_PENDING', 'MANUAL_FAILED', 'BLOCKED', 'UNKNOWN', 'PENDING', 'SENDING']);
+                ->whereIn('attempts.status', ['MANUAL_PENDING', 'MANUAL_FAILED', 'FAILED_CONFIRMED', 'BLOCKED', 'UNKNOWN', 'PENDING', 'SENDING']);
         } elseif ($filters['scope'] === 'manual') {
             $query->where('providers.code', 'MANUAL');
         }
@@ -178,6 +178,7 @@ class AdminFulfillmentController
                 'response_code' => $attempt->provider_rc,
                 'price_idr' => $attempt->price_idr !== null ? (int) $attempt->price_idr : null,
                 'safe_to_failover' => (bool) $attempt->safe_to_failover,
+                'provider_sku' => data_get($snapshot, 'provider.sku'),
                 'last_error' => $presentation->note($attempt->last_error),
                 'last_checked_at' => $presentation->date($attempt->last_checked_at),
                 'created_at' => $presentation->date($attempt->created_at),
@@ -195,6 +196,12 @@ class AdminFulfillmentController
                 'is_overdue' => $attempt->status === 'MANUAL_PENDING'
                     && $manualAge > $manualOverdueMinutes,
                 'can_resolve_quarantine' => $canResolveQuarantine,
+                'can_resend' => $attempt->order_status === 'BLOCKED'
+                    && $attempt->order_paid_at !== null
+                    && $attempt->status === 'FAILED_CONFIRMED'
+                    && $attempt->provider_code === 'DIGIFLAZZ'
+                    && ! DB::table('fulfillment_attempts')->where('order_id', $attempt->order_id)
+                        ->whereIn('status', ['CREATED', 'QUEUED', 'SENDING', 'PENDING', 'UNKNOWN', 'SUCCESS'])->exists(),
                 'resolution_destination' => $resolutionDestination,
                 'can_complete' => $terminal === false && $attempt->status === 'MANUAL_PENDING'
                     && in_array($attempt->order_status, ['PAID', 'PROCESSING'], true),
@@ -287,6 +294,28 @@ class AdminFulfillmentController
         $this->audit($request, 'fulfillment.retry.requested', $attemptId, (array) $before);
 
         return back()->with('status', 'Proses ulang dimasukkan ke antrean dengan pengaman transaksi ganda.');
+    }
+
+    public function resend(
+        Request $request,
+        int $order,
+        FulfillmentService $fulfillment,
+    ): RedirectResponse {
+        $previous = DB::table('fulfillment_attempts')->where('order_id', $order)
+            ->orderByDesc('attempt_no')->first();
+        $newAttemptId = $fulfillment->resendAfterConfirmedFailure(
+            $order, (int) $request->user('admin')->id
+        );
+        app(AdminAuditService::class)->record(
+            $request,
+            'fulfillment.manual.resend.requested',
+            'fulfillment_attempt',
+            $newAttemptId,
+            ['previous_attempt_id' => $previous?->id, 'order_id' => $order],
+            ['new_attempt_id' => $newAttemptId, 'order_id' => $order]
+        );
+
+        return back()->with('status', 'Kirim ulang dimasukkan ke antrean menggunakan referensi baru.');
     }
 
     public function resolveQuarantine(

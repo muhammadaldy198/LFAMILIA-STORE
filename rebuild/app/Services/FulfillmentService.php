@@ -753,6 +753,76 @@ class FulfillmentService
         }
     }
 
+    /**
+     * Open one new attempt after a provider-confirmed failure. Never switch
+     * SKUs or retry any reference whose outcome is still uncertain.
+     */
+    public function resendAfterConfirmedFailure(int $orderId, int $adminId): int
+    {
+        $newAttemptId = DB::transaction(function () use ($orderId, $adminId): int {
+            // An order lock serializes competing requests from two admins.
+            $order = DB::table('orders')->where('id', $orderId)->lockForUpdate()->first();
+            if (! $order || $order->status !== 'BLOCKED' || $order->paid_at === null) {
+                throw ValidationException::withMessages([
+                    'fulfillment' => 'Hanya pesanan terblokir yang sudah dibayar dapat dikirim ulang.',
+                ]);
+            }
+            $latest = DB::table('fulfillment_attempts')->where('order_id', $orderId)
+                ->orderByDesc('attempt_no')->lockForUpdate()->first();
+            if (! $latest || $latest->status !== 'FAILED_CONFIRMED') {
+                throw ValidationException::withMessages([
+                    'fulfillment' => 'Attempt terakhir belum terkonfirmasi gagal. Muat ulang halaman.',
+                ]);
+            }
+            if ($this->isLegacyQuarantined($latest)) {
+                throw ValidationException::withMessages([
+                    'fulfillment' => 'Attempt karantina harus diselesaikan lewat resolusi khusus.',
+                ]);
+            }
+            if (DB::table('fulfillment_attempts')->where('order_id', $orderId)
+                ->whereIn('status', ['CREATED', 'QUEUED', 'SENDING', 'PENDING', 'UNKNOWN', 'SUCCESS'])->exists()) {
+                throw ValidationException::withMessages([
+                    'fulfillment' => 'Masih ada attempt berjalan, belum pasti, atau sukses. Tidak boleh mengirim ulang.',
+                ]);
+            }
+
+            $snapshot = $this->json($order->snapshot);
+            $mapping = $this->mapping((int) $latest->provider_mapping_id);
+            if (data_get($snapshot, 'product.fulfillment_mode') !== 'AUTO_PROVIDER'
+                || ! $mapping || $mapping->provider_code !== 'DIGIFLAZZ'
+                || (int) $mapping->provider_id !== (int) $latest->provider_id
+                || (int) $mapping->product_package_id !== (int) $order->product_package_id
+                || ! is_string($mapping->external_sku)
+                || trim($mapping->external_sku) === ''
+                || strcasecmp((string) data_get($snapshot, 'provider.sku', ''), (string) $mapping->external_sku) !== 0) {
+                throw ValidationException::withMessages([
+                    'fulfillment' => 'SKU atau mapping pesanan tidak cocok dengan sumber yang aktif.',
+                ]);
+            }
+            if ($reason = $this->mappingBlockReason($mapping, $snapshot, $orderId)) {
+                throw ValidationException::withMessages(['fulfillment' => $reason]);
+            }
+
+            $newAttempt = $this->createAttempt($order, $mapping, 'CREATED');
+            DB::table('orders')->where('id', $orderId)->update([
+                'status' => 'PROCESSING', 'updated_at' => now(),
+            ]);
+            $this->event($orderId, 'FULFILLMENT_MANUAL_RESEND_QUEUED', 'BLOCKED', 'PROCESSING', [
+                'previous_attempt_id' => (int) $latest->id,
+                'previous_provider_rc' => $latest->provider_rc,
+                'new_attempt_id' => (int) $newAttempt->id,
+                'admin_id' => $adminId,
+                'automatic_failover' => false,
+            ]);
+
+            return (int) $newAttempt->id;
+        }, 3);
+
+        SendFulfillmentJob::dispatch($newAttemptId)->afterCommit();
+
+        return $newAttemptId;
+    }
+
     private function ensureLatestAttempt(object $attempt): void
     {
         $newerExists = DB::table('fulfillment_attempts')
