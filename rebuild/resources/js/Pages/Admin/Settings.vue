@@ -3,7 +3,8 @@ import { computed, reactive, ref, watch } from 'vue';
 import { Head, router, usePage } from '@inertiajs/vue3';
 import AdminLayout from '../../Components/Admin/AdminLayout.vue';
 
-const canManageTemplates = computed(() => (usePage().props.adminPanel?.menu || []).some(item => item.href === '/admin/message-templates'));
+const page = usePage();
+const canManageTemplates = computed(() => (page.props.adminPanel?.menu || []).some(item => item.href === '/admin/message-templates'));
 
 const props = defineProps({
     settings: { type: Object, default: () => ({}) },
