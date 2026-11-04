@@ -100,7 +100,7 @@ try {
     const detailPaths = ['/admin/orders/' + orderId, '/admin/customers/' + customerId, '/admin/support?ticket=' + ticketId];
 
     const nav = await evaluate(`[...document.querySelectorAll('.adm-nav a')].map(a => a.getAttribute('href'))`);
-    if (nav.length !== 21) throw Error('Sidebar menu count changed: ' + nav.length + ' ' + JSON.stringify(nav));
+    if (nav.length !== 22 || !nav.includes('/admin/message-templates')) throw Error('Sidebar template menu missing: ' + nav.length + ' ' + JSON.stringify(nav));
 
     const sizes = process.env.ADMIN_UI_SIZES
         ? process.env.ADMIN_UI_SIZES.split(',').map(pair => pair.split('x').map(Number))
