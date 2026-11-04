@@ -3,42 +3,43 @@
 namespace App\Services;
 
 /**
- * Tiga ember notifikasi admin, dipakai bersama oleh Telegram dan Discord.
- * Pemetaan event lama tetap lengkap; event tak dikenal menuju arsip.
+ * Empat tujuan notifikasi admin bersama untuk Telegram dan Discord.
+ * Event tak dikenal selalu dikirim ke arsip.
  */
 final class DiscordNotificationRouting
 {
-    public const CHANNELS = ['order', 'insiden', 'arsip'];
+    public const CHANNELS = ['order', 'tugas', 'sistem', 'arsip'];
 
     /** @var array<string,string> */
     private const MAP = [
         'order.created' => 'order',
         'payment.paid' => 'order',
         'payment.late_verified' => 'order',
-        'payment.manual_qris.pending' => 'order',
         'payment.refund_review' => 'order',
         'payment.partial_refund_review' => 'order',
         'wallet.topup_refund_review' => 'order',
         'wallet.topup_refund_resolved' => 'order',
+        'fulfillment.success' => 'order',
+        'fulfillment.stock.success' => 'order',
+        'fulfillment.manual.success' => 'order',
+        'fulfillment.pending' => 'order',
 
-        'fulfillment.success' => 'insiden',
-        'fulfillment.stock.success' => 'insiden',
-        'fulfillment.failed' => 'insiden',
-        'fulfillment.manual.pending' => 'insiden',
-        'fulfillment.manual.success' => 'insiden',
-        'fulfillment.manual.failed' => 'insiden',
-        'fulfillment.pending' => 'insiden',
-        'fulfillment.unknown' => 'insiden',
-        'fulfillment.pending.stale' => 'insiden',
-        'fulfillment.blocked' => 'insiden',
-        'fulfillment.exhausted' => 'insiden',
-        'fulfillment.reconcile.stalled' => 'insiden',
-        'fulfillment.price_guard_breach' => 'insiden',
-        'digiflazz.mapping.duplicate_active' => 'insiden',
-        'system.healthcheck.failed' => 'insiden',
-        'system.healthcheck.recovered' => 'insiden',
-        'integration.error' => 'insiden',
-        'digiflazz.sync.failed' => 'insiden',
+        'fulfillment.manual.pending' => 'tugas',
+        'fulfillment.manual.failed' => 'tugas',
+        'fulfillment.failed' => 'tugas',
+        'fulfillment.blocked' => 'tugas',
+        'fulfillment.exhausted' => 'tugas',
+        'fulfillment.unknown' => 'tugas',
+        'fulfillment.pending.stale' => 'tugas',
+        'fulfillment.reconcile.stalled' => 'tugas',
+        'payment.manual_qris.pending' => 'tugas',
+        'digiflazz.mapping.duplicate_active' => 'tugas',
+
+        'system.healthcheck.failed' => 'sistem',
+        'system.healthcheck.recovered' => 'sistem',
+        'integration.error' => 'sistem',
+        'digiflazz.sync.failed' => 'sistem',
+        'fulfillment.price_guard_breach' => 'sistem',
 
         'support.ticket.created' => 'arsip',
         'support.ticket.replied' => 'arsip',

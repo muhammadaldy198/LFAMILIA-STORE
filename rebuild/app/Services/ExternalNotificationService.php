@@ -48,7 +48,6 @@ class ExternalNotificationService
         $environment = (string) ($resolved['environment'] ?? '');
         if (! is_array($config)
             || ($environment !== 'production' && ! (app()->environment('testing') && $environment === 'test'))
-            || empty($config['bot_token'])
             || empty($config['chat_id'])) {
             return null;
         }
@@ -58,14 +57,22 @@ class ExternalNotificationService
             ...$renderer->telegram($payload),
         ];
         $bucket = DiscordNotificationRouting::channelFor($payload['event']);
+        $token = trim((string) ($config['bot_token_'.$bucket] ?? ''));
+        if ($token === '') {
+            $token = trim((string) ($config['bot_token'] ?? ''));
+        }
+        if ($token === '') {
+            return null;
+        }
+
         $thread = trim((string) ($config['thread_'.$bucket] ?? ''));
         if ($thread !== '' && ctype_digit($thread) && (int) $thread > 0 && (int) $thread <= 2147483647) {
             $body['message_thread_id'] = (int) $thread;
         }
 
-        return $this->attempt($id, 'telegram', (string) $config['chat_id'], $withLock, function () use ($config, $environment, $body) {
+        return $this->attempt($id, 'telegram', (string) $config['chat_id'], $withLock, function () use ($token, $environment, $body) {
             return Http::acceptJson()->timeout(8)->post(
-                $this->runtime->telegramBotBase($environment, (string) $config['bot_token']).'/sendMessage',
+                $this->runtime->telegramBotBase($environment, $token).'/sendMessage',
                 $body
             );
         });

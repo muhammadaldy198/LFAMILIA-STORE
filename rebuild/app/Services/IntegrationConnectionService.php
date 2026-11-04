@@ -200,29 +200,38 @@ class IntegrationConnectionService
      */
     private function telegram(array $config, ?string $environment): array
     {
-        $token = trim((string) ($config['bot_token'] ?? ''));
-        if ($token === '') {
-            return $this->notConfigured('Bot token Telegram belum diisi.');
+        $tokens = [];
+        foreach (['bot_token', 'bot_token_order', 'bot_token_tugas', 'bot_token_sistem', 'bot_token_arsip'] as $key) {
+            $token = trim((string) ($config[$key] ?? ''));
+            if ($token !== '') {
+                $tokens[$token] = true;
+            }
+        }
+        if ($tokens === []) {
+            return $this->notConfigured('Token bot Telegram belum diisi.');
         }
         if ($environment !== 'production' && ! (app()->environment('testing') && $environment === 'test')) {
             return $this->notConfigured('Environment Telegram belum valid.');
         }
 
-        $response = Http::acceptJson()
-            ->connectTimeout(3)
-            ->timeout(8)
-            ->get($this->runtime->telegramBotBase((string) $environment, $token).'/getMe');
+        foreach (array_keys($tokens) as $token) {
+            $response = Http::acceptJson()
+                ->connectTimeout(3)
+                ->timeout(8)
+                ->get($this->runtime->telegramBotBase((string) $environment, $token).'/getMe');
 
-        if (in_array($response->status(), [401, 403, 404], true)) {
-            return $this->invalidCredential();
-        }
-        if ($this->isProviderUnavailable($response)) {
-            return $this->unavailable();
+            if (in_array($response->status(), [401, 403, 404], true)) {
+                return $this->invalidCredential();
+            }
+            if ($this->isProviderUnavailable($response)) {
+                return $this->unavailable();
+            }
+            if (! $response->successful() || $response->json('ok') !== true) {
+                return $this->invalidCredential('Ada bot Telegram yang tidak dapat diverifikasi.');
+            }
         }
 
-        return $response->successful() && $response->json('ok') === true
-            ? $this->verified('Bot Telegram terverifikasi melalui getMe tanpa mengirim notifikasi.')
-            : $this->invalidCredential('Bot Telegram tidak dapat diverifikasi.');
+        return $this->verified('Seluruh bot Telegram yang dikonfigurasi terverifikasi melalui getMe tanpa mengirim notifikasi.');
     }
 
     /**

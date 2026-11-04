@@ -14,7 +14,7 @@ use Tests\TestCase;
 
 /**
  * Routing Discord per jenis notif (keputusan 15 Okt 2026 02:49 WIB):
- * Telegram tetap 1 tujuan dan menerima SEMUA notif; Discord hanya
+ * Telegram memakai bot per tujuan dan menerima SEMUA notif yang bertoken; Discord hanya
  * ke channel yang webhook-nya terkonfigurasi (fallback ke webhook
  * default bila ada); pengiriman dicatat terpisah per channel Discord.
  */
@@ -72,7 +72,7 @@ class ExternalNotificationRoutingTest extends TestCase
     {
         $this->seedDiscord(['webhook_url_order' => self::ORDER_WEBHOOK]);
 
-        $fulfillmentId = $this->record('fulfillment.success');
+        $fulfillmentId = $this->record('fulfillment.failed');
         $orderId = $this->record('order.created');
         app(ExternalNotificationService::class)->deliver($fulfillmentId);
         app(ExternalNotificationService::class)->deliver($orderId);
@@ -95,7 +95,7 @@ class ExternalNotificationRoutingTest extends TestCase
         $this->assertSame(1, Http::recorded(fn ($request) => $request->url() === self::ORDER_WEBHOOK)->count());
         $this->assertDatabaseMissing('notification_deliveries', [
             'admin_notification_id' => $fulfillmentId,
-            'channel' => 'discord:insiden',
+            'channel' => 'discord:tugas',
         ]);
         $this->assertDatabaseHas('notification_deliveries', [
             'admin_notification_id' => $orderId,
@@ -108,11 +108,11 @@ class ExternalNotificationRoutingTest extends TestCase
     {
         $this->seedDiscord([
             'webhook_url_order' => self::ORDER_WEBHOOK,
-            'webhook_url_insiden' => self::FULFILLMENT_WEBHOOK,
+            'webhook_url_tugas' => self::FULFILLMENT_WEBHOOK,
         ]);
 
         $orderId = $this->record('order.created');
-        $fulfillmentId = $this->record('fulfillment.success');
+        $fulfillmentId = $this->record('fulfillment.failed');
 
         // Kirim dua kali (seperti job antrean yang retry): tidak dobel.
         $service = app(ExternalNotificationService::class);
@@ -132,7 +132,7 @@ class ExternalNotificationRoutingTest extends TestCase
         ]);
         $this->assertDatabaseHas('notification_deliveries', [
             'admin_notification_id' => $fulfillmentId,
-            'channel' => 'discord:insiden',
+            'channel' => 'discord:tugas',
             'status' => 'SENT',
         ]);
         $this->assertSame(2, $this->telegramSends());
@@ -209,7 +209,7 @@ class ExternalNotificationRoutingTest extends TestCase
         $this->seedDiscord(['webhook_url' => self::LEGACY_WEBHOOK]);
 
         $orderId = $this->record('order.created');
-        $fulfillmentId = $this->record('fulfillment.success');
+        $fulfillmentId = $this->record('fulfillment.failed');
         $service = app(ExternalNotificationService::class);
         $service->deliver($orderId);
         $service->deliver($fulfillmentId);
@@ -219,7 +219,7 @@ class ExternalNotificationRoutingTest extends TestCase
         $this->assertSame(2, Http::recorded(fn ($request) => $request->url() === self::LEGACY_WEBHOOK)->count());
         $this->assertDatabaseHas('notification_deliveries', [
             'admin_notification_id' => $fulfillmentId,
-            'channel' => 'discord:insiden',
+            'channel' => 'discord:tugas',
             'status' => 'SENT',
         ]);
     }

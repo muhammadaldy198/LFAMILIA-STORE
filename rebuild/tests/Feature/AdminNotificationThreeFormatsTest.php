@@ -18,7 +18,7 @@ class AdminNotificationThreeFormatsTest extends TestCase
 
     private const ORDER_WEBHOOK = 'https://discord.com/api/webhooks/111/order';
 
-    private const INCIDENT_WEBHOOK = 'https://discord.com/api/webhooks/222/incident';
+    private const TASK_WEBHOOK = 'https://discord.com/api/webhooks/222/task';
 
     private const ARCHIVE_WEBHOOK = 'https://discord.com/api/webhooks/333/archive';
 
@@ -84,8 +84,8 @@ class AdminNotificationThreeFormatsTest extends TestCase
 
     public function test_one_admin_event_renders_three_distinct_formats_with_same_facts(): void
     {
-        $this->telegram(['thread_insiden' => '5678']);
-        $this->discord(['webhook_url_insiden' => self::INCIDENT_WEBHOOK]);
+        $this->telegram(['thread_tugas' => '5678']);
+        $this->discord(['webhook_url_tugas' => self::TASK_WEBHOOK]);
         $this->resend();
 
         $id = $this->event();
@@ -96,7 +96,7 @@ class AdminNotificationThreeFormatsTest extends TestCase
         app(ExternalNotificationService::class)->deliver($id);
 
         $telegram = Http::recorded(fn ($request) => str_contains($request->url(), '/sendMessage'))->first()[0];
-        $discord = Http::recorded(fn ($request) => $request->url() === self::INCIDENT_WEBHOOK)->first()[0];
+        $discord = Http::recorded(fn ($request) => $request->url() === self::TASK_WEBHOOK)->first()[0];
         $resend = Http::recorded(fn ($request) => $request->url() === 'https://api.resend.com/emails')->first()[0];
 
         $this->assertSame('HTML', $telegram['parse_mode']);
@@ -124,7 +124,7 @@ class AdminNotificationThreeFormatsTest extends TestCase
         $this->assertStringContainsString('WIB', $resend['text']);
         $this->assertSame(1, substr_count($resend['html'], 'Buka di Panel Admin'));
 
-        foreach (['telegram', 'discord:insiden', 'email'] as $channel) {
+        foreach (['telegram', 'discord:tugas', 'email'] as $channel) {
             $this->assertDatabaseHas('notification_deliveries', [
                 'admin_notification_id' => $id,
                 'channel' => $channel,
@@ -133,24 +133,78 @@ class AdminNotificationThreeFormatsTest extends TestCase
         }
     }
 
-    public function test_three_telegram_buckets_use_only_their_configured_thread_ids(): void
+    public function test_four_telegram_purposes_use_only_their_configured_thread_ids(): void
     {
         $this->telegram([
             'thread_order' => '101',
-            'thread_insiden' => '202',
-            // arsip intentionally omitted.
+            'thread_tugas' => '202',
+            'thread_sistem' => '303',
+            // Arsip intentionally has no thread.
         ]);
-        foreach (['payment.manual_qris.pending', 'fulfillment.blocked', 'support.ticket.created'] as $event) {
-            $id = $this->event($event);
-            app(ExternalNotificationService::class)->deliver($id);
+        foreach (['order.created', 'fulfillment.blocked', 'system.healthcheck.failed', 'support.ticket.created'] as $event) {
+            app(ExternalNotificationService::class)->deliver($this->event($event));
         }
         $requests = Http::recorded(fn ($request) => str_contains($request->url(), '/sendMessage'))
             ->map(fn ($pair) => $pair[0]);
 
-        $this->assertCount(3, $requests);
+        $this->assertCount(4, $requests);
         $this->assertSame(101, $requests[0]['message_thread_id']);
         $this->assertSame(202, $requests[1]['message_thread_id']);
-        $this->assertArrayNotHasKey('message_thread_id', $requests[2]->data());
+        $this->assertSame(303, $requests[2]['message_thread_id']);
+        $this->assertArrayNotHasKey('message_thread_id', $requests[3]->data());
+    }
+
+    public function test_four_telegram_bots_use_distinct_tokens_and_shared_group(): void
+    {
+        $this->telegram([
+            'bot_token' => '',
+            'bot_token_order' => 'order-bot',
+            'bot_token_tugas' => 'tugas-bot',
+            'bot_token_sistem' => 'sistem-bot',
+            'bot_token_arsip' => 'arsip-bot',
+            'thread_order' => '101',
+            'thread_tugas' => '202',
+            'thread_sistem' => '303',
+            'thread_arsip' => '404',
+        ]);
+        foreach (['order.created', 'fulfillment.failed', 'system.healthcheck.failed', 'support.ticket.created'] as $event) {
+            app(ExternalNotificationService::class)->deliver($this->event($event));
+        }
+        $requests = Http::recorded(fn ($request) => str_contains($request->url(), '/sendMessage'))
+            ->map(fn ($pair) => $pair[0]);
+        $this->assertCount(4, $requests);
+        foreach (['order', 'tugas', 'sistem', 'arsip'] as $index => $purpose) {
+            $this->assertStringContainsString('/bot'.$purpose.'-bot/test/sendMessage', $requests[$index]->url());
+            $this->assertSame('test-chat', $requests[$index]['chat_id']);
+            $this->assertSame(($index + 1) * 101, $requests[$index]['message_thread_id']);
+        }
+    }
+
+    public function test_telegram_uses_default_token_for_missing_purpose_and_silently_skips_without_any_token(): void
+    {
+        $this->telegram([
+            'bot_token' => 'fallback-bot',
+            'bot_token_order' => 'order-bot',
+            'bot_token_tugas' => '',
+        ]);
+        $service = app(ExternalNotificationService::class);
+        $service->deliver($this->event('order.created'));
+        $service->deliver($this->event('fulfillment.failed'));
+        $requests = Http::recorded(fn ($request) => str_contains($request->url(), '/sendMessage'))
+            ->map(fn ($pair) => $pair[0]);
+
+        $this->assertCount(2, $requests);
+        $this->assertStringContainsString('/botorder-bot/test/sendMessage', $requests[0]->url());
+        $this->assertStringContainsString('/botfallback-bot/test/sendMessage', $requests[1]->url());
+
+        $this->telegram(['bot_token' => '', 'bot_token_order' => '']);
+        $skippedId = $this->event('order.created');
+        $service->deliver($skippedId);
+        $this->assertSame(2, Http::recorded(fn ($request) => str_contains($request->url(), '/sendMessage'))->count());
+        $this->assertDatabaseMissing('notification_deliveries', [
+            'admin_notification_id' => $skippedId,
+            'channel' => 'telegram',
+        ]);
     }
 
     public function test_discord_fallback_unconfigured_destinations_and_dedupe(): void
@@ -161,7 +215,7 @@ class AdminNotificationThreeFormatsTest extends TestCase
         ]);
         $this->telegram();
 
-        $orderId = $this->event('payment.manual_qris.pending', 'INFO');
+        $orderId = $this->event('order.created', 'INFO');
         $archiveId = $this->event('support.ticket.replied', 'SUCCESS');
         $service = app(ExternalNotificationService::class);
         $service->deliver($orderId);
@@ -183,13 +237,13 @@ class AdminNotificationThreeFormatsTest extends TestCase
         $skipped = $this->event('fulfillment.blocked');
         $service->deliver($skipped);
         $this->assertDatabaseMissing('notification_deliveries', [
-            'admin_notification_id' => $skipped, 'channel' => 'discord:insiden',
+            'admin_notification_id' => $skipped, 'channel' => 'discord:tugas',
         ]);
     }
 
     public function test_old_discord_sent_row_prevents_double_send_after_bucket_migration(): void
     {
-        $this->discord(['webhook_url_insiden' => self::INCIDENT_WEBHOOK]);
+        $this->discord(['webhook_url_tugas' => self::TASK_WEBHOOK]);
         $id = $this->event();
         DB::table('notification_deliveries')->insert([
             'admin_notification_id' => $id,
@@ -201,7 +255,7 @@ class AdminNotificationThreeFormatsTest extends TestCase
         ]);
 
         app(ExternalNotificationService::class)->deliver($id);
-        $this->assertSame(0, Http::recorded(fn ($request) => $request->url() === self::INCIDENT_WEBHOOK)->count());
+        $this->assertSame(0, Http::recorded(fn ($request) => $request->url() === self::TASK_WEBHOOK)->count());
     }
 
     public function test_discord_embed_respects_combined_character_budget(): void
