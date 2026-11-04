@@ -294,6 +294,18 @@ class AdminIntegrationController
             }
         }
 
+        // Retire the 10 historical Discord webhook keys on save. The UI now
+        // declares only three buckets, so stale hidden settings must not
+        // survive as invisible or invalid webhook credentials.
+        if ($code === 'discord') {
+            foreach (array_keys($config) as $key) {
+                if (str_starts_with($key, 'webhook_url_')
+                    && ! in_array($key, ['webhook_url_order', 'webhook_url_insiden', 'webhook_url_arsip'], true)) {
+                    unset($config[$key]);
+                }
+            }
+        }
+
         $selectedConfig = $environments !== [] && $registry->credentialsArePerEnvironment($code)
             ? (is_array($config['profiles'][$environment] ?? null) ? $config['profiles'][$environment] : [])
             : $config;

@@ -66,7 +66,8 @@ class AdminNotificationRenderer
         ];
         foreach ($safe as $key => $label) {
             $value = $data[$key] ?? null;
-            if ((! is_string($value) && ! is_numeric($value)) || trim((string) $value) === '') {
+            $scalar = is_string($value) || is_numeric($value);
+            if (! $scalar || trim((string) $value) === '') {
                 continue;
             }
             if (! collect($fields)->contains(fn (array $field): bool => strcasecmp($field['name'], $label) === 0)) {
@@ -133,33 +134,46 @@ class AdminNotificationRenderer
         ];
     }
 
-    /** @param array<string,mixed> $message */
+    /** @param  array<string, mixed>  $message */
     public function discord(array $message): array
     {
-        $fields = [];
-        foreach ($message['fields'] as $fact) {
-            if (count($fields) === 25) {
-                break;
-            }
-            $fields[] = [
-                'name' => mb_substr($fact['name'], 0, 256),
-                'value' => mb_substr($fact['value'], 0, 1024),
-                'inline' => mb_strlen($fact['value']) < 110,
-            ];
-        }
-
+        $title = mb_substr($message['icon'].' ['.$message['level'].'] '.$message['title'], 0, 256);
         $footer = $message['wib'];
         if ($message['action'] !== null) {
             $footer .= ' • Yang harus dilakukan: '.$message['action'];
         }
+        $footer = mb_substr($footer, 0, 1600);
+
+        // Discord limits all text within one embed to 6,000 characters
+        // COMBINED (not 6,000 per field). Reserve room for its title, footer,
+        // field names and a buffer for provider-side counting differences.
+        $remaining = 6000 - mb_strlen($title) - mb_strlen($footer) - 80;
+        $fields = [];
+        foreach ($message['fields'] as $fact) {
+            if (count($fields) >= 25 || $remaining <= 8) {
+                break;
+            }
+            $name = mb_substr($fact['name'], 0, min(256, $remaining - 2));
+            $remaining -= mb_strlen($name);
+            $value = mb_substr($fact['value'], 0, min(1024, $remaining - 2));
+            $remaining -= mb_strlen($value);
+            if ($name === '' || $value === '') {
+                break;
+            }
+            $fields[] = [
+                'name' => $name,
+                'value' => $value,
+                'inline' => mb_strlen($value) < 110,
+            ];
+        }
 
         return [
             'embeds' => [[
-                'title' => mb_substr($message['icon'].' ['.$message['level'].'] '.$message['title'], 0, 256),
+                'title' => $title,
                 'url' => $message['url'],
                 'color' => hexdec(ltrim($message['color'], '#')),
                 'fields' => $fields,
-                'footer' => ['text' => mb_substr($footer, 0, 2048)],
+                'footer' => ['text' => $footer],
             ]],
             'allowed_mentions' => ['parse' => []],
         ];
@@ -217,6 +231,11 @@ class AdminNotificationRenderer
             || str_starts_with($event, 'payment.') || str_starts_with($event, 'fulfillment.')) {
             if ($targetType === 'order' && ctype_digit($targetId) && (int) $targetId > 0) {
                 return route('admin.orders.show', ['id' => (int) $targetId]);
+            }
+
+            $orderId = (string) ($data['order_id'] ?? '');
+            if (ctype_digit($orderId) && (int) $orderId > 0) {
+                return route('admin.orders.show', ['id' => (int) $orderId]);
             }
 
             $invoice = (string) ($data['invoice'] ?? $data['order_number'] ?? '');

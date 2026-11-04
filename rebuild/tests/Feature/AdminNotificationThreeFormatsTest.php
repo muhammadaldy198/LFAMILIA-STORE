@@ -204,6 +204,49 @@ class AdminNotificationThreeFormatsTest extends TestCase
         $this->assertSame(0, Http::recorded(fn ($request) => $request->url() === self::INCIDENT_WEBHOOK)->count());
     }
 
+    public function test_discord_embed_respects_combined_character_budget(): void
+    {
+        $renderer = app(AdminNotificationRenderer::class);
+        $payload = $renderer->fromNotification((object) [
+            'event_type' => 'integration.error',
+            'severity' => 'ERROR',
+            'title' => 'Webhook warning',
+            'message' => implode("\n", array_map(
+                fn (int $i): string => 'Fakta '.$i.': '.str_repeat('X', 1000),
+                range(1, 10)
+            )),
+            'target_type' => null,
+            'target_id' => null,
+            'data' => null,
+            'created_at' => '2026-11-04 07:02:00',
+        ]);
+        $embed = $renderer->discord($payload)['embeds'][0];
+        $length = mb_strlen($embed['title']) + mb_strlen($embed['footer']['text']);
+        foreach ($embed['fields'] as $field) {
+            $length += mb_strlen($field['name']) + mb_strlen($field['value']);
+        }
+
+        $this->assertLessThanOrEqual(6000, $length);
+        $this->assertNotEmpty($embed['fields']);
+    }
+
+    public function test_fulfillment_attempt_metadata_links_to_specific_admin_order(): void
+    {
+        $renderer = app(AdminNotificationRenderer::class);
+        $payload = $renderer->fromNotification((object) [
+            'event_type' => 'fulfillment.failed',
+            'severity' => 'ERROR',
+            'title' => 'Pengiriman Gagal',
+            'message' => 'Penyedia mengembalikan kesalahan.',
+            'target_type' => 'fulfillment_attempt',
+            'target_id' => '88',
+            'data' => json_encode(['order_id' => 107], JSON_THROW_ON_ERROR),
+            'created_at' => '2026-11-04 07:02:00',
+        ]);
+
+        $this->assertSame(route('admin.orders.show', ['id' => 107]), $payload['url']);
+    }
+
     public function test_renderer_escapes_untrusted_markup_and_converts_utc_to_wib(): void
     {
         $notification = (object) [
