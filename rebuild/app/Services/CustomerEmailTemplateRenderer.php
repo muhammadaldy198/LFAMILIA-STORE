@@ -196,6 +196,7 @@ class CustomerEmailTemplateRenderer
 
         $override = app(TemplateOverrideService::class)->apply('email.'.$event, $subject, $intro, [
             'nama' => $name,
+            'nama_toko' => $store,
             'email' => $recipient,
             'invoice' => $invoice,
             'produk' => $fullProductName,

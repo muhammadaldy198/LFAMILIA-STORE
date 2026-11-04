@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Jobs\SendTransactionalEmailJob;
 use App\Services\AdminNotificationRenderer;
 use App\Services\CustomerEmailTemplateRenderer;
+use App\Services\EditableMessageTemplateService;
 use App\Services\TemplateOverrideService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
@@ -135,6 +136,94 @@ class AdminTemplateOverrideTest extends TestCase
         $this->delete('/admin/message-templates/overrides/email.order_paid')->assertRedirect();
         $this->assertDatabaseMissing('message_template_overrides', ['template_key' => 'email.order_paid']);
         $this->assertDatabaseHas('audit_logs', ['action' => 'templates.override.reset', 'target_id' => 'email.order_paid']);
+    }
+
+    public function test_admin_custom_copy_keeps_immutable_original_facts_across_channels(): void
+    {
+        $this->override('admin.fulfillment.blocked', '{judul}', 'Mohon periksa pembayaran ini.');
+        $renderer = app(AdminNotificationRenderer::class);
+        $notification = (object) [
+            'event_type' => 'fulfillment.blocked', 'severity' => 'ERROR',
+            'title' => 'Pembayaran perlu pemeriksaan',
+            'message' => "Gateway: Midtrans\nAlasan: Timeout saat verifikasi\nPeriksa gateway sebelum meminta pembeli membayar ulang.",
+            'target_type' => 'order', 'target_id' => '1',
+            'data' => [], 'created_at' => now('UTC'),
+        ];
+        $message = $renderer->fromNotification($notification);
+        $factText = implode(' | ', array_column($message['fields'], 'value'));
+        $this->assertStringContainsString('Midtrans', $factText);
+        $this->assertStringContainsString('Timeout saat verifikasi', $factText);
+        $this->assertStringContainsString('Periksa gateway sebelum meminta pembeli membayar ulang.', $factText);
+        $this->assertStringContainsString('Mohon periksa pembayaran ini.', $factText);
+        $this->assertStringContainsString('Midtrans', $renderer->telegram($message)['text']);
+        $this->assertStringContainsString('Midtrans', json_encode($renderer->discord($message), JSON_THROW_ON_ERROR));
+        $this->assertStringContainsString('Midtrans', $renderer->email($message)['text']);
+    }
+
+    public function test_reset_clears_legacy_template_but_preserves_other_events(): void
+    {
+        $this->admin();
+        DB::table('system_settings')->updateOrInsert(['key' => 'store.message_templates'], [
+            'value' => json_encode([
+                'emails' => [
+                    'order_paid' => [
+                        'subject' => '[LAMA] {{default_subject}}',
+                        'body' => 'LAMA {{default_body}}',
+                    ],
+                    'ticket_reply' => [
+                        'subject' => '{{default_subject}}',
+                        'body' => 'PESAN LAIN {{default_body}}',
+                    ],
+                ],
+            ], JSON_THROW_ON_ERROR),
+            'version' => 1, 'updated_at' => now('UTC'), 'created_at' => now('UTC'),
+        ]);
+        $service = app(TemplateOverrideService::class);
+        $before = collect($service->listing())->firstWhere('key', 'email.order_paid');
+        $this->assertSame('Diubah', $before['status']);
+        $this->assertTrue($before['has_legacy']);
+        $this->assertSame('[LAMA] {subjek_bawaan}', $before['subject']);
+
+        $this->override('email.order_paid', 'Judul yang sudah diubah', 'Konten yang sudah diubah');
+        $this->delete('/admin/message-templates/overrides/email.order_paid')
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $after = app(EditableMessageTemplateService::class)->saved();
+        $this->assertArrayNotHasKey('order_paid', $after['emails']);
+        $this->assertArrayHasKey('ticket_reply', $after['emails']);
+        $this->assertDatabaseMissing('message_template_overrides', ['template_key' => 'email.order_paid']);
+        $this->assertSame('Bawaan', collect($service->listing())->firstWhere('key', 'email.order_paid')['status']);
+        $this->assertSame('Pembayaran diterima', $service->apply(
+            'email.order_paid', 'Pembayaran diterima', 'Isi bawaan'
+        )['subject']);
+    }
+
+    public function test_saving_new_override_replaces_legacy_without_affecting_other_templates(): void
+    {
+        $this->admin();
+        DB::table('system_settings')->updateOrInsert(['key' => 'store.message_templates'], [
+            'value' => json_encode([
+                'emails' => ['order_paid' => [
+                    'subject' => 'LAMA {{default_subject}}',
+                    'body' => 'LAMA {{default_body}}',
+                ]],
+                'notifications' => ['fulfillment.blocked' => [
+                    'title' => 'REKAN {{default_title}}',
+                    'body' => '{{default_body}}',
+                ]],
+            ], JSON_THROW_ON_ERROR),
+            'version' => 1, 'updated_at' => now('UTC'), 'created_at' => now('UTC'),
+        ]);
+        $this->put('/admin/message-templates/overrides', [
+            'template_key' => 'email.order_paid',
+            'subject' => 'Baru {invoice}',
+            'body' => 'Pembayaran {invoice} sudah diterima.',
+            'is_enabled' => true,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $saved = app(EditableMessageTemplateService::class)->saved();
+        $this->assertArrayNotHasKey('order_paid', $saved['emails']);
+        $this->assertArrayHasKey('fulfillment.blocked', $saved['notifications']);
+        $this->assertDatabaseHas('message_template_overrides', ['template_key' => 'email.order_paid']);
+        $this->assertDatabaseHas('audit_logs', ['action' => 'templates.override.saved', 'target_id' => 'email.order_paid']);
     }
 
     public function test_preview_renders_real_html_without_sending_mail(): void
