@@ -13,7 +13,7 @@
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
 <tr><td align="left"><img src="{{ $logoUrl }}" alt="{{ $store }}" width="168" height="31" style="display:block;width:168px;max-width:100%;height:auto;border:0"></td></tr>
 <tr><td style="padding-top:18px;font-size:20px;line-height:1.4;color:#111111;font-weight:bold">{{ $name !== '' ? 'Hai '.$name.',' : 'Hai,' }}</td></tr>
-<tr><td style="padding-top:12px;font-size:14px;line-height:1.6;color:#333333">{{ $intro }}</td></tr>
+<tr><td style="padding-top:12px;font-size:14px;line-height:1.6;color:#333333">{!! nl2br(e($intro), false) !!}</td></tr>
 <tr><td style="padding-top:13px;font-size:14px;line-height:1.7;color:#333333">{{ $metaDateLabel }}: {{ $metaDate }}</td></tr>
 <tr><td style="font-size:14px;line-height:1.7;color:#333333">No. Transaksi: <strong>{{ $reference }}</strong></td></tr>
 <tr><td style="padding:16px 0">

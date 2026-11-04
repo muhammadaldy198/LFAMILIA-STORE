@@ -90,6 +90,19 @@ class AdminTemplateOverrideTest extends TestCase
         $this->assertSame($before['html'], $reset['html']);
     }
 
+    public function test_customer_email_body_preserves_newlines_and_escapes_html(): void
+    {
+        $this->override('email.order_paid', 'Pembaruan pesanan', "Paragraf pertama.\n<script>alert(1)</script>");
+        $rendered = app(CustomerEmailTemplateRenderer::class)->render(
+            'order_paid', 'Pembayaran diterima', 'Nomor Invoice: LF261104-TEST',
+            'customer@example.test', ['invoice' => 'LF261104-TEST', 'total' => 1659]
+        );
+
+        $this->assertStringContainsString('Paragraf pertama.<br>', $rendered['html']);
+        $this->assertStringContainsString('&lt;script&gt;alert(1)&lt;/script&gt;', $rendered['html']);
+        $this->assertStringNotContainsString('<script>', $rendered['html']);
+    }
+
     public function test_unauthorized_role_cannot_open_edit_or_preview(): void
     {
         $this->admin('ADMIN', ['settings.manage']);
