@@ -64,6 +64,24 @@ class SecurityM10Test extends TestCase
         );
     }
 
+    public function test_https_security_headers_have_one_authoritative_value_in_laravel(): void
+    {
+        $response = $this->get('https://lfamilia.com/login')->assertOk();
+
+        $expected = [
+            'Strict-Transport-Security' => 'max-age=31536000; includeSubDomains',
+            'X-Content-Type-Options' => 'nosniff',
+            'X-Frame-Options' => 'DENY',
+            'Referrer-Policy' => 'strict-origin-when-cross-origin',
+            'Permissions-Policy' => 'camera=(), microphone=(), geolocation=(), payment=()',
+        ];
+
+        foreach ($expected as $name => $value) {
+            $response->assertHeader($name, $value);
+            $this->assertCount(1, $response->headers->all($name));
+        }
+    }
+
     public function test_trusted_host_guard_rejects_unconfigured_host(): void
     {
         config(['lfamilia.trusted_hosts' => ['lfamilia.com']]);

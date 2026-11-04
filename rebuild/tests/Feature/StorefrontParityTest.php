@@ -4,12 +4,15 @@ namespace Tests\Feature;
 
 use App\Models\AdminUser;
 use App\Models\Category;
+use App\Models\IntegrationCredential;
 use App\Models\Product;
 use App\Models\ProductReview;
 use App\Models\StoreAsset;
 use App\Models\User;
 use App\Services\CheckoutPricing;
 use App\Services\PaymentRoutingService;
+use Illuminate\Cookie\CookieValuePrefix;
+use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Crypt;
@@ -410,6 +413,98 @@ class StorefrontParityTest extends TestCase
             ])->assertUnprocessable();
     }
 
+    public function test_login_can_immediately_save_game_account_and_quote_checkout_without_reload(): void
+    {
+        $this->withServerVariables(['REMOTE_ADDR' => '192.0.2.182']);
+        $catalog = $this->catalog();
+        $password = 'VeryStrongPassword123!';
+        $user = User::create([
+            'name' => 'Session Rotation User',
+            'email' => 'session-rotation-'.bin2hex(random_bytes(4)).'@example.test',
+            'phone' => '081234567890',
+            'password' => Hash::make($password),
+        ]);
+        // email_verified_at is guarded, so mass assignment silently drops it.
+        $user->forceFill(['email_verified_at' => now()])->save();
+
+        DB::table('payment_gateways')->where('code', 'MIDTRANS')->update([
+            'is_active' => true, 'is_maintenance' => false,
+        ]);
+        DB::table('payment_channels')->where('code', 'qris')->update(['is_active' => true]);
+        $gatewayId = DB::table('payment_gateways')->where('code', 'MIDTRANS')->value('id');
+        $channelId = DB::table('payment_channels')->where('code', 'qris')->value('id');
+        DB::table('payment_routes')->updateOrInsert(
+            ['payment_channel_id' => $channelId, 'payment_gateway_id' => $gatewayId],
+            [
+                'provider_channel' => 'qris', 'configuration' => null,
+                'priority' => 0, 'is_active' => true,
+                'created_at' => now(), 'updated_at' => now(),
+            ]
+        );
+
+        IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
+            'config_ciphertext' => ['server_key' => 'session-rotation-test-key', 'is_production' => true],
+            'is_active' => true,
+        ]);
+
+        // Laravel skips CSRF checks in test mode by default; explicitly restore
+        // validation so the 419 regression cannot silently pass.
+        $this->app->bind(ValidateCsrfToken::class, StrictCsrfValidationMiddleware::class);
+        $this->withCredentials();
+
+        $loginPage = $this->get('/login')->assertOk();
+        $this->assertSame(1, preg_match('/<meta name="csrf-token" content="([^"]+)"/', $loginPage->getContent(), $meta));
+        $staleMetaToken = $meta[1];
+        $cookieValue = function ($response, string $name): string {
+            foreach ($response->headers->getCookies() as $cookie) {
+                if ($cookie->getName() === $name) {
+                    return $cookie->getValue();
+                }
+            }
+
+            $this->fail('Expected cookie '.$name.' in response.');
+        };
+        $sessionCookieName = config('session.cookie');
+        $oldXsrf = $cookieValue($loginPage, 'XSRF-TOKEN');
+        $this->withUnencryptedCookie($sessionCookieName, $cookieValue($loginPage, $sessionCookieName));
+        $login = $this->withHeader('X-XSRF-TOKEN', $oldXsrf)->post('/login', [
+            'email' => $user->email,
+            'password' => $password,
+        ])->assertRedirect();
+        $this->assertAuthenticatedAs($user, 'web');
+
+        $newXsrf = $cookieValue($login, 'XSRF-TOKEN');
+        $this->assertNotSame(
+            CookieValuePrefix::remove(app('encrypter')->decrypt($oldXsrf, false)),
+            CookieValuePrefix::remove(app('encrypter')->decrypt($newXsrf, false)),
+            'Login must rotate the CSRF token, not just re-encrypt the same value.'
+        );
+        $this->withUnencryptedCookie($sessionCookieName, $cookieValue($login, $sessionCookieName));
+
+        $account = [
+            'product_id' => $catalog['product']->id,
+            'label' => 'Login Langsung',
+            'customer_input' => ['user_id' => '123456'],
+        ];
+        $quote = [
+            'package_id' => $catalog['package_id'],
+            'payment_channel_code' => 'qris',
+        ];
+
+        // The token from the original meta/cookie must be rejected on BOTH flows.
+        $this->withHeader('X-CSRF-TOKEN', $staleMetaToken)
+            ->postJson('/account/game-accounts', $account)->assertStatus(419);
+        $this->postJson('/checkout/quote', $quote)->assertStatus(419);
+
+        // Same logged-in browser session, no page reload: use the new XSRF
+        // cookie as the frontend helper does, not the stale meta token.
+        $this->withoutHeader('X-CSRF-TOKEN');
+        $this->withHeader('X-XSRF-TOKEN', $newXsrf);
+        $this->postJson('/account/game-accounts', $account)->assertCreated();
+        $this->postJson('/checkout/quote', $quote)->assertOk()
+            ->assertJsonStructure(['total_idr']);
+    }
+
     public function test_popular_now_restores_legacy_priority_and_can_be_controlled_from_promo(): void
     {
         $catalog = $this->catalog();
@@ -521,5 +616,16 @@ class StorefrontParityTest extends TestCase
             'is_active' => false,
             'body' => '[Ulasan dihapus oleh admin]',
         ]);
+    }
+}
+
+/**
+ * Exercise real CSRF enforcement; Laravel otherwise bypasses it in testing.
+ */
+class StrictCsrfValidationMiddleware extends ValidateCsrfToken
+{
+    protected function runningUnitTests(): bool
+    {
+        return false;
     }
 }
