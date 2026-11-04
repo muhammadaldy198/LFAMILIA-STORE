@@ -51,11 +51,11 @@ class CustomerHtmlEmailTest extends TestCase
             'payment.show', now()->addMinutes(20), ['invoice' => 'LF261103-7KQ7R1GVCD']
         );
         $cases = [
-            'verification' => ["Verifikasi melalui https://lfamilia.com/verify?a=b", []],
-            'password_reset' => ["Atur ulang kata sandi: https://lfamilia.com/reset-password/token", []],
+            'verification' => ['Verifikasi melalui https://lfamilia.com/verify?a=b', []],
+            'password_reset' => ['Atur ulang kata sandi: https://lfamilia.com/reset-password/token', []],
             'password_changed' => ['Kata sandi berhasil diperbarui.', []],
             'password_reset_completed' => ['Kata sandi berhasil diatur ulang.', []],
-            'order_created' => ["Bayar sekarang: ".$paymentUrl, $this->orderContext()],
+            'order_created' => ['Bayar sekarang: '.$paymentUrl, $this->orderContext()],
             'order_paid' => ['Pembayaran diterima.', $this->orderContext()],
             'order_completed' => ['No. Referensi Pengiriman: MLBB123', [
                 ...$this->orderContext(), 'delivery_kind' => 'digiflazz', 'delivery_reference' => 'MLBB123',
