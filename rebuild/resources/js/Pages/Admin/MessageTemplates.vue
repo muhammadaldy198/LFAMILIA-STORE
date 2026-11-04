@@ -92,7 +92,7 @@ const updated = value => value ? new Intl.DateTimeFormat('id-ID',
         </div></header>
         <section v-for="group in [{ title: 'Email Pelanggan', rows: emails }, { title: 'Notifikasi Admin', rows: admins }]" :key="group.title">
             <h2 class="tpl-section-title">{{ group.title }}</h2>
-            <div class="tpl-scroll"><table class="tpl-table">
+            <div class="tpl-scroll adm-scroll"><table class="tpl-table">
                 <thead><tr><th>Template</th><th>Status</th><th>Terakhir Diubah</th><th>Aksi</th></tr></thead>
                 <tbody><tr v-for="entry in group.rows" :key="entry.key" :class="{ chosen: key === entry.key }">
                     <td>{{ entry.label }}</td>
