@@ -28,11 +28,12 @@ class ExternalNotificationService
             return;
         }
 
-        $text = '['.$notification->severity.'] '.$notification->title."\n".$notification->message;
+        $renderer = app(AdminNotificationRenderer::class);
+        $payload = $renderer->fromNotification($notification);
         $results = [
-            $this->telegram($notificationId, $text, $withLock),
-            $this->discord($notification, $text, $withLock),
-            $this->resend($notificationId, $notification->title, $text, $withLock),
+            $this->telegram($notificationId, $payload, $withLock, $renderer),
+            $this->discord($notification, $payload, $withLock, $renderer),
+            $this->resend($notificationId, $payload, $withLock, $renderer),
         ];
 
         if (in_array(false, $results, true)) {
@@ -40,7 +41,7 @@ class ExternalNotificationService
         }
     }
 
-    private function telegram(int $id, string $text, bool $withLock): ?bool
+    private function telegram(int $id, array $payload, bool $withLock, AdminNotificationRenderer $renderer): ?bool
     {
         $resolved = $this->runtime->resolve('telegram');
         $config = $resolved['config'] ?? [];
@@ -52,33 +53,46 @@ class ExternalNotificationService
             return null;
         }
 
-        return $this->attempt($id, 'telegram', (string) $config['chat_id'], $withLock, function () use ($config, $environment, $text) {
+        $body = [
+            'chat_id' => (string) $config['chat_id'],
+            ...$renderer->telegram($payload),
+        ];
+        $bucket = DiscordNotificationRouting::channelFor($payload['event']);
+        $thread = trim((string) ($config['thread_'.$bucket] ?? ''));
+        if ($thread !== '' && ctype_digit($thread) && (int) $thread > 0 && (int) $thread <= 2147483647) {
+            $body['message_thread_id'] = (int) $thread;
+        }
+
+        return $this->attempt($id, 'telegram', (string) $config['chat_id'], $withLock, function () use ($config, $environment, $body) {
             return Http::acceptJson()->timeout(8)->post(
                 $this->runtime->telegramBotBase($environment, (string) $config['bot_token']).'/sendMessage',
-                ['chat_id' => (string) $config['chat_id'], 'text' => $text]
+                $body
             );
         });
     }
 
-    private function discord(object $notification, string $text, bool $withLock): ?bool
+    private function discord(object $notification, array $payload, bool $withLock, AdminNotificationRenderer $renderer): ?bool
     {
         $config = $this->config('discord');
         if (! $config) {
             return null;
         }
 
-        // Discord dipecah per jenis notif; tiap channel dilacak terpisah
-        // di notification_deliveries agar retry tidak tertukar.
-        $channel = DiscordNotificationRouting::channelFor((string) $notification->event_type);
+        // Historical notification deliveries used 10 channel names. A queued
+        // retry after migration must not resend an event already marked SENT.
+        if (DB::table('notification_deliveries')->where('admin_notification_id', $notification->id)
+            ->where('channel', 'like', 'discord:%')->where('status', 'SENT')->exists()) {
+            return true;
+        }
+
+        $channel = DiscordNotificationRouting::channelFor($payload['event']);
         $url = DiscordNotificationRouting::webhookUrl($config, $channel);
         if ($url === null) {
             return null;
         }
 
-        $post = fn (string $target) => Http::acceptJson()->withOptions(['allow_redirects' => false])->timeout(8)->post($target, [
-            'content' => mb_substr($text, 0, 1900),
-            'allowed_mentions' => ['parse' => []],
-        ]);
+        $embed = $renderer->discord($payload);
+        $post = fn (string $target) => Http::acceptJson()->withOptions(['allow_redirects' => false])->timeout(8)->post($target, $embed);
 
         $sent = $this->attempt((int) $notification->id, 'discord:'.$channel, $url, $withLock, fn () => $post($url));
 
@@ -105,7 +119,7 @@ class ExternalNotificationService
         return $this->attempt((int) $notification->id, 'discord:'.$channel, $default, $withLock, fn () => $post($default));
     }
 
-    private function resend(int $id, string $subject, string $text, bool $withLock): ?bool
+    private function resend(int $id, array $payload, bool $withLock, AdminNotificationRenderer $renderer): ?bool
     {
         $config = $this->config('resend');
         $recipients = $config['admin_recipients'] ?? [];
@@ -117,12 +131,15 @@ class ExternalNotificationService
             return null;
         }
 
+        $mail = $renderer->email($payload);
+
         return $this->attempt($id, 'email', implode(',', $recipients), $withLock, fn () => Http::withToken((string) $config['api_key'])
             ->acceptJson()->timeout(8)->post('https://api.resend.com/emails', [
                 'from' => (string) $config['from_email'],
                 'to' => $recipients,
-                'subject' => '[LFAMILIA] '.$subject,
-                'text' => $text,
+                'subject' => $mail['subject'],
+                'text' => $mail['text'],
+                'html' => $mail['html'],
             ]));
     }
 

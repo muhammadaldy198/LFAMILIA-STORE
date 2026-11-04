@@ -871,7 +871,7 @@ class AdminIntegrationsRestorationTest extends TestCase
             'config_ciphertext' => [
                 'webhook_url' => 'https://discord.com/api/webhooks/111/aaa',
                 'webhook_url_order' => 'https://discord.com/api/webhooks/222/bbb',
-                'webhook_url_qris' => 'https://discord.com/api/webhooks/111/aaa',
+                'webhook_url_arsip' => 'https://discord.com/api/webhooks/111/aaa',
             ],
         ]);
 
@@ -893,7 +893,7 @@ class AdminIntegrationsRestorationTest extends TestCase
             ->assertJsonPath('channels.0.verified', true)
             ->assertJsonPath('channels.1.channel', 'order')
             ->assertJsonPath('channels.1.verified', false)
-            ->assertJsonPath('channels.2.channel', 'qris')
+            ->assertJsonPath('channels.2.channel', 'arsip')
             ->assertJsonPath('channels.2.verified', true);
 
         $saved = json_decode((string) DB::table('system_settings')

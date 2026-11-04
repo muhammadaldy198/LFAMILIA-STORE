@@ -306,7 +306,10 @@ class AdminIntegrationController
         // mendarat di channel yang salah padahal integrasi tampak
         // terkonfigurasi benar.
         if ($code === 'discord') {
-            $this->validateDiscordWebhooks($config);
+            $this->validateDiscordWebhooks($selectedConfig);
+        }
+        if ($code === 'telegram') {
+            $this->validateTelegramThreads($selectedConfig);
         }
 
         if ($data['is_active']) {
@@ -789,6 +792,27 @@ class AdminIntegrationController
             throw ValidationException::withMessages([
                 'config.'.$key => 'Webhook Discord tidak valid. Gunakan URL webhook Discord (https://discord.com/api/webhooks/...).',
             ]);
+        }
+    }
+
+    /**
+     * @param  array<string,mixed>  $config
+     */
+    private function validateTelegramThreads(array $config): void
+    {
+        foreach (['order', 'insiden', 'arsip'] as $bucket) {
+            $key = 'thread_'.$bucket;
+            $value = trim((string) ($config[$key] ?? ''));
+            if ($value === '') {
+                continue;
+            }
+            if (filter_var($value, FILTER_VALIDATE_INT, [
+                'options' => ['min_range' => 1, 'max_range' => 2147483647],
+            ]) === false) {
+                throw ValidationException::withMessages([
+                    'config.'.$key => 'ID topik Telegram harus berupa bilangan bulat positif.',
+                ]);
+            }
         }
     }
 
