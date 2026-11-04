@@ -140,7 +140,7 @@ class AdminTemplateOverrideTest extends TestCase
 
         $this->put('/admin/message-templates/overrides', [
             'template_key' => 'email.order_paid',
-            'subject' => 'Info untuk {email}', 'body' => 'Customer Service kami siap membantu.',
+            'subject' => 'Info untuk {invoice}', 'body' => 'Customer Service kami siap membantu.',
             'is_enabled' => true,
         ])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertDatabaseHas('message_template_overrides', ['template_key' => 'email.order_paid']);
