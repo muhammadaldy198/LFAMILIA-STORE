@@ -460,6 +460,16 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
             ->middleware('throttle:admin-mutation')->name('admin.reports.export-audit');
     });
 
+    Route::middleware('admin.permission:templates.manage')->group(function (): void {
+        Route::get('/admin/message-templates', [AdminMessageTemplatesController::class, 'index'])->name('admin.message-templates');
+        Route::put('/admin/message-templates/overrides', [AdminMessageTemplatesController::class, 'saveOverride'])
+            ->middleware('throttle:admin-sensitive')->name('admin.message-templates.override');
+        Route::delete('/admin/message-templates/overrides/{templateKey}', [AdminMessageTemplatesController::class, 'resetOverride'])
+            ->middleware('throttle:admin-sensitive')->name('admin.message-templates.reset');
+        Route::post('/admin/message-templates/preview', [AdminMessageTemplatesController::class, 'preview'])
+            ->middleware('throttle:admin-sensitive')->name('admin.message-templates.preview');
+    });
+
     Route::middleware('admin.permission:settings.manage')->group(function (): void {
         Route::get('/admin/settings', [AdminSettingsController::class, 'index'])->name('admin.settings');
         Route::get('/admin/choice-settings', [AdminChoiceSettingsController::class, 'index'])
@@ -470,7 +480,6 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
             ->middleware('admin.super')->name('admin.operational-settings');
         Route::put('/admin/operational-settings', [AdminOperationalSettingsController::class, 'update'])
             ->middleware(['admin.super', 'throttle:admin-sensitive'])->name('admin.operational-settings.update');
-        Route::get('/admin/message-templates', [AdminMessageTemplatesController::class, 'index'])->name('admin.message-templates');
         Route::put('/admin/message-templates', [AdminMessageTemplatesController::class, 'update'])
             ->middleware('throttle:admin-sensitive')->name('admin.message-templates.update');
         Route::post('/admin/message-templates/test-email', [AdminMessageTemplatesController::class, 'testEmail'])
