@@ -203,7 +203,8 @@ test('sidebar covers every backend menu entry and names the support group', () =
     const layout = repo('resources/js/Components/Admin/AdminLayout.vue');
     const service = repo('app/Services/AdminPermissionService.php');
     const backend = [...service.matchAll(/'href' => '([^']+)'/g)].map(match => match[1]);
-    assert.equal(backend.length, 21, 'daftar menu backend harus 21');
+    assert.equal(backend.length, 22, 'daftar menu backend harus memuat menu Template Email & Notifikasi');
+    assert.ok(backend.includes('/admin/message-templates'), 'menu template harus muncul di navigasi server');
     assert.equal(new Set(backend).size, backend.length, 'URL menu backend tidak boleh duplikat');
     assert.doesNotMatch(layout, /const MENU =/, 'sidebar tidak boleh punya daftar menu kedua');
     assert.match(layout, /panel\.value\.menu/, 'sidebar wajib memakai menu dari server');
