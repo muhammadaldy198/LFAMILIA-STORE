@@ -48,7 +48,10 @@ class AdminNotificationRenderer
             'link_panel' => $this->adminUrl($event, (string) ($notification->target_type ?? ''), (string) ($notification->target_id ?? ''), $data),
         ], $previewDraft);
         $title = trim($override['subject']);
-        $message = trim($override['body']);
+        $customMessage = trim($override['body']);
+        // Original notification facts must never be replaced by editable copy.
+        // Only additional editorial text is displayed separately from immutable facts.
+        $extraMessage = trim(str_replace($message, '', $customMessage));
         $fields = [];
 
         $targetType = (string) ($notification->target_type ?? '');
@@ -73,6 +76,9 @@ class AdminNotificationRenderer
         }
         if ($description !== []) {
             $fields[] = ['name' => 'Rincian', 'value' => implode("\n", $description)];
+        }
+        if ($extraMessage !== '') {
+            $fields[] = ['name' => 'Pesan tambahan', 'value' => $extraMessage];
         }
 
         // The historical notification message was the only external source.

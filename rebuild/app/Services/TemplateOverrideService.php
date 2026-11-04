@@ -60,7 +60,7 @@ class TemplateOverrideService
                 'label' => self::EMAIL_LABELS[$event] ?? $event,
                 'group' => 'email',
                 'placeholders' => array_values(array_unique([
-                    'subjek_bawaan', 'pesan_bawaan', ...(self::EMAIL_PLACEHOLDERS[$event] ?? []),
+                    'subjek_bawaan', 'pesan_bawaan', 'nama_toko', ...(self::EMAIL_PLACEHOLDERS[$event] ?? []),
                 ])),
             ];
         }
@@ -89,22 +89,75 @@ class TemplateOverrideService
     public function listing(): array
     {
         $rows = DB::table('message_template_overrides')->get()->keyBy('template_key');
+        $legacy = app(EditableMessageTemplateService::class)->saved();
+        $legacyUpdatedAt = DB::table('system_settings')->where('key', 'store.message_templates')->value('updated_at');
         $entries = [];
         foreach ($this->definitions() as $key => $definition) {
             $row = $rows->get($key);
+            [$type, $event] = explode('.', $key, 2);
+            $group = $type === 'email' ? 'emails' : 'notifications';
+            $old = $legacy[$group][$event] ?? null;
+            $old = is_array($old) && (trim((string) ($old['subject'] ?? $old['title'] ?? '')) !== ''
+                || trim((string) ($old['body'] ?? '')) !== '') ? $old : null;
+            $subjectDefault = $type === 'admin' ? '{judul}' : '{subjek_bawaan}';
+            $bodyDefault = $type === 'admin' ? '{detail}' : '{pesan_bawaan}';
+            $subjectLegacy = $type === 'admin' ? (string) ($old['title'] ?? '') : (string) ($old['subject'] ?? '');
+            $subjectLegacy = str_replace(
+                ['{{default_subject}}', '{{default_title}}', '{{store_name}}'],
+                ['{subjek_bawaan}', '{judul}', '{nama_toko}'],
+                $subjectLegacy
+            );
+            $bodyLegacy = str_replace(
+                ['{{default_body}}', '{{store_name}}'],
+                [$bodyDefault, '{nama_toko}'],
+                (string) ($old['body'] ?? '')
+            );
+            $modifiedAt = $row?->updated_at ?? ($old !== null ? $legacyUpdatedAt : null);
             $entries[] = [
                 ...$definition,
-                'subject' => $row?->subject ?? ($definition['group'] === 'admin' ? '{judul}' : '{subjek_bawaan}'),
-                'body' => $row?->body ?? ($definition['group'] === 'admin' ? '{detail}' : '{pesan_bawaan}'),
+                'subject' => $row?->subject ?? ($subjectLegacy !== '' ? $subjectLegacy : $subjectDefault),
+                'body' => $row?->body ?? ($bodyLegacy !== '' ? $bodyLegacy : $bodyDefault),
                 'is_enabled' => $row ? (bool) $row->is_enabled : true,
-                'status' => $row === null ? 'Bawaan' : (! $row->is_enabled ? 'Nonaktif' : 'Diubah'),
-                'updated_at' => $row?->updated_at
-                    ? Carbon::parse((string) $row->updated_at, 'UTC')->timezone('Asia/Jakarta')->toIso8601String()
+                'has_legacy' => $old !== null,
+                'status' => $row === null && $old === null ? 'Bawaan' : (($row !== null && ! $row->is_enabled) ? 'Nonaktif' : 'Diubah'),
+                'updated_at' => $modifiedAt
+                    ? Carbon::parse((string) $modifiedAt, 'UTC')->timezone('Asia/Jakarta')->toIso8601String()
                     : null,
             ];
         }
 
         return $entries;
+    }
+
+    /**
+     * Remove only the selected event from the previous editor's settings.
+     * Called inside the caller's transaction; never discard other templates.
+     * Returns the previous value so the change can be audited.
+     */
+    public function clearLegacy(string $key, int $adminId): ?array
+    {
+        [$kind, $event] = explode('.', $key, 2);
+        $group = $kind === 'email' ? 'emails' : 'notifications';
+        $setting = DB::table('system_settings')->where('key', 'store.message_templates')->lockForUpdate()->first();
+        if ($setting === null) {
+            return null;
+        }
+
+        $all = json_decode((string) $setting->value, true);
+        if (! is_array($all) || ! isset($all[$group][$event]) || ! is_array($all[$group][$event])) {
+            return null;
+        }
+
+        $previous = $all[$group][$event];
+        unset($all[$group][$event]);
+        DB::table('system_settings')->where('key', 'store.message_templates')->update([
+            'value' => json_encode($all, JSON_THROW_ON_ERROR),
+            'version' => (int) $setting->version + 1,
+            'updated_by_admin_id' => $adminId,
+            'updated_at' => now('UTC'),
+        ]);
+
+        return $previous;
     }
 
     public function enabled(string $key): bool

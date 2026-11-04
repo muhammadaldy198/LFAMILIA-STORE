@@ -34,12 +34,17 @@ class AdminMessageTemplatesController
         ]);
         $key = $input['template_key'];
         $draft = $templates->validateDraft($key, $input['subject'], $input['body'], (bool) $input['is_enabled']);
-        $before = (array) (DB::table('message_template_overrides')->where('template_key', $key)->first() ?? []);
-        DB::table('message_template_overrides')->updateOrInsert(
-            ['template_key' => $key],
-            [...$draft, 'created_at' => $before['created_at'] ?? now('UTC'), 'updated_at' => now('UTC')]
-        );
-        $audit->record($request, 'templates.override.saved', 'message_template', $key, $before, $draft);
+        DB::transaction(function () use ($request, $templates, $audit, $key, $draft): void {
+            $before = (array) (DB::table('message_template_overrides')->where('template_key', $key)->lockForUpdate()->first() ?? []);
+            $legacy = $templates->clearLegacy($key, (int) $request->user('admin')->id);
+            DB::table('message_template_overrides')->updateOrInsert(
+                ['template_key' => $key],
+                [...$draft, 'created_at' => $before['created_at'] ?? now('UTC'), 'updated_at' => now('UTC')]
+            );
+            $audit->record($request, 'templates.override.saved', 'message_template', $key, [
+                'override' => $before, 'legacy' => $legacy,
+            ], $draft);
+        });
 
         return back()->with('status', 'Template disimpan.');
     }
@@ -47,9 +52,14 @@ class AdminMessageTemplatesController
     public function resetOverride(Request $request, TemplateOverrideService $templates, AdminAuditService $audit, string $templateKey): RedirectResponse
     {
         abort_unless(array_key_exists($templateKey, $templates->definitions()), 404);
-        $before = (array) (DB::table('message_template_overrides')->where('template_key', $templateKey)->first() ?? []);
-        DB::table('message_template_overrides')->where('template_key', $templateKey)->delete();
-        $audit->record($request, 'templates.override.reset', 'message_template', $templateKey, $before);
+        DB::transaction(function () use ($request, $templates, $audit, $templateKey): void {
+            $before = (array) (DB::table('message_template_overrides')->where('template_key', $templateKey)->lockForUpdate()->first() ?? []);
+            $legacy = $templates->clearLegacy($templateKey, (int) $request->user('admin')->id);
+            DB::table('message_template_overrides')->where('template_key', $templateKey)->delete();
+            $audit->record($request, 'templates.override.reset', 'message_template', $templateKey, [
+                'override' => $before, 'legacy' => $legacy,
+            ]);
+        });
 
         return back()->with('status', 'Template kembali ke bawaan.');
     }

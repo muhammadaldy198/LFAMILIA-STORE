@@ -121,6 +121,7 @@ const updated = value => value ? new Intl.DateTimeFormat('id-ID',
                     <label class="adm-field"><span>Badan teks</span>
                         <textarea ref="bodyInput" v-model="selected.body" class="adm-textarea" rows="7" maxlength="10000" @focus="activeField = 'body'" />
                     </label>
+                    <p v-if="selected.has_legacy" class="tpl-warning">Template ini memiliki penyesuaian dari editor lama. Pratinjau memperlihatkan rancangan baru; Simpan akan menggantikan penyesuaian lama, sedangkan Kembalikan ke Bawaan akan menghapus keduanya.</p>
                     <p v-if="error" class="tpl-warning" role="alert">{{ error }}</p>
                     <div class="tpl-buttons">
                         <button type="button" class="adm-btn primary" :disabled="busy" @click="save">Simpan</button>
