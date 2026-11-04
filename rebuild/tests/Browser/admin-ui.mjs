@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-// Smoke panel admin: 21 menu + 3 halaman detail pada 8 lebar layar, pop-up
+// Smoke panel admin: 22 menu + 3 halaman detail pada 8 lebar layar, pop-up
 // tengah, laci menu ponsel, pencarian Ctrl+K, dan satu impor Digiflazz nyata.
 // Fixture lokal (tests/Browser/fixture.php) wajib sudah dijalankan.
 const group = process.argv[3] || 'all';
@@ -16,7 +16,7 @@ const groups = {
     operations: ['/admin/providers', '/admin/vouchers', '/admin/support', '/admin/reports', '/admin/digiflazz'],
     customers: ['/admin/customers'],
     payments: ['/admin/payments'],
-    settings: ['/admin/access', '/admin/settings', '/admin/integrations', '/admin/health', '/admin/audit', '/admin/nickname-tools', '/admin/notifications'],
+    settings: ['/admin/access', '/admin/settings', '/admin/integrations', '/admin/health', '/admin/audit', '/admin/nickname-tools', '/admin/notifications', '/admin/message-templates'],
 };
 if (group !== 'all' && !groups[group]) throw Error('Unknown group: ' + group);
 const paths = group === 'all' ? Object.values(groups).flat() : groups[group];
