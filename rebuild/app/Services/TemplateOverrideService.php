@@ -65,9 +65,22 @@ class TemplateOverrideService
             ];
         }
 
+        // Keep previously customized admin events visible after historical
+        // notifications have been pruned or the routing table changes.
+        $saved = app(EditableMessageTemplateService::class)->saved();
+        $legacyEvents = is_array($saved['notifications'] ?? null)
+            ? array_keys($saved['notifications'])
+            : [];
+        $overrideEvents = DB::table('message_template_overrides')
+            ->where('template_key', 'like', 'admin.%')
+            ->pluck('template_key')
+            ->map(static fn ($key): string => substr((string) $key, strlen('admin.')))
+            ->all();
         $events = array_unique(array_merge(
             DiscordNotificationRouting::templateEvents(),
-            DB::table('admin_notifications')->distinct()->pluck('event_type')->all()
+            DB::table('admin_notifications')->distinct()->pluck('event_type')->all(),
+            $legacyEvents,
+            $overrideEvents
         ));
         sort($events);
         foreach ($events as $event) {

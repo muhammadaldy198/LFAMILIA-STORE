@@ -39,6 +39,25 @@ class AdminTemplateOverrideTest extends TestCase
         ]);
     }
 
+    public function test_saved_admin_events_remain_listed_after_notifications_are_pruned(): void
+    {
+        $this->override('admin.custom.saved_event', '{judul}', '{detail}');
+        DB::table('system_settings')->updateOrInsert(['key' => 'store.message_templates'], [
+            'value' => json_encode(['notifications' => [
+                'custom.legacy_event' => [
+                    'title' => '{{default_title}}',
+                    'body' => '{{default_body}}',
+                ],
+            ]], JSON_THROW_ON_ERROR),
+            'version' => 1, 'updated_at' => now('UTC'), 'created_at' => now('UTC'),
+        ]);
+
+        // Neither event appears in the static registry or notification history.
+        $keys = array_column(app(TemplateOverrideService::class)->listing(), 'key');
+        $this->assertContains('admin.custom.saved_event', $keys);
+        $this->assertContains('admin.custom.legacy_event', $keys);
+    }
+
     public function test_customer_registry_drives_list_and_defaults_are_kept_in_code(): void
     {
         $list = app(TemplateOverrideService::class)->listing();
