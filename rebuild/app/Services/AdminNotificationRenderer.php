@@ -67,10 +67,10 @@ class AdminNotificationRenderer
         foreach ($safe as $key => $label) {
             $value = $data[$key] ?? null;
             $scalar = is_string($value) || is_numeric($value);
-            if (! $scalar || trim((string) $value) === '') {
+            if ($scalar === false || trim((string) $value) === '') {
                 continue;
             }
-            if (! collect($fields)->contains(fn (array $field): bool => strcasecmp($field['name'], $label) === 0)) {
+            if (collect($fields)->contains(fn (array $field): bool => strcasecmp($field['name'], $label) === 0) === false) {
                 $fields[] = ['name' => $label, 'value' => trim((string) $value)];
             }
         }
@@ -79,7 +79,7 @@ class AdminNotificationRenderer
         $fields[] = ['name' => 'Peristiwa', 'value' => $event];
 
         $action = $data['action_required'] ?? $data['action'] ?? null;
-        if (! is_string($action) || trim($action) === '') {
+        if (is_string($action) === false || trim((string) $action) === '') {
             $action = in_array($level, ['WARNING', 'ERROR'], true)
                 ? 'Periksa kejadian dan lakukan penanganan melalui panel admin.'
                 : null;
