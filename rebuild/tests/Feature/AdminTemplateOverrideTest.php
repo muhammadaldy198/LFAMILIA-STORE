@@ -153,6 +153,25 @@ class AdminTemplateOverrideTest extends TestCase
         $this->assertDatabaseMissing('message_template_overrides', ['template_key' => 'admin.fulfillment.blocked']);
     }
 
+    public function test_legacy_update_cannot_stack_copy_on_existing_new_override(): void
+    {
+        $this->admin();
+        $this->override('email.order_paid', '{subjek_bawaan}', 'Teks baru.');
+        $this->put('/admin/message-templates', [
+            'emails' => ['order_paid' => [
+                'subject' => 'Lama {{default_subject}}',
+                'body' => 'Lama {{default_body}}',
+            ]],
+            'notifications' => [],
+        ])->assertSessionHasErrors('emails');
+
+        $this->assertDatabaseHas('message_template_overrides', [
+            'template_key' => 'email.order_paid', 'body' => 'Teks baru.',
+        ]);
+        $this->assertArrayNotHasKey('order_paid',
+            app(EditableMessageTemplateService::class)->saved()['emails'] ?? []);
+    }
+
     public function test_template_reset_is_forbidden_without_granular_permission(): void
     {
         $this->override('email.order_paid', 'Subjek', 'Isi');

@@ -155,6 +155,19 @@ class AdminMessageTemplatesController
             }
         }
 
+        // Legacy endpoint remains available for older clients, but it must not
+        // reintroduce wrappers on top of any event managed by the new editor.
+        $legacyKeys = [
+            ...array_map(static fn (string $event): string => 'email.'.$event, array_keys($clean['emails'])),
+            ...array_map(static fn (string $event): string => 'admin.'.$event, array_keys($clean['notifications'])),
+        ];
+        if ($legacyKeys !== [] && DB::table('message_template_overrides')
+            ->whereIn('template_key', $legacyKeys)->exists()) {
+            throw ValidationException::withMessages([
+                'emails' => 'Salah satu template sudah dikelola editor baru. Edit melalui menu Template Email & Notifikasi.',
+            ]);
+        }
+
         $before = $templates->saved();
         DB::transaction(function () use ($request, $clean): void {
             $current = DB::table('system_settings')->where('key', 'store.message_templates')
