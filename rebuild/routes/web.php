@@ -462,6 +462,11 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
 
     Route::middleware('admin.permission:templates.manage')->group(function (): void {
         Route::get('/admin/message-templates', [AdminMessageTemplatesController::class, 'index'])->name('admin.message-templates');
+        // Legacy template wrappers and test-send must respect the same granular permission.
+        Route::put('/admin/message-templates', [AdminMessageTemplatesController::class, 'update'])
+            ->middleware('throttle:admin-sensitive')->name('admin.message-templates.update');
+        Route::post('/admin/message-templates/test-email', [AdminMessageTemplatesController::class, 'testEmail'])
+            ->middleware('throttle:admin-sensitive')->name('admin.message-templates.test');
         Route::put('/admin/message-templates/overrides', [AdminMessageTemplatesController::class, 'saveOverride'])
             ->middleware('throttle:admin-sensitive')->name('admin.message-templates.override');
         Route::delete('/admin/message-templates/overrides/{templateKey}', [AdminMessageTemplatesController::class, 'resetOverride'])
@@ -480,10 +485,6 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
             ->middleware('admin.super')->name('admin.operational-settings');
         Route::put('/admin/operational-settings', [AdminOperationalSettingsController::class, 'update'])
             ->middleware(['admin.super', 'throttle:admin-sensitive'])->name('admin.operational-settings.update');
-        Route::put('/admin/message-templates', [AdminMessageTemplatesController::class, 'update'])
-            ->middleware('throttle:admin-sensitive')->name('admin.message-templates.update');
-        Route::post('/admin/message-templates/test-email', [AdminMessageTemplatesController::class, 'testEmail'])
-            ->middleware('throttle:admin-sensitive')->name('admin.message-templates.test');
         Route::put('/admin/settings', [AdminSettingsController::class, 'updateStore'])
             ->middleware('throttle:admin-sensitive')->name('admin.settings.update');
         Route::put('/admin/settings/membership/{code}', [AdminSettingsController::class, 'updateTier'])
