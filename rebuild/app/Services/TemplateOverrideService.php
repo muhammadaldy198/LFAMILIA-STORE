@@ -189,7 +189,14 @@ class TemplateOverrideService
                 }
             }
         }
-        if ($definition['group'] === 'email' && preg_match('/\brefund\b|pengembalian\s+dana|uang\s+kembali/iu', $subject."\n".$body)) {
+        // Support address is supplied exclusively by the global shop settings and footer.
+        // A literal email address in customer copy would duplicate it or become stale.
+        if ($definition['group'] === 'email' && preg_match('/[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}/iu', $subject."\n".$body)) {
+            throw ValidationException::withMessages([
+                'body' => 'Alamat email tidak boleh ditulis langsung di template pelanggan. Gunakan {email} untuk alamat pelanggan; kontak support tetap di footer.',
+            ]);
+        }
+        if (preg_match('/\brefund\b|pengembalian\s+dana|uang\s+kembali/iu', $subject."\n".$body)) {
             throw ValidationException::withMessages(['body' => 'Teks menjanjikan pengembalian dana tidak diperbolehkan.']);
         }
         if ($definition['group'] === 'admin') {

@@ -96,6 +96,39 @@ class AdminTemplateOverrideTest extends TestCase
         $this->assertDatabaseMissing('message_template_overrides', ['template_key' => 'email.order_paid']);
     }
 
+    public function test_customer_template_rejects_hardcoded_support_email_and_admin_refund_copy(): void
+    {
+        $this->admin();
+        $this->put('/admin/message-templates/overrides', [
+            'template_key' => 'email.order_paid',
+            'subject' => 'Info pembayaran', 'body' => 'Hubungi support@lfamilia.com.',
+            'is_enabled' => true,
+        ])->assertSessionHasErrors('body');
+        $this->assertDatabaseMissing('message_template_overrides', ['template_key' => 'email.order_paid']);
+
+        $this->put('/admin/message-templates/overrides', [
+            'template_key' => 'email.order_paid',
+            'subject' => 'Info untuk {email}', 'body' => 'Customer Service kami siap membantu.',
+            'is_enabled' => true,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('message_template_overrides', ['template_key' => 'email.order_paid']);
+
+        $this->put('/admin/message-templates/overrides', [
+            'template_key' => 'admin.fulfillment.blocked',
+            'subject' => '{judul}', 'body' => 'Proses refund sekarang.',
+            'is_enabled' => true,
+        ])->assertSessionHasErrors('body');
+        $this->assertDatabaseMissing('message_template_overrides', ['template_key' => 'admin.fulfillment.blocked']);
+    }
+
+    public function test_template_reset_is_forbidden_without_granular_permission(): void
+    {
+        $this->override('email.order_paid', 'Subjek', 'Isi');
+        $this->admin('ADMIN', ['settings.manage']);
+        $this->delete('/admin/message-templates/overrides/email.order_paid')->assertForbidden();
+        $this->assertDatabaseHas('message_template_overrides', ['template_key' => 'email.order_paid']);
+    }
+
     public function test_disable_email_skips_resend_before_credentials_are_loaded(): void
     {
         $this->override('email.verification', '{subjek_bawaan}', '{pesan_bawaan}', false);
