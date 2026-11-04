@@ -24,6 +24,11 @@ class CustomerEmailTemplateRenderer
         'ticket_reply' => ['label' => 'Tiket bantuan', 'value' => 'ADA BALASAN', 'cta' => 'Lihat Balasan Tiket'],
     ];
 
+    public static function templateKeys(): array
+    {
+        return array_keys(self::REGISTRY);
+    }
+
     /**
      * @param  array<string, mixed>  $context
      * @return array{html:string,text:string}
@@ -34,7 +39,8 @@ class CustomerEmailTemplateRenderer
         string $body,
         string $recipient,
         array $context = [],
-        ?string $originalBody = null
+        ?string $originalBody = null,
+        ?array $previewDraft = null
     ): array {
         $definition = self::REGISTRY[$event] ?? self::REGISTRY['ticket_reply'];
         $sourceBody = $originalBody ?? $body;
@@ -188,6 +194,20 @@ class CustomerEmailTemplateRenderer
             }
         }
 
+        $override = app(TemplateOverrideService::class)->apply('email.'.$event, $subject, $intro, [
+            'nama' => $name,
+            'nama_toko' => $store,
+            'email' => $recipient,
+            'invoice' => $invoice,
+            'produk' => $fullProductName,
+            'total' => $this->rupiah($total),
+            'batas_waktu' => $deadline,
+            'link_bayar' => (string) ($context['payment_url'] ?? ''),
+            'link_lacak' => route('guest.orders.lookup'),
+        ], $previewDraft);
+        $subject = $override['subject'];
+        $intro = $override['body'];
+
         $linkToSupport = $support !== '' ? 'mailto:'.$support : route('content.contact');
         $copy = [
             'store' => $store,
@@ -213,6 +233,7 @@ class CustomerEmailTemplateRenderer
         ];
 
         return [
+            'subject' => $subject,
             'html' => view('emails.customer', $copy)->render(),
             'text' => $this->plainText($copy),
         ];

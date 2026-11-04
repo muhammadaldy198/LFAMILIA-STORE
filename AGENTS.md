@@ -176,7 +176,7 @@ main → branch fokus → commit terstruktur → PR → CI → review/perbaikan 
 - Pesan commit menjelaskan perubahan sebenarnya.
 - Isi PR: apa yang berubah, kenapa, bukti (test/pemeriksaan yang dijalankan), dan apa yang **tidak** berubah.
 - **Jangan push, buka PR, atau merge tanpa izin pemilik.** Ini aturan yang berlaku sekarang.
-- Setelah PR dibuka, minta review `@codex` di komentar PR tanpa menunggu CI.
+- Setelah PR dibuka, minta review CodeRabbit dengan komentar `@coderabbitai full review` pada HEAD terbaru. Tindak lanjuti semua temuan sebelum merge.
 
 ---
 
