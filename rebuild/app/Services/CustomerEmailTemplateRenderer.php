@@ -25,7 +25,7 @@ class CustomerEmailTemplateRenderer
     ];
 
     /**
-     * @param array<string, mixed> $context
+     * @param  array<string, mixed>  $context
      * @return array{html:string,text:string}
      */
     public function render(
@@ -62,7 +62,7 @@ class CustomerEmailTemplateRenderer
         $subtotal = (int) ($context['subtotal'] ?? 0);
         $fee = (int) ($context['fee'] ?? 0);
         $total = (int) ($context['total'] ?? 0);
-        $deadline = $this->wib($context['expires_at'] ?? null);
+        $deadline = ! empty($context['expires_at']) ? $this->wib($context['expires_at']) : '';
         $highlight = $event === 'order_created' ? $this->rupiah($total) : $definition['value'];
 
         $intro = '';
@@ -173,7 +173,9 @@ class CustomerEmailTemplateRenderer
                 if (is_string($reply) && $reply !== '') {
                     $extra[] = ['label' => 'Balasan', 'value' => $reply];
                 }
-                $ctaUrl = $number !== '' ? url('/account/tickets/'.$number) : route('content.contact');
+                $ctaUrl = ($context['ticket_guest'] ?? false)
+                    ? route('guest.support')
+                    : ($number !== '' ? url('/account/tickets/'.$number) : route('content.contact'));
                 $after = 'Jika masih membutuhkan bantuan, silakan balas melalui tiket atau hubungi Customer Service kami.';
                 break;
         }
@@ -258,7 +260,7 @@ class CustomerEmailTemplateRenderer
         return 'Rp. '.number_format($amount, 0, ',', '.');
     }
 
-    /** @param array<string, mixed> $data */
+    /** @param  array<string, mixed>  $data */
     private function plainText(array $data): string
     {
         $lines = [

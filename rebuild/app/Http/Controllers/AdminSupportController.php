@@ -235,7 +235,8 @@ class AdminSupportController
                     $email,
                     'Balasan tiket LFAMILIA #'.$id,
                     'Tim LFAMILIA membalas tiket #'.$id.': '.$reply,
-                    'ticket_reply'
+                    'ticket_reply',
+                    ['ticket_guest' => DB::table('support_tickets')->where('id', $id)->whereNull('user_id')->exists()]
                 );
             }
         }
