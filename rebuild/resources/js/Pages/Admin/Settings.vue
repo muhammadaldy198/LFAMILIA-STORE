@@ -1,7 +1,9 @@
 <script setup>
-import { reactive, ref, watch } from 'vue';
-import { Head, router } from '@inertiajs/vue3';
+import { computed, reactive, ref, watch } from 'vue';
+import { Head, router, usePage } from '@inertiajs/vue3';
 import AdminLayout from '../../Components/Admin/AdminLayout.vue';
+
+const canManageTemplates = computed(() => (usePage().props.adminPanel?.menu || []).some(item => item.href === '/admin/message-templates'));
 
 const props = defineProps({
     settings: { type: Object, default: () => ({}) },
@@ -64,7 +66,7 @@ const save = () => {
             <div class="adm-head-actions">
                 <a v-if="canExport" href="/admin/operational-settings" class="adm-btn">Pengaturan Operasional</a>
                 <a v-if="canExport" href="/admin/choice-settings" class="adm-btn">Alasan &amp; Kategori</a>
-                <a href="/admin/message-templates" class="adm-btn">Template Email &amp; Notifikasi</a>
+                <a v-if="canManageTemplates" href="/admin/message-templates" class="adm-btn">Template Email &amp; Notifikasi</a>
                 <button type="button" class="adm-btn" @click="router.reload({ preserveScroll: true })">Muat ulang</button>
             </div>
         </header>
