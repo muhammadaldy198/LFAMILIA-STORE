@@ -51,10 +51,10 @@ class AdminM9Test extends TestCase
         $this->assertSame([
             'Dashboard', 'Pesanan', 'Pengiriman', 'Promo', 'Produk', 'Kategori', 'Banner & Konten',
             'Tampilan Toko', 'Digiflazz', 'Validasi Akun', 'Provider', 'Pembayaran', 'Laporan', 'Pelanggan',
-            'Layanan Pelanggan', 'Notifikasi', 'Integrasi', 'Kesehatan Sistem', 'Catatan Audit',
+            'Layanan Pelanggan', 'Notifikasi', 'Template Email & Notifikasi', 'Integrasi', 'Kesehatan Sistem', 'Catatan Audit',
             'Admin & Akses', 'Pengaturan',
         ], collect($menu)->pluck('label')->all());
-        $this->assertCount(21, $menu);
+        $this->assertCount(22, $menu);
 
         $unsupported = $this->createAdmin([
             'name' => 'Unsupported Staff',
