@@ -1005,6 +1005,7 @@ class AdminIntegrationsRestorationTest extends TestCase
         $this->assertGreaterThanOrEqual(7.0, $elapsed);
         $this->assertLessThan(12.0, $elapsed);
     }
+
     public function test_telegram_accepts_four_purpose_bots_without_a_default_and_rejects_invalid_new_thread(): void
     {
         $this->loginSuperAdmin();
@@ -1078,5 +1079,4 @@ class AdminIntegrationsRestorationTest extends TestCase
             $this->assertArrayHasKey('webhook_url_'.$purpose, $stored);
         }
     }
-
 }
