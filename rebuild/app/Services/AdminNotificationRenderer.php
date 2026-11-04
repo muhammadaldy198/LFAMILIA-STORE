@@ -20,7 +20,7 @@ class AdminNotificationRenderer
     /**
      * @return array{level:string,color:string,icon:string,title:string,event:string,fields:array<int,array{name:string,value:string}>,action:?string,url:string,wib:string}
      */
-    public function fromNotification(object $notification): array
+    public function fromNotification(object $notification, ?array $previewDraft = null): array
     {
         $level = $this->level((string) ($notification->severity ?? 'INFO'));
         $design = self::LEVELS[$level];
@@ -28,6 +28,27 @@ class AdminNotificationRenderer
         $data = $this->json($notification->data ?? null);
         $title = trim((string) ($notification->title ?? 'Notifikasi admin'));
         $message = trim((string) ($notification->message ?? ''));
+        $createdAt = $notification->created_at ?? now('UTC');
+        $wib = Carbon::parse($createdAt, 'UTC')
+            ->timezone('Asia/Jakarta')->locale('id')->translatedFormat('j M Y, H.i').' WIB';
+        $override = app(TemplateOverrideService::class)->apply('admin.'.$event, $title, $message, [
+            'judul' => $title, 'detail' => $message, 'event' => $event,
+            'wib' => $wib,
+            'invoice' => (string) ($data['invoice'] ?? $data['order_number'] ?? ''),
+            'produk' => (string) ($data['product'] ?? ''),
+            'sku' => (string) ($data['sku'] ?? ''),
+            'seller' => (string) ($data['seller'] ?? ''),
+            'provider' => (string) ($data['provider'] ?? ''),
+            'status' => (string) ($data['status'] ?? ''),
+            'response_code' => (string) ($data['response_code'] ?? ''),
+            'rc' => (string) ($data['rc'] ?? ''),
+            'reason' => (string) ($data['reason'] ?? ''),
+            'channel' => (string) ($data['channel'] ?? ''),
+            'total' => (string) ($data['total'] ?? ''),
+            'link_panel' => $this->adminUrl($event, (string) ($notification->target_type ?? ''), (string) ($notification->target_id ?? ''), $data),
+        ], $previewDraft);
+        $title = trim($override['subject']);
+        $message = trim($override['body']);
         $fields = [];
 
         $targetType = (string) ($notification->target_type ?? '');
@@ -84,10 +105,6 @@ class AdminNotificationRenderer
                 ? 'Periksa kejadian dan lakukan penanganan melalui panel admin.'
                 : null;
         }
-
-        $createdAt = $notification->created_at ?? now('UTC');
-        $wib = Carbon::parse($createdAt, 'UTC')
-            ->timezone('Asia/Jakarta')->locale('id')->translatedFormat('j M Y, H.i').' WIB';
 
         return [
             'level' => $design['label'],

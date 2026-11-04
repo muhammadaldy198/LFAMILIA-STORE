@@ -45,6 +45,15 @@ final class DiscordNotificationRouting
         'security.admin_login_suspicious' => 'arsip',
     ];
 
+    /** The routing table is PR 2's event registry; historical refund flows are excluded. */
+    public static function templateEvents(): array
+    {
+        return array_values(array_filter(
+            array_keys(self::MAP),
+            static fn (string $event): bool => ! str_contains(strtolower($event), 'refund')
+        ));
+    }
+
     public static function channelFor(string $eventType): string
     {
         return self::MAP[$eventType] ?? 'arsip';

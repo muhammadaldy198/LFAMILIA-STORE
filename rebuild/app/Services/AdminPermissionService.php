@@ -21,6 +21,7 @@ class AdminPermissionService
         'reports.finance' => 'Laporan finansial',
         'settings.manage' => 'Pengaturan non-secret',
         'notifications.view' => 'Notifikasi',
+        'templates.manage' => 'Template Email & Notifikasi',
     ];
 
     public function allows(?AdminUser $admin, string $permission): bool
@@ -69,6 +70,7 @@ class AdminPermissionService
             ['label' => 'Pelanggan', 'href' => '/admin/customers', 'group' => 'Pelanggan', 'permission' => 'customers.view'],
             ['label' => 'Layanan Pelanggan', 'href' => '/admin/support', 'group' => 'Pelanggan', 'permission' => 'support.manage'],
             ['label' => 'Notifikasi', 'href' => '/admin/notifications', 'group' => 'Sistem', 'permission' => 'notifications.view'],
+            ['label' => 'Template Email & Notifikasi', 'href' => '/admin/message-templates', 'group' => 'Sistem', 'permission' => 'templates.manage'],
             ['label' => 'Integrasi', 'href' => '/admin/integrations', 'group' => 'Sistem', 'permission' => null, 'super_only' => true],
             ['label' => 'Kesehatan Sistem', 'href' => '/admin/health', 'group' => 'Sistem', 'permission' => null, 'super_only' => true],
             ['label' => 'Catatan Audit', 'href' => '/admin/audit', 'group' => 'Sistem', 'permission' => null, 'super_only' => true],

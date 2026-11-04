@@ -6,6 +6,7 @@ use App\Models\IntegrationCredential;
 use App\Services\CustomerEmailTemplateRenderer;
 use App\Services\EditableMessageTemplateService;
 use App\Services\StorefrontContentService;
+use App\Services\TemplateOverrideService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Http;
@@ -30,6 +31,11 @@ class SendTransactionalEmailJob implements ShouldQueue
 
     public function handle(): void
     {
+        // Disable before loading credentials or touching Resend; applies to queued jobs.
+        if (! app(TemplateOverrideService::class)->enabled('email.'.$this->emailTemplateKey())) {
+            return;
+        }
+
         $record = IntegrationCredential::where('code', 'resend')->where('is_active', true)->first();
         $config = $record?->config_ciphertext;
         if (! is_array($config) || empty($config['api_key']) || empty($config['from_email'])) {
@@ -58,6 +64,10 @@ class SendTransactionalEmailJob implements ShouldQueue
                 isset($this->context) ? $this->context : [],
                 $this->text
             );
+
+        if (! $legacy) {
+            $rendered['subject'] = $message['subject'];
+        }
 
         $response = Http::withToken((string) $config['api_key'])
             ->acceptJson()->timeout(10)->post('https://api.resend.com/emails', [
