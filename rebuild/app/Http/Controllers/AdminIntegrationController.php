@@ -268,6 +268,15 @@ class AdminIntegrationController
             $profiles = $runtime->profiles($code, $existing);
             $target = $profiles[$environment] ?? [];
             $target = $this->applyFields($definition, $target, $data['config'], $clearSecrets);
+            if ($code === 'telegram') {
+                // Discard retired per-destination settings on the next credential save.
+                foreach (array_keys($target) as $key) {
+                    if ((str_starts_with($key, 'thread_') || str_starts_with($key, 'bot_token_'))
+                        && ! array_key_exists($key, $definition['fields'])) {
+                        unset($target[$key]);
+                    }
+                }
+            }
             if ($code === 'digiflazz') {
                 unset(
                     $target['testing'],
@@ -294,13 +303,12 @@ class AdminIntegrationController
             }
         }
 
-        // Retire the 10 historical Discord webhook keys on save. The UI now
-        // declares only three buckets, so stale hidden settings must not
-        // survive as invisible or invalid webhook credentials.
+        // Retire old Discord webhook keys when the four-purpose configuration is saved.
+        // Hidden legacy fields must not survive in credentials.
         if ($code === 'discord') {
             foreach (array_keys($config) as $key) {
                 if (str_starts_with($key, 'webhook_url_')
-                    && ! in_array($key, ['webhook_url_order', 'webhook_url_insiden', 'webhook_url_arsip'], true)) {
+                    && ! in_array($key, ['webhook_url_order', 'webhook_url_tugas', 'webhook_url_sistem', 'webhook_url_arsip'], true)) {
                     unset($config[$key]);
                 }
             }
@@ -812,7 +820,7 @@ class AdminIntegrationController
      */
     private function validateTelegramThreads(array $config): void
     {
-        foreach (['order', 'insiden', 'arsip'] as $bucket) {
+        foreach (['order', 'tugas', 'sistem', 'arsip'] as $bucket) {
             $key = 'thread_'.$bucket;
             $value = trim((string) ($config[$key] ?? ''));
             if ($value === '') {

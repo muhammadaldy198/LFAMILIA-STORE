@@ -1005,4 +1005,78 @@ class AdminIntegrationsRestorationTest extends TestCase
         $this->assertGreaterThanOrEqual(7.0, $elapsed);
         $this->assertLessThan(12.0, $elapsed);
     }
+    public function test_telegram_accepts_four_purpose_bots_without_a_default_and_rejects_invalid_new_thread(): void
+    {
+        $this->loginSuperAdmin();
+        $this->clearIntegrationState();
+
+        $this->put('/admin/integrations/telegram', [
+            'is_active' => true,
+            'environment' => 'production',
+            'config' => [
+                'chat_id' => '-100123',
+                'bot_token_order' => 'order-token',
+                'bot_token_tugas' => 'tugas-token',
+                'bot_token_sistem' => 'sistem-token',
+                'bot_token_arsip' => 'arsip-token',
+                'thread_tugas' => '202',
+                'thread_sistem' => 'not-an-id',
+            ],
+            'clear_secrets' => [],
+        ])->assertSessionHasErrors('config.thread_sistem');
+
+        $this->put('/admin/integrations/telegram', [
+            'is_active' => true,
+            'environment' => 'production',
+            'config' => [
+                'chat_id' => '-100123',
+                'bot_token_order' => 'order-token',
+                'bot_token_tugas' => 'tugas-token',
+                'bot_token_sistem' => 'sistem-token',
+                'bot_token_arsip' => 'arsip-token',
+                'thread_tugas' => '202',
+                'thread_sistem' => '303',
+            ],
+            'clear_secrets' => [],
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $stored = IntegrationCredential::where('code', 'telegram')->firstOrFail()->config_ciphertext;
+        $profile = $stored['profiles']['production'];
+        $this->assertSame('tugas-token', $profile['bot_token_tugas']);
+        $this->assertSame('sistem-token', $profile['bot_token_sistem']);
+        $this->assertSame('202', $profile['thread_tugas']);
+        $this->assertSame('303', $profile['thread_sistem']);
+        $this->assertArrayNotHasKey('bot_token', $profile);
+    }
+
+    public function test_discord_four_purpose_webhooks_save_and_retire_old_destinations(): void
+    {
+        $this->loginSuperAdmin();
+        $this->clearIntegrationState();
+        IntegrationCredential::create([
+            'code' => 'discord',
+            'is_active' => true,
+            'config_ciphertext' => [
+                'webhook_url_insiden' => 'https://discord.com/api/webhooks/111/old',
+            ],
+        ]);
+
+        $this->put('/admin/integrations/discord', [
+            'is_active' => true,
+            'config' => [
+                'webhook_url_order' => 'https://discord.com/api/webhooks/111/order',
+                'webhook_url_tugas' => 'https://discord.com/api/webhooks/222/tugas',
+                'webhook_url_sistem' => 'https://discord.com/api/webhooks/333/sistem',
+                'webhook_url_arsip' => 'https://discord.com/api/webhooks/444/arsip',
+            ],
+            'clear_secrets' => [],
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $stored = IntegrationCredential::where('code', 'discord')->firstOrFail()->config_ciphertext;
+        $this->assertArrayNotHasKey('webhook_url_insiden', $stored);
+        foreach (['order', 'tugas', 'sistem', 'arsip'] as $purpose) {
+            $this->assertArrayHasKey('webhook_url_'.$purpose, $stored);
+        }
+    }
+
 }

@@ -204,7 +204,7 @@ class IntegrationRegistry
             'telegram' => [
                 'name' => 'Notifikasi Telegram',
                 'group' => 'Pemberitahuan',
-                'description' => 'Notifikasi admin terstruktur ke grup Telegram dan topik per kelompok.',
+                'description' => 'Empat bot berbeda di satu grup admin: Order, Tugas, Sistem, dan Arsip.',
                 'default_environment' => 'production',
                 'credential_scope' => 'per_environment',
                 'environments' => $this->availableEnvironments('test', [
@@ -214,42 +214,72 @@ class IntegrationRegistry
                 ]),
                 'fields' => [
                     'bot_token' => [
-                        'label' => 'Token bot Telegram',
+                        'label' => 'Token bot default (cadangan)',
                         'secret' => true,
-                        'required' => true,
-                        'help' => 'Token bot Telegram Production.',
+                        'required' => false,
+                        'help' => 'Opsional. Dipakai hanya bila token bot untuk tujuan tertentu belum diisi.',
+                    ],
+                    'bot_token_order' => [
+                        'label' => 'Token bot Order',
+                        'secret' => true,
+                        'required' => false,
+                        'help' => 'Bot pengirim khusus informasi transaksi dan pesanan.',
+                    ],
+                    'bot_token_tugas' => [
+                        'label' => 'Token bot Tugas',
+                        'secret' => true,
+                        'required' => false,
+                        'help' => 'Bot pengirim khusus pekerjaan yang memerlukan tindakan admin.',
+                    ],
+                    'bot_token_sistem' => [
+                        'label' => 'Token bot Sistem',
+                        'secret' => true,
+                        'required' => false,
+                        'help' => 'Bot pengirim khusus gangguan mesin, integrasi, dan kesehatan layanan.',
+                    ],
+                    'bot_token_arsip' => [
+                        'label' => 'Token bot Arsip',
+                        'secret' => true,
+                        'required' => false,
+                        'help' => 'Bot pengirim khusus tiket, keamanan, dan catatan lainnya.',
                     ],
                     'chat_id' => [
-                        'label' => 'ID ruang obrolan',
+                        'label' => 'ID grup admin Telegram',
                         'secret' => true,
                         'required' => true,
-                        'help' => 'ID chat tujuan Telegram Production.',
+                        'help' => 'Satu chat ID grup yang dipakai bersama oleh keempat bot.',
                     ],
                     'thread_order' => [
                         'label' => 'ID topik Order',
                         'secret' => false,
                         'required' => false,
-                        'help' => 'Opsional. Message thread ID topik Telegram untuk pesanan dan QRIS.',
+                        'help' => 'Opsional. ID topik untuk informasi transaksi.',
                     ],
-                    'thread_insiden' => [
-                        'label' => 'ID topik Insiden',
+                    'thread_tugas' => [
+                        'label' => 'ID topik Tugas',
                         'secret' => false,
                         'required' => false,
-                        'help' => 'Opsional. Message thread ID untuk fulfillment, integrasi, kesehatan situs, dan insiden.',
+                        'help' => 'Opsional. ID topik untuk pesanan yang harus ditangani admin.',
+                    ],
+                    'thread_sistem' => [
+                        'label' => 'ID topik Sistem',
+                        'secret' => false,
+                        'required' => false,
+                        'help' => 'Opsional. ID topik untuk kesehatan situs, integrasi, dan sinkronisasi.',
                     ],
                     'thread_arsip' => [
                         'label' => 'ID topik Arsip',
                         'secret' => false,
                         'required' => false,
-                        'help' => 'Opsional. Message thread ID untuk tiket, login, dan peristiwa lainnya.',
+                        'help' => 'Opsional. ID topik untuk tiket dan catatan lainnya.',
                     ],
                 ],
-                'note' => 'Tanpa ID topik, notifikasi dikirim seperti biasa langsung ke chat_id.',
+                'note' => 'Setiap tujuan memakai bot dan topiknya sendiri dalam satu grup. Token tujuan kosong memakai token default; tanpa keduanya tujuan dilewati. Thread kosong mengirim ke grup tanpa ID topik.',
             ],
             'discord' => [
                 'name' => 'Notifikasi Discord',
                 'group' => 'Pemberitahuan',
-                'description' => 'Discord embed admin, disalurkan ke Order, Insiden, dan Arsip.',
+                'description' => 'Discord embed admin untuk tujuan Order, Tugas, Sistem, dan Arsip.',
                 'environment_note' => 'Webhook Discord memakai alamat webhook aktif.',
                 'fields' => [
                     'webhook_url' => [
@@ -262,22 +292,28 @@ class IntegrationRegistry
                         'label' => 'Webhook Order',
                         'secret' => true,
                         'required' => false,
-                        'help' => 'Pesanan dan QRIS. Kosong = gunakan webhook default.',
+                        'help' => 'Info transaksi dan pesanan. Kosong = gunakan default.',
                     ],
-                    'webhook_url_insiden' => [
-                        'label' => 'Webhook Insiden',
+                    'webhook_url_tugas' => [
+                        'label' => 'Webhook Tugas',
                         'secret' => true,
                         'required' => false,
-                        'help' => 'Fulfillment, integrasi, situs, dan sinkronisasi. Kosong = gunakan default.',
+                        'help' => 'Pesanan yang butuh tindakan admin. Kosong = gunakan default.',
+                    ],
+                    'webhook_url_sistem' => [
+                        'label' => 'Webhook Sistem',
+                        'secret' => true,
+                        'required' => false,
+                        'help' => 'Gangguan layanan dan mesin. Kosong = gunakan default.',
                     ],
                     'webhook_url_arsip' => [
                         'label' => 'Webhook Arsip',
                         'secret' => true,
                         'required' => false,
-                        'help' => 'Tiket, login, dan peristiwa lainnya. Kosong = gunakan default.',
+                        'help' => 'Tiket, keamanan, dan catatan lain. Kosong = gunakan default.',
                     ],
                 ],
-                'note' => 'Webhook lama 10 channel tidak dipakai untuk pengiriman baru. Atur tiga webhook kelompok sesuai tujuan yang diinginkan.',
+                'note' => 'Webhook tujuan yang kosong memakai webhook default. Webhook tujuan lama tidak digunakan lagi.',
             ],
             'turnstile' => [
                 'name' => 'Cloudflare Turnstile',

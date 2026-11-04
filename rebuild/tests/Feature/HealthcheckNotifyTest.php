@@ -124,7 +124,7 @@ class HealthcheckNotifyTest extends TestCase
             'admin_notification_id' => $recoveryId, 'channel' => 'telegram', 'status' => 'SENT',
         ]);
         $this->assertDatabaseHas('notification_deliveries', [
-            'admin_notification_id' => $recoveryId, 'channel' => 'discord:insiden', 'status' => 'FAILED',
+            'admin_notification_id' => $recoveryId, 'channel' => 'discord:sistem', 'status' => 'FAILED',
         ]);
         $this->assertSame(2, $telegramPosts());
         $this->assertSame(2, $discordPosts());
@@ -133,7 +133,7 @@ class HealthcheckNotifyTest extends TestCase
         $this->assertSame(2, $telegramPosts());
         $this->assertSame(3, $discordPosts());
         $this->assertDatabaseHas('notification_deliveries', [
-            'admin_notification_id' => $recoveryId, 'channel' => 'discord:insiden', 'status' => 'SENT',
+            'admin_notification_id' => $recoveryId, 'channel' => 'discord:sistem', 'status' => 'SENT',
         ]);
 
         // All channels are now SENT; a fourth 'up' does not resend.
@@ -292,13 +292,13 @@ class HealthcheckNotifyTest extends TestCase
         $this->assertSame(1, $telegramPosts());
         $this->assertSame(1, $discordPosts());
         $this->assertDatabaseHas('notification_deliveries', ['channel' => 'telegram', 'status' => 'SENT']);
-        $this->assertDatabaseHas('notification_deliveries', ['channel' => 'discord:insiden', 'status' => 'FAILED']);
+        $this->assertDatabaseHas('notification_deliveries', ['channel' => 'discord:sistem', 'status' => 'FAILED']);
 
         // Retry: Telegram TIDAK dikirim ulang, Discord dicoba lagi.
         $this->assertSame(0, $this->notify('down', 'Partial failure'));
         $this->assertSame(1, $telegramPosts());
         $this->assertSame(2, $discordPosts());
-        $this->assertDatabaseHas('notification_deliveries', ['channel' => 'discord:insiden', 'status' => 'SENT']);
+        $this->assertDatabaseHas('notification_deliveries', ['channel' => 'discord:sistem', 'status' => 'SENT']);
     }
 
     public function test_down_retries_notification_recorded_but_never_delivered(): void
