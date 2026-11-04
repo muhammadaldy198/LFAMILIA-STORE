@@ -121,6 +121,7 @@ class AdminNotificationRenderer
             $line = '<b>'.$escape(mb_substr($fact['name'], 0, 90)).':</b> '.$escape(mb_substr($fact['value'], 0, 1000));
             if (mb_strlen(implode("\n", [...$lines, $line, ...$action, ...$footer])) > 3900) {
                 $lines[] = 'Rincian lainnya: lihat panel admin.';
+
                 break;
             }
             $lines[] = $line;
@@ -239,6 +240,7 @@ class AdminNotificationRenderer
             }
 
             $invoice = (string) ($data['invoice'] ?? $data['order_number'] ?? '');
+
             return $invoice !== '' ? route('admin.orders', ['q' => $invoice]) : route('admin.orders');
         }
 
