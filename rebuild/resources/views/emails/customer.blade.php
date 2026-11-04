@@ -28,13 +28,13 @@
 @foreach ($summary as $row)
 <tr>
 <td valign="top" style="padding:4px 12px 4px 0;font-size:14px;line-height:1.45;color:#333333{{ !empty($row['strong']) ? ';font-weight:bold' : '' }}">{{ $row['label'] }}</td>
-<td valign="top" align="right" style="padding:4px 0;font-size:14px;line-height:1.45;text-align:right;overflow-wrap:anywhere;color:#333333{{ !empty($row['strong']) ? ';font-weight:bold' : '' }}">{{ $row['value'] }}</td>
+<td valign="top" align="right" style="padding:4px 0;font-size:14px;line-height:1.45;text-align:right;overflow-wrap:anywhere;color:#333333{{ !empty($row['strong']) ? ';font-weight:bold' : '' }}">{!! nl2br(e($row['value']), false) !!}</td>
 </tr>
 @endforeach
 @foreach ($extra as $row)
 <tr>
 <td valign="top" style="padding:5px 12px 5px 0;font-size:14px;line-height:1.5;color:#333333">{{ $row['label'] }}</td>
-<td valign="top" align="right" style="padding:5px 0;font-size:14px;line-height:1.5;text-align:right;overflow-wrap:anywhere;color:#333333">{{ $row['value'] }}</td>
+<td valign="top" align="right" style="padding:5px 0;font-size:14px;line-height:1.5;text-align:right;overflow-wrap:anywhere;color:#333333">{!! nl2br(e($row['value']), false) !!}</td>
 </tr>
 @endforeach
 </table>

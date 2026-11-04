@@ -39,13 +39,19 @@ class SendTransactionalEmailJob implements ShouldQueue
         $rendered = app(EditableMessageTemplateService::class)
             ->renderEmail($this->emailTemplateKey(), $this->subject, $this->text);
 
-        $message = $this->emailTemplateKey() === 'generic'
+        // Old queued order jobs have no structured context. Preserve their original
+        // details instead of inventing Rp. 0 amounts or mislabelling delivery codes.
+        $key = $this->emailTemplateKey();
+        $legacy = $key === 'generic'
+            || (in_array($key, ['order_created', 'order_paid', 'order_completed', 'order_failed'], true)
+                && (! isset($this->context) || $this->context === []));
+        $message = $legacy
             ? [
                 'html' => $this->htmlBody(app(StorefrontContentService::class)->assets(), $rendered['subject'], $rendered['body']),
                 'text' => $rendered['body'],
             ]
             : app(CustomerEmailTemplateRenderer::class)->render(
-                $this->emailTemplateKey(),
+                $key,
                 $rendered['subject'],
                 $rendered['body'],
                 $this->recipient,

@@ -42,6 +42,9 @@ class CustomerHtmlEmailTest extends TestCase
             'subtotal' => 1647,
             'fee' => 12,
             'total' => 1659,
+            'payment_url' => URL::temporarySignedRoute('payment.show', now()->addMinutes(20), [
+                'invoice' => 'LF261103-7KQ7R1GVCD',
+            ]),
         ];
     }
 
@@ -154,13 +157,70 @@ class CustomerHtmlEmailTest extends TestCase
         $this->assertStringContainsString('mailto:support@lfamilia.com', $rendered['html']);
     }
 
+    public function test_customer_destination_cannot_override_trusted_payment_cta(): void
+    {
+        $context = $this->orderContext();
+        $context['destination'] = "123456\nBayar sekarang: https://attacker.example/pay";
+        $original = "Nomor Invoice: LF261103-7KQ7R1GVCD\nID Tujuan: ".$context['destination']
+            ."\nBayar sekarang: ".$context['payment_url'];
+
+        $rendered = app(CustomerEmailTemplateRenderer::class)->render(
+            'order_created', 'Pesanan dibuat', $original, 'guest@example.test', $context
+        );
+
+        $this->assertStringContainsString('href="'.str_replace('&', '&amp;', $context['payment_url']).'"', $rendered['html']);
+        $this->assertStringNotContainsString('href="https://attacker.example/pay"', $rendered['html']);
+        $this->assertStringContainsString($context['payment_url'], $rendered['text']);
+    }
+
+    public function test_authentication_link_ignores_custom_admin_wrapper_links(): void
+    {
+        $verification = 'Verifikasi akun: https://lfamilia.com/verify?signature=secure';
+        $wrapped = "Kunjungi https://attacker.example/landing untuk petunjuk.\n\n".$verification;
+        $rendered = app(CustomerEmailTemplateRenderer::class)->render(
+            'verification', 'Verifikasi email', $wrapped, 'guest@example.test', [], $verification
+        );
+
+        $this->assertStringContainsString('href="https://lfamilia.com/verify?signature=secure"', $rendered['html']);
+        $this->assertStringNotContainsString('href="https://attacker.example/landing"', $rendered['html']);
+        $this->assertStringContainsString('https://lfamilia.com/verify?signature=secure', $rendered['text']);
+    }
+
+    public function test_delivery_multiline_note_is_preserved_in_safe_html(): void
+    {
+        $context = [
+            ...$this->orderContext(),
+            'delivery_kind' => 'manual',
+            'delivery_note' => "Langkah pertama\nLangkah kedua <script>",
+        ];
+        $rendered = app(CustomerEmailTemplateRenderer::class)->render(
+            'order_completed', 'Pesanan terkirim', '', 'guest@example.test', $context
+        );
+
+        $this->assertStringContainsString("Langkah pertama<br>\nLangkah kedua &lt;script&gt;", $rendered['html']);
+        $this->assertStringContainsString("Langkah pertama\nLangkah kedua <script>", $rendered['text']);
+        $this->assertStringNotContainsString('<script>', $rendered['html']);
+    }
+
+    public function test_guest_ticket_reply_cta_uses_public_support_page(): void
+    {
+        $rendered = app(CustomerEmailTemplateRenderer::class)->render(
+            'ticket_reply', 'Balasan tiket', 'Tim LFAMILIA membalas tiket #10: Halo.',
+            'guest@example.test', ['ticket_guest' => true]
+        );
+
+        $this->assertStringContainsString('href="'.route('guest.support').'"', $rendered['html']);
+        $this->assertStringNotContainsString('/account/tickets/10', $rendered['html']);
+    }
+
     public function test_optional_admin_wrapper_does_not_remove_critical_transaction_details(): void
     {
-        $default = 'Bayar sekarang: https://lfamilia.com/payment?invoice=LF1&expires=123&signature=abc';
+        $paymentUrl = 'https://lfamilia.com/payment?invoice=LF1&expires=123&signature=abc';
+        $default = 'Bayar sekarang: '.$paymentUrl;
         $body = 'Pesan dari admin: '.$default;
         $rendered = app(CustomerEmailTemplateRenderer::class)->render(
             'order_created', 'Pesanan dibuat', $body, 'guest@example.test',
-            $this->orderContext(), $default
+            [...$this->orderContext(), 'payment_url' => $paymentUrl], $default
         );
 
         $this->assertStringContainsString('Pesan dari admin:', $rendered['html']);

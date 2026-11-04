@@ -112,7 +112,7 @@ class CustomerEmailTemplateRenderer
                 break;
             case 'order_created':
                 $intro = 'Terima kasih atas kepercayaan kamu bertransaksi di '.$store.'. Berikut rincian informasi tagihan pembayaran.';
-                $ctaUrl = $this->field($sourceBody, 'Bayar sekarang') ?: $ctaUrl;
+                $ctaUrl = (string) ($context['payment_url'] ?? '');
                 $after = $deadline !== ''
                     ? 'Selesaikan pembayaran sebelum '.$deadline.'. Transaksi dianggap batal jika melewati batas pembayaran. Setelah membayar, kamu dapat memeriksa status di halaman lacak pesanan.'
                     : 'Setelah membayar, kamu dapat memeriksa status pembayaran di halaman lacak pesanan.';
@@ -281,7 +281,8 @@ class CustomerEmailTemplateRenderer
         $lines = [
             ...$lines,
             '',
-            $data['ctaLabel'].': '.$data['ctaUrl'],
+            $data['ctaLabel'].': '.(str_starts_with($data['ctaUrl'], 'mailto:')
+                ? 'lihat alamat Customer Service di footer' : $data['ctaUrl']),
             '',
             $data['after'],
             '',

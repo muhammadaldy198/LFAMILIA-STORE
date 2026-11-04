@@ -61,6 +61,7 @@ class TransactionalEmailService
         }
 
         $deadline = $this->deadlineWib($details['expires_at']);
+        $paymentUrl = $this->payUrl($details['invoice'], $details['expires_at']);
         $subject = 'Pesanan '.$details['invoice'].' dibuat';
         if ($deadline) {
             $subject .= ' — selesaikan pembayaran sebelum '.Carbon::parse($details['expires_at'])->timezone('Asia/Jakarta')->format('H.i').' WIB';
@@ -91,7 +92,7 @@ class TransactionalEmailService
             ];
         }
         $lines = [...$lines,
-            'Bayar sekarang: '.$this->payUrl($details['invoice'], $details['expires_at']),
+            'Bayar sekarang: '.$paymentUrl,
             'Lacak pesanan: '.$this->trackingUrl(),
             '',
         ];
@@ -111,6 +112,7 @@ class TransactionalEmailService
         $this->queueForOrder($orderId, $subject, implode("\n", $lines), 'order_created', [
             ...$details,
             'access_code' => $accessCode,
+            'payment_url' => $paymentUrl,
         ]);
     }
 
