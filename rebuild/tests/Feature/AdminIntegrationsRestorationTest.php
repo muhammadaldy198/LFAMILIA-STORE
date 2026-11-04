@@ -860,6 +860,23 @@ class AdminIntegrationsRestorationTest extends TestCase
         $this->assertSame('https://discord.com/api/webhooks/222/bbb', $stored['webhook_url_order']);
     }
 
+    public function test_telegram_topic_ids_must_be_positive_integers(): void
+    {
+        $this->loginSuperAdmin();
+        $this->clearIntegrationState();
+
+        $this->put('/admin/integrations/telegram', [
+            'is_active' => false,
+            'environment' => 'production',
+            'config' => [
+                'bot_token' => '111:token',
+                'chat_id' => '-100123',
+                'thread_order' => 'not-a-number',
+            ],
+            'clear_secrets' => [],
+        ])->assertSessionHasErrors('config.thread_order');
+    }
+
     public function test_discord_connection_test_probes_every_declared_channel_webhook(): void
     {
         $this->loginSuperAdmin();
@@ -871,7 +888,7 @@ class AdminIntegrationsRestorationTest extends TestCase
             'config_ciphertext' => [
                 'webhook_url' => 'https://discord.com/api/webhooks/111/aaa',
                 'webhook_url_order' => 'https://discord.com/api/webhooks/222/bbb',
-                'webhook_url_qris' => 'https://discord.com/api/webhooks/111/aaa',
+                'webhook_url_arsip' => 'https://discord.com/api/webhooks/111/aaa',
             ],
         ]);
 
@@ -893,7 +910,7 @@ class AdminIntegrationsRestorationTest extends TestCase
             ->assertJsonPath('channels.0.verified', true)
             ->assertJsonPath('channels.1.channel', 'order')
             ->assertJsonPath('channels.1.verified', false)
-            ->assertJsonPath('channels.2.channel', 'qris')
+            ->assertJsonPath('channels.2.channel', 'arsip')
             ->assertJsonPath('channels.2.verified', true);
 
         $saved = json_decode((string) DB::table('system_settings')

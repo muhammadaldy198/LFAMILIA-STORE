@@ -95,7 +95,7 @@ class ExternalNotificationRoutingTest extends TestCase
         $this->assertSame(1, Http::recorded(fn ($request) => $request->url() === self::ORDER_WEBHOOK)->count());
         $this->assertDatabaseMissing('notification_deliveries', [
             'admin_notification_id' => $fulfillmentId,
-            'channel' => 'discord:fulfillment',
+            'channel' => 'discord:insiden',
         ]);
         $this->assertDatabaseHas('notification_deliveries', [
             'admin_notification_id' => $orderId,
@@ -108,7 +108,7 @@ class ExternalNotificationRoutingTest extends TestCase
     {
         $this->seedDiscord([
             'webhook_url_order' => self::ORDER_WEBHOOK,
-            'webhook_url_fulfillment' => self::FULFILLMENT_WEBHOOK,
+            'webhook_url_insiden' => self::FULFILLMENT_WEBHOOK,
         ]);
 
         $orderId = $this->record('order.created');
@@ -132,7 +132,7 @@ class ExternalNotificationRoutingTest extends TestCase
         ]);
         $this->assertDatabaseHas('notification_deliveries', [
             'admin_notification_id' => $fulfillmentId,
-            'channel' => 'discord:fulfillment',
+            'channel' => 'discord:insiden',
             'status' => 'SENT',
         ]);
         $this->assertSame(2, $this->telegramSends());
@@ -219,7 +219,7 @@ class ExternalNotificationRoutingTest extends TestCase
         $this->assertSame(2, Http::recorded(fn ($request) => $request->url() === self::LEGACY_WEBHOOK)->count());
         $this->assertDatabaseHas('notification_deliveries', [
             'admin_notification_id' => $fulfillmentId,
-            'channel' => 'discord:fulfillment',
+            'channel' => 'discord:insiden',
             'status' => 'SENT',
         ]);
     }

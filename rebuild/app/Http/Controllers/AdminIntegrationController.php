@@ -294,6 +294,18 @@ class AdminIntegrationController
             }
         }
 
+        // Retire the 10 historical Discord webhook keys on save. The UI now
+        // declares only three buckets, so stale hidden settings must not
+        // survive as invisible or invalid webhook credentials.
+        if ($code === 'discord') {
+            foreach (array_keys($config) as $key) {
+                if (str_starts_with($key, 'webhook_url_')
+                    && ! in_array($key, ['webhook_url_order', 'webhook_url_insiden', 'webhook_url_arsip'], true)) {
+                    unset($config[$key]);
+                }
+            }
+        }
+
         $selectedConfig = $environments !== [] && $registry->credentialsArePerEnvironment($code)
             ? (is_array($config['profiles'][$environment] ?? null) ? $config['profiles'][$environment] : [])
             : $config;
@@ -306,7 +318,10 @@ class AdminIntegrationController
         // mendarat di channel yang salah padahal integrasi tampak
         // terkonfigurasi benar.
         if ($code === 'discord') {
-            $this->validateDiscordWebhooks($config);
+            $this->validateDiscordWebhooks($selectedConfig);
+        }
+        if ($code === 'telegram') {
+            $this->validateTelegramThreads($selectedConfig);
         }
 
         if ($data['is_active']) {
@@ -789,6 +804,27 @@ class AdminIntegrationController
             throw ValidationException::withMessages([
                 'config.'.$key => 'Webhook Discord tidak valid. Gunakan URL webhook Discord (https://discord.com/api/webhooks/...).',
             ]);
+        }
+    }
+
+    /**
+     * @param  array<string,mixed>  $config
+     */
+    private function validateTelegramThreads(array $config): void
+    {
+        foreach (['order', 'insiden', 'arsip'] as $bucket) {
+            $key = 'thread_'.$bucket;
+            $value = trim((string) ($config[$key] ?? ''));
+            if ($value === '') {
+                continue;
+            }
+            if (filter_var($value, FILTER_VALIDATE_INT, [
+                'options' => ['min_range' => 1, 'max_range' => 2147483647],
+            ]) === false) {
+                throw ValidationException::withMessages([
+                    'config.'.$key => 'ID topik Telegram harus berupa bilangan bulat positif.',
+                ]);
+            }
         }
     }
 
