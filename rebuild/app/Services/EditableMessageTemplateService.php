@@ -14,6 +14,10 @@ class EditableMessageTemplateService
         'order_failed' => 'Pesanan gagal',
         'verification' => 'Verifikasi email',
         'password_reset' => 'Reset kata sandi',
+        'password_changed' => 'Kata sandi diperbarui',
+        'password_reset_completed' => 'Kata sandi berhasil diatur ulang',
+        'ticket_created' => 'Tiket bantuan diterima',
+        'ticket_reply' => 'Balasan tiket',
     ];
 
     public function saved(): array

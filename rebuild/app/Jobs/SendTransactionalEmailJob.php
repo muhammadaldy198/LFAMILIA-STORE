@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\IntegrationCredential;
+use App\Services\CustomerEmailTemplateRenderer;
 use App\Services\EditableMessageTemplateService;
 use App\Services\StorefrontContentService;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -22,6 +23,7 @@ class SendTransactionalEmailJob implements ShouldQueue
         public readonly string $subject,
         public readonly string $text,
         public readonly string $templateKey = 'generic',
+        public readonly array $context = [],
     ) {
         $this->onQueue('notifications');
     }
@@ -37,13 +39,33 @@ class SendTransactionalEmailJob implements ShouldQueue
         $rendered = app(EditableMessageTemplateService::class)
             ->renderEmail($this->emailTemplateKey(), $this->subject, $this->text);
 
+        // Old queued order jobs have no structured context. Preserve their original
+        // details instead of inventing Rp. 0 amounts or mislabelling delivery codes.
+        $key = $this->emailTemplateKey();
+        $legacy = $key === 'generic'
+            || (in_array($key, ['order_created', 'order_paid', 'order_completed', 'order_failed'], true)
+                && (! isset($this->context) || $this->context === []));
+        $message = $legacy
+            ? [
+                'html' => $this->htmlBody(app(StorefrontContentService::class)->assets(), $rendered['subject'], $rendered['body']),
+                'text' => $rendered['body'],
+            ]
+            : app(CustomerEmailTemplateRenderer::class)->render(
+                $key,
+                $rendered['subject'],
+                $rendered['body'],
+                $this->recipient,
+                isset($this->context) ? $this->context : [],
+                $this->text
+            );
+
         $response = Http::withToken((string) $config['api_key'])
             ->acceptJson()->timeout(10)->post('https://api.resend.com/emails', [
                 'from' => (string) $config['from_email'],
                 'to' => [$this->recipient],
                 'subject' => $rendered['subject'],
-                'text' => $rendered['body'],
-                'html' => $this->htmlBody(app(StorefrontContentService::class)->assets(), $rendered['subject'], $rendered['body']),
+                'text' => $message['text'],
+                'html' => $message['html'],
             ]);
 
         if (! $response->successful()) {

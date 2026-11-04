@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\URL;
 
 class TransactionalEmailService
 {
-    public function queue(string $email, string $subject, string $text, string $event = 'generic'): void
+    public function queue(string $email, string $subject, string $text, string $event = 'generic', array $context = []): void
     {
         if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
             return;
@@ -19,7 +19,7 @@ class TransactionalEmailService
         // Enqueue is best-effort for customer events; direct job dispatch
         // (verification and admin test-email) must still propagate failures.
         try {
-            SendTransactionalEmailJob::dispatch(strtolower($email), $subject, $text, $event)->afterCommit();
+            SendTransactionalEmailJob::dispatch(strtolower($email), $subject, $text, $event, $context)->afterCommit();
         } catch (\Throwable $exception) {
             Log::warning('Could not queue customer transactional email.', [
                 'exception' => get_class($exception),
@@ -27,19 +27,24 @@ class TransactionalEmailService
         }
     }
 
-    public function queueForOrder(int $orderId, string $subject, string $text, string $event = 'generic'): void
+    public function queueForOrder(int $orderId, string $subject, string $text, string $event = 'generic', array $context = []): void
     {
-        $order = DB::table('orders')->where('id', $orderId)->first(['user_id', 'guest_email']);
+        $order = DB::table('orders')->where('id', $orderId)->first(['user_id', 'guest_email', 'created_at']);
         if (! $order) {
             return;
         }
 
-        $email = $order->user_id
-            ? DB::table('users')->where('id', $order->user_id)->value('email')
-            : $order->guest_email;
+        $customer = $order->user_id
+            ? DB::table('users')->where('id', $order->user_id)->first(['email', 'name'])
+            : null;
+        $email = $order->user_id ? $customer?->email : $order->guest_email;
 
         if (is_string($email)) {
-            $this->queue($email, $subject, $text, $event);
+            $this->queue($email, $subject, $text, $event, [
+                ...$context,
+                'name' => (string) ($customer?->name ?? ''),
+                'created_at' => $order->created_at,
+            ]);
         }
     }
 
@@ -56,6 +61,7 @@ class TransactionalEmailService
         }
 
         $deadline = $this->deadlineWib($details['expires_at']);
+        $paymentUrl = $this->payUrl($details['invoice'], $details['expires_at']);
         $subject = 'Pesanan '.$details['invoice'].' dibuat';
         if ($deadline) {
             $subject .= ' — selesaikan pembayaran sebelum '.Carbon::parse($details['expires_at'])->timezone('Asia/Jakarta')->format('H.i').' WIB';
@@ -86,7 +92,7 @@ class TransactionalEmailService
             ];
         }
         $lines = [...$lines,
-            'Bayar sekarang: '.$this->payUrl($details['invoice'], $details['expires_at']),
+            'Bayar sekarang: '.$paymentUrl,
             'Lacak pesanan: '.$this->trackingUrl(),
             '',
         ];
@@ -103,7 +109,11 @@ class TransactionalEmailService
             $this->csLine(),
         ];
 
-        $this->queueForOrder($orderId, $subject, implode("\n", $lines), 'order_created');
+        $this->queueForOrder($orderId, $subject, implode("\n", $lines), 'order_created', [
+            ...$details,
+            'access_code' => $accessCode,
+            'payment_url' => $paymentUrl,
+        ]);
     }
 
     /**
@@ -144,7 +154,8 @@ class TransactionalEmailService
             $orderId,
             'Pembayaran diterima — pesanan '.$details['invoice'].' sedang diproses',
             implode("\n", $lines),
-            'order_paid'
+            'order_paid',
+            $details
         );
     }
 
@@ -233,7 +244,11 @@ class TransactionalEmailService
                     ? 'Pesanan selesai — '.$details['package'].' sudah dikirim'
                     : 'Pesanan selesai — '.$details['package'].' sudah masuk ke akunmu'),
             implode("\n", $lines),
-            'order_completed'
+            'order_completed',
+            [
+                ...$details,
+                'delivery_kind' => $deliveryKind,
+            ]
         );
     }
 
@@ -274,7 +289,8 @@ class TransactionalEmailService
             $orderId,
             'Pesanan '.$details['invoice'].' gagal diproses — ini langkah berikutnya',
             implode("\n", $lines),
-            'order_failed'
+            'order_failed',
+            $details
         );
     }
 

@@ -58,7 +58,8 @@ class SupportTicketController
             $emails->queue(
                 $request->user()->email,
                 'Tiket LFAMILIA diterima',
-                'Tiket #'.$ticket->id.' "'.$ticket->subject.'" telah diterima tim LFAMILIA.'
+                'Tiket #'.$ticket->id.' "'.$ticket->subject.'" telah diterima tim LFAMILIA.',
+                'ticket_created'
             );
         }
 

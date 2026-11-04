@@ -142,7 +142,8 @@ class CustomerAccountController
                     'Jika kamu tidak melakukan perubahan ini, segera hubungi CS: '.$supportEmail,
                     '',
                     'Jangan bagikan kata sandi atau kode keamanan kepada siapa pun.',
-                ])
+                ]),
+                'password_changed'
             );
         }
 
