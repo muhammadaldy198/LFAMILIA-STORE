@@ -33,6 +33,7 @@ class AdminNotificationRenderer
             ->timezone('Asia/Jakarta')->locale('id')->translatedFormat('j M Y, H.i').' WIB';
         $override = app(TemplateOverrideService::class)->apply('admin.'.$event, $title, $message, [
             'judul' => $title, 'detail' => $message, 'event' => $event,
+            'nama_toko' => (string) (app(StorefrontContentService::class)->settings()['store.name'] ?? 'LFAMILIA STORE'),
             'wib' => $wib,
             'invoice' => (string) ($data['invoice'] ?? $data['order_number'] ?? ''),
             'produk' => (string) ($data['product'] ?? ''),

@@ -37,7 +37,7 @@ class TemplateOverrideService
     ];
 
     private const ADMIN_PLACEHOLDERS = [
-        'judul', 'detail', 'event', 'invoice', 'produk', 'sku', 'seller',
+        'judul', 'detail', 'nama_toko', 'event', 'invoice', 'produk', 'sku', 'seller',
         'provider', 'status', 'response_code', 'rc', 'reason', 'channel',
         'total', 'wib', 'link_panel',
     ];

@@ -138,6 +138,41 @@ class AdminTemplateOverrideTest extends TestCase
         $this->assertDatabaseHas('audit_logs', ['action' => 'templates.override.reset', 'target_id' => 'email.order_paid']);
     }
 
+    public function test_legacy_admin_store_name_token_is_editable_and_resolves_dynamically(): void
+    {
+        $this->admin();
+        DB::table('system_settings')->updateOrInsert(['key' => 'store.message_templates'], [
+            'value' => json_encode(['notifications' => [
+                'fulfillment.blocked' => [
+                    'title' => '{{default_title}}',
+                    'body' => 'Info dari {{store_name}}: {{default_body}}',
+                ],
+            ]], JSON_THROW_ON_ERROR),
+            'version' => 1, 'updated_at' => now('UTC'), 'created_at' => now('UTC'),
+        ]);
+
+        $row = collect(app(TemplateOverrideService::class)->listing())
+            ->firstWhere('key', 'admin.fulfillment.blocked');
+        $this->assertTrue($row['has_legacy']);
+        $this->assertSame('Info dari {nama_toko}: {detail}', $row['body']);
+        $this->put('/admin/message-templates/overrides', [
+            'template_key' => 'admin.fulfillment.blocked',
+            'subject' => '{judul}', 'body' => $row['body'], 'is_enabled' => true,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertArrayNotHasKey('fulfillment.blocked',
+            app(EditableMessageTemplateService::class)->saved()['notifications']);
+
+        $notification = (object) [
+            'event_type' => 'fulfillment.blocked', 'severity' => 'WARNING',
+            'title' => 'Butuh pemeriksaan', 'message' => 'Detail insiden',
+            'data' => [], 'created_at' => now('UTC'),
+        ];
+        $copy = app(AdminNotificationRenderer::class)->fromNotification($notification);
+        $facts = implode(' ', array_column($copy['fields'], 'value'));
+        $this->assertStringContainsString('LFAMILIA', $facts);
+        $this->assertStringContainsString('Detail insiden', $facts);
+    }
+
     public function test_admin_custom_copy_keeps_immutable_original_facts_across_channels(): void
     {
         $this->override('admin.fulfillment.blocked', '{judul}', 'Mohon periksa pembayaran ini.');
