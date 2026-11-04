@@ -78,6 +78,8 @@ class AdminTemplateOverrideTest extends TestCase
             'body' => '{pesan_bawaan}', 'is_enabled' => true,
         ];
         $this->get('/admin/message-templates')->assertForbidden();
+        $this->put('/admin/message-templates', ['emails' => [], 'notifications' => []])->assertForbidden();
+        $this->post('/admin/message-templates/test-email')->assertForbidden();
         $this->put('/admin/message-templates/overrides', $payload)->assertForbidden();
         $this->postJson('/admin/message-templates/preview', $payload)->assertForbidden();
         $this->assertDatabaseMissing('message_template_overrides', ['template_key' => 'email.order_paid']);
