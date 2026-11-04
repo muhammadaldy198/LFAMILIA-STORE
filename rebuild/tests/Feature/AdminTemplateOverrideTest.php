@@ -141,6 +141,10 @@ class AdminTemplateOverrideTest extends TestCase
     public function test_legacy_admin_store_name_token_is_editable_and_resolves_dynamically(): void
     {
         $this->admin();
+        DB::table('system_settings')->updateOrInsert(['key' => 'store.name'], [
+            'value' => json_encode('NAMA TOKO DINAMIS', JSON_THROW_ON_ERROR),
+            'version' => 1, 'created_at' => now('UTC'), 'updated_at' => now('UTC'),
+        ]);
         DB::table('system_settings')->updateOrInsert(['key' => 'store.message_templates'], [
             'value' => json_encode(['notifications' => [
                 'fulfillment.blocked' => [
@@ -169,7 +173,7 @@ class AdminTemplateOverrideTest extends TestCase
         ];
         $copy = app(AdminNotificationRenderer::class)->fromNotification($notification);
         $facts = implode(' ', array_column($copy['fields'], 'value'));
-        $this->assertStringContainsString('LFAMILIA', $facts);
+        $this->assertStringContainsString('NAMA TOKO DINAMIS', $facts);
         $this->assertStringContainsString('Detail insiden', $facts);
     }
 
