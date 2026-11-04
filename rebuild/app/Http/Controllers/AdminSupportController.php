@@ -234,7 +234,8 @@ class AdminSupportController
                 $emails->queue(
                     $email,
                     'Balasan tiket LFAMILIA #'.$id,
-                    'Tim LFAMILIA membalas tiket #'.$id.': '.$reply
+                    'Tim LFAMILIA membalas tiket #'.$id.': '.$reply,
+                    'ticket_reply'
                 );
             }
         }
