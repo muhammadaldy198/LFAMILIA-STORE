@@ -90,6 +90,14 @@ jobs:
       - name: Audit frontend dependencies
         run: npm audit --audit-level=high
 
+      # Temporary PR diagnostic. Remove after applying the generated Pint patch.
+      - name: Print exact Pint formatting patch
+        run: |
+          vendor/bin/pint app/Http/Controllers/AdminOrderDetailController.php app/Services/CheckoutInputValidator.php app/Services/CheckoutService.php app/Services/FulfillmentService.php
+          echo 'BEGIN_EXACT_PINT_DIFF'
+          git -C .. diff --unified=3 -- rebuild/app/Http/Controllers/AdminOrderDetailController.php rebuild/app/Services/CheckoutInputValidator.php rebuild/app/Services/CheckoutService.php rebuild/app/Services/FulfillmentService.php
+          echo 'END_EXACT_PINT_DIFF'
+
       - name: Validate local Git hooks
         env:
           LFAMILIA_ENABLE_HOOKS: '1'
