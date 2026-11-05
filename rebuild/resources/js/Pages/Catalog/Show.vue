@@ -170,15 +170,20 @@ const reviewSaving = ref(false);
 const reviewMessage = ref('');
 const reviewError = ref('');
 
+/** Show region warnings only for the currently entered account. */
 const regionWarning = computed(() => accountValidationSignature.value === accountInputSignature()
     && nicknameResult.value?.status === 'REGION_MISMATCH');
+/** Block checkout only when this product has an enforced region. */
 const regionMismatch = computed(() => Boolean(props.product.nickname_required_region) && regionWarning.value);
+/** Refresh proof before its expiry to avoid submitting an expired checkout token. */
 const regionProofStale = () => {
     if (!props.product.nickname_required_region) return false;
     const expiry = Date.parse(nicknameResult.value?.region_proof_expires_at || '');
     return !nicknameResult.value?.region_proof || !Number.isFinite(expiry) || expiry <= Date.now() + 15000;
 };
+/** Track ineligible package IDs returned by the current account check. */
 const disabledPackageIds = computed(() => new Set((nicknameResult.value?.disabled_package_ids || []).map(String)));
+/** Prevent selecting packages blocked by region or purchase eligibility. */
 const packageDisabled = (item) => regionMismatch.value || disabledPackageIds.value.has(String(item.id));
 const selectedPackage = computed(() => (props.packages || []).find((item) =>
     item.is_available !== false && !packageDisabled(item) && String(item.id) === String(selectedPackageId.value)
@@ -190,11 +195,13 @@ watch([regionMismatch, disabledPackageIds], () => {
         invalidateQuote();
     }
 });
+/** Display a readable country label when a region code is available. */
 const regionName = (code) => {
     if (!code) return 'Tidak diketahui';
     try { return new Intl.DisplayNames(['id'], { type: 'region' }).of(String(code).toUpperCase()) || code; }
     catch { return code; }
 };
+/** Find an alternative product matching the detected account region. */
 const alternativeProduct = computed(() => (props.regionAlternatives || []).find(
     (item) => String(item.nickname_required_region).toUpperCase() === String(nicknameResult.value?.region || '').toUpperCase()
 ));
