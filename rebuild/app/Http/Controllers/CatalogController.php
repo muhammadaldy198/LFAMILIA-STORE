@@ -304,7 +304,7 @@ class CatalogController
         return SeoMetadata::render('Catalog/Show', [
             'product' => [
                 ...$product->only('id', 'name', 'publisher', 'slug', 'description', 'nickname_check_enabled',
-                    'package_tabs_enabled', 'package_tabs'),
+                    'package_tabs_enabled', 'package_tabs', 'nickname_required_region'),
                 'category_name' => $product->category->name,
                 'category_slug' => $product->category->slug,
                 'image_url' => OptimizedMedia::url($product, 'image', 'detail'),
@@ -314,6 +314,14 @@ class CatalogController
                     ? 'Pesanan diproses admin setelah pembayaran.'
                     : 'Pesanan diproses otomatis setelah pembayaran.',
             ],
+            'regionAlternatives' => $product->nickname_required_region
+                ? Product::where('nickname_game_code', $product->nickname_game_code)
+                    ->where('id', '!=', $product->id)
+                    ->where('is_active', true)
+                    ->whereNotNull('nickname_required_region')
+                    ->whereHas('category', fn ($query) => $query->where('is_active', true))
+                    ->get(['slug', 'name', 'nickname_required_region'])->toArray()
+                : [],
             'packages' => $packages,
             'packageGroups' => $product->packageGroups->map(fn ($group): array => [
                 'name' => $group->name,

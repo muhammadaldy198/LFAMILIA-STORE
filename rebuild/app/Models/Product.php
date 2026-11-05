@@ -20,7 +20,7 @@ class Product extends Model implements HasMedia
         'initials', 'accent_color', 'instant', 'package_tabs_enabled', 'package_tabs',
         'customer_no_template', 'manual_instructions', 'manual_open_time', 'manual_close_time', 'manual_timezone', 'margin_percent', 'price_markup_type', 'price_markup_fixed_idr', 'sell_markup_percent', 'cost_uplift_percent', 'sort_order', 'is_active', 'popular',
         'nickname_check_enabled', 'nickname_game_code', 'nickname_user_field_key',
-        'nickname_server_field_key',
+        'nickname_server_field_key', 'nickname_required_region',
     ];
 
     protected function casts(): array

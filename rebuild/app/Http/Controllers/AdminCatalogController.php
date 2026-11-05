@@ -62,7 +62,7 @@ class AdminCatalogController
                 'customer_no_template', 'manual_instructions', 'manual_open_time', 'manual_close_time', 'manual_timezone', 'sort_order', 'is_active', 'popular',
                 'cost_uplift_percent',
                 'nickname_check_enabled', 'nickname_game_code', 'nickname_user_field_key',
-                'nickname_server_field_key'),
+                'nickname_server_field_key', 'nickname_required_region'),
             'image_url' => $product->getFirstMediaUrl('image'),
             'banner_url' => $product->getFirstMediaUrl('banner'),
             'buyable_nominal_count' => $buyableCount,
@@ -487,6 +487,7 @@ class AdminCatalogController
             'nickname_game_code' => ['nullable', 'string', 'max:80', 'regex:/^[a-z0-9][a-z0-9-]*$/'],
             'nickname_user_field_key' => ['nullable', 'string', 'max:80', 'regex:/^[a-z][a-z0-9_]*$/'],
             'nickname_server_field_key' => ['nullable', 'string', 'max:80', 'regex:/^[a-z][a-z0-9_]*$/'],
+            'nickname_required_region' => ['nullable', 'string', 'size:2', 'regex:/^[A-Z]{2}$/'],
         ]);
         $templateSubmitted = array_key_exists('customer_no_template', $data);
         $template = trim((string) ($templateSubmitted
@@ -596,6 +597,16 @@ class AdminCatalogController
             ]);
         }
 
+        $requiredRegion = trim((string) ($data['nickname_required_region'] ?? $product->nickname_required_region));
+        if ($requiredRegion !== '') {
+            $regionGame = NicknameGameCode::active()->nicknameSupported()
+                ->where('code', $data['nickname_game_code'] ?? $product->nickname_game_code)->first();
+            if (! ($data['nickname_check_enabled'] ?? $product->nickname_check_enabled) || ! $regionGame?->requires_region_check) {
+                throw ValidationException::withMessages([
+                    'nickname_required_region' => 'Pembatasan region hanya untuk game yang mendukung pemeriksaan region dan cek nickname aktif.',
+                ]);
+            }
+        }
         if (($data['nickname_check_enabled'] ?? false) === true) {
             $fieldKeys = $product->fields()->pluck('field_key')->all();
             if (empty($data['nickname_game_code']) || empty($data['nickname_user_field_key'])) {

@@ -7,6 +7,7 @@ use App\Services\CheckoutInputValidator;
 use App\Services\CheckoutService;
 use App\Services\NicknameService;
 use App\Services\PaymentRoutingService;
+use App\Services\RegionCheckProof;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -18,6 +19,7 @@ class CheckoutController
         Request $request,
         CheckoutInputValidator $validator,
         NicknameService $nickname,
+        RegionCheckProof $proof,
     ): JsonResponse {
         $data = $request->validate([
             'product_id' => ['required', 'integer'],
@@ -32,8 +34,10 @@ class CheckoutController
             ->firstOrFail();
         $input = $validator->validate($product, $data['customer_input']);
 
-        return response()->json($nickname->check($product, $input))
-            ->header('Cache-Control', 'no-store, private');
+        $result = $nickname->check($product, $input);
+        $result['region_proof'] = $proof->issue($product, $input, $result);
+
+        return response()->json($result)->header('Cache-Control', 'no-store, private');
     }
 
     public function quote(Request $request, CheckoutService $checkout, PaymentRoutingService $routing): JsonResponse
@@ -143,6 +147,7 @@ class CheckoutController
                 ? ['required', 'string', 'max:32', 'regex:/^(?=(?:[^0-9]*[0-9]){10})[0-9+().\-\s]{6,32}$/']
                 : ['prohibited'],
             'idempotency_key' => ['required', 'string', 'min:16', 'max:120', 'regex:/^[A-Za-z0-9:_-]+$/'],
+            'region_proof' => ['nullable', 'string', 'max:10000'],
             'total_idr' => ['prohibited'],
             'cost_idr' => ['prohibited'],
             'margin_idr' => ['prohibited'],

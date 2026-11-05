@@ -22,6 +22,7 @@ class CheckoutService
         private readonly MembershipService $membership,
         private readonly AdminNotificationService $notifications,
         private readonly TransactionalEmailService $emails,
+        private readonly RegionCheckProof $regionProof,
     ) {}
 
     /**
@@ -167,9 +168,9 @@ class CheckoutService
         $prePrice = $this->pricing->forPackage((int) $data['package_id']);
         $product = Product::with(['fields', 'category'])->findOrFail($prePrice['product_id']);
         $input = $this->inputValidator->validate($product, $data['customer_input']);
-        // Kokinpay is a UI-only helper. Never call (or charge) the
-        // external nickname service a second time while placing an order.
-        $nickname = [
+        // Verify the original signed H2H outcome; never call H2H again here.
+        $regionNickname = $this->regionProof->assertOrder($product, $input, $data['region_proof'] ?? null);
+        $nickname = $regionNickname ?? [
             'supported' => (bool) $product->nickname_check_enabled,
             'verified' => false,
             'nickname' => null,
@@ -188,6 +189,7 @@ class CheckoutService
                 $price = $this->pricing->forPackage((int) $data['package_id'], true);
                 $lockedProduct = Product::with(['fields', 'category'])->findOrFail($price['product_id']);
                 $lockedInput = $this->inputValidator->validate($lockedProduct, $input);
+                $this->regionProof->assertOrder($lockedProduct, $lockedInput, $data['region_proof'] ?? null);
                 $member = $user
                     ? $this->membership->discount($user, $price['subtotal_idr'])
                     : ['amount_idr' => 0, 'tier_code' => null, 'discount_bps' => 0, 'profile' => null];
