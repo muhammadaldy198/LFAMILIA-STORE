@@ -2,8 +2,8 @@
 
 namespace App\Services;
 
-use App\Models\Product;
 use App\Models\OrderSensitiveInput;
+use App\Models\Product;
 use App\Models\User;
 use App\Services\Fulfillment\DigiflazzDestinationTemplate;
 use Illuminate\Database\QueryException;

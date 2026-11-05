@@ -75,7 +75,7 @@ class CheckoutInputValidator
     /**
      * Strip credentials before H2H requests and public order persistence.
      *
-     * @param array<string, string> $input
+     * @param  array<string, string>  $input
      * @return array<string, string>
      */
     public function publicInput(Product $product, array $input): array
@@ -85,4 +85,3 @@ class CheckoutInputValidator
         return array_diff_key($input, array_flip($passwordKeys));
     }
 }
-
