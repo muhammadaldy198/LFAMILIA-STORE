@@ -7,6 +7,9 @@ use Throwable;
 
 class H2hNicknameClient
 {
+    /**
+     * Check whether an H2H credential and an allowed endpoint are configured.
+     */
     public function configured(): bool
     {
         return trim((string) config('lfamilia.h2h.api_key')) !== ''
@@ -60,6 +63,9 @@ class H2hNicknameClient
         }
     }
 
+    /**
+     * Allow remote HTTPS endpoints or loopback HTTP without URL credentials.
+     */
     private function allowedBaseUrl(string $url): bool
     {
         $parts = parse_url($url);
