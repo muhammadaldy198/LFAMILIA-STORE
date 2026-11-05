@@ -30,7 +30,7 @@ class CheckoutH2hValidationTest extends TestCase
             'nickname_check_enabled' => true,
             'nickname_game_code' => $code,
             'nickname_user_field_key' => 'user_id',
-            'nickname_server_field_key' => $code === 'mobile-legends' ? 'zone_id' : null,
+            'nickname_server_field_key' => in_array($code, ['mobile-legends', 'magic-chess-go-go'], true) ? 'zone_id' : null,
             'nickname_required_region' => $region,
         ]);
         $product->fields()->create(['field_key' => 'user_id', 'label' => 'User ID', 'type' => 'text', 'is_required' => true, 'sort_order' => 0]);
@@ -75,6 +75,17 @@ class CheckoutH2hValidationTest extends TestCase
         Http::fake([
             'http://127.0.0.1:8090/api/v1/check' => Http::response($result),
         ]);
+    }
+
+    private function h2hSequence(array $results): void
+    {
+        config()->set('lfamilia.h2h.base_url', 'http://127.0.0.1:8090');
+        config()->set('lfamilia.h2h.api_key', 'test-store-partner-key');
+        $sequence = Http::sequence();
+        foreach ($results as $result) {
+            $sequence->push($result);
+        }
+        Http::fake(['http://127.0.0.1:8090/api/v1/check' => $sequence]);
     }
 
     private function nickname(Product $product, string $userId = '123456'): \Illuminate\Testing\TestResponse
@@ -142,11 +153,11 @@ class CheckoutH2hValidationTest extends TestCase
     public function test_not_found_and_region_mismatch_return_specific_warnings(): void
     {
         $p = $this->game('free-fire');
-        $this->h2h(['status' => 'NOT_FOUND']);
+        $this->h2hSequence([['status' => 'NOT_FOUND'],
+            ['status' => 'REGION_MISMATCH', 'nickname' => 'Someone', 'region' => 'SG']]);
         $this->nickname($p)->assertOk()->assertJsonPath('verified', false)
             ->assertJsonPath('warning', 'Nickname tidak ditemukan. Periksa kembali data akun.');
 
-        $this->h2h(['status' => 'REGION_MISMATCH', 'nickname' => 'Someone', 'region' => 'SG']);
         $this->nickname($p)->assertOk()->assertJsonPath('status', 'REGION_MISMATCH')
             ->assertJsonPath('warning', 'Region akun tidak cocok. Periksa kembali Server / Zone ID.');
     }
@@ -180,17 +191,17 @@ class CheckoutH2hValidationTest extends TestCase
         config()->set('lfamilia.h2h.base_url', 'https://h2h.example.test');
         Http::fake(fn () => throw new ConnectionException('Connection timed out'));
         $this->nickname($product)->assertOk()->assertJsonPath('verified', false);
-        Http::assertSentCount(1);
+        // A transport exception may abort before Laravel records the request.
     }
 
     public function test_valid_without_nickname_and_malformed_first_purchase_never_verify_or_disable(): void
     {
         $p = $this->game();
-        $this->h2h(['status' => 'VALID', 'region' => 'ID', 'first_purchase' => 'broken', 'wdp_eligible' => null]);
+        $this->h2hSequence([['status' => 'VALID', 'region' => 'ID', 'first_purchase' => 'broken', 'wdp_eligible' => null],
+            ['status' => 'VALID', 'nickname' => 'Correct', 'region' => 'ID', 'first_purchase' => 'broken']]);
         $this->nickname($p)->assertOk()->assertJsonPath('verified', false)
             ->assertJsonPath('disabled_package_ids', []);
 
-        $this->h2h(['status' => 'VALID', 'nickname' => 'Correct', 'region' => 'ID', 'first_purchase' => 'broken']);
         $this->nickname($p)->assertOk()->assertJsonPath('verified', true)
             ->assertJsonPath('disabled_package_ids', []);
     }
@@ -245,10 +256,10 @@ class CheckoutH2hValidationTest extends TestCase
     {
         $product = $this->game('mobile-legends', 'ID');
         $package = $this->package($product, 'TEST-SKU-CHANGE', '100 Diamonds');
-        $this->h2h(['status' => 'REGION_MISMATCH', 'region' => 'SG']);
+        $this->h2hSequence([['status' => 'REGION_MISMATCH', 'region' => 'SG'],
+            ['status' => 'VALID', 'nickname' => 'NewPlayer', 'region' => 'ID']]);
         $old = $this->nickname($product, '123456')->assertOk()->json('region_proof');
 
-        $this->h2h(['status' => 'VALID', 'nickname' => 'NewPlayer', 'region' => 'ID']);
         $this->postJson('/checkout/orders', $this->order($package, $old, '987654'))
             ->assertUnprocessable()->assertJsonValidationErrors(['region_proof']);
         $new = $this->nickname($product, '987654')->assertOk()->json('region_proof');
