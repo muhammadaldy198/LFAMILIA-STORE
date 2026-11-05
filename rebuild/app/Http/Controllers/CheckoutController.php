@@ -36,6 +36,7 @@ class CheckoutController
 
         $result = $nickname->check($product, $input);
         $result['region_proof'] = $proof->issue($product, $input, $result);
+        $result['region_proof_expires_at'] = $result['region_proof'] ? now()->addMinutes(10)->toIso8601String() : null;
 
         return response()->json($result)->header('Cache-Control', 'no-store, private');
     }

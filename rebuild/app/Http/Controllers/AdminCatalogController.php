@@ -597,7 +597,8 @@ class AdminCatalogController
             ]);
         }
 
-        $requiredRegion = trim((string) ($data['nickname_required_region'] ?? $product->nickname_required_region));
+        $requiredRegion = trim((string) (array_key_exists('nickname_required_region', $data)
+            ? $data['nickname_required_region'] : $product->nickname_required_region));
         if ($requiredRegion !== '') {
             $regionGame = NicknameGameCode::active()->nicknameSupported()
                 ->where('code', $data['nickname_game_code'] ?? $product->nickname_game_code)->first();

@@ -95,6 +95,7 @@ const nicknameResult = ref(null);
 const nicknameChecking = ref(false);
 const accountValidationSignature = ref('');
 let accountValidationRequest = 0;
+let nicknameInFlight = null;
 let quoteRequest = 0;
 const checkoutResult = ref(null);
 const checkoutClockTick = ref(Date.now());
@@ -169,8 +170,14 @@ const reviewSaving = ref(false);
 const reviewMessage = ref('');
 const reviewError = ref('');
 
-const regionMismatch = computed(() => accountValidationSignature.value === accountInputSignature()
+const regionWarning = computed(() => accountValidationSignature.value === accountInputSignature()
     && nicknameResult.value?.status === 'REGION_MISMATCH');
+const regionMismatch = computed(() => Boolean(props.product.nickname_required_region) && regionWarning.value);
+const regionProofStale = () => {
+    if (!props.product.nickname_required_region) return false;
+    const expiry = Date.parse(nicknameResult.value?.region_proof_expires_at || '');
+    return !nicknameResult.value?.region_proof || !Number.isFinite(expiry) || expiry <= Date.now() + 15000;
+};
 const disabledPackageIds = computed(() => new Set((nicknameResult.value?.disabled_package_ids || []).map(String)));
 const packageDisabled = (item) => regionMismatch.value || disabledPackageIds.value.has(String(item.id));
 const selectedPackage = computed(() => (props.packages || []).find((item) =>
@@ -598,31 +605,38 @@ async function checkNickname() {
     }
 
     const signature = accountInputSignature();
+    if (nicknameInFlight?.signature === signature) return nicknameInFlight.promise;
+    if (nicknameAutoTimer) {
+        window.clearTimeout(nicknameAutoTimer);
+        nicknameAutoTimer = null;
+    }
     const requestId = ++accountValidationRequest;
     errors.value = withoutAccountErrors();
     nicknameResult.value = null;
     nicknameChecking.value = true;
 
-    try {
-        const result = await requestJson('/checkout/nickname', {
-            method: 'POST',
-            body: JSON.stringify({ product_id: props.product.id, customer_input: { ...customerInput } }),
-        });
-
-        if (requestId !== accountValidationRequest || signature !== accountInputSignature()) return false;
-
-        nicknameResult.value = result;
-        accountValidationSignature.value = signature;
-        return true;
-    } catch (_error) {
-        if (requestId !== accountValidationRequest || signature !== accountInputSignature()) return false;
-
-        accountValidationSignature.value = signature;
-        nicknameResult.value = { verified: false, warning: 'Nickname belum dapat diverifikasi. Pastikan ID tujuan benar.' };
-        return true;
-    } finally {
-        if (requestId === accountValidationRequest) nicknameChecking.value = false;
-    }
+    const promise = (async () => {
+        try {
+            const result = await requestJson('/checkout/nickname', {
+                method: 'POST',
+                body: JSON.stringify({ product_id: props.product.id, customer_input: { ...customerInput } }),
+            });
+            if (requestId !== accountValidationRequest || signature !== accountInputSignature()) return false;
+            nicknameResult.value = result;
+            accountValidationSignature.value = signature;
+            return true;
+        } catch (_error) {
+            if (requestId !== accountValidationRequest || signature !== accountInputSignature()) return false;
+            accountValidationSignature.value = signature;
+            nicknameResult.value = { verified: false, warning: 'Nickname belum dapat diverifikasi. Pastikan ID tujuan benar.' };
+            return true;
+        } finally {
+            if (requestId === accountValidationRequest) nicknameChecking.value = false;
+            if (nicknameInFlight?.requestId === requestId) nicknameInFlight = null;
+        }
+    })();
+    nicknameInFlight = { signature, requestId, promise };
+    return promise;
 }
 
 function choosePackage(item) {
@@ -725,7 +739,7 @@ async function applyVoucher(code) {
 
 async function prepareOrder() {
     if (busy.value || regionMismatch.value) return;
-    if (props.product.nickname_required_region && (!nicknameResult.value?.region_proof || accountValidationSignature.value !== accountInputSignature())) {
+    if (props.product.nickname_required_region && (regionProofStale() || accountValidationSignature.value !== accountInputSignature())) {
         await checkNickname();
         if (regionMismatch.value) return;
         if (!nicknameResult.value?.region_proof) {
@@ -767,6 +781,15 @@ async function prepareOrder() {
 
 async function createOrder() {
     if (!agreed.value || !confirmationSnapshot.value || busy.value || regionMismatch.value) return;
+
+    if (regionProofStale()) {
+        const checked = await checkNickname();
+        if (!checked || regionMismatch.value || !nicknameResult.value?.region_proof || !selectedPackage.value) {
+            closeConfirmation();
+            errors.value = { checkout: ['Pemeriksaan region berubah. Periksa kembali data akun sebelum memesan.'] };
+            return;
+        }
+    }
 
     errors.value = {};
     requiresEmailVerification.value = false;
@@ -811,6 +834,12 @@ async function createOrder() {
         checkoutClockTick.value = Date.now();
     } catch (error) {
         errors.value = error.validation || { checkout: [error.message || 'Pesanan gagal dibuat.'] };
+        if (error.validation?.region_proof) {
+            nicknameResult.value = null;
+            accountValidationSignature.value = '';
+            closeConfirmation();
+            void checkNickname();
+        }
         requiresEmailVerification.value = error.requiresEmailVerification === true;
         busy.value = '';
         return;
@@ -915,6 +944,7 @@ watch([guestEmail, guestPhone], () => {
 let nicknameAutoTimer;
 watch(() => props.fields.map((field) => String(customerInput[field.field_key] || '')), () => {
     accountValidationRequest += 1;
+    nicknameInFlight = null;
     accountValidationSignature.value = '';
     nicknameResult.value = null;
     selectedSavedId.value = '';
@@ -952,9 +982,10 @@ function closeReview() { summaryOpen.value = false; closeConfirmation(); }
         <div class="lfx-sections">
           <template v-if="activeTab==='transaction'">
             <section v-if="hasAccountStep" id="lfx-account" class="lfx-panel"><header class="lfx-panel-header"><span class="lfx-number">1</span><div><h2>{{customerText("checkout.account_title", "Data Akun")}}</h2></div></header><div class="lfx-panel-content"><label v-if="savedAccountItems.length" class="lfx-field lfx-saved-account"><span>Akun tersimpan</span><select v-model="selectedSavedId" @change="chooseSavedAccount(selectedSavedId)"><option value="">Isi manual</option><option v-for="saved in savedAccountItems" :key="saved.id" :value="String(saved.id)">{{saved.label}}{{saved.nickname?' · '+saved.nickname:''}}</option></select></label><div class="lfx-field-grid" :class="{single:fields.length===1}"><label v-for="field in fields" :key="field.field_key" class="lfx-field"><span>{{field.label}} <b v-if="field.is_required">*</b><i title="Pastikan data akun benar">ⓘ</i></span><input v-model="customerInput[field.field_key]" :placeholder="field.placeholder||'Masukkan '+field.label" :type="['email','tel'].includes(field.type)?field.type:'text'" :inputmode="field.type==='number'?'numeric':undefined" :required="field.is_required" maxlength="255" autocomplete="off"/></label></div><p v-for="field in fields.filter(x=>fieldError(x.field_key))" :key="field.field_key" class="lfx-error">{{fieldError(field.field_key)}}</p><div v-if="nicknameChecking" class="lfx-hint">Memeriksa akun…</div>
-<div v-else-if="regionMismatch" class="lfx-region-banner lfx-region-mismatch" role="alert">
+<div v-else-if="regionWarning" class="lfx-region-banner lfx-region-mismatch" role="alert">
   <strong>{{nicknameResult?.nickname || 'Akun'}} · {{regionName(nicknameResult?.region)}}</strong>
-  <span>Region tidak cocok. Produk ini khusus akun {{regionName(product.nickname_required_region)}}.</span>
+  <span v-if="product.nickname_required_region">Region tidak cocok. Produk ini khusus akun {{regionName(product.nickname_required_region)}}.</span>
+  <span v-else>Region akun belum cocok. Periksa kembali Server / Zone ID.</span>
   <Link v-if="alternativeProduct" :href="'/catalog/'+alternativeProduct.slug">Lihat produk {{alternativeProduct.name}}</Link>
 </div>
 <div v-else-if="nicknameResult?.verified && nicknameResult?.region" class="lfx-region-banner lfx-region-valid" role="status">
