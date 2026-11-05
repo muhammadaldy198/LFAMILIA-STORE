@@ -329,7 +329,7 @@ class CatalogController
                 'sort_order' => $group->sort_order,
             ])->all(),
             'fields' => ProductInputField::where('product_id', $product->id)->orderBy('sort_order')
-                ->get(['field_key', 'label', 'placeholder', 'type', 'is_required']),
+                ->get(['field_key', 'label', 'placeholder', 'type', 'options', 'is_required']),
             'customer' => $user ? [
                 'name' => $user->name,
                 'email' => $user->email,

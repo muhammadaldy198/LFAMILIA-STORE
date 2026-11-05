@@ -453,3 +453,12 @@
   grid-column: 1 / -1;
   white-space: nowrap;
 }
+
+/* Product data: select values are fixed server-side, and password visibility remains local. */
+.lfx .lfx-field>select{width:100%;min-width:0;height:44px;min-height:44px;padding:0 12px;border:1px solid #8fa4c02c;border-radius:9px;background:var(--lf-color-background-alt);color:var(--lf-color-text);font-size:16px;outline:0}
+.lfx .lfx-field>select:focus{border-color:#719aff;box-shadow:0 0 0 3px #507bef23}
+.lfx .lfx-field>select option{background:#111a2a;color:#edf3ff}
+.lfx .lfx-password-field{display:flex;position:relative;align-items:center;width:100%;min-width:0}
+.lfx .lfx-password-field input{min-height:44px;height:44px;padding-right:102px;font-size:16px}
+.lfx .lfx-password-field button{position:absolute;right:4px;top:0;height:44px;min-width:88px;border:0;border-radius:7px;background:transparent;color:#c8d9ff;font-size:12px;font-weight:700;padding:0 9px}
+.lfx .lfx-password-field button:focus-visible{outline:2px solid #719aff;outline-offset:-2px}

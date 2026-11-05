@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Jobs\ReconcileFulfillmentJob;
+use App\Models\OrderSensitiveInput;
 use App\Services\AdminAuditService;
 use App\Services\AdminOrderPresentation;
 use App\Services\FulfillmentService;
@@ -147,6 +148,10 @@ class AdminFulfillmentController
                 && $attempt->order_status === 'BLOCKED' && $attempt->order_paid_at !== null
                 && data_get($snapshot, 'product.fulfillment_mode') === 'AUTO_PROVIDER';
             $resolutionDestination = null;
+            // Decrypted login credentials may only appear on the authorized order detail page.
+            if ($canResolveQuarantine && OrderSensitiveInput::where('order_id', $attempt->order_id)->exists()) {
+                $canResolveQuarantine = false;
+            }
             if ($canResolveQuarantine) {
                 try {
                     $order = DB::table('orders')->where('id', $attempt->order_id)->firstOrFail();

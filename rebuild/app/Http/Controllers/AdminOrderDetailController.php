@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\AdminChoiceSettings;
+use App\Models\OrderSensitiveInput;
 use App\Services\AdminOrderPresentation;
 use App\Services\AdminPermissionService;
 use App\Services\FulfillmentService;
@@ -52,6 +53,16 @@ class AdminOrderDetailController
                 && ! DB::table('fulfillment_attempts')->where('order_id', $id)
                     ->whereIn('status', ['CREATED', 'QUEUED', 'SENDING', 'PENDING', 'UNKNOWN', 'SUCCESS'])->exists()]);
         $order = $presentation->row($row);
+        if ($canFulfill) {
+            $labels = DB::table('product_input_fields')->where('product_id', $row->product_id)
+                ->pluck('label', 'field_key')->all();
+            foreach (OrderSensitiveInput::where('order_id', $id)->get() as $secret) {
+                $order['destinations'][] = [
+                    'label' => $labels[$secret->field_key] ?? 'Kredensial via-login',
+                    'value' => $secret->value,
+                ];
+            }
+        }
         $deliveryCode = trim((string) ($order['delivery']['code'] ?? $order['delivery']['serial_number'] ?? ''));
         $deliveryNote = trim((string) ($order['delivery']['note'] ?? ''));
         $canResendDelivery = $canFulfill

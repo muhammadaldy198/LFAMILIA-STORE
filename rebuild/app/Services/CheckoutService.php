@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Product;
+use App\Models\OrderSensitiveInput;
 use App\Models\User;
 use App\Services\Fulfillment\DigiflazzDestinationTemplate;
 use Illuminate\Database\QueryException;
@@ -169,7 +170,7 @@ class CheckoutService
         $product = Product::with(['fields', 'category'])->findOrFail($prePrice['product_id']);
         $input = $this->inputValidator->validate($product, $data['customer_input']);
         // Verify the original signed H2H outcome; never call H2H again here.
-        $regionNickname = $this->regionProof->assertOrder($product, $input, $data['region_proof'] ?? null);
+        $regionNickname = $this->regionProof->assertOrder($product, $this->inputValidator->publicInput($product, $input), $data['region_proof'] ?? null);
         $nickname = $regionNickname ?? [
             'supported' => (bool) $product->nickname_check_enabled,
             'verified' => false,
@@ -189,7 +190,9 @@ class CheckoutService
                 $price = $this->pricing->forPackage((int) $data['package_id'], true);
                 $lockedProduct = Product::with(['fields', 'category'])->findOrFail($price['product_id']);
                 $lockedInput = $this->inputValidator->validate($lockedProduct, $input);
-                $this->regionProof->assertOrder($lockedProduct, $lockedInput, $data['region_proof'] ?? null);
+                $publicInput = $this->inputValidator->publicInput($lockedProduct, $lockedInput);
+                $sensitiveInput = array_diff_key($lockedInput, $publicInput);
+                $this->regionProof->assertOrder($lockedProduct, $publicInput, $data['region_proof'] ?? null);
                 $member = $user
                     ? $this->membership->discount($user, $price['subtotal_idr'])
                     : ['amount_idr' => 0, 'tier_code' => null, 'discount_bps' => 0, 'profile' => null];
@@ -292,7 +295,7 @@ class CheckoutService
                         'discount_idr' => (int) $member['amount_idr'],
                     ] : null,
                     'voucher' => $voucher['snapshot'],
-                    'customer_input' => $lockedInput,
+                    'customer_input' => $publicInput,
                     'nickname' => $nickname,
                 ];
 
@@ -310,7 +313,7 @@ class CheckoutService
                     'payment_route_id' => $paymentRoute['route_id'],
                     'status' => 'PENDING_PAYMENT',
                     'currency' => 'IDR',
-                    'customer_input' => json_encode($lockedInput, JSON_THROW_ON_ERROR),
+                    'customer_input' => json_encode($publicInput, JSON_THROW_ON_ERROR),
                     'snapshot' => json_encode($snapshot, JSON_THROW_ON_ERROR),
                     'cost_idr' => $price['cost_idr'],
                     'margin_idr' => $price['margin_idr'],
@@ -322,6 +325,14 @@ class CheckoutService
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
+
+                foreach ($sensitiveInput as $key => $secret) {
+                    OrderSensitiveInput::create([
+                        'order_id' => $orderId,
+                        'field_key' => $key,
+                        'value' => $secret,
+                    ]);
+                }
 
                 if ($voucher['voucher_id']) {
                     DB::table('voucher_redemptions')->insert([

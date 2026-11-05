@@ -490,6 +490,7 @@ const loadFields = () => {
     fieldRows.value = (product.value?.fields || []).map(row => ({
         field_key: row.field_key, label: row.label, placeholder: row.placeholder || '',
         type: row.type || 'text', is_required: Boolean(row.is_required),
+        optionsText: (row.options || []).map(option => option.value === option.label ? option.value : `${option.value}|${option.label}`).join('\n'),
     }));
     destinationFormat.value = product.value?.customer_no_template || '';
 };
@@ -500,13 +501,15 @@ const FIELD_KEYS = [
     { value: 'destination', label: 'destination — tujuan umum' },
     { value: 'email', label: 'email — alamat email' },
     { value: 'phone', label: 'phone — nomor telepon' },
+    { value: 'server', label: 'server — pilihan server' },
+    { value: 'password', label: 'password — kata sandi via-login' },
 ];
 
 const addField = () => {
     const used = new Set(fieldRows.value.map(row => row.field_key));
     const next = FIELD_KEYS.find(option => !used.has(option.value));
     if (!next) return;
-    fieldRows.value.push({ field_key: next.value, label: '', placeholder: '', type: 'text', is_required: true });
+    fieldRows.value.push({ field_key: next.value, label: '', placeholder: '', type: 'text', is_required: true, optionsText: '' });
 };
 
 const moveField = (index, direction) => {
@@ -546,7 +549,14 @@ const showTemplateEditor = computed(() => fieldRows.value.length > 1
         || !fieldRows.value.some(row => row.field_key === 'zone_id')));
 
 // Contoh nilai per kode kolom, dipakai bila admin belum mengisi contoh isian.
-const SAMPLES = { user_id: '12345678', zone_id: '1234', destination: '12345678', email: 'nama@email.com', phone: '08123456789' };
+const SAMPLES = { user_id: '12345678', zone_id: '1234', destination: '12345678', email: 'nama@email.com', phone: '08123456789', server: 'os_asia' };
+const parseFieldOptions = (text) => String(text || '').split(/\r?\n/)
+    .map(line => line.trim()).filter(Boolean).map(line => {
+        const separator = line.indexOf('|');
+        const value = (separator < 0 ? line : line.slice(0, separator)).trim();
+        const label = (separator < 0 ? line : line.slice(separator + 1)).trim();
+        return { value, label };
+    });
 
 // Pratinjau memakai contoh angka lebih dulu supaya bentuk hasilnya kelihatan,
 // bukan kalimat perintah yang kebetulan diisi di kolom "Contoh isian".
@@ -554,7 +564,8 @@ const preview = computed(() => {
     let text = template.value;
     fieldRows.value.forEach(row => {
         const filled = String(row.placeholder || '').trim();
-        const sample = SAMPLES[row.field_key];
+        const sample = row.type === 'password' ? '••••••' : row.type === 'select'
+            ? parseFieldOptions(row.optionsText)[0]?.value : SAMPLES[row.field_key];
         text = text.replaceAll(`{{${row.field_key}}}`, sample || filled || row.field_key);
     });
     return text;
@@ -566,7 +577,10 @@ const saveFields = () => {
     fieldErrors.value = {};
     fieldSaved.value = false;
     router.put(`/admin/catalog/products/${product.value.id}/fields`, {
-        fields: fieldRows.value.map((row, index) => ({ ...row, is_required: Boolean(row.is_required), sort_order: index })),
+        fields: fieldRows.value.map(({ optionsText, ...row }, index) => ({
+            ...row, options: row.type === 'select' ? parseFieldOptions(optionsText) : null,
+            is_required: Boolean(row.is_required), sort_order: index,
+        })),
         customer_no_template: template.value || null,
     }, {
         preserveScroll: true,
@@ -1247,7 +1261,14 @@ onMounted(() => {
                                         <option value="text">Teks / ID</option>
                                         <option value="tel">Nomor telepon</option>
                                         <option value="email">Email</option>
+                                        <option value="select">Pilihan (dropdown)</option>
+                                        <option value="password">Password via-login</option>
                                     </select>
+                                    <template v-if="row.type === 'select'">
+                                        <textarea v-model="row.optionsText" class="adm-input" rows="4" style="min-width:220px;margin-top:8px" placeholder="os_asia|Asia&#10;os_usa|America" :aria-label="'Opsi pilihan untuk '+row.label" />
+                                        <small class="adm-note">Satu opsi per baris: nilai atau nilai|Label.</small>
+                                        <small v-if="fieldErrors['fields.'+index+'.options']" class="err">{{ fieldErrors['fields.'+index+'.options'] }}</small>
+                                    </template>
                                 </td>
                                 <td><input v-model="row.is_required" type="checkbox"></td>
                                 <td><button type="button" class="adm-btn sm danger" @click="fieldRows.splice(index, 1)">Hapus</button></td>

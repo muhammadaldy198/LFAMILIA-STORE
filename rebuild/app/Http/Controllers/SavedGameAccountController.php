@@ -28,7 +28,7 @@ class SavedGameAccountController
             ->where('is_active', true)
             ->whereHas('category', fn ($query) => $query->where('slug', 'game'))
             ->firstOrFail();
-        $input = $validator->validate($product, $data['customer_input']);
+        $input = $validator->validate($product, $data['customer_input'], true);
         $checked = $product->nickname_check_enabled ? $nickname->check($product, $input) : null;
 
         $saved = SavedGameAccount::create([
@@ -67,7 +67,7 @@ class SavedGameAccountController
             ->where('is_active', true)
             ->whereHas('category', fn ($query) => $query->where('slug', 'game'))
             ->firstOrFail();
-        $input = $validator->validate($product, $data['customer_input']);
+        $input = $validator->validate($product, $data['customer_input'], true);
         $checked = $product->nickname_check_enabled ? $nickname->check($product, $input) : null;
 
         $savedGameAccount->forceFill([

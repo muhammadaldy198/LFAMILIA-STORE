@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Jobs\SendFulfillmentJob;
 use App\Services\Fulfillment\DigiflazzClient;
 use App\Services\Fulfillment\DigiflazzDestinationTemplate;
+use App\Models\OrderSensitiveInput;
+use Illuminate\Support\Facades\Crypt;
 use App\Services\Fulfillment\FulfillmentTargetBuilder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -182,9 +184,13 @@ class FulfillmentService
                     ];
                 }
 
+                $storedRequest = json_encode($request, JSON_THROW_ON_ERROR);
+                if (OrderSensitiveInput::where('order_id', $order->id)->exists()) {
+                    $storedRequest = json_encode(['encrypted' => Crypt::encryptString($storedRequest)], JSON_THROW_ON_ERROR);
+                }
                 DB::table('fulfillment_attempts')->where('id', $attempt->id)->update([
                     'status' => 'SENDING',
-                    'request_payload' => json_encode($request, JSON_THROW_ON_ERROR),
+                    'request_payload' => $storedRequest,
                     'last_error' => null,
                     'last_checked_at' => now(),
                     'updated_at' => now(),
@@ -432,12 +438,28 @@ class FulfillmentService
             $providerRc = isset($response['rc']) && is_scalar($response['rc'])
                 ? substr((string) $response['rc'], 0, 40) : null;
 
+            // Providers can echo customer_no (including via-login credentials)
+            // in any free-text field; redact those echoes before persistence.
+            $secrets = OrderSensitiveInput::where('order_id', $order->id)->get()
+                ->pluck('value')->filter(fn ($value) => is_string($value) && $value !== '')->all();
+            $safeResponse = $this->sanitizeProviderResponse($response);
+            if ($secrets !== []) {
+                unset($safeResponse['customer_no'], $safeResponse['message']);
+                foreach ($safeResponse as $key => $value) {
+                    if (is_string($value)) {
+                        $safeResponse[$key] = str_replace($secrets, '[REDACTED]', $value);
+                    }
+                }
+                $serial = $serial === null ? null : str_replace($secrets, '[REDACTED]', $serial);
+                $providerRc = $providerRc === null ? null : str_replace($secrets, '[REDACTED]', $providerRc);
+            }
+
             $common = [
                 'provider_status' => substr((string) $response['status'], 0, 40),
                 'provider_rc' => $providerRc,
                 'serial_number' => $serial !== '' ? $serial : null,
                 'price_idr' => $price,
-                'response_payload' => json_encode($this->sanitizeProviderResponse($response), JSON_THROW_ON_ERROR),
+                'response_payload' => json_encode($safeResponse, JSON_THROW_ON_ERROR),
                 'last_checked_at' => now(),
                 'updated_at' => now(),
             ];
@@ -691,6 +713,9 @@ class FulfillmentService
         // Prefer the frozen template's fields when optional input is empty.
         preg_match_all('/\{\{([a-z][a-z0-9_]*)\}\}/', $snapshotTemplate, $matches);
         $input = $this->json($order->customer_input);
+        foreach (OrderSensitiveInput::where('order_id', $order->id)->get() as $secret) {
+            $input[$secret->field_key] = $secret->value;
+        }
         $keys = $matches[1] ?: array_keys($input);
         $config['customer_no_template'] = app(DigiflazzDestinationTemplate::class)->resolve(
             (string) data_get($snapshot, 'product.slug', $product?->slug ?? ''),
@@ -1357,6 +1382,9 @@ class FulfillmentService
         }
 
         $decoded = json_decode($value, true);
+        if (is_array($decoded) && isset($decoded['encrypted']) && is_string($decoded['encrypted'])) {
+            $decoded = json_decode(Crypt::decryptString($decoded['encrypted']), true);
+        }
 
         return is_array($decoded) ? $decoded : [];
     }

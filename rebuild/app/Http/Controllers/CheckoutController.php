@@ -32,7 +32,7 @@ class CheckoutController
             ->where('is_active', true)
             ->whereHas('category', fn ($query) => $query->where('is_active', true))
             ->firstOrFail();
-        $input = $validator->validate($product, $data['customer_input']);
+        $input = $validator->validate($product, $data['customer_input'], true);
 
         $result = $nickname->check($product, $input);
         $result['region_proof'] = $proof->issue($product, $input, $result);

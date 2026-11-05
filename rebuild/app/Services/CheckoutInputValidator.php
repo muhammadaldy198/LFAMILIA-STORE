@@ -11,7 +11,7 @@ class CheckoutInputValidator
      * @param  array<string, mixed>  $input
      * @return array<string, string>
      */
-    public function validate(Product $product, array $input): array
+    public function validate(Product $product, array $input, bool $ignorePassword = false): array
     {
         $fields = $product->fields()->orderBy('sort_order')->get();
         $allowed = $fields->pluck('field_key')->all();
@@ -26,6 +26,9 @@ class CheckoutInputValidator
 
         $normalized = [];
         foreach ($fields as $field) {
+            if ($field->type === 'password' && $ignorePassword) {
+                continue;
+            }
             $raw = $input[$field->field_key] ?? null;
             if ($raw !== null && ! is_string($raw)) {
                 throw ValidationException::withMessages([
@@ -47,6 +50,11 @@ class CheckoutInputValidator
                     'customer_input.'.$field->field_key => $field->label.' terlalu panjang.',
                 ]);
             }
+            if ($field->type === 'select' && ! in_array($value, collect($field->options ?? [])->pluck('value')->all(), true)) {
+                throw ValidationException::withMessages([
+                    'customer_input.'.$field->field_key => $field->label.' harus dipilih dari opsi yang tersedia.',
+                ]);
+            }
             if ($field->type === 'email' && ! filter_var($value, FILTER_VALIDATE_EMAIL)) {
                 throw ValidationException::withMessages([
                     'customer_input.'.$field->field_key => $field->label.' harus berupa email valid.',
@@ -63,4 +71,18 @@ class CheckoutInputValidator
 
         return $normalized;
     }
+
+    /**
+     * Strip credentials before H2H requests and public order persistence.
+     *
+     * @param array<string, string> $input
+     * @return array<string, string>
+     */
+    public function publicInput(Product $product, array $input): array
+    {
+        $passwordKeys = $product->fields()->where('type', 'password')->pluck('field_key')->all();
+
+        return array_diff_key($input, array_flip($passwordKeys));
+    }
 }
+

@@ -116,7 +116,11 @@ async function remove(account) {
             <label class="text-xs">{{ customerText("pages.customer.gameaccounts.9087cd09", "Nama akun") }}<input v-model="label" maxlength="100" :placeholder="customerText('pages.customer.gameaccounts.attribute.placeholder.e8d07a66', 'Contoh: Mobile Legends Utama')" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/[0.03] p-3"></label>
             <label v-for="field in fields" :key="field.field_key" class="text-xs">
                 {{field.label}}
-                <input v-model="values[field.field_key]" :type="field.type || 'text'" :required="field.is_required" :placeholder="field.placeholder || ''" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/[0.03] p-3">
+                <select v-if="field.type === 'select'" v-model="values[field.field_key]" :required="field.is_required" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/[0.03] p-3">
+                    <option value="" disabled>{{field.placeholder || 'Pilih '+field.label}}</option>
+                    <option v-for="option in field.options || []" :key="option.value" :value="option.value">{{option.label}}</option>
+                </select>
+                <input v-else v-model="values[field.field_key]" :type="field.type || 'text'" :required="field.is_required" :placeholder="field.placeholder || ''" class="mt-1 block w-full rounded-lg border border-white/10 bg-white/[0.03] p-3">
             </label>
         </div>
         <button type="button" class="lf-primary mt-4" :disabled="busy" @click="save">{{busy?'Menyimpan...':editingId?'Simpan perubahan':'Tambah akun'}}</button>
