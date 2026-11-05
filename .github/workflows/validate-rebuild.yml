@@ -106,7 +106,12 @@ jobs:
         run: find app bootstrap config public routes tests -name '*.php' -print0 | xargs -0 -n1 php -l
 
       - name: Check PHP style
-        run: vendor/bin/pint --test
+        run: |
+          vendor/bin/pint app/Services/H2hNicknameClient.php app/Services/NicknameService.php app/Services/RegionCheckProof.php tests/Feature/CheckoutH2hValidationTest.php
+          echo '--- START H2H PINT DIFF ---'
+          git diff -- app/Services/H2hNicknameClient.php app/Services/NicknameService.php app/Services/RegionCheckProof.php tests/Feature/CheckoutH2hValidationTest.php
+          echo '--- END H2H PINT DIFF ---'
+          vendor/bin/pint --test
 
       - name: Validate cached configuration
         run: |
