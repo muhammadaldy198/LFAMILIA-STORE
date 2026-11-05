@@ -17,6 +17,9 @@ class CheckoutH2hValidationTest extends TestCase
 {
     use DatabaseTransactions;
 
+    /**
+     * Create a nickname-enabled game product with optional region enforcement.
+     */
     private function game(string $code = 'mobile-legends', ?string $region = null): Product
     {
         NicknameGameCode::where('code', $code)->update(['is_active' => true, 'supports_nickname_check' => true]);
@@ -39,6 +42,9 @@ class CheckoutH2hValidationTest extends TestCase
         return $product;
     }
 
+    /**
+     * Create a purchasable package and its Digiflazz provider mapping.
+     */
     private function package(Product $product, string $sku, string $name, bool $activeMapping = true): ProductPackage
     {
         $package = $product->packages()->create([
@@ -68,6 +74,9 @@ class CheckoutH2hValidationTest extends TestCase
         return $package;
     }
 
+    /**
+     * Configure one fake H2H response for the nickname endpoint.
+     */
     private function h2h(array $result): void
     {
         config()->set('lfamilia.h2h.base_url', 'http://127.0.0.1:8090');
@@ -77,6 +86,9 @@ class CheckoutH2hValidationTest extends TestCase
         ]);
     }
 
+    /**
+     * Queue fake H2H responses for successive nickname requests.
+     */
     private function h2hSequence(array $results): void
     {
         config()->set('lfamilia.h2h.base_url', 'http://127.0.0.1:8090');
@@ -88,6 +100,9 @@ class CheckoutH2hValidationTest extends TestCase
         Http::fake(['http://127.0.0.1:8090/api/v1/check' => $sequence]);
     }
 
+    /**
+     * Send a nickname-check request for the product and account input.
+     */
     private function nickname(Product $product, string $userId = '123456'): TestResponse
     {
         return $this->postJson('/checkout/nickname', [
@@ -96,6 +111,9 @@ class CheckoutH2hValidationTest extends TestCase
         ]);
     }
 
+    /**
+     * Build a checkout payload carrying the given encrypted region proof.
+     */
     private function order(ProductPackage $package, ?string $proof, string $userId = '123456'): array
     {
         DB::table('payment_gateways')->where('code', 'MANUAL_QRIS')->update(['is_active' => true]);
@@ -112,6 +130,9 @@ class CheckoutH2hValidationTest extends TestCase
         ];
     }
 
+    /**
+     * Valid responses disable only packages with eligible-to-block active mappings.
+     */
     public function test_valid_returns_nickname_region_and_only_ineligible_active_mapping_packages(): void
     {
         $product = $this->game();
@@ -139,6 +160,9 @@ class CheckoutH2hValidationTest extends TestCase
         Http::assertNotSent(fn ($request): bool => str_contains(strtolower($request->url()), 'kokinpay'));
     }
 
+    /**
+     * Magic Chess first-purchase restrictions map to its own provider SKUs.
+     */
     public function test_magic_chess_first_recharge_mapping(): void
     {
         $product = $this->game('magic-chess-go-go');
@@ -150,6 +174,9 @@ class CheckoutH2hValidationTest extends TestCase
         $this->assertSame([$package->id], $r->json('disabled_package_ids'));
     }
 
+    /**
+     * Missing accounts and mismatched regions produce distinct advisory responses.
+     */
     public function test_not_found_and_region_mismatch_return_specific_warnings(): void
     {
         $p = $this->game('free-fire');
@@ -162,6 +189,9 @@ class CheckoutH2hValidationTest extends TestCase
             ->assertJsonPath('warning', 'Region akun tidak cocok. Periksa kembali Server / Zone ID.');
     }
 
+    /**
+     * Missing H2H configuration does not block customers or issue network requests.
+     */
     public function test_missing_configuration_fails_open_without_any_request(): void
     {
         config()->set('lfamilia.h2h.base_url', null);
@@ -172,6 +202,9 @@ class CheckoutH2hValidationTest extends TestCase
         Http::assertNothingSent();
     }
 
+    /**
+     * Non-loopback HTTP endpoints are rejected before a network request is made.
+     */
     public function test_http_remote_destination_is_rejected_before_request(): void
     {
         config()->set('lfamilia.h2h.base_url', 'http://remote.example.test');
@@ -181,6 +214,9 @@ class CheckoutH2hValidationTest extends TestCase
         Http::assertNothingSent();
     }
 
+    /**
+     * H2H route failures and timeouts remain advisory rather than blocking checkout.
+     */
     public function test_route_error_and_timeout_remain_advisory(): void
     {
         $product = $this->game('free-fire');
@@ -194,6 +230,9 @@ class CheckoutH2hValidationTest extends TestCase
         // A transport exception may abort before Laravel records the request.
     }
 
+    /**
+     * Incomplete provider data cannot verify a nickname or disable packages.
+     */
     public function test_valid_without_nickname_and_malformed_first_purchase_never_verify_or_disable(): void
     {
         $p = $this->game();
@@ -206,6 +245,9 @@ class CheckoutH2hValidationTest extends TestCase
             ->assertJsonPath('disabled_package_ids', []);
     }
 
+    /**
+     * A confirmed region mismatch cannot be bypassed with a forged checkout proof.
+     */
     public function test_confirmed_mismatch_blocks_real_order_even_with_forged_region(): void
     {
         $product = $this->game('mobile-legends', 'ID');
@@ -227,6 +269,9 @@ class CheckoutH2hValidationTest extends TestCase
         Http::assertSentCount(1);
     }
 
+    /**
+     * A matching encrypted proof permits checkout without another H2H request.
+     */
     public function test_matching_region_proof_allows_order_without_h2h_recheck(): void
     {
         $product = $this->game('mobile-legends', 'ID');
@@ -240,6 +285,9 @@ class CheckoutH2hValidationTest extends TestCase
         Http::assertSentCount(1);
     }
 
+    /**
+     * Unknown region status preserves fail-open behavior with a valid proof.
+     */
     public function test_unknown_region_allows_order_with_advisory_proof(): void
     {
         $product = $this->game('mobile-legends', 'ID');
@@ -252,6 +300,9 @@ class CheckoutH2hValidationTest extends TestCase
         Http::assertSentCount(1);
     }
 
+    /**
+     * Changing account input invalidates its earlier proof until rechecked.
+     */
     public function test_changing_user_id_invalidates_proof_and_new_matching_check_allows_order(): void
     {
         $product = $this->game('mobile-legends', 'ID');
@@ -266,6 +317,9 @@ class CheckoutH2hValidationTest extends TestCase
         $this->postJson('/checkout/orders', $this->order($package, $new, '987654'))->assertCreated();
     }
 
+    /**
+     * The additional game codes are seeded as active nickname-check options.
+     */
     public function test_three_new_game_codes_are_available_to_admin_dropdown(): void
     {
         foreach (['blood-strike', 'blood-strike-max', 'delta-force-garena'] as $code) {
