@@ -8,6 +8,9 @@ use App\Models\ProductPackage;
 
 class NicknameService
 {
+    /**
+     * Inject the H2H client used for advisory nickname lookups.
+     */
     public function __construct(private readonly H2hNicknameClient $h2h) {}
 
     /**
@@ -44,6 +47,9 @@ class NicknameService
         return $this->checkViaH2h($product, $gameCode, $userId, $server);
     }
 
+    /**
+     * Convert the provider verdict into nickname, region, and package availability information.
+     */
     private function checkViaH2h(Product $product, string $gameCode, string $userId, string $server): array
     {
         $result = $this->h2h->check($gameCode, $userId, $server !== '' ? $server : null);
@@ -90,6 +96,9 @@ class NicknameService
         ];
     }
 
+    /**
+     * Find ineligible first-purchase and weekly-pass packages for the selected game.
+     */
     private function disabledPackages(Product $product, string $gameCode, mixed $firstPurchase, mixed $wdpEligible): array
     {
         $skuMap = match ($gameCode) {
@@ -127,11 +136,17 @@ class NicknameService
         return array_values(array_unique(array_map('intval', $ids)));
     }
 
+    /**
+     * Accept only a nonempty string from a potentially untrusted provider field.
+     */
     private function stringValue(mixed $value): ?string
     {
         return is_string($value) && trim($value) !== '' ? trim($value) : null;
     }
 
+    /**
+     * Return the standard result when a product cannot perform nickname checking.
+     */
     private function unsupported(): array
     {
         return [
@@ -141,6 +156,9 @@ class NicknameService
         ];
     }
 
+    /**
+     * Return an unverified, non-blocking result with an actionable warning.
+     */
     private function warning(string $message, ?string $status = null): array
     {
         return [
