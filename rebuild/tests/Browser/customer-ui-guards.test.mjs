@@ -157,7 +157,7 @@ test('paid or uncertain failed orders cannot be encouraged to pay again', () => 
 
 test('modal summary payment button is disabled during busy checkout', () => {
     const checkout = read('Pages/Catalog/Show.vue');
-    assert.match(checkout, /v-else type="button" :disabled="Boolean\(busy\)" @click="prepareOrder"/);
+    assert.match(checkout, /v-else type="button" :disabled="Boolean\(busy\)\|\|regionMismatch" @click="prepareOrder"/);
     assert.match(checkout, /id="lfx-bottom-pay"/);
 });
 

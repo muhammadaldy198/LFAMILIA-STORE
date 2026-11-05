@@ -2,30 +2,27 @@
 
 namespace App\Services;
 
-use App\Exceptions\NicknameServiceUnavailable;
 use App\Models\NicknameGameCode;
 use App\Models\Product;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Validation\ValidationException;
-use Throwable;
+use App\Models\ProductPackage;
 
 class NicknameService
 {
-    public function __construct(
-        private readonly AccountValidationConfig $config,
-    ) {}
+    /**
+     * Inject the H2H client used for advisory nickname lookups.
+     */
+    public function __construct(private readonly H2hNicknameClient $h2h) {}
 
     /**
+     * Advisory verdict only. The account destination remains customer_input.
+     *
      * @param  array<string, string>  $input
-     * @return array{supported:bool,verified:bool,nickname:?string,country:?string,warning:?string}
+     * @return array<string, mixed>
      */
     public function check(Product $product, array $input): array
     {
-        if ($product->relationLoaded('category') && strtolower((string) $product->category?->slug) === 'voucher') {
-            return $this->unsupported();
-        }
-
-        if (! $product->nickname_check_enabled) {
+        if (($product->relationLoaded('category') && strtolower((string) $product->category?->slug) === 'voucher')
+            || ! $product->nickname_check_enabled) {
             return $this->unsupported();
         }
 
@@ -39,158 +36,135 @@ class NicknameService
             return $this->unsupported();
         }
 
-        $game = NicknameGameCode::active()
-            ->nicknameSupported()
-            ->where('code', $gameCode)
-            ->first();
+        $game = NicknameGameCode::active()->nicknameSupported()->where('code', $gameCode)->first();
         if (! $game) {
             return $this->unsupported();
         }
-
         if (mb_strlen($userId) < 2 || ($game->requires_server && $server === '')) {
             return $this->warning('Nickname belum bisa diperiksa. Pastikan User ID dan Zone ID benar.');
         }
 
-        $settings = $this->config->active();
-        if (! $settings) {
-            return $this->warning('Nickname tidak berhasil diverifikasi karena layanan pengecekan sedang tidak tersedia. Pastikan ID sudah benar.');
-        }
-
-        try {
-            $nicknameData = $this->post(
-                $this->config->endpoint($settings, 'nickname_path'),
-                [
-                    'api_key' => $settings['api_key'],
-                    'id' => $userId,
-                    'game_code' => $game->code,
-                    ...($server !== '' ? ['server' => $server] : []),
-                ],
-                $userField,
-                $settings['resolved_ip'],
-            );
-
-            $nickname = $this->firstString([
-                data_get($nicknameData, 'data.nickname'),
-                data_get($nicknameData, 'data.username'),
-            ]);
-            if (! $nickname) {
-                throw ValidationException::withMessages([
-                    'customer_input.'.$userField => 'Nickname tidak ditemukan. Periksa kembali data akun.',
-                ]);
-            }
-
-            $country = $this->firstString([
-                data_get($nicknameData, 'data.region'),
-                data_get($nicknameData, 'data.country'),
-            ]);
-
-            if ($game->requires_region_check) {
-                if ($server === '') {
-                    throw ValidationException::withMessages([
-                        'customer_input.'.($serverField ?: 'server') => 'Server / Zone ID wajib diisi untuk pemeriksaan region.',
-                    ]);
-                }
-
-                $regionData = $this->post(
-                    $this->config->endpoint($settings, 'region_path'),
-                    [
-                        'api_key' => $settings['api_key'],
-                        'id' => $userId,
-                        'server' => $server,
-                    ],
-                    $serverField ?: $userField,
-                    $settings['resolved_ip'],
-                );
-                $country = $this->firstString([
-                    data_get($regionData, 'data.region'),
-                    data_get($regionData, 'data.country'),
-                ]);
-                if (! $country) {
-                    throw ValidationException::withMessages([
-                        'customer_input.'.($serverField ?: $userField) => 'Region akun tidak ditemukan. Periksa kembali Server / Zone.',
-                    ]);
-                }
-            }
-
-            return [
-                'supported' => true,
-                'verified' => true,
-                'nickname' => $nickname,
-                'country' => $country,
-                'warning' => null,
-            ];
-        } catch (NicknameServiceUnavailable|ValidationException) {
-            // Kokinpay only helps display a nickname. Its rejection or outage
-            // cannot override the fulfillment target supplied by the buyer.
-            return $this->warning('Nickname tidak berhasil diverifikasi. Pastikan ID tujuan sudah benar.');
-        }
+        return $this->checkViaH2h($product, $gameCode, $userId, $server);
     }
 
     /**
-     * @param  array<string, string>  $body
-     * @return array<string, mixed>
+     * Convert the provider verdict into nickname, region, and package availability information.
      */
-    private function post(string $url, array $body, string $field, string $resolvedIp): array
+    private function checkViaH2h(Product $product, string $gameCode, string $userId, string $server): array
     {
-        $host = (string) parse_url($url, PHP_URL_HOST);
-        $port = (int) (parse_url($url, PHP_URL_PORT) ?: 443);
-
-        try {
-            $response = Http::acceptJson()->withOptions([
-                'allow_redirects' => false,
-                'curl' => [CURLOPT_RESOLVE => [sprintf('%s:%d:%s', $host, $port, $resolvedIp)]],
-            ])->timeout(8)->post($url, $body);
-        } catch (Throwable) {
-            throw new NicknameServiceUnavailable;
+        $result = $this->h2h->check($gameCode, $userId, $server !== '' ? $server : null);
+        if (! $result || ($result['status'] ?? null) === 'ROUTE_ERROR') {
+            return $this->warning('Nickname belum dapat diverifikasi. Pastikan ID tujuan benar.');
         }
 
-        if (in_array($response->status(), [400, 404, 422], true)) {
-            throw ValidationException::withMessages([
-                'customer_input.'.$field => 'ID, Server, atau kode game tidak valid.',
-            ]);
-        }
-        if (! $response->successful()) {
-            throw new NicknameServiceUnavailable;
-        }
+        $nickname = $this->stringValue($result['nickname'] ?? null);
+        $region = strtoupper((string) ($this->stringValue($result['region'] ?? null) ?? ''));
+        $region = $region !== '' ? $region : null;
+        $expected = strtoupper(trim((string) $product->nickname_required_region));
 
-        $data = $response->json();
-        if (! is_array($data) || ($data['status'] ?? null) !== true) {
-            throw new NicknameServiceUnavailable;
+        if ($result['status'] === 'NOT_FOUND') {
+            return $this->warning('Nickname tidak ditemukan. Periksa kembali data akun.', 'NOT_FOUND');
         }
 
-        return $data;
-    }
-
-    private function firstString(array $values): ?string
-    {
-        foreach ($values as $value) {
-            if (is_string($value) && trim($value) !== '') {
-                return trim($value);
-            }
+        if ($result['status'] === 'REGION_MISMATCH'
+            || ($result['status'] === 'VALID' && $expected !== '' && $region !== null && $expected !== $region)) {
+            return [
+                ...$this->warning('Region akun tidak cocok. Periksa kembali Server / Zone ID.', 'REGION_MISMATCH'),
+                'nickname' => $nickname,
+                'country' => $region,
+                'region' => $region,
+            ];
         }
 
-        return null;
-    }
+        if ($result['status'] !== 'VALID' || $nickname === null) {
+            return $this->warning('Nickname belum dapat diverifikasi. Pastikan ID tujuan benar.');
+        }
 
-    private function unsupported(): array
-    {
+        $firstPurchase = $result['first_purchase'] ?? null;
+
         return [
-            'supported' => false,
-            'verified' => false,
-            'nickname' => null,
-            'country' => null,
+            'supported' => true,
+            'verified' => true,
+            'status' => 'VALID',
+            'nickname' => $nickname,
+            'country' => $region,
+            'region' => $region,
             'warning' => null,
+            'first_purchase' => $firstPurchase,
+            'wdp_eligible' => $result['wdp_eligible'] ?? null,
+            'disabled_package_ids' => $this->disabledPackages($product, $gameCode, $firstPurchase, $result['wdp_eligible'] ?? null),
         ];
     }
 
-    private function warning(string $message): array
+    /**
+     * Find ineligible first-purchase and weekly-pass packages for the selected game.
+     */
+    private function disabledPackages(Product $product, string $gameCode, mixed $firstPurchase, mixed $wdpEligible): array
+    {
+        $skuMap = match ($gameCode) {
+            'mobile-legends' => [50 => 'MLFS100', 150 => 'MLFS300', 250 => 'MLFS500', 500 => 'MLFS1000'],
+            'magic-chess-go-go' => [50 => 'MC50_A', 150 => 'MC150_A', 250 => 'MC250_A', 500 => 'MC500_A'],
+            default => [],
+        };
+
+        $skus = [];
+        if (is_array($firstPurchase)) {
+            foreach ($firstPurchase as $key => $item) {
+                if (! is_array($item) || ($item['eligible'] ?? null) !== false) {
+                    continue;
+                }
+                $tier = (int) ($item['tier'] ?? $key);
+                if (isset($skuMap[$tier])) {
+                    $skus[] = $skuMap[$tier];
+                }
+            }
+        }
+
+        $ids = [];
+        if ($skus !== []) {
+            $ids = ProductPackage::query()->where('product_id', $product->id)
+                ->whereHas('mappings', fn ($query) => $query->where('is_active', true)->whereIn('external_sku', $skus))
+                ->pluck('id')->all();
+        }
+        if ($gameCode === 'mobile-legends' && $wdpEligible === false) {
+            $ids = array_merge($ids, ProductPackage::query()
+                ->where('product_id', $product->id)
+                ->whereRaw('LOWER(name) LIKE ?', ['%weekly diamond pass%'])
+                ->pluck('id')->all());
+        }
+
+        return array_values(array_unique(array_map('intval', $ids)));
+    }
+
+    /**
+     * Accept only a nonempty string from a potentially untrusted provider field.
+     */
+    private function stringValue(mixed $value): ?string
+    {
+        return is_string($value) && trim($value) !== '' ? trim($value) : null;
+    }
+
+    /**
+     * Return the standard result when a product cannot perform nickname checking.
+     */
+    private function unsupported(): array
     {
         return [
-            'supported' => true,
-            'verified' => false,
-            'nickname' => null,
-            'country' => null,
-            'warning' => $message,
+            'supported' => false, 'verified' => false, 'status' => null,
+            'nickname' => null, 'country' => null, 'region' => null,
+            'warning' => null, 'disabled_package_ids' => [],
+        ];
+    }
+
+    /**
+     * Return an unverified, non-blocking result with an actionable warning.
+     */
+    private function warning(string $message, ?string $status = null): array
+    {
+        return [
+            'supported' => true, 'verified' => false, 'status' => $status,
+            'nickname' => null, 'country' => null, 'region' => null,
+            'warning' => $message, 'disabled_package_ids' => [],
         ];
     }
 }

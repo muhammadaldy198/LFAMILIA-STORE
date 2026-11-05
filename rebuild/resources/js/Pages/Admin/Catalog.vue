@@ -146,7 +146,7 @@ const syncMapping = mapping => {
 const info = reactive({
     name: '', slug: '', publisher: '', category_id: '', fulfillment_mode: 'AUTO_PROVIDER',
     sort_order: 0, description: '', is_active: false, nickname_check_enabled: false,
-    nickname_game_code: '', nickname_user_field_key: '', nickname_server_field_key: '',
+    nickname_game_code: '', nickname_user_field_key: '', nickname_server_field_key: '', nickname_required_region: '',
     ...MANUAL_DEFAULTS,
 });
 
@@ -165,6 +165,7 @@ const loadInfo = () => {
         nickname_game_code: product.value.nickname_game_code || '',
         nickname_user_field_key: product.value.nickname_user_field_key || '',
         nickname_server_field_key: product.value.nickname_server_field_key || '',
+        nickname_required_region: product.value.nickname_required_region || '',
         manual_instructions: product.value.manual_instructions || '',
         manual_open_time: product.value.manual_open_time || '',
         manual_close_time: product.value.manual_close_time || '',
@@ -179,6 +180,7 @@ const saveInfo = () => {
         category_id: Number(info.category_id),
         sort_order: Number(info.sort_order || 0),
         nickname_check_enabled: info.nickname_game_code ? info.nickname_check_enabled : false,
+        nickname_required_region: info.nickname_required_region || null,
         manual_instructions: info.manual_instructions || null,
         manual_open_time: info.manual_open_time || null,
         manual_close_time: info.manual_close_time || null,
@@ -1048,6 +1050,11 @@ onMounted(() => {
                             <option value="">Tidak dipakai</option>
                             <option v-for="option in fieldKeyOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
                         </select>
+                    </label>
+                    <label class="adm-field full"><span>Produk khusus region (opsional)</span>
+                        <input v-model.trim="info.nickname_required_region" class="adm-input" maxlength="2" placeholder="ID untuk Indonesia; kosong = semua region" @input="info.nickname_required_region = info.nickname_required_region.toUpperCase()">
+                        <span class="hint">Isi ID untuk produk khusus Indonesia. Kosongkan jika berlaku untuk semua region. Game harus mendukung cek region.</span>
+                        <span v-if="editErrors.nickname_required_region" class="err">{{editErrors.nickname_required_region}}</span>
                     </label>
                     <label class="adm-field full">
                         <span>Alamat produk</span>
