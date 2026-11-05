@@ -491,7 +491,9 @@ function localAccountErrors(ignorePassword = false) {
 
     for (const field of props.fields || []) {
         if (ignorePassword && field.type === 'password') continue;
-        const value = String(customerInput[field.field_key] || '').trim();
+        const value = field.type === 'password'
+            ? String(customerInput[field.field_key] || '')
+            : String(customerInput[field.field_key] || '').trim();
         const key = 'customer_input.' + field.field_key;
 
         if (field.is_required && value === '') {

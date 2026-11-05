@@ -36,7 +36,7 @@ class CheckoutInputValidator
                 ]);
             }
 
-            $value = trim((string) $raw);
+            $value = $field->type === 'password' ? (string) $raw : trim((string) $raw);
             if ($field->is_required && $value === '') {
                 throw ValidationException::withMessages([
                     'customer_input.'.$field->field_key => $field->label.' wajib diisi.',

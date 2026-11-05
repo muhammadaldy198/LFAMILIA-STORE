@@ -161,9 +161,10 @@ class CheckoutService
         }
 
         $fingerprint = $this->fingerprint($data, $user);
+        $legacyFingerprint = $this->fingerprint($data, $user, true);
         $existing = DB::table('orders')->where('idempotency_key', $data['idempotency_key'])->first();
         if ($existing) {
-            return $this->existingResult($existing, $fingerprint, $data['idempotency_key']);
+            return $this->existingResult($existing, $fingerprint, $data['idempotency_key'], $legacyFingerprint);
         }
 
         $prePrice = $this->pricing->forPackage((int) $data['package_id']);
@@ -382,11 +383,11 @@ class CheckoutService
                 throw $exception;
             }
 
-            return $this->existingResult($existing, $fingerprint, $data['idempotency_key']);
+            return $this->existingResult($existing, $fingerprint, $data['idempotency_key'], $legacyFingerprint);
         }
 
         if (! $result['created']) {
-            return $this->existingResult($result['order'], $fingerprint, $data['idempotency_key']);
+            return $this->existingResult($result['order'], $fingerprint, $data['idempotency_key'], $legacyFingerprint);
         }
 
         $accessCode = $user ? null : $this->guestAccess->issueStable(
@@ -525,7 +526,7 @@ class CheckoutService
     /**
      * @param  array<string, mixed>  $data
      */
-    private function fingerprint(array $data, ?User $user): string
+    private function fingerprint(array $data, ?User $user, bool $legacy = false): string
     {
         $input = $data['customer_input'];
         ksort($input);
@@ -544,19 +545,28 @@ class CheckoutService
             'customer_input' => $input,
         ];
 
-        return hash('sha256', json_encode($payload, JSON_THROW_ON_ERROR));
+        $encoded = json_encode($payload, JSON_THROW_ON_ERROR);
+
+        // Legacy fingerprints predate password fields and must keep retry compatibility.
+        if ($legacy) {
+            return hash('sha256', $encoded);
+        }
+
+        return 'hmac-sha256:'.hash_hmac('sha256', $encoded, (string) config('app.key'));
     }
 
     /**
      * @return array{order:object,access_code:?string,created:bool}
      */
-    private function existingResult(object $order, string $fingerprint, string $idempotencyKey): array
+    private function existingResult(object $order, string $fingerprint, string $idempotencyKey, string $legacyFingerprint): array
     {
         $snapshot = is_string($order->snapshot)
             ? json_decode($order->snapshot, true, 512, JSON_THROW_ON_ERROR)
             : (array) $order->snapshot;
 
-        if (($snapshot['checkout_fingerprint'] ?? null) !== $fingerprint) {
+        $storedFingerprint = (string) ($snapshot['checkout_fingerprint'] ?? '');
+        if ($storedFingerprint === '' || (! hash_equals($storedFingerprint, $fingerprint)
+            && ! hash_equals($storedFingerprint, $legacyFingerprint))) {
             throw new HttpException(409, 'Idempotency key sudah digunakan untuk checkout berbeda.');
         }
 

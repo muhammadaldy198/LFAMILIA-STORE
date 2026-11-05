@@ -10,7 +10,9 @@ use App\Services\CheckoutService;
 use App\Services\Fulfillment\FulfillmentTargetBuilder;
 use App\Services\FulfillmentService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
@@ -146,6 +148,7 @@ class ProductSelectPasswordTest extends TestCase
 
         $this->assertStringNotContainsString($plainPassword, (string) $order->customer_input);
         $this->assertStringNotContainsString($plainPassword, (string) $order->snapshot);
+        $this->assertStringStartsWith('hmac-sha256:', $snapshot['checkout_fingerprint']);
         $this->assertStringNotContainsString($plainPassword, (string) $record->value);
         $this->assertSame($plainPassword, $secret->value);
         $this->assertArrayNotHasKey('password', $snapshot['customer_input']);
@@ -155,6 +158,79 @@ class ProductSelectPasswordTest extends TestCase
         $this->assertSame('123456789|os_asia', app(FulfillmentService::class)->digiflazzCustomerNo(
             $order, $mapping, $snapshot
         ));
+    }
+
+    public function test_failed_provider_response_never_persists_plaintext_password(): void
+    {
+        Queue::fake();
+        $product = $this->product(true);
+        $product->update(['customer_no_template' => '{{user_id}}|{{password}}']);
+        $fixture = $this->fixtureCheckout($product);
+        $password = 'VeryPrivate-'.bin2hex(random_bytes(6));
+        $order = $this->checkout($fixture['package_id'], [
+            'user_id' => '123456789', 'server' => 'os_asia', 'password' => $password,
+        ]);
+        DB::table('orders')->where('id', $order->id)->update(['status' => 'PAID', 'paid_at' => now()]);
+
+        $service = app(FulfillmentService::class);
+        $service->startOrder((int) $order->id);
+        $attempt = DB::table('fulfillment_attempts')->where('order_id', $order->id)->firstOrFail();
+        $sku = DB::table('provider_mappings')->where('id', $fixture['mapping_id'])->value('external_sku');
+        $request = [
+            'ref_id' => $attempt->external_reference,
+            'buyer_sku_code' => $sku,
+            'customer_no' => '123456789|'.$password,
+        ];
+        $encrypted = Crypt::encryptString(json_encode($request, JSON_THROW_ON_ERROR));
+        DB::table('fulfillment_attempts')->where('id', $attempt->id)->update([
+            'status' => 'SENDING',
+            'request_payload' => json_encode(['encrypted' => $encrypted], JSON_THROW_ON_ERROR),
+        ]);
+
+        $service->applyProviderResult((int) $attempt->id, [
+            ...$request,
+            'status' => 'Gagal',
+            'rc' => '02',
+            'message' => 'Login ditolak untuk '.$request['customer_no'],
+        ], 'provider_response');
+
+        $stored = DB::table('fulfillment_attempts')->where('id', $attempt->id)->firstOrFail();
+        $this->assertSame('FAILED_CONFIRMED', $stored->status);
+        $this->assertStringNotContainsString($password, (string) $stored->last_error);
+        $this->assertStringNotContainsString($password, (string) $stored->response_payload);
+        $this->assertStringNotContainsString($password, (string) $stored->serial_number);
+        $this->assertSame('BLOCKED', DB::table('orders')->where('id', $order->id)->value('status'));
+    }
+
+    public function test_existing_legacy_idempotency_fingerprints_remain_accepted(): void
+    {
+        $product = $this->product();
+        $fixture = $this->fixtureCheckout($product);
+        $key = 'genshin-legacy-'.bin2hex(random_bytes(8));
+        $data = [
+            'package_id' => $fixture['package_id'],
+            'payment_channel_code' => 'manual_qris',
+            'customer_input' => ['user_id' => '123456789', 'server' => 'os_asia'],
+            'guest_email' => 'genshin@example.test',
+            'guest_phone' => '081234567890',
+            'idempotency_key' => $key,
+        ];
+        $service = app(CheckoutService::class);
+        $service->create($data, null);
+        $order = DB::table('orders')->where('idempotency_key', $key)->firstOrFail();
+        $snapshot = json_decode($order->snapshot, true, 512, JSON_THROW_ON_ERROR);
+        $payload = [
+            'actor' => ['type' => 'guest', 'email' => 'genshin@example.test', 'phone' => '081234567890'],
+            'package_id' => $fixture['package_id'],
+            'payment_channel_code' => 'manual_qris',
+            'voucher_code' => '',
+            'customer_input' => ['server' => 'os_asia', 'user_id' => '123456789'],
+        ];
+        $snapshot['checkout_fingerprint'] = hash('sha256', json_encode($payload, JSON_THROW_ON_ERROR));
+        DB::table('orders')->where('id', $order->id)->update(['snapshot' => json_encode($snapshot, JSON_THROW_ON_ERROR)]);
+        $retried = $service->create($data, null);
+        $this->assertFalse($retried['created']);
+        $this->assertSame((int) $order->id, (int) $retried['order']->id);
     }
 
     public function test_password_can_reach_provider_only_when_template_explicitly_uses_it(): void
@@ -172,5 +248,19 @@ class ProductSelectPasswordTest extends TestCase
             $order, $mapping, $snapshot
         ));
         $this->assertStringNotContainsString($password, $order->snapshot);
+
+        // Leading/trailing spaces are part of the password, not input formatting.
+        $spaced = '  another secret  ';
+        $validator = app(CheckoutInputValidator::class);
+        $this->assertSame($spaced, $validator->validate($product, [
+            'user_id' => '7654321', 'server' => 'os_euro', 'password' => $spaced,
+        ])['password']);
+        $spacedOrder = $this->checkout($fixture['package_id'], [
+            'user_id' => '7654321', 'server' => 'os_euro', 'password' => $spaced,
+        ]);
+        $this->assertSame($spaced, OrderSensitiveInput::where('order_id', $spacedOrder->id)->firstOrFail()->value);
+        $this->assertSame('7654321|'.$spaced, app(FulfillmentService::class)->digiflazzCustomerNo(
+            $spacedOrder, $mapping, json_decode($spacedOrder->snapshot, true, 512, JSON_THROW_ON_ERROR)
+        ));
     }
 }

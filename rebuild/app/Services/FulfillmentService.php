@@ -443,8 +443,10 @@ class FulfillmentService
             $secrets = OrderSensitiveInput::where('order_id', $order->id)->get()
                 ->pluck('value')->filter(fn ($value) => is_string($value) && $value !== '')->all();
             $safeResponse = $this->sanitizeProviderResponse($response);
+            $safeMessage = isset($response['message']) ? (string) $response['message'] : null;
             if ($secrets !== []) {
                 unset($safeResponse['customer_no'], $safeResponse['message']);
+                $safeMessage = $safeMessage === null ? null : str_replace($secrets, '[REDACTED]', $safeMessage);
                 foreach ($safeResponse as $key => $value) {
                     if (is_string($value)) {
                         $safeResponse[$key] = str_replace($secrets, '[REDACTED]', $value);
@@ -455,7 +457,8 @@ class FulfillmentService
             }
 
             $common = [
-                'provider_status' => substr((string) $response['status'], 0, 40),
+                'provider_status' => $secrets === [] ? substr((string) $response['status'], 0, 40)
+                    : str_replace($secrets, '[REDACTED]', substr((string) $response['status'], 0, 40)),
                 'provider_rc' => $providerRc,
                 'serial_number' => $serial !== '' ? $serial : null,
                 'price_idr' => $price,
@@ -505,7 +508,7 @@ class FulfillmentService
                     ...$common,
                     'status' => 'FAILED_CONFIRMED',
                     'safe_to_failover' => false,
-                    'last_error' => isset($response['message']) ? substr((string) $response['message'], 0, 1000) : null,
+                    'last_error' => $safeMessage === null ? null : substr($safeMessage, 0, 1000),
                     'completed_at' => now(),
                 ]);
                 $this->event((int) $order->id, 'FULFILLMENT_FAILED_CONFIRMED', $order->status, $order->status, [
@@ -647,6 +650,12 @@ class FulfillmentService
                 throw ValidationException::withMessages(['fulfillment' => $blockReason]);
             }
 
+            if (OrderSensitiveInput::where('order_id', $order->id)->exists()) {
+                throw ValidationException::withMessages([
+                    'fulfillment' => 'Karantina via-login tidak dapat diselesaikan lewat jalur ini.',
+                ]);
+            }
+
             $target = $this->digiflazzCustomerNo($order, $mapping, $snapshot);
             if (! hash_equals($target, $confirmedCustomerNo)) {
                 throw ValidationException::withMessages(['confirmed_customer_no' => 'Nomor tujuan tidak cocok dengan data pesanan.']);
@@ -713,9 +722,12 @@ class FulfillmentService
         // Prefer the frozen template's fields when optional input is empty.
         preg_match_all('/\{\{([a-z][a-z0-9_]*)\}\}/', $snapshotTemplate, $matches);
         $input = $this->json($order->customer_input);
+        $secretKeys = [];
         foreach (OrderSensitiveInput::where('order_id', $order->id)->get() as $secret) {
             $input[$secret->field_key] = $secret->value;
+            $secretKeys[] = $secret->field_key;
         }
+        $config['raw_field_keys'] = $secretKeys;
         $keys = $matches[1] ?: array_keys($input);
         $config['customer_no_template'] = app(DigiflazzDestinationTemplate::class)->resolve(
             (string) data_get($snapshot, 'product.slug', $product?->slug ?? ''),
