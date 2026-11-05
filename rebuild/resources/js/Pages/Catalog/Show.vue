@@ -168,8 +168,15 @@ const reviewSaving = ref(false);
 const reviewMessage = ref('');
 const reviewError = ref('');
 
+// Packages the checked account may not buy (first-recharge tiers already
+// used, WDP over its limit) come back from /checkout/nickname and are
+// hidden entirely — the same rule as unavailable nominals (D11).
+const hiddenPackageIds = computed(() => new Set(
+    (nicknameResult.value?.hidden_package_ids || []).map((id) => String(id)),
+));
 const selectedPackage = computed(() => (props.packages || []).find((item) =>
-    item.is_available !== false && String(item.id) === String(selectedPackageId.value)
+    item.is_available !== false && !hiddenPackageIds.value.has(String(item.id))
+    && String(item.id) === String(selectedPackageId.value)
 ));
 const requiredFieldsComplete = computed(() => (props.fields || []).filter((field) => field.is_required)
     .every((field) => String(customerInput[field.field_key] || '').trim() !== ''));
@@ -196,7 +203,11 @@ const firstCheckoutError = computed(() => {
 });
 
 // Honor group priority independently from legacy tab navigation.
-const packageGroups = computed(() => orderedPackageGroups(props.packages || [], props.product?.package_tabs || [], props.packageGroups));
+const packageGroups = computed(() => orderedPackageGroups(
+    (props.packages || []).filter((item) => !hiddenPackageIds.value.has(String(item.id))),
+    props.product?.package_tabs || [],
+    props.packageGroups,
+));
 const packageTabs = computed(() => props.product?.package_tabs_enabled
     ? (props.product?.package_tabs || []).filter((name) => packageGroups.value.some((group) => group.name === name))
     : []);
@@ -592,6 +603,12 @@ async function checkNickname() {
 
         nicknameResult.value = result;
         accountValidationSignature.value = signature;
+        // A package the buyer already picked may become hidden by this
+        // check (e.g. a first-recharge tier the account already used).
+        if (selectedPackageId.value && (result.hidden_package_ids || []).map((id) => String(id)).includes(String(selectedPackageId.value))) {
+            selectedPackageId.value = '';
+            invalidateQuote();
+        }
         return true;
     } catch (_error) {
         if (requestId !== accountValidationRequest || signature !== accountInputSignature()) return false;
@@ -605,7 +622,7 @@ async function checkNickname() {
 }
 
 function choosePackage(item) {
-    if (item.is_available === false || busy.value === 'order' || busy.value === 'payment') return;
+    if (item.is_available === false || hiddenPackageIds.value.has(String(item.id)) || busy.value === 'order' || busy.value === 'payment') return;
     selectedPackageId.value = String(item.id);
     if (errors.value.voucher_code?.[0] === 'Pilih nominal terlebih dahulu untuk melihat voucher yang tersedia.') {
         const { voucher_code: _voucherCodeError, ...remainingErrors } = errors.value;
