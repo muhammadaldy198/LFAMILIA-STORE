@@ -154,6 +154,12 @@ class NicknameService
             return $this->warning('Nickname tidak berhasil diverifikasi karena layanan pengecekan sedang tidak tersedia. Pastikan ID sudah benar.');
         }
 
+        // A VALID verdict without a nickname is not proof of anything:
+        // never present the account as verified.
+        if ((string) $data['status'] === 'VALID' && $this->firstString([data_get($data, 'account.nickname')]) === null) {
+            return $this->warning('Nickname tidak berhasil diverifikasi. Pastikan ID tujuan sudah benar.');
+        }
+
         return match ((string) $data['status']) {
             'VALID' => [
                 'supported' => true,
@@ -197,7 +203,8 @@ class NicknameService
         };
 
         $hiddenSkus = [];
-        foreach (($eligibility['first_purchase'] ?? []) as $tier => $info) {
+        $firstPurchase = $eligibility['first_purchase'] ?? null;
+        foreach ((is_array($firstPurchase) ? $firstPurchase : []) as $tier => $info) {
             if (is_array($info) && ($info['eligible'] ?? null) === false && isset($tierSkus[(string) $tier])) {
                 $hiddenSkus[] = $tierSkus[(string) $tier];
             }
@@ -208,7 +215,7 @@ class NicknameService
             $ids = ProductPackage::query()
                 ->where('product_id', $product->id)
                 ->where('is_active', true)
-                ->whereHas('mappings', fn ($query) => $query->whereIn('external_sku', $hiddenSkus))
+                ->whereHas('mappings', fn ($query) => $query->where('is_active', true)->whereIn('external_sku', $hiddenSkus))
                 ->pluck('id')
                 ->map(fn ($id) => (int) $id)
                 ->all();

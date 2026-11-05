@@ -202,6 +202,30 @@ class CheckoutH2hValidationTest extends TestCase
             ->assertJsonPath('hidden_package_ids', []);
     }
 
+    public function test_valid_without_nickname_is_not_marked_verified(): void
+    {
+        $product = $this->product();
+        $this->fakeH2h(['status' => 'VALID', 'account' => ['nickname' => null, 'region' => 'id']]);
+
+        $this->postJson('/checkout/nickname', $this->payload($product))
+            ->assertOk()
+            ->assertJsonPath('verified', false)
+            ->assertJsonPath('warning', 'Nickname tidak berhasil diverifikasi. Pastikan ID tujuan sudah benar.');
+    }
+
+    public function test_plain_http_remote_base_url_is_rejected(): void
+    {
+        config(['lfamilia.h2h.base_url' => 'http://203.0.113.10:8090']);
+        $product = $this->product();
+        Http::fake();
+
+        $this->postJson('/checkout/nickname', $this->payload($product))
+            ->assertOk()
+            ->assertJsonPath('verified', false);
+
+        Http::assertNothingSent();
+    }
+
     public function test_h2h_not_configured_does_not_call_h2h(): void
     {
         config(['lfamilia.h2h.api_key' => '']);
