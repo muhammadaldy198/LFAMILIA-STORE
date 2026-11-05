@@ -28,6 +28,7 @@ const props = defineProps({
     reviewStats: Object,
     faqs: Array,
     initialPackageId: { type: String, default: '' },
+    regionAlternatives: { type: Array, default: () => [] },
 });
 
 
@@ -168,8 +169,27 @@ const reviewSaving = ref(false);
 const reviewMessage = ref('');
 const reviewError = ref('');
 
+const regionMismatch = computed(() => accountValidationSignature.value === accountInputSignature()
+    && nicknameResult.value?.status === 'REGION_MISMATCH');
+const disabledPackageIds = computed(() => new Set((nicknameResult.value?.disabled_package_ids || []).map(String)));
+const packageDisabled = (item) => regionMismatch.value || disabledPackageIds.value.has(String(item.id));
 const selectedPackage = computed(() => (props.packages || []).find((item) =>
-    item.is_available !== false && String(item.id) === String(selectedPackageId.value)
+    item.is_available !== false && !packageDisabled(item) && String(item.id) === String(selectedPackageId.value)
+));
+watch([regionMismatch, disabledPackageIds], () => {
+    const selected = (props.packages || []).find(item => String(item.id) === String(selectedPackageId.value));
+    if (selected && packageDisabled(selected)) {
+        selectedPackageId.value = '';
+        invalidateQuote();
+    }
+});
+const regionName = (code) => {
+    if (!code) return 'Tidak diketahui';
+    try { return new Intl.DisplayNames(['id'], { type: 'region' }).of(String(code).toUpperCase()) || code; }
+    catch { return code; }
+};
+const alternativeProduct = computed(() => (props.regionAlternatives || []).find(
+    (item) => String(item.nickname_required_region).toUpperCase() === String(nicknameResult.value?.region || '').toUpperCase()
 ));
 const requiredFieldsComplete = computed(() => (props.fields || []).filter((field) => field.is_required)
     .every((field) => String(customerInput[field.field_key] || '').trim() !== ''));
@@ -562,7 +582,8 @@ function chooseSavedAccount(id) {
     const saved = savedAccountItems.value.find((item) => String(item.id) === String(id));
     if (!saved) return;
     Object.keys(customerInput).forEach((key) => { customerInput[key] = saved.customer_input?.[key] || ''; });
-    nicknameResult.value = saved.nickname ? { verified: true, nickname: saved.nickname } : null;
+    nicknameResult.value = props.product.nickname_required_region
+        ? null : (saved.nickname ? { verified: true, nickname: saved.nickname } : null);
 }
 
 async function checkNickname() {
@@ -605,7 +626,7 @@ async function checkNickname() {
 }
 
 function choosePackage(item) {
-    if (item.is_available === false || busy.value === 'order' || busy.value === 'payment') return;
+    if (item.is_available === false || packageDisabled(item) || busy.value === 'order' || busy.value === 'payment') return;
     selectedPackageId.value = String(item.id);
     if (errors.value.voucher_code?.[0] === 'Pilih nominal terlebih dahulu untuk melihat voucher yang tersedia.') {
         const { voucher_code: _voucherCodeError, ...remainingErrors } = errors.value;
@@ -703,7 +724,15 @@ async function applyVoucher(code) {
 }
 
 async function prepareOrder() {
-    if (busy.value) return;
+    if (busy.value || regionMismatch.value) return;
+    if (props.product.nickname_required_region && (!nicknameResult.value?.region_proof || accountValidationSignature.value !== accountInputSignature())) {
+        await checkNickname();
+        if (regionMismatch.value) return;
+        if (!nicknameResult.value?.region_proof) {
+            errors.value = { checkout: ['Periksa akun terlebih dahulu untuk memastikan region produk.'] };
+            return;
+        }
+    }
     summaryOpen.value = false;
     errors.value = {};
 
@@ -737,7 +766,7 @@ async function prepareOrder() {
 }
 
 async function createOrder() {
-    if (!agreed.value || !confirmationSnapshot.value || busy.value) return;
+    if (!agreed.value || !confirmationSnapshot.value || busy.value || regionMismatch.value) return;
 
     errors.value = {};
     requiresEmailVerification.value = false;
@@ -775,6 +804,7 @@ async function createOrder() {
                 ...basePayload(),
                 customer_input: { ...customerInput },
                 idempotency_key: confirmationSnapshot.value.idempotency_key,
+                ...(props.product.nickname_required_region ? { region_proof: nicknameResult.value?.region_proof || null } : {}),
             }),
         });
         checkoutExpiryOffset.value = Date.parse(checkoutResult.value.server_now) - Date.now();
@@ -921,7 +951,17 @@ function closeReview() { summaryOpen.value = false; closeConfirmation(); }
       <div class="lfx-layout">
         <div class="lfx-sections">
           <template v-if="activeTab==='transaction'">
-            <section v-if="hasAccountStep" id="lfx-account" class="lfx-panel"><header class="lfx-panel-header"><span class="lfx-number">1</span><div><h2>{{customerText("checkout.account_title", "Data Akun")}}</h2></div></header><div class="lfx-panel-content"><label v-if="savedAccountItems.length" class="lfx-field lfx-saved-account"><span>Akun tersimpan</span><select v-model="selectedSavedId" @change="chooseSavedAccount(selectedSavedId)"><option value="">Isi manual</option><option v-for="saved in savedAccountItems" :key="saved.id" :value="String(saved.id)">{{saved.label}}{{saved.nickname?' · '+saved.nickname:''}}</option></select></label><div class="lfx-field-grid" :class="{single:fields.length===1}"><label v-for="field in fields" :key="field.field_key" class="lfx-field"><span>{{field.label}} <b v-if="field.is_required">*</b><i title="Pastikan data akun benar">ⓘ</i></span><input v-model="customerInput[field.field_key]" :placeholder="field.placeholder||'Masukkan '+field.label" :type="['email','tel'].includes(field.type)?field.type:'text'" :inputmode="field.type==='number'?'numeric':undefined" :required="field.is_required" maxlength="255" autocomplete="off"/></label></div><p v-for="field in fields.filter(x=>fieldError(x.field_key))" :key="field.field_key" class="lfx-error">{{fieldError(field.field_key)}}</p><div v-if="nicknameChecking" class="lfx-hint">Memeriksa akun…</div><div v-else-if="nicknameResult?.verified" class="lfx-hint">✓ {{nicknameResult.nickname}}</div><div v-else-if="nicknameResult?.warning" class="lfx-hint">{{nicknameResult.warning}}</div><div class="lfx-hint"><span>i</span> {{customerText("checkout.account_hint", "Pastikan ID atau Server sudah sesuai sebelum memesan.")}}</div></div></section>
+            <section v-if="hasAccountStep" id="lfx-account" class="lfx-panel"><header class="lfx-panel-header"><span class="lfx-number">1</span><div><h2>{{customerText("checkout.account_title", "Data Akun")}}</h2></div></header><div class="lfx-panel-content"><label v-if="savedAccountItems.length" class="lfx-field lfx-saved-account"><span>Akun tersimpan</span><select v-model="selectedSavedId" @change="chooseSavedAccount(selectedSavedId)"><option value="">Isi manual</option><option v-for="saved in savedAccountItems" :key="saved.id" :value="String(saved.id)">{{saved.label}}{{saved.nickname?' · '+saved.nickname:''}}</option></select></label><div class="lfx-field-grid" :class="{single:fields.length===1}"><label v-for="field in fields" :key="field.field_key" class="lfx-field"><span>{{field.label}} <b v-if="field.is_required">*</b><i title="Pastikan data akun benar">ⓘ</i></span><input v-model="customerInput[field.field_key]" :placeholder="field.placeholder||'Masukkan '+field.label" :type="['email','tel'].includes(field.type)?field.type:'text'" :inputmode="field.type==='number'?'numeric':undefined" :required="field.is_required" maxlength="255" autocomplete="off"/></label></div><p v-for="field in fields.filter(x=>fieldError(x.field_key))" :key="field.field_key" class="lfx-error">{{fieldError(field.field_key)}}</p><div v-if="nicknameChecking" class="lfx-hint">Memeriksa akun…</div>
+<div v-else-if="regionMismatch" class="lfx-region-banner lfx-region-mismatch" role="alert">
+  <strong>{{nicknameResult?.nickname || 'Akun'}} · {{regionName(nicknameResult?.region)}}</strong>
+  <span>Region tidak cocok. Produk ini khusus akun {{regionName(product.nickname_required_region)}}.</span>
+  <Link v-if="alternativeProduct" :href="'/catalog/'+alternativeProduct.slug">Lihat produk {{alternativeProduct.name}}</Link>
+</div>
+<div v-else-if="nicknameResult?.verified && nicknameResult?.region" class="lfx-region-banner lfx-region-valid" role="status">
+  <strong>✓ {{nicknameResult.nickname}}</strong><span>Region akun: {{regionName(nicknameResult.region)}} · Cocok</span>
+</div>
+<div v-else-if="nicknameResult?.verified" class="lfx-hint">✓ {{nicknameResult.nickname}}</div>
+<div v-else-if="nicknameResult?.warning" class="lfx-hint">{{nicknameResult.warning}}</div><div class="lfx-hint"><span>i</span> {{customerText("checkout.account_hint", "Pastikan ID atau Server sudah sesuai sebelum memesan.")}}</div></div></section>
             <section id="lfx-nominal" class="lfx-panel">
               <header class="lfx-panel-header"><span class="lfx-number">2</span><div><h2>{{customerText("checkout.nominal_title", "Pilih Nominal")}}</h2></div></header>
               <div class="lfx-panel-content">
@@ -930,19 +970,19 @@ function closeReview() { summaryOpen.value = false; closeConfirmation(); }
                   <div v-if="itemsGroup.name" class="lfx-subtitle"><img v-if="itemsGroup.image_url" :src="itemsGroup.image_url" :alt="itemsGroup.name" width="34" height="34" loading="lazy" decoding="async" style="width:34px;height:34px;object-fit:cover;border-radius:8px"><span v-else class="lfx-mini-star">✦</span><h3>{{itemsGroup.name}}</h3><small>{{itemsGroup.items.length}} pilihan</small></div>
                   <div class="lfx-nominal-grid" role="radiogroup" :aria-label="itemsGroup.name || 'Pilih nominal'">
                     <div v-for="item in itemsGroup.items" :key="item.id"
-                      class="lfx-nominal" :class="{selected:String(selectedPackageId)===String(item.id),unavailable:item.is_available===false}"
+                      class="lfx-nominal" :class="{selected:String(selectedPackageId)===String(item.id),unavailable:item.is_available===false||packageDisabled(item)}"
                       role="radio" :aria-checked="String(selectedPackageId)===String(item.id)"
-                      :aria-disabled="item.is_available===false" :tabindex="item.is_available===false?-1:0"
-                      @click="item.is_available!==false&&choosePackage(item)"
-                      @keydown.enter.prevent="item.is_available!==false&&choosePackage(item)"
-                      @keydown.space.prevent="item.is_available!==false&&choosePackage(item)">
+                      :aria-disabled="item.is_available===false||packageDisabled(item)" :tabindex="item.is_available===false||packageDisabled(item)?-1:0"
+                      @click="item.is_available!==false&&!packageDisabled(item)&&choosePackage(item)"
+                      @keydown.enter.prevent="item.is_available!==false&&!packageDisabled(item)&&choosePackage(item)"
+                      @keydown.space.prevent="item.is_available!==false&&!packageDisabled(item)&&choosePackage(item)">
                       <span class="lfx-check" aria-hidden="true">{{String(selectedPackageId)===String(item.id)?'✓':''}}</span>
                       <span class="lfx-nominal-top">
                         <span class="lfx-nominal-name"><strong>{{item.name}}</strong><small>{{item.group_name||product.name}}</small></span>
                         <img v-if="item.image_url" class="lfx-item-art" :src="item.image_url" alt="" loading="lazy" decoding="async" width="128" height="128"/>
                         <span v-else class="lfx-diamond" aria-hidden="true">✦</span>
                       </span>
-                      <span class="lfx-nominal-bottom"><b>{{item.is_available===false?'Tidak tersedia':formatIdr(item.price_idr)}}</b><small v-if="String(selectedPackageId)===String(item.id)">DIPILIH</small></span>
+                      <span class="lfx-nominal-bottom"><b>{{item.is_available===false?'Tidak tersedia':packageDisabled(item)?'Tidak memenuhi syarat':formatIdr(item.price_idr)}}</b><small v-if="String(selectedPackageId)===String(item.id)">DIPILIH</small></span>
                     </div>
                   </div>
                 </section>
@@ -1056,7 +1096,7 @@ function closeReview() { summaryOpen.value = false; closeConfirmation(); }
         <span class="lfx-bottom-amount"><span>Total Bayar</span><strong>{{selectedPackage ? (displayTotal===null ? 'Menghitung…' : formatIdr(displayTotal)) : 'Rp 0'}}</strong></span>
         <span class="lfx-bottom-chevron" aria-hidden="true">⌃</span>
       </button>
-      <button :disabled="Boolean(busy)" id="lfx-bottom-pay" class="lfx-bottom-pay" type="button" @click="prepareOrder">{{busy==='order'||busy==='payment'?'Memproses…':'Bayar Sekarang'}} <b aria-hidden="true">→</b></button>
+      <button :disabled="Boolean(busy)||regionMismatch" id="lfx-bottom-pay" class="lfx-bottom-pay" type="button" @click="prepareOrder">{{busy==='order'||busy==='payment'?'Memproses…':'Bayar Sekarang'}} <b aria-hidden="true">→</b></button>
     </div>
   </div>
 
@@ -1108,8 +1148,8 @@ function closeReview() { summaryOpen.value = false; closeConfirmation(); }
       </div>
       <p v-if="firstCheckoutError" role="alert" class="lfx-error">{{firstCheckoutError}}</p><div v-if="requiresEmailVerification" role="alert" class="lfx-error">Belum menerima email? <button type="button" :disabled="verificationResending" @click="resendVerificationEmail">Kirim ulang link verifikasi</button> atau <a href="/email/verify">buka halaman verifikasi</a>.<span v-if="verificationResendStatus"> {{verificationResendStatus}}</span></div><label v-if="confirmOpen" class="lfx-agreement"><input v-model="agreed" type="checkbox"/> Dengan melanjutkan, saya menyetujui <Link href="/terms">syarat & ketentuan</Link>.</label><div class="lfx-modal-buttons">
         <button type="button" @click="closeReview">{{confirmOpen ? 'Kembali' : 'Tutup'}}</button>
-        <button v-if="confirmOpen" type="button" :disabled="Boolean(busy)||!agreed" @click="createOrder">{{busy?'Memproses…':'Bayar Sekarang →'}}</button>
-        <button v-else type="button" :disabled="Boolean(busy)" @click="prepareOrder">Bayar Sekarang →</button>
+        <button v-if="confirmOpen" type="button" :disabled="Boolean(busy)||!agreed||regionMismatch" @click="createOrder">{{busy?'Memproses…':'Bayar Sekarang →'}}</button>
+        <button v-else type="button" :disabled="Boolean(busy)||regionMismatch" @click="prepareOrder">Bayar Sekarang →</button>
       </div>
 
     </div>
@@ -1117,3 +1157,10 @@ function closeReview() { summaryOpen.value = false; closeConfirmation(); }
 </div>
 </CustomerShell>
 </template>
+
+<style scoped>
+.lfx-region-banner { display:flex;flex-direction:column;gap:4px;padding:12px 14px;border-radius:12px;margin-top:10px;border:1px solid transparent;font-size:13px;line-height:1.5 }
+.lfx-region-valid { background:#113527;color:#a7f3c4;border-color:#2e7951 }
+.lfx-region-mismatch { background:#411c26;color:#ffbac6;border-color:#b94f63 }
+.lfx-region-mismatch a { color:#b4d4ff;text-decoration:underline;font-weight:600 }
+</style>
