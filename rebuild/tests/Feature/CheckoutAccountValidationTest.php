@@ -114,28 +114,14 @@ class CheckoutAccountValidationTest extends TestCase
             'nickname_game_code' => 'free-fire',
             'nickname_user_field_key' => 'user_id',
         ]);
-
-        IntegrationCredential::create([
-            'code' => 'kokinpay',
-            'config_ciphertext' => [
-                'api_key' => 'test-secret',
-                'base_url' => 'https://example.com',
-                'nickname_path' => '/v1/check-nickname',
-                'region_path' => '/v1/check-region',
-                'pln_path' => '/v1/check-pln',
-            ],
-            'is_active' => true,
-        ]);
-
-        $this->assertSame('192.0.2.1', app(AccountValidationConfig::class)->active()['resolved_ip']);
+        config()->set('lfamilia.h2h.base_url', 'https://h2h.example.test');
+        config()->set('lfamilia.h2h.api_key', 'test-key');
 
         Http::fake([
-            'https://example.com/*' => Http::response([
-                'status' => true,
-                'data' => [
-                    'nickname' => 'AldayPlayer',
-                    'country' => 'ID',
-                ],
+            'https://h2h.example.test/api/v1/check' => Http::response([
+                'status' => 'VALID',
+                'nickname' => 'AldayPlayer',
+                'region' => 'ID',
             ]),
         ]);
 
@@ -149,9 +135,9 @@ class CheckoutAccountValidationTest extends TestCase
             ->assertJsonPath('country', 'ID');
 
         $this->assertStringContainsString('no-store', strtolower((string) $response->headers->get('Cache-Control')));
-        $body = strtolower($response->getContent());
-        $this->assertStringNotContainsString('kokinpay', $body);
-        $this->assertStringNotContainsString('test-secret', $body);
+        $this->assertStringNotContainsString('test-key', $response->getContent());
+        Http::assertSentCount(1);
+        Http::assertSent(fn ($request): bool => $request->url() === 'https://h2h.example.test/api/v1/check');
     }
 
     public function test_verified_invalid_account_is_reported_on_the_user_id_field(): void
@@ -225,7 +211,7 @@ class CheckoutAccountValidationTest extends TestCase
         Http::assertNothingSent();
     }
 
-    public function test_validation_uses_editable_endpoint_paths_from_integration_config(): void
+    public function test_validation_no_longer_calls_kokinpay_even_when_configured(): void
     {
         $product = $this->product([
             'nickname_check_enabled' => true,
@@ -245,21 +231,23 @@ class CheckoutAccountValidationTest extends TestCase
             'is_active' => true,
         ]);
 
+        config()->set('lfamilia.h2h.base_url', 'https://h2h.example.test');
+        config()->set('lfamilia.h2h.api_key', 'test-key');
         Http::fake([
-            'https://example.com/custom/nickname' => Http::response([
-                'status' => true,
-                'data' => ['nickname' => 'ConfigDriven'],
+            'https://h2h.example.test/*' => Http::response([
+                'status' => 'VALID', 'nickname' => 'H2hPlayer', 'region' => 'ID',
             ]),
+            'https://example.com/*' => Http::response(['status' => true, 'data' => ['nickname' => 'LegacyName']]),
         ]);
 
         $this->postJson('/checkout/nickname', [
             'product_id' => $product->id,
             'customer_input' => ['user_id' => '123456', 'zone_id' => ''],
         ])->assertOk()
-            ->assertJsonPath('verified', true)
-            ->assertJsonPath('nickname', 'ConfigDriven');
+            ->assertJsonPath('nickname', 'H2hPlayer');
 
-        Http::assertSent(fn ($request): bool => $request->url() === 'https://example.com/custom/nickname');
+        Http::assertSentCount(1);
+        Http::assertNotSent(fn ($request): bool => str_contains($request->url(), 'example.com'));
     }
 
     public function test_supported_game_with_empty_nickname_is_rejected(): void
