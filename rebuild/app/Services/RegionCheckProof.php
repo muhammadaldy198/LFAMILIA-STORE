@@ -71,6 +71,9 @@ class RegionCheckProof
         ];
     }
 
+    /**
+     * Hash sorted checkout fields so a region proof is bound to the exact account.
+     */
     private function inputHash(array $input): string
     {
         ksort($input);
