@@ -53,6 +53,7 @@ class H2hNicknameClient
 
             // Accept both flat and nested data fields, but never trust the status in data.
             $payload = is_array($json['data'] ?? null) ? $json['data'] : [];
+
             return [...$payload, ...$json];
         } catch (Throwable) {
             return null;

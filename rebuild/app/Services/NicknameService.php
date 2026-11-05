@@ -75,6 +75,7 @@ class NicknameService
         }
 
         $firstPurchase = $result['first_purchase'] ?? null;
+
         return [
             'supported' => true,
             'verified' => true,

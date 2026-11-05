@@ -74,6 +74,7 @@ class RegionCheckProof
     private function inputHash(array $input): string
     {
         ksort($input);
+
         return hash('sha256', json_encode($input, JSON_THROW_ON_ERROR));
     }
 }

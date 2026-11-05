@@ -6,11 +6,11 @@ use App\Models\Category;
 use App\Models\NicknameGameCode;
 use App\Models\Product;
 use App\Models\ProductPackage;
-use App\Services\RegionCheckProof;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 class CheckoutH2hValidationTest extends TestCase
@@ -88,7 +88,7 @@ class CheckoutH2hValidationTest extends TestCase
         Http::fake(['http://127.0.0.1:8090/api/v1/check' => $sequence]);
     }
 
-    private function nickname(Product $product, string $userId = '123456'): \Illuminate\Testing\TestResponse
+    private function nickname(Product $product, string $userId = '123456'): TestResponse
     {
         return $this->postJson('/checkout/nickname', [
             'product_id' => $product->id,
