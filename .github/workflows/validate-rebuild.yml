@@ -90,6 +90,13 @@ jobs:
       - name: Audit frontend dependencies
         run: npm audit --audit-level=high
 
+      - name: Temporary Pint prepush diagnostics
+        run: |
+          vendor/bin/pint app/Services/H2hNicknameClient.php app/Services/NicknameService.php app/Services/RegionCheckProof.php tests/Feature/CheckoutH2hValidationTest.php
+          echo '--- START H2H PINT DIFF ---'
+          git diff -- app/Services/H2hNicknameClient.php app/Services/NicknameService.php app/Services/RegionCheckProof.php tests/Feature/CheckoutH2hValidationTest.php
+          echo '--- END H2H PINT DIFF ---'
+
       - name: Validate local Git hooks
         env:
           LFAMILIA_ENABLE_HOOKS: '1'
