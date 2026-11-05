@@ -211,6 +211,9 @@ class CheckoutAccountValidationTest extends TestCase
         Http::assertNothingSent();
     }
 
+    /**
+     * The new H2H provider is used without falling back to the former endpoint.
+     */
     public function test_validation_no_longer_calls_kokinpay_even_when_configured(): void
     {
         $product = $this->product([
