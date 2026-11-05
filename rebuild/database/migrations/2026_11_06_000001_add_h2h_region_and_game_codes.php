@@ -7,6 +7,9 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Add the optional product region and register additional H2H game codes.
+     */
     public function up(): void
     {
         // Nullable: existing products remain unrestricted unless admin opts in.
@@ -41,6 +44,9 @@ return new class extends Migration
         }
     }
 
+    /**
+     * Drop the region column while retaining game codes that might already be used.
+     */
     public function down(): void
     {
         // Seeded game codes may already be in use; do not delete them on rollback.
