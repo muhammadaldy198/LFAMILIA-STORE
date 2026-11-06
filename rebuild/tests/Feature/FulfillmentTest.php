@@ -759,11 +759,42 @@ class FulfillmentTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        app(FulfillmentService::class)->retrySafeAttempt($attemptId);
+        try {
+            app(FulfillmentService::class)->retrySafeAttempt($attemptId);
+            $this->fail('Legacy confirmed failure must reject retry explicitly.');
+        } catch (ValidationException $exception) {
+            $this->assertStringContainsString('Kirim Ulang', $exception->getMessage());
+        }
 
         $this->assertSame('FAILED_CONFIRMED', DB::table('fulfillment_attempts')->where('id', $attemptId)->value('status'));
         $this->assertSame('PAID', DB::table('orders')->where('id', $orderId)->value('status'));
         Queue::assertNotPushed(SendFulfillmentJob::class);
+    }
+
+    public function test_safe_retry_still_queues_a_legitimate_blocked_attempt(): void
+    {
+        Queue::fake();
+        $catalog = $this->automaticCatalog();
+        $orderId = $this->paidOrder($catalog);
+        $attemptId = DB::table('fulfillment_attempts')->insertGetId([
+            'order_id' => $orderId,
+            'provider_mapping_id' => $catalog['mapping_id'],
+            'provider_id' => DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id'),
+            'attempt_no' => 1,
+            'external_reference' => 'FUL-RETRY-'.bin2hex(random_bytes(4)),
+            'status' => 'BLOCKED',
+            'last_error' => 'Penyedia belum bisa dihubungi.',
+            'safe_to_failover' => false,
+            'correlation_id' => 'blocked-retry-fixture',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        app(FulfillmentService::class)->retrySafeAttempt($attemptId);
+
+        $this->assertSame('CREATED', DB::table('fulfillment_attempts')->where('id', $attemptId)->value('status'));
+        $this->assertSame('PROCESSING', DB::table('orders')->where('id', $orderId)->value('status'));
+        Queue::assertPushed(SendFulfillmentJob::class, fn (SendFulfillmentJob $job): bool => $job->attemptId === $attemptId);
     }
 
     public function test_confirmed_failure_marks_blocked_without_automatic_failover(): void
