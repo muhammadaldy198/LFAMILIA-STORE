@@ -36,6 +36,7 @@ const selectedPackageId = ref(props.initialPackageId || '');
 const savedAccountItems = ref([...(props.savedAccounts || [])]);
 const customerInput = reactive(Object.fromEntries((props.fields || []).map((field) => [field.field_key, ''])));
 const passwordVisible = reactive({});
+/** Return only non-sensitive customer fields for public requests and summaries. */
 const publicInputPayload = () => Object.fromEntries((props.fields || [])
     .filter(field => field.type !== 'password')
     .map(field => [field.field_key, customerInput[field.field_key] || '']));
@@ -402,6 +403,7 @@ function confirmationStateSignature() {
     ]);
 }
 
+/** Freeze public checkout details without retaining credentials in the confirmation summary. */
 function buildConfirmationSnapshot(currentQuote) {
     const stateSignature = confirmationStateSignature();
     const attemptKey = ensureCheckoutAttemptKey(stateSignature);
@@ -411,7 +413,7 @@ function buildConfirmationSnapshot(currentQuote) {
         quote_signature: financialSummarySignature(currentQuote),
         idempotency_key: attemptKey,
         quote: { ...currentQuote },
-        customer_input: { ...customerInput },
+        customer_input: publicInputPayload(),
         nickname: nicknameResult.value?.nickname || null,
         product_name: props.product.name,
         item_name: selectedPackage.value ? nominalLabel(selectedPackage.value.name, props.product.name) : '-',
@@ -486,6 +488,7 @@ function accountInputSignature() {
     ]));
 }
 
+/** Validate customer fields locally; password limits mirror the server validator. */
 function localAccountErrors(ignorePassword = false) {
     const validation = {};
 
@@ -501,7 +504,7 @@ function localAccountErrors(ignorePassword = false) {
             continue;
         }
         if (value === '') continue;
-        if (value.length > 255) {
+        if (value.length > (field.type === 'password' ? 64 : 255)) {
             validation[key] = [field.label + ' terlalu panjang.'];
             continue;
         }
@@ -1001,7 +1004,7 @@ function closeReview() { summaryOpen.value = false; closeConfirmation(); }
           <template v-if="activeTab==='transaction'">
             <section v-if="hasAccountStep" id="lfx-account" class="lfx-panel"><header class="lfx-panel-header"><span class="lfx-number">1</span><div><h2>{{customerText("checkout.account_title", "Data Akun")}}</h2></div></header><div class="lfx-panel-content"><label v-if="savedAccountItems.length" class="lfx-field lfx-saved-account"><span>Akun tersimpan</span><select v-model="selectedSavedId" @change="chooseSavedAccount(selectedSavedId)"><option value="">Isi manual</option><option v-for="saved in savedAccountItems" :key="saved.id" :value="String(saved.id)">{{saved.label}}{{saved.nickname?' · '+saved.nickname:''}}</option></select></label><div class="lfx-field-grid" :class="{single:fields.length===1}"><label v-for="field in fields" :key="field.field_key" class="lfx-field"><span>{{field.label}} <b v-if="field.is_required">*</b><i title="Pastikan data akun benar">ⓘ</i></span>
 <select v-if="field.type==='select'" v-model="customerInput[field.field_key]" :required="field.is_required"><option value="" disabled>{{field.placeholder || 'Pilih '+field.label}}</option><option v-for="option in field.options||[]" :key="option.value" :value="option.value">{{option.label}}</option></select>
-<span v-else-if="field.type==='password'" class="lfx-password-field"><input v-model="customerInput[field.field_key]" :type="passwordVisible[field.field_key]?'text':'password'" :placeholder="field.placeholder||'Masukkan '+field.label" :required="field.is_required" maxlength="255" autocomplete="new-password"/><button type="button" :aria-label="(passwordVisible[field.field_key]?'Sembunyikan ':'Lihat ')+field.label" :aria-pressed="Boolean(passwordVisible[field.field_key])" @click.prevent="passwordVisible[field.field_key]=!passwordVisible[field.field_key]">{{passwordVisible[field.field_key]?'Sembunyikan':'Lihat'}}</button></span>
+<span v-else-if="field.type==='password'" class="lfx-password-field"><input v-model="customerInput[field.field_key]" :type="passwordVisible[field.field_key]?'text':'password'" :placeholder="field.placeholder||'Masukkan '+field.label" :required="field.is_required" maxlength="64" autocomplete="new-password"/><button type="button" :aria-label="(passwordVisible[field.field_key]?'Sembunyikan ':'Lihat ')+field.label" :aria-pressed="Boolean(passwordVisible[field.field_key])" @click.prevent="passwordVisible[field.field_key]=!passwordVisible[field.field_key]">{{passwordVisible[field.field_key]?'Sembunyikan':'Lihat'}}</button></span>
 <input v-else v-model="customerInput[field.field_key]" :placeholder="field.placeholder||'Masukkan '+field.label" :type="['email','tel'].includes(field.type)?field.type:'text'" :required="field.is_required" maxlength="255" autocomplete="off"/></label></div><p v-for="field in fields.filter(x=>fieldError(x.field_key))" :key="field.field_key" class="lfx-error">{{fieldError(field.field_key)}}</p><div v-if="nicknameChecking" class="lfx-hint">Memeriksa akun…</div>
 <div v-else-if="regionWarning" class="lfx-region-banner lfx-region-mismatch" role="alert">
   <strong>{{nicknameResult?.nickname || 'Akun'}} · {{regionName(nicknameResult?.region)}}</strong>
