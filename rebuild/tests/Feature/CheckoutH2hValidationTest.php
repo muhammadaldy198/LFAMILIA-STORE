@@ -157,6 +157,8 @@ class CheckoutH2hValidationTest extends TestCase
         $this->assertEqualsCanonicalizing([$first->id, $wdp->id], $ids);
         $this->assertNotContains($inactive->id, $ids);
         Http::assertSentCount(1);
+        Http::assertSent(fn ($request): bool => $request->data()['zone_id'] === '9876'
+            && ! array_key_exists('zone', $request->data()));
         Http::assertNotSent(fn ($request): bool => str_contains(strtolower($request->url()), 'kokinpay'));
     }
 
@@ -172,6 +174,36 @@ class CheckoutH2hValidationTest extends TestCase
 
         $r = $this->nickname($product)->assertOk();
         $this->assertSame([$package->id], $r->json('disabled_package_ids'));
+        Http::assertSent(fn ($request): bool => $request->data()['zone_id'] === '9876'
+            && ! array_key_exists('zone', $request->data()));
+    }
+
+    /**
+     * Verify the outbound H2H payload contract for games with and without a zone.
+     */
+    public function test_h2h_zone_id_is_sent_only_for_games_with_a_zone(): void
+    {
+        $mobileLegends = $this->game('mobile-legends');
+        $magicChess = $this->game('magic-chess-go-go');
+        $freeFire = $this->game('free-fire');
+        $this->h2h(['status' => 'NOT_FOUND']);
+
+        foreach ([$mobileLegends, $magicChess, $freeFire] as $product) {
+            $this->nickname($product)->assertOk()->assertJsonPath('status', 'NOT_FOUND');
+        }
+
+        Http::assertSentCount(3);
+        foreach (['mobile-legends', 'magic-chess-go-go'] as $code) {
+            Http::assertSent(fn ($request): bool => $request->url() === 'http://127.0.0.1:8090/api/v1/check'
+                && ($request->data()['game'] ?? null) === $code
+                && ($request->data()['user_id'] ?? null) === '123456'
+                && ($request->data()['zone_id'] ?? null) === '9876'
+                && ! array_key_exists('zone', $request->data()));
+        }
+        Http::assertSent(fn ($request): bool => ($request->data()['game'] ?? null) === 'free-fire'
+            && ($request->data()['user_id'] ?? null) === '123456'
+            && ! array_key_exists('zone_id', $request->data())
+            && ! array_key_exists('zone', $request->data()));
     }
 
     /**
