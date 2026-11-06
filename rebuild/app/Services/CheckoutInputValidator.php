@@ -45,7 +45,7 @@ class CheckoutInputValidator
             if ($value === '') {
                 continue;
             }
-            if (mb_strlen($value) > 255) {
+            if (mb_strlen($value) > ($field->type === 'password' ? 64 : 255)) {
                 throw ValidationException::withMessages([
                     'customer_input.'.$field->field_key => $field->label.' terlalu panjang.',
                 ]);
