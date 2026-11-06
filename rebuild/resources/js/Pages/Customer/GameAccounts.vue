@@ -69,6 +69,7 @@ async function save() {
         busy.value = false;
     }
 }
+/** Delete a saved game account after customer confirmation. */
 async function remove(account) {
     if (busy.value) return;
     if (!confirm('Hapus akun game tersimpan ini?')) return;
