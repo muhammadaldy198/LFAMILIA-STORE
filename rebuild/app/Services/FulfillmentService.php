@@ -1395,7 +1395,11 @@ class FulfillmentService
 
         $decoded = json_decode($value, true);
         if (is_array($decoded) && isset($decoded['encrypted']) && is_string($decoded['encrypted'])) {
-            $decoded = json_decode(Crypt::decryptString($decoded['encrypted']), true);
+            try {
+                $decoded = json_decode(Crypt::decryptString($decoded['encrypted']), true);
+            } catch (\Illuminate\Contracts\Encryption\DecryptException) {
+                return [];
+            }
         }
 
         return is_array($decoded) ? $decoded : [];
