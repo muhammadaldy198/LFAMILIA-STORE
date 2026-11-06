@@ -29,17 +29,6 @@ const manualQris=computed(()=>paymentState.value?.instructions?.kind==='manual_q
     || String(paymentState.value?.channel_code||'').toLowerCase().includes('manual'));
 const paymentUncertain=computed(()=>['UNKNOWN','CREATING'].includes(paymentState.value?.status));
 const statusLabel=s=>visibleOrderStatus(s).label;
-const eventLabel=e=>{
-    if(e.to_status) return statusLabel(e.to_status);
-    const map={
-        'order.created':'Pesanan dibuat',
-        'payment.created':'Pembayaran dibuat',
-        'payment.updated':'Status pembayaran diperbarui',
-        'fulfillment.started':'Pesanan diteruskan untuk diproses',
-        'fulfillment.updated':'Proses pesanan diperbarui',
-    };
-    return map[e.event_type]||'Status pesanan diperbarui';
-};
 const eventTime=v=>v?new Date(v).toLocaleString('id-ID',{timeZone:'Asia/Jakarta',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',second:'2-digit'}):'-';
 
 async function refreshStatus(){
@@ -152,7 +141,7 @@ onUnmounted(()=>{disposed=true;if(timer)clearInterval(timer);});
                 <ol>
                     <li v-for="event in timeline" :key="event.id">
                         <span></span>
-                        <div><strong>{{eventLabel(event)}}</strong><small>{{eventTime(event.created_at)}}</small><p v-if="event.from_status&&event.to_status">{{statusLabel(event.from_status)}} → {{statusLabel(event.to_status)}}</p></div>
+                        <div><strong>{{event.label}}</strong><small>{{eventTime(event.created_at)}}</small><p v-if="event.from_status&&event.to_status">{{statusLabel(event.from_status)}} → {{statusLabel(event.to_status)}}</p></div>
                     </li>
                     <li v-if="!timeline.length"><span></span><div><strong>{{ customerText("pages.guest.orderstatus.243a5ea5", "Pesanan tercatat") }}</strong><small>{{ customerText("pages.guest.orderstatus.97f7dab7", "Menunggu log transaksi berikutnya.") }}</small></div></li>
                 </ol>

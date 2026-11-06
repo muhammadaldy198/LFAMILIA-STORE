@@ -36,6 +36,18 @@ final class PublicOrderStatusService
         };
     }
 
+    public function eventLabel(string $eventType, mixed $toStatus): string
+    {
+        if (is_string($toStatus) && $toStatus !== '') {
+            return $this->label($toStatus);
+        }
+
+        return match (strtoupper($eventType)) {
+            'ORDER_CREATED' => 'Pesanan dibuat',
+            default => 'Status pesanan diperbarui',
+        };
+    }
+
     public function note(string $status, bool $wasPaid): ?string
     {
         return ! $wasPaid && in_array(strtoupper($status), ['EXPIRED', 'CANCELLED'], true)

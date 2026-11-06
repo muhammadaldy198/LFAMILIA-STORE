@@ -96,11 +96,15 @@ class GuestOrderTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->where('order.status', 'FAILED')
                 ->where('events.0.from_status', 'PROCESSING')
-                ->where('events.0.to_status', 'FAILED'));
+                ->where('events.0.to_status', 'FAILED')
+                ->where('events.0.label', 'Gagal')
+                ->missing('events.0.event_type'));
         $guestEvents = $this->get('/orders/guest/LFTRACK-STATUS-100/events')
             ->assertOk()
             ->assertJsonPath('order.status', 'FAILED')
-            ->assertJsonPath('events.0.to_status', 'FAILED');
+            ->assertJsonPath('events.0.to_status', 'FAILED')
+            ->assertJsonPath('events.0.label', 'Gagal')
+            ->assertJsonMissingPath('events.0.event_type');
         $paymentPage = $this->get('/payment?invoice=LFTRACK-STATUS-100')
             ->assertOk()
             ->assertInertia(fn ($page) => $page->where('order.status', 'FAILED'));

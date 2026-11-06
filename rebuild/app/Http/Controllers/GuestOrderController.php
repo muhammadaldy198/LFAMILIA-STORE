@@ -112,7 +112,7 @@ class GuestOrderController
             ->orderBy('id')->get(['id', 'event_type', 'from_status', 'to_status', 'created_at'])
             ->map(fn ($event): array => [
                 'id' => (int) $event->id,
-                'event_type' => $event->event_type,
+                'label' => $this->statuses->eventLabel((string) $event->event_type, $event->to_status),
                 'from_status' => $event->from_status ? $this->statuses->value((string) $event->from_status) : null,
                 'to_status' => $event->to_status ? $this->statuses->value((string) $event->to_status) : null,
                 'created_at' => Carbon::parse($event->created_at, 'UTC')->toIso8601String(),

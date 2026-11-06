@@ -191,7 +191,7 @@ class PublicOrderTrackingController
                 'id' => (int) $event->id,
                 'source' => $this->eventSource((string) $event->event_type),
                 'status' => $event->to_status ? $this->statuses->slug((string) $event->to_status) : null,
-                'label' => $this->eventLabel((string) $event->event_type, $event->to_status),
+                'label' => $this->statuses->eventLabel((string) $event->event_type, $event->to_status),
                 'createdAt' => $this->utcIso($event->created_at),
             ])->values()->all();
 
@@ -403,17 +403,5 @@ class PublicOrderTrackingController
         }
 
         return 'system';
-    }
-
-    private function eventLabel(string $eventType, mixed $toStatus): string
-    {
-        if (is_string($toStatus) && $toStatus !== '') {
-            return $this->statuses->label($toStatus);
-        }
-
-        return match (strtoupper($eventType)) {
-            'ORDER_CREATED' => 'Pesanan dibuat',
-            default => 'Status pesanan diperbarui',
-        };
     }
 }
