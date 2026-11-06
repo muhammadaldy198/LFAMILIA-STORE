@@ -263,4 +263,70 @@ class ProductSelectPasswordTest extends TestCase
             $spacedOrder, $mapping, json_decode($spacedOrder->snapshot, true, 512, JSON_THROW_ON_ERROR)
         ));
     }
+
+    /**
+     * Password inputs are capped independently without reducing normal text limits.
+     */
+    public function test_password_maximum_length_is_enforced_only_for_password_fields(): void
+    {
+        $product = $this->product(true);
+        $validator = app(CheckoutInputValidator::class);
+        $longUserId = str_repeat('1', 75);
+        $valid = $validator->validate($product, [
+            'user_id' => $longUserId, 'server' => 'os_asia', 'password' => str_repeat('p', 64),
+        ]);
+        $this->assertSame($longUserId, $valid['user_id']);
+
+        try {
+            $validator->validate($product, [
+                'user_id' => $longUserId, 'server' => 'os_asia', 'password' => str_repeat('p', 65),
+            ]);
+            $this->fail('Password yang lebih panjang dari 64 karakter harus ditolak.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('customer_input.password', $exception->errors());
+        }
+    }
+
+    /**
+     * Reject impossible Digiflazz targets before creating a payable order.
+     */
+    public function test_checkout_rejects_destination_over_100_characters_before_payment(): void
+    {
+        $product = $this->product(true);
+        $product->update(['customer_no_template' => '{{user_id}}|{{password}}']);
+        $fixture = $this->fixtureCheckout($product);
+        $before = DB::table('orders')->where('product_id', $product->id)->count();
+
+        try {
+            $this->checkout($fixture['package_id'], [
+                'user_id' => str_repeat('1', 70),
+                'server' => 'os_asia',
+                'password' => str_repeat('p', 40),
+            ]);
+            $this->fail('Target provider terlalu panjang harus ditolak sebelum order dibuat.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('fulfillment', $exception->errors());
+        }
+
+        $this->assertSame($before, DB::table('orders')->where('product_id', $product->id)->count());
+    }
+
+    /**
+     * Bad encrypted payloads return no request; valid and plain JSON still decode.
+     */
+    public function test_corrupt_encrypted_fulfillment_payload_fails_closed(): void
+    {
+        $service = app(FulfillmentService::class);
+        $method = new \ReflectionMethod(FulfillmentService::class, 'json');
+
+        $this->assertSame([], $method->invoke(
+            $service, json_encode(['encrypted' => 'invalid-ciphertext'], JSON_THROW_ON_ERROR)
+        ));
+        $plain = ['ref_id' => 'FUL-TEST', 'buyer_sku_code' => 'GS-TEST'];
+        $this->assertSame($plain, $method->invoke($service, json_encode($plain, JSON_THROW_ON_ERROR)));
+        $this->assertSame($plain, $method->invoke(
+            $service, json_encode(['encrypted' => Crypt::encryptString(json_encode($plain, JSON_THROW_ON_ERROR))], JSON_THROW_ON_ERROR)
+        ));
+    }
+
 }
