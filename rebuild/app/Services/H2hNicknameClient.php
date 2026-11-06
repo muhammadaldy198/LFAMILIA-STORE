@@ -41,7 +41,7 @@ class H2hNicknameClient
                 ->post(rtrim($baseUrl, '/').'/api/v1/check', [
                     'game' => $game,
                     'user_id' => $userId,
-                    ...($zone !== null && $zone !== '' ? ['zone' => $zone] : []),
+                    ...($zone !== null && $zone !== '' ? ['zone_id' => $zone] : []),
                 ]);
             if (! $response->successful()) {
                 return null;
