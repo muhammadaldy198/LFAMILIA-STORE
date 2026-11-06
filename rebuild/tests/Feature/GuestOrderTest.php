@@ -96,11 +96,15 @@ class GuestOrderTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->where('order.status', 'FAILED')
                 ->where('events.0.from_status', 'PROCESSING')
-                ->where('events.0.to_status', 'FAILED'));
+                ->where('events.0.to_status', 'FAILED')
+                ->where('events.0.label', 'Gagal')
+                ->missing('events.0.event_type'));
         $guestEvents = $this->get('/orders/guest/LFTRACK-STATUS-100/events')
             ->assertOk()
             ->assertJsonPath('order.status', 'FAILED')
-            ->assertJsonPath('events.0.to_status', 'FAILED');
+            ->assertJsonPath('events.0.to_status', 'FAILED')
+            ->assertJsonPath('events.0.label', 'Gagal')
+            ->assertJsonMissingPath('events.0.event_type');
         $paymentPage = $this->get('/payment?invoice=LFTRACK-STATUS-100')
             ->assertOk()
             ->assertInertia(fn ($page) => $page->where('order.status', 'FAILED'));
@@ -152,9 +156,8 @@ class GuestOrderTest extends TestCase
             ->assertJsonPath('order.createdAt', $isoCreated)
             ->assertJsonPath('order.events.0.createdAt', $isoEvent);
 
-        $this->get('/orders/track/feed')
-            ->assertOk()
-            ->assertJsonPath('transactions.0.createdAt', $isoCreated);
+        $feed = $this->get('/orders/track/feed')->assertOk()->json('transactions');
+        $this->assertNotContains('LFTRA••••-100', array_column($feed, 'maskedReferenceId'));
         $this->withSession(['guest_order_id' => $orderId])->get('/orders/guest/LFTRACK-UTC-100/events')
             ->assertOk()
             ->assertJsonPath('order.created_at', $isoCreated)
@@ -166,6 +169,27 @@ class GuestOrderTest extends TestCase
                 ->where('order.status', 'FAILED')
                 ->where('order.status_note', 'Kedaluwarsa')
                 ->where('order.created_at', $isoCreated));
+    }
+
+    public function test_public_recent_transactions_include_only_paid_orders_on_feed_and_index(): void
+    {
+        $suffix = strtoupper(bin2hex(random_bytes(4)));
+        $unpaidNumber = 'LF-FEED-UNPAID-'.$suffix.'U';
+        $paidNumber = 'LF-FEED-PAID-'.$suffix.'P';
+        $unpaidId = $this->guestOrder($unpaidNumber);
+        $paidId = $this->guestOrder($paidNumber);
+        DB::table('orders')->where('id', $unpaidId)->update(['status' => 'EXPIRED', 'paid_at' => null]);
+        DB::table('orders')->where('id', $paidId)->update(['status' => 'FAILED', 'paid_at' => now()]);
+        $mask = fn (string $number): string => substr($number, 0, 5).'••••'.substr($number, -4);
+
+        $feed = $this->get('/orders/track/feed')->assertOk()->json('transactions');
+        $this->assertContains($mask($paidNumber), array_column($feed, 'maskedReferenceId'));
+        $this->assertNotContains($mask($unpaidNumber), array_column($feed, 'maskedReferenceId'));
+
+        $index = $this->get('/orders/check')->assertOk();
+        $index->assertInertia(fn ($page) => $page
+            ->where('transactions', fn ($rows): bool => collect($rows)->contains('maskedReferenceId', $mask($paidNumber))
+                && collect($rows)->doesntContain('maskedReferenceId', $mask($unpaidNumber))));
     }
 
     public function test_reissuing_code_invalidates_old_code(): void

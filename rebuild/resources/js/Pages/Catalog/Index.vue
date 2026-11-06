@@ -3,8 +3,8 @@ import SeoHead from '../../Components/SeoHead.js';
 import { useCustomerPresentation } from '../../Composables/customerPresentation';
 const { customerText, sectionEnabled } = useCustomerPresentation();
 
-import {Link,usePage} from '@inertiajs/vue3';
-import {computed,onMounted,onUnmounted,ref} from 'vue';
+import {Link,usePage,router} from '@inertiajs/vue3';
+import {computed,onMounted,onUnmounted,ref,watch} from 'vue';
 import CustomerShell from '../../Components/CustomerShell.vue';
 import ProductSearch from '../../Components/ProductSearch.vue';
 import CategoryIcon from '../../Components/CategoryIcon.vue';
@@ -29,8 +29,41 @@ const popular=computed(()=>p.popularProducts??[]);
 const q=(x={})=>{const a={...p.filters,...x};Object.keys(a).forEach(k=>{if(!a[k])delete a[k]});const s=new URLSearchParams(a).toString();return s?'/?'+s:'/'};
 // Keep catalogue filter tabs as partial Inertia updates without remounting the homepage.
 const listingProps=['products','filters'];
+const displayedProducts=ref([...(p.products?.data||[])]);
+const loadedPage=ref(Number(p.products?.current_page||1));
+const loadingMore=ref(false);
+const filterKey=computed(()=>JSON.stringify([p.filters?.q||'',p.filters?.category||'',p.filters?.mode||'']));
+const hasMore=computed(()=>displayedProducts.value.length<Number(p.products?.total||0));
+// A changed category/search resets the list; paginated responses are appended below.
+watch(filterKey,()=>{
+    displayedProducts.value=[...(p.products?.data||[])];
+    loadedPage.value=Number(p.products?.current_page||1);
+});
+watch(()=>p.products,next=>{
+    if(Number(next?.current_page||1)===1){
+        displayedProducts.value=[...(next?.data||[])];
+        loadedPage.value=1;
+    }
+});
+const loadMore=()=>{
+    if(loadingMore.value||!hasMore.value)return;
+    const nextPage=loadedPage.value+1;
+    const expectedFilter=filterKey.value;
+    loadingMore.value=true;
+    router.get(q({page:nextPage}),{}, {
+        only:listingProps,preserveState:true,preserveScroll:true,
+        onSuccess:page=>{
+            if(filterKey.value!==expectedFilter)return;
+            const result=page.props.products;
+            if(Number(result?.current_page)!==nextPage)return;
+            const seen=new Set(displayedProducts.value.map(item=>item.slug));
+            displayedProducts.value.push(...(result.data||[]).filter(item=>!seen.has(item.slug)));
+            loadedPage.value=nextPage;
+        },
+        onFinish:()=>{loadingMore.value=false;},
+    });
+};
 const initial=n=>(n||'L').slice(0,1).toUpperCase();
-const label=l=>String(l).includes('Previous')?'‹':String(l).includes('Next')?'›':String(l).replace(/&laquo;|&raquo;/g,'').trim();
 const newsDate=v=>v?new Date(v).toLocaleDateString('id-ID',{timeZone:'Asia/Jakarta',day:'numeric',month:'short',year:'numeric'}):'LFAMILIA News';
 const bannerPrev=()=>{const n=visibleBanners.value.length;if(n)bannerIndex.value=(bannerIndex.value-1+n)%n};
 const bannerNext=()=>{const n=visibleBanners.value.length;if(n)bannerIndex.value=(bannerIndex.value+1)%n};
@@ -43,6 +76,13 @@ const closePopup=()=>{
     popupOpen.value=false;
 };
 onMounted(()=>{
+    // A hard refresh on a previous load-more URL only contains that one page.
+    // Restore the first batch instead of trapping users on an incomplete grid.
+    if(Number(p.products?.current_page||1)>1){
+        router.get(q({page:''}),{}, {
+            only:listingProps,replace:true,preserveState:true,preserveScroll:true,
+        });
+    }
     mediaQuery=window.matchMedia('(max-width:639px)');
     const updateMobile=()=>{mobile.value=mediaQuery.matches;bannerIndex.value=0};
     updateMobile();
@@ -138,8 +178,8 @@ onUnmounted(()=>{
                     </Link>
                 </nav>
 
-                <div v-if="products.data.length" class="lf-products">
-                    <Link v-for="x in products.data" :key="x.slug" :href="'/catalog/'+x.slug" class="lf-product">
+                <div v-if="displayedProducts.length" class="lf-products">
+                    <Link v-for="x in displayedProducts" :key="x.slug" :href="'/catalog/'+x.slug" class="lf-product">
                         <img v-if="x.image_url" :src="x.image_url" :alt="x.name" width="288" height="432" loading="lazy" decoding="async">
                         <span v-else class="lf-product-fallback" :style="x.accent_color?{background:x.accent_color}:undefined"><strong>{{x.initials||x.name}}</strong><small>{{x.category_name}}</small></span>
                         <span v-if="x.instant" class="absolute right-2 top-2 z-10 rounded-full bg-black/70 px-2 py-1 text-[10px] font-semibold text-white">Instan</span>
@@ -147,12 +187,11 @@ onUnmounted(()=>{
                 </div>
                 <p v-else class="mt-6 text-center text-sm text-white/40">{{ customerText("pages.catalog.index.3b98f425", "Produk tidak ditemukan.") }}</p>
 
-                <nav v-if="products.links?.length>3" class="lf-pages">
-                    <template v-for="x in products.links" :key="x.label">
-                        <Link v-if="x.url" :href="x.url" :only="listingProps" preserve-state preserve-scroll :class="{active:x.active}">{{label(x.label)}}</Link>
-                        <span v-else>{{label(x.label)}}</span>
-                    </template>
-                </nav>
+                <div v-if="hasMore" class="mt-6 flex justify-center">
+                    <button type="button" class="lf-secondary min-h-11 px-6" :disabled="loadingMore" :aria-busy="loadingMore" @click="loadMore">
+                        {{loadingMore?'Memuat...':'Lihat lebih lanjut'}}
+                    </button>
+                </div>
             </section>
 
             <section v-if="sectionEnabled('tutorial')" class="lf-steps">

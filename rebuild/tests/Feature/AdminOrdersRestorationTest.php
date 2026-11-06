@@ -211,6 +211,12 @@ class AdminOrdersRestorationTest extends TestCase
             ->where('attempts.0.can_retry', true));
         $this->get('/admin/fulfillment?scope=all&q='.urlencode($number))->assertOk()
             ->assertInertia(fn (Assert $page) => $page->where('attempts.data.0.can_retry', true));
+
+        DB::table('fulfillment_attempts')->where('order_id', $id)->update([
+            'status' => 'FAILED_CONFIRMED', 'safe_to_failover' => true,
+        ]);
+        $this->get('/admin/orders/'.$id)->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('attempts.0.can_retry', false));
     }
 
     public function test_manual_order_is_paid_queued_once_and_never_sent_to_an_external_provider(): void

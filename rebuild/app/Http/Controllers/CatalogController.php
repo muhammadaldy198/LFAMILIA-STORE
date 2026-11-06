@@ -124,95 +124,109 @@ class CatalogController
         ]);
         $search = trim($filters['q'] ?? '');
 
-        $categories = Category::with('media')->where('is_active', true)->orderBy('sort_order')->get()
+        $categories = fn () => Category::with('media')->where('is_active', true)->orderBy('sort_order')->get()
             ->map(fn (Category $category): array => [
                 ...$category->only('name', 'slug', 'icon'),
                 'image_url' => OptimizedMedia::url($category, 'image', 'card'),
             ]);
 
-        $baseProducts = Product::with(['category', 'media'])->where('is_active', true)
-            ->whereHas('category', fn ($query) => $query->where('is_active', true))
-            ->whereHas('packages', fn ($query) => $query->where('is_active', true))
-            ->when(($filters['category'] ?? null), fn ($query, $slug) => $query->whereHas('category',
-                fn ($category) => $category->where('slug', $slug)))
-            ->when(($filters['mode'] ?? null) === 'manual', fn ($query) => $query->where('fulfillment_mode', 'MANUAL'))
-            ->when($search !== '', fn ($query) => $this->searchScope($query, $search));
+        $products = function () use ($request, $filters, $search): LengthAwarePaginator {
+            $baseProducts = Product::with(['category', 'media'])->where('is_active', true)
+                ->whereHas('category', fn ($query) => $query->where('is_active', true))
+                ->whereHas('packages', fn ($query) => $query->where('is_active', true))
+                ->when(($filters['category'] ?? null), fn ($query, $slug) => $query->whereHas('category',
+                    fn ($category) => $category->where('slug', $slug)))
+                ->when(($filters['mode'] ?? null) === 'manual', fn ($query) => $query->where('fulfillment_mode', 'MANUAL'))
+                ->when($search !== '', fn ($query) => $this->searchScope($query, $search));
 
-        // Admin sort_order takes precedence; natural name and id break ties before
-        // pagination so numbered names (5, 20, 1100) stay stable across pages.
-        $buyable = $baseProducts->whereIn('id', $this->buyableProductIds());
-        $orderedIds = (clone $buyable)->withoutEagerLoads()->reorder()->get(['id', 'name', 'sort_order'])
-            ->sort(fn (Product $a, Product $b): int => ((int) $a->sort_order <=> (int) $b->sort_order)
-                ?: strnatcasecmp($a->name, $b->name)
-                ?: ($a->id <=> $b->id))->pluck('id')->values();
-        $perPage = 24;
-        $currentPage = max(1, (int) $request->query('page', 1));
-        $pageIds = $orderedIds->forPage($currentPage, $perPage)->all();
-        $positions = array_flip($pageIds);
-        $pageProducts = Product::with(['category', 'media'])->whereIn('id', $pageIds)->get()
-            ->sortBy(fn (Product $row): int => $positions[$row->id])->values();
-        $products = (new LengthAwarePaginator($pageProducts, $orderedIds->count(), $perPage, $currentPage, [
-            'path' => $request->url(), 'query' => $request->query(),
-        ]))->through(fn (Product $product): array => [
-            ...$product->only('name', 'slug', 'initials', 'accent_color', 'instant'),
-            'category_name' => $product->category->name,
-            'category_slug' => $product->category->slug,
-            'image_url' => OptimizedMedia::url($product, 'image', 'card'),
-        ]);
+            // Admin sort_order takes precedence; natural name and id break ties before
+            // pagination so numbered names (5, 20, 1100) stay stable across pages.
+            $buyable = $baseProducts->whereIn('id', $this->buyableProductIds());
+            $orderedIds = (clone $buyable)->withoutEagerLoads()->reorder()->get(['id', 'name', 'sort_order'])
+                ->sort(fn (Product $a, Product $b): int => ((int) $a->sort_order <=> (int) $b->sort_order)
+                    ?: strnatcasecmp($a->name, $b->name)
+                    ?: ($a->id <=> $b->id))->pluck('id')->values();
+            $perPage = 12;
+            $currentPage = max(1, (int) $request->query('page', 1));
+            $pageIds = $orderedIds->forPage($currentPage, $perPage)->all();
+            $positions = array_flip($pageIds);
+            $pageProducts = Product::with(['category', 'media'])->whereIn('id', $pageIds)->get()
+                ->sortBy(fn (Product $row): int => $positions[$row->id])->values();
 
-        $basePopular = Product::with(['category', 'media'])
-            ->withCount(['reviews as active_reviews_count' => fn ($query) => $query->where('is_active', true)])
-            ->where('is_active', true)
-            ->whereHas('category', fn ($query) => $query->where('is_active', true))
-            ->whereHas('packages', fn ($query) => $query->where('is_active', true));
-        $popularProducts = $basePopular
-            ->whereIn('id', $this->buyableProductIds())
-            ->orderByDesc('popular')
-            ->orderByDesc('active_reviews_count')
-            ->orderBy('sort_order')
-            ->orderBy('name')
-            ->limit(8)
-            ->get()
-            ->map(fn (Product $product): array => [
-                ...$product->only('name', 'slug', 'popular', 'initials', 'accent_color', 'instant'),
-                'publisher' => trim((string) $product->publisher) ?: null,
+            return (new LengthAwarePaginator($pageProducts, $orderedIds->count(), $perPage, $currentPage, [
+                'path' => $request->url(), 'query' => $request->query(),
+            ]))->through(fn (Product $product): array => [
+                ...$product->only('name', 'slug', 'initials', 'accent_color', 'instant'),
                 'category_name' => $product->category->name,
                 'category_slug' => $product->category->slug,
                 'image_url' => OptimizedMedia::url($product, 'image', 'card'),
             ]);
+        };
 
-        $assets = StoreAsset::with('media')->where('is_active', true)->get()->keyBy('key');
-        $banners = $content->homeBanners();
-        if ($banners->isEmpty()) {
-            $desktop = $assets->get('banner_desktop');
-            $mobile = $assets->get('banner_mobile');
-            if ($desktop || $mobile) {
-                $banners = collect([[
-                    'id' => null,
-                    'title' => 'LFAMILIA STORE',
-                    'subtitle' => null,
-                    'cta_label' => null,
-                    'cta_href' => $desktop?->target_url ?: $mobile?->target_url,
-                    'show_desktop' => true,
-                    'show_mobile' => true,
-                    'sort_order' => 0,
-                    'desktop_url' => ($desktop ? OptimizedMedia::url($desktop, 'image', 'display') : '') ?: ($mobile ? OptimizedMedia::url($mobile, 'image', 'display') : ''),
-                    'mobile_url' => ($mobile ? OptimizedMedia::url($mobile, 'image', 'display') : '') ?: ($desktop ? OptimizedMedia::url($desktop, 'image', 'display') : ''),
-                ]]);
+        $popularProducts = function () {
+            $basePopular = Product::with(['category', 'media'])
+                ->withCount(['reviews as active_reviews_count' => fn ($query) => $query->where('is_active', true)])
+                ->where('is_active', true)
+                ->whereHas('category', fn ($query) => $query->where('is_active', true))
+                ->whereHas('packages', fn ($query) => $query->where('is_active', true));
+
+            return $basePopular
+                ->whereIn('id', $this->buyableProductIds())
+                ->orderByDesc('popular')
+                ->orderByDesc('active_reviews_count')
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->limit(8)
+                ->get()
+                ->map(fn (Product $product): array => [
+                    ...$product->only('name', 'slug', 'popular', 'initials', 'accent_color', 'instant'),
+                    'publisher' => trim((string) $product->publisher) ?: null,
+                    'category_name' => $product->category->name,
+                    'category_slug' => $product->category->slug,
+                    'image_url' => OptimizedMedia::url($product, 'image', 'card'),
+                ]);
+        };
+
+        $assets = null;
+        $loadAssets = function () use (&$assets) {
+            return $assets ??= StoreAsset::with('media')->where('is_active', true)->get()->keyBy('key');
+        };
+        $banners = function () use ($content, $loadAssets) {
+            $assets = $loadAssets();
+            $banners = $content->homeBanners();
+            if ($banners->isEmpty()) {
+                $desktop = $assets->get('banner_desktop');
+                $mobile = $assets->get('banner_mobile');
+                if ($desktop || $mobile) {
+                    $banners = collect([[
+                        'id' => null,
+                        'title' => 'LFAMILIA STORE',
+                        'subtitle' => null,
+                        'cta_label' => null,
+                        'cta_href' => $desktop?->target_url ?: $mobile?->target_url,
+                        'show_desktop' => true,
+                        'show_mobile' => true,
+                        'sort_order' => 0,
+                        'desktop_url' => ($desktop ? OptimizedMedia::url($desktop, 'image', 'display') : '') ?: ($mobile ? OptimizedMedia::url($mobile, 'image', 'display') : ''),
+                        'mobile_url' => ($mobile ? OptimizedMedia::url($mobile, 'image', 'display') : '') ?: ($desktop ? OptimizedMedia::url($desktop, 'image', 'display') : ''),
+                    ]]);
+                }
             }
-        }
+
+            return $banners;
+        };
 
         return SeoMetadata::render('Catalog/Index', [
             'categories' => $categories,
             'products' => $products,
             'popularProducts' => $popularProducts,
             'filters' => $filters,
-            'logoUrl' => ($assets->get('logo') ? OptimizedMedia::url($assets->get('logo'), 'image', 'icon') : ''),
-            'faviconUrl' => $assets->get('favicon')?->getFirstMediaUrl('image'),
+            'logoUrl' => fn () => ($loadAssets()->get('logo') ? OptimizedMedia::url($loadAssets()->get('logo'), 'image', 'icon') : ''),
+            'faviconUrl' => fn () => $loadAssets()->get('favicon')?->getFirstMediaUrl('image'),
             'banners' => $banners,
-            'popups' => $content->popups(),
-            'news' => $content->news(3),
-            'reviews' => $content->reviews(6),
+            'popups' => fn () => $content->popups(),
+            'news' => fn () => $content->news(3),
+            'reviews' => fn () => $content->reviews(6),
         ]);
     }
 

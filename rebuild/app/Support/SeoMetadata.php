@@ -14,11 +14,10 @@ final class SeoMetadata
 {
     public static function render(string $component, array $props = []): Response
     {
-        $storefront = app(StorefrontContentService::class)->shared();
-
         return Inertia::render($component, [
             ...$props,
-            'seo' => self::forPage($component, $props, $storefront),
+            // Partial Inertia visits do not need SEO metadata or its database queries.
+            'seo' => fn (): array => self::forPage($component, $props, app(StorefrontContentService::class)->shared()),
         ]);
     }
 

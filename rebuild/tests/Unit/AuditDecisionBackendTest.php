@@ -5,6 +5,7 @@ namespace Tests\Unit;
 use App\Models\Category;
 use App\Models\Product;
 use App\Services\FulfillmentService;
+use App\Services\GuestOrderAccess;
 use App\Support\ServiceHours;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Carbon;
@@ -48,14 +49,38 @@ class AuditDecisionBackendTest extends TestCase
             'password' => bcrypt('not-a-real-password'), 'created_at' => now(), 'updated_at' => now(),
         ]);
         $oldGuest = $this->insertOrder($product->id, $packageId, null, now()->subDays(31));
+        $legacyGuest = $this->insertOrder($product->id, $packageId, null, now()->subDays(32));
         $newGuest = $this->insertOrder($product->id, $packageId, null, now()->subDays(29));
         $member = $this->insertOrder($product->id, $packageId, $userId, now()->subDays(31));
+        DB::table('orders')->where('id', $legacyGuest)->update([
+            'guest_email' => null, 'guest_phone' => null, 'guest_phone_normalized' => null,
+        ]);
+        $access = app(GuestOrderAccess::class);
+        $oldCode = $access->issue($oldGuest);
+        $legacyCode = $access->issue($legacyGuest);
+        $newCode = $access->issue($newGuest);
+        // A legacy member token must never be touched by the guest-only sweep.
+        DB::table('guest_order_tokens')->insert([
+            'order_id' => $member, 'token_hash' => hash('sha256', 'member-fixture'),
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
 
         Artisan::call('lfamilia:purge-guest-data');
 
         $this->assertDatabaseHas('orders', ['id' => $oldGuest, 'guest_email' => null, 'guest_phone' => null, 'guest_phone_normalized' => null, 'total_idr' => 1000]);
         $this->assertNotNull(DB::table('orders')->where('id', $newGuest)->value('guest_email'));
         $this->assertNotNull(DB::table('orders')->where('id', $member)->value('guest_email'));
+        $this->assertFalse($access->matches($oldGuest, $oldCode));
+        $this->assertFalse($access->matches($legacyGuest, $legacyCode));
+        $this->assertTrue($access->matches($newGuest, $newCode));
+        $this->assertDatabaseMissing('guest_order_tokens', ['order_id' => $oldGuest]);
+        $this->assertDatabaseMissing('guest_order_tokens', ['order_id' => $legacyGuest]);
+        $this->assertDatabaseHas('guest_order_tokens', ['order_id' => $newGuest]);
+        $this->assertDatabaseHas('guest_order_tokens', ['order_id' => $member]);
+        $this->post('/orders/check', [
+            'order_number' => DB::table('orders')->where('id', $oldGuest)->value('order_number'),
+            'access_code' => $oldCode,
+        ])->assertSessionHasErrors('order_number');
     }
 
     public function test_manual_fulfillment_service_rejects_empty_code_and_note(): void

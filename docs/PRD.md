@@ -29,7 +29,7 @@ LFAMILIA STORE adalah toko digital Indonesia yang menjual:
 3. **Pulsa, paket data, PLN, dan entertainment** — produk digital dengan input nomor tujuan.
 4. **Alat bantu gratis** — kalkulator win rate, zodiac, magic wheel. Bukan produk berbayar; berfungsi menarik pengunjung.
 
-Pembeli bisa **tanpa akun (guest)** atau **dengan akun (member)**. Guest bisa membeli dan melacak pesanan cukup lewat nomor HP/WhatsApp yang dipakai ketika memesan; akun, nomor pesanan, dan kode akses tidak wajib. Member mendapat saldo, riwayat, tiket, dan tingkatan member.
+Pembeli bisa **tanpa akun (guest)** atau **dengan akun (member)**. Guest wajib memberikan email **dan** nomor HP/WhatsApp saat checkout, tanpa perlu membuat akun. Setelah memesan, guest bisa melacak pesanan cukup lewat nomor HP/WhatsApp yang digunakan; nomor pesanan dan kode akses tidak wajib untuk pelacakan. Member mendapat saldo, riwayat, tiket, dan tingkatan member.
 
 **Model bisnis:** jual produk pihak ketiga dengan selisih harga (margin). Toko tidak memproduksi produk; toko mengatur harga jual, menerima pembayaran, meneruskan pesanan ke penyedia, dan menanggung selisih kalau terjadi kegagalan.
 
@@ -174,7 +174,7 @@ Aturan:
 - Biaya kanal **ditanggung pembeli di atas harga** (dihitung gross-up agar jumlah bersih yang diterima toko utuh). **Saldo LFAMILIA dan QRIS manual tanpa biaya kanal.** Angka biaya per kanal diatur di dokumen pembayaran, bukan di dokumen ini. Top up saldo dikenai biaya yang sama seperti pesanan, tetapi yang dikreditkan ke saldo hanya nominal top up-nya.
 - **Voucher divalidasi di server** saat checkout dan sekali lagi saat pesanan dibuat.
 - **Stok voucher (kode) direservasi** saat pesanan dibuat, dilepas kalau pesanan gagal/kedaluwarsa.
-- Guest wajib memberi kontak (email atau telepon) yang bisa dihubungi; tanpa itu, keluhan tidak bisa ditangani.
+- Guest wajib mengisi **email DAN nomor HP/WhatsApp**, keduanya harus dapat dihubungi. Tanda terima transaksi dikirim lewat email; nomor WhatsApp digunakan untuk pelacakan pesanan dan penanganan keluhan.
 - Guest melacak pesanan cukup dengan **nomor HP/WhatsApp**. Sistem boleh menyediakan tautan/kode akses tambahan, tetapi **tidak wajib** untuk menggunakan fitur lacak.
 
 ---

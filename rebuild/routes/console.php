@@ -278,7 +278,20 @@ Artisan::command('lfamilia:purge-guest-data', function (): int {
             ]);
         });
 
-    $this->info('Data pribadi pesanan tamu dibersihkan: '.$purged.' pesanan (lebih dari '.$days.' hari). Catatan transaksi tetap disimpan.');
+    // Independently sweep all expired guest orders, including rows whose PII was
+    // already cleared by an older purge run. Paid transaction records stay intact.
+    $deletedTokens = 0;
+    DB::table('orders')
+        ->whereNull('user_id')
+        ->where('created_at', '<', $cutoff)
+        ->orderBy('id')
+        ->chunkById(500, function ($orders) use (&$deletedTokens): void {
+            $deletedTokens += DB::table('guest_order_tokens')
+                ->whereIn('order_id', $orders->pluck('id')->all())
+                ->delete();
+        });
+
+    $this->info('Data pribadi pesanan tamu dibersihkan: '.$purged.' pesanan (lebih dari '.$days.' hari). Kode akses kedaluwarsa dihapus: '.$deletedTokens.'. Catatan transaksi tetap disimpan.');
 
     return 0;
 })->purpose('Hapus email dan nomor HP pesanan tamu yang lebih tua dari 30 hari, tanpa menghapus catatan transaksi');
