@@ -396,6 +396,7 @@ function financialSummarySignature(source = quote.value) {
     ]);
 }
 
+/** Sign the public state and quote used for confirmation consistency. */
 function confirmationStateSignature() {
     return JSON.stringify([
         currentQuoteSignature(),
@@ -605,6 +606,7 @@ function basePayload() {
     };
 }
 
+/** Restore previously saved public inputs without restoring a password. */
 function chooseSavedAccount(id) {
     selectedSavedId.value = id;
     const saved = savedAccountItems.value.find((item) => String(item.id) === String(id));
@@ -614,6 +616,7 @@ function chooseSavedAccount(id) {
         ? null : (saved.nickname ? { verified: true, nickname: saved.nickname } : null);
 }
 
+/** Check account eligibility using public, non-password customer fields. */
 async function checkNickname() {
     if (isVoucherProduct.value || !hasAccountStep.value) return true;
 
