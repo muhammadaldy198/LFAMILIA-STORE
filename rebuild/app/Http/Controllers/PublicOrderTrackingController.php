@@ -223,6 +223,7 @@ class PublicOrderTrackingController
     private function recentTransactions(): array
     {
         return DB::table('orders')
+            ->whereNotNull('orders.paid_at')
             ->join('products', 'products.id', '=', 'orders.product_id')
             ->join('product_packages', 'product_packages.id', '=', 'orders.product_package_id')
             ->orderByDesc('orders.id')->limit(20)
