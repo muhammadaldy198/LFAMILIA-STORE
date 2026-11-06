@@ -15,6 +15,9 @@ use Illuminate\Validation\ValidationException;
 
 class CheckoutController
 {
+    /**
+     * Check nickname using public account input without sending passwords to H2H.
+     */
     public function nickname(
         Request $request,
         CheckoutInputValidator $validator,
