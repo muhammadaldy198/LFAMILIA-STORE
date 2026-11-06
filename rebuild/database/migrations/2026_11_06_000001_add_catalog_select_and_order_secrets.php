@@ -6,6 +6,9 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Add select-field metadata and isolated encrypted order inputs.
+     */
     public function up(): void
     {
         Schema::table('product_input_fields', function (Blueprint $table): void {
@@ -22,6 +25,9 @@ return new class extends Migration
         });
     }
 
+    /**
+     * Remove the additive catalog and sensitive-input schema changes.
+     */
     public function down(): void
     {
         Schema::dropIfExists('order_sensitive_inputs');
