@@ -1157,6 +1157,9 @@ class AdminCatalogController
         return back();
     }
 
+    /**
+     * Validate catalog field definitions; password input lengths are checked at checkout.
+     */
     public function fields(Request $request, Product $product, CatalogAudit $audit): RedirectResponse
     {
         $data = $request->validate([
@@ -1165,9 +1168,38 @@ class AdminCatalogController
             'fields.*.field_key' => ['required', 'string', 'max:80', 'regex:/^[a-z][a-z0-9_]*$/', 'distinct'],
             'fields.*.label' => ['required', 'string', 'max:255'],
             'fields.*.placeholder' => ['nullable', 'string', 'max:255'],
-            'fields.*.type' => ['required', Rule::in(['text', 'tel', 'email'])],
+            'fields.*.type' => ['required', Rule::in(['text', 'tel', 'email', 'select', 'password'])],
+            'fields.*.options' => ['nullable', 'array', 'max:50'],
+            'fields.*.options.*.value' => ['required', 'string', 'max:100'],
+            'fields.*.options.*.label' => ['required', 'string', 'max:100'],
             'fields.*.is_required' => ['required', 'boolean'],
         ]);
+        foreach ($data['fields'] as $index => &$field) {
+            if ($field['type'] !== 'select') {
+                $field['options'] = null;
+
+                continue;
+            }
+            $options = $field['options'] ?? [];
+            if ($options === []) {
+                throw ValidationException::withMessages(['fields.'.$index.'.options' => 'Tambahkan minimal satu pilihan.']);
+            }
+            $normalized = [];
+            $seen = [];
+            foreach ($options as $option) {
+                $value = trim((string) ($option['value'] ?? ''));
+                $label = trim((string) ($option['label'] ?? ''));
+                if ($value === '' || $label === '' || in_array($value, $seen, true)
+                    || str_contains($value, '{{') || str_contains($value, '}}')) {
+                    throw ValidationException::withMessages(['fields.'.$index.'.options' => 'Nilai dan label pilihan harus terisi, unik, dan tanpa placeholder template.']);
+                }
+                $seen[] = $value;
+                $normalized[] = ['value' => $value, 'label' => $label];
+            }
+            $field['options'] = $normalized;
+        }
+        unset($field);
+
         $keys = array_column($data['fields'], 'field_key');
         $template = (string) (app(DigiflazzDestinationTemplate::class)->resolve(
             (string) $product->slug,

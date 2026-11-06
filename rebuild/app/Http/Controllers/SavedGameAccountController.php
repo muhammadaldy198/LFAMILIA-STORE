@@ -11,6 +11,9 @@ use Illuminate\Http\Request;
 
 class SavedGameAccountController
 {
+    /**
+     * Persist a saved game account without any password fields.
+     */
     public function store(
         Request $request,
         CheckoutInputValidator $validator,
@@ -28,7 +31,7 @@ class SavedGameAccountController
             ->where('is_active', true)
             ->whereHas('category', fn ($query) => $query->where('slug', 'game'))
             ->firstOrFail();
-        $input = $validator->validate($product, $data['customer_input']);
+        $input = $validator->validate($product, $data['customer_input'], true);
         $checked = $product->nickname_check_enabled ? $nickname->check($product, $input) : null;
 
         $saved = SavedGameAccount::create([
@@ -47,6 +50,9 @@ class SavedGameAccountController
         ], 201);
     }
 
+    /**
+     * Update saved account metadata without retaining credentials.
+     */
     public function update(
         Request $request,
         SavedGameAccount $savedGameAccount,
@@ -67,7 +73,7 @@ class SavedGameAccountController
             ->where('is_active', true)
             ->whereHas('category', fn ($query) => $query->where('slug', 'game'))
             ->firstOrFail();
-        $input = $validator->validate($product, $data['customer_input']);
+        $input = $validator->validate($product, $data['customer_input'], true);
         $checked = $product->nickname_check_enabled ? $nickname->check($product, $input) : null;
 
         $savedGameAccount->forceFill([

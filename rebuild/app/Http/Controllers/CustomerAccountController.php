@@ -235,6 +235,9 @@ class CustomerAccountController
         return Inertia::render('Customer/Codes', ['items' => $items]);
     }
 
+    /**
+     * List saved game accounts using only non-sensitive input fields.
+     */
     public function gameAccounts(Request $request): Response
     {
         return Inertia::render('Customer/GameAccounts', [
@@ -247,11 +250,12 @@ class CustomerAccountController
                 ->map(fn (Product $product): array => [
                     'id' => (int) $product->id,
                     'name' => $product->name,
-                    'fields' => $product->fields->map(fn ($field): array => [
+                    'fields' => $product->fields->filter(fn ($field): bool => $field->type !== 'password')->map(fn ($field): array => [
                         'field_key' => $field->field_key,
                         'label' => $field->label,
                         'placeholder' => $field->placeholder,
                         'type' => $field->type,
+                        'options' => $field->options,
                         'is_required' => (bool) $field->is_required,
                     ])->values()->all(),
                 ]),

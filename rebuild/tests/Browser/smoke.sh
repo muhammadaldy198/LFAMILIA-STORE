@@ -114,6 +114,8 @@ if has_stage checkout; then
     echo "Default favicon is unavailable (GET /favicon.ico)."
     exit 1
   }
+  echo "Capturing select/password checkout screenshots for desktop and mobile"
+  timeout --signal=TERM --kill-after=10s 2m node tests/Browser/catalog-fields-visual.mjs "$CHROME_BIN"
   echo "Running checkout Lab comparison across ten viewports"
   if ! timeout --signal=TERM --kill-after=10s 5m node tests/Browser/checkout-visual.mjs "$CHROME_BIN"; then
     echo "Browser server HTTP errors:"

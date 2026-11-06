@@ -2,9 +2,11 @@
 
 namespace App\Services;
 
+use App\Models\OrderSensitiveInput;
 use App\Models\Product;
 use App\Models\User;
 use App\Services\Fulfillment\DigiflazzDestinationTemplate;
+use App\Services\Fulfillment\FulfillmentTargetBuilder;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -160,16 +162,17 @@ class CheckoutService
         }
 
         $fingerprint = $this->fingerprint($data, $user);
+        $legacyFingerprint = $this->fingerprint($data, $user, true);
         $existing = DB::table('orders')->where('idempotency_key', $data['idempotency_key'])->first();
         if ($existing) {
-            return $this->existingResult($existing, $fingerprint, $data['idempotency_key']);
+            return $this->existingResult($existing, $fingerprint, $data['idempotency_key'], $legacyFingerprint);
         }
 
         $prePrice = $this->pricing->forPackage((int) $data['package_id']);
         $product = Product::with(['fields', 'category'])->findOrFail($prePrice['product_id']);
         $input = $this->inputValidator->validate($product, $data['customer_input']);
         // Verify the original signed H2H outcome; never call H2H again here.
-        $regionNickname = $this->regionProof->assertOrder($product, $input, $data['region_proof'] ?? null);
+        $regionNickname = $this->regionProof->assertOrder($product, $this->inputValidator->publicInput($product, $input), $data['region_proof'] ?? null);
         $nickname = $regionNickname ?? [
             'supported' => (bool) $product->nickname_check_enabled,
             'verified' => false,
@@ -189,7 +192,9 @@ class CheckoutService
                 $price = $this->pricing->forPackage((int) $data['package_id'], true);
                 $lockedProduct = Product::with(['fields', 'category'])->findOrFail($price['product_id']);
                 $lockedInput = $this->inputValidator->validate($lockedProduct, $input);
-                $this->regionProof->assertOrder($lockedProduct, $lockedInput, $data['region_proof'] ?? null);
+                $publicInput = $this->inputValidator->publicInput($lockedProduct, $lockedInput);
+                $sensitiveInput = array_diff_key($lockedInput, $publicInput);
+                $this->regionProof->assertOrder($lockedProduct, $publicInput, $data['region_proof'] ?? null);
                 $member = $user
                     ? $this->membership->discount($user, $price['subtotal_idr'])
                     : ['amount_idr' => 0, 'tier_code' => null, 'discount_bps' => 0, 'profile' => null];
@@ -243,6 +248,13 @@ class CheckoutService
                         $customerNoTemplate,
                         $lockedProduct->fields->pluck('field_key')->all()
                     );
+                    // Preflight new select/password destinations without changing legacy checkout behavior.
+                    if ($sensitiveInput !== [] || $lockedProduct->fields->contains('type', 'select')) {
+                        app(FulfillmentTargetBuilder::class)->customerNo($lockedInput, [
+                            'customer_no_template' => $customerNoTemplate,
+                            'raw_field_keys' => array_keys($sensitiveInput),
+                        ]);
+                    }
                 }
                 $snapshot = [
                     'checkout_fingerprint' => $fingerprint,
@@ -292,7 +304,7 @@ class CheckoutService
                         'discount_idr' => (int) $member['amount_idr'],
                     ] : null,
                     'voucher' => $voucher['snapshot'],
-                    'customer_input' => $lockedInput,
+                    'customer_input' => $publicInput,
                     'nickname' => $nickname,
                 ];
 
@@ -310,7 +322,7 @@ class CheckoutService
                     'payment_route_id' => $paymentRoute['route_id'],
                     'status' => 'PENDING_PAYMENT',
                     'currency' => 'IDR',
-                    'customer_input' => json_encode($lockedInput, JSON_THROW_ON_ERROR),
+                    'customer_input' => json_encode($publicInput, JSON_THROW_ON_ERROR),
                     'snapshot' => json_encode($snapshot, JSON_THROW_ON_ERROR),
                     'cost_idr' => $price['cost_idr'],
                     'margin_idr' => $price['margin_idr'],
@@ -322,6 +334,14 @@ class CheckoutService
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
+
+                foreach ($sensitiveInput as $key => $secret) {
+                    OrderSensitiveInput::create([
+                        'order_id' => $orderId,
+                        'field_key' => $key,
+                        'value' => $secret,
+                    ]);
+                }
 
                 if ($voucher['voucher_id']) {
                     DB::table('voucher_redemptions')->insert([
@@ -371,11 +391,11 @@ class CheckoutService
                 throw $exception;
             }
 
-            return $this->existingResult($existing, $fingerprint, $data['idempotency_key']);
+            return $this->existingResult($existing, $fingerprint, $data['idempotency_key'], $legacyFingerprint);
         }
 
         if (! $result['created']) {
-            return $this->existingResult($result['order'], $fingerprint, $data['idempotency_key']);
+            return $this->existingResult($result['order'], $fingerprint, $data['idempotency_key'], $legacyFingerprint);
         }
 
         $accessCode = $user ? null : $this->guestAccess->issueStable(
@@ -514,7 +534,7 @@ class CheckoutService
     /**
      * @param  array<string, mixed>  $data
      */
-    private function fingerprint(array $data, ?User $user): string
+    private function fingerprint(array $data, ?User $user, bool $legacy = false): string
     {
         $input = $data['customer_input'];
         ksort($input);
@@ -533,19 +553,28 @@ class CheckoutService
             'customer_input' => $input,
         ];
 
-        return hash('sha256', json_encode($payload, JSON_THROW_ON_ERROR));
+        $encoded = json_encode($payload, JSON_THROW_ON_ERROR);
+
+        // Legacy fingerprints predate password fields and must keep retry compatibility.
+        if ($legacy) {
+            return hash('sha256', $encoded);
+        }
+
+        return 'hmac-sha256:'.hash_hmac('sha256', $encoded, (string) config('app.key'));
     }
 
     /**
      * @return array{order:object,access_code:?string,created:bool}
      */
-    private function existingResult(object $order, string $fingerprint, string $idempotencyKey): array
+    private function existingResult(object $order, string $fingerprint, string $idempotencyKey, string $legacyFingerprint): array
     {
         $snapshot = is_string($order->snapshot)
             ? json_decode($order->snapshot, true, 512, JSON_THROW_ON_ERROR)
             : (array) $order->snapshot;
 
-        if (($snapshot['checkout_fingerprint'] ?? null) !== $fingerprint) {
+        $storedFingerprint = (string) ($snapshot['checkout_fingerprint'] ?? '');
+        if ($storedFingerprint === '' || (! hash_equals($storedFingerprint, $fingerprint)
+            && ! hash_equals($storedFingerprint, $legacyFingerprint))) {
             throw new HttpException(409, 'Idempotency key sudah digunakan untuk checkout berbeda.');
         }
 
