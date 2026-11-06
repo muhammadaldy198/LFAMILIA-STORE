@@ -1157,6 +1157,9 @@ class AdminCatalogController
         return back();
     }
 
+    /**
+     * Validate catalog field definitions; password input lengths are checked at checkout.
+     */
     public function fields(Request $request, Product $product, CatalogAudit $audit): RedirectResponse
     {
         $data = $request->validate([
@@ -1186,8 +1189,9 @@ class AdminCatalogController
             foreach ($options as $option) {
                 $value = trim((string) ($option['value'] ?? ''));
                 $label = trim((string) ($option['label'] ?? ''));
-                if ($value === '' || $label === '' || in_array($value, $seen, true)) {
-                    throw ValidationException::withMessages(['fields.'.$index.'.options' => 'Nilai dan label pilihan harus terisi dan nilainya unik.']);
+                if ($value === '' || $label === '' || in_array($value, $seen, true)
+                    || str_contains($value, '{{') || str_contains($value, '}}')) {
+                    throw ValidationException::withMessages(['fields.'.$index.'.options' => 'Nilai dan label pilihan harus terisi, unik, dan tanpa placeholder template.']);
                 }
                 $seen[] = $value;
                 $normalized[] = ['value' => $value, 'label' => $label];
