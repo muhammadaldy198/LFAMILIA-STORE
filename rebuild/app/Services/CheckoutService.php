@@ -248,11 +248,13 @@ class CheckoutService
                         $customerNoTemplate,
                         $lockedProduct->fields->pluck('field_key')->all()
                     );
-                    // Reject invalid destinations before collecting payment, not during fulfillment.
-                    app(FulfillmentTargetBuilder::class)->customerNo($lockedInput, [
-                        'customer_no_template' => $customerNoTemplate,
-                        'raw_field_keys' => array_keys($sensitiveInput),
-                    ]);
+                    // Preflight new select/password destinations without changing legacy checkout behavior.
+                    if ($sensitiveInput !== [] || $lockedProduct->fields->contains('type', 'select')) {
+                        app(FulfillmentTargetBuilder::class)->customerNo($lockedInput, [
+                            'customer_no_template' => $customerNoTemplate,
+                            'raw_field_keys' => array_keys($sensitiveInput),
+                        ]);
+                    }
                 }
                 $snapshot = [
                     'checkout_fingerprint' => $fingerprint,
