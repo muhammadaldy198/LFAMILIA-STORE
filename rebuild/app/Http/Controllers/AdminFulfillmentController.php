@@ -24,6 +24,9 @@ class AdminFulfillmentController
         'FAILED_CONFIRMED', 'BLOCKED', 'MANUAL_PENDING', 'MANUAL_FAILED', 'CANCELLED',
     ];
 
+    /**
+     * Render fulfillment queues while protecting sensitive order details.
+     */
     public function index(Request $request, AdminOrderPresentation $presentation): Response
     {
         $filters = $request->validate([
