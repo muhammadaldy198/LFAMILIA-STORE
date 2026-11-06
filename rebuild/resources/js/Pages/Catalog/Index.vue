@@ -76,6 +76,13 @@ const closePopup=()=>{
     popupOpen.value=false;
 };
 onMounted(()=>{
+    // A hard refresh on a previous load-more URL only contains that one page.
+    // Restore the first batch instead of trapping users on an incomplete grid.
+    if(Number(p.products?.current_page||1)>1){
+        router.get(q({page:''}),{}, {
+            only:listingProps,replace:true,preserveState:true,preserveScroll:true,
+        });
+    }
     mediaQuery=window.matchMedia('(max-width:639px)');
     const updateMobile=()=>{mobile.value=mediaQuery.matches;bannerIndex.value=0};
     updateMobile();

@@ -775,7 +775,7 @@ class FulfillmentService
 
             if ($attempt->status === 'FAILED_CONFIRMED') {
                 throw ValidationException::withMessages([
-                    'fulfillment' => 'Attempt yang sudah terkonfirmasi gagal tidak dapat dicoba ulang. Gunakan Kirim Ulang.',
+                    'fulfillment' => 'Attempt yang sudah terkonfirmasi gagal tidak dapat dicoba ulang. Periksa hasil penyedia dan syarat Kirim Ulang sebelum mengirim ulang.',
                 ]);
             }
             if ($attempt->status !== 'BLOCKED' || $attempt->last_error === 'Semua SKU yang diizinkan telah gagal. Hubungi superadmin.') {

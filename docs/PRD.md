@@ -29,7 +29,7 @@ LFAMILIA STORE adalah toko digital Indonesia yang menjual:
 3. **Pulsa, paket data, PLN, dan entertainment** — produk digital dengan input nomor tujuan.
 4. **Alat bantu gratis** — kalkulator win rate, zodiac, magic wheel. Bukan produk berbayar; berfungsi menarik pengunjung.
 
-Pembeli bisa **tanpa akun (guest)** atau **dengan akun (member)**. Guest bisa membeli dan melacak pesanan cukup lewat nomor HP/WhatsApp yang dipakai ketika memesan; akun, nomor pesanan, dan kode akses tidak wajib. Member mendapat saldo, riwayat, tiket, dan tingkatan member.
+Pembeli bisa **tanpa akun (guest)** atau **dengan akun (member)**. Guest wajib memberikan email **dan** nomor HP/WhatsApp saat checkout, tanpa perlu membuat akun. Setelah memesan, guest bisa melacak pesanan cukup lewat nomor HP/WhatsApp yang digunakan; nomor pesanan dan kode akses tidak wajib untuk pelacakan. Member mendapat saldo, riwayat, tiket, dan tingkatan member.
 
 **Model bisnis:** jual produk pihak ketiga dengan selisih harga (margin). Toko tidak memproduksi produk; toko mengatur harga jual, menerima pembayaran, meneruskan pesanan ke penyedia, dan menanggung selisih kalau terjadi kegagalan.
 

@@ -6,6 +6,13 @@ import { formatTicketDate, ticketStatusLabel } from '../../resources/js/lib/tick
 
 const read = path => readFileSync(new URL('../../resources/js/' + path, import.meta.url), 'utf8');
 
+test('home load-more resets a hard-refreshed deep pagination URL safely', () => {
+    const home = read('Pages/Catalog/Index.vue');
+    assert.match(home, /if\(Number\(p\.products\?\.current_page\|\|1\)>1\)/);
+    assert.match(home, /router\.get\(q\(\{page:''\}\),\{\},/);
+    assert.match(home, /replace:true,preserveState:true,preserveScroll:true/);
+});
+
 test('homepage never renders hardcoded preview news', () => {
     const source = read('Pages/Catalog/Index.vue');
     assert.doesNotMatch(source, /fallbackNews|Contoh Berita|is_preview/);
