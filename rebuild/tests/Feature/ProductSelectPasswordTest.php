@@ -355,4 +355,69 @@ class ProductSelectPasswordTest extends TestCase
             $service, json_encode(['encrypted' => Crypt::encryptString(json_encode($plain, JSON_THROW_ON_ERROR))], JSON_THROW_ON_ERROR)
         ));
     }
+
+    /**
+     * Credential-like braces must be treated as data, never template syntax.
+     */
+    public function test_password_with_braced_text_is_not_parsed_as_provider_placeholder(): void
+    {
+        $product = $this->product(true);
+        $product->update(['customer_no_template' => '{{user_id}}|{{password}}']);
+        $fixture = $this->fixtureCheckout($product);
+        $password = 'p@ss{{phrase}}!';
+        $order = $this->checkout($fixture['package_id'], [
+            'user_id' => '123456789', 'server' => 'os_asia', 'password' => $password,
+        ]);
+        $mapping = DB::table('provider_mappings')->where('id', $fixture['mapping_id'])->firstOrFail();
+
+        $this->assertSame('123456789|'.$password, app(FulfillmentService::class)->digiflazzCustomerNo(
+            $order, $mapping, json_decode($order->snapshot, true, 512, JSON_THROW_ON_ERROR)
+        ));
+    }
+
+    /**
+     * Provider protocol statuses and response codes remain usable for manual retry.
+     */
+    public function test_password_redaction_keeps_digiflazz_failure_status_and_rc(): void
+    {
+        Queue::fake();
+        $product = $this->product(true);
+        $product->update(['customer_no_template' => '{{user_id}}|{{password}}']);
+        $fixture = $this->fixtureCheckout($product);
+        $sku = DB::table('provider_mappings')->where('id', $fixture['mapping_id'])->value('external_sku');
+
+        foreach (['Gagal', '02', 'a'] as $password) {
+            $order = $this->checkout($fixture['package_id'], [
+                'user_id' => '123456789', 'server' => 'os_asia', 'password' => $password,
+            ]);
+            DB::table('orders')->where('id', $order->id)->update(['status' => 'PAID', 'paid_at' => now()]);
+            $service = app(FulfillmentService::class);
+            $service->startOrder((int) $order->id);
+            $attempt = DB::table('fulfillment_attempts')->where('order_id', $order->id)->firstOrFail();
+            $request = [
+                'ref_id' => $attempt->external_reference,
+                'buyer_sku_code' => $sku,
+                'customer_no' => '123456789|'.$password,
+            ];
+            DB::table('fulfillment_attempts')->where('id', $attempt->id)->update([
+                'status' => 'SENDING',
+                'request_payload' => json_encode([
+                    'encrypted' => Crypt::encryptString(json_encode($request, JSON_THROW_ON_ERROR)),
+                ], JSON_THROW_ON_ERROR),
+            ]);
+            $service->applyProviderResult((int) $attempt->id, [
+                ...$request, 'status' => 'Gagal', 'rc' => '02',
+                'message' => 'Akun ditolak: '.$request['customer_no'],
+            ], 'provider_response');
+
+            $stored = DB::table('fulfillment_attempts')->where('id', $attempt->id)->firstOrFail();
+            $this->assertSame('Gagal', $stored->provider_status);
+            $this->assertSame('02', $stored->provider_rc);
+            $this->assertTrue(FulfillmentService::isDefinitiveProviderFailure($stored->provider_status, $stored->provider_rc));
+            $savedResponse = json_decode($stored->response_payload, true, 512, JSON_THROW_ON_ERROR);
+            $this->assertSame('Gagal', $savedResponse['status']);
+            $this->assertSame('02', $savedResponse['rc']);
+            $this->assertSame('FAILED_CONFIRMED', $stored->status);
+        }
+    }
 }
