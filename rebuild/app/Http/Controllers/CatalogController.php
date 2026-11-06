@@ -247,6 +247,9 @@ class CatalogController
         return response()->json(['products' => $products]);
     }
 
+    /**
+     * Assemble customer-visible product data, including configured dropdown fields.
+     */
     public function show(
         Request $request,
         string $slug,
