@@ -174,7 +174,7 @@ Aturan:
 - Biaya kanal **ditanggung pembeli di atas harga** (dihitung gross-up agar jumlah bersih yang diterima toko utuh). **Saldo LFAMILIA dan QRIS manual tanpa biaya kanal.** Angka biaya per kanal diatur di dokumen pembayaran, bukan di dokumen ini. Top up saldo dikenai biaya yang sama seperti pesanan, tetapi yang dikreditkan ke saldo hanya nominal top up-nya.
 - **Voucher divalidasi di server** saat checkout dan sekali lagi saat pesanan dibuat.
 - **Stok voucher (kode) direservasi** saat pesanan dibuat, dilepas kalau pesanan gagal/kedaluwarsa.
-- Guest wajib memberi kontak (email atau telepon) yang bisa dihubungi; tanpa itu, keluhan tidak bisa ditangani.
+- Guest wajib mengisi **email DAN nomor HP/WhatsApp**, keduanya harus dapat dihubungi. Tanda terima transaksi dikirim lewat email; nomor WhatsApp digunakan untuk pelacakan pesanan dan penanganan keluhan.
 - Guest melacak pesanan cukup dengan **nomor HP/WhatsApp**. Sistem boleh menyediakan tautan/kode akses tambahan, tetapi **tidak wajib** untuk menggunakan fitur lacak.
 
 ---
