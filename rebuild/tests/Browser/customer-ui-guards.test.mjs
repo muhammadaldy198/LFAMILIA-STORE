@@ -416,3 +416,17 @@ test('F18 saved game accounts provide real accessible 40px edit and danger butto
     assert.match(game, /@click="edit\(account\)"/);
     assert.match(game, /@click="remove\(account\)"/);
 });
+
+test('verified nickname uses a one-line flagged success without changing the region mismatch warning', () => {
+    const product = read('Pages/Catalog/Show.vue');
+    const validWithRegion = product.match(/<div v-else-if="nicknameResult\?\.verified && nicknameResult\?\.region"[\s\S]*?<\/div>/)?.[0];
+    assert.ok(validWithRegion);
+    assert.match(validWithRegion, /class="lfx-region-line" role="status"/);
+    assert.match(validWithRegion, /✅ <strong>\{\{nicknameResult\.nickname\}\}<\/strong> from \{\{regionName\(nicknameResult\.region\)\}\} \{\{flagEmoji\(nicknameResult\.region\)\}\}/);
+    assert.doesNotMatch(validWithRegion, /lfx-region-banner|Region akun:|· Cocok/);
+    assert.match(product, /v-else-if="nicknameResult\?\.verified" class="lfx-region-line" role="status">✅ <strong>/);
+    assert.match(product, /const flagEmoji = \(code\) => \{/);
+    assert.match(product, /String\.fromCodePoint/);
+    assert.match(product, /v-else-if="regionWarning" class="lfx-region-banner lfx-region-mismatch" role="alert"/);
+    assert.match(product, /\.lfx-region-line \{[^}]*color:#a7f3c4;[^}]*white-space:nowrap;[^}]*overflow-x:auto/);
+});

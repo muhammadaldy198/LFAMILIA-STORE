@@ -206,6 +206,12 @@ const regionName = (code) => {
     try { return new Intl.DisplayNames(['id'], { type: 'region' }).of(String(code).toUpperCase()) || code; }
     catch { return code; }
 };
+/** Convert an ISO two-letter region code into its flag emoji. */
+const flagEmoji = (code) => {
+    const c = String(code || '').toUpperCase();
+    if (!/^[A-Z]{2}$/.test(c)) return '';
+    return String.fromCodePoint(...[...c].map((ch) => 0x1F1E6 + ch.charCodeAt(0) - 65));
+};
 /** Find an alternative product matching the detected account region. */
 const alternativeProduct = computed(() => (props.regionAlternatives || []).find(
     (item) => String(item.nickname_required_region).toUpperCase() === String(nicknameResult.value?.region || '').toUpperCase()
@@ -1015,10 +1021,10 @@ function closeReview() { summaryOpen.value = false; closeConfirmation(); }
   <span v-else>Region akun belum cocok. Periksa kembali Server / Zone ID.</span>
   <Link v-if="alternativeProduct" :href="'/catalog/'+alternativeProduct.slug">Lihat produk {{alternativeProduct.name}}</Link>
 </div>
-<div v-else-if="nicknameResult?.verified && nicknameResult?.region" class="lfx-region-banner lfx-region-valid" role="status">
-  <strong>✓ {{nicknameResult.nickname}}</strong><span>Region akun: {{regionName(nicknameResult.region)}} · Cocok</span>
+<div v-else-if="nicknameResult?.verified && nicknameResult?.region" class="lfx-region-line" role="status">
+  ✅ <strong>{{nicknameResult.nickname}}</strong> from {{regionName(nicknameResult.region)}} {{flagEmoji(nicknameResult.region)}}
 </div>
-<div v-else-if="nicknameResult?.verified" class="lfx-hint">✓ {{nicknameResult.nickname}}</div>
+<div v-else-if="nicknameResult?.verified" class="lfx-region-line" role="status">✅ <strong>{{nicknameResult.nickname}}</strong></div>
 <div v-else-if="nicknameResult?.warning" class="lfx-hint">{{nicknameResult.warning}}</div><div class="lfx-hint"><span>i</span> {{customerText("checkout.account_hint", "Pastikan ID atau Server sudah sesuai sebelum memesan.")}}</div></div></section>
             <section id="lfx-nominal" class="lfx-panel">
               <header class="lfx-panel-header"><span class="lfx-number">2</span><div><h2>{{customerText("checkout.nominal_title", "Pilih Nominal")}}</h2></div></header>
@@ -1218,7 +1224,7 @@ function closeReview() { summaryOpen.value = false; closeConfirmation(); }
 
 <style scoped>
 .lfx-region-banner { display:flex;flex-direction:column;gap:4px;padding:12px 14px;border-radius:12px;margin-top:10px;border:1px solid transparent;font-size:13px;line-height:1.5 }
-.lfx-region-valid { background:#113527;color:#a7f3c4;border-color:#2e7951 }
+.lfx-region-line { margin-top:10px;color:#a7f3c4;font-size:13px;line-height:1.5;white-space:nowrap;overflow-x:auto }
 .lfx-region-mismatch { background:#411c26;color:#ffbac6;border-color:#b94f63 }
 .lfx-region-mismatch a { color:#b4d4ff;text-decoration:underline;font-weight:600 }
 </style>
