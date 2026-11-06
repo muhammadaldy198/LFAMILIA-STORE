@@ -139,6 +139,57 @@ DB::transaction(function (): void {
         ]
     );
 
+
+    // New field types: isolated CI-only product for real desktop/mobile screenshots.
+    $fieldProduct = Product::updateOrCreate(['slug' => 'browser-genshin-field-types'], [
+        'category_id' => $category->id,
+        'name' => 'Genshin Field Types',
+        'publisher' => 'LFAMILIA Regression',
+        'description' => 'Visual regression fixture untuk server dan password via-login.',
+        'fulfillment_mode' => 'AUTO_PROVIDER',
+        'customer_no_template' => '{{user_id}}|{{server}}',
+        'nickname_check_enabled' => false,
+        'is_active' => true,
+    ]);
+    foreach ([
+        ['field_key' => 'user_id', 'label' => 'UID Genshin', 'type' => 'text',
+            'placeholder' => 'Masukkan UID', 'is_required' => true, 'sort_order' => 0],
+        ['field_key' => 'server', 'label' => 'Server', 'type' => 'select',
+            'placeholder' => 'Pilih server', 'is_required' => true, 'sort_order' => 1,
+            'options' => [
+                ['value' => 'os_asia', 'label' => 'Asia'],
+                ['value' => 'os_usa', 'label' => 'America'],
+                ['value' => 'os_euro', 'label' => 'Europe'],
+                ['value' => 'os_cht', 'label' => 'TW, HK, MO'],
+            ]],
+        ['field_key' => 'password', 'label' => 'Password via-login', 'type' => 'password',
+            'placeholder' => 'Masukkan password', 'is_required' => true, 'sort_order' => 2],
+    ] as $field) {
+        $fieldProduct->fields()->updateOrCreate(['field_key' => $field['field_key']], $field);
+    }
+
+    $fieldPackage = $fieldProduct->packages()->updateOrCreate(['code' => 'BROWSER-GENSHIN-60'], [
+        'name' => '60 Crystals', 'nominal_value' => 60, 'sort_order' => 0,
+        'pricing_mode' => 'PERCENT', 'margin_percent' => 10, 'is_active' => true,
+    ]);
+    DB::table('provider_mappings')->updateOrInsert(
+        ['provider_id' => $providerId, 'external_sku' => 'BROWSER-GENSHIN-60'],
+        ['product_package_id' => $fieldPackage->id, 'cost_idr' => 10000,
+            'max_price_idr' => 10000, 'priority' => 1, 'is_active' => true,
+            'created_at' => now(), 'updated_at' => now()]
+    );
+    DB::table('digiflazz_catalog_items')->updateOrInsert(
+        ['buyer_sku_code' => 'BROWSER-GENSHIN-60'],
+        ['product_name' => 'Genshin Field Types 60 Crystals',
+            'category' => 'Games', 'brand' => 'Visual fixture', 'type' => 'Umum',
+            'seller_name' => 'Fixture lokal', 'price_idr' => 10000,
+            'baseline_price_idr' => 10000, 'buyer_active' => true,
+            'seller_active' => true, 'unlimited_stock' => true,
+            'stock' => 0, 'multi' => false,
+            'start_cut_off' => '00:00', 'end_cut_off' => '00:00',
+            'synced_at' => now(), 'created_at' => now(), 'updated_at' => now()]
+    );
+
     // The admin browser smoke imports these SKUs into the fixture product. Drop
     // whatever a previous run imported so the import picker still lists them as
     // unmapped and the duplicate-nominal guard starts from a clean product —
