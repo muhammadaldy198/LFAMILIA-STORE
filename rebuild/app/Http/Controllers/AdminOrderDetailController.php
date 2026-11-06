@@ -14,6 +14,9 @@ use Inertia\Response;
 
 class AdminOrderDetailController
 {
+    /**
+     * Render order details with credential access restricted by fulfillment permission.
+     */
     public function __invoke(Request $request, int $id, AdminOrdersController $orders, AdminOrderPresentation $presentation): Response
     {
         // Do not apply list filters to a direct detail link.
