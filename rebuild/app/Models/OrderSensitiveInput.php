@@ -10,6 +10,11 @@ class OrderSensitiveInput extends Model
 
     protected $hidden = ['value'];
 
+    /**
+     * Encrypt sensitive values transparently at the persistence boundary.
+     *
+     * @return array<string, string>
+     */
     protected function casts(): array
     {
         return ['value' => 'encrypted'];
