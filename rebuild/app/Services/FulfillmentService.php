@@ -107,6 +107,9 @@ class FulfillmentService
         }
     }
 
+    /**
+     * Prepare an immutable provider request and encrypt persisted credential data.
+     */
     public function sendAttempt(int $attemptId): void
     {
         try {
