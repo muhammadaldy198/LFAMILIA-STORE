@@ -11,6 +11,9 @@ use Illuminate\Http\Request;
 
 class SavedGameAccountController
 {
+    /**
+     * Persist a saved game account without any password fields.
+     */
     public function store(
         Request $request,
         CheckoutInputValidator $validator,
@@ -47,6 +50,9 @@ class SavedGameAccountController
         ], 201);
     }
 
+    /**
+     * Update saved account metadata without retaining credentials.
+     */
     public function update(
         Request $request,
         SavedGameAccount $savedGameAccount,
