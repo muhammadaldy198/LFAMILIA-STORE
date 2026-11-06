@@ -30,6 +30,14 @@ class FulfillmentTargetBuilder
 
             $target = (string) array_values($values)[0];
         } else {
+            // Validate placeholders on the template, never on substituted password data.
+            $remainder = preg_replace('/\{\{[a-z][a-z0-9_]*\}\}/', '', $template);
+            if (! is_string($remainder) || preg_match('/\{\{[^}]+\}\}/', $remainder)) {
+                throw ValidationException::withMessages([
+                    'fulfillment' => 'Template customer_no tidak valid.',
+                ]);
+            }
+
             $target = preg_replace_callback(
                 '/\{\{([a-z][a-z0-9_]*)\}\}/',
                 function (array $match) use ($values): string {
@@ -45,7 +53,7 @@ class FulfillmentTargetBuilder
                 $template
             );
 
-            if (! is_string($target) || preg_match('/\{\{[^}]+\}\}/', $target)) {
+            if (! is_string($target)) {
                 throw ValidationException::withMessages([
                     'fulfillment' => 'Template customer_no tidak valid.',
                 ]);
