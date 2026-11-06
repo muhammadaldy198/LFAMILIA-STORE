@@ -139,7 +139,6 @@ DB::transaction(function (): void {
         ]
     );
 
-
     // New field types: isolated CI-only product for real desktop/mobile screenshots.
     $fieldProduct = Product::updateOrCreate(['slug' => 'browser-genshin-field-types'], [
         'category_id' => $category->id,

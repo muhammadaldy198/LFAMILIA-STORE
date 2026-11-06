@@ -90,14 +90,6 @@ jobs:
       - name: Audit frontend dependencies
         run: npm audit --audit-level=high
 
-      # Temporary: exact Pint formatting patch for browser visual fixture.
-      - name: Print Pint fixture patch
-        run: |
-          vendor/bin/pint tests/Browser/fixture.php
-          echo 'BEGIN_FIXTURE_PINT_DIFF'
-          git -C .. diff --unified=3 -- rebuild/tests/Browser/fixture.php
-          echo 'END_FIXTURE_PINT_DIFF'
-
       - name: Validate local Git hooks
         env:
           LFAMILIA_ENABLE_HOOKS: '1'
