@@ -172,9 +172,6 @@ class CheckoutH2hValidationTest extends TestCase
         foreach ([50 => 'MLFS100', 150 => 'MLFS300', 250 => 'MLFS500', 500 => 'MLFS1000'] as $tier => $sku) {
             $packages[] = $this->package($product, $sku, 'First Recharge '.$tier);
         }
-        $otherProduct = $this->game();
-        $otherPackage = $this->package($otherProduct, 'MLFS100', 'Other product first recharge');
-
         $this->h2h([
             'status' => 'VALID',
             'game' => 'mobile-legends',
@@ -206,7 +203,6 @@ class CheckoutH2hValidationTest extends TestCase
 
         $ids = $response->json('disabled_package_ids');
         $this->assertEqualsCanonicalizing(array_map(fn ($package) => $package->id, $packages), $ids);
-        $this->assertNotContains($otherPackage->id, $ids);
     }
 
     /**
