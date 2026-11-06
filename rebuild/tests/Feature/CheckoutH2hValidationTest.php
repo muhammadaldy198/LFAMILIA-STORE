@@ -163,6 +163,150 @@ class CheckoutH2hValidationTest extends TestCase
     }
 
     /**
+     * Real H2H envelopes expose nickname and first-purchase eligibility in nested objects.
+     */
+    public function test_nested_valid_envelope_verifies_nickname_and_disables_four_first_purchase_tiers(): void
+    {
+        $product = $this->game();
+        $packages = [];
+        foreach ([50 => 'MLFS100', 150 => 'MLFS300', 250 => 'MLFS500', 500 => 'MLFS1000'] as $tier => $sku) {
+            $packages[] = $this->package($product, $sku, 'First Recharge '.$tier);
+        }
+        $otherProduct = $this->game();
+        $otherPackage = $this->package($otherProduct, 'MLFS100', 'Other product first recharge');
+
+        $this->h2h([
+            'status' => 'VALID',
+            'game' => 'mobile-legends',
+            'account' => ['id' => '123456', 'zone' => '9876', 'nickname' => 'PlayerAce', 'region' => 'id'],
+            'eligibility' => [
+                'first_purchase' => [
+                    '50' => ['eligible' => false, 'status' => 'ineligible'],
+                    '150' => ['eligible' => false, 'status' => 'ineligible'],
+                    '250' => ['eligible' => false, 'status' => 'ineligible'],
+                    '500' => ['eligible' => false, 'status' => 'ineligible'],
+                ],
+                'first_purchase_eligible' => false,
+                'wdp_limit_remaining' => null,
+                'wdp_eligible' => true,
+                'verification' => 'partial',
+            ],
+            'provider' => 'mobapay',
+            'message' => null,
+            'request_id' => 'h2h-envelope-test',
+        ]);
+
+        $response = $this->nickname($product)->assertOk()
+            ->assertJsonPath('status', 'VALID')
+            ->assertJsonPath('verified', true)
+            ->assertJsonPath('nickname', 'PlayerAce')
+            ->assertJsonPath('region', 'ID')
+            ->assertJsonPath('wdp_eligible', true)
+            ->assertJsonPath('first_purchase.50.eligible', false);
+
+        $ids = $response->json('disabled_package_ids');
+        $this->assertEqualsCanonicalizing(array_map(fn ($package) => $package->id, $packages), $ids);
+        $this->assertNotContains($otherPackage->id, $ids);
+    }
+
+    /**
+     * Nested NOT_FOUND results preserve the specific advisory warning.
+     */
+    public function test_nested_not_found_envelope_remains_unverified(): void
+    {
+        $product = $this->game();
+        $this->h2h([
+            'status' => 'NOT_FOUND',
+            'game' => 'mobile-legends',
+            'account' => ['id' => '123456', 'zone' => '9876', 'nickname' => null, 'region' => null],
+            'eligibility' => ['first_purchase' => null, 'wdp_eligible' => null],
+            'provider' => 'mobapay',
+            'message' => null,
+            'request_id' => 'h2h-not-found-test',
+        ]);
+
+        $this->nickname($product)->assertOk()
+            ->assertJsonPath('status', 'NOT_FOUND')
+            ->assertJsonPath('verified', false)
+            ->assertJsonPath('warning', 'Nickname tidak ditemukan. Periksa kembali data akun.')
+            ->assertJsonPath('disabled_package_ids', []);
+    }
+
+    /**
+     * An incomplete VALID lookup must not make a nickname or package decision.
+     */
+    public function test_nested_valid_envelope_without_nickname_remains_advisory(): void
+    {
+        $product = $this->game();
+        $this->package($product, 'MLFS100', 'First Recharge 50');
+        $this->package($product, 'WDP-TEST', 'Weekly Diamond Pass');
+        $this->h2h([
+            'status' => 'VALID',
+            'game' => 'mobile-legends',
+            'account' => ['id' => '123456', 'zone' => '9876', 'nickname' => null, 'region' => null],
+            'eligibility' => [
+                'first_purchase' => ['50' => ['eligible' => false, 'status' => 'ineligible']],
+                'wdp_eligible' => false,
+                'verification' => 'partial',
+            ],
+            'provider' => 'mobapay',
+            'message' => null,
+            'request_id' => 'h2h-partial-test',
+        ]);
+
+        $this->nickname($product)->assertOk()
+            ->assertJsonPath('verified', false)
+            ->assertJsonPath('warning', 'Nickname belum dapat diverifikasi. Pastikan ID tujuan benar.')
+            ->assertJsonPath('disabled_package_ids', []);
+    }
+
+    /**
+     * WDP eligibility in the real nested envelope disables the pass only.
+     */
+    public function test_nested_wdp_ineligible_envelope_disables_weekly_diamond_pass(): void
+    {
+        $product = $this->game();
+        $regular = $this->package($product, 'MLFS100', '100 Diamonds');
+        $wdp = $this->package($product, 'WDP-TEST', 'Weekly Diamond Pass');
+        $this->h2h([
+            'status' => 'VALID',
+            'game' => 'mobile-legends',
+            'account' => ['id' => '123456', 'zone' => '9876', 'nickname' => 'PlayerAce', 'region' => 'id'],
+            'eligibility' => ['first_purchase' => [], 'wdp_eligible' => false, 'verification' => 'partial'],
+            'provider' => 'mobapay',
+            'message' => null,
+            'request_id' => 'h2h-wdp-test',
+        ]);
+
+        $response = $this->nickname($product)->assertOk()
+            ->assertJsonPath('verified', true)
+            ->assertJsonPath('wdp_eligible', false);
+        $this->assertSame([$wdp->id], $response->json('disabled_package_ids'));
+        $this->assertNotContains($regular->id, $response->json('disabled_package_ids'));
+    }
+
+    /**
+     * Legacy flat and data-wrapped payloads still work, with top-level status authoritative.
+     */
+    public function test_legacy_flat_and_data_wrapped_h2h_envelopes_remain_supported(): void
+    {
+        $product = $this->game();
+        $this->h2hSequence([
+            ['status' => 'VALID', 'data' => ['status' => 'NOT_FOUND', 'nickname' => 'WrappedPlayer', 'region' => 'id']],
+            ['status' => 'VALID', 'nickname' => 'FlatPlayer', 'region' => 'id'],
+        ]);
+
+        $this->nickname($product)->assertOk()
+            ->assertJsonPath('status', 'VALID')
+            ->assertJsonPath('verified', true)
+            ->assertJsonPath('nickname', 'WrappedPlayer');
+        $this->nickname($product)->assertOk()
+            ->assertJsonPath('status', 'VALID')
+            ->assertJsonPath('verified', true)
+            ->assertJsonPath('nickname', 'FlatPlayer');
+    }
+
+    /**
      * Magic Chess first-purchase restrictions map to its own provider SKUs.
      */
     public function test_magic_chess_first_recharge_mapping(): void
