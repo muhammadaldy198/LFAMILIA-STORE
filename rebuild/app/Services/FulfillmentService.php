@@ -7,6 +7,7 @@ use App\Models\OrderSensitiveInput;
 use App\Services\Fulfillment\DigiflazzClient;
 use App\Services\Fulfillment\DigiflazzDestinationTemplate;
 use App\Services\Fulfillment\FulfillmentTargetBuilder;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
@@ -1400,7 +1401,7 @@ class FulfillmentService
         if (is_array($decoded) && isset($decoded['encrypted']) && is_string($decoded['encrypted'])) {
             try {
                 $decoded = json_decode(Crypt::decryptString($decoded['encrypted']), true);
-            } catch (\Illuminate\Contracts\Encryption\DecryptException) {
+            } catch (DecryptException) {
                 return [];
             }
         }
