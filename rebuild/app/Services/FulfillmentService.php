@@ -441,6 +441,7 @@ class FulfillmentService
                 ? trim((string) $response['sn']) : null;
             $providerRc = isset($response['rc']) && is_scalar($response['rc'])
                 ? substr((string) $response['rc'], 0, 40) : null;
+            $providerStatus = substr((string) $response['status'], 0, 40);
 
             // Providers can echo customer_no (including via-login credentials)
             // in any free-text field; redact those echoes before persistence.
@@ -457,12 +458,26 @@ class FulfillmentService
                     }
                 }
                 $serial = $serial === null ? null : str_replace($secrets, '[REDACTED]', $serial);
-                $providerRc = $providerRc === null ? null : str_replace($secrets, '[REDACTED]', $providerRc);
+
+                // Known protocol values are independent of echoed credentials.
+                // Normalize them instead of substring-redacting status or response codes.
+                $providerStatus = match ($this->providerStatus((string) $response['status'])) {
+                    'SUCCESS' => 'Sukses',
+                    'FAILED_CONFIRMED' => 'Gagal',
+                    'PENDING' => 'Pending',
+                    default => str_replace($secrets, '[REDACTED]', $providerStatus),
+                };
+                $providerRc = preg_match('/^[0-9]{2}$/', $responseCode)
+                    ? $responseCode
+                    : ($providerRc === null ? null : str_replace($secrets, '[REDACTED]', $providerRc));
+                $safeResponse['status'] = $providerStatus;
+                if (array_key_exists('rc', $safeResponse)) {
+                    $safeResponse['rc'] = $providerRc;
+                }
             }
 
             $common = [
-                'provider_status' => $secrets === [] ? substr((string) $response['status'], 0, 40)
-                    : str_replace($secrets, '[REDACTED]', substr((string) $response['status'], 0, 40)),
+                'provider_status' => $providerStatus,
                 'provider_rc' => $providerRc,
                 'serial_number' => $serial !== '' ? $serial : null,
                 'price_idr' => $price,
