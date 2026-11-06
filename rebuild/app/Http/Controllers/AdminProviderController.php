@@ -152,8 +152,7 @@ class AdminProviderController
                 'mapping_active' => DB::table('provider_mappings')->where('is_active', true)->count(),
                 'needs_reconciliation' => DB::table('fulfillment_attempts')
                     ->whereIn('status', ['PENDING', 'UNKNOWN', 'SENDING'])->count(),
-                'safe_to_failover' => DB::table('fulfillment_attempts')
-                    ->where('status', 'FAILED_CONFIRMED')->where('safe_to_failover', true)->count(),
+
             ],
         ]);
     }

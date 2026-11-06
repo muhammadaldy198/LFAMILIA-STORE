@@ -82,7 +82,8 @@ class AdminProviderRestorationTest extends TestCase
                 ->where('mappings.data.0.external_sku', 'SAFE-SKU-10')
                 ->where('mappings.data.0.priority', 2)
                 ->where('mappings.data.0.source_position', 1)
-                ->where('summary.mapping_active', fn ($value) => (int) $value >= 1));
+                ->where('summary.mapping_active', fn ($value) => (int) $value >= 1)
+                ->missing('summary.safe_to_failover'));
 
         $this->get('/admin/catalog')->assertOk()->assertInertia(fn (Assert $page) => $page
             ->where('products', function ($products): bool {
