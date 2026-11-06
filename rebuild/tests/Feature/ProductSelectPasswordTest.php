@@ -20,6 +20,9 @@ class ProductSelectPasswordTest extends TestCase
 {
     use DatabaseTransactions;
 
+    /**
+     * Create a product fixture with optional via-login credentials.
+     */
     private function product(bool $withPassword = false): Product
     {
         $product = Product::create([
@@ -55,6 +58,9 @@ class ProductSelectPasswordTest extends TestCase
         return $product;
     }
 
+    /**
+     * Prepare a buyable Digiflazz package for checkout tests.
+     */
     private function fixtureCheckout(Product $product): array
     {
         DB::table('providers')->where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
@@ -78,6 +84,9 @@ class ProductSelectPasswordTest extends TestCase
         return ['package_id' => $package->id, 'mapping_id' => $mappingId];
     }
 
+    /**
+     * Create a guest order through the real checkout service.
+     */
     private function checkout(int $packageId, array $input): object
     {
         $key = 'genshin-fields-'.bin2hex(random_bytes(10));
@@ -93,6 +102,9 @@ class ProductSelectPasswordTest extends TestCase
         return DB::table('orders')->where('idempotency_key', $key)->firstOrFail();
     }
 
+    /**
+     * Ensure select inputs use exact allowed codes.
+     */
     public function test_select_requires_a_valid_code_and_keeps_the_value_not_label(): void
     {
         $product = $this->product();
@@ -114,6 +126,9 @@ class ProductSelectPasswordTest extends TestCase
         ));
     }
 
+    /**
+     * Keep the Genshin server code unchanged through order fulfillment.
+     */
     public function test_genshin_checkout_snapshot_and_provider_target_use_exact_server_code(): void
     {
         $product = $this->product();
@@ -131,6 +146,9 @@ class ProductSelectPasswordTest extends TestCase
         ));
     }
 
+    /**
+     * Persist secrets separately without exposing them in public order records.
+     */
     public function test_password_is_encrypted_and_absent_from_public_order_json(): void
     {
         $product = $this->product(true);
@@ -160,6 +178,9 @@ class ProductSelectPasswordTest extends TestCase
         ));
     }
 
+    /**
+     * Redact failed-provider diagnostics before persistence.
+     */
     public function test_failed_provider_response_never_persists_plaintext_password(): void
     {
         Queue::fake();
@@ -202,6 +223,9 @@ class ProductSelectPasswordTest extends TestCase
         $this->assertSame('BLOCKED', DB::table('orders')->where('id', $order->id)->value('status'));
     }
 
+    /**
+     * Preserve idempotent retries for older, unkeyed fingerprints.
+     */
     public function test_existing_legacy_idempotency_fingerprints_remain_accepted(): void
     {
         $product = $this->product();
@@ -233,6 +257,9 @@ class ProductSelectPasswordTest extends TestCase
         $this->assertSame((int) $order->id, (int) $retried['order']->id);
     }
 
+    /**
+     * Only substitute secret values in explicitly configured templates.
+     */
     public function test_password_can_reach_provider_only_when_template_explicitly_uses_it(): void
     {
         $product = $this->product(true);
@@ -328,5 +355,4 @@ class ProductSelectPasswordTest extends TestCase
             $service, json_encode(['encrypted' => Crypt::encryptString(json_encode($plain, JSON_THROW_ON_ERROR))], JSON_THROW_ON_ERROR)
         ));
     }
-
 }
