@@ -486,6 +486,7 @@ const destinationFormat = ref('');
 const fieldBusy = ref(false);
 const fieldErrors = ref({});
 
+/** Load field definitions and their selectable options into the admin editor. */
 const loadFields = () => {
     fieldRows.value = (product.value?.fields || []).map(row => ({
         field_key: row.field_key, label: row.label, placeholder: row.placeholder || '',
@@ -550,6 +551,7 @@ const showTemplateEditor = computed(() => fieldRows.value.length > 1
 
 // Contoh nilai per kode kolom, dipakai bila admin belum mengisi contoh isian.
 const SAMPLES = { user_id: '12345678', zone_id: '1234', destination: '12345678', email: 'nama@email.com', phone: '08123456789', server: 'os_asia' };
+/** Parse the admin's value|label rows without altering submitted codes. */
 const parseFieldOptions = (text) => String(text || '').split(/\r?\n/)
     .map(line => line.trim()).filter(Boolean).map(line => {
         const separator = line.indexOf('|');
@@ -572,6 +574,7 @@ const preview = computed(() => {
 });
 
 const fieldSaved = ref(false);
+/** Save field definitions after converting dropdown option rows. */
 const saveFields = () => {
     fieldBusy.value = true;
     fieldErrors.value = {};
