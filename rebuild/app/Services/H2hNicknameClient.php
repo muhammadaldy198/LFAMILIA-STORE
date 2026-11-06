@@ -54,10 +54,21 @@ class H2hNicknameClient
                 return null;
             }
 
-            // Accept both flat and nested data fields, but never trust the status in data.
+            // H2H nests account and eligibility at the top level; older replies
+            // may put these values directly in the response or inside data.
             $payload = is_array($json['data'] ?? null) ? $json['data'] : [];
+            $merged = [...$payload, ...$json];
+            $account = is_array($merged['account'] ?? null) ? $merged['account'] : [];
+            $eligibility = is_array($merged['eligibility'] ?? null) ? $merged['eligibility'] : [];
 
-            return [...$payload, ...$json];
+            return [
+                ...$merged,
+                'status' => $json['status'],
+                'nickname' => $account['nickname'] ?? $merged['nickname'] ?? null,
+                'region' => $account['region'] ?? $merged['region'] ?? null,
+                'first_purchase' => $eligibility['first_purchase'] ?? $merged['first_purchase'] ?? null,
+                'wdp_eligible' => $eligibility['wdp_eligible'] ?? $merged['wdp_eligible'] ?? null,
+            ];
         } catch (Throwable) {
             return null;
         }
