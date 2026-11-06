@@ -235,6 +235,9 @@ class CustomerAccountController
         return Inertia::render('Customer/Codes', ['items' => $items]);
     }
 
+    /**
+     * List saved game accounts using only non-sensitive input fields.
+     */
     public function gameAccounts(Request $request): Response
     {
         return Inertia::render('Customer/GameAccounts', [
