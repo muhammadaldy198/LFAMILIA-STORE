@@ -6,6 +6,7 @@ use App\Models\OrderSensitiveInput;
 use App\Models\Product;
 use App\Models\User;
 use App\Services\Fulfillment\DigiflazzDestinationTemplate;
+use App\Services\Fulfillment\FulfillmentTargetBuilder;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -247,6 +248,11 @@ class CheckoutService
                         $customerNoTemplate,
                         $lockedProduct->fields->pluck('field_key')->all()
                     );
+                    // Reject invalid destinations before collecting payment, not during fulfillment.
+                    app(FulfillmentTargetBuilder::class)->customerNo($lockedInput, [
+                        'customer_no_template' => $customerNoTemplate,
+                        'raw_field_keys' => array_keys($sensitiveInput),
+                    ]);
                 }
                 $snapshot = [
                     'checkout_fingerprint' => $fingerprint,
