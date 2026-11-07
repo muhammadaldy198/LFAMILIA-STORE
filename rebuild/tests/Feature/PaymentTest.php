@@ -2631,4 +2631,604 @@ class PaymentTest extends TestCase
 
         $this->assertNull(collect($channels)->firstWhere('code', 'qris'));
     }
+
+    // ---------------------------------------------------------------
+    // Audit PR 4: locked-state revalidation, CREATING recovery,
+    // payment-scoped Midtrans dedupe.
+    // ---------------------------------------------------------------
+
+    private function creatingPaymentRow(
+        int $routeId,
+        ?int $orderId,
+        string $reference,
+        int $amount,
+        string $gateway = 'MIDTRANS',
+        string $channel = 'qris',
+        ?int $topupId = null,
+        int $staleMinutes = 10
+    ): int {
+        return DB::table('payment_transactions')->insertGetId([
+            'order_id' => $orderId,
+            'wallet_topup_id' => $topupId,
+            'payment_route_id' => $routeId,
+            'gateway_code' => $gateway,
+            'channel_code' => $channel,
+            'merchant_reference' => $reference,
+            'amount_idr' => $amount,
+            'status' => 'CREATING',
+            'request_fingerprint' => hash('sha256', $reference),
+            'idempotency_key' => 'pr4-'.strtolower($reference),
+            'created_at' => now()->subMinutes($staleMinutes),
+            'updated_at' => now()->subMinutes($staleMinutes),
+        ]);
+    }
+
+    private function seedMidtransCredential(): void
+    {
+        IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
+            'config_ciphertext' => ['server_key' => 'server-test', 'is_production' => false],
+            'is_active' => true,
+        ]);
+    }
+
+    public function test_start_order_revalidates_status_from_the_locked_row(): void
+    {
+        $catalog = $this->catalog();
+        $this->route('qris', 'MIDTRANS', 0, 70, 'qris');
+        $this->seedMidtransCredential();
+        $creates = 0;
+        Http::fake(function ($request) use (&$creates) {
+            if (str_contains($request->url(), 'snap/v1/transactions')) {
+                $creates++;
+
+                return Http::response(['token' => 'should-never-be-created', 'redirect_url' => 'https://example.test/x']);
+            }
+
+            return Http::response([], 404);
+        });
+        $checkout = $this->postJson('/checkout/orders', $this->guestCheckout(
+            $catalog['package_id'], 'qris', 'pr4-locked-status-order'
+        ))->assertCreated();
+        $stale = DB::table('orders')->where('order_number', $checkout->json('order_number'))->firstOrFail();
+        // The order is cancelled after the caller's snapshot was taken.
+        DB::table('orders')->where('id', $stale->id)->update(['status' => 'CANCELLED']);
+
+        try {
+            app(PaymentService::class)->startOrder($stale, 'pr4-locked-status-payment', null);
+            $this->fail('startOrder should have rejected the cancelled order.');
+        } catch (ValidationException $exception) {
+            $this->assertSame('Pesanan tidak menunggu pembayaran.', $exception->errors()['payment'][0]);
+        }
+        $this->assertSame(0, DB::table('payment_transactions')->where('order_id', $stale->id)->count());
+        $this->assertSame(0, $creates);
+    }
+
+    public function test_start_order_revalidates_expiry_from_the_locked_row(): void
+    {
+        $catalog = $this->catalog();
+        $this->route('qris', 'MIDTRANS', 0, 70, 'qris');
+        $this->seedMidtransCredential();
+        Http::fake(['*' => Http::response([], 404)]);
+        $checkout = $this->postJson('/checkout/orders', $this->guestCheckout(
+            $catalog['package_id'], 'qris', 'pr4-locked-expiry-order'
+        ))->assertCreated();
+        $stale = DB::table('orders')->where('order_number', $checkout->json('order_number'))->firstOrFail();
+        // The order reaches its expiry after the caller's snapshot was taken.
+        DB::table('orders')->where('id', $stale->id)->update(['expires_at' => now()->subMinute()]);
+
+        try {
+            app(PaymentService::class)->startOrder($stale, 'pr4-locked-expiry-payment', null);
+            $this->fail('startOrder should have rejected the expired order.');
+        } catch (ValidationException $exception) {
+            $this->assertSame('Pesanan sudah kedaluwarsa.', $exception->errors()['payment'][0]);
+        }
+        $this->assertSame('EXPIRED', DB::table('orders')->where('id', $stale->id)->value('status'));
+        $this->assertSame(0, DB::table('payment_transactions')->where('order_id', $stale->id)->count());
+    }
+
+    public function test_recovery_redrives_creation_when_gateway_definitively_has_no_transaction(): void
+    {
+        $catalog = $this->catalog();
+        $routeId = $this->route('qris', 'MIDTRANS', 0, 70, 'qris');
+        $this->seedMidtransCredential();
+        $checkout = $this->postJson('/checkout/orders', $this->guestCheckout(
+            $catalog['package_id'], 'qris', 'pr4-recovery-redrive-order'
+        ))->assertCreated();
+        $order = DB::table('orders')->where('order_number', $checkout->json('order_number'))->firstOrFail();
+        $reference = 'PAY-PR4-REDRIVE-'.strtoupper(bin2hex(random_bytes(3)));
+        $paymentId = $this->creatingPaymentRow($routeId, (int) $order->id, $reference, (int) $order->total_idr);
+
+        $creates = [];
+        Http::fake(function ($request) use (&$creates) {
+            if (str_contains($request->url(), '/status')) {
+                return Http::response([
+                    'status_code' => '404',
+                    'status_message' => "Transaction doesn't exist.",
+                ], 404);
+            }
+            if (str_contains($request->url(), 'snap/v1/transactions')) {
+                $creates[] = json_decode($request->body(), true, 512, JSON_THROW_ON_ERROR);
+
+                return Http::response(['token' => 'recovered-token', 'redirect_url' => 'https://example.test/recovered']);
+            }
+
+            return Http::response([], 404);
+        });
+
+        Artisan::call('lfamilia:recover-creating-payments');
+
+        $this->assertCount(1, $creates);
+        $this->assertSame($reference, $creates[0]['transaction_details']['order_id']);
+        $payment = DB::table('payment_transactions')->where('id', $paymentId)->firstOrFail();
+        $this->assertSame('PENDING', $payment->status);
+        $this->assertStringContainsString('recovered-token', (string) $payment->public_payload);
+    }
+
+    public function test_recovery_adopts_existing_gateway_transaction_without_creating(): void
+    {
+        $catalog = $this->catalog();
+        $routeId = $this->route('qris', 'MIDTRANS', 0, 70, 'qris');
+        $this->seedMidtransCredential();
+        $checkout = $this->postJson('/checkout/orders', $this->guestCheckout(
+            $catalog['package_id'], 'qris', 'pr4-recovery-adopt-order'
+        ))->assertCreated();
+        $order = DB::table('orders')->where('order_number', $checkout->json('order_number'))->firstOrFail();
+        $reference = 'PAY-PR4-ADOPT-'.strtoupper(bin2hex(random_bytes(3)));
+        $paymentId = $this->creatingPaymentRow($routeId, (int) $order->id, $reference, (int) $order->total_idr);
+
+        $creates = 0;
+        Http::fake(function ($request) use (&$creates, $reference, $order) {
+            if (str_contains($request->url(), '/status')) {
+                return Http::response([
+                    'transaction_id' => 'adopted-transaction',
+                    'transaction_status' => 'settlement',
+                    'status_code' => '200',
+                    'order_id' => $reference,
+                    'gross_amount' => number_format((int) $order->total_idr, 2, '.', ''),
+                    'fraud_status' => 'accept',
+                ]);
+            }
+            if (str_contains($request->url(), 'snap/v1/transactions')) {
+                $creates++;
+
+                return Http::response(['token' => 'must-not-happen', 'redirect_url' => 'https://example.test/x']);
+            }
+
+            return Http::response([], 404);
+        });
+
+        Artisan::call('lfamilia:recover-creating-payments');
+
+        $this->assertSame(0, $creates);
+        $this->assertSame('PAID', DB::table('payment_transactions')->where('id', $paymentId)->value('status'));
+        $this->assertSame('PAID', DB::table('orders')->where('id', $order->id)->value('status'));
+    }
+
+    public function test_recovery_adopts_pending_gateway_transaction_out_of_creating(): void
+    {
+        $catalog = $this->catalog();
+        $routeId = $this->route('qris', 'MIDTRANS', 0, 70, 'qris');
+        $this->seedMidtransCredential();
+        $checkout = $this->postJson('/checkout/orders', $this->guestCheckout(
+            $catalog['package_id'], 'qris', 'pr4-recovery-adopt-pending-order'
+        ))->assertCreated();
+        $order = DB::table('orders')->where('order_number', $checkout->json('order_number'))->firstOrFail();
+        $reference = 'PAY-PR4-ADOPT-PENDING-'.strtoupper(bin2hex(random_bytes(3)));
+        $paymentId = $this->creatingPaymentRow($routeId, (int) $order->id, $reference, (int) $order->total_idr);
+
+        Http::fake(function ($request) use ($reference, $order) {
+            if (str_contains($request->url(), '/status')) {
+                return Http::response([
+                    'transaction_id' => 'adopted-pending-transaction',
+                    'transaction_status' => 'pending',
+                    'status_code' => '201',
+                    'order_id' => $reference,
+                    'gross_amount' => number_format((int) $order->total_idr, 2, '.', ''),
+                    'fraud_status' => 'accept',
+                ]);
+            }
+
+            return Http::response([], 404);
+        });
+
+        $outcome = app(PaymentService::class)->recoverStuckCreating($paymentId);
+
+        $this->assertSame('adopted', $outcome);
+        $this->assertSame('PENDING', DB::table('payment_transactions')->where('id', $paymentId)->value('status'));
+        $this->assertSame('PENDING_PAYMENT', DB::table('orders')->where('id', $order->id)->value('status'));
+    }
+
+    public function test_recovery_terminates_when_order_is_no_longer_payable(): void
+    {
+        $catalog = $this->catalog();
+        $routeId = $this->route('qris', 'MIDTRANS', 0, 70, 'qris');
+        $this->seedMidtransCredential();
+        $checkout = $this->postJson('/checkout/orders', $this->guestCheckout(
+            $catalog['package_id'], 'qris', 'pr4-recovery-terminate-order'
+        ))->assertCreated();
+        $order = DB::table('orders')->where('order_number', $checkout->json('order_number'))->firstOrFail();
+        DB::table('orders')->where('id', $order->id)->update(['status' => 'CANCELLED']);
+        $reference = 'PAY-PR4-TERMINATE-'.strtoupper(bin2hex(random_bytes(3)));
+        $paymentId = $this->creatingPaymentRow($routeId, (int) $order->id, $reference, (int) $order->total_idr);
+
+        $creates = 0;
+        Http::fake(function ($request) use (&$creates) {
+            if (str_contains($request->url(), '/status')) {
+                return Http::response([
+                    'status_code' => '404',
+                    'status_message' => "Transaction doesn't exist.",
+                ], 404);
+            }
+            if (str_contains($request->url(), 'snap/v1/transactions')) {
+                $creates++;
+
+                return Http::response(['token' => 'must-not-happen', 'redirect_url' => 'https://example.test/x']);
+            }
+
+            return Http::response([], 404);
+        });
+
+        Artisan::call('lfamilia:recover-creating-payments');
+
+        $this->assertSame(0, $creates);
+        $this->assertSame('FAILED', DB::table('payment_transactions')->where('id', $paymentId)->value('status'));
+        $this->assertSame('CANCELLED', DB::table('orders')->where('id', $order->id)->value('status'));
+        $this->assertSame(0, DB::table('order_events')
+            ->where('order_id', $order->id)->where('event_type', 'PAYMENT_VERIFIED')->count());
+    }
+
+    public function test_recovery_leaves_fresh_creating_payments_untouched(): void
+    {
+        $catalog = $this->catalog();
+        $routeId = $this->route('qris', 'MIDTRANS', 0, 70, 'qris');
+        $this->seedMidtransCredential();
+        $checkout = $this->postJson('/checkout/orders', $this->guestCheckout(
+            $catalog['package_id'], 'qris', 'pr4-recovery-fresh-order'
+        ))->assertCreated();
+        $order = DB::table('orders')->where('order_number', $checkout->json('order_number'))->firstOrFail();
+        $reference = 'PAY-PR4-FRESH-'.strtoupper(bin2hex(random_bytes(3)));
+        $paymentId = $this->creatingPaymentRow($routeId, (int) $order->id, $reference, (int) $order->total_idr, staleMinutes: 2);
+
+        $statusCalls = 0;
+        Http::fake(function ($request) use (&$statusCalls) {
+            if (str_contains($request->url(), '/status')) {
+                $statusCalls++;
+            }
+
+            return Http::response([], 404);
+        });
+
+        Artisan::call('lfamilia:recover-creating-payments');
+
+        $this->assertSame(0, $statusCalls);
+        $this->assertSame('CREATING', DB::table('payment_transactions')->where('id', $paymentId)->value('status'));
+    }
+
+    public function test_recovery_leaves_row_unchanged_when_gateway_inquiry_is_inconclusive(): void
+    {
+        $catalog = $this->catalog();
+        $routeId = $this->route('qris', 'MIDTRANS', 0, 70, 'qris');
+        $this->seedMidtransCredential();
+        $checkout = $this->postJson('/checkout/orders', $this->guestCheckout(
+            $catalog['package_id'], 'qris', 'pr4-recovery-inconclusive-order'
+        ))->assertCreated();
+        $order = DB::table('orders')->where('order_number', $checkout->json('order_number'))->firstOrFail();
+        $reference = 'PAY-PR4-INCONCLUSIVE-'.strtoupper(bin2hex(random_bytes(3)));
+        $paymentId = $this->creatingPaymentRow($routeId, (int) $order->id, $reference, (int) $order->total_idr);
+
+        Http::fake(['*' => Http::response(['error' => 'gateway unavailable'], 503)]);
+
+        $outcome = app(PaymentService::class)->recoverStuckCreating($paymentId);
+
+        $this->assertSame('inconclusive', $outcome);
+        $this->assertSame('CREATING', DB::table('payment_transactions')->where('id', $paymentId)->value('status'));
+    }
+
+    public function test_recovery_cannot_redrive_the_same_payment_twice(): void
+    {
+        $catalog = $this->catalog();
+        $routeId = $this->route('qris', 'MIDTRANS', 0, 70, 'qris');
+        $this->seedMidtransCredential();
+        $checkout = $this->postJson('/checkout/orders', $this->guestCheckout(
+            $catalog['package_id'], 'qris', 'pr4-recovery-twice-order'
+        ))->assertCreated();
+        $order = DB::table('orders')->where('order_number', $checkout->json('order_number'))->firstOrFail();
+        $reference = 'PAY-PR4-TWICE-'.strtoupper(bin2hex(random_bytes(3)));
+        $paymentId = $this->creatingPaymentRow($routeId, (int) $order->id, $reference, (int) $order->total_idr);
+
+        $creates = 0;
+        Http::fake(function ($request) use (&$creates) {
+            if (str_contains($request->url(), '/status')) {
+                return Http::response([
+                    'status_code' => '404',
+                    'status_message' => "Transaction doesn't exist.",
+                ], 404);
+            }
+            if (str_contains($request->url(), 'snap/v1/transactions')) {
+                $creates++;
+
+                return Http::response(['token' => 'only-once-token', 'redirect_url' => 'https://example.test/once']);
+            }
+
+            return Http::response([], 404);
+        });
+
+        $service = app(PaymentService::class);
+        $this->assertSame('redriven', $service->recoverStuckCreating($paymentId));
+        $this->assertSame('skipped', $service->recoverStuckCreating($paymentId));
+        $this->assertSame(1, $creates);
+    }
+
+    public function test_recovery_adopts_existing_doku_transaction_without_creating(): void
+    {
+        $catalog = $this->catalog();
+        $routeId = $this->route('virtual_account', 'DOKU', 2500, 0, null, [
+            'api_path' => '/checkout/v1/payment',
+            'public_paths' => ['payment_url' => 'response.payment.url'],
+        ]);
+        IntegrationCredential::updateOrCreate(['code' => 'doku'], [
+            'config_ciphertext' => [
+                'client_id' => 'MCH-TEST',
+                'secret_key' => 'doku-secret',
+                'base_url' => 'https://api-sandbox.doku.test',
+            ],
+            'is_active' => true,
+        ]);
+        $checkout = $this->postJson('/checkout/orders', $this->guestCheckout(
+            $catalog['package_id'], 'virtual_account', 'pr4-recovery-doku-order'
+        ))->assertCreated();
+        $order = DB::table('orders')->where('order_number', $checkout->json('order_number'))->firstOrFail();
+        $reference = 'PAY-PR4-DOKU-'.strtoupper(bin2hex(random_bytes(3)));
+        $paymentId = $this->creatingPaymentRow(
+            $routeId, (int) $order->id, $reference, (int) $order->total_idr, 'DOKU', 'virtual_account'
+        );
+
+        $creates = 0;
+        Http::fake(function ($request) use (&$creates, $reference, $order) {
+            if ($request->method() === 'GET' && str_contains($request->url(), '/orders/v1/status/')) {
+                return Http::response([
+                    'order' => ['invoice_number' => $reference, 'amount' => (int) $order->total_idr],
+                    'transaction' => ['status' => 'SUCCESS'],
+                ]);
+            }
+            if (str_contains($request->url(), '/checkout/v1/payment')) {
+                $creates++;
+
+                return Http::response(['error' => 'must not create'], 500);
+            }
+
+            return Http::response([], 404);
+        });
+
+        Artisan::call('lfamilia:recover-creating-payments');
+
+        $this->assertSame(0, $creates);
+        $this->assertSame('PAID', DB::table('payment_transactions')->where('id', $paymentId)->value('status'));
+        $this->assertSame('PAID', DB::table('orders')->where('id', $order->id)->value('status'));
+    }
+
+    public function test_recovery_redrives_topup_creation_when_gateway_has_no_transaction(): void
+    {
+        $routeId = $this->route('qris', 'MIDTRANS', 0, 70, 'qris');
+        $this->seedMidtransCredential();
+        $user = User::create([
+            'name' => 'Recovery Topup Buyer',
+            'email' => 'recovery-topup@example.test',
+            'phone' => '081234567893',
+            'password' => Hash::make('StrongPassword123!'),
+            'email_verified_at' => now(),
+        ]);
+        $wallet = DB::table('wallets')->where('user_id', $user->id)->firstOrFail();
+        $channelId = DB::table('payment_channels')->where('code', 'qris')->value('id');
+        $topupId = DB::table('wallet_topups')->insertGetId([
+            'wallet_id' => $wallet->id,
+            'user_id' => $user->id,
+            'payment_channel_id' => $channelId,
+            'payment_route_id' => $routeId,
+            'amount_idr' => 10000,
+            'fee_idr' => 700,
+            'total_idr' => 10700,
+            'status' => 'PENDING_PAYMENT',
+            'idempotency_key' => 'pr4-topup-direct-0001',
+            'request_fingerprint' => hash('sha256', 'pr4-topup'),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $reference = 'TOP-PR4-REDRIVE-'.strtoupper(bin2hex(random_bytes(3)));
+        $paymentId = $this->creatingPaymentRow($routeId, null, $reference, 10700, 'MIDTRANS', 'qris', (int) $topupId);
+
+        $creates = [];
+        Http::fake(function ($request) use (&$creates) {
+            if (str_contains($request->url(), '/status')) {
+                return Http::response([
+                    'status_code' => '404',
+                    'status_message' => "Transaction doesn't exist.",
+                ], 404);
+            }
+            if (str_contains($request->url(), 'snap/v1/transactions')) {
+                $creates[] = json_decode($request->body(), true, 512, JSON_THROW_ON_ERROR);
+
+                return Http::response(['token' => 'topup-recovered-token', 'redirect_url' => 'https://example.test/topup']);
+            }
+
+            return Http::response([], 404);
+        });
+
+        Artisan::call('lfamilia:recover-creating-payments');
+
+        $this->assertCount(1, $creates);
+        $this->assertSame($reference, $creates[0]['transaction_details']['order_id']);
+        $this->assertSame('PENDING', DB::table('payment_transactions')->where('id', $paymentId)->value('status'));
+    }
+
+    public function test_admin_check_payment_on_creating_payment_drives_recovery(): void
+    {
+        Queue::fake();
+        $catalog = $this->catalog();
+        $routeId = $this->route('qris', 'MIDTRANS', 0, 70, 'qris');
+        $this->seedMidtransCredential();
+        $checkout = $this->postJson('/checkout/orders', $this->guestCheckout(
+            $catalog['package_id'], 'qris', 'pr4-admin-creating-order'
+        ))->assertCreated();
+        $order = DB::table('orders')->where('order_number', $checkout->json('order_number'))->firstOrFail();
+        $reference = 'PAY-PR4-ADMIN-'.strtoupper(bin2hex(random_bytes(3)));
+        $paymentId = $this->creatingPaymentRow(
+            $routeId, (int) $order->id, $reference, (int) $order->total_idr, staleMinutes: 1
+        );
+
+        $creates = 0;
+        Http::fake(function ($request) use (&$creates) {
+            if (str_contains($request->url(), '/status')) {
+                return Http::response([
+                    'status_code' => '404',
+                    'status_message' => "Transaction doesn't exist.",
+                ], 404);
+            }
+            if (str_contains($request->url(), 'snap/v1/transactions')) {
+                $creates++;
+
+                return Http::response(['token' => 'admin-recovered-token', 'redirect_url' => 'https://example.test/admin']);
+            }
+
+            return Http::response([], 404);
+        });
+        $admin = $this->createAdmin([
+            'name' => 'Creating Checker',
+            'email' => 'creating-check-'.bin2hex(random_bytes(3)).'@example.test',
+            'password' => bcrypt('payment-test-password'),
+            'role' => 'SUPER_ADMIN',
+            'is_active' => true,
+        ]);
+        $this->actingAs($admin, 'admin')
+            ->post('/admin/orders/'.$order->id.'/check-payment')
+            ->assertRedirect();
+
+        $this->assertSame(1, $creates);
+        $this->assertSame('PENDING', DB::table('payment_transactions')->where('id', $paymentId)->value('status'));
+        $this->assertSame(1, DB::table('audit_logs')->where('action', 'order.payment.checked')
+            ->where('target_id', (string) $order->id)->count());
+    }
+
+    public function test_midtrans_notifications_with_identical_tuples_for_two_payments_are_both_processed(): void
+    {
+        $catalog = $this->catalog();
+        $this->route('qris', 'MIDTRANS', 0, 70, 'qris');
+        $this->seedMidtransCredential();
+        Http::fake(function ($request) {
+            if (str_contains($request->url(), 'snap/v1/transactions')) {
+                return Http::response(['token' => 'tuple-token', 'redirect_url' => 'https://example.test/pay']);
+            }
+            if (preg_match('#/v2/(.+)/status$#', $request->url(), $matches)) {
+                $reference = rawurldecode($matches[1]);
+                $local = DB::table('payment_transactions')
+                    ->where('merchant_reference', $reference)->firstOrFail();
+
+                return Http::response([
+                    'transaction_id' => '',
+                    'transaction_status' => 'pending',
+                    'status_code' => '200',
+                    'order_id' => $reference,
+                    'gross_amount' => number_format((int) $local->amount_idr, 2, '.', ''),
+                    'fraud_status' => 'accept',
+                ]);
+            }
+
+            return Http::response([], 404);
+        });
+
+        $payments = [];
+        foreach (['a', 'b'] as $suffix) {
+            $checkout = $this->postJson('/checkout/orders', $this->guestCheckout(
+                $catalog['package_id'], 'qris', 'pr4-tuple-order-'.$suffix
+            ))->assertCreated();
+            $this->postJson('/payments/orders/'.$checkout->json('order_number'), [
+                'idempotency_key' => 'pr4-tuple-payment-'.$suffix,
+                'access_code' => $checkout->json('access_code'),
+            ])->assertOk();
+            $payments[$suffix] = DB::table('payment_transactions')
+                ->where('idempotency_key', 'pr4-tuple-payment-'.$suffix)->firstOrFail();
+        }
+
+        foreach (['a', 'b'] as $suffix) {
+            $payment = $payments[$suffix];
+            $gross = number_format((int) $payment->amount_idr, 2, '.', '');
+            // Identical dedupe tuples: no transaction_id, no settlement_time,
+            // same transaction_status and status_code for both payments.
+            $notification = [
+                'transaction_status' => 'pending',
+                'status_code' => '200',
+                'order_id' => $payment->merchant_reference,
+                'gross_amount' => $gross,
+                'fraud_status' => 'accept',
+            ];
+            $notification['signature_key'] = hash('sha512',
+                $notification['order_id'].$notification['status_code'].$notification['gross_amount'].'server-test'
+            );
+            $this->postJson('/api/payments/midtrans/notification', $notification)
+                ->assertOk()->assertJsonPath('status', 'ok');
+        }
+
+        $this->assertSame(2, DB::table('payment_callbacks')->where('gateway_code', 'MIDTRANS')->count());
+    }
+
+    public function test_midtrans_duplicate_notification_for_the_same_payment_is_still_rejected(): void
+    {
+        $catalog = $this->catalog();
+        $this->route('qris', 'MIDTRANS', 0, 70, 'qris');
+        $this->seedMidtransCredential();
+        Http::fake(function ($request) {
+            if (str_contains($request->url(), 'snap/v1/transactions')) {
+                return Http::response(['token' => 'dup-token', 'redirect_url' => 'https://example.test/pay']);
+            }
+            if (preg_match('#/v2/(.+)/status$#', $request->url(), $matches)) {
+                $reference = rawurldecode($matches[1]);
+                $local = DB::table('payment_transactions')
+                    ->where('merchant_reference', $reference)->firstOrFail();
+
+                return Http::response([
+                    'transaction_id' => 'dup-transaction',
+                    'transaction_status' => 'settlement',
+                    'status_code' => '200',
+                    'order_id' => $reference,
+                    'gross_amount' => number_format((int) $local->amount_idr, 2, '.', ''),
+                    'fraud_status' => 'accept',
+                    'settlement_time' => '2026-11-07 10:00:00',
+                ]);
+            }
+
+            return Http::response([], 404);
+        });
+
+        $checkout = $this->postJson('/checkout/orders', $this->guestCheckout(
+            $catalog['package_id'], 'qris', 'pr4-duplicate-order'
+        ))->assertCreated();
+        $this->postJson('/payments/orders/'.$checkout->json('order_number'), [
+            'idempotency_key' => 'pr4-duplicate-payment',
+            'access_code' => $checkout->json('access_code'),
+        ])->assertOk();
+        $payment = DB::table('payment_transactions')
+            ->where('idempotency_key', 'pr4-duplicate-payment')->firstOrFail();
+
+        $gross = number_format((int) $payment->amount_idr, 2, '.', '');
+        $notification = [
+            'transaction_id' => 'dup-transaction',
+            'transaction_status' => 'settlement',
+            'status_code' => '200',
+            'order_id' => $payment->merchant_reference,
+            'gross_amount' => $gross,
+            'fraud_status' => 'accept',
+            'settlement_time' => '2026-11-07 10:00:00',
+        ];
+        $notification['signature_key'] = hash('sha512',
+            $notification['order_id'].$notification['status_code'].$notification['gross_amount'].'server-test'
+        );
+
+        $this->postJson('/api/payments/midtrans/notification', $notification)
+            ->assertOk()->assertJsonPath('status', 'ok');
+        $this->postJson('/api/payments/midtrans/notification', $notification)
+            ->assertOk()->assertJsonPath('status', 'duplicate');
+        $this->assertSame('PAID', DB::table('payment_transactions')->where('id', $payment->id)->value('status'));
+        $this->assertSame(1, DB::table('order_events')
+            ->where('order_id', $payment->order_id)->where('event_type', 'PAYMENT_VERIFIED')->count());
+    }
 }
