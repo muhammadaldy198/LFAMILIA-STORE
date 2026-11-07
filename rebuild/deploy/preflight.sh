@@ -167,6 +167,14 @@ location ~* ^/(?:storage/logs|bootstrap/cache)/'
     missing_denies="$(printf '%s\n' "${vhost_block}" | DENY_PATTERNS="${deny_patterns}" awk '
       function overlaps(k, i,    p, s, t) {
         p = e_pat[k]
+        if (e_caret[k]) {
+          for (s = 1; s <= sc[i]; s++) if (index(subj[i, s], p) == 1) return 1
+          return 0
+        }
+        if (e_exact[k]) {
+          for (s = 1; s <= sc[i]; s++) if (subj[i, s] == p) return 1
+          return 0
+        }
         if (index(p, "(?")) return 0
         for (s = 1; s <= sc[i]; s++) {
           t = subj[i, s]
@@ -182,7 +190,7 @@ location ~* ^/(?:storage/logs|bootstrap/cache)/'
           for (j = 1; j <= E; j++) if (e_prot[j] == i) { j0 = j; break }
           if (j0 && e_eff[j0]) {
             credited = 1
-            for (j = 1; j < j0; j++) if (e_regex[j] && !e_eff[j] && overlaps(j, i)) { credited = 0; break }
+            for (j = 1; j < j0; j++) if ((e_regex[j] || e_caret[j] || e_exact[j]) && !e_eff[j] && overlaps(j, i)) { credited = 0; break }
           }
           if (!credited) missing[pats[i]] = 1
         }
@@ -212,23 +220,24 @@ location ~* ^/(?:storage/logs|bootstrap/cache)/'
           for (i = 1; i <= n; i++) if (index(line, pats[i])) { e_prot[E] = i; break }
           e_regex[E] = (mod == "~" || mod == "~*") ? 1 : 0
           e_ci[E] = (mod == "~*") ? 1 : 0
+          e_caret[E] = (mod == "^~") ? 1 : 0
+          e_exact[E] = (mod == "=") ? 1 : 0
           e_pat[E] = pat_text
           e_eff[E] = 0
           inloc = 1; ldepth = 0; cur_eff = 0; scope_deny_seen = 0; allow_before = 0
         }
-        pd = index(line, "deny all;")
-        scope_deny_here = 0
-        if (pd) {
+        pd = 0; scope_deny_here = 0
+        if (match(line, /(^|[;{]) *deny all;/)) {
+          pd = RSTART + RLENGTH - 9
           pre = substr(line, 1, pd - 1)
           tmp = pre; ob = gsub(/\{/, "{", tmp); tmp = pre; cb = gsub(/\}/, "}", tmp)
           if (ldepth + ob - cb <= 1) scope_deny_here = 1
         }
         allow_here = 0; pa = 0
-        if (match(line, /(^| )allow [^;]*;/)) {
-          pa = RSTART
-          pre = substr(line, 1, pa)
-          tmp = pre; ob = gsub(/\{/, "{", tmp); tmp = pre; cb = gsub(/\}/, "}", tmp)
-          if (ldepth + ob - cb <= 1) allow_here = 1
+        if (match(line, /(^|[;{]) *allow [^;]*;/)) {
+          mtxt = substr(line, RSTART, RLENGTH)
+          pa = RSTART + index(mtxt, "allow") - 1
+          allow_here = 1
         }
         eff_allow = (allow_before || (allow_here && (!scope_deny_here || pa < pd))) ? 1 : 0
         if (scope_deny_here && !scope_deny_seen) { scope_deny_seen = 1; cur_eff = eff_allow ? 0 : 1 }

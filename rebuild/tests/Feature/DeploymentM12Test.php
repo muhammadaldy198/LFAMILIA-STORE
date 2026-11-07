@@ -217,6 +217,10 @@ class DeploymentM12Test extends TestCase
         $cidrOverride = implode("\n", [$location($p1), $location($p2, "allow 203.0.113.0/24;\n        deny all;"), $location($p3)]);
         $nestedDeny = implode("\n", ["    {$p1} {\n        limit_except POST {\n            deny all;\n        }\n    }", $location($p2), $location($p3)]);
         $shadowed = implode("\n", ["    location ~* \\.env$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
+        $nestedAllow = implode("\n", ["    {$p1} {\n        limit_except POST {\n            allow 203.0.113.0/24;\n        }\n        deny all;\n    }", $location($p2), $location($p3)]);
+        $caretShadow = implode("\n", ["    location ^~ /storage/ {\n    }", $location($p1), $location($p2), $location($p3)]);
+        $exactShadow = implode("\n", ["    location = /.env {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
+        $quotedDeny = implode("\n", [$location($p1, 'return 200 "deny all;";'), $location($p2), $location($p3)]);
         $server = static fn (string $name, string $inner = ''): string => "server {\n    listen 443 ssl;\n    server_name {$name};\n{$inner}\n}";
 
         $cases = [
@@ -230,6 +234,10 @@ class DeploymentM12Test extends TestCase
             'CIDR allow overrides the deny' => [$server('lfamilia.com', $cidrOverride), 1],
             'deny nested in limit_except does not protect' => [$server('lfamilia.com', $nestedDeny), 1],
             'earlier overlapping regex location shadows two rules' => [$server('lfamilia.com', $shadowed), 2],
+            'allow nested in limit_except before the deny warns' => [$server('lfamilia.com', $nestedAllow), 1],
+            'earlier caret prefix location shadows the storage rule' => [$server('lfamilia.com', $caretShadow), 1],
+            'earlier exact-match location shadows the dotfile rule' => [$server('lfamilia.com', $exactShadow), 1],
+            'quoted deny string earns no credit' => [$server('lfamilia.com', $quotedDeny), 1],
         ];
 
         foreach ($cases as $label => [$body, $expected]) {
