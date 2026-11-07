@@ -11,6 +11,7 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Testing\TestResponse;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class CheckoutH2hValidationTest extends TestCase
@@ -763,6 +764,31 @@ class CheckoutH2hValidationTest extends TestCase
         $this->postJson('/checkout/orders', $this->order($first, null))
             ->assertUnprocessable()->assertJsonValidationErrors(['package_id']);
         $this->assertDatabaseCount('orders', 0);
+    }
+
+    /**
+     * NV-07 (Codex P2, round 5): the product page must tell the client which
+     * packages are eligibility-gated, so a missing proof can be refreshed
+     * before submit instead of only failing at the server guard.
+     */
+    public function test_product_page_exposes_eligibility_gated_package_ids(): void
+    {
+        $product = $this->game();
+        $first = $this->package($product, 'MLFS100', 'First Recharge 50');
+        $weekly = $this->package($product, 'WDP1', 'Weekly Diamond Pass');
+        $this->package($product, 'ML86', '86 Diamonds');
+
+        $expected = [$first->id, $weekly->id];
+        sort($expected);
+        $this->get('/catalog/'.$product->slug)->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Catalog/Show')
+                ->where('eligibilityPackageIds', function ($ids) use ($expected) {
+                    $actual = collect($ids)->map(fn ($id) => (int) $id)->sort()->values()->all();
+
+                    return $actual === $expected;
+                })
+                ->etc());
     }
 
     /**

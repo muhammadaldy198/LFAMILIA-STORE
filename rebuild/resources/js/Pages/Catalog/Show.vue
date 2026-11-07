@@ -18,6 +18,7 @@ import { checkoutAttemptKey, checkoutSignatureHash } from '../../lib/checkoutAtt
 const props = defineProps({
     product: Object,
     packages: Array,
+    eligibilityPackageIds: { type: Array, default: () => [] },
     packageGroups: { type: Array, default: () => [] },
     fields: Array,
     customer: Object,
@@ -191,14 +192,17 @@ const regionProofStale = () => {
     if (!props.product.nickname_required_region) return false;
     return !nicknameResult.value?.region_proof || proofExpired();
 };
+/** Packages the server only sells against a fresh eligibility proof. */
+const gatedPackageIds = computed(() => new Set((props.eligibilityPackageIds || []).map(String)));
 /**
  * Eligibility-family packages (first recharge, weekly pass) are guarded by
- * the same proof on products without a required region: an existing proof
- * that expired or no longer matches the account input must be refreshed
- * before submitting, or the server rejects the order.
+ * the checkout proof on products without a required region too: a missing,
+ * expired, or input-mismatched proof must be refreshed before submitting,
+ * or the server rejects the order.
  */
 const eligibilityProofStale = () => {
-    if (!nicknameResult.value?.region_proof) return false;
+    if (!gatedPackageIds.value.has(String(selectedPackageId.value))) return false;
+    if (!nicknameResult.value?.region_proof) return true;
     return accountValidationSignature.value !== accountInputSignature() || proofExpired();
 };
 /** Track ineligible package IDs returned by the current account check. */
@@ -805,7 +809,9 @@ async function prepareOrder() {
         await checkNickname();
         if (regionMismatch.value) return;
         if (!nicknameResult.value?.region_proof) {
-            errors.value = { checkout: ['Periksa akun terlebih dahulu untuk memastikan region produk.'] };
+            errors.value = { checkout: [props.product.nickname_required_region
+                ? 'Periksa akun terlebih dahulu untuk memastikan region produk.'
+                : 'Periksa akun terlebih dahulu untuk memastikan kelayakan paket.'] };
             return;
         }
     }
