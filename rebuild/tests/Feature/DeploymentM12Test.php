@@ -254,6 +254,7 @@ class DeploymentM12Test extends TestCase
         $inlineModifier = implode("\n", ["    location ~ (?i)\\.ENV$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $backrefShadow = implode("\n", ["    location ~* (?<empty>)\\k<empty>\\.env$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $inClassWord = implode("\n", ["    location ~* ^/files/[\\w]+\\.env$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
+        $posixClassWord = implode("\n", ["    location ~* ^/files/[[:alpha:]\\w]+\\.env$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $inClassNegated = implode("\n", ["    location ~* ^/files/[\\D]+\\.env$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $numericBackref = implode("\n", ["    location ~* \\.(env|log)\\1$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $wordClass = implode("\n", ["    location ~* ^/files/\\w+\\.env$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
@@ -286,6 +287,7 @@ class DeploymentM12Test extends TestCase
             'inline modifier makes the earlier allow location case-insensitive' => [$server('lfamilia.com', $inlineModifier), 2],
             'named backreference counts as overlapping' => [$server('lfamilia.com', $backrefShadow), 3],
             'word shorthand inside a character class is translated as class content' => [$server('lfamilia.com', $inClassWord), 1],
+            'posix class does not end the character class early' => [$server('lfamilia.com', $posixClassWord), 1],
             'negated shorthand inside a character class counts as overlapping' => [$server('lfamilia.com', $inClassNegated), 3],
             'numeric backreference counts as overlapping' => [$server('lfamilia.com', $numericBackref), 3],
             'word-class escape is translated for matching' => [$server('lfamilia.com', $wordClass), 1],

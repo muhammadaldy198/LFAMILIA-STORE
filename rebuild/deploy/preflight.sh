@@ -175,22 +175,24 @@ if command -v nginx >/dev/null 2>&1; then
 location ~* \.(?:env|log|sql|bak|ini)$
 location ~* ^/(?:storage/logs|bootstrap/cache)/'
     missing_denies="$(printf '%s\n' "${vhost_block}" | DENY_PATTERNS="${deny_patterns}" awk '
-      function spanend(p, j,    d2, e2, c2, q, st) {
+      function spanend(p, j,    d2, e2, c2, q, st, pd2) {
         d2 = 0; e2 = 0; c2 = 0
         for (q = j; q <= length(p); q++) {
           st = substr(p, q, 1)
           if (e2) { e2 = 0; continue }
           if (st == "\\") { e2 = 1; continue }
-          if (c2 == 1) { if (st == "^") c2 = 2; else c2 = 3; continue }
-          if (c2 == 2) { c2 = 3; continue }
-          if (c2 == 3) { if (st == "]") c2 = 0; continue }
+          if (c2 == 1) { if (st == "^") c2 = 2; else if (st == "[" && substr(p, q + 1, 1) ~ /[:.=]/) { c2 = 4; pd2 = substr(p, q + 1, 1) } else c2 = 3; continue }
+          if (c2 == 2) { if (st == "[" && substr(p, q + 1, 1) ~ /[:.=]/) { c2 = 4; pd2 = substr(p, q + 1, 1) } else c2 = 3; continue }
+          if (c2 == 3) { if (st == "]") c2 = 0; else if (st == "[" && substr(p, q + 1, 1) ~ /[:.=]/) { c2 = 4; pd2 = substr(p, q + 1, 1) } continue }
+          if (c2 == 4) { if (st == pd2) c2 = 5; continue }
+          if (c2 == 5) { if (st == "]") c2 = 3; else if (st != pd2) c2 = 4; continue }
           if (st == "[") { c2 = 1; continue }
           if (st == "(") d2++
           else if (st == ")") { d2--; if (!d2) return q }
         }
         return 0
       }
-      function simplify(p,    out, j, ch, nx, t3, esc, cls, cut, fl, fk, ps, ng) {
+      function simplify(p,    out, j, ch, nx, t3, esc, cls, cut, fl, fk, ps, ng, pd) {
         out = ""; esc = 0; cls = 0; simp_ci = 0
         for (j = 1; j <= length(p); j++) {
           ch = substr(p, j, 1)
@@ -207,9 +209,11 @@ location ~* ^/(?:storage/logs|bootstrap/cache)/'
             out = out "\\" ch; continue
           }
           if (ch == "\\") { esc = 1; continue }
-          if (cls == 1) { out = out ch; if (ch == "^") cls = 2; else cls = 3; continue }
-          if (cls == 2) { out = out ch; cls = 3; continue }
-          if (cls == 3) { out = out ch; if (ch == "]") cls = 0; continue }
+          if (cls == 1) { out = out ch; if (ch == "^") cls = 2; else if (ch == "[" && substr(p, j + 1, 1) ~ /[:.=]/) { cls = 4; pd = substr(p, j + 1, 1) } else cls = 3; continue }
+          if (cls == 2) { out = out ch; if (ch == "[" && substr(p, j + 1, 1) ~ /[:.=]/) { cls = 4; pd = substr(p, j + 1, 1) } else cls = 3; continue }
+          if (cls == 3) { out = out ch; if (ch == "]") cls = 0; else if (ch == "[" && substr(p, j + 1, 1) ~ /[:.=]/) { cls = 4; pd = substr(p, j + 1, 1) } continue }
+          if (cls == 4) { out = out ch; if (ch == pd) cls = 5; continue }
+          if (cls == 5) { out = out ch; if (ch == "]") cls = 3; else if (ch != pd) cls = 4; continue }
           if (ch == "[") { out = out ch; cls = 1; continue }
           if (ch == "(" && substr(p, j + 1, 1) == "?") {
             nx = substr(p, j + 2, 1)
