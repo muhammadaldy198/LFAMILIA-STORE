@@ -156,7 +156,14 @@ class OneTimeGameNominalImport
                         );
                         $mapping->update([
                             'is_active' => true,
-                            'fulfillment_config' => ['customer_no_template' => $template],
+                            'fulfillment_config' => [
+                                'customer_no_template' => $template,
+                                // Pin the verified supplier identity exactly
+                                // like importGroup does: once the cutoff ends,
+                                // a reused SKU code must never silently sell
+                                // or deliver a different brand or service.
+                                'auto_source_group' => $sources->key($selected),
+                            ],
                         ]);
                         $audit->record($request, 'catalog.manual_source_cutoff_attached',
                             'provider_mapping', $mapping->id, null, $mapping->fresh()->toArray());

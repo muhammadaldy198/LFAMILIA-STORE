@@ -193,7 +193,14 @@ class OneTimeGameNominalImportTest extends TestCase
         foreach ($mappings as $mapping) {
             $this->assertTrue($mapping->is_active);
             $this->assertSame('{{destination}}', $mapping->fulfillment_config['customer_no_template']);
-            $this->assertArrayNotHasKey('auto_source_group', $mapping->fulfillment_config);
+            // The cutoff fallback pins the verified supplier identity too:
+            // after the cutoff, a retagged SKU must stay unsellable.
+            $catalogItem = DB::table('digiflazz_catalog_items')
+                ->where('buyer_sku_code', $mapping->external_sku)->first();
+            $this->assertSame(
+                app(DigiflazzAutoSources::class)->key($catalogItem),
+                $mapping->fulfillment_config['auto_source_group'] ?? null
+            );
         }
 
         $second = app(OneTimeGameNominalImport::class)->run();

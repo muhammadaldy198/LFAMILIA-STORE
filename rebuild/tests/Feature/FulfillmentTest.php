@@ -573,15 +573,25 @@ class FulfillmentTest extends TestCase
         $service->reconcileAttempt((int) $attempt->id, true);
 
         // No provider call, no reconcile claim consumed, attempt untouched,
-        // and a human is notified through the stalled-reconciliation path.
+        // and a human is notified through the AGE-SPECIFIC escalation: its
+        // text must not claim automatic checks are still running.
         $this->assertSame(1, $calls);
         $this->assertSame('UNKNOWN', DB::table('fulfillment_attempts')->where('id', $attempt->id)->value('status'));
         $this->assertSame(0, (int) DB::table('fulfillment_attempts')->where('id', $attempt->id)->value('reconcile_checks'));
         $this->assertDatabaseHas('admin_notifications', [
+            'event_type' => 'fulfillment.reconcile.too_old',
+            'target_type' => 'fulfillment_attempt',
+            'target_id' => (string) $attempt->id,
+        ]);
+        $this->assertDatabaseMissing('admin_notifications', [
             'event_type' => 'fulfillment.reconcile.stalled',
             'target_type' => 'fulfillment_attempt',
             'target_id' => (string) $attempt->id,
         ]);
+        $notice = DB::table('admin_notifications')
+            ->where('event_type', 'fulfillment.reconcile.too_old')
+            ->where('target_id', (string) $attempt->id)->value('message');
+        $this->assertStringContainsString('lebih dari 90 hari', (string) $notice);
     }
 
     /**
