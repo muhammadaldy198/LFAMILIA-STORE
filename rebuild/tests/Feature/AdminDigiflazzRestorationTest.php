@@ -1106,6 +1106,67 @@ class AdminDigiflazzRestorationTest extends TestCase
         ]);
     }
 
+    /**
+     * NV-06: the bulk import must pin the supplier identity exactly like
+     * attach and auto-bootstrap do; a retagged SKU may then never reprice
+     * the imported mapping or become quotable as a different product.
+     */
+    public function test_bulk_import_pins_identity_and_checkout_rejects_reused_sku(): void
+    {
+        $this->login();
+        $product = Product::create([
+            'category_id' => Category::where('slug', 'game')->value('id'),
+            'name' => 'Impor Pin', 'slug' => 'impor-pin',
+            'fulfillment_mode' => 'AUTO_PROVIDER', 'margin_percent' => 10, 'is_active' => true,
+        ]);
+        $product->fields()->create([
+            'field_key' => 'user_id', 'label' => 'User ID', 'type' => 'text',
+            'is_required' => true, 'sort_order' => 0,
+        ]);
+        $this->fakeCatalog([$this->row([
+            'buyer_sku_code' => 'impor-pin-sku', 'product_name' => 'Impor Pin 10',
+            'brand' => 'ImporPin', 'price' => 10000,
+        ])]);
+        $this->post('/admin/digiflazz/sync')->assertRedirect()->assertSessionHasNoErrors();
+        $item = DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'impor-pin-sku')->first();
+
+        $this->post('/admin/catalog/products/'.$product->id.'/import', [
+            'item_ids' => [$item->id],
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $package = $product->packages()->firstOrFail();
+        $mapping = $package->mappings()->firstOrFail();
+        $this->assertSame(
+            app(DigiflazzAutoSources::class)->key($item),
+            data_get($mapping->fulfillment_config, 'auto_source_group')
+        );
+
+        Category::where('slug', 'game')->update(['is_active' => true]);
+        Provider::where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
+        $package->update(['is_active' => true]);
+        $mapping->update(['is_active' => true]);
+        $this->assertSame(
+            $package->id,
+            app(CheckoutPricing::class)->forPackage($package->id)['package_id']
+        );
+
+        // Supplier retags the same SKU code; the imported mapping must stay
+        // active but unsellable, and sync may never reprice it.
+        DB::table('digiflazz_catalog_items')->where('buyer_sku_code', 'impor-pin-sku')
+            ->update(['brand' => 'Wrong Product', 'product_name' => 'Wrong 10']);
+        $this->assertSame([], app(CheckoutPricing::class)->forPackages([$package->id]));
+
+        $this->fakeCatalog([$this->row([
+            'buyer_sku_code' => 'impor-pin-sku', 'brand' => 'Wrong Product',
+            'product_name' => 'Wrong 10', 'price' => 18000,
+        ])]);
+        app(DigiflazzCatalogService::class)->sync('impor-pin-sku');
+        $this->assertDatabaseHas('provider_mappings', [
+            'id' => $mapping->id, 'cost_idr' => 10000,
+            'store_cost_idr' => 10000, 'max_price_idr' => 10000, 'is_active' => true,
+        ]);
+    }
+
     public function test_auto_bootstrap_pins_identity_and_checkout_rejects_reused_sku(): void
     {
         $sample = $this->mappedItem('PINNED8.000', [

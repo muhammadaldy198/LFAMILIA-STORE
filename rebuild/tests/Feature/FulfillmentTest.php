@@ -528,6 +528,108 @@ class FulfillmentTest extends TestCase
         $this->assertSame($firstRequest['ref_id'], $recorded[1][0]->data()['ref_id']);
     }
 
+    /**
+     * NV-08: a manual status check must never re-post an attempt older
+     * than 90 days — Digiflazz would create a new transaction for the
+     * original ref_id. The aged attempt is escalated instead.
+     */
+    public function test_manual_reconciliation_never_reposts_attempt_older_than_ninety_days(): void
+    {
+        Queue::fake();
+        $this->credentials();
+        $catalog = $this->automaticCatalog();
+        $orderId = $this->paidOrder($catalog);
+
+        $calls = 0;
+        Http::fake(function ($request) use (&$calls) {
+            $calls++;
+            if ($calls === 1) {
+                return Http::response(['error' => 'temporary'], 503);
+            }
+            $payload = $request->data();
+
+            return Http::response(['data' => [
+                'ref_id' => $payload['ref_id'],
+                'customer_no' => $payload['customer_no'],
+                'buyer_sku_code' => $payload['buyer_sku_code'],
+                'message' => 'Sukses',
+                'status' => 'Sukses',
+                'rc' => '00',
+                'sn' => 'RECOVERED',
+                'price' => 10000,
+            ]]);
+        });
+
+        $service = app(FulfillmentService::class);
+        $service->startOrder($orderId);
+        $attempt = DB::table('fulfillment_attempts')->where('order_id', $orderId)->firstOrFail();
+        $service->sendAttempt((int) $attempt->id);
+        $this->assertSame('UNKNOWN', DB::table('fulfillment_attempts')->where('id', $attempt->id)->value('status'));
+        $this->assertSame(1, $calls);
+
+        DB::table('fulfillment_attempts')->where('id', $attempt->id)
+            ->update(['created_at' => now()->subDays(91)]);
+
+        $service->reconcileAttempt((int) $attempt->id, true);
+
+        // No provider call, no reconcile claim consumed, attempt untouched,
+        // and a human is notified through the stalled-reconciliation path.
+        $this->assertSame(1, $calls);
+        $this->assertSame('UNKNOWN', DB::table('fulfillment_attempts')->where('id', $attempt->id)->value('status'));
+        $this->assertSame(0, (int) DB::table('fulfillment_attempts')->where('id', $attempt->id)->value('reconcile_checks'));
+        $this->assertDatabaseHas('admin_notifications', [
+            'event_type' => 'fulfillment.reconcile.stalled',
+            'target_type' => 'fulfillment_attempt',
+            'target_id' => (string) $attempt->id,
+        ]);
+    }
+
+    /**
+     * NV-08 control: a manual check of a young uncertain attempt still
+     * re-posts the original ref_id and applies the provider result.
+     */
+    public function test_manual_reconciliation_of_recent_attempt_still_reposts_same_reference(): void
+    {
+        Queue::fake();
+        $this->credentials();
+        $catalog = $this->automaticCatalog();
+        $orderId = $this->paidOrder($catalog);
+
+        $calls = 0;
+        Http::fake(function ($request) use (&$calls) {
+            $calls++;
+            if ($calls === 1) {
+                return Http::response(['error' => 'temporary'], 503);
+            }
+            $payload = $request->data();
+
+            return Http::response(['data' => [
+                'ref_id' => $payload['ref_id'],
+                'customer_no' => $payload['customer_no'],
+                'buyer_sku_code' => $payload['buyer_sku_code'],
+                'message' => 'Sukses',
+                'status' => 'Sukses',
+                'rc' => '00',
+                'sn' => 'RECOVERED',
+                'price' => 10000,
+            ]]);
+        });
+
+        $service = app(FulfillmentService::class);
+        $service->startOrder($orderId);
+        $attempt = DB::table('fulfillment_attempts')->where('order_id', $orderId)->firstOrFail();
+        $service->sendAttempt((int) $attempt->id);
+        $this->assertSame('UNKNOWN', DB::table('fulfillment_attempts')->where('id', $attempt->id)->value('status'));
+        $firstRequest = json_decode((string) DB::table('fulfillment_attempts')->where('id', $attempt->id)->value('request_payload'), true);
+
+        $service->reconcileAttempt((int) $attempt->id, true);
+
+        $this->assertSame(2, $calls);
+        $this->assertSame('SUCCESS', DB::table('orders')->where('id', $orderId)->value('status'));
+        $recorded = Http::recorded();
+        $this->assertSame($firstRequest['ref_id'], $recorded[1][0]->data()['ref_id']);
+    }
+
     public function test_confirmed_failure_does_not_switch_to_another_mapping(): void
     {
         Queue::fake();

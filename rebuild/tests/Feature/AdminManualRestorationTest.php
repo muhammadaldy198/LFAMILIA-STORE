@@ -117,6 +117,36 @@ class AdminManualRestorationTest extends TestCase
         ]);
     }
 
+    /**
+     * NV-08: the fulfillment queue must not offer a manual status check
+     * for attempts older than the 90-day recheck bound.
+     */
+    public function test_can_reconcile_hides_attempts_older_than_ninety_days(): void
+    {
+        $admin = $this->login();
+        $orderId = $this->order($admin);
+        $attemptId = $this->addDigiflazzAttempt($orderId, 'UNKNOWN');
+
+        $assertCanReconcile = function (bool $expected) use ($attemptId) {
+            $this->get('/admin/fulfillment?scope=all&per_page=100')->assertOk()
+                ->assertInertia(fn (Assert $page) => $page
+                    ->component('Admin/Fulfillment')
+                    ->where('attempts.data', function ($rows) use ($attemptId, $expected) {
+                        $row = collect($rows)->firstWhere('id', $attemptId);
+
+                        return $row !== null && $row['can_reconcile'] === $expected;
+                    })
+                    ->etc());
+        };
+
+        $assertCanReconcile(true);
+
+        DB::table('fulfillment_attempts')->where('id', $attemptId)
+            ->update(['created_at' => now()->subDays(91)]);
+
+        $assertCanReconcile(false);
+    }
+
     public function test_manual_workspace_shows_only_latest_attempt_with_human_labels_and_search(): void
     {
         $admin = $this->login();

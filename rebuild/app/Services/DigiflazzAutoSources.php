@@ -188,9 +188,11 @@ class DigiflazzAutoSources
             $mapping = app(DigiflazzCatalogImport::class)->upsert($package, $item->buyer_sku_code, (int) $item->price_idr, (int) $item->price_idr, $costUplift);
             $before = $mapping->toArray();
             $config = $mapping->fulfillment_config ?? [];
-            if ($automatic) {
-                $config['auto_source_group'] = $this->key($item);
-            }
+            // Pin the verified supplier identity on every import path, not
+            // only automatic grouping: a reused SKU code must never silently
+            // sell or deliver a different brand or service. Bulk and managed
+            // imports pin exactly like the attach and auto-bootstrap paths.
+            $config['auto_source_group'] = $this->key($item);
             $mapping->update([
                 // Do not silently reactivate an existing disabled SKU when
                 // the historical automatic import grouping is refreshed.

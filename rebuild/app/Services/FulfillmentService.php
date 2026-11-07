@@ -274,7 +274,13 @@ class FulfillmentService
                 }
             }
 
-            if (! $manual && Carbon::parse($attempt->created_at)->lte(now()->subDay())) {
+            // Age stop: automatic checks give up after a day. Manual checks
+            // get the repository's absolute bound instead — never re-check a
+            // transaction older than 90 days, because Digiflazz treats the
+            // re-post as a brand-new transaction (AGENTS.md, PRD). An aged
+            // attempt is escalated for a human, never re-posted.
+            $oldestRecheckable = $manual ? now()->subDays(90) : now()->subDay();
+            if (Carbon::parse($attempt->created_at)->lte($oldestRecheckable)) {
                 $this->escalateStalledReconciliation($attempt, $order);
 
                 return null;

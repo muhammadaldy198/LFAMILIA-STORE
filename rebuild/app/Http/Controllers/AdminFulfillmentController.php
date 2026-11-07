@@ -11,6 +11,7 @@ use App\Services\OperationalSettings;
 use App\Support\ServiceHours;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -215,7 +216,8 @@ class AdminFulfillmentController
                 'can_complete' => $terminal === false && $attempt->status === 'MANUAL_PENDING'
                     && in_array($attempt->order_status, ['PAID', 'PROCESSING'], true),
                 'can_fail' => $terminal === false && $attempt->status === 'MANUAL_PENDING',
-                'can_reconcile' => $terminal === false && in_array($attempt->status, ['SENDING', 'PENDING', 'UNKNOWN'], true),
+                'can_reconcile' => $terminal === false && in_array($attempt->status, ['SENDING', 'PENDING', 'UNKNOWN'], true)
+                    && Carbon::parse($attempt->created_at)->gt(now()->subDays(90)),
                 'can_retry' => ($terminal || $quarantined)
                     ? false
                     : ($attempt->status === 'BLOCKED'
