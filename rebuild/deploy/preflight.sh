@@ -175,7 +175,39 @@ if command -v nginx >/dev/null 2>&1; then
 location ~* \.(?:env|log|sql|bak|ini)$
 location ~* ^/(?:storage/logs|bootstrap/cache)/'
     missing_denies="$(printf '%s\n' "${vhost_block}" | DENY_PATTERNS="${deny_patterns}" awk '
-      function overlaps(k, i,    p, s, t, ix, depth, cut, pos, ch) {
+      function simplify(p,    out, j, ch, nx, esc, cls, cut, d2, e2, c2, q, st) {
+        out = ""; esc = 0; cls = 0
+        for (j = 1; j <= length(p); j++) {
+          ch = substr(p, j, 1)
+          if (esc) { out = out ch; esc = 0; continue }
+          if (ch == "\\") { out = out ch; esc = 1; continue }
+          if (cls == 1) { out = out ch; if (ch == "^") cls = 2; else cls = 3; continue }
+          if (cls == 2) { out = out ch; cls = 3; continue }
+          if (cls == 3) { out = out ch; if (ch == "]") cls = 0; continue }
+          if (ch == "[") { out = out ch; cls = 1; continue }
+          if (ch == "(" && substr(p, j + 1, 1) == "?") {
+            nx = substr(p, j + 2, 1)
+            if (nx == ":") { out = out "("; j += 2; continue }
+            d2 = 0; e2 = 0; c2 = 0; cut = 0
+            for (q = j; q <= length(p); q++) {
+              st = substr(p, q, 1)
+              if (e2) { e2 = 0; continue }
+              if (st == "\\") { e2 = 1; continue }
+              if (c2 == 1) { if (st == "^") c2 = 2; else c2 = 3; continue }
+              if (c2 == 2) { c2 = 3; continue }
+              if (c2 == 3) { if (st == "]") c2 = 0; continue }
+              if (st == "[") { c2 = 1; continue }
+              if (st == "(") d2++
+              else if (st == ")") { d2--; if (!d2) { cut = q; break } }
+            }
+            if (!cut) return ""
+            j = cut; continue
+          }
+          out = out ch
+        }
+        return out
+      }
+      function overlaps(k, i,    p, s, t) {
         p = e_pat[k]
         if (e_caret[k]) {
           for (s = 1; s <= sc[i]; s++) if (index(subj[i, s], p) == 1) return 1
@@ -185,17 +217,8 @@ location ~* ^/(?:storage/logs|bootstrap/cache)/'
           for (s = 1; s <= sc[i]; s++) if (subj[i, s] == p) return 1
           return 0
         }
-        while ((ix = index(p, "(?:")) > 0) p = substr(p, 1, ix - 1) "(" substr(p, ix + 3)
-        while ((ix = index(p, "(?")) > 0) {
-          depth = 0; cut = 0
-          for (pos = ix; pos <= length(p); pos++) {
-            ch = substr(p, pos, 1)
-            if (ch == "(") depth++
-            else if (ch == ")") { depth--; if (!depth) { cut = pos; break } }
-          }
-          if (!cut) return 0
-          p = substr(p, 1, ix - 1) substr(p, cut + 1)
-        }
+        p = simplify(p)
+        if (p == "") return 1
         for (s = 1; s <= sc[i]; s++) {
           t = subj[i, s]
           if (e_ci[k]) { if (match(tolower(t), tolower(p))) return 1 }

@@ -250,6 +250,8 @@ class DeploymentM12Test extends TestCase
         $caretAfter = implode("\n", [$location($p1), $location($p2), $location($p3), "    location ^~ /storage/ {\n    }"]);
         $nestedAllowAfter = implode("\n", ["    {$p1} {\n        deny all;\n        limit_except POST {\n            allow all;\n        }\n    }", $location($p2), $location($p3)]);
         $lookaheadShadow = implode("\n", ["    location ~* \\.(?=(?:env|log)$) {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
+        $escapedParenShadow = implode("\n", ["    location ~* \\.(?=(?:env\\)|env)$) {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
+        $classParens = implode("\n", ["    location ~* \\.((env)|[(]log[)])$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $server = static fn (string $name, string $inner = ''): string => "server {\n    listen 443 ssl;\n    server_name {$name};\n{$inner}\n}";
         $noSpaceSplit = "server{\n    listen 443 ssl;\n    server_name lfamilia.com;\n{$complete}\n}\n".$server('www.lfamilia.com');
 
@@ -273,6 +275,8 @@ class DeploymentM12Test extends TestCase
             'caret prefix after the rules still shadows' => [$server('lfamilia.com', $caretAfter), 1],
             'allow nested after the deny warns' => [$server('lfamilia.com', $nestedAllowAfter), 1],
             'lookahead group location shadows all three rules' => [$server('lfamilia.com', $lookaheadShadow), 3],
+            'escaped paren inside the lookahead still shadows all three rules' => [$server('lfamilia.com', $escapedParenShadow), 3],
+            'parentheses inside character classes stay literal' => [$server('lfamilia.com', $classParens), 2],
             'server keyword without a space still splits blocks' => [$noSpaceSplit, 3],
         ];
 
