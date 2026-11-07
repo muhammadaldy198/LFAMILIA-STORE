@@ -10,6 +10,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Route;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\User as GoogleUser;
 use Mockery;
@@ -204,7 +205,7 @@ class AccountSecurityTest extends TestCase
         $this->assertNotNull($user->fresh()->remember_token);
         Queue::assertPushed(SendTransactionalEmailJob::class,
             fn (SendTransactionalEmailJob $job): bool => $job->recipient === 'original-google@example.test'
-                && $job->templateKey === 'account_email_changed'
+                && $job->templateKey === 'generic'
                 && str_contains($job->text, 'new-google@example.test'));
         Queue::assertPushed(SendTransactionalEmailJob::class,
             fn (SendTransactionalEmailJob $job): bool => $job->recipient === 'new-google@example.test'
@@ -228,6 +229,70 @@ class AccountSecurityTest extends TestCase
             ->assertSessionHasErrors('google');
         $this->assertAuthenticatedAs($user, 'web');
         $this->assertDatabaseMissing('users', ['email' => 'other-google@example.test']);
+    }
+
+    public function test_google_only_account_cannot_bypass_email_reauth_by_setting_first_password(): void
+    {
+        $user = $this->customer('bypass-first-password@example.test', false);
+        $user->forceFill(['google_sub' => 'bypass-google'])->saveQuietly();
+        $newPassword = [
+            'password' => 'fresh-google-password-123',
+            'password_confirmation' => 'fresh-google-password-123',
+        ];
+
+        $this->actingAs($user, 'web')->put('/account/password', $newPassword)
+            ->assertSessionHasErrors('current_password');
+        $this->assertNull($user->fresh()->password);
+
+        // The second endpoint must not become an escape hatch for a stolen session.
+        $this->put('/account/profile', $this->profile('stolen-after-password@example.test'))
+            ->assertSessionHasErrors('current_password');
+        $this->assertSame('bypass-first-password@example.test', $user->fresh()->email);
+    }
+
+    public function test_google_only_account_can_set_first_password_with_one_fresh_google_proof(): void
+    {
+        $user = $this->customer('google-first-pass@example.test', false);
+        $user->forceFill(['google_sub' => 'proof-google'])->saveQuietly();
+        $newPassword = [
+            'password' => 'first-google-password-123',
+            'password_confirmation' => 'first-google-password-123',
+        ];
+
+        $this->actingAs($user, 'web')->withSession([
+            'auth.google_reauth_at' => time(),
+            'auth.google_reauth_user_id' => (string) $user->id,
+        ])->put('/account/password', $newPassword)->assertRedirect()
+            ->assertSessionMissing('auth.google_reauth_at');
+        $this->assertTrue(Hash::check('first-google-password-123', $user->fresh()->password));
+    }
+
+    public function test_first_google_password_rejects_stale_and_other_users_proof(): void
+    {
+        $user = $this->customer('google-stale-first-pass@example.test', false);
+        $user->forceFill(['google_sub' => 'stale-google'])->saveQuietly();
+        $password = [
+            'password' => 'first-google-password-123',
+            'password_confirmation' => 'first-google-password-123',
+        ];
+        $this->actingAs($user, 'web')->withSession([
+            'auth.google_reauth_at' => time() - 601,
+            'auth.google_reauth_user_id' => (string) $user->id,
+        ])->put('/account/password', $password)->assertSessionHasErrors('current_password');
+
+        $this->withSession([
+            'auth.google_reauth_at' => time(),
+            'auth.google_reauth_user_id' => (string) ($user->id + 100),
+        ])->put('/account/password', $password)->assertSessionHasErrors('current_password');
+        $this->assertNull($user->fresh()->password);
+    }
+
+    public function test_email_rebind_and_first_password_routes_block_simultaneous_session_replays(): void
+    {
+        // Without Laravel session blocking concurrent requests could read the
+        // same Google proof before either response consumes it.
+        $this->assertSame(30, Route::getRoutes()->getByName('account.profile.update')->locksFor());
+        $this->assertSame(30, Route::getRoutes()->getByName('account.password.update')->locksFor());
     }
 
     public function test_passwordless_account_without_google_must_set_password_first(): void
