@@ -197,12 +197,12 @@ location ~* ^/(?:storage/logs|bootstrap/cache)/'
           if (esc) {
             esc = 0
             if (ch ~ /[0-9]/) return ""
-            if (ch == "d") { out = out "[0-9]"; continue }
-            if (ch == "D") { out = out "[^0-9]"; continue }
-            if (ch == "s") { out = out "[[:space:]]"; continue }
-            if (ch == "S") { out = out "[^[:space:]]"; continue }
-            if (ch == "w") { out = out "[A-Za-z0-9_]"; continue }
-            if (ch == "W") { out = out "[^A-Za-z0-9_]"; continue }
+            if (ch == "d") { out = out (cls ? "0-9" : "[0-9]"); continue }
+            if (ch == "D") { if (cls) return ""; out = out "[^0-9]"; continue }
+            if (ch == "s") { out = out (cls ? "[:space:]" : "[[:space:]]"); continue }
+            if (ch == "S") { if (cls) return ""; out = out "[^[:space:]]"; continue }
+            if (ch == "w") { out = out (cls ? "A-Za-z0-9_" : "[A-Za-z0-9_]"); continue }
+            if (ch == "W") { if (cls) return ""; out = out "[^A-Za-z0-9_]"; continue }
             if (ch ~ /[A-Za-z]/) return ""
             out = out "\\" ch; continue
           }

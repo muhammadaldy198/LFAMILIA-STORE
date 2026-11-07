@@ -253,6 +253,8 @@ class DeploymentM12Test extends TestCase
         $escapedParenShadow = implode("\n", ["    location ~* \\.(?=(?:env\\)|env)$) {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $inlineModifier = implode("\n", ["    location ~ (?i)\\.ENV$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $backrefShadow = implode("\n", ["    location ~* (?<empty>)\\k<empty>\\.env$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
+        $inClassWord = implode("\n", ["    location ~* ^/files/[\\w]+\\.env$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
+        $inClassNegated = implode("\n", ["    location ~* ^/files/[\\D]+\\.env$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $numericBackref = implode("\n", ["    location ~* \\.(env|log)\\1$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $wordClass = implode("\n", ["    location ~* ^/files/\\w+\\.env$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $scopedModifier = implode("\n", ["    location ~ \\.(?i:ENV|LOG)$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
@@ -283,6 +285,8 @@ class DeploymentM12Test extends TestCase
             'escaped paren inside the lookahead still shadows all three rules' => [$server('lfamilia.com', $escapedParenShadow), 3],
             'inline modifier makes the earlier allow location case-insensitive' => [$server('lfamilia.com', $inlineModifier), 2],
             'named backreference counts as overlapping' => [$server('lfamilia.com', $backrefShadow), 3],
+            'word shorthand inside a character class is translated as class content' => [$server('lfamilia.com', $inClassWord), 1],
+            'negated shorthand inside a character class counts as overlapping' => [$server('lfamilia.com', $inClassNegated), 3],
             'numeric backreference counts as overlapping' => [$server('lfamilia.com', $numericBackref), 3],
             'word-class escape is translated for matching' => [$server('lfamilia.com', $wordClass), 1],
             'scoped modifier group shadows all three rules' => [$server('lfamilia.com', $scopedModifier), 3],
