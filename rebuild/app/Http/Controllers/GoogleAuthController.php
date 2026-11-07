@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\IntegrationCredential;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -42,6 +43,33 @@ class GoogleAuthController
         return Socialite::driver('google')->redirect();
     }
 
+    public function reauthenticate(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+        if (! $user?->google_sub) {
+            return redirect()->route('account.profile')
+                ->withErrors(['google' => 'Akun ini belum terhubung ke Google.']);
+        }
+
+        if (! $this->configure()) {
+            return redirect()->route('account.profile')
+                ->withErrors(['google' => 'Login Google belum tersedia. Coba lagi nanti.']);
+        }
+
+        $request->session()->forget([
+            'auth.google_reauth_at',
+            'auth.google_reauth_user_id',
+            'auth.google_reauth_pending_at',
+            'auth.google_reauth_pending_user_id',
+        ]);
+        $request->session()->put([
+            'auth.google_reauth_pending_at' => time(),
+            'auth.google_reauth_pending_user_id' => (string) $user->getAuthIdentifier(),
+        ]);
+
+        return Socialite::driver('google')->redirect();
+    }
+
     public function callback(): RedirectResponse
     {
         if (! $this->configure()) {
@@ -65,6 +93,36 @@ class GoogleAuthController
 
         abort_unless($verified && filter_var($email, FILTER_VALIDATE_EMAIL)
             && $subject !== '', 403, 'Akun Google tidak valid.');
+
+        $session = request()->session();
+        $authenticated = Auth::guard('web')->user();
+        $pendingUserId = $session->pull('auth.google_reauth_pending_user_id');
+        $pendingAt = $session->pull('auth.google_reauth_pending_at');
+
+        if ($authenticated) {
+            // Never change the authenticated account while handling an OAuth callback.
+            // A reauthentication proof must belong to this same Google identity.
+            if ((string) $pendingUserId !== (string) $authenticated->getAuthIdentifier()
+                || ! is_numeric($pendingAt)
+                || (int) $pendingAt > time()
+                || time() - (int) $pendingAt > 600
+                || ! is_string($authenticated->google_sub)
+                || ! hash_equals($authenticated->google_sub, $subject)) {
+                $session->forget(['auth.google_reauth_at', 'auth.google_reauth_user_id']);
+
+                return redirect()->route('account.profile')
+                    ->withErrors(['google' => 'Autentikasi ulang Google tidak cocok atau sudah kedaluwarsa. Coba lagi.']);
+            }
+
+            $session->put([
+                'auth.google_reauth_at' => time(),
+                'auth.google_reauth_user_id' => (string) $authenticated->getAuthIdentifier(),
+            ]);
+
+            return redirect()->route('account.profile');
+        }
+
+        $session->forget(['auth.google_reauth_at', 'auth.google_reauth_user_id']);
 
         $user = DB::transaction(function () use ($profile, $email, $subject): User {
             $user = User::where('google_sub', $subject)->lockForUpdate()->first();
@@ -90,10 +148,19 @@ class GoogleAuthController
                 return $user;
             }
 
-            $user->forceFill([
+            // An unverified local preregistration does not prove ownership of
+            // its password or phone: never carry those credentials into Google.
+            $adoptingUnverified = ! $user->google_sub && $user->email_verified_at === null;
+            $attributes = [
                 'google_sub' => $subject,
                 'email_verified_at' => $user->email_verified_at ?? now(),
-            ])->save();
+            ];
+            if ($adoptingUnverified) {
+                $attributes['password'] = null;
+                $attributes['phone'] = null;
+                $attributes['phone_normalized'] = null;
+            }
+            $user->forceFill($attributes)->save();
 
             return $user;
         });
