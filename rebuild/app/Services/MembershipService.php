@@ -47,7 +47,10 @@ class MembershipService
         if (! $automatic) {
             // Preserve only a non-internal saved tier. Switching MANUAL MAFIA to AUTO
             // must revoke internal pricing even if no automatic tier qualifies.
-            $saved = MembershipTier::query()->where('code', $user->membership_tier_code)->first();
+            $saved = MembershipTier::query()
+                ->where('code', $user->membership_tier_code)
+                ->where('is_active', true)
+                ->first();
             if ($saved && ! in_array((string) $saved->code, self::INTERNAL_CODES, true)) {
                 $automatic = $saved;
             }
