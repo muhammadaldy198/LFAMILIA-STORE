@@ -105,6 +105,15 @@ class PaymentStateService
                 throw ValidationException::withMessages(['payment' => 'Nominal pembayaran tidak cocok.']);
             }
 
+            $wallet = DB::table('wallets')->where('user_id', $userId)->lockForUpdate()->first();
+
+            // The refund-review freeze is checked only here, under the wallet
+            // lock: the refund path in applyTopup takes the same lock before
+            // it may commit a REFUND_REVIEW, so a freeze committed before this
+            // point is always seen by this read (the transaction's first
+            // consistent read) and no freeze can land between it and the
+            // debit below. Checking before the lock left exactly that window
+            // open.
             if (DB::table('wallet_topups')
                 ->where('user_id', $userId)
                 ->where('status', 'REFUND_REVIEW')
@@ -114,7 +123,6 @@ class PaymentStateService
                 ]);
             }
 
-            $wallet = DB::table('wallets')->where('user_id', $userId)->lockForUpdate()->first();
             if (! $wallet || (int) $wallet->balance_idr < (int) $payment->amount_idr) {
                 throw ValidationException::withMessages(['payment' => 'Saldo LFAMILIA tidak mencukupi.']);
             }
@@ -301,6 +309,35 @@ class PaymentStateService
                 return ['result' => 'ALREADY_PAID', 'status' => 'PAID'];
             }
 
+            if ($topup->status === 'PENDING_PAYMENT'
+                && $topup->expires_at && now()->greaterThanOrEqualTo($topup->expires_at)) {
+                $this->expireTopup($topup);
+                $topup->status = 'EXPIRED';
+            }
+
+            if ($topup->status !== 'PENDING_PAYMENT') {
+                // Mirror of the late-PAID path for orders in applyOrder: the
+                // payment row is verified, but money that arrives for a
+                // top-up that is no longer payable is never credited
+                // automatically; an admin reviews it instead.
+                DB::table('payment_transactions')->where('id', $payment->id)->update([
+                    'status' => 'PAID',
+                    'verified_at' => now(),
+                    'last_callback_at' => now(),
+                    'updated_at' => now(),
+                ]);
+                $this->notifications->record(
+                    'payment.late_verified',
+                    'Pembayaran terlambat terverifikasi',
+                    'Pembayaran top up #'.$topup->id.' masuk setelah top up berstatus '.$topup->status.'. Perlu diperiksa.',
+                    'WARNING',
+                    'wallet_topup',
+                    $topup->id
+                );
+
+                return ['result' => 'LATE_PAID_REVIEW', 'status' => $topup->status];
+            }
+
             $wallet = DB::table('wallets')->where('id', $topup->wallet_id)->lockForUpdate()->first();
             if (! $wallet) {
                 throw ValidationException::withMessages(['payment' => 'Wallet tidak ditemukan.']);
@@ -351,6 +388,11 @@ class PaymentStateService
                 'last_callback_at' => now(),
                 'updated_at' => now(),
             ]);
+            // Serialize against wallet spending on the wallet row lock — the
+            // same lock the PAID branch takes and payOrderWithWallet holds
+            // while it re-checks the freeze — so a REFUND_REVIEW commit can
+            // never land in the middle of an in-flight wallet checkout.
+            DB::table('wallets')->where('id', $topup->wallet_id)->lockForUpdate()->first();
             // No automatic reversal of a customer's existing wallet balance.
             $review = $topup->status === 'PAID';
             DB::table('wallet_topups')->where('id', $topup->id)->update([
@@ -457,6 +499,18 @@ class PaymentStateService
         ]);
         $this->releaseVoucher((int) $order->id);
         $this->orderEvent($order->id, 'ORDER_EXPIRED', 'PENDING_PAYMENT', 'EXPIRED', []);
+    }
+
+    public function expireTopup(object $topup): void
+    {
+        if ($topup->status !== 'PENDING_PAYMENT') {
+            return;
+        }
+
+        DB::table('wallet_topups')->where('id', $topup->id)->update([
+            'status' => 'EXPIRED',
+            'updated_at' => now(),
+        ]);
     }
 
     private function releaseVoucher(int $orderId): void

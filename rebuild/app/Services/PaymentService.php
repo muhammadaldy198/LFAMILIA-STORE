@@ -202,6 +202,16 @@ class PaymentService
             if ($lockedTopup->status !== 'PENDING_PAYMENT') {
                 throw ValidationException::withMessages(['payment' => 'Top up tidak dapat dibayar.']);
             }
+            if ($lockedTopup->expires_at && now()->greaterThanOrEqualTo($lockedTopup->expires_at)) {
+                $this->states->expireTopup($lockedTopup);
+
+                // Do not throw here: throwing would roll back the expiry
+                // committed by this transaction. The caller turns this
+                // marker into the same expiry rejection — the same contract
+                // as the locked expiry path in startOrder.
+                return ['payment' => null, 'topup' => $lockedTopup, 'route' => null,
+                    'topup_expired_in_lock' => true];
+            }
 
             $existing = DB::table('payment_transactions')
                 ->where('idempotency_key', $idempotencyKey)
@@ -250,6 +260,10 @@ class PaymentService
                 'route' => $route,
             ];
         }, 3);
+
+        if (($result['topup_expired_in_lock'] ?? false) === true) {
+            throw ValidationException::withMessages(['payment' => 'Top up sudah kedaluwarsa.']);
+        }
 
         $payment = $result['payment'];
         if (! hash_equals((string) $payment->request_fingerprint, $fingerprint)) {
@@ -587,9 +601,14 @@ class PaymentService
         } else {
             $topup = DB::table('wallet_topups')->where('id', $payment->wallet_topup_id)->first();
             // Top-up payability follows the top-up row's own state, exactly
-            // like startTopup's locked validation. Top-up expiry is not
-            // enforced anywhere yet, so the clock must not strand it here.
-            if ($topup === null || $topup->status !== 'PENDING_PAYMENT') {
+            // like startTopup's locked validation — including its deadline,
+            // which startTopup now enforces: a top-up past its deadline is
+            // not payable anywhere, so recovery terminates instead of
+            // re-driving creation for it.
+            $payable = $topup !== null
+                && $topup->status === 'PENDING_PAYMENT'
+                && ! ($topup->expires_at && now()->greaterThanOrEqualTo($topup->expires_at));
+            if (! $payable) {
                 return $this->terminateCreating($payment, 'TOPUP_NOT_PAYABLE');
             }
             $target = (object) [

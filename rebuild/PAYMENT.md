@@ -79,6 +79,7 @@ Proteksi final/stale antara lain:
 - `PAID` tidak didowngrade selain flow review/refund manual;
 - payment yang sudah FAILED/CANCELLED/EXPIRED tidak dikembalikan ke PENDING oleh callback lama;
 - late PAID setelah order terminal tidak otomatis memproses ulang order; masuk review path;
+- late PAID setelah top up terminal atau kedaluwarsa tidak otomatis mengkredit saldo; masuk review path yang sama (`LATE_PAID_REVIEW`);
 - amount callback harus cocok dengan amount lokal.
 
 Redirect browser bukan bukti paid.
@@ -92,6 +93,8 @@ Detail signature/challenge ada di [SECURITY.md](SECURITY.md).
 ## Wallet
 
 Pembayaran order dengan wallet dan credit/refund top-up memakai MySQL transaction + `lockForUpdate` pada payment/order/topup/wallet yang relevan.
+
+Batas waktu top up (`wallet_topup_minutes`) ditegakkan sebagai tenggat keras: pembayaran top up yang sudah kedaluwarsa tidak dapat dimulai (`Top up sudah kedaluwarsa.`), perintah terjadwal `lfamilia:expire-unpaid-topups` meng-EXPIRED-kan top up `PENDING_PAYMENT` yang lewat tenggat, dan PAID yang tiba sesudahnya masuk review tanpa kredit otomatis. Cek beku `REFUND_REVIEW` pada pembayaran order dengan wallet dilakukan di bawah kunci baris wallet, dan jalur refund top-up mengambil kunci wallet yang sama sebelum membekukan, sehingga pembekuan dan debit tidak dapat saling menyalip.
 
 Wallet ledger menyimpan amount, balance before/after, source, reference, actor, timestamp, dan idempotency key. Ledger idempotency mencegah credit/debit yang sama diterapkan dua kali.
 
