@@ -106,6 +106,8 @@ class GoogleAuthTest extends TestCase
             'email' => 'returning-google@example.test',
             'password' => Hash::make('local-password-123'),
         ]);
+        // A verified local account keeps its credentials when linking Google.
+        $user->forceFill(['email_verified_at' => now()])->saveQuietly();
         IntegrationCredential::create([
             'code' => 'google_oauth',
             'config_ciphertext' => [
