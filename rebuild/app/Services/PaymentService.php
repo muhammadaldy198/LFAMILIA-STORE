@@ -178,6 +178,29 @@ class PaymentService
             throw ValidationException::withMessages(['payment' => 'Top up tidak dapat dibayar.']);
         }
 
+        // The deadline gate runs before the findExisting fast path below:
+        // a retry with the original idempotency key must not hand back live
+        // payment instructions for a top-up whose deadline has passed. The
+        // decision is taken on the locked row (the snapshot may be stale in
+        // either direction); a top-up already PAID keeps its normal result.
+        if ($topup->expires_at && now()->greaterThanOrEqualTo($topup->expires_at)) {
+            $expiredPending = DB::transaction(function () use ($topup): bool {
+                $locked = DB::table('wallet_topups')->where('id', $topup->id)
+                    ->lockForUpdate()->first();
+                if ($locked && $locked->status === 'PENDING_PAYMENT'
+                    && $locked->expires_at && now()->greaterThanOrEqualTo($locked->expires_at)) {
+                    $this->states->expireTopup($locked);
+
+                    return true;
+                }
+
+                return false;
+            });
+            if ($expiredPending) {
+                throw ValidationException::withMessages(['payment' => 'Top up sudah kedaluwarsa.']);
+            }
+        }
+
         $channelCode = DB::table('payment_channels')
             ->where('id', $topup->payment_channel_id)->value('code');
         if (! is_string($channelCode) || $channelCode === '') {

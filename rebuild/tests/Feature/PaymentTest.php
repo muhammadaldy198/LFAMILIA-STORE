@@ -3679,4 +3679,63 @@ class PaymentTest extends TestCase
         $this->assertSame(0, $creates);
         $this->assertSame('FAILED', DB::table('payment_transactions')->where('id', $paymentId)->value('status'));
     }
+
+    public function test_topup_retry_after_expiry_does_not_hand_back_existing_payment_instructions(): void
+    {
+        $routeId = $this->route('qris', 'MIDTRANS', 0, 70, 'qris');
+        $user = User::create([
+            'name' => 'Expired Retry Buyer',
+            'email' => 'expired-retry@example.test',
+            'phone' => '081234567806',
+            'password' => Hash::make('StrongPassword123!'),
+            'email_verified_at' => now(),
+        ]);
+        $wallet = DB::table('wallets')->where('user_id', $user->id)->firstOrFail();
+        $channelId = DB::table('payment_channels')->where('code', 'qris')->value('id');
+        $topupId = DB::table('wallet_topups')->insertGetId([
+            'wallet_id' => $wallet->id,
+            'user_id' => $user->id,
+            'payment_channel_id' => $channelId,
+            'payment_route_id' => $routeId,
+            'amount_idr' => 10000,
+            'fee_idr' => 700,
+            'total_idr' => 10700,
+            'status' => 'PENDING_PAYMENT',
+            'idempotency_key' => 'pr5-retry-topup-0001',
+            'request_fingerprint' => hash('sha256', 'pr5-retry-topup'),
+            'expires_at' => now()->subMinute(),
+            'created_at' => now()->subMinutes(31),
+            'updated_at' => now()->subMinutes(2),
+        ]);
+        // The payment created before the deadline, still pending: the
+        // findExisting fast path must not return it as payable instructions.
+        $fingerprint = hash('sha256', implode('|', ['topup', $topupId, 'qris', $routeId, 10700]));
+        $paymentId = DB::table('payment_transactions')->insertGetId([
+            'wallet_topup_id' => $topupId,
+            'payment_route_id' => $routeId,
+            'gateway_code' => 'MIDTRANS',
+            'channel_code' => 'qris',
+            'merchant_reference' => 'TOP-PR5-RETRY-1',
+            'amount_idr' => 10700,
+            'status' => 'PENDING',
+            'request_fingerprint' => $fingerprint,
+            'idempotency_key' => 'payment-pr5-retry-0001',
+            'expires_at' => now()->addMinutes(5),
+            'created_at' => now()->subMinutes(30),
+            'updated_at' => now()->subMinutes(2),
+        ]);
+        $topup = DB::table('wallet_topups')->where('id', $topupId)->firstOrFail();
+
+        try {
+            app(PaymentService::class)->startTopup(
+                $topup, 'payment-pr5-retry-0001', $user->name, $user->email, (string) $user->phone
+            );
+            $this->fail('Retry sesudah tenggat tidak boleh mengembalikan instruksi pembayaran lama.');
+        } catch (ValidationException $exception) {
+            $this->assertSame('Top up sudah kedaluwarsa.', $exception->errors()['payment'][0]);
+        }
+
+        $this->assertSame('EXPIRED', DB::table('wallet_topups')->where('id', $topupId)->value('status'));
+        $this->assertSame('PENDING', DB::table('payment_transactions')->where('id', $paymentId)->value('status'));
+    }
 }
