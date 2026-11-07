@@ -209,7 +209,7 @@ class AdminSettingsController
             } else {
                 $benefits['benefit_notes'] = $notes;
             }
-        } else {
+        } elseif (! $internalTier) {
             throw ValidationException::withMessages([
                 'discount_percent' => 'Diskon membership wajib dikirim.',
             ]);
