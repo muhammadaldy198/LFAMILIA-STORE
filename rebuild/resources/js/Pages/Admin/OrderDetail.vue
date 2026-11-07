@@ -10,7 +10,6 @@ const props = defineProps({
     attempts: { type: Array, default: () => [] },
     payments: { type: Array, default: () => [] },
     events: { type: Array, default: () => [] },
-    canViewCustomer: Boolean,
     canResendDelivery: Boolean,
     canCancel: Boolean,
     canCheckFulfillment: Boolean,
@@ -151,8 +150,8 @@ const whatsapp = computed(() => {
                 <div class="adm-card-body">
                     <dl class="adm-kv">
                         <dt>Nama pelanggan</dt><dd>{{ order.buyer_name || 'Pelanggan tamu' }}</dd>
-                        <dt>Nomor telepon/WhatsApp</dt><dd>{{ canViewCustomer ? (order.buyer_phone || '—') : 'Tidak berizin' }}</dd>
-                        <dt>Email</dt><dd>{{ canViewCustomer ? (order.buyer_email || '—') : 'Tidak berizin' }}</dd>
+                        <dt>Nomor telepon/WhatsApp</dt><dd>{{ order.buyer_phone || '—' }}</dd>
+                        <dt>Email</dt><dd>{{ order.buyer_email || '—' }}</dd>
                         <template v-for="item in order.destinations" :key="item.label">
                             <dt>{{ item.label }}</dt><dd>{{ item.value }}</dd>
                         </template>
