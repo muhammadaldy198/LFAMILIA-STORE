@@ -54,9 +54,9 @@ class AdminSecurityPr3Test extends TestCase
         });
 
         $this->actingAs($owner, 'admin')->withSession(['admin.password_confirmed_at' => time()])->put('/admin/access/'.$first->id, [
-                'name' => $first->name, 'email' => $first->email, 'role' => 'ADMIN',
-                'permissions' => ['dashboard.view'], 'is_active' => true,
-            ])->assertSessionHasNoErrors();
+            'name' => $first->name, 'email' => $first->email, 'role' => 'ADMIN',
+            'permissions' => ['dashboard.view'], 'is_active' => true,
+        ])->assertSessionHasNoErrors();
 
         $this->delete('/admin/access/'.$second->id)->assertSessionHasNoErrors();
         $this->put('/admin/access/'.$owner->id, [
