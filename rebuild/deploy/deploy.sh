@@ -9,6 +9,7 @@ source "${OPS_ENV_FILE}"
 : "${REPO_DIR:?REPO_DIR is required}"
 : "${APP_SUBDIR:?APP_SUBDIR is required}"
 : "${REPO_REF:?REPO_REF is required}"
+: "${DEPLOY_EXPECTED_SHA:?DEPLOY_EXPECTED_SHA is required}"
 : "${PHP_BIN:?PHP_BIN is required}"
 : "${COMPOSER_BIN:?COMPOSER_BIN is required}"
 : "${NPM_BIN:?NPM_BIN is required}"
@@ -36,6 +37,7 @@ git_repo fetch --prune origin "${REPO_REF}"
 git_repo checkout "${REPO_REF}"
 git_repo merge --ff-only "origin/${REPO_REF}"
 target_sha="$(git_repo rev-parse HEAD)"
+[[ "${target_sha}" == "${DEPLOY_EXPECTED_SHA}" ]] || { echo "Refusing to deploy ${target_sha}: it does not match DEPLOY_EXPECTED_SHA (${DEPLOY_EXPECTED_SHA}). Pin the reviewed, CI-green commit in ops.env first." >&2; exit 1; }
 
 cd "${APP_DIR}"
 "${PHP_BIN}" artisan down --retry=60 --refresh=15

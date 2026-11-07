@@ -58,6 +58,9 @@ class AppServiceProvider extends ServiceProvider
             if (config('lfamilia.trusted_proxies', []) === []) {
                 throw new LogicException('TRUSTED_PROXIES must be configured in production.');
             }
+            if (config('lfamilia.trusted_proxies') === '*') {
+                throw new LogicException('TRUSTED_PROXIES must list the proxy addresses in production; the wildcard is not allowed.');
+            }
             if (! str_starts_with((string) config('app.url'), 'https://')) {
                 throw new LogicException('APP_URL must use HTTPS in production.');
             }

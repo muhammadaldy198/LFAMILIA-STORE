@@ -61,6 +61,10 @@ grep -Eq '^APP_KEY=base64:.+$' "${ENV_FILE}" || { echo "APP_KEY must be generate
 grep -Eq '^APP_URL=https://' "${ENV_FILE}" || { echo "APP_URL must use HTTPS" >&2; exit 1; }
 grep -Eq '^APP_TRUSTED_HOSTS=.+$' "${ENV_FILE}" || { echo "APP_TRUSTED_HOSTS is required" >&2; exit 1; }
 grep -Eq '^TRUSTED_PROXIES=.+$' "${ENV_FILE}" || { echo "TRUSTED_PROXIES is required" >&2; exit 1; }
+if grep -Eq '^TRUSTED_PROXIES=\*[[:space:]]*$' "${ENV_FILE}"; then
+  echo "TRUSTED_PROXIES must not be the wildcard in production; list the proxy addresses (e.g. 127.0.0.1,::1)" >&2
+  exit 1
+fi
 
 cd "${APP_DIR}"
 COMPOSER_ALLOW_SUPERUSER=1 \
@@ -103,5 +107,23 @@ for privileged_script in backup.sh restore-verify.sh; do
     echo "WARNING: Privileged script differs from repository: ${privileged_script}. Review and synchronize it separately before relying on the corresponding systemd service." >&2
   fi
 done
+
+# Signal when the effective nginx configuration has lost the secret-file
+# deny rules from deploy/nginx/cloudpanel-vhost-snippet.conf. CloudPanel
+# regenerates vhosts outside this repository, so - like the privileged
+# script drift check above - this warns instead of failing the deploy.
+if command -v nginx >/dev/null 2>&1; then
+  nginx_dump="$(nginx -T 2>/dev/null || true)"
+  for deny_location in \
+    'location ~ /\.(?!well-known).*' \
+    'location ~* \.(?:env|log|sql|bak|ini)$' \
+    'location ~* ^/(?:storage/logs|bootstrap/cache)/'; do
+    if ! grep -Fq -- "${deny_location}" <<<"${nginx_dump}"; then
+      echo "WARNING: nginx deny rule missing from the effective configuration: ${deny_location}. Reapply deploy/nginx/cloudpanel-vhost-snippet.conf to the vhost, then run nginx -t before reload." >&2
+    fi
+  done
+else
+  echo "WARNING: nginx binary not found; the vhost deny rules could not be verified." >&2
+fi
 
 echo "M12 production preflight passed."

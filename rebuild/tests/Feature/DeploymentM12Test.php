@@ -2,8 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Providers\AppServiceProvider;
+use Illuminate\Http\Middleware\TrustProxies;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use LogicException;
 use Tests\TestCase;
 
 class DeploymentM12Test extends TestCase
@@ -28,6 +31,63 @@ class DeploymentM12Test extends TestCase
                 'secure' => true,
                 'ip' => '198.51.100.25',
             ]);
+    }
+
+    /**
+     * NV-16/NV-22: with trusted proxies restricted to the loopback hops, a
+     * request whose direct peer is not a trusted proxy must not be able to
+     * name its own client IP through X-Forwarded-For - every IP-keyed
+     * limiter in the application reads $request->ip().
+     */
+    public function test_untrusted_remote_cannot_spoof_client_ip_with_forwarded_for(): void
+    {
+        TrustProxies::flushState();
+        TrustProxies::at(['127.0.0.1', '::1']);
+        TrustProxies::withHeaders(
+            Request::HEADER_X_FORWARDED_FOR
+            | Request::HEADER_X_FORWARDED_HOST
+            | Request::HEADER_X_FORWARDED_PORT
+            | Request::HEADER_X_FORWARDED_PROTO
+        );
+
+        Route::get('/_m12/proxy-restricted', function (Request $request) {
+            return response()->json(['ip' => $request->ip()]);
+        });
+
+        $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.10'])
+            ->withHeaders(['X-Forwarded-For' => '198.51.100.25'])
+            ->get('/_m12/proxy-restricted')
+            ->assertOk()
+            ->assertJson(['ip' => '203.0.113.10']);
+    }
+
+    /**
+     * NV-16/NV-22: production boot must refuse the trusted-proxies
+     * wildcard outright, not merely require a non-empty value.
+     */
+    public function test_production_boot_rejects_wildcard_trusted_proxies(): void
+    {
+        config([
+            'app.debug' => false,
+            'app.url' => 'https://example.test',
+            'session.encrypt' => true,
+            'session.secure' => true,
+            'lfamilia.trusted_hosts' => ['example.test'],
+            'lfamilia.trusted_proxies' => '*',
+        ]);
+        $this->app->detectEnvironment(fn (): string => 'production');
+
+        try {
+            (new AppServiceProvider($this->app))->boot();
+            $this->fail('Production boot must reject the trusted-proxies wildcard.');
+        } catch (LogicException $exception) {
+            $this->assertStringContainsString('TRUSTED_PROXIES', $exception->getMessage());
+            $this->assertStringContainsString('wildcard', $exception->getMessage());
+        }
+
+        config(['lfamilia.trusted_proxies' => ['127.0.0.1', '::1']]);
+        (new AppServiceProvider($this->app))->boot();
+        $this->addToAssertionCount(1);
     }
 
     public function test_application_uses_wib_and_deployment_guards_its_cached_configuration(): void
@@ -67,10 +127,17 @@ class DeploymentM12Test extends TestCase
         $this->assertStringContainsString("APP_ENV=production\n", $production);
         $this->assertStringContainsString("APP_DEBUG=false\n", $production);
         $this->assertStringContainsString("SESSION_SECURE_COOKIE=true\n", $production);
-        $this->assertStringContainsString("TRUSTED_PROXIES=*\n", $production);
+        $this->assertStringContainsString("TRUSTED_PROXIES=127.0.0.1,::1\n", $production);
         $this->assertStringContainsString("DB_PASSWORD=\n", $production);
         $this->assertStringContainsString("APP_KEY=\n", $production);
 
+        $preflight = file_get_contents(base_path('deploy/preflight.sh'));
+        $deploy = file_get_contents(base_path('deploy/deploy.sh'));
+        $this->assertStringContainsString('TRUSTED_PROXIES must not be the wildcard', $preflight);
+        $this->assertStringContainsString('cloudpanel-vhost-snippet.conf', $preflight);
+        $this->assertStringContainsString('DEPLOY_EXPECTED_SHA', $deploy);
+        $this->assertStringContainsString('does not match DEPLOY_EXPECTED_SHA', $deploy);
+        $this->assertStringContainsString('DEPLOY_EXPECTED_SHA=', $ops);
         $this->assertStringContainsString('MYSQL_DEFAULTS_FILE=', $ops);
         $this->assertStringContainsString('BACKUP_PASSPHRASE_FILE=', $ops);
         $this->assertStringContainsString('BACKUP_REQUIRE_REMOTE=true', $ops);

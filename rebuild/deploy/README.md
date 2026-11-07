@@ -18,7 +18,7 @@ Provider/application credential yang dikelola aplikasi tetap di Super Admin → 
 
 Urutan operasional yang aman:
 
-1. Pastikan PR sudah merged ke `main` dan CI hijau.
+1. Pastikan PR sudah merged ke `main` dan CI hijau, lalu atur `DEPLOY_EXPECTED_SHA` di `/etc/lfamilia/ops.env` ke SHA commit target (deploy.sh menolak SHA lain).
 2. Jalankan encrypted database backup dengan `bash deploy/backup.sh`.
 3. Pastikan backup berhasil sebelum perubahan runtime.
 4. Jalankan `bash deploy/preflight.sh`.
