@@ -189,6 +189,29 @@ class AdminSecurityPr3Test extends TestCase
         $this->assertSame('MAFIA', $service->discount($user, 100000)['tier_code']);
     }
 
+    public function test_switching_manual_mafia_to_auto_revokes_internal_pricing_without_eligible_floor(): void
+    {
+        $user = $this->customer();
+        $mafia = MembershipTier::where('code', 'MAFIA')->firstOrFail();
+        $mafia->forceFill(['benefits' => ['discount_bps' => 2500]])->save();
+        MembershipTier::where('code', 'BASIC')->firstOrFail()->forceFill(['is_active' => false])->save();
+        MembershipTier::where('code', 'SILVER')->firstOrFail()->forceFill([
+            'requirements' => ['minimum_spend_idr' => 100000],
+            'is_active' => true,
+        ])->save();
+
+        $service = app(MembershipService::class);
+        $service->setMode($user, 'MAFIA');
+        $this->assertSame(25000, $service->discount($user, 100000)['amount_idr']);
+
+        $service->setMode($user, 'AUTO');
+        $profile = $service->sync($user);
+        $this->assertSame('AUTO', $profile['mode']);
+        $this->assertSame('BASIC', $profile['code']);
+        $this->assertNull($user->fresh()->membership_override_code);
+        $this->assertSame(0, $service->discount($user, 100000)['amount_idr']);
+    }
+
     public function test_orders_view_without_customers_view_can_see_contact_on_order_detail_only(): void
     {
         $owner = $this->admin();
