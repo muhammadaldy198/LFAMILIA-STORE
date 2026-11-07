@@ -15,6 +15,7 @@ class CustomerEmailTemplateRenderer
         'verification' => ['label' => 'Verifikasi email', 'value' => 'VERIFIKASI', 'cta' => 'Verifikasi Email'],
         'password_reset' => ['label' => 'Keamanan akun', 'value' => 'ATUR ULANG', 'cta' => 'Atur Ulang Kata Sandi'],
         'password_changed' => ['label' => 'Keamanan akun', 'value' => 'DIPERBARUI', 'cta' => 'Masuk ke Akun'],
+        'account_email_changed' => ['label' => 'Keamanan akun', 'value' => 'EMAIL DIUBAH', 'cta' => 'Hubungi Kami'],
         'password_reset_completed' => ['label' => 'Keamanan akun', 'value' => 'BERHASIL', 'cta' => 'Masuk ke Akun'],
         'order_created' => ['label' => 'Total yang harus dibayar', 'value' => '', 'cta' => 'Bayar Sekarang'],
         'order_paid' => ['label' => 'Total yang harus dibayar', 'value' => 'LUNAS', 'cta' => 'Cek Rincian Pesanan'],
@@ -103,6 +104,12 @@ class CustomerEmailTemplateRenderer
                 $ctaUrl = $this->firstHttpUrl($sourceBody) ?: $ctaUrl;
                 $after = 'Jika kamu tidak meminta ini, abaikan email ini dan jangan bagikan tautan kepada siapa pun.';
                 $summary = [['label' => 'Email akun', 'value' => $recipient]];
+                break;
+            case 'account_email_changed':
+                $intro = $body;
+                $ctaUrl = $support !== '' ? 'mailto:'.$support : route('content.contact');
+                $after = 'Jika kamu tidak melakukan perubahan ini, segera hubungi Customer Service.';
+                $summary = [['label' => 'Email sebelumnya', 'value' => $recipient]];
                 break;
             case 'password_changed':
                 $intro = 'Kata sandi akun kamu berhasil diperbarui.';
