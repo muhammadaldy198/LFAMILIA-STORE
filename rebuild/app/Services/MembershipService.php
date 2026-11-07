@@ -52,7 +52,10 @@ class MembershipService
                 ->where('is_active', true)
                 ->first();
             if ($saved && ! in_array((string) $saved->code, self::INTERNAL_CODES, true)) {
-                $automatic = $saved;
+                $savedMinimum = $this->minimumSpend($this->array($saved->requirements));
+                if ($savedMinimum === null || $progress >= $savedMinimum) {
+                    $automatic = $saved;
+                }
             }
         }
 
