@@ -4,6 +4,7 @@ import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import AdminLayout from '../../Components/Admin/AdminLayout.vue';
 import AdminModal from '../../Components/Admin/AdminModal.vue';
 import { label, num, rupiah, tone, wibDateTime, wibTime, copyText } from '../../lib/adminFormat';
+import { withSensitive } from '../../lib/sensitivePrompt';
 
 const props = defineProps({
     orders: { type: Object, default: () => ({ data: [], links: [] }) },
@@ -84,9 +85,11 @@ const openManual = () => {
     manualOpen.value = true;
 };
 const submitManual = () => {
-    manual.post('/admin/orders/manual', {
-        preserveScroll: true,
-        onSuccess: () => { manualOpen.value = false; manual.reset(); },
+    void withSensitive('Konfirmasi pencatatan pesanan manual yang pembayarannya sudah diterima.', () => {
+        manual.post('/admin/orders/manual', {
+            preserveScroll: true,
+            onSuccess: () => { manualOpen.value = false; manual.reset(); },
+        });
     });
 };
 </script>

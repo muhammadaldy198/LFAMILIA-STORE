@@ -149,45 +149,56 @@ class AdminAccessController
         $data = $this->normalizePermissions($this->validateAdmin($request, $permissions, $admin, false));
         $currentAdminId = (int) $request->user('admin')->id;
 
-        if ($admin->id === $currentAdminId
-            && ($data['role'] !== 'SUPER_ADMIN' || ! $data['is_active'])) {
-            throw ValidationException::withMessages([
-                'role' => 'Akun yang sedang digunakan tidak dapat dinonaktifkan atau diturunkan. Gunakan Super Admin lain.',
+        DB::transaction(function () use ($request, $admin, $data, $currentAdminId, $audit): void {
+            // Lock the same active set in a stable order for every access mutation.
+            // Evaluate the guard only after these locks are held.
+            $activeSuperIds = AdminUser::query()
+                ->where('role', 'SUPER_ADMIN')
+                ->where('is_active', true)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->pluck('id');
+            $target = AdminUser::query()->whereKey($admin->id)->lockForUpdate()->firstOrFail();
+
+            if ($target->id === $currentAdminId
+                && ($data['role'] !== 'SUPER_ADMIN' || ! $data['is_active'])) {
+                throw ValidationException::withMessages([
+                    'role' => 'Akun yang sedang digunakan tidak dapat dinonaktifkan atau diturunkan. Gunakan Super Admin lain.',
+                ]);
+            }
+
+            if ($target->role === 'SUPER_ADMIN'
+                && ($data['role'] !== 'SUPER_ADMIN' || ! $data['is_active'])
+                && $activeSuperIds->reject(fn ($id): bool => (int) $id === (int) $target->id)->isEmpty()) {
+                throw ValidationException::withMessages([
+                    'role' => 'Super Admin aktif terakhir tidak boleh dinonaktifkan atau diturunkan.',
+                ]);
+            }
+
+            $before = $this->auditState($target);
+
+            $target->fill([
+                'name' => trim($data['name']),
+                'email' => strtolower(trim($data['email'])),
             ]);
-        }
-
-        if ($admin->role === 'SUPER_ADMIN'
-            && ($data['role'] !== 'SUPER_ADMIN' || ! $data['is_active'])
-            && AdminUser::where('role', 'SUPER_ADMIN')->where('is_active', true)
-                ->where('id', '!=', $admin->id)->count() < 1) {
-            throw ValidationException::withMessages([
-                'role' => 'Super Admin aktif terakhir tidak boleh dinonaktifkan atau diturunkan.',
+            $target->forceFill([
+                'role' => $data['role'],
+                'permissions' => $data['role'] === 'ADMIN' ? $data['permissions'] : null,
+                'is_active' => $data['is_active'],
             ]);
-        }
+            if (! empty($data['password'])) {
+                $target->password = Hash::make($data['password']);
+            }
+            $target->save();
 
-        $before = $this->auditState($admin);
+            if (! empty($data['password']) && $target->id === $currentAdminId) {
+                // Only this authenticated request may refresh its own session
+                // fingerprint; unrelated in-flight requests must keep theirs stale.
+                $request->attributes->set('security.admin_self_password_hash', (string) $target->getAuthPassword());
+            }
 
-        $admin->fill([
-            'name' => trim($data['name']),
-            'email' => strtolower(trim($data['email'])),
-        ]);
-        $admin->forceFill([
-            'role' => $data['role'],
-            'permissions' => $data['role'] === 'ADMIN' ? $data['permissions'] : null,
-            'is_active' => $data['is_active'],
-        ]);
-        if (! empty($data['password'])) {
-            $admin->password = Hash::make($data['password']);
-        }
-        $admin->save();
-
-        if (! empty($data['password']) && $admin->id === $currentAdminId) {
-            // Only this authenticated request may refresh its own session
-            // fingerprint; unrelated in-flight requests must keep theirs stale.
-            $request->attributes->set('security.admin_self_password_hash', (string) $admin->getAuthPassword());
-        }
-
-        $audit->record($request, 'admin.updated', 'admin_user', $admin->id, $before, $this->auditState($admin));
+            $audit->record($request, 'admin.updated', 'admin_user', $target->id, $before, $this->auditState($target));
+        });
 
         return back()->with('status', 'Akun dan hak akses berhasil diperbarui.');
     }
@@ -199,25 +210,34 @@ class AdminAccessController
     ): RedirectResponse {
         $currentAdminId = (int) $request->user('admin')->id;
 
-        if ($admin->id === $currentAdminId) {
-            throw ValidationException::withMessages([
-                'admin' => 'Akun yang sedang digunakan tidak dapat dihapus.',
-            ]);
-        }
+        DB::transaction(function () use ($request, $admin, $currentAdminId, $audit): void {
+            $activeSuperIds = AdminUser::query()
+                ->where('role', 'SUPER_ADMIN')
+                ->where('is_active', true)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->pluck('id');
+            $target = AdminUser::query()->whereKey($admin->id)->lockForUpdate()->firstOrFail();
 
-        if ($admin->role === 'SUPER_ADMIN'
-            && AdminUser::where('role', 'SUPER_ADMIN')->where('is_active', true)
-                ->where('id', '!=', $admin->id)->count() < 1) {
-            throw ValidationException::withMessages([
-                'admin' => 'Super Admin aktif terakhir tidak boleh dihapus.',
-            ]);
-        }
+            if ($target->id === $currentAdminId) {
+                throw ValidationException::withMessages([
+                    'admin' => 'Akun yang sedang digunakan tidak dapat dihapus.',
+                ]);
+            }
 
-        $before = $this->auditState($admin);
-        $id = $admin->id;
-        $admin->delete();
+            if ($target->role === 'SUPER_ADMIN'
+                && $activeSuperIds->reject(fn ($id): bool => (int) $id === (int) $target->id)->isEmpty()) {
+                throw ValidationException::withMessages([
+                    'admin' => 'Super Admin aktif terakhir tidak boleh dihapus.',
+                ]);
+            }
 
-        $audit->record($request, 'admin.deleted', 'admin_user', $id, $before, null);
+            $before = $this->auditState($target);
+            $id = $target->id;
+            $target->delete();
+
+            $audit->record($request, 'admin.deleted', 'admin_user', $id, $before, null);
+        });
 
         return redirect('/admin/access')->with('status', 'Akun Admin berhasil dihapus.');
     }

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\AdminAuditService;
+use App\Services\MembershipService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -175,11 +176,23 @@ class AdminSettingsController
         $requirements = $before['requirements'];
         $benefits = $before['benefits'];
 
+        $internalTier = in_array((string) $tier->code, MembershipService::INTERNAL_CODES, true);
+        if ($internalTier && $request->exists('minimum_spend_idr')) {
+            throw ValidationException::withMessages([
+                'minimum_spend_idr' => 'Tier internal tidak boleh memiliki syarat minimum transaksi.',
+            ]);
+        }
+
         if ($request->filled('requirements')) {
             $requirements = $this->jsonPayload($data['requirements'] ?? null, 'requirements');
+            if ($internalTier && array_key_exists('minimum_spend_idr', $requirements)) {
+                throw ValidationException::withMessages([
+                    'requirements' => 'Tier internal tidak boleh memiliki syarat minimum transaksi.',
+                ]);
+            }
         } elseif ($request->exists('minimum_spend_idr')) {
             $requirements['minimum_spend_idr'] = (int) ($data['minimum_spend_idr'] ?? 0);
-        } else {
+        } elseif (! $internalTier) {
             throw ValidationException::withMessages([
                 'minimum_spend_idr' => 'Minimum transaksi membership wajib dikirim.',
             ]);
@@ -196,7 +209,7 @@ class AdminSettingsController
             } else {
                 $benefits['benefit_notes'] = $notes;
             }
-        } else {
+        } elseif (! $internalTier) {
             throw ValidationException::withMessages([
                 'discount_percent' => 'Diskon membership wajib dikirim.',
             ]);

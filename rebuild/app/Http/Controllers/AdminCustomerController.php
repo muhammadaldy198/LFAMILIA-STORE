@@ -163,6 +163,7 @@ class AdminCustomerController
 
                     return [
                         'code' => (string) $tier->code,
+                        'is_internal' => in_array((string) $tier->code, MembershipService::INTERNAL_CODES, true),
                         'rank' => (int) $tier->rank,
                         'is_active' => (bool) $tier->is_active,
                         'minimum_spend_idr' => max(0, (int) ($requirements['minimum_spend_idr'] ?? 0)),

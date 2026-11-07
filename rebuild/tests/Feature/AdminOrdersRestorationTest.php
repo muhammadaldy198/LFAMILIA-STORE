@@ -226,9 +226,9 @@ class AdminOrdersRestorationTest extends TestCase
         Http::swap(new Factory);
         Http::fake();
         $data = $this->data();
-        $this->post('/admin/orders/manual', $data)->assertRedirect();
+        $this->withSession(['admin.password_confirmed_at' => time()])->post('/admin/orders/manual', $data)->assertRedirect();
         $order = DB::table('orders')->where('guest_email', $data['email'])->orderByDesc('id')->first();
-        $this->post('/admin/orders/manual', $data)->assertRedirect(route('admin.orders.show', $order->id));
+        $this->withSession(['admin.password_confirmed_at' => time()])->post('/admin/orders/manual', $data)->assertRedirect(route('admin.orders.show', $order->id));
         $this->assertSame(1, DB::table('orders')->where('idempotency_key', 'admin-manual:'.$admin->id.':'.$data['idempotency_key'])->count());
         $this->assertSame('PROCESSING', $order->status);
         $this->assertNotNull($order->paid_at);
@@ -239,8 +239,8 @@ class AdminOrdersRestorationTest extends TestCase
         Queue::assertNotPushed(SendFulfillmentJob::class);
         Queue::assertNotPushed(ReconcileFulfillmentJob::class);
         Http::assertNothingSent();
-        $this->post('/admin/orders/manual', [...$data, 'total_idr' => 16000])->assertSessionHasErrors('order');
-        $this->post('/admin/orders/manual', [...$data, 'idempotency_key' => (string) Str::uuid(), 'payment_received' => false])->assertSessionHasErrors('payment_received');
+        $this->withSession(['admin.password_confirmed_at' => time()])->post('/admin/orders/manual', [...$data, 'total_idr' => 16000])->assertSessionHasErrors('order');
+        $this->withSession(['admin.password_confirmed_at' => time()])->post('/admin/orders/manual', [...$data, 'idempotency_key' => (string) Str::uuid(), 'payment_received' => false])->assertSessionHasErrors('payment_received');
     }
 
     public function test_manual_order_accepts_formatted_phone_numbers(): void
@@ -256,7 +256,7 @@ class AdminOrdersRestorationTest extends TestCase
         ];
         foreach ($formatted as $phone => $digits) {
             $data = [...$this->data(), 'phone' => $phone, 'idempotency_key' => (string) Str::uuid()];
-            $this->post('/admin/orders/manual', $data)->assertRedirect()->assertSessionHasNoErrors();
+            $this->withSession(['admin.password_confirmed_at' => time()])->post('/admin/orders/manual', $data)->assertRedirect()->assertSessionHasNoErrors();
 
             $order = DB::table('orders')->where('guest_email', $data['email'])->orderByDesc('id')->first();
             $this->assertSame($phone, $order->guest_phone);
@@ -265,9 +265,9 @@ class AdminOrdersRestorationTest extends TestCase
 
         // Di bawah 10 digit tetap ditolak; karakter selain
         // digit/+/().-/spasi tetap ditolak.
-        $this->post('/admin/orders/manual', [...$this->data(), 'phone' => '0812-345'])
+        $this->withSession(['admin.password_confirmed_at' => time()])->post('/admin/orders/manual', [...$this->data(), 'phone' => '0812-345'])
             ->assertSessionHasErrors('phone');
-        $this->post('/admin/orders/manual', [...$this->data(), 'phone' => '0812 3456 7890 x123'])
+        $this->withSession(['admin.password_confirmed_at' => time()])->post('/admin/orders/manual', [...$this->data(), 'phone' => '0812 3456 7890 x123'])
             ->assertSessionHasErrors('phone');
     }
 
@@ -383,7 +383,7 @@ class AdminOrdersRestorationTest extends TestCase
         $this->get('/admin/orders')->assertInertia(fn (Assert $page) => $page->where('canCreateManual', false));
         $this->get('/admin/orders/'.$id)->assertInertia(fn (Assert $page) => $page
             ->where('attempts.0.can_manual', false)->where('canCheckFulfillment', false)->where('canViewCustomer', false));
-        $this->post('/admin/orders/manual', $this->data())->assertForbidden();
+        $this->withSession(['admin.password_confirmed_at' => time()])->post('/admin/orders/manual', $this->data())->assertForbidden();
         $this->post('/admin/orders/'.$id.'/check-payment')->assertForbidden();
         $this->post('/admin/orders/'.$id.'/resend-delivery')->assertForbidden();
         $this->login('ADMIN', ['dashboard.view']);

@@ -126,12 +126,13 @@ const openTier = tier => {
 const saveTier = () => {
     const tier = tierEditor.value;
     busy.value = true;
-    router.put('/admin/settings/membership/' + encodeURIComponent(tier.code), {
+    const payload = {
         is_active: Boolean(tier.is_active),
-        minimum_spend_idr: Number(tier.minimum_spend_idr || 0),
         discount_percent: Number(tier.discount_percent || 0),
         benefit_notes: tier.benefit_notes || '',
-    }, {
+    };
+    if (!tier.is_internal) payload.minimum_spend_idr = Number(tier.minimum_spend_idr || 0);
+    router.put('/admin/settings/membership/' + encodeURIComponent(tier.code), payload, {
         preserveScroll: true,
         onError: bag => { errors.value = bag; },
         onSuccess: () => { tierEditor.value = null; },
@@ -300,7 +301,7 @@ const saveTier = () => {
                         <tbody>
                             <tr v-for="tier in tiers" :key="tier.code">
                                 <td><strong>{{ tier.rank }}. {{ tier.code }}</strong><div v-if="tier.code === 'MAFIA'" class="adm-note">Hanya di panel</div></td>
-                                <td style="text-align:right">{{ rupiah(tier.minimum_spend_idr) }}</td>
+                                <td style="text-align:right">{{ tier.is_internal ? 'Tidak berlaku' : rupiah(tier.minimum_spend_idr) }}</td>
                                 <td style="text-align:right">{{ tier.discount_percent }}%</td>
                                 <td class="adm-note">{{ tier.benefit_notes || '—' }}</td>
                                 <td><span class="adm-tag" :class="tier.is_active ? 'ok' : 'bad'">{{ tier.is_active ? 'Aktif' : 'Nonaktif' }}</span></td>
@@ -396,11 +397,12 @@ const saveTier = () => {
             description="Syarat, diskon, dan manfaat berlaku untuk semua pelanggan di tingkat ini."
             @update:open="value => { if (!value) tierEditor = null; }">
             <div v-if="tierEditor" class="adm-grid">
-                <label class="adm-field">
+                <label v-if="!tierEditor.is_internal" class="adm-field">
                     <span>Minimum total transaksi berhasil (Rp)</span>
                     <input v-model.number="tierEditor.minimum_spend_idr" type="number" min="0" class="adm-input">
                     <span class="hint">Isi 0 bila tidak ada minimum.</span>
                 </label>
+                <p v-else class="adm-note">Tier internal hanya dapat diberikan secara manual, tanpa minimum transaksi.</p>
                 <label class="adm-field">
                     <span>Diskon untuk pelanggan tingkat ini (%)</span>
                     <input v-model.number="tierEditor.discount_percent" type="number" min="0" max="100" step="0.01" class="adm-input">
