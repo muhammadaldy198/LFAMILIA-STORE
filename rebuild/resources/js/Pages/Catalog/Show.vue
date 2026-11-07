@@ -349,6 +349,14 @@ async function ensureCheckoutAttemptKey(signature) {
         // Storage can be unavailable in hardened/private browsers.
     }
 
+    // Hashing unavailable (or storage failed): never leave a legacy
+    // raw-signature record behind in sessionStorage.
+    try {
+        window.sessionStorage.removeItem(checkoutAttemptStorageKey());
+    } catch {
+        // Storage can be unavailable in hardened/private browsers.
+    }
+
     const key = newIdempotencyKey();
     idempotencyKey.value = key;
     return key;
