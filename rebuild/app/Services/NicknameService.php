@@ -147,42 +147,44 @@ class NicknameService
     }
 
     /**
-     * Every package an H2H eligibility verdict could disable for this
-     * product, regardless of any single account's verdict. Checkout uses
-     * this family to decide which orders must carry an eligibility proof.
+     * The packages H2H eligibility verdicts could disable for this
+     * product, split by verdict family, regardless of any single
+     * account's verdict. Checkout uses these families to decide which
+     * orders must carry a proof attesting that family's verdict.
      *
-     * @return array<int, int>
+     * @return array{first_purchase: array<int, int>, weekly_pass: array<int, int>}
      */
-    public function eligibilityPackageIds(Product $product): array
+    public function eligibilityFamilies(Product $product): array
     {
+        $families = ['first_purchase' => [], 'weekly_pass' => []];
         if (($product->relationLoaded('category') && strtolower((string) $product->category?->slug) === 'voucher')
             || ! $product->nickname_check_enabled) {
-            return [];
+            return $families;
         }
 
         $gameCode = strtolower(trim((string) $product->nickname_game_code));
         $userField = trim((string) $product->nickname_user_field_key);
         $skuMap = $this->firstPurchaseSkuMap($gameCode);
         if ($gameCode === '' || $userField === '' || $skuMap === []) {
-            return [];
+            return $families;
         }
 
         $game = NicknameGameCode::active()->nicknameSupported()->where('code', $gameCode)->first();
         if (! $game) {
-            return [];
+            return $families;
         }
 
-        $ids = ProductPackage::query()->where('product_id', $product->id)
+        $families['first_purchase'] = ProductPackage::query()->where('product_id', $product->id)
             ->whereHas('mappings', fn ($query) => $query->where('is_active', true)->whereIn('external_sku', array_values($skuMap)))
-            ->pluck('id')->all();
+            ->pluck('id')->map(fn ($id) => (int) $id)->all();
         if ($gameCode === 'mobile-legends') {
-            $ids = array_merge($ids, ProductPackage::query()
+            $families['weekly_pass'] = ProductPackage::query()
                 ->where('product_id', $product->id)
                 ->whereRaw('LOWER(name) LIKE ?', ['%weekly diamond pass%'])
-                ->pluck('id')->all());
+                ->pluck('id')->map(fn ($id) => (int) $id)->all();
         }
 
-        return array_values(array_unique(array_map('intval', $ids)));
+        return $families;
     }
 
     /**

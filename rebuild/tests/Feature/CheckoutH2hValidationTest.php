@@ -654,6 +654,73 @@ class CheckoutH2hValidationTest extends TestCase
     }
 
     /**
+     * NV-07 (Codex P1): when H2H returns VALID but omits both eligibility
+     * verdicts, the client normalizes them to null; that must not count
+     * as evaluated, so no proof is issued and family packages reject.
+     */
+    public function test_family_packages_rejected_when_h2h_omits_eligibility_verdicts(): void
+    {
+        $product = $this->game();
+        $first = $this->package($product, 'MLFS100', 'First Recharge 50');
+        $wdp = $this->package($product, 'WDP-TEST', 'Weekly Diamond Pass');
+        $this->h2h([
+            'status' => 'VALID', 'nickname' => 'PlayerAce', 'region' => 'id',
+        ]);
+
+        $this->nickname($product)->assertOk()->assertJsonPath('region_proof', null);
+        $this->postJson('/checkout/orders', $this->order($first, null))
+            ->assertUnprocessable()->assertJsonValidationErrors(['package_id']);
+        $this->postJson('/checkout/orders', $this->order($wdp, null))
+            ->assertUnprocessable()->assertJsonValidationErrors(['package_id']);
+        $this->assertDatabaseCount('orders', 0);
+    }
+
+    /**
+     * NV-07 (Codex P1): verdicts are per-family. A proof attesting only
+     * the first-purchase verdict opens first-purchase packages but must
+     * not open a Weekly Diamond Pass whose verdict is missing.
+     */
+    public function test_weekly_pass_rejected_when_only_first_purchase_was_evaluated(): void
+    {
+        $product = $this->game();
+        $first = $this->package($product, 'MLFS100', 'First Recharge 50');
+        $wdp = $this->package($product, 'WDP-TEST', 'Weekly Diamond Pass');
+        $this->h2h([
+            'status' => 'VALID', 'nickname' => 'PlayerAce', 'region' => 'id',
+            'first_purchase' => [['tier' => 50, 'eligible' => true]],
+        ]);
+        $proof = $this->nickname($product)->assertOk()->json('region_proof');
+        $this->assertNotEmpty($proof);
+
+        $this->postJson('/checkout/orders', $this->order($first, $proof))->assertCreated();
+        $this->postJson('/checkout/orders', $this->order($wdp, $proof))
+            ->assertUnprocessable()->assertJsonValidationErrors(['package_id']);
+        $this->assertDatabaseCount('orders', 1);
+    }
+
+    /**
+     * NV-07 (Codex P1): the mirror case — a proof attesting only the
+     * weekly-pass verdict must not open first-purchase packages.
+     */
+    public function test_first_purchase_rejected_when_only_weekly_pass_was_evaluated(): void
+    {
+        $product = $this->game();
+        $first = $this->package($product, 'MLFS100', 'First Recharge 50');
+        $wdp = $this->package($product, 'WDP-TEST', 'Weekly Diamond Pass');
+        $this->h2h([
+            'status' => 'VALID', 'nickname' => 'PlayerAce', 'region' => 'id',
+            'wdp_eligible' => true,
+        ]);
+        $proof = $this->nickname($product)->assertOk()->json('region_proof');
+        $this->assertNotEmpty($proof);
+
+        $this->postJson('/checkout/orders', $this->order($wdp, $proof))->assertCreated();
+        $this->postJson('/checkout/orders', $this->order($first, $proof))
+            ->assertUnprocessable()->assertJsonValidationErrors(['package_id']);
+        $this->assertDatabaseCount('orders', 1);
+    }
+
+    /**
      * NV-07: without any explicit VALID eligibility verdict (account not
      * found), a first-purchase package cannot be ordered either.
      */

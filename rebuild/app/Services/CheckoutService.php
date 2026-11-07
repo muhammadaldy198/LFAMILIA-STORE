@@ -179,7 +179,7 @@ class CheckoutService
             (int) $data['package_id'],
             $this->inputValidator->publicInput($product, $input),
             $data['region_proof'] ?? null,
-            $this->nicknameService->eligibilityPackageIds($product),
+            $this->nicknameService->eligibilityFamilies($product),
         );
         $nickname = $regionNickname ?? [
             'supported' => (bool) $product->nickname_check_enabled,
@@ -208,7 +208,7 @@ class CheckoutService
                     (int) $data['package_id'],
                     $publicInput,
                     $data['region_proof'] ?? null,
-                    $this->nicknameService->eligibilityPackageIds($lockedProduct),
+                    $this->nicknameService->eligibilityFamilies($lockedProduct),
                 );
                 $member = $user
                     ? $this->membership->discount($user, $price['subtotal_idr'])

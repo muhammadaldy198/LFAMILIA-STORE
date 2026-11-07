@@ -15,10 +15,16 @@ class RegionCheckProof
      */
     public function issue(Product $product, array $input, array $result): ?string
     {
-        $eligibilityEvaluated = ($result['status'] ?? null) === 'VALID'
-            && (array_key_exists('first_purchase', $result) || array_key_exists('wdp_eligible', $result));
+        // The H2H client normalizes a missing verdict to null, so a key's
+        // presence proves nothing: only a concrete per-family verdict
+        // (an array of tiers, a boolean) counts as evaluated.
+        $firstPurchaseEvaluated = ($result['status'] ?? null) === 'VALID'
+            && is_array($result['first_purchase'] ?? null);
+        $weeklyPassEvaluated = ($result['status'] ?? null) === 'VALID'
+            && is_bool($result['wdp_eligible'] ?? null);
 
-        if (trim((string) $product->nickname_required_region) === '' && ! $eligibilityEvaluated) {
+        if (trim((string) $product->nickname_required_region) === ''
+            && ! $firstPurchaseEvaluated && ! $weeklyPassEvaluated) {
             return null;
         }
 
@@ -29,7 +35,8 @@ class RegionCheckProof
             'region' => $result['region'] ?? null,
             'nickname' => $result['nickname'] ?? null,
             'disabled_package_ids' => array_values(array_map('intval', $result['disabled_package_ids'] ?? [])),
-            'eligibility_evaluated' => $eligibilityEvaluated,
+            'first_purchase_evaluated' => $firstPurchaseEvaluated,
+            'weekly_pass_evaluated' => $weeklyPassEvaluated,
             'expires_at' => now()->addMinutes(10)->timestamp,
         ], JSON_THROW_ON_ERROR));
     }
@@ -70,20 +77,25 @@ class RegionCheckProof
 
     /**
      * Enforce the H2H first-purchase / weekly-pass verdict for the gated
-     * package family: the order must carry the proof issued for the same
-     * account input, and the ordered package must not be in its disabled
-     * list. Packages outside the family are not affected.
+     * package families: the order must carry the proof issued for the same
+     * account input, the proof must attest a concrete verdict for the
+     * ordered package's family, and the package must not be in its
+     * disabled list. Packages outside the families are not affected.
      *
-     * @param  array<int, int>  $familyPackageIds
+     * @param  array{first_purchase?: array<int, int>, weekly_pass?: array<int, int>}  $families
      */
-    public function assertPackageEligible(Product $product, int $packageId, array $input, ?string $proof, array $familyPackageIds): void
+    public function assertPackageEligible(Product $product, int $packageId, array $input, ?string $proof, array $families): void
     {
-        if (! in_array($packageId, $familyPackageIds, true)) {
+        $inFirstPurchase = in_array($packageId, array_map('intval', $families['first_purchase'] ?? []), true);
+        $inWeeklyPass = in_array($packageId, array_map('intval', $families['weekly_pass'] ?? []), true);
+        if (! $inFirstPurchase && ! $inWeeklyPass) {
             return;
         }
 
         $decoded = $this->decode($product, $input, $proof);
-        if ($decoded === null || ($decoded['eligibility_evaluated'] ?? false) !== true) {
+        if ($decoded === null
+            || ($inFirstPurchase && ($decoded['first_purchase_evaluated'] ?? false) !== true)
+            || ($inWeeklyPass && ($decoded['weekly_pass_evaluated'] ?? false) !== true)) {
             throw ValidationException::withMessages([
                 'package_id' => 'Periksa akun terlebih dahulu untuk memastikan kelayakan paket.',
             ]);
