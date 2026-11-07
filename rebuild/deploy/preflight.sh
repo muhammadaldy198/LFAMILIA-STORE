@@ -124,6 +124,7 @@ if command -v nginx >/dev/null 2>&1; then
   vhost_block="$(printf '%s\n' "${nginx_dump}" | awk '
     {
       line = $0
+      sub(/#.*/, "", line)
       if (!inblock) {
         if (line ~ /(^|[[:space:]])server[[:space:]]*\{/) { inblock = 1; depth = 0; buf = ""; hit = 0 } else next
       }
@@ -144,6 +145,7 @@ location ~* ^/(?:storage/logs|bootstrap/cache)/'
       BEGIN { n = split(ENVIRON["DENY_PATTERNS"], pats, "\n") }
       {
         line = $0
+        sub(/#.*/, "", line)
         if (cur == "") {
           for (i = 1; i <= n; i++) if (index(line, pats[i])) { cur = pats[i]; seen[i] = 1; depth = 0; deny = 0; break }
           if (cur == "") next
