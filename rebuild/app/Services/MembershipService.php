@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\DB;
 
 class MembershipService
 {
+    public const INTERNAL_CODES = ['MAFIA'];
+
     /**
      * @return array<string, mixed>
      */
@@ -21,13 +23,30 @@ class MembershipService
         $bonus = max(0, (int) ($user->membership_progress_bonus_idr ?? 0));
         $progress = $lifetimeSpend + $bonus;
 
-        $automatic = $tiers->firstWhere('code', 'BASIC') ?? $tiers->first();
-        foreach ($tiers as $tier) {
-            $requirements = $this->array($tier->requirements);
-            $minimum = $this->minimumSpend($requirements);
+        // Internal tiers may only be assigned through the explicit MANUAL path.
+        $automaticTiers = $tiers->reject(
+            fn (MembershipTier $tier): bool => in_array((string) $tier->code, self::INTERNAL_CODES, true)
+        )->values();
+
+        $automatic = $automaticTiers->firstWhere('code', 'BASIC');
+        if (! $automatic) {
+            $floor = $automaticTiers->first();
+            $floorMinimum = $floor ? $this->minimumSpend($this->array($floor->requirements)) : null;
+            if ($floor && ($floorMinimum === null || $progress >= $floorMinimum)) {
+                $automatic = $floor;
+            }
+        }
+
+        foreach ($automaticTiers as $tier) {
+            $minimum = $this->minimumSpend($this->array($tier->requirements));
             if ($minimum !== null && $progress >= $minimum) {
                 $automatic = $tier;
             }
+        }
+
+        if (! $automatic) {
+            // No eligible automatic tier: retain the persisted assignment unchanged.
+            $automatic = MembershipTier::query()->where('code', $user->membership_tier_code)->first();
         }
 
         $mode = strtoupper((string) ($user->membership_mode ?? 'AUTO')) === 'MANUAL' ? 'MANUAL' : 'AUTO';
@@ -37,7 +56,7 @@ class MembershipService
         $current = $override ?: $automatic;
 
         $next = null;
-        foreach ($tiers as $tier) {
+        foreach ($automaticTiers as $tier) {
             if ((int) $tier->rank <= (int) $current?->rank) {
                 continue;
             }
