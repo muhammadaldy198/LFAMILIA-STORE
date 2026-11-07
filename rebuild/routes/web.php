@@ -401,7 +401,7 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
     Route::get('/admin/orders/export', [AdminOrdersController::class, 'export'])
         ->middleware('admin.permission:orders.view')->name('admin.orders.export');
     Route::post('/admin/orders/manual', [AdminOrdersController::class, 'manual'])
-        ->middleware(['admin.permission:orders.view', 'admin.permission:fulfillment.manage', 'admin.permission:payments.manage', 'throttle:30,1'])->name('admin.orders.manual');
+        ->middleware(['admin.permission:orders.view', 'admin.permission:fulfillment.manage', 'admin.permission:payments.manage', 'throttle:30,1', 'throttle:admin-sensitive', 'admin.password.confirm'])->name('admin.orders.manual');
     Route::post('/admin/orders/{id}/check-payment', [AdminOrdersController::class, 'refreshPayment'])
         ->middleware(['admin.permission:orders.view', 'admin.permission:payments.manage', 'throttle:10,1'])->name('admin.orders.check-payment');
     Route::post('/admin/orders/{id}/resend-delivery', [AdminOrdersController::class, 'resendDelivery'])
