@@ -85,6 +85,10 @@ while IFS= read -r proxies_line; do
       echo "TRUSTED_PROXIES must not trust every address in production; catch-all CIDR ranges (any address with a /0 prefix length) are not allowed" >&2
       exit 1
     fi
+    if [[ "${proxies_entry}" == '*' ]]; then
+      echo "TRUSTED_PROXIES must not contain a wildcard entry in production; list the proxy addresses (e.g. 127.0.0.1,::1)" >&2
+      exit 1
+    fi
   done
   if [[ "${proxies_value}" == '*' ]]; then
     echo "TRUSTED_PROXIES must not be the wildcard in production; list the proxy addresses (e.g. 127.0.0.1,::1)" >&2
@@ -171,7 +175,7 @@ if command -v nginx >/dev/null 2>&1; then
 location ~* \.(?:env|log|sql|bak|ini)$
 location ~* ^/(?:storage/logs|bootstrap/cache)/'
     missing_denies="$(printf '%s\n' "${vhost_block}" | DENY_PATTERNS="${deny_patterns}" awk '
-      function overlaps(k, i,    p, s, t, ix, rest, cb) {
+      function overlaps(k, i,    p, s, t, ix, depth, cut, pos, ch) {
         p = e_pat[k]
         if (e_caret[k]) {
           for (s = 1; s <= sc[i]; s++) if (index(subj[i, s], p) == 1) return 1
@@ -183,10 +187,14 @@ location ~* ^/(?:storage/logs|bootstrap/cache)/'
         }
         while ((ix = index(p, "(?:")) > 0) p = substr(p, 1, ix - 1) "(" substr(p, ix + 3)
         while ((ix = index(p, "(?")) > 0) {
-          rest = substr(p, ix)
-          cb = index(rest, ")")
-          if (!cb) return 0
-          p = substr(p, 1, ix - 1) substr(rest, cb + 1)
+          depth = 0; cut = 0
+          for (pos = ix; pos <= length(p); pos++) {
+            ch = substr(p, pos, 1)
+            if (ch == "(") depth++
+            else if (ch == ")") { depth--; if (!depth) { cut = pos; break } }
+          }
+          if (!cut) return 0
+          p = substr(p, 1, ix - 1) substr(p, cut + 1)
         }
         for (s = 1; s <= sc[i]; s++) {
           t = subj[i, s]
@@ -224,7 +232,7 @@ location ~* ^/(?:storage/logs|bootstrap/cache)/'
         sub(/#.*/, "", line)
         gsub(/[[:space:]]+/, " ", line)
         gsub(/ ;/, ";", line)
-        if (!inloc && line ~ /(^| )server \{/) { if (started) finalize(); started = 1; next }
+        if (!inloc && line ~ /(^| )server *\{/) { if (started) finalize(); started = 1; next }
         if (!inloc) {
           nf = split(line, f, " ")
           li = 0

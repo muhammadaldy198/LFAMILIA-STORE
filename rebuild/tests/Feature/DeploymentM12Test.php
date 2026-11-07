@@ -90,6 +90,26 @@ class DeploymentM12Test extends TestCase
         $this->addToAssertionCount(1);
     }
 
+    public function test_production_boot_rejects_wildcard_entry_in_trusted_proxies_list(): void
+    {
+        config([
+            'app.debug' => false,
+            'app.url' => 'https://example.test',
+            'session.encrypt' => true,
+            'session.secure' => true,
+            'lfamilia.trusted_hosts' => ['example.test'],
+            'lfamilia.trusted_proxies' => ['127.0.0.1', '*'],
+        ]);
+        $this->app->detectEnvironment(fn (): string => 'production');
+
+        try {
+            (new AppServiceProvider($this->app))->boot();
+            $this->fail('Production boot must reject a wildcard entry in the trusted-proxies list.');
+        } catch (LogicException $exception) {
+            $this->assertStringContainsString('wildcard', $exception->getMessage());
+        }
+    }
+
     public function test_application_uses_wib_and_deployment_guards_its_cached_configuration(): void
     {
         $this->assertSame('Asia/Jakarta', config('app.timezone'));
@@ -144,6 +164,7 @@ class DeploymentM12Test extends TestCase
         $this->assertStringContainsString('allow [^;]*;', $preflight, 'Preflight must not credit a deny rule that an earlier allow rule overrides.');
         $this->assertStringContainsString('multiline values are not allowed', $preflight, 'Preflight must reject multiline TRUSTED_PROXIES values instead of examining only the assignment line.');
         $this->assertStringContainsString('must name at least one proxy', $preflight, 'Preflight must reject an empty TRUSTED_PROXIES value; the app resolves it to no proxies and the boot guard throws during deploy.');
+        $this->assertStringContainsString('must not contain a wildcard entry', $preflight, 'Preflight must reject a wildcard entry anywhere in the TRUSTED_PROXIES list, not only as the whole value.');
         $this->assertStringContainsString('catch-all CIDR', $preflight, 'Preflight must reject catch-all proxy CIDRs as well as the literal wildcard.');
         $this->assertStringContainsString('function finalize(', $preflight, 'Preflight must verify the nginx deny rules in each matching server block independently.');
         $this->assertStringContainsString('DEPLOY_EXPECTED_SHA', $deploy);
@@ -187,6 +208,7 @@ class DeploymentM12Test extends TestCase
             'variable reference fails' => ["TRUSTED_PROXIES=\"\${PROXY_SETTING}\"\n", 1],
             'multiline value fails' => ["TRUSTED_PROXIES=\"127.0.0.1,\n*\"\n", 1],
             'empty quoted value fails' => ["TRUSTED_PROXIES=\"\"\n", 1],
+            'wildcard entry among valid proxies fails' => ["TRUSTED_PROXIES=127.0.0.1,*\n", 1],
         ];
 
         foreach ($cases as $label => [$env, $expected]) {
@@ -227,7 +249,9 @@ class DeploymentM12Test extends TestCase
         $exactAfter = implode("\n", [$location($p1), $location($p2), $location($p3), "    location = /.env {\n        allow all;\n    }"]);
         $caretAfter = implode("\n", [$location($p1), $location($p2), $location($p3), "    location ^~ /storage/ {\n    }"]);
         $nestedAllowAfter = implode("\n", ["    {$p1} {\n        deny all;\n        limit_except POST {\n            allow all;\n        }\n    }", $location($p2), $location($p3)]);
+        $lookaheadShadow = implode("\n", ["    location ~* \\.(?=(?:env|log)$) {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $server = static fn (string $name, string $inner = ''): string => "server {\n    listen 443 ssl;\n    server_name {$name};\n{$inner}\n}";
+        $noSpaceSplit = "server{\n    listen 443 ssl;\n    server_name lfamilia.com;\n{$complete}\n}\n".$server('www.lfamilia.com');
 
         $cases = [
             'complete vhost stays silent' => [$server('lfamilia.com', $complete), 0],
@@ -248,6 +272,8 @@ class DeploymentM12Test extends TestCase
             'exact match after the rules still shadows' => [$server('lfamilia.com', $exactAfter), 1],
             'caret prefix after the rules still shadows' => [$server('lfamilia.com', $caretAfter), 1],
             'allow nested after the deny warns' => [$server('lfamilia.com', $nestedAllowAfter), 1],
+            'lookahead group location shadows all three rules' => [$server('lfamilia.com', $lookaheadShadow), 3],
+            'server keyword without a space still splits blocks' => [$noSpaceSplit, 3],
         ];
 
         foreach ($cases as $label => [$body, $expected]) {
