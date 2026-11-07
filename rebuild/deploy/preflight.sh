@@ -61,7 +61,7 @@ grep -Eq '^APP_KEY=base64:.+$' "${ENV_FILE}" || { echo "APP_KEY must be generate
 grep -Eq '^APP_URL=https://' "${ENV_FILE}" || { echo "APP_URL must use HTTPS" >&2; exit 1; }
 grep -Eq '^APP_TRUSTED_HOSTS=.+$' "${ENV_FILE}" || { echo "APP_TRUSTED_HOSTS is required" >&2; exit 1; }
 grep -Eq '^TRUSTED_PROXIES=.+$' "${ENV_FILE}" || { echo "TRUSTED_PROXIES is required" >&2; exit 1; }
-if grep -Eq '^TRUSTED_PROXIES=\*[[:space:]]*$' "${ENV_FILE}"; then
+if grep -Eq "^TRUSTED_PROXIES=[[:space:]]*[\"']?\*[\"']?[[:space:]]*$" "${ENV_FILE}"; then
   echo "TRUSTED_PROXIES must not be the wildcard in production; list the proxy addresses (e.g. 127.0.0.1,::1)" >&2
   exit 1
 fi
