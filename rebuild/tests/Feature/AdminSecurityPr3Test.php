@@ -53,8 +53,7 @@ class AdminSecurityPr3Test extends TestCase
             }
         });
 
-        $this->actingAs($owner, 'admin')->withSession(['admin.password_confirmed_at' => time()])
-            ->put('/admin/access/'.$first->id, [
+        $this->actingAs($owner, 'admin')->withSession(['admin.password_confirmed_at' => time()])->put('/admin/access/'.$first->id, [
                 'name' => $first->name, 'email' => $first->email, 'role' => 'ADMIN',
                 'permissions' => ['dashboard.view'], 'is_active' => true,
             ])->assertSessionHasNoErrors();
@@ -75,30 +74,16 @@ class AdminSecurityPr3Test extends TestCase
     {
         AdminUser::query()->delete();
         $existing = $this->admin();
-        $this->artisan('lfamilia:bootstrap-super-admin')
-            ->expectsOutput('Super Admin sudah ada. Kelola akses berikutnya dari panel.')
-            ->assertExitCode(1);
+        $this->artisan('lfamilia:bootstrap-super-admin')->expectsOutput('Super Admin sudah ada. Kelola akses berikutnya dari panel.')->assertExitCode(1);
 
         $existing->forceFill(['is_active' => false])->save();
-        $this->artisan('lfamilia:bootstrap-super-admin')
-            ->expectsQuestion('Nama Super Admin', 'Recovered PR3')
-            ->expectsQuestion('Email Super Admin', 'pr3-recovered@example.test')
-            ->expectsQuestion('Kata sandi (minimal 12 karakter)', 'Recovered-password-123!')
-            ->expectsQuestion('Ulangi kata sandi', 'Recovered-password-123!')
-            ->expectsOutput('Super Admin dibuat.')
-            ->assertExitCode(0);
+        $this->artisan('lfamilia:bootstrap-super-admin')->expectsQuestion('Nama Super Admin', 'Recovered PR3')->expectsQuestion('Email Super Admin', 'pr3-recovered@example.test')->expectsQuestion('Kata sandi (minimal 12 karakter)', 'Recovered-password-123!')->expectsQuestion('Ulangi kata sandi', 'Recovered-password-123!')->expectsOutput('Super Admin dibuat.')->assertExitCode(0);
         $this->assertDatabaseHas('admin_users', [
             'email' => 'pr3-recovered@example.test', 'role' => 'SUPER_ADMIN', 'is_active' => true,
         ]);
 
         AdminUser::query()->delete();
-        $this->artisan('lfamilia:bootstrap-super-admin')
-            ->expectsQuestion('Nama Super Admin', 'First PR3')
-            ->expectsQuestion('Email Super Admin', 'pr3-first@example.test')
-            ->expectsQuestion('Kata sandi (minimal 12 karakter)', 'Recovered-password-123!')
-            ->expectsQuestion('Ulangi kata sandi', 'Recovered-password-123!')
-            ->expectsOutput('Super Admin dibuat.')
-            ->assertExitCode(0);
+        $this->artisan('lfamilia:bootstrap-super-admin')->expectsQuestion('Nama Super Admin', 'First PR3')->expectsQuestion('Email Super Admin', 'pr3-first@example.test')->expectsQuestion('Kata sandi (minimal 12 karakter)', 'Recovered-password-123!')->expectsQuestion('Ulangi kata sandi', 'Recovered-password-123!')->expectsOutput('Super Admin dibuat.')->assertExitCode(0);
     }
 
     public function test_manual_order_requires_fresh_admin_password_and_preserves_permissions(): void
@@ -122,16 +107,13 @@ class AdminSecurityPr3Test extends TestCase
             'idempotency_key' => 'admin-manual:'.$admin->id.':'.$payload['idempotency_key'],
         ]);
 
-        $this->withSession(['admin.password_confirmed_at' => time()])
-            ->post('/admin/orders/manual', $payload)->assertRedirect()->assertSessionHasNoErrors();
+        $this->withSession(['admin.password_confirmed_at' => time()])->post('/admin/orders/manual', $payload)->assertRedirect()->assertSessionHasNoErrors();
         $this->assertDatabaseHas('orders', [
             'idempotency_key' => 'admin-manual:'.$admin->id.':'.$payload['idempotency_key'],
         ]);
 
         $staff = $this->admin('ADMIN', ['orders.view']);
-        $this->actingAs($staff, 'admin')->withSession(['admin.password_confirmed_at' => time()])
-            ->post('/admin/orders/manual', [...$payload, 'idempotency_key' => (string) Str::uuid()])
-            ->assertForbidden();
+        $this->actingAs($staff, 'admin')->withSession(['admin.password_confirmed_at' => time()])->post('/admin/orders/manual', [...$payload, 'idempotency_key' => (string) Str::uuid()])->assertForbidden();
     }
 
     public function test_auto_membership_never_selects_internal_mafia_even_when_minimum_is_zero(): void
@@ -156,10 +138,8 @@ class AdminSecurityPr3Test extends TestCase
     public function test_auto_floor_preserves_saved_tier_until_silver_minimum_is_reached(): void
     {
         $user = $this->customer();
-        MembershipTier::where('code', 'BASIC')->firstOrFail()
-            ->forceFill(['is_active' => false])->save();
-        MembershipTier::where('code', 'SILVER')->firstOrFail()
-            ->forceFill(['requirements' => ['minimum_spend_idr' => 100000], 'is_active' => true])->save();
+        MembershipTier::where('code', 'BASIC')->firstOrFail()->forceFill(['is_active' => false])->save();
+        MembershipTier::where('code', 'SILVER')->firstOrFail()->forceFill(['requirements' => ['minimum_spend_idr' => 100000], 'is_active' => true])->save();
         $service = app(MembershipService::class);
 
         $this->assertSame('BASIC', $service->sync($user)['code']);
@@ -221,12 +201,7 @@ class AdminSecurityPr3Test extends TestCase
         ], $owner->id);
 
         $staff = $this->admin('ADMIN', ['orders.view']);
-        $this->actingAs($staff, 'admin')
-            ->get('/admin/orders/'.$id)->assertOk()->assertInertia(fn (Assert $page) => $page
-                ->component('Admin/OrderDetail')
-                ->where('canViewCustomer', false)
-                ->where('order.buyer_phone', '081234567890')
-                ->where('order.buyer_email', 'pr3-buyer@example.test'));
+        $this->actingAs($staff, 'admin')->get('/admin/orders/'.$id)->assertOk()->assertInertia(fn (Assert $page) => $page->component('Admin/OrderDetail')->where('canViewCustomer', false)->where('order.buyer_phone', '081234567890')->where('order.buyer_email', 'pr3-buyer@example.test'));
 
         $vue = file_get_contents(resource_path('js/Pages/Admin/OrderDetail.vue'));
         $this->assertStringContainsString("{{ order.buyer_phone || '—' }}", $vue);
