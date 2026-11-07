@@ -175,11 +175,29 @@ if command -v nginx >/dev/null 2>&1; then
 location ~* \.(?:env|log|sql|bak|ini)$
 location ~* ^/(?:storage/logs|bootstrap/cache)/'
     missing_denies="$(printf '%s\n' "${vhost_block}" | DENY_PATTERNS="${deny_patterns}" awk '
-      function simplify(p,    out, j, ch, nx, esc, cls, cut, d2, e2, c2, q, st) {
-        out = ""; esc = 0; cls = 0
+      function spanend(p, j,    d2, e2, c2, q, st) {
+        d2 = 0; e2 = 0; c2 = 0
+        for (q = j; q <= length(p); q++) {
+          st = substr(p, q, 1)
+          if (e2) { e2 = 0; continue }
+          if (st == "\\") { e2 = 1; continue }
+          if (c2 == 1) { if (st == "^") c2 = 2; else c2 = 3; continue }
+          if (c2 == 2) { c2 = 3; continue }
+          if (c2 == 3) { if (st == "]") c2 = 0; continue }
+          if (st == "[") { c2 = 1; continue }
+          if (st == "(") d2++
+          else if (st == ")") { d2--; if (!d2) return q }
+        }
+        return 0
+      }
+      function simplify(p,    out, j, ch, nx, t3, esc, cls, cut, fl, fk, ps, ng) {
+        out = ""; esc = 0; cls = 0; simp_ci = 0
         for (j = 1; j <= length(p); j++) {
           ch = substr(p, j, 1)
-          if (esc) { out = out ch; esc = 0; continue }
+          if (esc) {
+            if (!cls && (ch == "Q" || ch == "K")) return ""
+            out = out ch; esc = 0; continue
+          }
           if (ch == "\\") { out = out ch; esc = 1; continue }
           if (cls == 1) { out = out ch; if (ch == "^") cls = 2; else cls = 3; continue }
           if (cls == 2) { out = out ch; cls = 3; continue }
@@ -188,26 +206,38 @@ location ~* ^/(?:storage/logs|bootstrap/cache)/'
           if (ch == "(" && substr(p, j + 1, 1) == "?") {
             nx = substr(p, j + 2, 1)
             if (nx == ":") { out = out "("; j += 2; continue }
-            d2 = 0; e2 = 0; c2 = 0; cut = 0
-            for (q = j; q <= length(p); q++) {
-              st = substr(p, q, 1)
-              if (e2) { e2 = 0; continue }
-              if (st == "\\") { e2 = 1; continue }
-              if (c2 == 1) { if (st == "^") c2 = 2; else c2 = 3; continue }
-              if (c2 == 2) { c2 = 3; continue }
-              if (c2 == 3) { if (st == "]") c2 = 0; continue }
-              if (st == "[") { c2 = 1; continue }
-              if (st == "(") d2++
-              else if (st == ")") { d2--; if (!d2) { cut = q; break } }
+            if (nx == ">") { out = out "("; j += 2; continue }
+            if (nx == "=" || nx == "!") { cut = spanend(p, j); if (!cut) return ""; j = cut; continue }
+            if (nx == "#") { cut = spanend(p, j); if (!cut) return ""; j = cut; continue }
+            if (nx == "<") {
+              t3 = substr(p, j + 3, 1)
+              if (t3 == "=" || t3 == "!") { cut = spanend(p, j); if (!cut) return ""; j = cut; continue }
+              cut = index(substr(p, j + 3), ">"); if (!cut) return ""
+              out = out "("; j = j + 2 + cut; continue
             }
-            if (!cut) return ""
-            j = cut; continue
+            if (nx == "\047") {
+              cut = index(substr(p, j + 3), "\047"); if (!cut) return ""
+              out = out "("; j = j + 2 + cut; continue
+            }
+            if (nx == "P" && substr(p, j + 3, 1) == "<") {
+              cut = index(substr(p, j + 4), ">"); if (!cut) return ""
+              out = out "("; j = j + 3 + cut; continue
+            }
+            fl = ""; fk = j + 2
+            while (fk <= length(p) && substr(p, fk, 1) ~ /[A-Za-z-]/) { fl = fl substr(p, fk, 1); fk++ }
+            if (fl != "" && fk <= length(p) && (substr(p, fk, 1) == ")" || substr(p, fk, 1) == ":")) {
+              ps = index(fl, "i"); ng = index(fl, "-")
+              if (ps && (!ng || ps < ng)) simp_ci = 1
+              if (substr(p, fk, 1) == ":") out = out "("
+              j = fk; continue
+            }
+            return ""
           }
           out = out ch
         }
         return out
       }
-      function overlaps(k, i,    p, s, t) {
+      function overlaps(k, i,    p, s, t, ci) {
         p = e_pat[k]
         if (e_caret[k]) {
           for (s = 1; s <= sc[i]; s++) if (index(subj[i, s], p) == 1) return 1
@@ -219,9 +249,10 @@ location ~* ^/(?:storage/logs|bootstrap/cache)/'
         }
         p = simplify(p)
         if (p == "") return 1
+        ci = (e_ci[k] || simp_ci)
         for (s = 1; s <= sc[i]; s++) {
           t = subj[i, s]
-          if (e_ci[k]) { if (match(tolower(t), tolower(p))) return 1 }
+          if (ci) { if (match(tolower(t), tolower(p))) return 1 }
           else if (match(t, p)) return 1
         }
         return 0
