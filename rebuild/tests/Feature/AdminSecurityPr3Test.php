@@ -212,6 +212,30 @@ class AdminSecurityPr3Test extends TestCase
         $this->assertSame(0, $service->discount($user, 100000)['amount_idr']);
     }
 
+    public function test_inactive_manual_gold_is_not_restored_when_returning_to_auto(): void
+    {
+        $user = $this->customer();
+        $gold = MembershipTier::where('code', 'GOLD')->firstOrFail();
+        $gold->forceFill(['benefits' => ['discount_bps' => 2000]])->save();
+        MembershipTier::where('code', 'BASIC')->firstOrFail()->forceFill(['is_active' => false])->save();
+        MembershipTier::where('code', 'SILVER')->firstOrFail()->forceFill([
+            'requirements' => ['minimum_spend_idr' => 100000],
+            'is_active' => true,
+        ])->save();
+
+        $service = app(MembershipService::class);
+        $service->setMode($user, 'GOLD');
+        $this->assertSame(20000, $service->discount($user, 100000)['amount_idr']);
+
+        $gold->forceFill(['is_active' => false])->save();
+        $service->setMode($user, 'AUTO');
+        $profile = $service->sync($user);
+        $this->assertSame('AUTO', $profile['mode']);
+        $this->assertSame('BASIC', $profile['code']);
+        $this->assertSame('BASIC', $user->fresh()->membership_tier_code);
+        $this->assertSame(0, $service->discount($user, 100000)['amount_idr']);
+    }
+
     public function test_orders_view_without_customers_view_can_see_contact_on_order_detail_only(): void
     {
         $owner = $this->admin();
