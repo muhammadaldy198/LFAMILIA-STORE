@@ -190,6 +190,11 @@ class AdminSecurityPr3Test extends TestCase
         $this->assertSame('Internal only', $tier->benefits['benefit_notes']);
 
         $this->put('/admin/settings/membership/MAFIA', [
+            'is_active' => false,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertFalse(MembershipTier::where('code', 'MAFIA')->firstOrFail()->is_active);
+
+        $this->put('/admin/settings/membership/MAFIA', [
             'is_active' => true, 'requirements' => '{"notes":"manual only"}',
             'benefits' => '{"benefit_notes":"still internal"}',
         ])->assertRedirect()->assertSessionHasNoErrors();
