@@ -134,7 +134,8 @@ class DeploymentM12Test extends TestCase
         $preflight = file_get_contents(base_path('deploy/preflight.sh'));
         $deploy = file_get_contents(base_path('deploy/deploy.sh'));
         $this->assertStringContainsString('TRUSTED_PROXIES must not be the wildcard', $preflight);
-        $this->assertStringContainsString('TRUSTED_PROXIES=[[:space:]]*', $preflight, 'Preflight must reject quoted wildcard forms too, not only the bare value.');
+        $this->assertStringContainsString('proxies_value}" ==', $preflight, 'Preflight must compare the parsed effective proxy value, not a raw line pattern.');
+        $this->assertStringContainsString('(#.*)?', $preflight, 'Preflight must strip dotenv comments before judging the proxy value.');
         $this->assertStringContainsString('cloudpanel-vhost-snippet.conf', $preflight);
         $this->assertStringContainsString('DEPLOY_EXPECTED_SHA', $deploy);
         $this->assertStringContainsString('does not match DEPLOY_EXPECTED_SHA', $deploy);

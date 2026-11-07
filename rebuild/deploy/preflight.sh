@@ -61,10 +61,13 @@ grep -Eq '^APP_KEY=base64:.+$' "${ENV_FILE}" || { echo "APP_KEY must be generate
 grep -Eq '^APP_URL=https://' "${ENV_FILE}" || { echo "APP_URL must use HTTPS" >&2; exit 1; }
 grep -Eq '^APP_TRUSTED_HOSTS=.+$' "${ENV_FILE}" || { echo "APP_TRUSTED_HOSTS is required" >&2; exit 1; }
 grep -Eq '^TRUSTED_PROXIES=.+$' "${ENV_FILE}" || { echo "TRUSTED_PROXIES is required" >&2; exit 1; }
-if grep -Eq "^TRUSTED_PROXIES=[[:space:]]*[\"']?\*[\"']?[[:space:]]*$" "${ENV_FILE}"; then
-  echo "TRUSTED_PROXIES must not be the wildcard in production; list the proxy addresses (e.g. 127.0.0.1,::1)" >&2
-  exit 1
-fi
+while IFS= read -r proxies_line; do
+  proxies_value="$(printf '%s' "${proxies_line}" | sed -E 's/^TRUSTED_PROXIES=[[:space:]]*//; s/[[:space:]]+(#.*)?$//' | tr -d '[:space:]' | tr -d "\"'")"
+  if [[ "${proxies_value}" == '*' ]]; then
+    echo "TRUSTED_PROXIES must not be the wildcard in production; list the proxy addresses (e.g. 127.0.0.1,::1)" >&2
+    exit 1
+  fi
+done < <(grep -E '^TRUSTED_PROXIES=' "${ENV_FILE}" || true)
 
 cd "${APP_DIR}"
 COMPOSER_ALLOW_SUPERUSER=1 \
