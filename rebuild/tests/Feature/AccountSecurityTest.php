@@ -8,7 +8,6 @@ use App\Jobs\SendTransactionalEmailJob;
 use App\Models\IntegrationCredential;
 use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Queue;
 use Laravel\Socialite\Facades\Socialite;
