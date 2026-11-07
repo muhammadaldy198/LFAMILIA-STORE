@@ -79,8 +79,8 @@ while IFS= read -r proxies_line; do
   fi
   IFS=',' read -ra proxies_entries <<<"${proxies_value}"
   for proxies_entry in "${proxies_entries[@]}"; do
-    if [[ "${proxies_entry}" == '0.0.0.0/0' || "${proxies_entry}" == '::/0' ]]; then
-      echo "TRUSTED_PROXIES must not trust every address in production; catch-all CIDR ranges (0.0.0.0/0, ::/0) are not allowed" >&2
+    if [[ "${proxies_entry}" =~ /0+$ ]]; then
+      echo "TRUSTED_PROXIES must not trust every address in production; catch-all CIDR ranges (any address with a /0 prefix length) are not allowed" >&2
       exit 1
     fi
   done
@@ -142,6 +142,7 @@ if command -v nginx >/dev/null 2>&1; then
     {
       line = $0
       sub(/#.*/, "", line)
+      gsub(/[[:space:]]+/, " ", line)
       if (!inblock) {
         if (line ~ /(^|[[:space:]])server[[:space:]]*\{/) { inblock = 1; depth = 0; buf = ""; hit = 0 } else next
       }
@@ -170,6 +171,7 @@ location ~* ^/(?:storage/logs|bootstrap/cache)/'
       {
         line = $0
         sub(/#.*/, "", line)
+        gsub(/[[:space:]]+/, " ", line)
         if (cur == "" && line ~ /(^|[[:space:]])server[[:space:]]*\{/) { if (started) finalize(); started = 1 }
         if (cur == "") {
           for (i = 1; i <= n; i++) if (index(line, pats[i])) { cur = pats[i]; seen[i] = 1; depth = 0; deny = 0; allowfirst = 0; break }

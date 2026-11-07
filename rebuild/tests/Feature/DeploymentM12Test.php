@@ -163,4 +163,102 @@ class DeploymentM12Test extends TestCase
         $this->assertStringContainsString('BACKUP_REQUIRE_REMOTE=true', $ops);
         $this->assertStringNotContainsString('password=', strtolower($ops));
     }
+
+    /**
+     * NV-16/NV-21/NV-22: the preflight proxy and nginx checks must behave,
+     * not merely contain the right strings - these tests execute the
+     * shipped check blocks from deploy/preflight.sh against fixtures.
+     */
+    public function test_preflight_proxy_guard_behaves_against_fixtures(): void
+    {
+        $preflight = file_get_contents(base_path('deploy/preflight.sh'));
+        $loop = $this->extractPreflightBlock(
+            $preflight,
+            'while IFS= read -r proxies_line; do',
+            'done < <(grep -E \'^TRUSTED_PROXIES=\' "${ENV_FILE}" || true)'
+        );
+
+        $cases = [
+            'loopback list passes' => ["TRUSTED_PROXIES=127.0.0.1,::1\n", 0],
+            'bare wildcard fails' => ["TRUSTED_PROXIES=*\n", 1],
+            'catch-all CIDRs fail' => ["TRUSTED_PROXIES=0.0.0.0/0,::/0\n", 1],
+            'noncanonical zero-prefix CIDR fails' => ["TRUSTED_PROXIES=192.0.2.1/0\n", 1],
+            'variable reference fails' => ["TRUSTED_PROXIES=\"\${PROXY_SETTING}\"\n", 1],
+            'multiline value fails' => ["TRUSTED_PROXIES=\"127.0.0.1,\n*\"\n", 1],
+        ];
+
+        foreach ($cases as $label => [$env, $expected]) {
+            $dir = $this->makePreflightFixtureDir(['env.txt' => $env]);
+            file_put_contents("{$dir}/run.sh", "ENV_FILE={$dir}/env.txt\n{$loop}\n");
+            $this->assertSame($expected, $this->runBashScript("{$dir}/run.sh"), "Preflight proxy guard: {$label}.");
+        }
+    }
+
+    public function test_preflight_nginx_check_behaves_against_fixtures(): void
+    {
+        $preflight = file_get_contents(base_path('deploy/preflight.sh'));
+        $start = strpos($preflight, 'if command -v nginx >/dev/null 2>&1; then');
+        $this->assertNotFalse($start);
+        $elseAt = strpos($preflight, "\nelse\n", $start);
+        $this->assertNotFalse($elseAt);
+        $endMarker = 'the vhost deny rules could not be verified." >&2';
+        $end = strpos($preflight, $endMarker, $elseAt);
+        $this->assertNotFalse($end);
+        $block = substr($preflight, $start, $end - $start + strlen($endMarker))."\nfi\n";
+
+        $location = static fn (string $pattern, string $directive = 'deny all;'): string => "    {$pattern} {\n        {$directive}\n    }";
+        $p1 = 'location ~ /\.(?!well-known).*';
+        $p2 = 'location ~* \.(?:env|log|sql|bak|ini)$';
+        $p3 = 'location ~* ^/(?:storage/logs|bootstrap/cache)/';
+        $complete = implode("\n", [$location($p1), $location($p2), $location($p3)]);
+        $overridden = implode("\n", [$location($p1), $location($p2, "allow all;\n        deny all;"), $location($p3)]);
+        $server = static fn (string $name, string $inner = ''): string => "server {\n    listen 443 ssl;\n    server_name {$name};\n{$inner}\n}";
+
+        $cases = [
+            'complete vhost stays silent' => [$server('lfamilia.com', $complete), 0],
+            'bare vhost warns for every rule' => [$server('lfamilia.com'), 3],
+            'complete block does not cover a bare one' => [$server('lfamilia.com', $complete)."\n".$server('www.lfamilia.com'), 3],
+            'impostor host does not count' => [$server('other-lfamilia.com', $complete), 1],
+            'overridden deny warns' => [$server('lfamilia.com', $overridden), 1],
+        ];
+
+        foreach ($cases as $label => [$body, $expected]) {
+            $dir = $this->makePreflightFixtureDir(['dump.txt' => "events { worker_connections 1024; }\nhttp {\n{$body}\n}\n"]);
+            file_put_contents("{$dir}/run.sh", "nginx() { cat {$dir}/dump.txt; }\n{$block}");
+            $this->runBashScript("{$dir}/run.sh", "{$dir}/err.txt");
+            $warnings = substr_count((string) file_get_contents("{$dir}/err.txt"), 'WARNING');
+            $this->assertSame($expected, $warnings, "Preflight nginx check: {$label}.");
+        }
+    }
+
+    private function extractPreflightBlock(string $haystack, string $startMarker, string $endMarker): string
+    {
+        $start = strpos($haystack, $startMarker);
+        $this->assertNotFalse($start, "Preflight block start not found: {$startMarker}");
+        $end = strpos($haystack, $endMarker, $start);
+        $this->assertNotFalse($end, "Preflight block end not found: {$endMarker}");
+
+        return substr($haystack, $start, $end - $start + strlen($endMarker));
+    }
+
+    private function makePreflightFixtureDir(array $files): string
+    {
+        $dir = sys_get_temp_dir().'/m12-preflight-'.getmypid().'-'.uniqid();
+        mkdir($dir, 0777, true);
+        foreach ($files as $name => $contents) {
+            file_put_contents("{$dir}/{$name}", $contents);
+        }
+
+        return $dir;
+    }
+
+    private function runBashScript(string $scriptPath, ?string $stderrPath = null): int
+    {
+        $redirect = $stderrPath === null ? '' : ' 2>'.escapeshellarg($stderrPath);
+        $output = [];
+        $code = 0;
+        exec('bash '.escapeshellarg($scriptPath).$redirect, $output, $code);
+
+        return $code;
+    }
 }
