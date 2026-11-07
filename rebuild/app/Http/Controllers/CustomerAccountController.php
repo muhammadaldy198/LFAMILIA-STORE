@@ -125,6 +125,9 @@ class CustomerAccountController
                 'remember_token' => Str::random(60),
             ])->save();
 
+            // Reset links issued before this password change must no longer work.
+            DB::table('password_reset_tokens')->where('email', $user->email)->delete();
+
             // Invalidate API tokens alongside other devices' web sessions.
             $user->tokens()->delete();
         });
