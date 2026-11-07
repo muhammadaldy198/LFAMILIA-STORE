@@ -274,8 +274,18 @@ class FulfillmentService
                 }
             }
 
-            if (! $manual && Carbon::parse($attempt->created_at)->lte(now()->subDay())) {
-                $this->escalateStalledReconciliation($attempt, $order);
+            // Age stop: automatic checks give up after a day. Manual checks
+            // get the repository's absolute bound instead — never re-check a
+            // transaction older than 90 days, because Digiflazz treats the
+            // re-post as a brand-new transaction (AGENTS.md, PRD). An aged
+            // attempt is escalated for a human, never re-posted.
+            $oldestRecheckable = $manual ? now()->subDays(90) : now()->subDay();
+            if (Carbon::parse($attempt->created_at)->lte($oldestRecheckable)) {
+                if ($manual) {
+                    $this->escalateAgedReconciliation($attempt, $order);
+                } else {
+                    $this->escalateStalledReconciliation($attempt, $order);
+                }
 
                 return null;
             }
@@ -1203,6 +1213,39 @@ class FulfillmentService
             'fulfillment.reconcile.stalled',
             'Hasil pengiriman belum pasti - perlu perhatian',
             'Pesanan '.$order->order_number.' sudah dicek otomatis berulang tanpa hasil final. Pengecekan otomatis tetap berjalan maksimal 24 jam; periksa dari menu Pemenuhan.',
+            'ERROR',
+            'fulfillment_attempt',
+            $attempt->id,
+            ['order_id' => (int) $order->id]
+        );
+    }
+
+    /**
+     * Age-specific counterpart of escalateStalledReconciliation(): an
+     * attempt older than the 90-day recheck bound will never be checked
+     * again - automatically or manually - so the notice must say exactly
+     * that instead of claiming checks are still running.
+     */
+    private function escalateAgedReconciliation(object $attempt, object $order): void
+    {
+        $alreadyEscalated = DB::table('admin_notifications')
+            ->where('event_type', 'fulfillment.reconcile.too_old')
+            ->where('target_type', 'fulfillment_attempt')
+            ->where('target_id', (string) $attempt->id)
+            ->exists();
+        if ($alreadyEscalated) {
+            return;
+        }
+
+        $this->event((int) $order->id, 'FULFILLMENT_RECONCILE_STALLED', $order->status, $order->status, [
+            'attempt_id' => $attempt->id,
+            'reconcile_checks' => (int) $attempt->reconcile_checks,
+            'reason' => 'attempt_older_than_90_days',
+        ]);
+        $this->notifications->record(
+            'fulfillment.reconcile.too_old',
+            'Hasil pengiriman melewati batas umur pemeriksaan - perlu penanganan manual',
+            'Pesanan '.$order->order_number.' mempunyai attempt pengiriman berumur lebih dari 90 hari yang hasilnya belum pasti. Pemeriksaan ulang tidak lagi dilakukan (otomatis maupun manual) karena Digiflazz akan membuat transaksi baru; periksa dan tangani manual dari menu Pemenuhan.',
             'ERROR',
             'fulfillment_attempt',
             $attempt->id,

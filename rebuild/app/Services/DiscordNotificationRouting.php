@@ -32,6 +32,7 @@ final class DiscordNotificationRouting
         'fulfillment.unknown' => 'tugas',
         'fulfillment.pending.stale' => 'tugas',
         'fulfillment.reconcile.stalled' => 'tugas',
+        'fulfillment.reconcile.too_old' => 'tugas',
         'payment.manual_qris.pending' => 'tugas',
         'digiflazz.mapping.duplicate_active' => 'tugas',
 

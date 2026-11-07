@@ -34,6 +34,7 @@ class DiscordNotificationRoutingTest extends TestCase
                 'fulfillment.unknown',
                 'fulfillment.pending.stale',
                 'fulfillment.reconcile.stalled',
+                'fulfillment.reconcile.too_old',
                 'payment.manual_qris.pending',
                 'digiflazz.mapping.duplicate_active',
             ],
