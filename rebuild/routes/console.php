@@ -143,6 +143,34 @@ Artisan::command('lfamilia:expire-unpaid-orders', function (PaymentStateService 
 
 Schedule::command('lfamilia:expire-unpaid-orders')->everyMinute()->withoutOverlapping();
 
+Artisan::command('lfamilia:expire-unpaid-topups', function (PaymentStateService $states): int {
+    $expired = 0;
+    DB::table('wallet_topups')
+        ->where('status', 'PENDING_PAYMENT')
+        ->whereNotNull('expires_at')
+        ->where('expires_at', '<=', now())
+        ->orderBy('id')
+        ->chunkById(100, function ($topups) use ($states, &$expired): void {
+            foreach ($topups as $candidate) {
+                DB::transaction(function () use ($states, $candidate, &$expired): void {
+                    $topup = DB::table('wallet_topups')->where('id', $candidate->id)->lockForUpdate()->first();
+                    if (! $topup || $topup->status !== 'PENDING_PAYMENT'
+                        || ! $topup->expires_at || now()->lt($topup->expires_at)) {
+                        return;
+                    }
+
+                    $states->expireTopup($topup);
+                    $expired++;
+                }, 3);
+            }
+        });
+    $this->info("Expired unpaid topups: {$expired}");
+
+    return 0;
+})->purpose('Expire overdue unpaid wallet topups using the existing state service');
+
+Schedule::command('lfamilia:expire-unpaid-topups')->everyMinute()->withoutOverlapping();
+
 Schedule::job(new QueueHeartbeatJob)->everyMinute()->name('lfamilia-queue-worker-heartbeat');
 
 Schedule::call(function (): void {

@@ -3343,4 +3343,459 @@ class PaymentTest extends TestCase
         $this->assertSame(1, $creates);
         $this->assertSame('PENDING', DB::table('payment_transactions')->where('id', $paymentId)->value('status'));
     }
+
+    public function test_topup_payment_start_is_rejected_after_expiry_and_marks_topup_expired(): void
+    {
+        $routeId = $this->route('qris', 'MIDTRANS', 0, 70, 'qris');
+        $user = User::create([
+            'name' => 'Expired Topup Buyer',
+            'email' => 'expired-topup@example.test',
+            'phone' => '081234567801',
+            'password' => Hash::make('StrongPassword123!'),
+            'email_verified_at' => now(),
+        ]);
+        $wallet = DB::table('wallets')->where('user_id', $user->id)->firstOrFail();
+        $channelId = DB::table('payment_channels')->where('code', 'qris')->value('id');
+        $topupId = DB::table('wallet_topups')->insertGetId([
+            'wallet_id' => $wallet->id,
+            'user_id' => $user->id,
+            'payment_channel_id' => $channelId,
+            'payment_route_id' => $routeId,
+            'amount_idr' => 10000,
+            'fee_idr' => 700,
+            'total_idr' => 10700,
+            'status' => 'PENDING_PAYMENT',
+            'idempotency_key' => 'pr5-expired-topup-0001',
+            'request_fingerprint' => hash('sha256', 'pr5-expired-topup'),
+            'expires_at' => now()->subMinute(),
+            'created_at' => now()->subMinutes(31),
+            'updated_at' => now()->subMinute(),
+        ]);
+        $topup = DB::table('wallet_topups')->where('id', $topupId)->firstOrFail();
+
+        try {
+            app(PaymentService::class)->startTopup(
+                $topup, 'payment-pr5-expired-topup-0001', $user->name, $user->email, (string) $user->phone
+            );
+            $this->fail('Top up kedaluwarsa tidak boleh dimulai pembayarannya.');
+        } catch (ValidationException $exception) {
+            $this->assertSame('Top up sudah kedaluwarsa.', $exception->errors()['payment'][0]);
+        }
+
+        $this->assertSame(0, DB::table('payment_transactions')->where('wallet_topup_id', $topupId)->count());
+        $this->assertSame('EXPIRED', DB::table('wallet_topups')->where('id', $topupId)->value('status'));
+    }
+
+    public function test_expire_unpaid_topups_command_expires_only_overdue_pending_topups(): void
+    {
+        $user = User::create([
+            'name' => 'Topup Expiry Buyer',
+            'email' => 'topup-expiry@example.test',
+            'phone' => '081234567802',
+            'password' => Hash::make('StrongPassword123!'),
+            'email_verified_at' => now(),
+        ]);
+        $wallet = DB::table('wallets')->where('user_id', $user->id)->firstOrFail();
+        $channelId = DB::table('payment_channels')->where('code', 'qris')->value('id');
+        $seed = function (string $key, string $status, $expiresAt) use ($wallet, $user, $channelId): int {
+            return DB::table('wallet_topups')->insertGetId([
+                'wallet_id' => $wallet->id,
+                'user_id' => $user->id,
+                'payment_channel_id' => $channelId,
+                'amount_idr' => 10000,
+                'fee_idr' => 700,
+                'total_idr' => 10700,
+                'status' => $status,
+                'idempotency_key' => $key,
+                'request_fingerprint' => hash('sha256', $key),
+                'expires_at' => $expiresAt,
+                'created_at' => now()->subHour(),
+                'updated_at' => now()->subHour(),
+            ]);
+        };
+        $overdue = $seed('pr5-expiry-overdue', 'PENDING_PAYMENT', now()->subMinute());
+        $fresh = $seed('pr5-expiry-fresh', 'PENDING_PAYMENT', now()->addMinutes(10));
+        $paidOverdue = $seed('pr5-expiry-paid', 'PAID', now()->subMinute());
+
+        Artisan::call('lfamilia:expire-unpaid-topups');
+
+        $this->assertSame('EXPIRED', DB::table('wallet_topups')->where('id', $overdue)->value('status'));
+        $this->assertSame('PENDING_PAYMENT', DB::table('wallet_topups')->where('id', $fresh)->value('status'));
+        $this->assertSame('PAID', DB::table('wallet_topups')->where('id', $paidOverdue)->value('status'));
+    }
+
+    public function test_late_paid_for_terminal_topup_goes_to_review_without_crediting(): void
+    {
+        $states = app(PaymentStateService::class);
+        foreach (['EXPIRED', 'FAILED', 'CANCELLED'] as $index => $terminalStatus) {
+            $user = User::create([
+                'name' => 'Late Paid Buyer '.$terminalStatus,
+                'email' => 'late-paid-'.strtolower($terminalStatus).'@example.test',
+                'phone' => '08123456781'.$index,
+                'password' => Hash::make('StrongPassword123!'),
+                'email_verified_at' => now(),
+            ]);
+            $wallet = DB::table('wallets')->where('user_id', $user->id)->firstOrFail();
+            $channelId = DB::table('payment_channels')->where('code', 'qris')->value('id');
+            $topupId = DB::table('wallet_topups')->insertGetId([
+                'wallet_id' => $wallet->id,
+                'user_id' => $user->id,
+                'payment_channel_id' => $channelId,
+                'amount_idr' => 10000,
+                'fee_idr' => 700,
+                'total_idr' => 10700,
+                'status' => $terminalStatus,
+                'idempotency_key' => 'pr5-late-paid-'.strtolower($terminalStatus),
+                'request_fingerprint' => hash('sha256', 'pr5-late-paid-'.strtolower($terminalStatus)),
+                'expires_at' => now()->subMinutes(40),
+                'created_at' => now()->subHour(),
+                'updated_at' => now()->subMinutes(30),
+            ]);
+            $paymentId = DB::table('payment_transactions')->insertGetId([
+                'wallet_topup_id' => $topupId,
+                'gateway_code' => 'MIDTRANS',
+                'channel_code' => 'qris',
+                'merchant_reference' => 'TOPUP-LATE-'.$terminalStatus,
+                'amount_idr' => 10700,
+                'status' => 'PENDING',
+                'idempotency_key' => 'pr5-late-paid-payment-'.strtolower($terminalStatus),
+                'created_at' => now()->subHour(),
+                'updated_at' => now()->subMinutes(30),
+            ]);
+
+            $result = $states->apply($paymentId, 'PAID');
+
+            $this->assertSame('LATE_PAID_REVIEW', $result['result'], $terminalStatus);
+            $this->assertSame($terminalStatus, $result['status'], $terminalStatus);
+            $this->assertSame('PAID', DB::table('payment_transactions')->where('id', $paymentId)->value('status'));
+            $this->assertSame($terminalStatus, DB::table('wallet_topups')->where('id', $topupId)->value('status'));
+            $this->assertSame(0, (int) DB::table('wallets')->where('id', $wallet->id)->value('balance_idr'));
+            $this->assertSame(0, DB::table('wallet_ledger')->where('wallet_id', $wallet->id)->where('source', 'TOPUP')->count());
+            $this->assertDatabaseHas('admin_notifications', [
+                'event_type' => 'payment.late_verified',
+                'target_id' => (string) $topupId,
+            ]);
+        }
+    }
+
+    public function test_paid_callback_after_topup_deadline_expires_topup_without_crediting(): void
+    {
+        $user = User::create([
+            'name' => 'Deadline Paid Buyer',
+            'email' => 'deadline-paid@example.test',
+            'phone' => '081234567803',
+            'password' => Hash::make('StrongPassword123!'),
+            'email_verified_at' => now(),
+        ]);
+        $wallet = DB::table('wallets')->where('user_id', $user->id)->firstOrFail();
+        $channelId = DB::table('payment_channels')->where('code', 'qris')->value('id');
+        $topupId = DB::table('wallet_topups')->insertGetId([
+            'wallet_id' => $wallet->id,
+            'user_id' => $user->id,
+            'payment_channel_id' => $channelId,
+            'amount_idr' => 10000,
+            'fee_idr' => 700,
+            'total_idr' => 10700,
+            'status' => 'PENDING_PAYMENT',
+            'idempotency_key' => 'pr5-deadline-topup-0001',
+            'request_fingerprint' => hash('sha256', 'pr5-deadline-topup'),
+            'expires_at' => now()->subMinute(),
+            'created_at' => now()->subMinutes(31),
+            'updated_at' => now()->subMinutes(2),
+        ]);
+        $paymentId = DB::table('payment_transactions')->insertGetId([
+            'wallet_topup_id' => $topupId,
+            'gateway_code' => 'MIDTRANS',
+            'channel_code' => 'qris',
+            'merchant_reference' => 'TOPUP-DEADLINE-1',
+            'amount_idr' => 10700,
+            'status' => 'PENDING',
+            'idempotency_key' => 'pr5-deadline-payment-0001',
+            'created_at' => now()->subMinutes(31),
+            'updated_at' => now()->subMinutes(2),
+        ]);
+
+        $result = app(PaymentStateService::class)->apply($paymentId, 'PAID');
+
+        $this->assertSame('LATE_PAID_REVIEW', $result['result']);
+        $this->assertSame('EXPIRED', $result['status']);
+        $this->assertSame('EXPIRED', DB::table('wallet_topups')->where('id', $topupId)->value('status'));
+        $this->assertSame('PAID', DB::table('payment_transactions')->where('id', $paymentId)->value('status'));
+        $this->assertSame(0, (int) DB::table('wallets')->where('id', $wallet->id)->value('balance_idr'));
+        $this->assertSame(0, DB::table('wallet_ledger')->where('wallet_id', $wallet->id)->where('source', 'TOPUP')->count());
+    }
+
+    public function test_refund_review_freeze_is_serialized_on_the_wallet_lock(): void
+    {
+        $user = User::create([
+            'name' => 'Freeze Lock Buyer',
+            'email' => 'freeze-lock@example.test',
+            'phone' => '081234567804',
+            'password' => Hash::make('StrongPassword123!'),
+        ]);
+        // email_verified_at is not fillable; member checkout requires it.
+        $user->forceFill(['email_verified_at' => now()])->save();
+        $wallet = DB::table('wallets')->where('user_id', $user->id)->firstOrFail();
+        $channelId = DB::table('payment_channels')->where('code', 'qris')->value('id');
+        $topupId = DB::table('wallet_topups')->insertGetId([
+            'wallet_id' => $wallet->id,
+            'user_id' => $user->id,
+            'payment_channel_id' => $channelId,
+            'amount_idr' => 10000,
+            'fee_idr' => 700,
+            'total_idr' => 10700,
+            'status' => 'PENDING_PAYMENT',
+            'idempotency_key' => 'pr5-freeze-topup-0001',
+            'request_fingerprint' => hash('sha256', 'pr5-freeze-topup'),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $paymentId = DB::table('payment_transactions')->insertGetId([
+            'wallet_topup_id' => $topupId,
+            'gateway_code' => 'MIDTRANS',
+            'channel_code' => 'qris',
+            'merchant_reference' => 'TOPUP-FREEZE-1',
+            'amount_idr' => 10700,
+            'status' => 'PENDING',
+            'idempotency_key' => 'pr5-freeze-payment-0001',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $states = app(PaymentStateService::class);
+        $states->apply($paymentId, 'PAID');
+
+        // During the REFUNDED transition the wallet row lock must be taken
+        // BEFORE the top-up status update writes the freeze; without that
+        // shared lock the freeze is not serialized against wallet spending.
+        $refundQueries = [];
+        DB::listen(function ($query) use (&$refundQueries): void {
+            $refundQueries[] = strtolower($query->sql);
+        });
+        $states->apply($paymentId, 'REFUNDED');
+
+        $walletLockAt = null;
+        $topupUpdateAt = null;
+        foreach ($refundQueries as $i => $sql) {
+            if ($walletLockAt === null && str_contains($sql, 'from `wallets`') && str_contains($sql, 'for update')) {
+                $walletLockAt = $i;
+            }
+            if ($topupUpdateAt === null && str_contains($sql, 'update `wallet_topups`')) {
+                $topupUpdateAt = $i;
+            }
+        }
+        $this->assertNotNull($walletLockAt, 'REFUNDED transition must lock the wallet row');
+        $this->assertNotNull($topupUpdateAt);
+        $this->assertLessThan($topupUpdateAt, $walletLockAt);
+        $this->assertSame('REFUND_REVIEW', DB::table('wallet_topups')->where('id', $topupId)->value('status'));
+
+        // During a wallet checkout the freeze check must run AFTER the
+        // wallet row lock is taken, so it reads the freeze state serialized
+        // by that lock instead of a pre-lock snapshot.
+        $catalog = $this->catalog();
+        $this->route('saldo', 'WALLET');
+        DB::table('wallets')->where('id', $wallet->id)->update(['balance_idr' => 50000]);
+        DB::table('wallet_topups')->where('id', $topupId)->update(['status' => 'REFUNDED']);
+        $checkout = $this->actingAs($user)->postJson('/checkout/orders', [
+            'package_id' => $catalog['package_id'],
+            'payment_channel_code' => 'saldo',
+            'customer_input' => ['user_id' => '777777'],
+            'voucher_code' => null,
+            'idempotency_key' => 'pr5-freeze-order-0001',
+        ])->assertCreated();
+
+        $payQueries = [];
+        DB::listen(function ($query) use (&$payQueries): void {
+            $payQueries[] = strtolower($query->sql);
+        });
+        $this->actingAs($user)->postJson('/payments/orders/'.$checkout->json('order_number'), [
+            'idempotency_key' => 'pr5-freeze-payment-0002',
+        ])->assertOk()->assertJsonPath('status', 'PAID');
+
+        $payWalletLockAt = null;
+        $freezeCheckAt = null;
+        foreach ($payQueries as $i => $sql) {
+            if ($payWalletLockAt === null && str_contains($sql, 'from `wallets`') && str_contains($sql, 'for update')) {
+                $payWalletLockAt = $i;
+            }
+            if ($freezeCheckAt === null && str_contains($sql, 'from `wallet_topups`') && str_contains($sql, '`status`')) {
+                $freezeCheckAt = $i;
+            }
+        }
+        $this->assertNotNull($payWalletLockAt, 'wallet checkout must lock the wallet row');
+        $this->assertNotNull($freezeCheckAt, 'wallet checkout must check the refund-review freeze');
+        $this->assertLessThan($freezeCheckAt, $payWalletLockAt);
+    }
+
+    public function test_recovery_terminates_creating_topup_payment_after_the_topup_deadline(): void
+    {
+        $routeId = $this->route('qris', 'MIDTRANS', 0, 70, 'qris');
+        $this->seedMidtransCredential();
+        $user = User::create([
+            'name' => 'Recovery Expired Topup Buyer',
+            'email' => 'recovery-expired-topup@example.test',
+            'phone' => '081234567805',
+            'password' => Hash::make('StrongPassword123!'),
+            'email_verified_at' => now(),
+        ]);
+        $wallet = DB::table('wallets')->where('user_id', $user->id)->firstOrFail();
+        $channelId = DB::table('payment_channels')->where('code', 'qris')->value('id');
+        $topupId = DB::table('wallet_topups')->insertGetId([
+            'wallet_id' => $wallet->id,
+            'user_id' => $user->id,
+            'payment_channel_id' => $channelId,
+            'payment_route_id' => $routeId,
+            'amount_idr' => 10000,
+            'fee_idr' => 700,
+            'total_idr' => 10700,
+            'status' => 'PENDING_PAYMENT',
+            'idempotency_key' => 'pr5-topup-expired-recovery-0001',
+            'request_fingerprint' => hash('sha256', 'pr5-topup-expired-recovery'),
+            'expires_at' => now()->subMinute(),
+            'created_at' => now()->subMinutes(31),
+            'updated_at' => now()->subMinutes(6),
+        ]);
+        $reference = 'TOP-PR5-EXPIRED-'.strtoupper(bin2hex(random_bytes(3)));
+        $paymentId = $this->creatingPaymentRow($routeId, null, $reference, 10700, 'MIDTRANS', 'qris', (int) $topupId);
+
+        $creates = 0;
+        Http::fake(function ($request) use (&$creates) {
+            if (str_contains($request->url(), '/status')) {
+                return Http::response([
+                    'status_code' => '404',
+                    'status_message' => "Transaction doesn't exist.",
+                ], 404);
+            }
+            if (str_contains($request->url(), 'snap/v1/transactions')) {
+                $creates++;
+
+                return Http::response(['token' => 'must-not-happen', 'redirect_url' => 'https://example.test/nope']);
+            }
+
+            return Http::response([], 404);
+        });
+
+        Artisan::call('lfamilia:recover-creating-payments');
+
+        $this->assertSame(0, $creates);
+        $this->assertSame('FAILED', DB::table('payment_transactions')->where('id', $paymentId)->value('status'));
+    }
+
+    public function test_topup_retry_after_expiry_does_not_hand_back_existing_payment_instructions(): void
+    {
+        $routeId = $this->route('qris', 'MIDTRANS', 0, 70, 'qris');
+        $user = User::create([
+            'name' => 'Expired Retry Buyer',
+            'email' => 'expired-retry@example.test',
+            'phone' => '081234567806',
+            'password' => Hash::make('StrongPassword123!'),
+            'email_verified_at' => now(),
+        ]);
+        $wallet = DB::table('wallets')->where('user_id', $user->id)->firstOrFail();
+        $channelId = DB::table('payment_channels')->where('code', 'qris')->value('id');
+        $topupId = DB::table('wallet_topups')->insertGetId([
+            'wallet_id' => $wallet->id,
+            'user_id' => $user->id,
+            'payment_channel_id' => $channelId,
+            'payment_route_id' => $routeId,
+            'amount_idr' => 10000,
+            'fee_idr' => 700,
+            'total_idr' => 10700,
+            'status' => 'PENDING_PAYMENT',
+            'idempotency_key' => 'pr5-retry-topup-0001',
+            'request_fingerprint' => hash('sha256', 'pr5-retry-topup'),
+            'expires_at' => now()->subMinute(),
+            'created_at' => now()->subMinutes(31),
+            'updated_at' => now()->subMinutes(2),
+        ]);
+        // The payment created before the deadline, still pending: the
+        // findExisting fast path must not return it as payable instructions.
+        $fingerprint = hash('sha256', implode('|', ['topup', $topupId, 'qris', $routeId, 10700]));
+        $paymentId = DB::table('payment_transactions')->insertGetId([
+            'wallet_topup_id' => $topupId,
+            'payment_route_id' => $routeId,
+            'gateway_code' => 'MIDTRANS',
+            'channel_code' => 'qris',
+            'merchant_reference' => 'TOP-PR5-RETRY-1',
+            'amount_idr' => 10700,
+            'status' => 'PENDING',
+            'request_fingerprint' => $fingerprint,
+            'idempotency_key' => 'payment-pr5-retry-0001',
+            'expires_at' => now()->addMinutes(5),
+            'created_at' => now()->subMinutes(30),
+            'updated_at' => now()->subMinutes(2),
+        ]);
+        $topup = DB::table('wallet_topups')->where('id', $topupId)->firstOrFail();
+
+        try {
+            app(PaymentService::class)->startTopup(
+                $topup, 'payment-pr5-retry-0001', $user->name, $user->email, (string) $user->phone
+            );
+            $this->fail('Retry sesudah tenggat tidak boleh mengembalikan instruksi pembayaran lama.');
+        } catch (ValidationException $exception) {
+            $this->assertSame('Top up sudah kedaluwarsa.', $exception->errors()['payment'][0]);
+        }
+
+        $this->assertSame('EXPIRED', DB::table('wallet_topups')->where('id', $topupId)->value('status'));
+        $this->assertSame('PENDING', DB::table('payment_transactions')->where('id', $paymentId)->value('status'));
+    }
+
+    public function test_topup_retry_for_already_expired_topup_does_not_hand_back_payment_instructions(): void
+    {
+        $routeId = $this->route('qris', 'MIDTRANS', 0, 70, 'qris');
+        $user = User::create([
+            'name' => 'Already Expired Buyer',
+            'email' => 'already-expired@example.test',
+            'phone' => '081234567807',
+            'password' => Hash::make('StrongPassword123!'),
+            'email_verified_at' => now(),
+        ]);
+        $wallet = DB::table('wallets')->where('user_id', $user->id)->firstOrFail();
+        $channelId = DB::table('payment_channels')->where('code', 'qris')->value('id');
+        // Already transitioned to EXPIRED by the scheduled command, which
+        // deliberately does not touch payment rows: the payment below is
+        // still PENDING and must not leak back as live instructions.
+        $topupId = DB::table('wallet_topups')->insertGetId([
+            'wallet_id' => $wallet->id,
+            'user_id' => $user->id,
+            'payment_channel_id' => $channelId,
+            'payment_route_id' => $routeId,
+            'amount_idr' => 10000,
+            'fee_idr' => 700,
+            'total_idr' => 10700,
+            'status' => 'EXPIRED',
+            'idempotency_key' => 'pr5-already-expired-topup-0001',
+            'request_fingerprint' => hash('sha256', 'pr5-already-expired-topup'),
+            'expires_at' => now()->subMinutes(10),
+            'created_at' => now()->subMinutes(40),
+            'updated_at' => now()->subMinutes(9),
+        ]);
+        $fingerprint = hash('sha256', implode('|', ['topup', $topupId, 'qris', $routeId, 10700]));
+        $paymentId = DB::table('payment_transactions')->insertGetId([
+            'wallet_topup_id' => $topupId,
+            'payment_route_id' => $routeId,
+            'gateway_code' => 'MIDTRANS',
+            'channel_code' => 'qris',
+            'merchant_reference' => 'TOP-PR5-EXPIRED-1',
+            'amount_idr' => 10700,
+            'status' => 'PENDING',
+            'request_fingerprint' => $fingerprint,
+            'idempotency_key' => 'payment-pr5-already-expired-0001',
+            'expires_at' => now()->subMinutes(10),
+            'created_at' => now()->subMinutes(39),
+            'updated_at' => now()->subMinutes(9),
+        ]);
+        $topup = DB::table('wallet_topups')->where('id', $topupId)->firstOrFail();
+
+        try {
+            app(PaymentService::class)->startTopup(
+                $topup, 'payment-pr5-already-expired-0001', $user->name, $user->email, (string) $user->phone
+            );
+            $this->fail('Retry untuk top up yang sudah EXPIRED tidak boleh mengembalikan instruksi pembayaran.');
+        } catch (ValidationException $exception) {
+            $this->assertSame('Top up sudah kedaluwarsa.', $exception->errors()['payment'][0]);
+        }
+
+        $this->assertSame('EXPIRED', DB::table('wallet_topups')->where('id', $topupId)->value('status'));
+        $this->assertSame('PENDING', DB::table('payment_transactions')->where('id', $paymentId)->value('status'));
+    }
 }
