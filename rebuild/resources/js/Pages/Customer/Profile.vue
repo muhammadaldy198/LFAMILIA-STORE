@@ -57,6 +57,10 @@ const remove = () => {
         </form>
         <form class="space-y-4 rounded-xl border border-slate-800 bg-slate-900 p-5" @submit.prevent="updatePassword">
             <h2 class="text-lg font-semibold">{{ hasPassword ? 'Ubah kata sandi' : 'Buat kata sandi' }}</h2>
+            <p v-if="!hasPassword && hasGoogle" class="text-sm text-slate-300">Untuk membuat kata sandi pertama, masuk ulang dengan Google yang sama.
+                <a href="/auth/google/reauth" class="text-cyan-300 underline">Masuk ulang dengan Google</a>
+            </p>
+            <p v-if="!hasPassword && password.errors.current_password" class="text-sm text-red-300">{{ password.errors.current_password }}</p>
             <label v-if="hasPassword" class="block">{{ customerText("pages.customer.profile.71b0940a", "Kata sandi saat ini") }}
                 <input v-model="password.current_password" type="password" autocomplete="current-password" required class="mt-1 block w-full rounded-md bg-slate-800 p-3 focus:outline-cyan-300">
                 <span v-if="password.errors.current_password" class="text-sm text-red-300">{{ password.errors.current_password }}</span>
