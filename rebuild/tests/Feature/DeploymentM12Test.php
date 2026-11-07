@@ -135,9 +135,10 @@ class DeploymentM12Test extends TestCase
         $deploy = file_get_contents(base_path('deploy/deploy.sh'));
         $this->assertStringContainsString('TRUSTED_PROXIES must not be the wildcard', $preflight);
         $this->assertStringContainsString('proxies_value}" ==', $preflight, 'Preflight must compare the parsed effective proxy value, not a raw line pattern.');
-        $this->assertStringContainsString('(#.*)?', $preflight, 'Preflight must strip dotenv comments before judging the proxy value.');
+        $this->assertStringContainsString('s/#.*//', $preflight, 'Preflight must strip dotenv comments (adjacent or spaced) before judging the proxy value.');
         $this->assertStringContainsString('must be written literally', $preflight, 'Preflight must reject dotenv variable references for the proxy value.');
         $this->assertStringContainsString('cloudpanel-vhost-snippet.conf', $preflight);
+        $this->assertStringContainsString('lfamilia\.com', $preflight, 'Preflight must scope the nginx deny check to the lfamilia.com server block.');
         $this->assertStringContainsString('DEPLOY_EXPECTED_SHA', $deploy);
         $this->assertStringContainsString('does not match DEPLOY_EXPECTED_SHA', $deploy);
         $pinCheckAt = strpos($deploy, 'does not match DEPLOY_EXPECTED_SHA');

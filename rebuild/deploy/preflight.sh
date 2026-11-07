@@ -62,7 +62,7 @@ grep -Eq '^APP_URL=https://' "${ENV_FILE}" || { echo "APP_URL must use HTTPS" >&
 grep -Eq '^APP_TRUSTED_HOSTS=.+$' "${ENV_FILE}" || { echo "APP_TRUSTED_HOSTS is required" >&2; exit 1; }
 grep -Eq '^TRUSTED_PROXIES=.+$' "${ENV_FILE}" || { echo "TRUSTED_PROXIES is required" >&2; exit 1; }
 while IFS= read -r proxies_line; do
-  proxies_value="$(printf '%s' "${proxies_line}" | sed -E 's/^TRUSTED_PROXIES=[[:space:]]*//; s/[[:space:]]+(#.*)?$//' | tr -d '[:space:]' | tr -d "\"'")"
+  proxies_value="$(printf '%s' "${proxies_line}" | sed -E 's/^TRUSTED_PROXIES=[[:space:]]*//; s/#.*//' | tr -d '[:space:]' | tr -d "\"'")"
   if [[ "${proxies_value}" == *'${'* ]]; then
     echo "TRUSTED_PROXIES must be written literally in production; variable references are not allowed" >&2
     exit 1
@@ -121,14 +121,30 @@ done
 # script drift check above - this warns instead of failing the deploy.
 if command -v nginx >/dev/null 2>&1; then
   nginx_dump="$(nginx -T 2>/dev/null || true)"
-  for deny_location in \
-    'location ~ /\.(?!well-known).*' \
-    'location ~* \.(?:env|log|sql|bak|ini)$' \
-    'location ~* ^/(?:storage/logs|bootstrap/cache)/'; do
-    if ! grep -Fq -- "${deny_location}" <<<"${nginx_dump}"; then
-      echo "WARNING: nginx deny rule missing from the effective configuration: ${deny_location}. Reapply deploy/nginx/cloudpanel-vhost-snippet.conf to the vhost, then run nginx -t before reload." >&2
-    fi
-  done
+  vhost_block="$(printf '%s\n' "${nginx_dump}" | awk '
+    {
+      line = $0
+      if (!inblock) {
+        if (line ~ /(^|[[:space:]])server[[:space:]]*\{/) { inblock = 1; depth = 0; buf = ""; hit = 0 } else next
+      }
+      buf = buf line ORS
+      if (line ~ /server_name[^;]*lfamilia\.com/) hit = 1
+      tmp = line; opens = gsub(/\{/, "{", tmp); tmp = line; closes = gsub(/\}/, "}", tmp); depth += opens - closes
+      if (depth <= 0) { if (hit) result = result buf; inblock = 0 }
+    }
+    END { printf "%s", result }')"
+  if [[ -z "${vhost_block}" ]]; then
+    echo "WARNING: Could not locate the lfamilia.com server block in the effective nginx configuration; the vhost deny rules could not be verified." >&2
+  else
+    for deny_location in \
+      'location ~ /\.(?!well-known).*' \
+      'location ~* \.(?:env|log|sql|bak|ini)$' \
+      'location ~* ^/(?:storage/logs|bootstrap/cache)/'; do
+      if ! grep -Fq -- "${deny_location}" <<<"${vhost_block}"; then
+        echo "WARNING: nginx deny rule missing from the lfamilia.com vhost: ${deny_location}. Reapply deploy/nginx/cloudpanel-vhost-snippet.conf to the vhost, then run nginx -t before reload." >&2
+      fi
+    done
+  fi
 else
   echo "WARNING: nginx binary not found; the vhost deny rules could not be verified." >&2
 fi
