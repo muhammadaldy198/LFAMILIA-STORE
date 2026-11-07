@@ -78,7 +78,9 @@ while IFS= read -r proxies_line; do
     exit 1
   fi
   IFS=',' read -ra proxies_entries <<<"${proxies_value}"
+  proxies_named=0
   for proxies_entry in "${proxies_entries[@]}"; do
+    [[ -n "${proxies_entry}" ]] && proxies_named=1
     if [[ "${proxies_entry}" =~ /0+$ ]]; then
       echo "TRUSTED_PROXIES must not trust every address in production; catch-all CIDR ranges (any address with a /0 prefix length) are not allowed" >&2
       exit 1
@@ -86,6 +88,10 @@ while IFS= read -r proxies_line; do
   done
   if [[ "${proxies_value}" == '*' ]]; then
     echo "TRUSTED_PROXIES must not be the wildcard in production; list the proxy addresses (e.g. 127.0.0.1,::1)" >&2
+    exit 1
+  fi
+  if [[ "${proxies_named}" -eq 0 ]]; then
+    echo "TRUSTED_PROXIES must name at least one proxy in production; an empty value is not allowed" >&2
     exit 1
   fi
 done < <(grep -E '^TRUSTED_PROXIES=' "${ENV_FILE}" || true)
@@ -165,7 +171,7 @@ if command -v nginx >/dev/null 2>&1; then
 location ~* \.(?:env|log|sql|bak|ini)$
 location ~* ^/(?:storage/logs|bootstrap/cache)/'
     missing_denies="$(printf '%s\n' "${vhost_block}" | DENY_PATTERNS="${deny_patterns}" awk '
-      function overlaps(k, i,    p, s, t) {
+      function overlaps(k, i,    p, s, t, ix, rest, cb) {
         p = e_pat[k]
         if (e_caret[k]) {
           for (s = 1; s <= sc[i]; s++) if (index(subj[i, s], p) == 1) return 1
@@ -175,7 +181,13 @@ location ~* ^/(?:storage/logs|bootstrap/cache)/'
           for (s = 1; s <= sc[i]; s++) if (subj[i, s] == p) return 1
           return 0
         }
-        if (index(p, "(?")) return 0
+        while ((ix = index(p, "(?:")) > 0) p = substr(p, 1, ix - 1) "(" substr(p, ix + 3)
+        while ((ix = index(p, "(?")) > 0) {
+          rest = substr(p, ix)
+          cb = index(rest, ")")
+          if (!cb) return 0
+          p = substr(p, 1, ix - 1) substr(rest, cb + 1)
+        }
         for (s = 1; s <= sc[i]; s++) {
           t = subj[i, s]
           if (e_ci[k]) { if (match(tolower(t), tolower(p))) return 1 }
@@ -183,14 +195,19 @@ location ~* ^/(?:storage/logs|bootstrap/cache)/'
         }
         return 0
       }
+      function close_loc() { e_eff[E] = (cur_eff && !nested_allow) ? 1 : 0; inloc = 0 }
       function finalize(    i, j, j0, credited) {
-        if (inloc) { e_eff[E] = cur_eff; inloc = 0 }
+        if (inloc) close_loc()
         for (i = 1; i <= n; i++) {
           credited = 0; j0 = 0
           for (j = 1; j <= E; j++) if (e_prot[j] == i) { j0 = j; break }
           if (j0 && e_eff[j0]) {
             credited = 1
-            for (j = 1; j < j0; j++) if ((e_regex[j] || e_caret[j] || e_exact[j]) && !e_eff[j] && overlaps(j, i)) { credited = 0; break }
+            for (j = 1; j <= E; j++) {
+              if (j == j0 || e_eff[j] || e_prot[j]) continue
+              if ((e_caret[j] || e_exact[j]) && overlaps(j, i)) { credited = 0; break }
+              if (e_regex[j] && j < j0 && overlaps(j, i)) { credited = 0; break }
+            }
           }
           if (!credited) missing[pats[i]] = 1
         }
@@ -224,7 +241,7 @@ location ~* ^/(?:storage/logs|bootstrap/cache)/'
           e_exact[E] = (mod == "=") ? 1 : 0
           e_pat[E] = pat_text
           e_eff[E] = 0
-          inloc = 1; ldepth = 0; cur_eff = 0; scope_deny_seen = 0; allow_before = 0
+          inloc = 1; ldepth = 0; cur_eff = 0; scope_deny_seen = 0; allow_before = 0; nested_allow = 0
         }
         pd = 0; scope_deny_here = 0
         if (match(line, /(^|[;{]) *deny all;/)) {
@@ -238,12 +255,15 @@ location ~* ^/(?:storage/logs|bootstrap/cache)/'
           mtxt = substr(line, RSTART, RLENGTH)
           pa = RSTART + index(mtxt, "allow") - 1
           allow_here = 1
+          pre = substr(line, 1, pa - 1)
+          tmp = pre; ob = gsub(/\{/, "{", tmp); tmp = pre; cb = gsub(/\}/, "}", tmp)
+          if (ldepth + ob - cb >= 2) nested_allow = 1
         }
         eff_allow = (allow_before || (allow_here && (!scope_deny_here || pa < pd))) ? 1 : 0
         if (scope_deny_here && !scope_deny_seen) { scope_deny_seen = 1; cur_eff = eff_allow ? 0 : 1 }
         if (allow_here && !scope_deny_seen) allow_before = 1
         tmp = line; o = gsub(/\{/, "{", tmp); tmp = line; c = gsub(/\}/, "}", tmp); ldepth += o - c
-        if (ldepth <= 0) { e_eff[E] = cur_eff; inloc = 0 }
+        if (ldepth <= 0) close_loc()
       }
       END { if (started) finalize(); for (m in missing) print m }
     ')"

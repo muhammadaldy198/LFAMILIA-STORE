@@ -143,6 +143,7 @@ class DeploymentM12Test extends TestCase
         $this->assertStringContainsString('sub(/#.*/, "", line)', $preflight, 'Preflight must ignore commented-out nginx directives when verifying the vhost.');
         $this->assertStringContainsString('allow [^;]*;', $preflight, 'Preflight must not credit a deny rule that an earlier allow rule overrides.');
         $this->assertStringContainsString('multiline values are not allowed', $preflight, 'Preflight must reject multiline TRUSTED_PROXIES values instead of examining only the assignment line.');
+        $this->assertStringContainsString('must name at least one proxy', $preflight, 'Preflight must reject an empty TRUSTED_PROXIES value; the app resolves it to no proxies and the boot guard throws during deploy.');
         $this->assertStringContainsString('catch-all CIDR', $preflight, 'Preflight must reject catch-all proxy CIDRs as well as the literal wildcard.');
         $this->assertStringContainsString('function finalize(', $preflight, 'Preflight must verify the nginx deny rules in each matching server block independently.');
         $this->assertStringContainsString('DEPLOY_EXPECTED_SHA', $deploy);
@@ -185,6 +186,7 @@ class DeploymentM12Test extends TestCase
             'noncanonical zero-prefix CIDR fails' => ["TRUSTED_PROXIES=192.0.2.1/0\n", 1],
             'variable reference fails' => ["TRUSTED_PROXIES=\"\${PROXY_SETTING}\"\n", 1],
             'multiline value fails' => ["TRUSTED_PROXIES=\"127.0.0.1,\n*\"\n", 1],
+            'empty quoted value fails' => ["TRUSTED_PROXIES=\"\"\n", 1],
         ];
 
         foreach ($cases as $label => [$env, $expected]) {
@@ -221,6 +223,10 @@ class DeploymentM12Test extends TestCase
         $caretShadow = implode("\n", ["    location ^~ /storage/ {\n    }", $location($p1), $location($p2), $location($p3)]);
         $exactShadow = implode("\n", ["    location = /.env {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $quotedDeny = implode("\n", [$location($p1, 'return 200 "deny all;";'), $location($p2), $location($p3)]);
+        $pcreShadow = implode("\n", ["    location ~* \\.(?:env|log)$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
+        $exactAfter = implode("\n", [$location($p1), $location($p2), $location($p3), "    location = /.env {\n        allow all;\n    }"]);
+        $caretAfter = implode("\n", [$location($p1), $location($p2), $location($p3), "    location ^~ /storage/ {\n    }"]);
+        $nestedAllowAfter = implode("\n", ["    {$p1} {\n        deny all;\n        limit_except POST {\n            allow all;\n        }\n    }", $location($p2), $location($p3)]);
         $server = static fn (string $name, string $inner = ''): string => "server {\n    listen 443 ssl;\n    server_name {$name};\n{$inner}\n}";
 
         $cases = [
@@ -238,6 +244,10 @@ class DeploymentM12Test extends TestCase
             'earlier caret prefix location shadows the storage rule' => [$server('lfamilia.com', $caretShadow), 1],
             'earlier exact-match location shadows the dotfile rule' => [$server('lfamilia.com', $exactShadow), 1],
             'quoted deny string earns no credit' => [$server('lfamilia.com', $quotedDeny), 1],
+            'PCRE group location shadows all three rules' => [$server('lfamilia.com', $pcreShadow), 3],
+            'exact match after the rules still shadows' => [$server('lfamilia.com', $exactAfter), 1],
+            'caret prefix after the rules still shadows' => [$server('lfamilia.com', $caretAfter), 1],
+            'allow nested after the deny warns' => [$server('lfamilia.com', $nestedAllowAfter), 1],
         ];
 
         foreach ($cases as $label => [$body, $expected]) {
