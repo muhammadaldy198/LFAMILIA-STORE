@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Actions\Fortify\CreateNewUser;
 use App\Models\MembershipTier;
 use App\Models\Product;
+use App\Models\User;
 use App\Models\Wallet;
 use App\Services\CustomerAccountDeletion;
 use App\Services\MembershipService;
@@ -80,12 +81,7 @@ class CustomerAccountController
                 ]);
             }
 
-            $reauthAt = $request->session()->get('auth.google_reauth_at');
-            $reauthUserId = $request->session()->get('auth.google_reauth_user_id');
-            if (! is_numeric($reauthAt)
-                || (int) $reauthAt > time()
-                || time() - (int) $reauthAt > 600
-                || (string) $reauthUserId !== (string) $user->getAuthIdentifier()) {
+            if (! $this->hasFreshGoogleReauthentication($request, $user)) {
                 throw ValidationException::withMessages([
                     'current_password' => 'Masuk ulang dengan Google untuk mengubah email (berlaku 10 menit).',
                 ]);
@@ -152,13 +148,28 @@ class CustomerAccountController
                         '',
                         'Jangan bagikan kata sandi atau kode keamanan kepada siapa pun.',
                     ]),
-                    'account_email_changed'
+                    'generic'
                 );
             }
             $user->sendEmailVerificationNotification();
         }
 
         return back()->with('status', 'Profil diperbarui.');
+    }
+
+    /**
+     * The Google proof is bound to this user and expires ten minutes after
+     * the OAuth callback. Session-blocked routes consume it once per change.
+     */
+    private function hasFreshGoogleReauthentication(Request $request, User $user): bool
+    {
+        $reauthAt = $request->session()->get('auth.google_reauth_at');
+        $reauthUserId = $request->session()->get('auth.google_reauth_user_id');
+
+        return is_numeric($reauthAt)
+            && (int) $reauthAt <= time()
+            && time() - (int) $reauthAt <= 600
+            && (string) $reauthUserId === (string) $user->getAuthIdentifier();
     }
 
     public function password(Request $request, TransactionalEmailService $emails): RedirectResponse
@@ -174,6 +185,15 @@ class CustomerAccountController
             throw ValidationException::withMessages(['current_password' => 'Kata sandi saat ini salah.']);
         }
 
+        // Without this check, a stolen Google session could set its first
+        // password and use that password to bypass email-change reauth.
+        $initialGooglePassword = ! $user->password && (bool) $user->google_sub;
+        if ($initialGooglePassword && ! $this->hasFreshGoogleReauthentication($request, $user)) {
+            throw ValidationException::withMessages([
+                'current_password' => 'Masuk ulang dengan Google sebelum membuat kata sandi pertama (berlaku 10 menit).',
+            ]);
+        }
+
         DB::transaction(function () use ($user, $data): void {
             $user->forceFill([
                 'password' => Hash::make($data['password']),
@@ -186,6 +206,9 @@ class CustomerAccountController
             // Invalidate API tokens alongside other devices' web sessions.
             $user->tokens()->delete();
         });
+        if ($initialGooglePassword) {
+            $request->session()->forget(['auth.google_reauth_at', 'auth.google_reauth_user_id']);
+        }
         $request->session()->regenerate();
         if (is_string($user->email)) {
             $supportEmail = (string) ((app(StorefrontContentService::class)->settings()['store.email'] ?? '') ?: 'support@lfamilia.com');
