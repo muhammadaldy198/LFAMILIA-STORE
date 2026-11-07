@@ -499,4 +499,173 @@ class CheckoutH2hValidationTest extends TestCase
                 ->where('is_active', true)->where('supports_nickname_check', true)->exists());
         }
     }
+
+    /**
+     * NV-07: an H2H first-purchase verdict now issues a checkout proof even
+     * when the product has no required region, so eligibility can be bound.
+     */
+    public function test_valid_eligibility_verdict_issues_proof_without_required_region(): void
+    {
+        $product = $this->game();
+        $this->package($product, 'MLFS100', 'First Recharge 50');
+        $this->h2h([
+            'status' => 'VALID', 'nickname' => 'PlayerAce', 'region' => 'id',
+            'first_purchase' => [['tier' => 50, 'eligible' => false]],
+            'wdp_eligible' => true,
+        ]);
+
+        $this->nickname($product)->assertOk()
+            ->assertJsonPath('region_proof', fn ($proof) => is_string($proof) && $proof !== '');
+    }
+
+    /**
+     * NV-07: a first-purchase package H2H marked ineligible is rejected at
+     * order creation, both with the genuine proof and with no proof at all.
+     */
+    public function test_disabled_first_purchase_package_is_rejected_with_and_without_proof(): void
+    {
+        $product = $this->game();
+        $first = $this->package($product, 'MLFS100', 'First Recharge 50');
+        $this->h2h([
+            'status' => 'VALID', 'nickname' => 'PlayerAce', 'region' => 'id',
+            'first_purchase' => [['tier' => 50, 'eligible' => false]],
+            'wdp_eligible' => true,
+        ]);
+        $proof = $this->nickname($product)->assertOk()->json('region_proof');
+
+        $this->postJson('/checkout/orders', $this->order($first, $proof))
+            ->assertUnprocessable()->assertJsonValidationErrors(['package_id']);
+        $this->postJson('/checkout/orders', $this->order($first, null))
+            ->assertUnprocessable()->assertJsonValidationErrors(['package_id']);
+        $this->assertDatabaseCount('orders', 0);
+    }
+
+    /**
+     * NV-07: the same first-purchase package stays orderable when H2H
+     * reports the account eligible and the order carries the proof.
+     */
+    public function test_eligible_first_purchase_package_can_be_ordered_with_proof(): void
+    {
+        $product = $this->game();
+        $first = $this->package($product, 'MLFS100', 'First Recharge 50');
+        $this->h2h([
+            'status' => 'VALID', 'nickname' => 'PlayerAce', 'region' => 'id',
+            'first_purchase' => [['tier' => 50, 'eligible' => true]],
+            'wdp_eligible' => true,
+        ]);
+        $proof = $this->nickname($product)->assertOk()->json('region_proof');
+
+        $this->postJson('/checkout/orders', $this->order($first, $proof))->assertCreated();
+    }
+
+    /**
+     * NV-07: packages outside the first-purchase / weekly-pass family keep
+     * the existing contract and need no proof at all.
+     */
+    public function test_regular_package_still_needs_no_proof(): void
+    {
+        $product = $this->game();
+        $regular = $this->package($product, 'MLREG100', 'Diamond 100');
+
+        $this->postJson('/checkout/orders', $this->order($regular, null))->assertCreated();
+    }
+
+    /**
+     * NV-07: a Weekly Diamond Pass is rejected when H2H reports the account
+     * ineligible for it, with or without a proof.
+     */
+    public function test_weekly_diamond_pass_rejected_when_h2h_reports_ineligible(): void
+    {
+        $product = $this->game();
+        $wdp = $this->package($product, 'WDP-TEST', 'Weekly Diamond Pass');
+        $this->h2h([
+            'status' => 'VALID', 'nickname' => 'PlayerAce', 'region' => 'id',
+            'first_purchase' => [],
+            'wdp_eligible' => false,
+        ]);
+        $proof = $this->nickname($product)->assertOk()->json('region_proof');
+
+        $this->postJson('/checkout/orders', $this->order($wdp, $proof))
+            ->assertUnprocessable()->assertJsonValidationErrors(['package_id']);
+        $this->postJson('/checkout/orders', $this->order($wdp, null))
+            ->assertUnprocessable()->assertJsonValidationErrors(['package_id']);
+        $this->assertDatabaseCount('orders', 0);
+    }
+
+    /**
+     * NV-07: Magic Chess first-purchase packages are enforced the same way.
+     */
+    public function test_magic_chess_first_purchase_package_rejected_when_ineligible(): void
+    {
+        $product = $this->game('magic-chess-go-go');
+        $first = $this->package($product, 'MC50_A', 'First Recharge 50');
+        $this->h2h([
+            'status' => 'VALID', 'nickname' => 'ChessAce', 'region' => 'id',
+            'first_purchase' => [['tier' => 50, 'eligible' => false]],
+            'wdp_eligible' => null,
+        ]);
+        $proof = $this->nickname($product)->assertOk()->json('region_proof');
+
+        $this->postJson('/checkout/orders', $this->order($first, $proof))
+            ->assertUnprocessable()->assertJsonValidationErrors(['package_id']);
+        $this->postJson('/checkout/orders', $this->order($first, null))
+            ->assertUnprocessable()->assertJsonValidationErrors(['package_id']);
+        $this->assertDatabaseCount('orders', 0);
+    }
+
+    /**
+     * NV-07: the eligibility proof is bound to the exact account input it
+     * was issued for; another account cannot reuse it.
+     */
+    public function test_eligibility_proof_is_bound_to_the_checked_account_input(): void
+    {
+        $product = $this->game();
+        $first = $this->package($product, 'MLFS100', 'First Recharge 50');
+        $this->h2h([
+            'status' => 'VALID', 'nickname' => 'PlayerAce', 'region' => 'id',
+            'first_purchase' => [['tier' => 50, 'eligible' => true]],
+            'wdp_eligible' => true,
+        ]);
+        $proof = $this->nickname($product, '123456')->assertOk()->json('region_proof');
+
+        $this->postJson('/checkout/orders', $this->order($first, $proof, '654321'))
+            ->assertUnprocessable()->assertJsonValidationErrors(['package_id']);
+        $this->assertDatabaseCount('orders', 0);
+    }
+
+    /**
+     * NV-07: a region-required product enforces eligibility from the same
+     * proof that carries its region verdict.
+     */
+    public function test_region_product_also_enforces_eligibility_from_the_same_proof(): void
+    {
+        $product = $this->game('mobile-legends', 'ID');
+        $first = $this->package($product, 'MLFS100', 'First Recharge 50');
+        $this->h2h([
+            'status' => 'VALID', 'nickname' => 'PlayerAce', 'region' => 'ID',
+            'first_purchase' => [['tier' => 50, 'eligible' => false]],
+            'wdp_eligible' => true,
+        ]);
+        $proof = $this->nickname($product)->assertOk()->json('region_proof');
+
+        $this->postJson('/checkout/orders', $this->order($first, $proof))
+            ->assertUnprocessable()->assertJsonValidationErrors(['package_id']);
+        $this->assertDatabaseCount('orders', 0);
+    }
+
+    /**
+     * NV-07: without any explicit VALID eligibility verdict (account not
+     * found), a first-purchase package cannot be ordered either.
+     */
+    public function test_first_purchase_package_requires_a_valid_eligibility_verdict(): void
+    {
+        $product = $this->game();
+        $first = $this->package($product, 'MLFS100', 'First Recharge 50');
+        $this->h2h(['status' => 'NOT_FOUND']);
+
+        $this->nickname($product)->assertOk()->assertJsonPath('region_proof', null);
+        $this->postJson('/checkout/orders', $this->order($first, null))
+            ->assertUnprocessable()->assertJsonValidationErrors(['package_id']);
+        $this->assertDatabaseCount('orders', 0);
+    }
 }

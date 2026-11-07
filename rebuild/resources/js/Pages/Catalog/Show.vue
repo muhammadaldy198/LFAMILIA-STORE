@@ -13,6 +13,7 @@ import { phoneCountries, LEADING_ZERO_PRESERVED_DIALS } from '../../Data/phoneCo
 import { flagUrl } from '../../lib/flags';
 import { orderedPackageGroups } from '../../lib/catalogGroups';
 import { currentXsrfHeaders } from '../../lib/currentXsrfHeaders';
+import { checkoutAttemptKey, checkoutSignatureHash } from '../../lib/checkoutAttempts';
 
 const props = defineProps({
     product: Object,
@@ -318,30 +319,39 @@ function newIdempotencyKey() {
 }
 
 function checkoutAttemptStorageKey() {
-    return 'lfamilia:checkout-attempt:' + props.product.id;
+    return checkoutAttemptKey(props.product.id);
 }
 
-function ensureCheckoutAttemptKey(signature) {
+async function ensureCheckoutAttemptKey(signature) {
+    // Only the signature's SHA-256 digest is persisted (NV-23): the raw
+    // signature serializes the buyer's contact and game-account inputs and
+    // must never sit in sessionStorage next to the idempotency key. Legacy
+    // records holding a raw signature never match and are overwritten.
+    const signatureHash = await checkoutSignatureHash(signature);
     try {
-        const stored = JSON.parse(window.sessionStorage.getItem(checkoutAttemptStorageKey()) || 'null');
-        if (
-            stored?.signature === signature
-            && typeof stored?.key === 'string'
-            && /^[A-Za-z0-9:_-]{16,120}$/.test(stored.key)
-        ) {
-            idempotencyKey.value = stored.key;
-            return stored.key;
-        }
+        if (signatureHash) {
+            const stored = JSON.parse(window.sessionStorage.getItem(checkoutAttemptStorageKey()) || 'null');
+            if (
+                stored?.signature_hash === signatureHash
+                && typeof stored?.key === 'string'
+                && /^[A-Za-z0-9:_-]{16,120}$/.test(stored.key)
+            ) {
+                idempotencyKey.value = stored.key;
+                return stored.key;
+            }
 
-        const key = newIdempotencyKey();
-        window.sessionStorage.setItem(checkoutAttemptStorageKey(), JSON.stringify({ signature, key }));
-        idempotencyKey.value = key;
-        return key;
+            const key = newIdempotencyKey();
+            window.sessionStorage.setItem(checkoutAttemptStorageKey(), JSON.stringify({ signature_hash: signatureHash, key }));
+            idempotencyKey.value = key;
+            return key;
+        }
     } catch {
-        const key = newIdempotencyKey();
-        idempotencyKey.value = key;
-        return key;
+        // Storage can be unavailable in hardened/private browsers.
     }
+
+    const key = newIdempotencyKey();
+    idempotencyKey.value = key;
+    return key;
 }
 
 function clearCheckoutAttempt() {
@@ -411,9 +421,9 @@ function confirmationStateSignature() {
 }
 
 /** Freeze public checkout details without retaining credentials in the confirmation summary. */
-function buildConfirmationSnapshot(currentQuote) {
+async function buildConfirmationSnapshot(currentQuote) {
     const stateSignature = confirmationStateSignature();
-    const attemptKey = ensureCheckoutAttemptKey(stateSignature);
+    const attemptKey = await ensureCheckoutAttemptKey(stateSignature);
 
     return {
         state_signature: stateSignature,
@@ -804,7 +814,7 @@ async function prepareOrder() {
     const currentQuote = await loadQuote();
     if (!currentQuote) return;
 
-    confirmationSnapshot.value = buildConfirmationSnapshot(currentQuote);
+    confirmationSnapshot.value = await buildConfirmationSnapshot(currentQuote);
     agreed.value = false;
     confirmOpen.value = true;
 }
@@ -838,7 +848,7 @@ async function createOrder() {
     }
 
     if (confirmationSnapshot.value.quote_signature !== financialSummarySignature(freshQuote)) {
-        confirmationSnapshot.value = buildConfirmationSnapshot(freshQuote);
+        confirmationSnapshot.value = await buildConfirmationSnapshot(freshQuote);
         agreed.value = false;
         confirmOpen.value = true;
         errors.value = {
@@ -857,14 +867,14 @@ async function createOrder() {
                 ...basePayload(),
                 customer_input: { ...customerInput },
                 idempotency_key: confirmationSnapshot.value.idempotency_key,
-                ...(props.product.nickname_required_region ? { region_proof: nicknameResult.value?.region_proof || null } : {}),
+                region_proof: nicknameResult.value?.region_proof || null,
             }),
         });
         checkoutExpiryOffset.value = Date.parse(checkoutResult.value.server_now) - Date.now();
         checkoutClockTick.value = Date.now();
     } catch (error) {
         errors.value = error.validation || { checkout: [error.message || 'Pesanan gagal dibuat.'] };
-        if (error.validation?.region_proof) {
+        if (error.validation?.region_proof || error.validation?.package_id) {
             nicknameResult.value = null;
             accountValidationSignature.value = '';
             closeConfirmation();

@@ -25,6 +25,7 @@ class CheckoutService
         private readonly AdminNotificationService $notifications,
         private readonly TransactionalEmailService $emails,
         private readonly RegionCheckProof $regionProof,
+        private readonly NicknameService $nicknameService,
     ) {}
 
     /**
@@ -173,6 +174,13 @@ class CheckoutService
         $input = $this->inputValidator->validate($product, $data['customer_input']);
         // Verify the original signed H2H outcome; never call H2H again here.
         $regionNickname = $this->regionProof->assertOrder($product, $this->inputValidator->publicInput($product, $input), $data['region_proof'] ?? null);
+        $this->regionProof->assertPackageEligible(
+            $product,
+            (int) $data['package_id'],
+            $this->inputValidator->publicInput($product, $input),
+            $data['region_proof'] ?? null,
+            $this->nicknameService->eligibilityPackageIds($product),
+        );
         $nickname = $regionNickname ?? [
             'supported' => (bool) $product->nickname_check_enabled,
             'verified' => false,
@@ -195,6 +203,13 @@ class CheckoutService
                 $publicInput = $this->inputValidator->publicInput($lockedProduct, $lockedInput);
                 $sensitiveInput = array_diff_key($lockedInput, $publicInput);
                 $this->regionProof->assertOrder($lockedProduct, $publicInput, $data['region_proof'] ?? null);
+                $this->regionProof->assertPackageEligible(
+                    $lockedProduct,
+                    (int) $data['package_id'],
+                    $publicInput,
+                    $data['region_proof'] ?? null,
+                    $this->nicknameService->eligibilityPackageIds($lockedProduct),
+                );
                 $member = $user
                     ? $this->membership->discount($user, $price['subtotal_idr'])
                     : ['amount_idr' => 0, 'tier_code' => null, 'discount_bps' => 0, 'profile' => null];
@@ -580,11 +595,24 @@ class CheckoutService
 
         return [
             'order' => $order,
-            'access_code' => $order->user_id === null
+            'access_code' => $order->user_id === null && ! $this->guestAccessExpired($order)
                 ? $this->guestAccess->issueStable($order->id, $idempotencyKey)
                 : null,
             'created' => false,
         ];
+    }
+
+    /**
+     * Guest access ends at the same boundary the daily purge enforces
+     * (lfamilia:purge-guest-data): once a guest order is older than
+     * guest_pii_days, its access token stays deleted and the
+     * idempotent-retry path must not re-issue it.
+     */
+    private function guestAccessExpired(object $order): bool
+    {
+        $days = app(OperationalSettings::class)->value('guest_pii_days');
+
+        return Carbon::parse($order->created_at)->lt(now()->subDays($days));
     }
 
     private function guestIdentifier(string $email, string $phone): string

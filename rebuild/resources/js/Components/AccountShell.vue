@@ -5,6 +5,7 @@ const { customerText } = useCustomerPresentation();
 import {ref,watch} from 'vue';
 import {Link,router,usePage} from '@inertiajs/vue3';
 import CustomerShell from './CustomerShell.vue';
+import { clearStoredCheckoutAttempts } from '../lib/checkoutAttempts';
 const open=ref(false);
 const page=usePage();
 const links=[
@@ -18,6 +19,7 @@ const links=[
  {href:'/account/tickets',label:'Tiket'},
  {href:'/account/profile',label:'Profil'},
 ];
+const logout=()=>{clearStoredCheckoutAttempts();router.post('/logout');};
 watch(()=>page.url,()=>{open.value=false});
 </script>
 <template>
@@ -32,7 +34,7 @@ watch(()=>page.url,()=>{open.value=false});
     </div>
     <nav class="lf-account-nav">
      <Link v-for="x in links" :key="x.href" :href="x.href" :class="{active:$page.url.split('?')[0]===x.href}" @click="open=false">{{ customerText('navigation.account.' + x.href, x.label) }}</Link>
-     <button type="button" class="lf-account-logout" @click="router.post('/logout')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4H4v16h5M14 8l4 4-4 4M8 12h10"/></svg><span>{{ customerText("components.accountshell.65c9b771", "Keluar") }}</span></button>
+     <button type="button" class="lf-account-logout" @click="logout"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4H4v16h5M14 8l4 4-4 4M8 12h10"/></svg><span>{{ customerText("components.accountshell.65c9b771", "Keluar") }}</span></button>
     </nav>
    </aside>
    <section class="lf-account-main space-y-4"><slot/></section>

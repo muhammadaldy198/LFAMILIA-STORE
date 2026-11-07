@@ -101,11 +101,7 @@ class NicknameService
      */
     private function disabledPackages(Product $product, string $gameCode, mixed $firstPurchase, mixed $wdpEligible): array
     {
-        $skuMap = match ($gameCode) {
-            'mobile-legends' => [50 => 'MLFS100', 150 => 'MLFS300', 250 => 'MLFS500', 500 => 'MLFS1000'],
-            'magic-chess-go-go' => [50 => 'MC50_A', 150 => 'MC150_A', 250 => 'MC250_A', 500 => 'MC500_A'],
-            default => [],
-        };
+        $skuMap = $this->firstPurchaseSkuMap($gameCode);
 
         $skus = [];
         if (is_array($firstPurchase)) {
@@ -127,6 +123,59 @@ class NicknameService
                 ->pluck('id')->all();
         }
         if ($gameCode === 'mobile-legends' && $wdpEligible === false) {
+            $ids = array_merge($ids, ProductPackage::query()
+                ->where('product_id', $product->id)
+                ->whereRaw('LOWER(name) LIKE ?', ['%weekly diamond pass%'])
+                ->pluck('id')->all());
+        }
+
+        return array_values(array_unique(array_map('intval', $ids)));
+    }
+
+    /**
+     * The provider SKUs gated by H2H first-purchase verdicts, per game.
+     *
+     * @return array<int, string>
+     */
+    private function firstPurchaseSkuMap(string $gameCode): array
+    {
+        return match ($gameCode) {
+            'mobile-legends' => [50 => 'MLFS100', 150 => 'MLFS300', 250 => 'MLFS500', 500 => 'MLFS1000'],
+            'magic-chess-go-go' => [50 => 'MC50_A', 150 => 'MC150_A', 250 => 'MC250_A', 500 => 'MC500_A'],
+            default => [],
+        };
+    }
+
+    /**
+     * Every package an H2H eligibility verdict could disable for this
+     * product, regardless of any single account's verdict. Checkout uses
+     * this family to decide which orders must carry an eligibility proof.
+     *
+     * @return array<int, int>
+     */
+    public function eligibilityPackageIds(Product $product): array
+    {
+        if (($product->relationLoaded('category') && strtolower((string) $product->category?->slug) === 'voucher')
+            || ! $product->nickname_check_enabled) {
+            return [];
+        }
+
+        $gameCode = strtolower(trim((string) $product->nickname_game_code));
+        $userField = trim((string) $product->nickname_user_field_key);
+        $skuMap = $this->firstPurchaseSkuMap($gameCode);
+        if ($gameCode === '' || $userField === '' || $skuMap === []) {
+            return [];
+        }
+
+        $game = NicknameGameCode::active()->nicknameSupported()->where('code', $gameCode)->first();
+        if (! $game) {
+            return [];
+        }
+
+        $ids = ProductPackage::query()->where('product_id', $product->id)
+            ->whereHas('mappings', fn ($query) => $query->where('is_active', true)->whereIn('external_sku', array_values($skuMap)))
+            ->pluck('id')->all();
+        if ($gameCode === 'mobile-legends') {
             $ids = array_merge($ids, ProductPackage::query()
                 ->where('product_id', $product->id)
                 ->whereRaw('LOWER(name) LIKE ?', ['%weekly diamond pass%'])

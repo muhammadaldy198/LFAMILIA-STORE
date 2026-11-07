@@ -181,7 +181,13 @@ class CheckoutController
         $order = $result['order'];
 
         if ($order->user_id === null) {
-            $request->session()->put('guest_order_id', $order->id);
+            // A purged guest order returns without an access code (NV-14);
+            // its guest session binding must not be resurrected either.
+            if ($result['created'] || $result['access_code'] !== null) {
+                $request->session()->put('guest_order_id', $order->id);
+            } elseif ((int) $request->session()->get('guest_order_id') === (int) $order->id) {
+                $request->session()->forget('guest_order_id');
+            }
             $request->session()->forget('payment_signed_guest_order_id');
             $statusUrl = route('guest.orders.show', $order->order_number);
         } else {
