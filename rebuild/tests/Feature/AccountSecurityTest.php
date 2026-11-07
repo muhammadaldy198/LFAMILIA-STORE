@@ -6,6 +6,7 @@ use App\Actions\Fortify\CreateNewUser;
 use App\Jobs\SendTransactionalEmailJob;
 use App\Models\IntegrationCredential;
 use App\Models\User;
+use App\Http\Middleware\EnsurePhone;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -174,11 +175,11 @@ class AccountSecurityTest extends TestCase
         $this->assertNotNull($user->fresh()->remember_token);
         Queue::assertPushed(SendTransactionalEmailJob::class,
             fn (SendTransactionalEmailJob $job): bool => $job->recipient === 'original-google@example.test'
-                && $job->event === 'account_email_changed'
+                && $job->templateKey === 'account_email_changed'
                 && str_contains($job->text, 'new-google@example.test'));
         Queue::assertPushed(SendTransactionalEmailJob::class,
             fn (SendTransactionalEmailJob $job): bool => $job->recipient === 'new-google@example.test'
-                && $job->event === 'verification');
+                && $job->templateKey === 'verification');
 
         $this->put('/account/profile', $this->profile('third-google@example.test'))
             ->assertSessionHasErrors('current_password');
@@ -247,6 +248,7 @@ class AccountSecurityTest extends TestCase
     public function test_first_phone_assignment_needs_no_password_in_profile(): void
     {
         $user = $this->customer('first-phone@example.test', true, null);
+        $this->withoutMiddleware(EnsurePhone::class);
         $this->actingAs($user, 'web')->put('/account/profile',
             $this->profile($user->email))->assertRedirect();
         $this->assertSame('081234567890', $user->fresh()->phone);
