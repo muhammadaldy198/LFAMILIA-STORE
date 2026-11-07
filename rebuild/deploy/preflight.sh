@@ -63,6 +63,10 @@ grep -Eq '^APP_TRUSTED_HOSTS=.+$' "${ENV_FILE}" || { echo "APP_TRUSTED_HOSTS is 
 grep -Eq '^TRUSTED_PROXIES=.+$' "${ENV_FILE}" || { echo "TRUSTED_PROXIES is required" >&2; exit 1; }
 while IFS= read -r proxies_line; do
   proxies_value="$(printf '%s' "${proxies_line}" | sed -E 's/^TRUSTED_PROXIES=[[:space:]]*//; s/[[:space:]]+(#.*)?$//' | tr -d '[:space:]' | tr -d "\"'")"
+  if [[ "${proxies_value}" == *'${'* ]]; then
+    echo "TRUSTED_PROXIES must be written literally in production; variable references are not allowed" >&2
+    exit 1
+  fi
   if [[ "${proxies_value}" == '*' ]]; then
     echo "TRUSTED_PROXIES must not be the wildcard in production; list the proxy addresses (e.g. 127.0.0.1,::1)" >&2
     exit 1
