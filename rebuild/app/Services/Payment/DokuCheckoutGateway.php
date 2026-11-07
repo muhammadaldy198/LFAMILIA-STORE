@@ -52,6 +52,21 @@ class DokuCheckoutGateway
         }
 
         if (! $response->successful()) {
+            // DOKU's Check Status documentation maps an unknown reference to
+            // HTTP 404 with case code 4045301 (Transaction Not Found). Only
+            // that exact combination is a definitive absence; every other
+            // failure still proves nothing, as the docblock above states.
+            $errorData = $response->json();
+            $errorCode = null;
+            if (is_array($errorData)) {
+                $errorCode = data_get($errorData, 'error.code')
+                    ?? data_get($errorData, 'responseCode')
+                    ?? data_get($errorData, 'code');
+            }
+            if ($response->status() === 404 && (string) $errorCode === '4045301') {
+                throw new GatewayTransactionNotFoundException('DOKU_TRANSACTION_NOT_FOUND');
+            }
+
             throw new RuntimeException('DOKU_STATUS_UNAVAILABLE');
         }
 

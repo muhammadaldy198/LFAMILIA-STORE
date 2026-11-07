@@ -3231,4 +3231,116 @@ class PaymentTest extends TestCase
         $this->assertSame(1, DB::table('order_events')
             ->where('order_id', $payment->order_id)->where('event_type', 'PAYMENT_VERIFIED')->count());
     }
+
+    public function test_recovery_redrives_doku_creation_when_gateway_reports_transaction_not_found(): void
+    {
+        $catalog = $this->catalog();
+        $routeId = $this->route('virtual_account', 'DOKU', 2500, 0, null, [
+            'api_path' => '/checkout/v1/payment',
+            'public_paths' => ['payment_url' => 'response.payment.url'],
+        ]);
+        IntegrationCredential::updateOrCreate(['code' => 'doku'], [
+            'config_ciphertext' => [
+                'client_id' => 'MCH-TEST',
+                'secret_key' => 'doku-secret',
+                'base_url' => 'https://api-sandbox.doku.test',
+            ],
+            'is_active' => true,
+        ]);
+        $checkout = $this->postJson('/checkout/orders', $this->guestCheckout(
+            $catalog['package_id'], 'virtual_account', 'pr4-recovery-doku-redrive-order'
+        ))->assertCreated();
+        $order = DB::table('orders')->where('order_number', $checkout->json('order_number'))->firstOrFail();
+        $reference = 'PAY-PR4-DOKU-REDRIVE-'.strtoupper(bin2hex(random_bytes(3)));
+        $paymentId = $this->creatingPaymentRow(
+            $routeId, (int) $order->id, $reference, (int) $order->total_idr, 'DOKU', 'virtual_account'
+        );
+
+        $dokuSignature = new DokuSignature;
+        $creates = [];
+        Http::fake(function ($request) use ($dokuSignature, &$creates) {
+            if ($request->method() === 'GET' && str_contains($request->url(), '/orders/v1/status/')) {
+                // DOKU Check Status contract for an unknown reference:
+                // HTTP 404 with case code 4045301 (Transaction Not Found).
+                return Http::response([
+                    'error' => ['code' => '4045301', 'message' => 'Transaction Not Found'],
+                ], 404);
+            }
+            if (str_contains($request->url(), '/checkout/v1/payment')) {
+                $body = json_decode($request->body(), true, 512, JSON_THROW_ON_ERROR);
+                $creates[] = $body;
+                $responseData = [
+                    'order' => ['invoice_number' => $body['order']['invoice_number']],
+                    'response' => ['payment' => ['url' => 'https://sandbox.doku.test/checkout/recovered']],
+                ];
+                $responseBody = json_encode($responseData, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+                $timestamp = now('UTC')->format('Y-m-d\\TH:i:s\\Z');
+                $signature = $dokuSignature->signResponse(
+                    'MCH-TEST',
+                    (string) (($request->header('Request-Id')[0] ?? '')),
+                    $timestamp,
+                    '/checkout/v1/payment',
+                    $responseBody,
+                    'doku-secret'
+                );
+
+                return Http::response($responseBody, 200, [
+                    'Content-Type' => 'application/json',
+                    'Response-Timestamp' => $timestamp,
+                    'Signature' => $signature,
+                ]);
+            }
+
+            return Http::response([], 404);
+        });
+
+        Artisan::call('lfamilia:recover-creating-payments');
+
+        $this->assertCount(1, $creates);
+        $this->assertSame($reference, $creates[0]['order']['invoice_number']);
+        $payment = DB::table('payment_transactions')->where('id', $paymentId)->firstOrFail();
+        $this->assertSame('PENDING', $payment->status);
+        $this->assertStringContainsString('recovered', (string) $payment->public_payload);
+    }
+
+    public function test_recovery_processes_creating_rows_older_than_the_reconciler_window(): void
+    {
+        $catalog = $this->catalog();
+        $routeId = $this->route('qris', 'MIDTRANS', 0, 70, 'qris');
+        $this->seedMidtransCredential();
+        $checkout = $this->postJson('/checkout/orders', $this->guestCheckout(
+            $catalog['package_id'], 'qris', 'pr4-recovery-old-row-order'
+        ))->assertCreated();
+        $order = DB::table('orders')->where('order_number', $checkout->json('order_number'))->firstOrFail();
+        $reference = 'PAY-PR4-OLD-'.strtoupper(bin2hex(random_bytes(3)));
+        $paymentId = $this->creatingPaymentRow($routeId, (int) $order->id, $reference, (int) $order->total_idr);
+        // Older than the read-only reconciler's two-day window: recovery must
+        // still reach this row, because nothing else ever moves it again.
+        DB::table('payment_transactions')->where('id', $paymentId)->update([
+            'created_at' => now()->subDays(3),
+            'updated_at' => now()->subDays(3),
+        ]);
+
+        $creates = 0;
+        Http::fake(function ($request) use (&$creates) {
+            if (str_contains($request->url(), '/status')) {
+                return Http::response([
+                    'status_code' => '404',
+                    'status_message' => "Transaction doesn't exist.",
+                ], 404);
+            }
+            if (str_contains($request->url(), 'snap/v1/transactions')) {
+                $creates++;
+
+                return Http::response(['token' => 'old-row-token', 'redirect_url' => 'https://example.test/old']);
+            }
+
+            return Http::response([], 404);
+        });
+
+        Artisan::call('lfamilia:recover-creating-payments');
+
+        $this->assertSame(1, $creates);
+        $this->assertSame('PENDING', DB::table('payment_transactions')->where('id', $paymentId)->value('status'));
+    }
 }

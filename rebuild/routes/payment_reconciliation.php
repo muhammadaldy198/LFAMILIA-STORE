@@ -81,11 +81,14 @@ Artisan::command('lfamilia:recover-creating-payments', function (PaymentService 
     // payments orphaned in CREATING, whose gateway creation call never ran.
     // Recovery always asks the gateway first and only re-drives creation
     // after a definitive absence; see PaymentService::recoverStuckCreating.
+    // Unlike the reconciler there is deliberately no lower age bound: a
+    // CREATING row never stops being returned as the existing payment (a
+    // top-up would stay unpayable forever), and rows whose parent is dead
+    // terminate and leave the set, so the scan stays self-limiting.
     DB::table('payment_transactions')
         ->whereIn('gateway_code', ['MIDTRANS', 'DOKU'])
         ->where('status', 'CREATING')
         ->whereNotNull('merchant_reference')
-        ->where('created_at', '>=', now()->subDays(2))
         ->where('updated_at', '<=', now()->subMinutes(5))
         ->orderBy('id')
         ->chunkById(100, function ($rows) use ($payments, &$checked, &$resolved): void {
