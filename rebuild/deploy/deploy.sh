@@ -34,10 +34,11 @@ git_repo() {
 [[ -z "$(git_repo status --porcelain)" ]] || { echo "Repository has uncommitted changes" >&2; exit 1; }
 previous_sha="$(git_repo rev-parse HEAD)"
 git_repo fetch --prune origin "${REPO_REF}"
+target_sha="$(git_repo rev-parse "origin/${REPO_REF}")"
+[[ "${target_sha}" == "${DEPLOY_EXPECTED_SHA}" ]] || { echo "Refusing to deploy ${target_sha}: it does not match DEPLOY_EXPECTED_SHA (${DEPLOY_EXPECTED_SHA}). Pin the reviewed, CI-green commit in ops.env first." >&2; exit 1; }
 git_repo checkout "${REPO_REF}"
 git_repo merge --ff-only "origin/${REPO_REF}"
 target_sha="$(git_repo rev-parse HEAD)"
-[[ "${target_sha}" == "${DEPLOY_EXPECTED_SHA}" ]] || { echo "Refusing to deploy ${target_sha}: it does not match DEPLOY_EXPECTED_SHA (${DEPLOY_EXPECTED_SHA}). Pin the reviewed, CI-green commit in ops.env first." >&2; exit 1; }
 
 cd "${APP_DIR}"
 "${PHP_BIN}" artisan down --retry=60 --refresh=15

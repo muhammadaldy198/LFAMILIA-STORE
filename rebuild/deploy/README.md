@@ -26,6 +26,8 @@ Urutan operasional yang aman:
 6. Jalankan/konfirmasi `bash deploy/healthcheck.sh`.
 7. Periksa queue/scheduler dan error log bila healthcheck gagal.
 
+Catatan bootstrap pin: pada deploy PERTAMA yang memasang pemeriksaan `DEPLOY_EXPECTED_SHA`, `deploy.sh` yang berjalan masih versi lama (belum ada pemeriksaannya), jadi pin belum bisa menegakkan dirinya sendiri. Untuk deploy pertama itu, verifikasi manual SHA target di server sesudah fetch (`git rev-parse origin/main`) dan cocokkan dengan commit yang sudah di-review dan CI hijau SEBELUM menjalankan `deploy.sh`. Mulai deploy berikutnya, pemeriksaan berjalan otomatis di dalam script, sebelum checkout menyentuh tree live.
+
 **Catatan aktual:** `deploy.sh` memanggil `preflight.sh`, tetapi tidak otomatis memanggil `backup.sh`. Karena itu backup-before-deploy adalah kewajiban runbook/operator, bukan safety net otomatis di script.
 
 **Sinkronisasi script systemd root-owned:** `deploy.sh` juga **tidak otomatis** memperbarui `/usr/local/lib/lfamilia/backup.sh` atau `restore-verify.sh`. Kedua copy tersebut dipasang oleh `install-systemd.sh`. `preflight.sh` sekarang memberi **WARNING** apabila salah satu script terpasang hilang atau berbeda dari source repository, tanpa mengubah file server. Setelah review, operator harus menyinkronkan script terkait secara terpisah dengan prosedur perubahan production dan kemudian menjalankan verifikasi. Jangan abaikan warning drift ketika mengaudit backup, dan jangan menganggap CI hijau berarti copy script privileged di VPS sudah terbaru.

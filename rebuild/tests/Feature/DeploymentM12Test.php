@@ -137,6 +137,11 @@ class DeploymentM12Test extends TestCase
         $this->assertStringContainsString('cloudpanel-vhost-snippet.conf', $preflight);
         $this->assertStringContainsString('DEPLOY_EXPECTED_SHA', $deploy);
         $this->assertStringContainsString('does not match DEPLOY_EXPECTED_SHA', $deploy);
+        $pinCheckAt = strpos($deploy, 'does not match DEPLOY_EXPECTED_SHA');
+        $checkoutAt = strpos($deploy, 'git_repo checkout');
+        $this->assertNotFalse($pinCheckAt);
+        $this->assertNotFalse($checkoutAt);
+        $this->assertLessThan($checkoutAt, $pinCheckAt, 'The expected-SHA pin must be checked before checkout mutates the live tree.');
         $this->assertStringContainsString('DEPLOY_EXPECTED_SHA=', $ops);
         $this->assertStringContainsString('MYSQL_DEFAULTS_FILE=', $ops);
         $this->assertStringContainsString('BACKUP_PASSPHRASE_FILE=', $ops);
