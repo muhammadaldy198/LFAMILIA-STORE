@@ -3738,4 +3738,64 @@ class PaymentTest extends TestCase
         $this->assertSame('EXPIRED', DB::table('wallet_topups')->where('id', $topupId)->value('status'));
         $this->assertSame('PENDING', DB::table('payment_transactions')->where('id', $paymentId)->value('status'));
     }
+
+    public function test_topup_retry_for_already_expired_topup_does_not_hand_back_payment_instructions(): void
+    {
+        $routeId = $this->route('qris', 'MIDTRANS', 0, 70, 'qris');
+        $user = User::create([
+            'name' => 'Already Expired Buyer',
+            'email' => 'already-expired@example.test',
+            'phone' => '081234567807',
+            'password' => Hash::make('StrongPassword123!'),
+            'email_verified_at' => now(),
+        ]);
+        $wallet = DB::table('wallets')->where('user_id', $user->id)->firstOrFail();
+        $channelId = DB::table('payment_channels')->where('code', 'qris')->value('id');
+        // Already transitioned to EXPIRED by the scheduled command, which
+        // deliberately does not touch payment rows: the payment below is
+        // still PENDING and must not leak back as live instructions.
+        $topupId = DB::table('wallet_topups')->insertGetId([
+            'wallet_id' => $wallet->id,
+            'user_id' => $user->id,
+            'payment_channel_id' => $channelId,
+            'payment_route_id' => $routeId,
+            'amount_idr' => 10000,
+            'fee_idr' => 700,
+            'total_idr' => 10700,
+            'status' => 'EXPIRED',
+            'idempotency_key' => 'pr5-already-expired-topup-0001',
+            'request_fingerprint' => hash('sha256', 'pr5-already-expired-topup'),
+            'expires_at' => now()->subMinutes(10),
+            'created_at' => now()->subMinutes(40),
+            'updated_at' => now()->subMinutes(9),
+        ]);
+        $fingerprint = hash('sha256', implode('|', ['topup', $topupId, 'qris', $routeId, 10700]));
+        $paymentId = DB::table('payment_transactions')->insertGetId([
+            'wallet_topup_id' => $topupId,
+            'payment_route_id' => $routeId,
+            'gateway_code' => 'MIDTRANS',
+            'channel_code' => 'qris',
+            'merchant_reference' => 'TOP-PR5-EXPIRED-1',
+            'amount_idr' => 10700,
+            'status' => 'PENDING',
+            'request_fingerprint' => $fingerprint,
+            'idempotency_key' => 'payment-pr5-already-expired-0001',
+            'expires_at' => now()->subMinutes(10),
+            'created_at' => now()->subMinutes(39),
+            'updated_at' => now()->subMinutes(9),
+        ]);
+        $topup = DB::table('wallet_topups')->where('id', $topupId)->firstOrFail();
+
+        try {
+            app(PaymentService::class)->startTopup(
+                $topup, 'payment-pr5-already-expired-0001', $user->name, $user->email, (string) $user->phone
+            );
+            $this->fail('Retry untuk top up yang sudah EXPIRED tidak boleh mengembalikan instruksi pembayaran.');
+        } catch (ValidationException $exception) {
+            $this->assertSame('Top up sudah kedaluwarsa.', $exception->errors()['payment'][0]);
+        }
+
+        $this->assertSame('EXPIRED', DB::table('wallet_topups')->where('id', $topupId)->value('status'));
+        $this->assertSame('PENDING', DB::table('payment_transactions')->where('id', $paymentId)->value('status'));
+    }
 }

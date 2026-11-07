@@ -183,21 +183,31 @@ class PaymentService
         // payment instructions for a top-up whose deadline has passed. The
         // decision is taken on the locked row (the snapshot may be stale in
         // either direction); a top-up already PAID keeps its normal result.
+        // An already-EXPIRED top-up is rejected too: the scheduled expiry
+        // command (and this gate itself) expire the top-up without touching
+        // its payment rows, so a still-PENDING payment would otherwise keep
+        // leaking live instructions through the fast path.
         if ($topup->expires_at && now()->greaterThanOrEqualTo($topup->expires_at)) {
-            $expiredPending = DB::transaction(function () use ($topup): bool {
+            $gateRejection = DB::transaction(function () use ($topup): ?string {
                 $locked = DB::table('wallet_topups')->where('id', $topup->id)
                     ->lockForUpdate()->first();
-                if ($locked && $locked->status === 'PENDING_PAYMENT'
+                if (! $locked) {
+                    return null;
+                }
+                if ($locked->status === 'PENDING_PAYMENT'
                     && $locked->expires_at && now()->greaterThanOrEqualTo($locked->expires_at)) {
                     $this->states->expireTopup($locked);
 
-                    return true;
+                    return 'Top up sudah kedaluwarsa.';
+                }
+                if ($locked->status === 'EXPIRED') {
+                    return 'Top up sudah kedaluwarsa.';
                 }
 
-                return false;
+                return null;
             });
-            if ($expiredPending) {
-                throw ValidationException::withMessages(['payment' => 'Top up sudah kedaluwarsa.']);
+            if ($gateRejection !== null) {
+                throw ValidationException::withMessages(['payment' => $gateRejection]);
             }
         }
 
