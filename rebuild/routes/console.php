@@ -23,7 +23,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 Artisan::command('lfamilia:bootstrap-super-admin', function (): int {
-    if (AdminUser::where('role', 'SUPER_ADMIN')->exists()) {
+    if (AdminUser::where('role', 'SUPER_ADMIN')->where('is_active', true)->exists()) {
         $this->error('Super Admin sudah ada. Kelola akses berikutnya dari panel.');
 
         return 1;
