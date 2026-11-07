@@ -172,6 +172,7 @@ location ~* ^/(?:storage/logs|bootstrap/cache)/'
         line = $0
         sub(/#.*/, "", line)
         gsub(/[[:space:]]+/, " ", line)
+        gsub(/ ;/, ";", line)
         if (cur == "" && line ~ /(^|[[:space:]])server[[:space:]]*\{/) { if (started) finalize(); started = 1 }
         if (cur == "") {
           for (i = 1; i <= n; i++) if (index(line, pats[i])) { cur = pats[i]; seen[i] = 1; depth = 0; deny = 0; allowfirst = 0; break }

@@ -212,6 +212,7 @@ class DeploymentM12Test extends TestCase
         $p3 = 'location ~* ^/(?:storage/logs|bootstrap/cache)/';
         $complete = implode("\n", [$location($p1), $location($p2), $location($p3)]);
         $overridden = implode("\n", [$location($p1), $location($p2, "allow all;\n        deny all;"), $location($p3)]);
+        $spacedTerminator = implode("\n", [$location($p1), $location($p2, "allow all ;\n        deny all;"), $location($p3)]);
         $server = static fn (string $name, string $inner = ''): string => "server {\n    listen 443 ssl;\n    server_name {$name};\n{$inner}\n}";
 
         $cases = [
@@ -220,6 +221,7 @@ class DeploymentM12Test extends TestCase
             'complete block does not cover a bare one' => [$server('lfamilia.com', $complete)."\n".$server('www.lfamilia.com'), 3],
             'impostor host does not count' => [$server('other-lfamilia.com', $complete), 1],
             'overridden deny warns' => [$server('lfamilia.com', $overridden), 1],
+            'space before the semicolon still overrides' => [$server('lfamilia.com', $spacedTerminator), 1],
         ];
 
         foreach ($cases as $label => [$body, $expected]) {
