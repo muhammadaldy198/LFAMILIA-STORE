@@ -45,10 +45,11 @@ class CustomerAccountController
         return Inertia::render('Customer/Profile', [
             'customer' => $request->user()->only('name', 'email', 'phone', 'leaderboard_opt_in'),
             'hasPassword' => (bool) $request->user()->password,
+            'hasGoogle' => (bool) $request->user()->google_sub,
         ]);
     }
 
-    public function update(Request $request): RedirectResponse
+    public function update(Request $request, TransactionalEmailService $emails): RedirectResponse
     {
         $user = $request->user();
         $request->merge(['email' => Str::lower(trim((string) $request->input('email')))]);
@@ -60,14 +61,36 @@ class CustomerAccountController
             'leaderboard_opt_in' => ['sometimes', 'boolean'],
         ]);
         $email = $data['email'];
+        $normalized = CreateNewUser::normalizePhone($data['phone']);
+        $emailChanged = $email !== $user->email;
+        $passwordlessEmailChange = $emailChanged && ! $user->password;
+        $changingExistingPhone = $user->password && filled($user->phone)
+            && $normalized !== $user->phone_normalized;
 
-        if ($email !== $user->email && $user->password
+        if (($emailChanged || $changingExistingPhone) && $user->password
             && (! isset($data['current_password'])
                 || ! Hash::check($data['current_password'], $user->password))) {
             throw ValidationException::withMessages(['current_password' => 'Kata sandi saat ini salah.']);
         }
 
-        $normalized = CreateNewUser::normalizePhone($data['phone']);
+        if ($passwordlessEmailChange) {
+            if (! $user->google_sub) {
+                throw ValidationException::withMessages([
+                    'current_password' => 'Buat kata sandi terlebih dahulu sebelum mengubah email.',
+                ]);
+            }
+
+            $reauthAt = $request->session()->get('auth.google_reauth_at');
+            $reauthUserId = $request->session()->get('auth.google_reauth_user_id');
+            if (! is_numeric($reauthAt)
+                || (int) $reauthAt > time()
+                || time() - (int) $reauthAt > 600
+                || (string) $reauthUserId !== (string) $user->getAuthIdentifier()) {
+                throw ValidationException::withMessages([
+                    'current_password' => 'Masuk ulang dengan Google untuk mengubah email (berlaku 10 menit).',
+                ]);
+            }
+        }
         if (CreateNewUser::phoneAlreadyUsed($data['phone'], $user->id)
             || CreateNewUser::phoneAlreadyUsedByVariant($data['phone'], $user->id)) {
             throw ValidationException::withMessages(['phone' => 'Nomor WhatsApp sudah digunakan oleh akun lain.']);
@@ -75,16 +98,29 @@ class CustomerAccountController
 
         $oldEmail = $user->email;
         try {
-            $user->forceFill([
-                'name' => $data['name'],
-                'email' => $email,
-                'phone' => $data['phone'],
-                'phone_normalized' => $normalized,
-                'leaderboard_opt_in' => array_key_exists('leaderboard_opt_in', $data)
-                    ? (bool) $data['leaderboard_opt_in']
-                    : (bool) $user->leaderboard_opt_in,
-                'email_verified_at' => $email === $user->email ? $user->email_verified_at : null,
-            ])->save();
+            DB::transaction(function () use ($user, $data, $email, $normalized, $emailChanged, $passwordlessEmailChange, $oldEmail): void {
+                $attributes = [
+                    'name' => $data['name'],
+                    'email' => $email,
+                    'phone' => $data['phone'],
+                    'phone_normalized' => $normalized,
+                    'leaderboard_opt_in' => array_key_exists('leaderboard_opt_in', $data)
+                        ? (bool) $data['leaderboard_opt_in']
+                        : (bool) $user->leaderboard_opt_in,
+                    'email_verified_at' => $emailChanged ? null : $user->email_verified_at,
+                ];
+                if ($passwordlessEmailChange) {
+                    $attributes['remember_token'] = Str::random(60);
+                }
+                $user->forceFill($attributes)->save();
+
+                if ($emailChanged) {
+                    DB::table('password_reset_tokens')->where('email', $oldEmail)->delete();
+                }
+                if ($passwordlessEmailChange) {
+                    $user->tokens()->delete();
+                }
+            });
         } catch (QueryException $exception) {
             if (($exception->errorInfo[1] ?? null) === 1062) {
                 $message = $exception->getMessage();
@@ -98,8 +134,27 @@ class CustomerAccountController
             throw $exception;
         }
 
-        if ($oldEmail !== $email) {
-            DB::table('password_reset_tokens')->where('email', $oldEmail)->delete();
+        if ($emailChanged) {
+            if ($passwordlessEmailChange) {
+                // The Google step-up authorizes exactly one successful email rebind.
+                $request->session()->forget(['auth.google_reauth_at', 'auth.google_reauth_user_id']);
+                $supportEmail = (string) ((app(StorefrontContentService::class)->settings()['store.email'] ?? '') ?: 'support@lfamilia.com');
+                $emails->queue(
+                    $oldEmail,
+                    'Email akun LFAMILIA STORE telah diubah',
+                    implode("\n", [
+                        'Halo,',
+                        '',
+                        'Email akun LFAMILIA STORE telah diubah dari '.$oldEmail.' menjadi '.$email.'.',
+                        'Waktu perubahan: '.now()->timezone('Asia/Jakarta')->format('d-m-Y H:i:s').' WIB.',
+                        '',
+                        'Jika kamu tidak melakukan perubahan ini, segera hubungi CS: '.$supportEmail,
+                        '',
+                        'Jangan bagikan kata sandi atau kode keamanan kepada siapa pun.',
+                    ]),
+                    'account_email_changed'
+                );
+            }
             $user->sendEmailVerificationNotification();
         }
 
