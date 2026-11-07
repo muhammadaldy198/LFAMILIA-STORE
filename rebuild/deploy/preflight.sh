@@ -195,10 +195,18 @@ location ~* ^/(?:storage/logs|bootstrap/cache)/'
         for (j = 1; j <= length(p); j++) {
           ch = substr(p, j, 1)
           if (esc) {
-            if (!cls && (ch == "Q" || ch == "K")) return ""
-            out = out ch; esc = 0; continue
+            esc = 0
+            if (ch ~ /[0-9]/) return ""
+            if (ch == "d") { out = out "[0-9]"; continue }
+            if (ch == "D") { out = out "[^0-9]"; continue }
+            if (ch == "s") { out = out "[[:space:]]"; continue }
+            if (ch == "S") { out = out "[^[:space:]]"; continue }
+            if (ch == "w") { out = out "[A-Za-z0-9_]"; continue }
+            if (ch == "W") { out = out "[^A-Za-z0-9_]"; continue }
+            if (ch ~ /[A-Za-z]/) return ""
+            out = out "\\" ch; continue
           }
-          if (ch == "\\") { out = out ch; esc = 1; continue }
+          if (ch == "\\") { esc = 1; continue }
           if (cls == 1) { out = out ch; if (ch == "^") cls = 2; else cls = 3; continue }
           if (cls == 2) { out = out ch; cls = 3; continue }
           if (cls == 3) { out = out ch; if (ch == "]") cls = 0; continue }
