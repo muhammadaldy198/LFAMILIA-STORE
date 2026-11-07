@@ -6,7 +6,7 @@ import { Head, useForm, usePage } from '@inertiajs/vue3';
 import AccountShell from '../../Components/AccountShell.vue';
 import PhoneCountryPicker from '../../Components/PhoneCountryPicker.vue';
 
-const props = defineProps({ customer: Object, hasPassword: Boolean });
+const props = defineProps({ customer: Object, hasPassword: Boolean, hasGoogle: Boolean });
 const page = usePage();
 const profile = useForm({ name: props.customer.name, email: props.customer.email, phone: props.customer.phone, leaderboard_opt_in: Boolean(props.customer.leaderboard_opt_in), current_password: '' });
 const password = useForm({ current_password: '', password: '', password_confirmation: '' });
@@ -40,14 +40,27 @@ const remove = () => {
                 <span><strong class="block text-sm">{{ customerText("pages.customer.profile.db175326", "Tampil di leaderboard") }}</strong><small class="mt-1 block text-xs text-slate-400">{{ customerText("pages.customer.profile.8c806ec", "Jika aktif, hanya nama singkat yang ditampilkan. Email, telepon, dan data game tidak pernah ditampilkan.") }}</small></span>
                 <input v-model="profile.leaderboard_opt_in" type="checkbox" class="size-5 accent-lime-400">
             </label>
-            <label v-if="hasPassword" class="block">{{ customerText("pages.customer.profile.1c30598a", "Kata sandi saat ini (wajib jika mengubah email)") }}
+            <label v-if="hasPassword" class="block">Kata sandi saat ini (wajib jika mengubah email atau nomor HP)
                 <input v-model="profile.current_password" type="password" autocomplete="current-password" class="mt-1 block w-full rounded-md bg-slate-800 p-3 focus:outline-cyan-300">
                 <span v-if="profile.errors.current_password" class="text-sm text-red-300">{{ profile.errors.current_password }}</span>
             </label>
+            <div v-if="!hasPassword && hasGoogle" class="space-y-2 rounded-lg border border-slate-700 p-3 text-sm">
+                <p>Untuk mengubah email, masuk ulang dengan akun Google yang sama. Konfirmasi berlaku 10 menit dan hanya untuk satu perubahan email.</p>
+                <a href="/auth/google/reauth" class="inline-block rounded-md border border-cyan-400 px-3 py-2 text-cyan-300">Masuk ulang dengan Google</a>
+                <p v-if="profile.errors.current_password" class="text-red-300">{{ profile.errors.current_password }}</p>
+                <p v-if="page.props.errors?.google" class="text-red-300">{{ page.props.errors.google }}</p>
+            </div>
+            <p v-else-if="!hasPassword" class="text-sm text-slate-300">Buat kata sandi terlebih dahulu untuk mengubah email.
+                <span v-if="profile.errors.current_password" class="text-red-300">{{ profile.errors.current_password }}</span>
+            </p>
             <button :disabled="profile.processing" class="rounded-md bg-cyan-400 px-4 py-2 font-semibold text-slate-950 disabled:opacity-50">{{ customerText("pages.customer.profile.75b2c343", "Simpan profil") }}</button>
         </form>
         <form class="space-y-4 rounded-xl border border-slate-800 bg-slate-900 p-5" @submit.prevent="updatePassword">
             <h2 class="text-lg font-semibold">{{ hasPassword ? 'Ubah kata sandi' : 'Buat kata sandi' }}</h2>
+            <p v-if="!hasPassword && hasGoogle" class="text-sm text-slate-300">Untuk membuat kata sandi pertama, masuk ulang dengan Google yang sama.
+                <a href="/auth/google/reauth" class="text-cyan-300 underline">Masuk ulang dengan Google</a>
+            </p>
+            <p v-if="!hasPassword && password.errors.current_password" class="text-sm text-red-300">{{ password.errors.current_password }}</p>
             <label v-if="hasPassword" class="block">{{ customerText("pages.customer.profile.71b0940a", "Kata sandi saat ini") }}
                 <input v-model="password.current_password" type="password" autocomplete="current-password" required class="mt-1 block w-full rounded-md bg-slate-800 p-3 focus:outline-cyan-300">
                 <span v-if="password.errors.current_password" class="text-sm text-red-300">{{ password.errors.current_password }}</span>
