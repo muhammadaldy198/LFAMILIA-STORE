@@ -228,6 +228,10 @@ class CustomerAccountController
             'auth.password_confirmed_at',
             'auth.google_phone_onboarding_at',
             'auth.google_phone_onboarding_user_id',
+            'auth.google_reauth_at',
+            'auth.google_reauth_user_id',
+            'auth.google_reauth_pending_at',
+            'auth.google_reauth_pending_user_id',
         ]);
         $request->session()->regenerate(true);
 
