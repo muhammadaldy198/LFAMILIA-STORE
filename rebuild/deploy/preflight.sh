@@ -77,6 +77,13 @@ while IFS= read -r proxies_line; do
     echo "TRUSTED_PROXIES must be written literally in production; variable references are not allowed" >&2
     exit 1
   fi
+  IFS=',' read -ra proxies_entries <<<"${proxies_value}"
+  for proxies_entry in "${proxies_entries[@]}"; do
+    if [[ "${proxies_entry}" == '0.0.0.0/0' || "${proxies_entry}" == '::/0' ]]; then
+      echo "TRUSTED_PROXIES must not trust every address in production; catch-all CIDR ranges (0.0.0.0/0, ::/0) are not allowed" >&2
+      exit 1
+    fi
+  done
   if [[ "${proxies_value}" == '*' ]]; then
     echo "TRUSTED_PROXIES must not be the wildcard in production; list the proxy addresses (e.g. 127.0.0.1,::1)" >&2
     exit 1
@@ -157,11 +164,13 @@ if command -v nginx >/dev/null 2>&1; then
 location ~* \.(?:env|log|sql|bak|ini)$
 location ~* ^/(?:storage/logs|bootstrap/cache)/'
     missing_denies="$(printf '%s\n' "${vhost_block}" | DENY_PATTERNS="${deny_patterns}" awk '
-      function flush() { if (cur != "") { if (!deny) print cur; cur = ""; deny = 0; allowfirst = 0 } }
+      function flush() { if (cur != "") { if (!deny) missing[cur] = 1; cur = ""; deny = 0; allowfirst = 0 } }
+      function finalize() { flush(); for (i = 1; i <= n; i++) if (!seen[i]) missing[pats[i]] = 1; delete seen }
       BEGIN { n = split(ENVIRON["DENY_PATTERNS"], pats, "\n") }
       {
         line = $0
         sub(/#.*/, "", line)
+        if (cur == "" && line ~ /(^|[[:space:]])server[[:space:]]*\{/) { if (started) finalize(); started = 1 }
         if (cur == "") {
           for (i = 1; i <= n; i++) if (index(line, pats[i])) { cur = pats[i]; seen[i] = 1; depth = 0; deny = 0; allowfirst = 0; break }
           if (cur == "") next
@@ -172,7 +181,7 @@ location ~* ^/(?:storage/logs|bootstrap/cache)/'
         tmp = line; o = gsub(/\{/, "{", tmp); tmp = line; c = gsub(/\}/, "}", tmp); depth += o - c
         if (depth <= 0) flush()
       }
-      END { flush(); for (i = 1; i <= n; i++) if (!seen[i]) print pats[i] }
+      END { finalize(); for (m in missing) print m }
     ')"
     while IFS= read -r deny_location; do
       [[ -n "${deny_location}" ]] || continue

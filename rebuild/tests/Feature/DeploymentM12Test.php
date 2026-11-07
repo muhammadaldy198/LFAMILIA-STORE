@@ -143,6 +143,8 @@ class DeploymentM12Test extends TestCase
         $this->assertStringContainsString('sub(/#.*/, "", line)', $preflight, 'Preflight must ignore commented-out nginx directives when verifying the vhost.');
         $this->assertStringContainsString('allow all;', $preflight, 'Preflight must not credit a deny rule that an earlier allow all overrides.');
         $this->assertStringContainsString('multiline values are not allowed', $preflight, 'Preflight must reject multiline TRUSTED_PROXIES values instead of examining only the assignment line.');
+        $this->assertStringContainsString('catch-all CIDR', $preflight, 'Preflight must reject catch-all proxy CIDRs as well as the literal wildcard.');
+        $this->assertStringContainsString('function finalize()', $preflight, 'Preflight must verify the nginx deny rules in each matching server block independently.');
         $this->assertStringContainsString('DEPLOY_EXPECTED_SHA', $deploy);
         $this->assertStringContainsString('does not match DEPLOY_EXPECTED_SHA', $deploy);
         $pinCheckAt = strpos($deploy, 'does not match DEPLOY_EXPECTED_SHA');
