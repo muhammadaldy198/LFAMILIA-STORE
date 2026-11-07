@@ -8,6 +8,7 @@ use App\Services\AdminOrderPresentation;
 use App\Services\AdminPermissionService;
 use App\Services\MidtransStatusVerification;
 use App\Services\Payment\MidtransGateway;
+use App\Services\PaymentService;
 use App\Services\PaymentStateService;
 use App\Services\TransactionalEmailService;
 use Illuminate\Database\Query\Builder;
@@ -228,6 +229,23 @@ class AdminOrdersController
         abort_unless(DB::table('orders')->where('id', $id)->exists(), 404);
         if (! $payment || $payment->gateway_code !== 'MIDTRANS' || ! in_array($payment->status, ['PENDING', 'CREATING', 'SENDING', 'UNKNOWN'], true)) {
             throw ValidationException::withMessages(['payment' => 'Pembayaran ini tidak memerlukan pemeriksaan langsung. Pembayaran otomatis diperbarui setelah konfirmasi penyedia diterima.']);
+        }
+        if ($payment->status === 'CREATING') {
+            // A CREATING payment's creation call may never have reached the
+            // gateway, so a plain status inquiry cannot move it. Run the
+            // same recovery the scheduler uses, so a manual check can also
+            // drive the missing creation.
+            $outcome = app(PaymentService::class)->recoverStuckCreating((int) $payment->id);
+            if ($outcome === 'inconclusive') {
+                abort(503, 'Penyedia pembayaran belum dapat dihubungi. Status pesanan tidak diubah.');
+            }
+            $result = [
+                'result' => 'CREATING_RECOVERY_'.strtoupper($outcome),
+                'status' => DB::table('payment_transactions')->where('id', $payment->id)->value('status'),
+            ];
+            app(AdminAuditService::class)->record($request, 'order.payment.checked', 'order', $id, null, $result);
+
+            return back()->with('success', 'Status pembayaran sudah diperiksa.');
         }
         try {
             $verified = app(MidtransGateway::class)->status((string) $payment->merchant_reference);

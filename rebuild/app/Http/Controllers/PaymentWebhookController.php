@@ -55,6 +55,7 @@ class PaymentWebhookController
         }
 
         $eventId = hash('sha256', implode('|', [
+            (string) $payment->id,
             (string) ($payload['transaction_id'] ?? ''),
             (string) $payload['transaction_status'],
             (string) $payload['status_code'],

@@ -35,6 +35,17 @@ class MidtransGateway
         }
 
         if (! $response->successful()) {
+            // A 404 response whose payload status_code is also '404' is
+            // Midtrans's definitive "transaction does not exist" answer.
+            // It must stay distinguishable from a merely failed inquiry,
+            // because CREATING recovery may only re-drive creation after
+            // a definitive absence.
+            $errorData = $response->json();
+            if ($response->status() === 404 && is_array($errorData)
+                && (string) ($errorData['status_code'] ?? '') === '404') {
+                throw new GatewayTransactionNotFoundException('MIDTRANS_TRANSACTION_NOT_FOUND');
+            }
+
             throw new RuntimeException('MIDTRANS_STATUS_UNAVAILABLE');
         }
 

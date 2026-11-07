@@ -2,6 +2,7 @@
 
 use App\Services\MidtransStatusVerification;
 use App\Services\Payment\MidtransGateway;
+use App\Services\PaymentService;
 use App\Services\PaymentStateService;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -71,3 +72,49 @@ Artisan::command('lfamilia:reconcile-pending-payments', function (
 })->purpose('Recover payment settlements missed by callbacks using verified Midtrans status');
 
 Schedule::command('lfamilia:reconcile-pending-payments')->everyMinute()->withoutOverlapping(10);
+
+Artisan::command('lfamilia:recover-creating-payments', function (PaymentService $payments): int {
+    $checked = 0;
+    $resolved = 0;
+
+    // Separate from the read-only reconciler above: this command recovers
+    // payments orphaned in CREATING, whose gateway creation call never ran.
+    // Recovery always asks the gateway first and only re-drives creation
+    // after a definitive absence; see PaymentService::recoverStuckCreating.
+    // Unlike the reconciler there is deliberately no lower age bound: a
+    // CREATING row never stops being returned as the existing payment (a
+    // top-up would stay unpayable forever), and rows whose parent is dead
+    // terminate and leave the set, so the scan stays self-limiting.
+    DB::table('payment_transactions')
+        ->whereIn('gateway_code', ['MIDTRANS', 'DOKU'])
+        ->where('status', 'CREATING')
+        ->whereNotNull('merchant_reference')
+        ->where('updated_at', '<=', now()->subMinutes(5))
+        ->orderBy('id')
+        ->chunkById(100, function ($rows) use ($payments, &$checked, &$resolved): void {
+            foreach ($rows as $row) {
+                $checked++;
+
+                try {
+                    $outcome = $payments->recoverStuckCreating((int) $row->id);
+                } catch (Throwable $exception) {
+                    Log::warning('Stuck CREATING recovery failed', [
+                        'payment_transaction_id' => $row->id,
+                        'exception' => class_basename($exception),
+                    ]);
+
+                    continue;
+                }
+
+                if (in_array($outcome, ['adopted', 'redriven', 'terminated'], true)) {
+                    $resolved++;
+                }
+            }
+        });
+
+    $this->info("Stuck CREATING payments checked: {$checked}; resolved: {$resolved}");
+
+    return 0;
+})->purpose('Recover payments orphaned in CREATING state by asking the gateway first');
+
+Schedule::command('lfamilia:recover-creating-payments')->everyMinute()->withoutOverlapping(10);
