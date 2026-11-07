@@ -3,10 +3,10 @@
 namespace Tests\Feature;
 
 use App\Actions\Fortify\CreateNewUser;
+use App\Http\Middleware\EnsurePhone;
 use App\Jobs\SendTransactionalEmailJob;
 use App\Models\IntegrationCredential;
 use App\Models\User;
-use App\Http\Middleware\EnsurePhone;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -119,6 +119,36 @@ class AccountSecurityTest extends TestCase
         $this->assertNull($user->password);
         $this->assertNull($user->phone);
         $this->assertNotNull($user->email_verified_at);
+    }
+
+    public function test_google_reauthentication_entry_requires_same_signed_in_google_account(): void
+    {
+        $user = $this->customer('start-reauth@example.test', false);
+        $user->forceFill(['google_sub' => 'reauth-start-sub'])->saveQuietly();
+        IntegrationCredential::create([
+            'code' => 'google_oauth',
+            'config_ciphertext' => ['client_id' => 'test-client', 'client_secret' => 'test-secret'],
+            'is_active' => true,
+        ]);
+        $driver = Mockery::mock();
+        $driver->shouldReceive('redirect')->once()
+            ->andReturn(redirect('https://accounts.google.com/authorize'));
+        Socialite::shouldReceive('driver')->once()->with('google')->andReturn($driver);
+
+        $this->actingAs($user, 'web')->get('/auth/google/reauth')
+            ->assertRedirect('https://accounts.google.com/authorize')
+            ->assertSessionHas('auth.google_reauth_pending_user_id', (string) $user->id);
+    }
+
+    public function test_google_callback_cannot_issue_reauth_proof_without_pending_request(): void
+    {
+        $user = $this->customer('no-pending-reauth@example.test', false);
+        $user->forceFill(['google_sub' => 'same-google-sub'])->saveQuietly();
+        $this->google($user->email, 'same-google-sub');
+
+        $this->actingAs($user, 'web')->get('/auth/google/callback')
+            ->assertRedirect(route('account.profile'))->assertSessionHasErrors('google');
+        $this->assertAuthenticatedAs($user, 'web');
     }
 
     public function test_passwordless_google_email_change_requires_fresh_google_proof(): void
