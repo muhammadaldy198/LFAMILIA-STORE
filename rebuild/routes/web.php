@@ -165,9 +165,9 @@ Route::middleware('auth:web')->group(function (): void {
         Route::get('/account', [CustomerAccountController::class, 'dashboard'])->name('account');
         Route::get('/account/profile', [CustomerAccountController::class, 'profile'])->name('account.profile');
         Route::put('/account/profile', [CustomerAccountController::class, 'update'])
-            ->middleware('throttle:account-sensitive')->name('account.profile.update');
+            ->middleware('throttle:account-sensitive')->block(30, 30)->name('account.profile.update');
         Route::put('/account/password', [CustomerAccountController::class, 'password'])
-            ->middleware('throttle:account-sensitive')->name('account.password.update');
+            ->middleware('throttle:account-sensitive')->block(30, 30)->name('account.password.update');
         Route::delete('/account', [CustomerAccountController::class, 'destroy'])
             ->middleware(['throttle:account-sensitive', 'password.confirm'])->name('account.destroy');
         Route::get('/account/wallet', [CustomerAccountController::class, 'wallet'])->name('account.wallet');
