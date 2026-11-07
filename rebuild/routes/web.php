@@ -136,9 +136,13 @@ Route::post('/logout', CustomerLogoutController::class)
 Route::middleware('guest:web')->group(function (): void {
     Route::get('/auth/google/redirect', [GoogleAuthController::class, 'redirect'])
         ->middleware('throttle:google-oauth')->name('google.redirect');
-    Route::get('/auth/google/callback', [GoogleAuthController::class, 'callback'])
-        ->middleware('throttle:google-oauth')->name('google.callback');
 });
+// The callback must also be reachable by logged-in users doing a same-subject
+// Google reauthentication. Its controller forbids unrequested account switching.
+Route::get('/auth/google/callback', [GoogleAuthController::class, 'callback'])
+    ->middleware('throttle:google-oauth')->name('google.callback');
+Route::get('/auth/google/reauth', [GoogleAuthController::class, 'reauthenticate'])
+    ->middleware(['auth:web', 'throttle:google-oauth'])->name('google.reauthenticate');
 
 Route::post('/email/verification-resend', PublicEmailVerificationResendController::class)
     ->middleware('throttle:6,1')->name('customer.verification.resend');
