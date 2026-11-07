@@ -165,26 +165,78 @@ if command -v nginx >/dev/null 2>&1; then
 location ~* \.(?:env|log|sql|bak|ini)$
 location ~* ^/(?:storage/logs|bootstrap/cache)/'
     missing_denies="$(printf '%s\n' "${vhost_block}" | DENY_PATTERNS="${deny_patterns}" awk '
-      function flush() { if (cur != "") { if (!deny) missing[cur] = 1; cur = ""; deny = 0; allowfirst = 0 } }
-      function finalize() { flush(); for (i = 1; i <= n; i++) if (!seen[i]) missing[pats[i]] = 1; delete seen }
-      BEGIN { n = split(ENVIRON["DENY_PATTERNS"], pats, "\n") }
+      function overlaps(k, i,    p, s, t) {
+        p = e_pat[k]
+        if (index(p, "(?")) return 0
+        for (s = 1; s <= sc[i]; s++) {
+          t = subj[i, s]
+          if (e_ci[k]) { if (match(tolower(t), tolower(p))) return 1 }
+          else if (match(t, p)) return 1
+        }
+        return 0
+      }
+      function finalize(    i, j, j0, credited) {
+        if (inloc) { e_eff[E] = cur_eff; inloc = 0 }
+        for (i = 1; i <= n; i++) {
+          credited = 0; j0 = 0
+          for (j = 1; j <= E; j++) if (e_prot[j] == i) { j0 = j; break }
+          if (j0 && e_eff[j0]) {
+            credited = 1
+            for (j = 1; j < j0; j++) if (e_regex[j] && !e_eff[j] && overlaps(j, i)) { credited = 0; break }
+          }
+          if (!credited) missing[pats[i]] = 1
+        }
+        E = 0
+      }
+      BEGIN {
+        n = split(ENVIRON["DENY_PATTERNS"], pats, "\n")
+        subj[1, 1] = "/.env"; subj[1, 2] = "/.git/config"; sc[1] = 2
+        subj[2, 1] = "/files/x.env"; subj[2, 2] = "/files/x.log"; subj[2, 3] = "/files/x.sql"; subj[2, 4] = "/files/x.bak"; subj[2, 5] = "/files/x.ini"; sc[2] = 5
+        subj[3, 1] = "/storage/logs/laravel.log"; subj[3, 2] = "/bootstrap/cache/config.php"; sc[3] = 2
+      }
       {
         line = $0
         sub(/#.*/, "", line)
         gsub(/[[:space:]]+/, " ", line)
         gsub(/ ;/, ";", line)
-        if (cur == "" && line ~ /(^|[[:space:]])server[[:space:]]*\{/) { if (started) finalize(); started = 1 }
-        if (cur == "") {
-          for (i = 1; i <= n; i++) if (index(line, pats[i])) { cur = pats[i]; seen[i] = 1; depth = 0; deny = 0; allowfirst = 0; break }
-          if (cur == "") next
+        if (!inloc && line ~ /(^| )server \{/) { if (started) finalize(); started = 1; next }
+        if (!inloc) {
+          nf = split(line, f, " ")
+          li = 0
+          for (q = 1; q <= nf; q++) if (f[q] == "location") { li = q; break }
+          if (!li) next
+          mod = f[li + 1]; cand = f[li + 2]
+          if (mod == "~" || mod == "~*" || mod == "=" || mod == "^~") { pat_text = cand } else { pat_text = mod; mod = "" }
+          E++
+          e_prot[E] = 0
+          for (i = 1; i <= n; i++) if (index(line, pats[i])) { e_prot[E] = i; break }
+          e_regex[E] = (mod == "~" || mod == "~*") ? 1 : 0
+          e_ci[E] = (mod == "~*") ? 1 : 0
+          e_pat[E] = pat_text
+          e_eff[E] = 0
+          inloc = 1; ldepth = 0; cur_eff = 0; scope_deny_seen = 0; allow_before = 0
         }
-        pa = index(line, "allow all;"); pd = index(line, "deny all;")
-        if (pa && (!pd || pa < pd) && !deny) allowfirst = 1
-        if (pd && !allowfirst) deny = 1
-        tmp = line; o = gsub(/\{/, "{", tmp); tmp = line; c = gsub(/\}/, "}", tmp); depth += o - c
-        if (depth <= 0) flush()
+        pd = index(line, "deny all;")
+        scope_deny_here = 0
+        if (pd) {
+          pre = substr(line, 1, pd - 1)
+          tmp = pre; ob = gsub(/\{/, "{", tmp); tmp = pre; cb = gsub(/\}/, "}", tmp)
+          if (ldepth + ob - cb <= 1) scope_deny_here = 1
+        }
+        allow_here = 0; pa = 0
+        if (match(line, /(^| )allow [^;]*;/)) {
+          pa = RSTART
+          pre = substr(line, 1, pa)
+          tmp = pre; ob = gsub(/\{/, "{", tmp); tmp = pre; cb = gsub(/\}/, "}", tmp)
+          if (ldepth + ob - cb <= 1) allow_here = 1
+        }
+        eff_allow = (allow_before || (allow_here && (!scope_deny_here || pa < pd))) ? 1 : 0
+        if (scope_deny_here && !scope_deny_seen) { scope_deny_seen = 1; cur_eff = eff_allow ? 0 : 1 }
+        if (allow_here && !scope_deny_seen) allow_before = 1
+        tmp = line; o = gsub(/\{/, "{", tmp); tmp = line; c = gsub(/\}/, "}", tmp); ldepth += o - c
+        if (ldepth <= 0) { e_eff[E] = cur_eff; inloc = 0 }
       }
-      END { finalize(); for (m in missing) print m }
+      END { if (started) finalize(); for (m in missing) print m }
     ')"
     while IFS= read -r deny_location; do
       [[ -n "${deny_location}" ]] || continue

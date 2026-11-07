@@ -141,10 +141,10 @@ class DeploymentM12Test extends TestCase
         $this->assertStringContainsString('== "lfamilia.com"', $preflight, 'Preflight must scope the nginx deny check to a server block whose server_name contains the exact lfamilia.com hostname token.');
         $this->assertStringContainsString('deny all;', $preflight, 'Preflight must verify the deny directive inside each location, not only the location pattern.');
         $this->assertStringContainsString('sub(/#.*/, "", line)', $preflight, 'Preflight must ignore commented-out nginx directives when verifying the vhost.');
-        $this->assertStringContainsString('allow all;', $preflight, 'Preflight must not credit a deny rule that an earlier allow all overrides.');
+        $this->assertStringContainsString('allow [^;]*;', $preflight, 'Preflight must not credit a deny rule that an earlier allow rule overrides.');
         $this->assertStringContainsString('multiline values are not allowed', $preflight, 'Preflight must reject multiline TRUSTED_PROXIES values instead of examining only the assignment line.');
         $this->assertStringContainsString('catch-all CIDR', $preflight, 'Preflight must reject catch-all proxy CIDRs as well as the literal wildcard.');
-        $this->assertStringContainsString('function finalize()', $preflight, 'Preflight must verify the nginx deny rules in each matching server block independently.');
+        $this->assertStringContainsString('function finalize(', $preflight, 'Preflight must verify the nginx deny rules in each matching server block independently.');
         $this->assertStringContainsString('DEPLOY_EXPECTED_SHA', $deploy);
         $this->assertStringContainsString('does not match DEPLOY_EXPECTED_SHA', $deploy);
         $pinCheckAt = strpos($deploy, 'does not match DEPLOY_EXPECTED_SHA');
@@ -214,6 +214,9 @@ class DeploymentM12Test extends TestCase
         $overridden = implode("\n", [$location($p1), $location($p2, "allow all;\n        deny all;"), $location($p3)]);
         $spacedTerminator = implode("\n", [$location($p1), $location($p2, "allow all ;\n        deny all;"), $location($p3)]);
         $spacedDeny = implode("\n", [$location($p1, 'deny all ;'), $location($p2, 'deny all ;'), $location($p3, 'deny all ;')]);
+        $cidrOverride = implode("\n", [$location($p1), $location($p2, "allow 203.0.113.0/24;\n        deny all;"), $location($p3)]);
+        $nestedDeny = implode("\n", ["    {$p1} {\n        limit_except POST {\n            deny all;\n        }\n    }", $location($p2), $location($p3)]);
+        $shadowed = implode("\n", ["    location ~* \\.env$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $server = static fn (string $name, string $inner = ''): string => "server {\n    listen 443 ssl;\n    server_name {$name};\n{$inner}\n}";
 
         $cases = [
@@ -224,6 +227,9 @@ class DeploymentM12Test extends TestCase
             'overridden deny warns' => [$server('lfamilia.com', $overridden), 1],
             'space before the semicolon still overrides' => [$server('lfamilia.com', $spacedTerminator), 1],
             'spaced deny terminators stay silent' => [$server('lfamilia.com', $spacedDeny), 0],
+            'CIDR allow overrides the deny' => [$server('lfamilia.com', $cidrOverride), 1],
+            'deny nested in limit_except does not protect' => [$server('lfamilia.com', $nestedDeny), 1],
+            'earlier overlapping regex location shadows two rules' => [$server('lfamilia.com', $shadowed), 2],
         ];
 
         foreach ($cases as $label => [$body, $expected]) {
