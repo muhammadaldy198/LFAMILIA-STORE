@@ -213,6 +213,7 @@ class DeploymentM12Test extends TestCase
         $complete = implode("\n", [$location($p1), $location($p2), $location($p3)]);
         $overridden = implode("\n", [$location($p1), $location($p2, "allow all;\n        deny all;"), $location($p3)]);
         $spacedTerminator = implode("\n", [$location($p1), $location($p2, "allow all ;\n        deny all;"), $location($p3)]);
+        $spacedDeny = implode("\n", [$location($p1, 'deny all ;'), $location($p2, 'deny all ;'), $location($p3, 'deny all ;')]);
         $server = static fn (string $name, string $inner = ''): string => "server {\n    listen 443 ssl;\n    server_name {$name};\n{$inner}\n}";
 
         $cases = [
@@ -222,6 +223,7 @@ class DeploymentM12Test extends TestCase
             'impostor host does not count' => [$server('other-lfamilia.com', $complete), 1],
             'overridden deny warns' => [$server('lfamilia.com', $overridden), 1],
             'space before the semicolon still overrides' => [$server('lfamilia.com', $spacedTerminator), 1],
+            'spaced deny terminators stay silent' => [$server('lfamilia.com', $spacedDeny), 0],
         ];
 
         foreach ($cases as $label => [$body, $expected]) {
