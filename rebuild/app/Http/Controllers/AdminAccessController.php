@@ -181,6 +181,12 @@ class AdminAccessController
         }
         $admin->save();
 
+        if (! empty($data['password']) && $admin->id === $currentAdminId) {
+            // Only this authenticated request may refresh its own session
+            // fingerprint; unrelated in-flight requests must keep theirs stale.
+            $request->attributes->set('security.admin_self_password_hash', (string) $admin->getAuthPassword());
+        }
+
         $audit->record($request, 'admin.updated', 'admin_user', $admin->id, $before, $this->auditState($admin));
 
         return back()->with('status', 'Akun dan hak akses berhasil diperbarui.');
