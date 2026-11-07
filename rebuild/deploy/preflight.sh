@@ -136,14 +136,28 @@ if command -v nginx >/dev/null 2>&1; then
   if [[ -z "${vhost_block}" ]]; then
     echo "WARNING: Could not locate the lfamilia.com server block in the effective nginx configuration; the vhost deny rules could not be verified." >&2
   else
-    for deny_location in \
-      'location ~ /\.(?!well-known).*' \
-      'location ~* \.(?:env|log|sql|bak|ini)$' \
-      'location ~* ^/(?:storage/logs|bootstrap/cache)/'; do
-      if ! grep -Fq -- "${deny_location}" <<<"${vhost_block}"; then
-        echo "WARNING: nginx deny rule missing from the lfamilia.com vhost: ${deny_location}. Reapply deploy/nginx/cloudpanel-vhost-snippet.conf to the vhost, then run nginx -t before reload." >&2
-      fi
-    done
+    deny_patterns='location ~ /\.(?!well-known).*
+location ~* \.(?:env|log|sql|bak|ini)$
+location ~* ^/(?:storage/logs|bootstrap/cache)/'
+    missing_denies="$(printf '%s\n' "${vhost_block}" | DENY_PATTERNS="${deny_patterns}" awk '
+      function flush() { if (cur != "") { if (!deny) print cur; cur = ""; deny = 0 } }
+      BEGIN { n = split(ENVIRON["DENY_PATTERNS"], pats, "\n") }
+      {
+        line = $0
+        if (cur == "") {
+          for (i = 1; i <= n; i++) if (index(line, pats[i])) { cur = pats[i]; seen[i] = 1; depth = 0; deny = 0; break }
+          if (cur == "") next
+        }
+        if (index(line, "deny all;")) deny = 1
+        tmp = line; o = gsub(/\{/, "{", tmp); tmp = line; c = gsub(/\}/, "}", tmp); depth += o - c
+        if (depth <= 0) flush()
+      }
+      END { flush(); for (i = 1; i <= n; i++) if (!seen[i]) print pats[i] }
+    ')"
+    while IFS= read -r deny_location; do
+      [[ -n "${deny_location}" ]] || continue
+      echo "WARNING: nginx deny rule missing or inactive in the lfamilia.com vhost: ${deny_location}. Reapply deploy/nginx/cloudpanel-vhost-snippet.conf to the vhost, then run nginx -t before reload." >&2
+    done <<<"${missing_denies}"
   fi
 else
   echo "WARNING: nginx binary not found; the vhost deny rules could not be verified." >&2
