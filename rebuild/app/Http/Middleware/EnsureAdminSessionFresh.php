@@ -23,7 +23,10 @@ class EnsureAdminSessionFresh
 
         // actingAs() is not a browser session. Only enforce a stored login
         // key so pre-existing test-only guards are unaffected.
-        if ($user && $request->session()->has($guard->getName())) {
+        $authenticatedAtStart = $user && $request->session()->has($guard->getName());
+        $initialId = $authenticatedAtStart ? (string) $user->getAuthIdentifier() : null;
+
+        if ($authenticatedAtStart) {
             $stored = $request->session()->get(self::SESSION_KEY);
             $fresh = $user->fresh();
             $current = $fresh ? $this->fingerprint($fresh->getAuthIdentifier(), $fresh->getAuthPassword()) : null;
@@ -43,15 +46,33 @@ class EnsureAdminSessionFresh
 
         $response = $next($request);
 
-        // Refresh from storage: AdminAccessController may update the same
-        // admin through a different model instance during this request.
+        // A normal in-flight request must NEVER adopt a password rotated by
+        // another device after the check above (otherwise revocation races).
         $user = $guard->user();
-        $fresh = $user?->fresh();
-        if ($fresh && $request->session()->has($guard->getName())) {
-            $request->session()->put(
-                self::SESSION_KEY,
-                $this->fingerprint($fresh->getAuthIdentifier(), $fresh->getAuthPassword())
-            );
+        if ($user && $request->session()->has($guard->getName())) {
+            if (! $authenticatedAtStart || (string) $user->getAuthIdentifier() !== $initialId) {
+                // New login: stamp the credential actually used to authenticate,
+                // not a newer password fetched concurrently from the database.
+                $request->session()->put(
+                    self::SESSION_KEY,
+                    $this->fingerprint($user->getAuthIdentifier(), $user->getAuthPassword())
+                );
+            } else {
+                // Only an explicitly verified self-change may renew a stamp.
+                // Recheck the exact hash saved by this request to avoid
+                // adopting yet another concurrent password change.
+                $selfChangedHash = $request->attributes->get('security.admin_self_password_hash');
+                if (is_string($selfChangedHash)) {
+                    $fresh = $user->fresh();
+                    if ($fresh && (string) $fresh->getAuthIdentifier() === $initialId
+                        && hash_equals($selfChangedHash, (string) $fresh->getAuthPassword())) {
+                        $request->session()->put(
+                            self::SESSION_KEY,
+                            $this->fingerprint($fresh->getAuthIdentifier(), $selfChangedHash)
+                        );
+                    }
+                }
+            }
         } else {
             $request->session()->forget(self::SESSION_KEY);
         }
