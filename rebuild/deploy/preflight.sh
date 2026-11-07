@@ -147,16 +147,18 @@ if command -v nginx >/dev/null 2>&1; then
 location ~* \.(?:env|log|sql|bak|ini)$
 location ~* ^/(?:storage/logs|bootstrap/cache)/'
     missing_denies="$(printf '%s\n' "${vhost_block}" | DENY_PATTERNS="${deny_patterns}" awk '
-      function flush() { if (cur != "") { if (!deny) print cur; cur = ""; deny = 0 } }
+      function flush() { if (cur != "") { if (!deny) print cur; cur = ""; deny = 0; allowfirst = 0 } }
       BEGIN { n = split(ENVIRON["DENY_PATTERNS"], pats, "\n") }
       {
         line = $0
         sub(/#.*/, "", line)
         if (cur == "") {
-          for (i = 1; i <= n; i++) if (index(line, pats[i])) { cur = pats[i]; seen[i] = 1; depth = 0; deny = 0; break }
+          for (i = 1; i <= n; i++) if (index(line, pats[i])) { cur = pats[i]; seen[i] = 1; depth = 0; deny = 0; allowfirst = 0; break }
           if (cur == "") next
         }
-        if (index(line, "deny all;")) deny = 1
+        pa = index(line, "allow all;"); pd = index(line, "deny all;")
+        if (pa && (!pd || pa < pd) && !deny) allowfirst = 1
+        if (pd && !allowfirst) deny = 1
         tmp = line; o = gsub(/\{/, "{", tmp); tmp = line; c = gsub(/\}/, "}", tmp); depth += o - c
         if (depth <= 0) flush()
       }

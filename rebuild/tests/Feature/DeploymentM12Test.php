@@ -141,6 +141,7 @@ class DeploymentM12Test extends TestCase
         $this->assertStringContainsString('== "lfamilia.com"', $preflight, 'Preflight must scope the nginx deny check to a server block whose server_name contains the exact lfamilia.com hostname token.');
         $this->assertStringContainsString('deny all;', $preflight, 'Preflight must verify the deny directive inside each location, not only the location pattern.');
         $this->assertStringContainsString('sub(/#.*/, "", line)', $preflight, 'Preflight must ignore commented-out nginx directives when verifying the vhost.');
+        $this->assertStringContainsString('allow all;', $preflight, 'Preflight must not credit a deny rule that an earlier allow all overrides.');
         $this->assertStringContainsString('DEPLOY_EXPECTED_SHA', $deploy);
         $this->assertStringContainsString('does not match DEPLOY_EXPECTED_SHA', $deploy);
         $pinCheckAt = strpos($deploy, 'does not match DEPLOY_EXPECTED_SHA');
