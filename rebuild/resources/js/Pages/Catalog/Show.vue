@@ -13,10 +13,12 @@ import { phoneCountries, LEADING_ZERO_PRESERVED_DIALS } from '../../Data/phoneCo
 import { flagUrl } from '../../lib/flags';
 import { orderedPackageGroups } from '../../lib/catalogGroups';
 import { currentXsrfHeaders } from '../../lib/currentXsrfHeaders';
+import { checkoutAttemptKey, checkoutSignatureHash } from '../../lib/checkoutAttempts';
 
 const props = defineProps({
     product: Object,
     packages: Array,
+    eligibilityPackageIds: { type: Array, default: () => [] },
     packageGroups: { type: Array, default: () => [] },
     fields: Array,
     customer: Object,
@@ -180,11 +182,28 @@ const regionWarning = computed(() => accountValidationSignature.value === accoun
     && nicknameResult.value?.status === 'REGION_MISMATCH');
 /** Block checkout only when this product has an enforced region. */
 const regionMismatch = computed(() => Boolean(props.product.nickname_required_region) && regionWarning.value);
+/** A proof counts as expired shortly before its real expiry. */
+const proofExpired = () => {
+    const expiry = Date.parse(nicknameResult.value?.region_proof_expires_at || '');
+    return !Number.isFinite(expiry) || expiry <= Date.now() + 15000;
+};
 /** Refresh proof before its expiry to avoid submitting an expired checkout token. */
 const regionProofStale = () => {
     if (!props.product.nickname_required_region) return false;
-    const expiry = Date.parse(nicknameResult.value?.region_proof_expires_at || '');
-    return !nicknameResult.value?.region_proof || !Number.isFinite(expiry) || expiry <= Date.now() + 15000;
+    return !nicknameResult.value?.region_proof || proofExpired();
+};
+/** Packages the server only sells against a fresh eligibility proof. */
+const gatedPackageIds = computed(() => new Set((props.eligibilityPackageIds || []).map(String)));
+/**
+ * Eligibility-family packages (first recharge, weekly pass) are guarded by
+ * the checkout proof on products without a required region too: a missing,
+ * expired, or input-mismatched proof must be refreshed before submitting,
+ * or the server rejects the order.
+ */
+const eligibilityProofStale = () => {
+    if (!gatedPackageIds.value.has(String(selectedPackageId.value))) return false;
+    if (!nicknameResult.value?.region_proof) return true;
+    return accountValidationSignature.value !== accountInputSignature() || proofExpired();
 };
 /** Track ineligible package IDs returned by the current account check. */
 const disabledPackageIds = computed(() => new Set((nicknameResult.value?.disabled_package_ids || []).map(String)));
@@ -318,30 +337,47 @@ function newIdempotencyKey() {
 }
 
 function checkoutAttemptStorageKey() {
-    return 'lfamilia:checkout-attempt:' + props.product.id;
+    return checkoutAttemptKey(props.product.id);
 }
 
-function ensureCheckoutAttemptKey(signature) {
+async function ensureCheckoutAttemptKey(signature) {
+    // Only the signature's SHA-256 digest is persisted (NV-23): the raw
+    // signature serializes the buyer's contact and game-account inputs and
+    // must never sit in sessionStorage next to the idempotency key. Legacy
+    // records holding a raw signature never match and are overwritten.
+    const signatureHash = await checkoutSignatureHash(signature);
     try {
-        const stored = JSON.parse(window.sessionStorage.getItem(checkoutAttemptStorageKey()) || 'null');
-        if (
-            stored?.signature === signature
-            && typeof stored?.key === 'string'
-            && /^[A-Za-z0-9:_-]{16,120}$/.test(stored.key)
-        ) {
-            idempotencyKey.value = stored.key;
-            return stored.key;
-        }
+        if (signatureHash) {
+            const stored = JSON.parse(window.sessionStorage.getItem(checkoutAttemptStorageKey()) || 'null');
+            if (
+                stored?.signature_hash === signatureHash
+                && typeof stored?.key === 'string'
+                && /^[A-Za-z0-9:_-]{16,120}$/.test(stored.key)
+            ) {
+                idempotencyKey.value = stored.key;
+                return stored.key;
+            }
 
-        const key = newIdempotencyKey();
-        window.sessionStorage.setItem(checkoutAttemptStorageKey(), JSON.stringify({ signature, key }));
-        idempotencyKey.value = key;
-        return key;
+            const key = newIdempotencyKey();
+            window.sessionStorage.setItem(checkoutAttemptStorageKey(), JSON.stringify({ signature_hash: signatureHash, key }));
+            idempotencyKey.value = key;
+            return key;
+        }
     } catch {
-        const key = newIdempotencyKey();
-        idempotencyKey.value = key;
-        return key;
+        // Storage can be unavailable in hardened/private browsers.
     }
+
+    // Hashing unavailable (or storage failed): never leave a legacy
+    // raw-signature record behind in sessionStorage.
+    try {
+        window.sessionStorage.removeItem(checkoutAttemptStorageKey());
+    } catch {
+        // Storage can be unavailable in hardened/private browsers.
+    }
+
+    const key = newIdempotencyKey();
+    idempotencyKey.value = key;
+    return key;
 }
 
 function clearCheckoutAttempt() {
@@ -411,9 +447,9 @@ function confirmationStateSignature() {
 }
 
 /** Freeze public checkout details without retaining credentials in the confirmation summary. */
-function buildConfirmationSnapshot(currentQuote) {
+async function buildConfirmationSnapshot(currentQuote) {
     const stateSignature = confirmationStateSignature();
-    const attemptKey = ensureCheckoutAttemptKey(stateSignature);
+    const attemptKey = await ensureCheckoutAttemptKey(stateSignature);
 
     return {
         state_signature: stateSignature,
@@ -769,11 +805,13 @@ async function applyVoucher(code) {
 
 async function prepareOrder() {
     if (busy.value || regionMismatch.value) return;
-    if (props.product.nickname_required_region && (regionProofStale() || accountValidationSignature.value !== accountInputSignature())) {
+    if ((props.product.nickname_required_region && (regionProofStale() || accountValidationSignature.value !== accountInputSignature())) || eligibilityProofStale()) {
         await checkNickname();
         if (regionMismatch.value) return;
         if (!nicknameResult.value?.region_proof) {
-            errors.value = { checkout: ['Periksa akun terlebih dahulu untuk memastikan region produk.'] };
+            errors.value = { checkout: [props.product.nickname_required_region
+                ? 'Periksa akun terlebih dahulu untuk memastikan region produk.'
+                : 'Periksa akun terlebih dahulu untuk memastikan kelayakan paket.'] };
             return;
         }
     }
@@ -804,7 +842,7 @@ async function prepareOrder() {
     const currentQuote = await loadQuote();
     if (!currentQuote) return;
 
-    confirmationSnapshot.value = buildConfirmationSnapshot(currentQuote);
+    confirmationSnapshot.value = await buildConfirmationSnapshot(currentQuote);
     agreed.value = false;
     confirmOpen.value = true;
 }
@@ -812,11 +850,13 @@ async function prepareOrder() {
 async function createOrder() {
     if (!agreed.value || !confirmationSnapshot.value || busy.value || regionMismatch.value) return;
 
-    if (regionProofStale()) {
+    if (regionProofStale() || eligibilityProofStale()) {
         const checked = await checkNickname();
         if (!checked || regionMismatch.value || !nicknameResult.value?.region_proof || !selectedPackage.value) {
             closeConfirmation();
-            errors.value = { checkout: ['Pemeriksaan region berubah. Periksa kembali data akun sebelum memesan.'] };
+            errors.value = { checkout: [props.product.nickname_required_region
+                ? 'Pemeriksaan region berubah. Periksa kembali data akun sebelum memesan.'
+                : 'Pemeriksaan akun berubah. Periksa kembali data akun sebelum memesan.'] };
             return;
         }
     }
@@ -838,7 +878,7 @@ async function createOrder() {
     }
 
     if (confirmationSnapshot.value.quote_signature !== financialSummarySignature(freshQuote)) {
-        confirmationSnapshot.value = buildConfirmationSnapshot(freshQuote);
+        confirmationSnapshot.value = await buildConfirmationSnapshot(freshQuote);
         agreed.value = false;
         confirmOpen.value = true;
         errors.value = {
@@ -857,14 +897,14 @@ async function createOrder() {
                 ...basePayload(),
                 customer_input: { ...customerInput },
                 idempotency_key: confirmationSnapshot.value.idempotency_key,
-                ...(props.product.nickname_required_region ? { region_proof: nicknameResult.value?.region_proof || null } : {}),
+                region_proof: nicknameResult.value?.region_proof || null,
             }),
         });
         checkoutExpiryOffset.value = Date.parse(checkoutResult.value.server_now) - Date.now();
         checkoutClockTick.value = Date.now();
     } catch (error) {
         errors.value = error.validation || { checkout: [error.message || 'Pesanan gagal dibuat.'] };
-        if (error.validation?.region_proof) {
+        if (error.validation?.region_proof || error.validation?.package_id) {
             nicknameResult.value = null;
             accountValidationSignature.value = '';
             closeConfirmation();

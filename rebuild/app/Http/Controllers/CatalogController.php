@@ -11,6 +11,7 @@ use App\Models\SavedGameAccount;
 use App\Models\StoreAsset;
 use App\Services\CatalogNominalOrder;
 use App\Services\CheckoutPricing;
+use App\Services\NicknameService;
 use App\Services\OperationalSettings;
 use App\Services\PaymentRoutingService;
 use App\Services\StorefrontContentService;
@@ -318,6 +319,12 @@ class CatalogController
                 'customer_input' => $saved->customer_input,
             ])->values() : collect();
 
+        $eligibilityFamilies = app(NicknameService::class)->eligibilityFamilies($product);
+        $eligibilityPackageIds = array_values(array_unique([
+            ...array_map('intval', array_keys($eligibilityFamilies['first_purchase'])),
+            ...array_map('intval', $eligibilityFamilies['weekly_pass']),
+        ]));
+
         return SeoMetadata::render('Catalog/Show', [
             'product' => [
                 ...$product->only('id', 'name', 'publisher', 'slug', 'description', 'nickname_check_enabled',
@@ -340,6 +347,7 @@ class CatalogController
                     ->get(['slug', 'name', 'nickname_required_region'])->toArray()
                 : [],
             'packages' => $packages,
+            'eligibilityPackageIds' => $eligibilityPackageIds,
             'packageGroups' => $product->packageGroups->map(fn ($group): array => [
                 'name' => $group->name,
                 'image_url' => OptimizedMedia::url($group, 'image', 'card'),

@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\CheckoutPricing;
 use App\Services\CheckoutService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
@@ -181,6 +182,52 @@ class CheckoutTest extends TestCase
         $this->assertSame(1, DB::table('order_events')
             ->where('order_id', $order->id)
             ->where('event_type', 'ORDER_CREATED')->count());
+    }
+
+    /**
+     * NV-14: after the guest-data purge removes an old order's access
+     * token, replaying the original checkout request must not resurrect
+     * the token, the access code, or the guest session binding.
+     */
+    public function test_replay_after_guest_purge_does_not_resurrect_access(): void
+    {
+        $catalog = $this->catalog();
+        $payload = $this->guestPayload($catalog['package_id'], 'checkout-purge-replay-0001');
+
+        $first = $this->postJson('/checkout/orders', $payload)->assertCreated();
+        $orderId = (int) $first->json('order_id');
+        $this->assertNotEmpty($first->json('access_code'));
+        $this->assertDatabaseHas('guest_order_tokens', ['order_id' => $orderId]);
+
+        DB::table('orders')->where('id', $orderId)->update(['created_at' => now()->subDays(31)]);
+        Artisan::call('lfamilia:purge-guest-data');
+        $this->assertDatabaseMissing('guest_order_tokens', ['order_id' => $orderId]);
+
+        $replay = $this->postJson('/checkout/orders', $payload)->assertOk();
+        $replay->assertJsonPath('created', false);
+        $replay->assertJsonPath('access_code', null);
+        $replay->assertSessionMissing('guest_order_id');
+        $this->assertDatabaseMissing('guest_order_tokens', ['order_id' => $orderId]);
+    }
+
+    /**
+     * NV-14: a retry inside the retention window still re-issues the
+     * stable access code and rebinds the guest session.
+     */
+    public function test_replay_inside_retention_window_still_reissues_access(): void
+    {
+        $catalog = $this->catalog();
+        $payload = $this->guestPayload($catalog['package_id'], 'checkout-retry-window-0001');
+
+        $first = $this->postJson('/checkout/orders', $payload)->assertCreated();
+        $orderId = (int) $first->json('order_id');
+        DB::table('guest_order_tokens')->where('order_id', $orderId)->delete();
+
+        $replay = $this->postJson('/checkout/orders', $payload)->assertOk();
+        $replay->assertJsonPath('created', false);
+        $this->assertSame($first->json('access_code'), $replay->json('access_code'));
+        $replay->assertSessionHas('guest_order_id', $orderId);
+        $this->assertDatabaseHas('guest_order_tokens', ['order_id' => $orderId]);
     }
 
     public function test_single_digiflazz_sku_uses_its_cost_exactly_as_max_price(): void

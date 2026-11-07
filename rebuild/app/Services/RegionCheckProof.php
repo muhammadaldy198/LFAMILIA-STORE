@@ -15,7 +15,24 @@ class RegionCheckProof
      */
     public function issue(Product $product, array $input, array $result): ?string
     {
-        if (trim((string) $product->nickname_required_region) === '') {
+        // The H2H client normalizes a missing verdict to null, so a key's
+        // presence proves nothing. First purchase is attested per tier:
+        // only tiers carrying a concrete boolean verdict are listed. The
+        // weekly-pass verdict is a single boolean.
+        $firstPurchaseTiers = [];
+        if (($result['status'] ?? null) === 'VALID' && is_array($result['first_purchase'] ?? null)) {
+            foreach ($result['first_purchase'] as $key => $item) {
+                if (is_array($item) && is_bool($item['eligible'] ?? null)) {
+                    $firstPurchaseTiers[] = (int) ($item['tier'] ?? $key);
+                }
+            }
+            $firstPurchaseTiers = array_values(array_unique($firstPurchaseTiers));
+        }
+        $weeklyPassEvaluated = ($result['status'] ?? null) === 'VALID'
+            && is_bool($result['wdp_eligible'] ?? null);
+
+        if (trim((string) $product->nickname_required_region) === ''
+            && $firstPurchaseTiers === [] && ! $weeklyPassEvaluated) {
             return null;
         }
 
@@ -25,6 +42,9 @@ class RegionCheckProof
             'status' => $result['status'] ?? null,
             'region' => $result['region'] ?? null,
             'nickname' => $result['nickname'] ?? null,
+            'disabled_package_ids' => array_values(array_map('intval', $result['disabled_package_ids'] ?? [])),
+            'first_purchase_tiers' => $firstPurchaseTiers,
+            'weekly_pass_evaluated' => $weeklyPassEvaluated,
             'expires_at' => now()->addMinutes(10)->timestamp,
         ], JSON_THROW_ON_ERROR));
     }
@@ -39,16 +59,8 @@ class RegionCheckProof
             return null;
         }
 
-        try {
-            $decoded = json_decode(Crypt::decryptString((string) $proof), true, 512, JSON_THROW_ON_ERROR);
-        } catch (Throwable) {
-            $decoded = null;
-        }
-
-        if (! is_array($decoded)
-            || (int) ($decoded['product_id'] ?? 0) !== (int) $product->id
-            || ! hash_equals($this->inputHash($input), (string) ($decoded['input_hash'] ?? ''))
-            || (int) ($decoded['expires_at'] ?? 0) < now()->timestamp) {
+        $decoded = $this->decode($product, $input, $proof);
+        if ($decoded === null) {
             throw ValidationException::withMessages([
                 'region_proof' => 'Periksa akun terlebih dahulu untuk memastikan region produk.',
             ]);
@@ -69,6 +81,65 @@ class RegionCheckProof
             'country' => $region !== '' ? $region : null,
             'warning' => null,
         ];
+    }
+
+    /**
+     * Enforce the H2H first-purchase / weekly-pass verdict for the gated
+     * package families: the order must carry the proof issued for the same
+     * account input, the proof must attest a concrete verdict for the
+     * ordered package's family, and the package must not be in its
+     * disabled list. Packages outside the families are not affected.
+     *
+     * @param  array{first_purchase?: array<int, int>, weekly_pass?: array<int, int>}  $families
+     *                                                                                            first_purchase maps package id => its first-purchase tier;
+     *                                                                                            weekly_pass lists package ids.
+     */
+    public function assertPackageEligible(Product $product, int $packageId, array $input, ?string $proof, array $families): void
+    {
+        $firstPurchaseTier = $families['first_purchase'][$packageId] ?? null;
+        $inWeeklyPass = in_array($packageId, array_map('intval', $families['weekly_pass'] ?? []), true);
+        if ($firstPurchaseTier === null && ! $inWeeklyPass) {
+            return;
+        }
+
+        $decoded = $this->decode($product, $input, $proof);
+        if ($decoded === null
+            || ($firstPurchaseTier !== null && ! in_array((int) $firstPurchaseTier, array_map('intval', (array) ($decoded['first_purchase_tiers'] ?? [])), true))
+            || ($inWeeklyPass && ($decoded['weekly_pass_evaluated'] ?? false) !== true)) {
+            throw ValidationException::withMessages([
+                'package_id' => 'Periksa akun terlebih dahulu untuk memastikan kelayakan paket.',
+            ]);
+        }
+
+        if (in_array($packageId, array_map('intval', (array) ($decoded['disabled_package_ids'] ?? [])), true)) {
+            throw ValidationException::withMessages([
+                'package_id' => 'Paket ini tidak tersedia untuk akun tujuan.',
+            ]);
+        }
+    }
+
+    /**
+     * Decode a proof and verify its product, account-input, and expiry
+     * binding; null when the proof is missing or does not bind.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function decode(Product $product, array $input, ?string $proof): ?array
+    {
+        try {
+            $decoded = json_decode(Crypt::decryptString((string) $proof), true, 512, JSON_THROW_ON_ERROR);
+        } catch (Throwable) {
+            $decoded = null;
+        }
+
+        if (! is_array($decoded)
+            || (int) ($decoded['product_id'] ?? 0) !== (int) $product->id
+            || ! hash_equals($this->inputHash($input), (string) ($decoded['input_hash'] ?? ''))
+            || (int) ($decoded['expires_at'] ?? 0) < now()->timestamp) {
+            return null;
+        }
+
+        return $decoded;
     }
 
     /**

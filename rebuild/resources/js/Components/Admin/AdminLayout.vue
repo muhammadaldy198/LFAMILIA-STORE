@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import AdminSensitivePrompt from '../AdminSensitivePrompt.vue';
+import { clearStoredCheckoutAttempts } from '../../lib/checkoutAttempts';
 
 const page = usePage();
 const panel = computed(() => page.props.adminPanel || {});
@@ -83,7 +84,7 @@ const onKey = event => {
 onMounted(() => window.addEventListener('keydown', onKey));
 onUnmounted(() => { window.removeEventListener('keydown', onKey); clearTimeout(searchTimer); });
 
-const logout = () => router.post(`${base.value}/logout`);
+const logout = () => { clearStoredCheckoutAttempts(); router.post(`${base.value}/logout`); };
 </script>
 
 <template>
