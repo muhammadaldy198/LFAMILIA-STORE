@@ -145,6 +145,11 @@ class DeploymentM12Test extends TestCase
         $this->assertNotFalse($pinCheckAt);
         $this->assertNotFalse($checkoutAt);
         $this->assertLessThan($checkoutAt, $pinCheckAt, 'The expected-SHA pin must be checked before checkout mutates the live tree.');
+        $this->assertSame(2, substr_count($deploy, 'does not match DEPLOY_EXPECTED_SHA'), 'The pin must be verified twice: fetched ref before checkout, and HEAD after the merge.');
+        $mergeAt = strpos($deploy, 'merge --ff-only');
+        $lastPinCheckAt = strrpos($deploy, 'does not match DEPLOY_EXPECTED_SHA');
+        $this->assertNotFalse($mergeAt);
+        $this->assertGreaterThan($mergeAt, $lastPinCheckAt, 'The post-merge HEAD must be re-verified against the pin.');
         $this->assertStringContainsString('DEPLOY_EXPECTED_SHA=', $ops);
         $this->assertStringContainsString('MYSQL_DEFAULTS_FILE=', $ops);
         $this->assertStringContainsString('BACKUP_PASSPHRASE_FILE=', $ops);
