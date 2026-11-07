@@ -181,11 +181,25 @@ const regionWarning = computed(() => accountValidationSignature.value === accoun
     && nicknameResult.value?.status === 'REGION_MISMATCH');
 /** Block checkout only when this product has an enforced region. */
 const regionMismatch = computed(() => Boolean(props.product.nickname_required_region) && regionWarning.value);
+/** A proof counts as expired shortly before its real expiry. */
+const proofExpired = () => {
+    const expiry = Date.parse(nicknameResult.value?.region_proof_expires_at || '');
+    return !Number.isFinite(expiry) || expiry <= Date.now() + 15000;
+};
 /** Refresh proof before its expiry to avoid submitting an expired checkout token. */
 const regionProofStale = () => {
     if (!props.product.nickname_required_region) return false;
-    const expiry = Date.parse(nicknameResult.value?.region_proof_expires_at || '');
-    return !nicknameResult.value?.region_proof || !Number.isFinite(expiry) || expiry <= Date.now() + 15000;
+    return !nicknameResult.value?.region_proof || proofExpired();
+};
+/**
+ * Eligibility-family packages (first recharge, weekly pass) are guarded by
+ * the same proof on products without a required region: an existing proof
+ * that expired or no longer matches the account input must be refreshed
+ * before submitting, or the server rejects the order.
+ */
+const eligibilityProofStale = () => {
+    if (!nicknameResult.value?.region_proof) return false;
+    return accountValidationSignature.value !== accountInputSignature() || proofExpired();
 };
 /** Track ineligible package IDs returned by the current account check. */
 const disabledPackageIds = computed(() => new Set((nicknameResult.value?.disabled_package_ids || []).map(String)));
@@ -787,7 +801,7 @@ async function applyVoucher(code) {
 
 async function prepareOrder() {
     if (busy.value || regionMismatch.value) return;
-    if (props.product.nickname_required_region && (regionProofStale() || accountValidationSignature.value !== accountInputSignature())) {
+    if ((props.product.nickname_required_region && (regionProofStale() || accountValidationSignature.value !== accountInputSignature())) || eligibilityProofStale()) {
         await checkNickname();
         if (regionMismatch.value) return;
         if (!nicknameResult.value?.region_proof) {
@@ -830,11 +844,13 @@ async function prepareOrder() {
 async function createOrder() {
     if (!agreed.value || !confirmationSnapshot.value || busy.value || regionMismatch.value) return;
 
-    if (regionProofStale()) {
+    if (regionProofStale() || eligibilityProofStale()) {
         const checked = await checkNickname();
         if (!checked || regionMismatch.value || !nicknameResult.value?.region_proof || !selectedPackage.value) {
             closeConfirmation();
-            errors.value = { checkout: ['Pemeriksaan region berubah. Periksa kembali data akun sebelum memesan.'] };
+            errors.value = { checkout: [props.product.nickname_required_region
+                ? 'Pemeriksaan region berubah. Periksa kembali data akun sebelum memesan.'
+                : 'Pemeriksaan akun berubah. Periksa kembali data akun sebelum memesan.'] };
             return;
         }
     }
