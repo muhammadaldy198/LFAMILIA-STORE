@@ -138,7 +138,7 @@ class DeploymentM12Test extends TestCase
         $this->assertStringContainsString('s/#.*//', $preflight, 'Preflight must strip dotenv comments (adjacent or spaced) before judging the proxy value.');
         $this->assertStringContainsString('must be written literally', $preflight, 'Preflight must reject dotenv variable references for the proxy value.');
         $this->assertStringContainsString('cloudpanel-vhost-snippet.conf', $preflight);
-        $this->assertStringContainsString('lfamilia\.com', $preflight, 'Preflight must scope the nginx deny check to the lfamilia.com server block.');
+        $this->assertStringContainsString('== "lfamilia.com"', $preflight, 'Preflight must scope the nginx deny check to a server block whose server_name contains the exact lfamilia.com hostname token.');
         $this->assertStringContainsString('deny all;', $preflight, 'Preflight must verify the deny directive inside each location, not only the location pattern.');
         $this->assertStringContainsString('sub(/#.*/, "", line)', $preflight, 'Preflight must ignore commented-out nginx directives when verifying the vhost.');
         $this->assertStringContainsString('DEPLOY_EXPECTED_SHA', $deploy);

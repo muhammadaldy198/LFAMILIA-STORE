@@ -129,7 +129,13 @@ if command -v nginx >/dev/null 2>&1; then
         if (line ~ /(^|[[:space:]])server[[:space:]]*\{/) { inblock = 1; depth = 0; buf = ""; hit = 0 } else next
       }
       buf = buf line ORS
-      if (line ~ /server_name[^;]*lfamilia\.com/) hit = 1
+      if (line ~ /server_name/) {
+        rest = line
+        sub(/^.*server_name[[:space:]]+/, "", rest)
+        sub(/;.*/, "", rest)
+        ntok = split(rest, toks, /[[:space:]]+/)
+        for (k = 1; k <= ntok; k++) if (toks[k] == "lfamilia.com" || toks[k] == "www.lfamilia.com") hit = 1
+      }
       tmp = line; opens = gsub(/\{/, "{", tmp); tmp = line; closes = gsub(/\}/, "}", tmp); depth += opens - closes
       if (depth <= 0) { if (hit) result = result buf; inblock = 0 }
     }
