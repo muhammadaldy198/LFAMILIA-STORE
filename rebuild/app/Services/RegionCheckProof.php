@@ -16,15 +16,23 @@ class RegionCheckProof
     public function issue(Product $product, array $input, array $result): ?string
     {
         // The H2H client normalizes a missing verdict to null, so a key's
-        // presence proves nothing: only a concrete per-family verdict
-        // (an array of tiers, a boolean) counts as evaluated.
-        $firstPurchaseEvaluated = ($result['status'] ?? null) === 'VALID'
-            && is_array($result['first_purchase'] ?? null);
+        // presence proves nothing. First purchase is attested per tier:
+        // only tiers carrying a concrete boolean verdict are listed. The
+        // weekly-pass verdict is a single boolean.
+        $firstPurchaseTiers = [];
+        if (($result['status'] ?? null) === 'VALID' && is_array($result['first_purchase'] ?? null)) {
+            foreach ($result['first_purchase'] as $key => $item) {
+                if (is_array($item) && is_bool($item['eligible'] ?? null)) {
+                    $firstPurchaseTiers[] = (int) ($item['tier'] ?? $key);
+                }
+            }
+            $firstPurchaseTiers = array_values(array_unique($firstPurchaseTiers));
+        }
         $weeklyPassEvaluated = ($result['status'] ?? null) === 'VALID'
             && is_bool($result['wdp_eligible'] ?? null);
 
         if (trim((string) $product->nickname_required_region) === ''
-            && ! $firstPurchaseEvaluated && ! $weeklyPassEvaluated) {
+            && $firstPurchaseTiers === [] && ! $weeklyPassEvaluated) {
             return null;
         }
 
@@ -35,7 +43,7 @@ class RegionCheckProof
             'region' => $result['region'] ?? null,
             'nickname' => $result['nickname'] ?? null,
             'disabled_package_ids' => array_values(array_map('intval', $result['disabled_package_ids'] ?? [])),
-            'first_purchase_evaluated' => $firstPurchaseEvaluated,
+            'first_purchase_tiers' => $firstPurchaseTiers,
             'weekly_pass_evaluated' => $weeklyPassEvaluated,
             'expires_at' => now()->addMinutes(10)->timestamp,
         ], JSON_THROW_ON_ERROR));
@@ -83,18 +91,20 @@ class RegionCheckProof
      * disabled list. Packages outside the families are not affected.
      *
      * @param  array{first_purchase?: array<int, int>, weekly_pass?: array<int, int>}  $families
+     *                                                                                            first_purchase maps package id => its first-purchase tier;
+     *                                                                                            weekly_pass lists package ids.
      */
     public function assertPackageEligible(Product $product, int $packageId, array $input, ?string $proof, array $families): void
     {
-        $inFirstPurchase = in_array($packageId, array_map('intval', $families['first_purchase'] ?? []), true);
+        $firstPurchaseTier = $families['first_purchase'][$packageId] ?? null;
         $inWeeklyPass = in_array($packageId, array_map('intval', $families['weekly_pass'] ?? []), true);
-        if (! $inFirstPurchase && ! $inWeeklyPass) {
+        if ($firstPurchaseTier === null && ! $inWeeklyPass) {
             return;
         }
 
         $decoded = $this->decode($product, $input, $proof);
         if ($decoded === null
-            || ($inFirstPurchase && ($decoded['first_purchase_evaluated'] ?? false) !== true)
+            || ($firstPurchaseTier !== null && ! in_array((int) $firstPurchaseTier, array_map('intval', (array) ($decoded['first_purchase_tiers'] ?? [])), true))
             || ($inWeeklyPass && ($decoded['weekly_pass_evaluated'] ?? false) !== true)) {
             throw ValidationException::withMessages([
                 'package_id' => 'Periksa akun terlebih dahulu untuk memastikan kelayakan paket.',

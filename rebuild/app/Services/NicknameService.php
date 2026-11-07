@@ -153,6 +153,8 @@ class NicknameService
      * orders must carry a proof attesting that family's verdict.
      *
      * @return array{first_purchase: array<int, int>, weekly_pass: array<int, int>}
+     *                                                                              first_purchase maps package id => its first-purchase tier;
+     *                                                                              weekly_pass lists package ids.
      */
     public function eligibilityFamilies(Product $product): array
     {
@@ -174,9 +176,14 @@ class NicknameService
             return $families;
         }
 
-        $families['first_purchase'] = ProductPackage::query()->where('product_id', $product->id)
-            ->whereHas('mappings', fn ($query) => $query->where('is_active', true)->whereIn('external_sku', array_values($skuMap)))
-            ->pluck('id')->map(fn ($id) => (int) $id)->all();
+        foreach ($skuMap as $tier => $sku) {
+            $packageIds = ProductPackage::query()->where('product_id', $product->id)
+                ->whereHas('mappings', fn ($query) => $query->where('is_active', true)->where('external_sku', $sku))
+                ->pluck('id');
+            foreach ($packageIds as $packageId) {
+                $families['first_purchase'][(int) $packageId] = $tier;
+            }
+        }
         if ($gameCode === 'mobile-legends') {
             $families['weekly_pass'] = ProductPackage::query()
                 ->where('product_id', $product->id)

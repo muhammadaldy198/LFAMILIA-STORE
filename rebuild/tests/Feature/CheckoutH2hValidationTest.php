@@ -721,6 +721,51 @@ class CheckoutH2hValidationTest extends TestCase
     }
 
     /**
+     * NV-07 (Codex P2, round 3): first-purchase verdicts are per tier. A
+     * verdict covering only tier 150 opens tier 150 but must not open a
+     * tier-50 package the verdict never mentioned.
+     */
+    public function test_first_purchase_tier_without_a_verdict_is_rejected(): void
+    {
+        $product = $this->game();
+        $tier50 = $this->package($product, 'MLFS100', 'First Recharge 50');
+        $tier150 = $this->package($product, 'MLFS300', 'First Recharge 150');
+        $this->h2h([
+            'status' => 'VALID', 'nickname' => 'PlayerAce', 'region' => 'id',
+            'first_purchase' => [['tier' => 150, 'eligible' => true]],
+            'wdp_eligible' => true,
+        ]);
+        $proof = $this->nickname($product)->assertOk()->json('region_proof');
+        $this->assertNotEmpty($proof);
+
+        $this->postJson('/checkout/orders', $this->order($tier150, $proof))->assertCreated();
+        $this->postJson('/checkout/orders', $this->order($tier50, $proof))
+            ->assertUnprocessable()->assertJsonValidationErrors(['package_id']);
+        $this->assertDatabaseCount('orders', 1);
+    }
+
+    /**
+     * NV-07 (Codex P2, round 3): an empty first-purchase verdict array
+     * attests no tier at all, so (without any other verdict) no proof is
+     * issued and the package rejects.
+     */
+    public function test_first_purchase_empty_verdict_array_issues_no_proof(): void
+    {
+        $product = $this->game();
+        $first = $this->package($product, 'MLFS100', 'First Recharge 50');
+        $this->h2h([
+            'status' => 'VALID', 'nickname' => 'PlayerAce', 'region' => 'id',
+            'first_purchase' => [],
+            'wdp_eligible' => null,
+        ]);
+
+        $this->nickname($product)->assertOk()->assertJsonPath('region_proof', null);
+        $this->postJson('/checkout/orders', $this->order($first, null))
+            ->assertUnprocessable()->assertJsonValidationErrors(['package_id']);
+        $this->assertDatabaseCount('orders', 0);
+    }
+
+    /**
      * NV-07: without any explicit VALID eligibility verdict (account not
      * found), a first-purchase package cannot be ordered either.
      */
