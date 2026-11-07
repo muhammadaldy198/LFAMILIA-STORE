@@ -62,6 +62,16 @@ grep -Eq '^APP_URL=https://' "${ENV_FILE}" || { echo "APP_URL must use HTTPS" >&
 grep -Eq '^APP_TRUSTED_HOSTS=.+$' "${ENV_FILE}" || { echo "APP_TRUSTED_HOSTS is required" >&2; exit 1; }
 grep -Eq '^TRUSTED_PROXIES=.+$' "${ENV_FILE}" || { echo "TRUSTED_PROXIES is required" >&2; exit 1; }
 while IFS= read -r proxies_line; do
+  proxies_raw="${proxies_line#TRUSTED_PROXIES=}"
+  proxies_raw="${proxies_raw#"${proxies_raw%%[![:space:]]*}"}"
+  proxies_quote="${proxies_raw:0:1}"
+  if [[ "${proxies_quote}" == '"' || "${proxies_quote}" == "'" ]]; then
+    proxies_rest="${proxies_raw:1}"
+    if [[ "${proxies_rest}" != *"${proxies_quote}"* ]]; then
+      echo "TRUSTED_PROXIES must be written as a single-line value in production; multiline values are not allowed" >&2
+      exit 1
+    fi
+  fi
   proxies_value="$(printf '%s' "${proxies_line}" | sed -E 's/^TRUSTED_PROXIES=[[:space:]]*//; s/#.*//' | tr -d '[:space:]' | tr -d "\"'")"
   if [[ "${proxies_value}" == *'${'* ]]; then
     echo "TRUSTED_PROXIES must be written literally in production; variable references are not allowed" >&2
