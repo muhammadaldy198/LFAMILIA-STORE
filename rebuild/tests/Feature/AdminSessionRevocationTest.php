@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
 
 class AdminSessionRevocationTest extends TestCase
@@ -126,6 +127,27 @@ class AdminSessionRevocationTest extends TestCase
         $this->assertGuest('admin');
         $this->assertAuthenticatedAs($customer, 'web');
         $this->get('/account')->assertOk();
+    }
+
+    public function test_in_flight_admin_request_cannot_adopt_password_rotated_by_other_device(): void
+    {
+        $admin = $this->admin('race-admin-security@example.test');
+        $this->login($admin);
+        $previousFingerprint = session('security.admin_auth_fingerprint');
+
+        // Password rotation happens after the middleware's initial check,
+        // while this otherwise ordinary authenticated request is executing.
+        Route::middleware(['web', 'auth:admin'])->get('/admin/security/credential-race', function () use ($admin) {
+            $admin->forceFill(['password' => Hash::make('concurrent-new-password-123')])->save();
+
+            return response('ok');
+        });
+        $this->get('/admin/security/credential-race')->assertOk();
+
+        $this->assertSame($previousFingerprint, session('security.admin_auth_fingerprint'));
+        Auth::forgetGuards();
+        $this->get('/admin/panel')->assertRedirect(route('admin.login'));
+        $this->assertGuest('admin');
     }
 
     public function test_admin_broker_reset_revokes_old_sessions_without_auto_login_and_token_reuse(): void
