@@ -328,24 +328,31 @@ class DeploymentM12Test extends TestCase
             '# start of argon2id capability check',
             '# end of argon2id capability check'
         );
-        $config = fn (int $memory): string => "<?php return ['argon' => ['memory' => {$memory}, 'time' => 4, 'threads' => 1]];\n";
+        // The fixture config mirrors the real config/hashing.php shape:
+        // every value flows through env(), so the gate's dotenv resolution
+        // decides the effective values.
+        $config = fn (int $defaultMemory): string => "<?php return ['driver' => env('HASH_DRIVER', 'argon2id'), 'argon' => ['memory' => env('HASH_MEMORY', {$defaultMemory}), 'time' => env('HASH_TIME', 4), 'threads' => env('HASH_THREADS', 1)]];\n";
 
         $cases = [
-            'configured cost round-trips' => [PHP_BINARY, $config(65536), 0],
-            'impossible configured cost fails' => [PHP_BINARY, $config(1), 1],
-            'php that cannot hash at all fails' => [null, $config(65536), 1],
+            'configured cost round-trips' => [PHP_BINARY, '', $config(65536), 0],
+            'invalid env override fails despite a valid config default' => [PHP_BINARY, "HASH_MEMORY=1\n", $config(65536), 1],
+            'valid env override rescues an impossible config default' => [PHP_BINARY, "HASH_MEMORY=65536\n", $config(1), 0],
+            'bcrypt driver skips the gate entirely' => [PHP_BINARY, "HASH_DRIVER=bcrypt\n", $config(1), 0],
+            'quoted env override is honoured' => [PHP_BINARY, "HASH_MEMORY=\"65536\"\n", $config(1), 0],
+            'php that cannot hash at all fails' => [null, '', $config(65536), 1],
         ];
 
-        foreach ($cases as $label => [$phpBin, $contents, $expected]) {
+        foreach ($cases as $label => [$phpBin, $envContents, $configContents, $expected]) {
             $dir = $this->makePreflightFixtureDir([]);
             mkdir("{$dir}/config", 0777, true);
-            file_put_contents("{$dir}/config/hashing.php", $contents);
+            file_put_contents("{$dir}/config/hashing.php", $configContents);
+            file_put_contents("{$dir}/env.txt", $envContents);
             if ($phpBin === null) {
                 $phpBin = "{$dir}/php-stub";
                 file_put_contents($phpBin, "#!/bin/sh\nexit 1\n");
                 chmod($phpBin, 0755);
             }
-            file_put_contents("{$dir}/run.sh", "APP_DIR={$dir}\nPHP_BIN={$phpBin}\n{$block}\n");
+            file_put_contents("{$dir}/run.sh", "APP_DIR={$dir}\nENV_FILE={$dir}/env.txt\nPHP_BIN={$phpBin}\n{$block}\n");
             $this->assertSame($expected, $this->runBashScript("{$dir}/run.sh"), "Preflight Argon2id capability gate: {$label}.");
         }
     }

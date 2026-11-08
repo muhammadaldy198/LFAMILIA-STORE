@@ -48,25 +48,55 @@ done
 # The default password hash driver is Argon2id (config/hashing.php). A PHP
 # build without Argon2id support would pass every other check in this
 # script and still break password creation and login rehashing after the
-# deploy, so this is a hard gate, not a warning: the algorithm must be
-# listed by password_algos(), and a real hash must round-trip at the cost
-# the target tree is configured with. The config file is loaded with a
-# minimal env() stub so the values exercised are the pinned ones.
+# deploy, so this is a hard gate, not a warning. It resolves the EFFECTIVE
+# configuration exactly as the application will: the config file's env()
+# calls are answered from the production .env (first occurrence wins,
+# matching the immutable dotenv repository Laravel boots with), so an
+# invalid HASH_* override fails here instead of after the deploy. The
+# algorithm must be listed by password_algos(), and a real hash must
+# round-trip at the effective cost. A bcrypt driver skips the gate.
 "${PHP_BIN}" -r '
-if (! in_array("argon2id", password_algos(), true)) {
+$map = [];
+foreach (file($argv[1], FILE_IGNORE_NEW_LINES) ?: [] as $line) {
+    $line = trim($line);
+    if ($line === "" || $line[0] === "#" || ! str_contains($line, "=")) {
+        continue;
+    }
+    [$k, $v] = explode("=", $line, 2);
+    $k = trim($k);
+    $v = trim($v);
+    if (str_starts_with($k, "export ")) {
+        $k = trim(substr($k, 7));
+    }
+    if (strlen($v) >= 2 && ($v[0] === "\"" || $v[0] === "\047") && $v[strlen($v) - 1] === $v[0]) {
+        $v = substr($v, 1, -1);
+    } elseif (($pos = strpos($v, " #")) !== false) {
+        $v = trim(substr($v, 0, $pos));
+    }
+    if (! array_key_exists($k, $map)) {
+        $map[$k] = $v;
+    }
+}
+function env($key, $default = null) { global $map; return $map[$key] ?? $default; }
+$config = require $argv[2];
+$driver = $config["driver"] ?? "bcrypt";
+if ($driver === "bcrypt") {
+    exit(0);
+}
+$algo = $driver === "argon" ? PASSWORD_ARGON2I : PASSWORD_ARGON2ID;
+$algoName = $driver === "argon" ? "argon2i" : "argon2id";
+if (! in_array($algoName, password_algos(), true)) {
     exit(1);
 }
-function env($key, $default = null) { return $default; }
-$config = require $argv[1];
 $argon = $config["argon"] ?? [];
-$hash = password_hash("preflight-probe", PASSWORD_ARGON2ID, [
+$hash = password_hash("preflight-probe", $algo, [
     "memory_cost" => (int) ($argon["memory"] ?? 65536),
     "time_cost" => (int) ($argon["time"] ?? 4),
     "threads" => (int) ($argon["threads"] ?? 1),
 ]);
 exit($hash !== false && password_verify("preflight-probe", $hash) ? 0 : 1);
-' "${APP_DIR}/config/hashing.php" \
-  || { echo "PHP Argon2id support is required and must hash at the configured cost (see config/hashing.php)" >&2; exit 1; }
+' "${ENV_FILE}" "${APP_DIR}/config/hashing.php" \
+  || { echo "PHP Argon2 support is required and must hash at the effective configured cost (see config/hashing.php and HASH_* in .env)" >&2; exit 1; }
 # end of argon2id capability check
 
 for pair in \
