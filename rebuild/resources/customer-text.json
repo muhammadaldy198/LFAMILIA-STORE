@@ -2476,8 +2476,8 @@
   },
   "faq.status.04.body": {
     "group": "FAQ/Panduan status",
-    "label": "Jika transaksi gagal final, pesanan diperiksa admin lalu diselesaikan dengan pengiriman ulang. Hubungi bantuan dengan nomor invoice.",
-    "default": "Jika transaksi gagal final, pesanan diperiksa admin lalu diselesaikan dengan pengiriman ulang. Hubungi bantuan dengan nomor invoice."
+    "label": "Jika transaksi gagal final, pesanan diperiksa admin untuk diselesaikan. Hubungi bantuan dengan nomor invoice.",
+    "default": "Jika transaksi gagal final, pesanan diperiksa admin untuk diselesaikan. Hubungi bantuan dengan nomor invoice."
   },
   "pages.account.attribute.title.682fab7a": {
     "group": "Pages/Account",
