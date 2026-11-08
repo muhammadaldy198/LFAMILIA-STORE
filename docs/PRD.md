@@ -66,7 +66,7 @@ Webhook tervalidasi → pembayaran LUNAS → pesanan masuk antrean pengiriman
 Pengiriman: otomatis ke penyedia, atau manual oleh admin
       ↓
 Berhasil → produk terkirim, pesanan selesai
-Gagal   → perlu pemeriksaan admin → penyelesaian (kirim ulang / refund manual)
+Gagal   → perlu pemeriksaan admin → penyelesaian (kirim ulang / penanganan manual admin)
 ```
 
 Aturan yang mengikat alur ini:
@@ -257,7 +257,7 @@ Aturan turunan:
 - **Webhook diverifikasi tanda tangannya.** Tanpa verifikasi, payload diabaikan.
 - **Webhook hanya mempercepat**, bukan satu-satunya sumber. Cek ulang tetap dijalankan untuk pesanan yang belum pasti.
 - **Saldo penyedia hanya ditampilkan sebagai angka pantau.** Panel boleh menampilkan saldo Digiflazz apa adanya untuk dilihat admin. **Tidak ada alarm, peringatan otomatis, atau ambang saldo** — tidak ada notifikasi "saldo menipis" ke Telegram/Discord/email.
-- **Batas cek ulang otomatis: 3 kali**, dengan jeda minimal 2 menit antar percobaan. Setelah itu pesanan tidak dicek otomatis lagi dan naik ke pemeriksaan manusia. Artinya kegagalan penyedia biasanya diketahui dalam hitungan menit, bukan hari — jadi klaim "penyedia baru konfirmasi gagal berhari-hari kemudian" tidak dipakai sebagai alasan pengecualian refund.
+- **Batas cek ulang otomatis: 3 kali**, dengan jeda minimal 2 menit antar percobaan. Setelah itu pesanan tidak dicek otomatis lagi dan naik ke pemeriksaan manusia. Artinya kegagalan penyedia biasanya diketahui dalam hitungan menit, bukan hari — jadi klaim "penyedia baru konfirmasi gagal berhari-hari kemudian" tidak dipakai sebagai alasan pengecualian penyelesaian.
 - **Tidak ada ambang peringatan saldo.** Saldo penyedia tidak punya alarm otomatis; admin melihat angkanya sendiri di panel.
 
 ### 8.2 Manual
@@ -296,7 +296,7 @@ Ini yang tampil di halaman lacak pesanan dan email. Hanya enam, dengan bahasa to
 | **Menunggu Pembayaran** | Pesanan dibuat, belum dibayar. |
 | **Sedang Diproses** | Pembayaran diterima, pesanan sedang dikirim. |
 | **Berhasil** | Produk sudah terkirim. |
-| **Gagal** | Pesanan gagal final; ditangani sesuai kebijakan pengembalian dana. |
+| **Gagal** | Pesanan gagal final; ditangani sesuai kebijakan penyelesaian pesanan (§10). |
 | **Kedaluwarsa** | Waktu bayar habis. |
 | **Dibatalkan** | Pesanan dibatalkan. Kalau sudah bayar, hubungi bantuan. |
 
@@ -313,57 +313,35 @@ Aturan:
 
 ---
 
-## 10. Penyelesaian & pengembalian dana
+## 10. Penyelesaian pesanan bermasalah
 
-### 10.1 Prinsip
+### 10.1 Prinsip: tidak ada pengembalian dana
 
-Pengembalian dana **tidak pernah otomatis**. Tidak ada tombol yang memindahkan uang tanpa keputusan manusia. Sistem mencatat, admin memutuskan.
+LFAMILIA **tidak melayani pengembalian dana (refund)** — keputusan pemilik 2026-10-14, mutlak, tanpa jalur otomatis maupun manual. Tidak ada tombol refund, tidak ada formulir pengajuan refund, dan tidak ada teks untuk pembeli yang menjanjikan uang kembali (kode menegakkan larangan terakhir ini: teks templat yang menjanjikan pengembalian dana ditolak sistem).
 
-Kebijakan lengkap ada di halaman publik `/refund` dan **dokumen itu yang berlaku untuk pembeli**. Ringkasan aturan internal:
+Halaman publik `/refund` tetap ada sebagai dokumen hukum, dan isinya menyatakan kebijakan ini: tidak ada pengembalian dana; pesanan bermasalah diselesaikan dengan cara di bawah ini.
 
-### 10.2 Kondisi yang dapat diajukan
+### 10.2 Pesanan gagal diselesaikan, bukan dibatalkan sepihak
 
-1. Pembayaran terverifikasi, tetapi pesanan dinyatakan gagal oleh sistem/penyedia dan tidak bisa diproses ulang.
-2. Pembayaran ganda untuk invoice yang sama.
-3. Produk tidak tersedia dan tidak bisa dipenuhi dalam waktu wajar.
-4. Nominal terkirim lebih kecil dari yang dibayar dan selisih tidak bisa dipenuhi.
-5. Pembayaran dilaporkan tidak sah sebelum produk dikirim (setelah verifikasi kepemilikan).
+- Pesanan yang gagal atau belum pasti dicek ulang otomatis sampai 3 kali (§9), lalu naik ke pemeriksaan admin dan ditahan di status internal BLOCKED (§9.1) sampai ada keputusan manusia.
+- Penyelesaiannya adalah **menyelesaikan pesanannya**: kirim ulang oleh admin, pengiriman manual, atau tindakan operasional lain yang membuat pembeli menerima produk yang ia bayar.
+- Kalau pembeli salah mengisi ID/server/data tujuan dan penyedia sudah mengirim sesuai data itu, pesanan dianggap selesai — itu tanggung jawab pembeli, bukan kegagalan sistem.
+- Berubah pikiran, salah pilih produk/nominal, produk sudah terkirim, kode sudah ditampilkan, akun game diblokir publisher, atau bonus publisher tidak diterima **tidak mengubah apa pun**: tidak ada pengembalian dana untuk alasan-alasan itu maupun alasan lain.
 
-### 10.3 Kondisi yang tidak dapat diajukan
+### 10.3 Pembayaran bermasalah
 
-1. Produk sudah berhasil terkirim.
-2. Salah pilih game, produk, nominal, User ID, server, region, email, atau nomor tujuan.
-3. Kode voucher/lisensi sudah ditampilkan atau dipakai.
-4. Akun game diblokir/dibatasi publisher.
-5. Bonus/event publisher tidak diterima padahal produk utama terkirim.
-6. Berubah pikiran, menemukan harga lain, atau keterlambatan singkat.
+- Pembayaran ganda untuk invoice yang sama, atau pembayaran terverifikasi yang pesanannya benar-benar tidak dapat dipenuhi, diperiksa admin dari catatan sistem — bukan dari klaim lisan.
+- Untuk **member**, koreksinya dilakukan sebagai **penyesuaian saldo** oleh Super Admin (§10.5). Ini mekanisme koreksi internal atas keputusan admin, bukan hak refund pembeli dan tidak dijanjikan kepada pembeli.
+- Untuk **guest** (tidak punya saldo), penyelesaian diputuskan Super Admin kasus per kasus; panel mencatat hasil penyelesaian beserta catatan dan buktinya.
+- Membatalkan pesanan tidak otomatis mengembalikan uang; penyelesaian uang mengikuti bab ini.
 
-### 10.4 Batas waktu
+### 10.4 Top up saldo yang dibalik gateway
 
-- Pengajuan: **maksimal 7 hari kalender** sejak transaksi, lewat Hubungi Kami, dengan nomor invoice.
-- **Pengecualian:** kalau catatan sistem membuktikan kesalahan ada di sisi LFAMILIA (mis. pengiriman tidak pernah dijalankan, notifikasi pembayaran hilang, pesanan macet karena gangguan internal), pengajuan tetap dilayani walau lewat 7 hari. Pengecualian harus merujuk bukti di riwayat pesanan, bukan penilaian lisan.
-- **Bukan pengecualian:** produk ditarik publisher setelah terkirim, akun game diblokir, atau bonus publisher tidak diterima. Itu bukan kesalahan sistem dan tetap ditolak.
-- Pemeriksaan: umumnya **1–7 hari kerja**.
-- Dana diterima pembeli setelah refund diterbitkan: **hingga 14 hari kerja** (tergantung bank/dompet/gateway).
-
-### 10.5 Dua jalur penyelesaian
-
-**Member (punya akun):**
-- Pengembalian dapat dilakukan sebagai **penyesuaian saldo** oleh admin.
-- Wajib: jumlah, alasan, rujukan pesanan, dan pencatatan audit.
-- Nama fiturnya **"penyesuaian saldo"**, bukan "refund". Sistem tidak memutuskan apa pun; admin yang menyatakan.
-
-**Guest (tanpa akun):**
-- Guest **tidak punya saldo**, jadi tidak ada tempat menaruh saldo.
-- Penyelesaian dilakukan dengan **transfer manual di luar sistem**.
-- Di panel, admin hanya menandai: sudah diselesaikan + catatan + bukti.
-
-**Top up saldo yang dibalik gateway:**
-- Kalau gateway membatalkan dan mengembalikan dana sebuah top up, dana itu **sudah kembali ke pelanggan di luar sistem**. Sistem tidak memindahkan uang apa pun.
+- Kalau gateway membatalkan dan mengembalikan dana sebuah top up, dana itu **sudah kembali ke pelanggan di luar sistem** — yang membalikkannya gateway, bukan toko. Sistem tidak memindahkan uang apa pun.
 - Admin hanya **menutup tinjauan** top up itu dengan alasan tertulis. Penutupan ini **tidak mengubah saldo** pelanggan sama sekali — ia hanya membuka kembali pemakaian saldo oleh pelanggan.
-- Kalau saldo pelanggan ternyata masih memuat dana yang sudah dibalik gateway, penyelesaiannya lewat **penyesuaian saldo manual** oleh Super Admin (§10.6) — bukan lewat tombol refund.
+- Kalau saldo pelanggan ternyata masih memuat dana yang sudah dibalik gateway, penyelesaiannya lewat **penyesuaian saldo manual** oleh Super Admin (§10.5) — bukan lewat tombol refund.
 
-### 10.6 Pengaman penyesuaian saldo
+### 10.5 Pengaman penyesuaian saldo
 
 - **Hanya Super Admin.** Admin biasa tidak punya akses, walau diberi izin lain.
 - Alasan wajib diisi, tidak boleh kosong.
@@ -371,9 +349,6 @@ Kebijakan lengkap ada di halaman publik `/refund` dan **dokumen itu yang berlaku
 - Saldo tidak boleh minus.
 - Tercatat di ledger dan audit log, tidak bisa dihapus.
 - Kunci idempotensi **berlaku per pelanggan**: permintaan yang sama untuk pelanggan yang sama tidak boleh menambah saldo dua kali, tetapi pelanggan lain boleh memakai nilai kunci permintaan yang sama. Entri lama tetap terlindungi dari pemrosesan ulang.
-
----
-
 ## 11. Akun pelanggan
 
 ### 11.1 Guest
@@ -476,7 +451,7 @@ Daftar halaman yang harus ada dan berfungsi:
 | Status | `/status` | Status layanan |
 | Syarat & ketentuan | `/terms` | Dokumen hukum |
 | Kebijakan privasi | `/privacy` | Dokumen hukum |
-| Kebijakan pengembalian dana | `/refund` | Dokumen hukum — **wajib ada** |
+| Kebijakan pengembalian dana | `/refund` | Dokumen hukum — **wajib ada**; isinya menyatakan toko tidak melayani refund |
 
 Aturan:
 
