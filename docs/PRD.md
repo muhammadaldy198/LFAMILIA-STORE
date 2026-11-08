@@ -319,7 +319,7 @@ Aturan:
 
 LFAMILIA **tidak melayani pengembalian dana (refund)** — keputusan pemilik 2026-10-14, mutlak, tanpa jalur otomatis maupun manual. Tidak ada tombol refund, tidak ada formulir pengajuan refund, dan tidak ada teks untuk pembeli yang menjanjikan uang kembali (kode menegakkan larangan terakhir ini: teks templat yang menjanjikan pengembalian dana ditolak sistem).
 
-Halaman publik `/refund` tetap ada sebagai dokumen hukum, dan isinya menyatakan kebijakan ini: tidak ada pengembalian dana; pesanan bermasalah diselesaikan dengan cara di bawah ini.
+Halaman publik `/refund` tetap ada sebagai dokumen hukum; isinya dikelola pemilik dari panel dan bukan bagian dari dokumen ini. Kebijakan toko di bab ini yang berlaku untuk operasional: pesanan bermasalah diselesaikan dengan cara di bawah ini.
 
 ### 10.2 Pesanan gagal diselesaikan, bukan dibatalkan sepihak
 
@@ -451,7 +451,7 @@ Daftar halaman yang harus ada dan berfungsi:
 | Status | `/status` | Status layanan |
 | Syarat & ketentuan | `/terms` | Dokumen hukum |
 | Kebijakan privasi | `/privacy` | Dokumen hukum |
-| Kebijakan pengembalian dana | `/refund` | Dokumen hukum — **wajib ada**; isinya menyatakan toko tidak melayani refund |
+| Kebijakan pengembalian dana | `/refund` | Dokumen hukum — **wajib ada**; isi dikelola pemilik dari panel |
 
 Aturan:
 
