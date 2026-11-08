@@ -15,6 +15,8 @@ use App\Http\Controllers\AdminDigiflazzController;
 use App\Http\Controllers\AdminFulfillmentController;
 use App\Http\Controllers\AdminHealthController;
 use App\Http\Controllers\AdminIntegrationController;
+use App\Http\Controllers\AdminIntegrationCredentialController;
+use App\Http\Controllers\AdminIntegrationTestController;
 use App\Http\Controllers\AdminMessageTemplatesController;
 use App\Http\Controllers\AdminNicknameController;
 use App\Http\Controllers\AdminNotificationController;
@@ -517,11 +519,11 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
             ->middleware(['throttle:admin-sensitive', 'admin.password.confirm'])->name('admin.access.destroy');
 
         Route::get('/admin/integrations', [AdminIntegrationController::class, 'index'])->name('admin.integrations');
-        Route::put('/admin/integrations/{code}', [AdminIntegrationController::class, 'update'])
+        Route::put('/admin/integrations/{code}', [AdminIntegrationCredentialController::class, 'update'])
             ->middleware('throttle:admin-sensitive')->name('admin.integrations.update');
-        Route::post('/admin/integrations/resend/send-test-email', [AdminIntegrationController::class, 'sendTestEmail'])
+        Route::post('/admin/integrations/resend/send-test-email', [AdminIntegrationTestController::class, 'sendTestEmail'])
             ->middleware('throttle:3,1')->name('admin.integrations.resend.send-test-email');
-        Route::post('/admin/integrations/{code}/test', [AdminIntegrationController::class, 'test'])
+        Route::post('/admin/integrations/{code}/test', [AdminIntegrationTestController::class, 'test'])
             ->middleware('throttle:admin-sensitive')->name('admin.integrations.test');
 
         Route::get('/admin/health', [AdminHealthController::class, 'index'])->name('admin.health');
