@@ -9,11 +9,11 @@ return new class extends Migration
     {
         // Saved admin overrides for the FAQ failed-order card would keep
         // showing the old "Gagal / Refund" text, because saved presentation
-        // values win over the defaults. Clear an override while it still
-        // promises refunds — the exact old default text, or any customised
-        // wording that still mentions a refund or "pengembalian dana".
-        // Customised copy without a refund promise is the admin's content
-        // and stays untouched, as does every other saved value.
+        // values win over the defaults. Clear an override only while it
+        // still promises refunds (see promisesRefund()); copy that merely
+        // mentions refunds to say there are none, and copy with no refund
+        // promise at all, is the admin's content and stays untouched, as
+        // does every other saved value.
         $row = DB::table('system_settings')->where('key', 'store.customer_presentation')->first();
         if ($row === null) {
             return;
@@ -27,7 +27,7 @@ return new class extends Migration
         $changed = false;
         foreach (['faq.status.04.title', 'faq.status.04.body'] as $key) {
             $saved = $value['text'][$key] ?? null;
-            if (is_string($saved) && (stripos($saved, 'refund') !== false || stripos($saved, 'pengembalian dana') !== false)) {
+            if (is_string($saved) && $this->promisesRefund($saved, $key === 'faq.status.04.title')) {
                 unset($value['text'][$key]);
                 $changed = true;
             }
@@ -38,6 +38,53 @@ return new class extends Migration
 
         DB::table('system_settings')->where('key', 'store.customer_presentation')
             ->update(['value' => json_encode($value), 'updated_at' => now()]);
+    }
+
+    /**
+     * Whether saved copy still offers buyers a refund. Denials are checked
+     * first, so wording like "tidak ada refund" is preserved; the old
+     * defaults and any phrasing that points buyers at a refund policy, a
+     * refund application, or a refund outcome count as promises. A title
+     * is only a label, so any refund mention in it frames the card as
+     * being about refunds and counts as well.
+     */
+    private function promisesRefund(string $text, bool $isTitle): bool
+    {
+        $t = mb_strtolower($text);
+
+        $denials = [
+            'tidak ada refund', 'tidak ada pengembalian dana',
+            'tidak melayani refund', 'tidak melayani pengembalian dana',
+            'refund tidak tersedia', 'pengembalian dana tidak tersedia',
+            'tidak dapat direfund', 'tidak bisa direfund',
+            'tidak akan direfund', 'tidak direfund',
+            'tanpa refund', 'tanpa pengembalian dana',
+            'bukan refund', 'no refund',
+        ];
+        foreach ($denials as $denial) {
+            if (str_contains($t, $denial)) {
+                return false;
+            }
+        }
+
+        if ($isTitle) {
+            return str_contains($t, 'refund') || str_contains($t, 'pengembalian dana');
+        }
+
+        $promises = [
+            'kebijakan refund', 'kebijakan pengembalian',
+            'refund hanya tersedia', 'pengembalian dana hanya tersedia',
+            'pengajuan', 'mengajukan',
+            'ajukan refund', 'ajukan pengembalian',
+            'direfund',
+        ];
+        foreach ($promises as $promise) {
+            if (str_contains($t, $promise)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function down(): void
