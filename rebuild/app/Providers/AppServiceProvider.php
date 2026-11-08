@@ -58,6 +58,15 @@ class AppServiceProvider extends ServiceProvider
             if (config('lfamilia.trusted_proxies', []) === []) {
                 throw new LogicException('TRUSTED_PROXIES must be configured in production.');
             }
+            $trustedProxies = config('lfamilia.trusted_proxies');
+            if ($trustedProxies === '*' || (is_array($trustedProxies) && in_array('*', $trustedProxies, true))) {
+                throw new LogicException('TRUSTED_PROXIES must list the proxy addresses in production; the wildcard is not allowed.');
+            }
+            foreach ((array) $trustedProxies as $trustedProxy) {
+                if (! self::isValidTrustedProxyEntry((string) $trustedProxy)) {
+                    throw new LogicException('TRUSTED_PROXIES entries must be IP addresses or CIDR ranges in production; a malformed or catch-all entry is not allowed.');
+                }
+            }
             if (! str_starts_with((string) config('app.url'), 'https://')) {
                 throw new LogicException('APP_URL must use HTTPS in production.');
             }
@@ -101,5 +110,34 @@ class AppServiceProvider extends ServiceProvider
             ->by('admin-mutation:'.($request->user('admin')?->id ?? $request->ip())));
         RateLimiter::for('account-sensitive', fn (Request $request) => Limit::perMinute(10)
             ->by('account-sensitive:'.($request->user()?->id ?? $request->ip())));
+    }
+
+    /**
+     * A trusted-proxy entry is a plain IP address or a CIDR range with a
+     * non-zero prefix; embedded-IPv4 IPv6 forms are not accepted, matching
+     * the deploy preflight's validation of the same value.
+     */
+    private static function isValidTrustedProxyEntry(string $entry): bool
+    {
+        $parts = explode('/', $entry);
+        if (count($parts) > 2) {
+            return false;
+        }
+        $prefix = $parts[1] ?? null;
+        if ($prefix !== null && ($prefix === '' || ! ctype_digit($prefix) || (int) $prefix === 0)) {
+            return false;
+        }
+        $address = $parts[0];
+        if (str_contains($address, '.') && str_contains($address, ':')) {
+            return false;
+        }
+        if (filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false) {
+            return $prefix === null || (int) $prefix <= 32;
+        }
+        if (filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false) {
+            return $prefix === null || (int) $prefix <= 128;
+        }
+
+        return false;
     }
 }

@@ -18,13 +18,17 @@ Provider/application credential yang dikelola aplikasi tetap di Super Admin → 
 
 Urutan operasional yang aman:
 
-1. Pastikan PR sudah merged ke `main` dan CI hijau.
+1. Pastikan PR sudah merged ke `main` dan CI hijau, lalu atur `DEPLOY_EXPECTED_SHA` di `/etc/lfamilia/ops.env` ke SHA commit target (deploy.sh menolak SHA lain).
 2. Jalankan encrypted database backup dengan `bash deploy/backup.sh`.
 3. Pastikan backup berhasil sebelum perubahan runtime.
 4. Jalankan `bash deploy/preflight.sh`.
 5. Jalankan `bash deploy/deploy.sh`.
 6. Jalankan/konfirmasi `bash deploy/healthcheck.sh`.
 7. Periksa queue/scheduler dan error log bila healthcheck gagal.
+
+Catatan bootstrap pin: pada deploy PERTAMA yang memasang pemeriksaan `DEPLOY_EXPECTED_SHA`, `deploy.sh` yang berjalan masih versi lama (belum ada pemeriksaannya), jadi pin belum bisa menegakkan dirinya sendiri. Untuk deploy pertama itu, verifikasi manual SHA target di server sesudah fetch (`git rev-parse origin/main`) dan cocokkan dengan commit yang sudah di-review dan CI hijau SEBELUM menjalankan `deploy.sh`. Mulai deploy berikutnya, pemeriksaan berjalan otomatis di dalam script, sebelum checkout menyentuh tree live.
+
+Catatan bootstrap guard TRUSTED_PROXIES: pada deploy PERTAMA yang memasang boot guard TRUSTED_PROXIES (aplikasi menolak wildcard dan entri proxy yang malformed saat boot), `deploy.sh` yang berjalan masih versi lama, jadi pemeriksaan preflight target di dalam script belum bisa melindungi deploy tersebut. Sebelum deploy pertama itu: (1) migrasikan `TRUSTED_PROXIES` di `.env` live dari `*` ke daftar proxy eksplisit (mis. `127.0.0.1,::1`); (2) jalankan `preflight.sh` dari tree target (checkout SHA yang sudah di-review) terhadap env live dan wajibkan lolos SEBELUM menjalankan `deploy.sh`. Bila langkah ini dilewati, guard baru dapat melempar di `artisan down` sesudah checkout: tree target terpromosi tetapi aplikasi tidak bisa boot dan belum masuk maintenance mode. Preflight target juga memvalidasi nilai `TRUSTED_PROXIES` yang membeku di cache konfigurasi (`bootstrap/cache/config.php`), karena aplikasi membaca cache itu, bukan `.env`, begitu cache ada: cache yang dibangun saat `.env` masih berisi `*` akan tetap membuat boot pertama tree yang ter-guard melempar meski `.env` sudah dimigrasikan. Bila preflight target gagal karena cache tersebut, hapus `bootstrap/cache/config.php` lalu jalankan ulang preflight target sampai lolos sebelum deploy. Mulai deploy berikutnya, `deploy.sh` menjalankan preflight target sesudah checkout dan memulihkan tree sebelumnya bila gagal, jadi urutan ini menegakkan dirinya sendiri.
 
 **Catatan aktual:** `deploy.sh` memanggil `preflight.sh`, tetapi tidak otomatis memanggil `backup.sh`. Karena itu backup-before-deploy adalah kewajiban runbook/operator, bukan safety net otomatis di script.
 
