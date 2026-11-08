@@ -197,7 +197,7 @@ class DeploymentM12Test extends TestCase
         $loop = $this->extractPreflightBlock(
             $preflight,
             'while IFS= read -r proxies_line; do',
-            'done < <(grep -E \'^[[:space:]]*(export[[:space:]]+)?TRUSTED_PROXIES=\' "${ENV_FILE}" || true)'
+            'done < <(grep -E \'^[[:space:]]*(export[[:space:]]+)?TRUSTED_PROXIES[[:space:]]*=\' "${ENV_FILE}" || true)'
         );
 
         $cases = [
@@ -212,6 +212,8 @@ class DeploymentM12Test extends TestCase
             'export-prefixed wildcard entry fails' => ["export TRUSTED_PROXIES=127.0.0.1,*\n", 1],
             'export-prefixed loopback list passes' => ["export TRUSTED_PROXIES=127.0.0.1,::1\n", 0],
             'leading-space wildcard fails' => [" TRUSTED_PROXIES=*\n", 1],
+            'spaced-equals wildcard entry fails' => ["TRUSTED_PROXIES =127.0.0.1,*\n", 1],
+            'spaced-equals loopback list passes' => ["TRUSTED_PROXIES = 127.0.0.1,::1\n", 0],
             'quoted hash does not hide a wildcard entry' => ["TRUSTED_PROXIES=\"127.0.0.1#note,*\"\n", 1],
             'unquoted hash without a space does not hide a wildcard entry' => ["TRUSTED_PROXIES=127.0.0.1#note,*\n", 1],
             'space hash comment still passes for loopback' => ["TRUSTED_PROXIES=127.0.0.1,::1 # note\n", 0],
@@ -274,6 +276,8 @@ class DeploymentM12Test extends TestCase
         $upperEnvLocalShadow = implode("\n", ["    location ~ \\.ENV\\.LOCAL$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $uploadsIniShadow = implode("\n", ["    location ~ ^/uploads/.*\\.ini$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $privateBakShadow = implode("\n", ["    location ~ ^/private/.*\\.bak$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
+        $groupedEscapedShadow = implode("\n", ["    location ~ ^(/private/\\.env\\.bak)$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
+        $groupedReadme = implode("\n", ["    location ~ ^(/private/readme)$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $inClassNegated = implode("\n", ["    location ~* ^/files/[\\D]+\\.env$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $numericBackref = implode("\n", ["    location ~* \\.(env|log)\\1$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $wordClass = implode("\n", ["    location ~* ^/files/\\w+\\.env$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
@@ -320,6 +324,8 @@ class DeploymentM12Test extends TestCase
             'uppercase env.local regex shadows the dotfile rule' => [$server('lfamilia.com', $upperEnvLocalShadow), 1],
             'uploads-scoped ini regex shadows the extension rule' => [$server('lfamilia.com', $uploadsIniShadow), 1],
             'private-prefixed bak regex shadows the extension rule via derived probes' => [$server('lfamilia.com', $privateBakShadow), 1],
+            'grouped escaped literal shadows the dotfile and extension rules' => [$server('lfamilia.com', $groupedEscapedShadow), 2],
+            'grouped literal matching nothing protected stays clean' => [$server('lfamilia.com', $groupedReadme), 0],
             'negated shorthand inside a character class counts as overlapping' => [$server('lfamilia.com', $inClassNegated), 3],
             'numeric backreference counts as overlapping' => [$server('lfamilia.com', $numericBackref), 3],
             'word-class escape is translated for matching' => [$server('lfamilia.com', $wordClass), 1],

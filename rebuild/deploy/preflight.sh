@@ -60,9 +60,11 @@ done
 grep -Eq '^APP_KEY=base64:.+$' "${ENV_FILE}" || { echo "APP_KEY must be generated server-side" >&2; exit 1; }
 grep -Eq '^APP_URL=https://' "${ENV_FILE}" || { echo "APP_URL must use HTTPS" >&2; exit 1; }
 grep -Eq '^APP_TRUSTED_HOSTS=.+$' "${ENV_FILE}" || { echo "APP_TRUSTED_HOSTS is required" >&2; exit 1; }
-grep -Eq '^[[:space:]]*(export[[:space:]]+)?TRUSTED_PROXIES=.+$' "${ENV_FILE}" || { echo "TRUSTED_PROXIES is required" >&2; exit 1; }
+grep -Eq '^[[:space:]]*(export[[:space:]]+)?TRUSTED_PROXIES[[:space:]]*=.+$' "${ENV_FILE}" || { echo "TRUSTED_PROXIES is required" >&2; exit 1; }
 while IFS= read -r proxies_line; do
-  proxies_raw="${proxies_line#*TRUSTED_PROXIES=}"
+  proxies_raw="${proxies_line#*TRUSTED_PROXIES}"
+  proxies_raw="${proxies_raw#"${proxies_raw%%[![:space:]]*}"}"
+  proxies_raw="${proxies_raw#=}"
   proxies_raw="${proxies_raw#"${proxies_raw%%[![:space:]]*}"}"
   proxies_quote="${proxies_raw:0:1}"
   if [[ "${proxies_quote}" == '"' || "${proxies_quote}" == "'" ]]; then
@@ -109,7 +111,7 @@ while IFS= read -r proxies_line; do
     echo "TRUSTED_PROXIES must name at least one proxy in production; an empty value is not allowed" >&2
     exit 1
   fi
-done < <(grep -E '^[[:space:]]*(export[[:space:]]+)?TRUSTED_PROXIES=' "${ENV_FILE}" || true)
+done < <(grep -E '^[[:space:]]*(export[[:space:]]+)?TRUSTED_PROXIES[[:space:]]*=' "${ENV_FILE}" || true)
 
 cd "${APP_DIR}"
 COMPOSER_ALLOW_SUPERUSER=1 \
@@ -277,7 +279,7 @@ location ~* ^/(?:storage/logs|bootstrap/cache)/'
         }
         return out
       }
-      function litprefix(p,    out, j, ch, nx, d, inner, q, st) {
+      function litprefix(p,    out, j, ch, nx, d, inner, q, st, bad) {
         out = ""; j = 1
         if (substr(p, 1, 1) == "^") j = 2
         while (j <= length(p)) {
@@ -288,25 +290,28 @@ location ~* ^/(?:storage/logs|bootstrap/cache)/'
             out = out nx; j += 2; continue
           }
           if (ch == "(") {
-            d = 1; inner = ""; q = j + 1
+            d = 1; inner = ""; q = j + 1; bad = 0
             while (q <= length(p) && d > 0) {
               st = substr(p, q, 1)
-              if (st == "\\") { inner = inner substr(p, q, 2); q += 2; continue }
-              if (st == "(") d++
-              else if (st == ")") { d--; if (!d) break }
-              else inner = inner st
-              q++
+              if (st == "\\") {
+                nx = substr(p, q + 1, 1)
+                if (nx ~ /[A-Za-z0-9]/) { bad = 1; break }
+                inner = inner nx; q += 2; continue
+              }
+              if (st == "(") { bad = 1; break }
+              if (st == ")") { d--; q++; if (!d) break; continue }
+              if (st ~ /[.*+?|\[\]$^]/) { bad = 1; break }
+              inner = inner st; q++
             }
-            if (d != 0) break
-            if (inner ~ /[.*+?|\[\]$^]/) break
-            out = out inner; j = q + 1; continue
+            if (bad || d != 0) break
+            out = out inner; j = q; continue
           }
           if (ch ~ /[.*+?|\[\]$]/) break
           out = out ch; j++
         }
         return out
       }
-      function overlaps(k, i,    p, s, t, ci, lp, c) {
+      function overlaps(k, i,    p, s, t, ci, lp, c, pj, pp, pci, sp, sci) {
         p = e_pat[k]
         if (e_caret[k]) {
           for (s = 1; s <= sc[i]; s++) if (index(subj[i, s], p) == 1) return 1
@@ -330,6 +335,18 @@ location ~* ^/(?:storage/logs|bootstrap/cache)/'
             t = lp core[i, c]
             if (ci) { if (match(tolower(t), tolower(p))) return 1 }
             else if (match(t, p)) return 1
+          }
+          if (!index(lp, ".well-known")) {
+            pp = ""
+            for (pj = 1; pj <= E; pj++) if (e_prot[pj] == i) { pp = e_pat[pj]; pci = e_ci[pj]; break }
+            if (pp != "") {
+              sp = simplify(pp); sci = simp_ci
+              if (sp == "") return 1
+              if ((ci && match(tolower(lp), tolower(p))) || (!ci && match(lp, p))) {
+                if ((pci || sci) && match(tolower(lp), tolower(sp))) return 1
+                if (!(pci || sci) && match(lp, sp)) return 1
+              }
+            }
           }
         }
         return 0
