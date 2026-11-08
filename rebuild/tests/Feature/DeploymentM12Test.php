@@ -155,7 +155,7 @@ class DeploymentM12Test extends TestCase
         $deploy = file_get_contents(base_path('deploy/deploy.sh'));
         $this->assertStringContainsString('TRUSTED_PROXIES must not be the wildcard', $preflight);
         $this->assertStringContainsString('proxies_value}" ==', $preflight, 'Preflight must compare the parsed effective proxy value, not a raw line pattern.');
-        $this->assertStringContainsString('s/#.*//', $preflight, 'Preflight must strip dotenv comments (adjacent or spaced) before judging the proxy value.');
+        $this->assertStringContainsString('%%[[:space:]]#*', $preflight, 'Preflight must strip dotenv comments (adjacent or spaced) before judging the proxy value.');
         $this->assertStringContainsString('must be written literally', $preflight, 'Preflight must reject dotenv variable references for the proxy value.');
         $this->assertStringContainsString('cloudpanel-vhost-snippet.conf', $preflight);
         $this->assertStringContainsString('== "lfamilia.com"', $preflight, 'Preflight must scope the nginx deny check to a server block whose server_name contains the exact lfamilia.com hostname token.');
@@ -209,6 +209,9 @@ class DeploymentM12Test extends TestCase
             'multiline value fails' => ["TRUSTED_PROXIES=\"127.0.0.1,\n*\"\n", 1],
             'empty quoted value fails' => ["TRUSTED_PROXIES=\"\"\n", 1],
             'wildcard entry among valid proxies fails' => ["TRUSTED_PROXIES=127.0.0.1,*\n", 1],
+            'quoted hash does not hide a wildcard entry' => ["TRUSTED_PROXIES=\"127.0.0.1#note,*\"\n", 1],
+            'unquoted hash without a space does not hide a wildcard entry' => ["TRUSTED_PROXIES=127.0.0.1#note,*\n", 1],
+            'space hash comment still passes for loopback' => ["TRUSTED_PROXIES=127.0.0.1,::1 # note\n", 0],
         ];
 
         foreach ($cases as $label => [$env, $expected]) {
@@ -255,6 +258,10 @@ class DeploymentM12Test extends TestCase
         $backrefShadow = implode("\n", ["    location ~* (?<empty>)\\k<empty>\\.env$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $inClassWord = implode("\n", ["    location ~* ^/files/[\\w]+\\.env$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $posixClassWord = implode("\n", ["    location ~* ^/files/[[:alpha:]\\w]+\\.env$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
+        $quotedBrace = implode("\n", ["    location /x {\n        return 200 \"}\";\n    }", $location($p1), $location($p2), $location($p3)]);
+        $braceNextLine = implode("\n", ["    {$p1}\n    {\n        deny all;\n    }", "    {$p2}\n    {\n        deny all;\n    }", "    {$p3}\n    {\n        deny all;\n    }"]);
+        $splitDeny = implode("\n", [$location($p1), "    {$p2} {\n        deny\n        all;\n    }", $location($p3)]);
+        $phpShadow = implode("\n", ["    location ~ \\.php$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $inClassNegated = implode("\n", ["    location ~* ^/files/[\\D]+\\.env$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $numericBackref = implode("\n", ["    location ~* \\.(env|log)\\1$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $wordClass = implode("\n", ["    location ~* ^/files/\\w+\\.env$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
@@ -288,6 +295,10 @@ class DeploymentM12Test extends TestCase
             'named backreference counts as overlapping' => [$server('lfamilia.com', $backrefShadow), 3],
             'word shorthand inside a character class is translated as class content' => [$server('lfamilia.com', $inClassWord), 1],
             'posix class does not end the character class early' => [$server('lfamilia.com', $posixClassWord), 1],
+            'quoted brace in an earlier location does not break parsing' => [$server('lfamilia.com', $quotedBrace), 0],
+            'opening brace on the next line still counts' => [$server('lfamilia.com', $braceNextLine), 0],
+            'deny split across lines still counts' => [$server('lfamilia.com', $splitDeny), 0],
+            'earlier php regex shadows the cache rule' => [$server('lfamilia.com', $phpShadow), 1],
             'negated shorthand inside a character class counts as overlapping' => [$server('lfamilia.com', $inClassNegated), 3],
             'numeric backreference counts as overlapping' => [$server('lfamilia.com', $numericBackref), 3],
             'word-class escape is translated for matching' => [$server('lfamilia.com', $wordClass), 1],

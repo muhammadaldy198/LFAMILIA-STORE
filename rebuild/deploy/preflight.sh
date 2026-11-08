@@ -72,7 +72,18 @@ while IFS= read -r proxies_line; do
       exit 1
     fi
   fi
-  proxies_value="$(printf '%s' "${proxies_line}" | sed -E 's/^TRUSTED_PROXIES=[[:space:]]*//; s/#.*//' | tr -d '[:space:]' | tr -d "\"'")"
+  if [[ "${proxies_quote}" == '"' || "${proxies_quote}" == "'" ]]; then
+    proxies_rest="${proxies_raw:1}"
+    proxies_value="${proxies_rest%%"${proxies_quote}"*}"
+  else
+    proxies_value="${proxies_raw%%[[:space:]]#*}"
+    if [[ "${proxies_raw:0:1}" == '#' ]]; then proxies_value=""; fi
+  fi
+  proxies_value="$(printf '%s' "${proxies_value}" | tr -d '[:space:]')"
+  if [[ "${proxies_value}" == *\\* ]]; then
+    echo "TRUSTED_PROXIES must be written literally in production; escape sequences are not allowed" >&2
+    exit 1
+  fi
   if [[ "${proxies_value}" == *'${'* ]]; then
     echo "TRUSTED_PROXIES must be written literally in production; variable references are not allowed" >&2
     exit 1
@@ -149,9 +160,25 @@ done
 if command -v nginx >/dev/null 2>&1; then
   nginx_dump="$(nginx -T 2>/dev/null || true)"
   vhost_block="$(printf '%s\n' "${nginx_dump}" | awk '
+    function scrub(s,    out, i, c, q, esc) {
+      out = ""; q = ""; esc = 0
+      for (i = 1; i <= length(s); i++) {
+        c = substr(s, i, 1)
+        if (q != "") {
+          if (esc) { esc = 0; out = out " " }
+          else if (c == "\\") { esc = 1; out = out " " }
+          else if (c == q) { q = ""; out = out c }
+          else out = out " "
+        } else {
+          if (c == "#") break
+          if (c == "\"" || c == "\047") { q = c; out = out c }
+          else out = out c
+        }
+      }
+      return out
+    }
     {
-      line = $0
-      sub(/#.*/, "", line)
+      line = scrub($0)
       gsub(/[[:space:]]+/, " ", line)
       if (!inblock) {
         if (line ~ /(^|[[:space:]])server[[:space:]]*\{/) { inblock = 1; depth = 0; buf = ""; hit = 0 } else next
@@ -295,9 +322,12 @@ location ~* ^/(?:storage/logs|bootstrap/cache)/'
       }
       {
         line = $0
+        if (pending != "") line = pending " " line
         sub(/#.*/, "", line)
         gsub(/[[:space:]]+/, " ", line)
         gsub(/ ;/, ";", line)
+        if (line !~ /[;{}] *$/) { pending = line; next }
+        pending = ""
         if (!inloc && line ~ /(^| )server *\{/) { if (started) finalize(); started = 1; next }
         if (!inloc) {
           nf = split(line, f, " ")
