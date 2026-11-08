@@ -331,13 +331,16 @@ class DeploymentM12Test extends TestCase
         // The fixture config mirrors the real config/hashing.php shape:
         // every value flows through env(), so the gate's dotenv resolution
         // decides the effective values.
-        $config = fn (int $defaultMemory): string => "<?php return ['driver' => env('HASH_DRIVER', 'argon2id'), 'argon' => ['memory' => env('HASH_MEMORY', {$defaultMemory}), 'time' => env('HASH_TIME', 4), 'threads' => env('HASH_THREADS', 1)]];\n";
+        $config = fn (int $defaultMemory): string => "<?php return ['driver' => env('HASH_DRIVER', 'argon2id'), 'bcrypt' => ['rounds' => env('BCRYPT_ROUNDS', 12)], 'argon' => ['memory' => env('HASH_MEMORY', {$defaultMemory}), 'time' => env('HASH_TIME', 4), 'threads' => env('HASH_THREADS', 1)]];\n";
 
         $cases = [
             'configured cost round-trips' => [PHP_BINARY, '', $config(65536), 0],
             'invalid env override fails despite a valid config default' => [PHP_BINARY, "HASH_MEMORY=1\n", $config(65536), 1],
             'valid env override rescues an impossible config default' => [PHP_BINARY, "HASH_MEMORY=65536\n", $config(1), 0],
-            'bcrypt driver skips the gate entirely' => [PHP_BINARY, "HASH_DRIVER=bcrypt\n", $config(1), 0],
+            'bcrypt driver round-trips at its own rounds' => [PHP_BINARY, "HASH_DRIVER=bcrypt\n", $config(1), 0],
+            'bcrypt driver with out-of-range rounds fails' => [PHP_BINARY, "HASH_DRIVER=bcrypt\nBCRYPT_ROUNDS=3\n", $config(65536), 1],
+            'unsupported driver value is rejected' => [PHP_BINARY, "HASH_DRIVER=argon2idd\n", $config(65536), 1],
+            'absurd time cost is rejected before hashing' => [PHP_BINARY, "HASH_TIME=99999\n", $config(65536), 1],
             'quoted env override is honoured' => [PHP_BINARY, "HASH_MEMORY=\"65536\"\n", $config(1), 0],
             'php that cannot hash at all fails' => [null, '', $config(65536), 1],
         ];

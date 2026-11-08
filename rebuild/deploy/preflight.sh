@@ -54,7 +54,11 @@ done
 # matching the immutable dotenv repository Laravel boots with), so an
 # invalid HASH_* override fails here instead of after the deploy. The
 # algorithm must be listed by password_algos(), and a real hash must
-# round-trip at the effective cost. A bcrypt driver skips the gate.
+# round-trip at the effective cost. An unsupported driver value fails
+# here too (the framework would only throw after the deploy), and a
+# bcrypt driver round-trips at its effective rounds instead. Absurd
+# cost values are rejected by range checks before any hashing, so the
+# gate itself can never hang on a typo.
 "${PHP_BIN}" -r '
 $map = [];
 foreach (file($argv[1], FILE_IGNORE_NEW_LINES) ?: [] as $line) {
@@ -80,8 +84,16 @@ foreach (file($argv[1], FILE_IGNORE_NEW_LINES) ?: [] as $line) {
 function env($key, $default = null) { global $map; return $map[$key] ?? $default; }
 $config = require $argv[2];
 $driver = $config["driver"] ?? "bcrypt";
+if (! in_array($driver, ["bcrypt", "argon", "argon2id"], true)) {
+    exit(1);
+}
 if ($driver === "bcrypt") {
-    exit(0);
+    $rounds = (int) ($config["bcrypt"]["rounds"] ?? 12);
+    if ($rounds < 4 || $rounds > 20) {
+        exit(1);
+    }
+    $hash = password_hash("preflight-probe", PASSWORD_BCRYPT, ["cost" => $rounds]);
+    exit($hash !== false && password_verify("preflight-probe", $hash) ? 0 : 1);
 }
 $algo = $driver === "argon" ? PASSWORD_ARGON2I : PASSWORD_ARGON2ID;
 $algoName = $driver === "argon" ? "argon2i" : "argon2id";
@@ -89,10 +101,16 @@ if (! in_array($algoName, password_algos(), true)) {
     exit(1);
 }
 $argon = $config["argon"] ?? [];
+$memory = (int) ($argon["memory"] ?? 65536);
+$time = (int) ($argon["time"] ?? 4);
+$threads = (int) ($argon["threads"] ?? 1);
+if ($memory < 8 || $time < 1 || $time > 16 || $threads < 1 || $threads > 32) {
+    exit(1);
+}
 $hash = password_hash("preflight-probe", $algo, [
-    "memory_cost" => (int) ($argon["memory"] ?? 65536),
-    "time_cost" => (int) ($argon["time"] ?? 4),
-    "threads" => (int) ($argon["threads"] ?? 1),
+    "memory_cost" => $memory,
+    "time_cost" => $time,
+    "threads" => $threads,
 ]);
 exit($hash !== false && password_verify("preflight-probe", $hash) ? 0 : 1);
 ' "${ENV_FILE}" "${APP_DIR}/config/hashing.php" \
