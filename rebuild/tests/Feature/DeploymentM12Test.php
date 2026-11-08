@@ -200,6 +200,7 @@ class DeploymentM12Test extends TestCase
         $this->assertStringContainsString('must not contain a wildcard entry', $preflight, 'Preflight must reject a wildcard entry anywhere in the TRUSTED_PROXIES list, not only as the whole value.');
         $this->assertStringContainsString('catch-all CIDR', $preflight, 'Preflight must reject catch-all proxy CIDRs as well as the literal wildcard.');
         $this->assertStringContainsString('function finalize(', $preflight, 'Preflight must verify the nginx deny rules in each matching server block independently.');
+        $this->assertStringContainsString('function maskq(', $preflight, 'Preflight must match deny and allow directives on a quote-masked view so quoted values cannot fake or void a directive.');
         $this->assertStringContainsString('DEPLOY_EXPECTED_SHA', $deploy);
         $this->assertStringContainsString('does not match DEPLOY_EXPECTED_SHA', $deploy);
         $pinCheckAt = strpos($deploy, 'does not match DEPLOY_EXPECTED_SHA');
@@ -343,6 +344,10 @@ class DeploymentM12Test extends TestCase
         $nestedDeny = implode("\n", ["    {$p1} {\n        limit_except POST {\n            deny all;\n        }\n    }", $location($p2), $location($p3)]);
         $shadowed = implode("\n", ["    location ~* \\.env$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $nestedAllow = implode("\n", ["    {$p1} {\n        limit_except POST {\n            allow 203.0.113.0/24;\n        }\n        deny all;\n    }", $location($p2), $location($p3)]);
+        $quotedFakeDeny = implode("\n", ["    {$p1} {\n        add_header X-Notice \"ok; deny all;\" always;\n    }", $location($p2), $location($p3)]);
+        $quotedFakeAllow = implode("\n", ["    {$p1} {\n        add_header X-Notice \"allow all;\" always;\n        deny all;\n    }", $location($p2), $location($p3)]);
+        $quotedThenRealDeny = implode("\n", [$location($p1), "    {$p2} {\n        add_header X-Notice \"a;b\" always;\n        deny all;\n    }", $location($p3)]);
+        $quotedEscapedFakeDeny = implode("\n", ["    {$p1} {\n        add_header X-Notice \"a\\\"; deny all;\" always;\n    }", $location($p2), $location($p3)]);
         $caretShadow = implode("\n", ["    location ^~ /storage/ {\n    }", $location($p1), $location($p2), $location($p3)]);
         $exactShadow = implode("\n", ["    location = /.env {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $quotedDeny = implode("\n", [$location($p1, 'return 200 "deny all;";'), $location($p2), $location($p3)]);
@@ -433,6 +438,10 @@ class DeploymentM12Test extends TestCase
             'exact uri under well-known still shadows the dotfile rule via its git component' => [$server('lfamilia.com', $exactWkGit), 1],
             'caret prefix under well-known still shadows the file rules via its git component' => [$server('lfamilia.com', $caretWkGit), 2],
             'acme challenge file under well-known shadows nothing' => [$server('lfamilia.com', $exactAcme), 0],
+            'quoted directive value does not credit a missing deny' => [$server('lfamilia.com', $quotedFakeDeny), 1],
+            'quoted allow value does not void a real deny' => [$server('lfamilia.com', $quotedFakeAllow), 0],
+            'real deny after a quoted value still credits' => [$server('lfamilia.com', $quotedThenRealDeny), 0],
+            'escaped quote does not expose a fake deny inside a quoted value' => [$server('lfamilia.com', $quotedEscapedFakeDeny), 1],
             'negated shorthand inside a character class counts as overlapping' => [$server('lfamilia.com', $inClassNegated), 3],
             'numeric backreference counts as overlapping' => [$server('lfamilia.com', $numericBackref), 3],
             'word-class escape is translated for matching' => [$server('lfamilia.com', $wordClass), 1],

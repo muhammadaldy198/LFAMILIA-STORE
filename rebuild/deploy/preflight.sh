@@ -505,6 +505,22 @@ location ~* ^/(?:storage/logs|bootstrap/cache)/'
         }
         return out
       }
+      function maskq(s,    out, i, c, q, esc) {
+        out = ""; q = ""; esc = 0
+        for (i = 1; i <= length(s); i++) {
+          c = substr(s, i, 1)
+          if (q != "") {
+            out = out "x"
+            if (esc) esc = 0
+            else if (c == "\\") esc = 1
+            else if (c == q) q = ""
+          } else {
+            if (c == "\"" || c == "\047") { q = c; out = out "x" }
+            else out = out c
+          }
+        }
+        return out
+      }
       {
         line = scrub($0)
         if (pending != "") line = pending " " line
@@ -512,6 +528,7 @@ location ~* ^/(?:storage/logs|bootstrap/cache)/'
         gsub(/ ;/, ";", line)
         if (line !~ /[;{}] *$/) { pending = line; next }
         pending = ""
+        mline = maskq(line)
         if (!inloc && line ~ /(^| )server *\{/) { if (started) finalize(); started = 1; next }
         if (!inloc) {
           nf = split(line, f, " ")
@@ -533,18 +550,18 @@ location ~* ^/(?:storage/logs|bootstrap/cache)/'
           inloc = 1; ldepth = 0; cur_eff = 0; scope_deny_seen = 0; allow_before = 0; nested_allow = 0
         }
         pd = 0; scope_deny_here = 0
-        if (match(line, /(^|[;{]) *deny all;/)) {
+        if (match(mline, /(^|[;{]) *deny all;/)) {
           pd = RSTART + RLENGTH - 9
-          pre = substr(line, 1, pd - 1)
+          pre = substr(mline, 1, pd - 1)
           tmp = pre; ob = gsub(/\{/, "{", tmp); tmp = pre; cb = gsub(/\}/, "}", tmp)
           if (ldepth + ob - cb <= 1) scope_deny_here = 1
         }
         allow_here = 0; pa = 0
-        if (match(line, /(^|[;{]) *allow [^;]*;/)) {
-          mtxt = substr(line, RSTART, RLENGTH)
+        if (match(mline, /(^|[;{]) *allow [^;]*;/)) {
+          mtxt = substr(mline, RSTART, RLENGTH)
           pa = RSTART + index(mtxt, "allow") - 1
           allow_here = 1
-          pre = substr(line, 1, pa - 1)
+          pre = substr(mline, 1, pa - 1)
           tmp = pre; ob = gsub(/\{/, "{", tmp); tmp = pre; cb = gsub(/\}/, "}", tmp)
           if (ldepth + ob - cb >= 2) nested_allow = 1
         }
