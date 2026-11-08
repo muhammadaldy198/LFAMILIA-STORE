@@ -81,7 +81,8 @@ while IFS= read -r proxies_line; do
     proxies_value="${proxies_raw%%[[:space:]]#*}"
     if [[ "${proxies_raw:0:1}" == '#' ]]; then proxies_value=""; fi
   fi
-  proxies_value="$(printf '%s' "${proxies_value}" | tr -d '[:space:]')"
+  proxies_value="${proxies_value#"${proxies_value%%[![:space:]]*}"}"
+  proxies_value="${proxies_value%"${proxies_value##*[![:space:]]}"}"
   if [[ "${proxies_value}" == *\\* ]]; then
     echo "TRUSTED_PROXIES must be written literally in production; escape sequences are not allowed" >&2
     exit 1
@@ -93,6 +94,8 @@ while IFS= read -r proxies_line; do
   IFS=',' read -ra proxies_entries <<<"${proxies_value}"
   proxies_named=0
   for proxies_entry in "${proxies_entries[@]}"; do
+    proxies_entry="${proxies_entry#"${proxies_entry%%[![:space:]]*}"}"
+    proxies_entry="${proxies_entry%"${proxies_entry##*[![:space:]]}"}"
     [[ -n "${proxies_entry}" ]] && proxies_named=1
     if [[ "${proxies_entry}" =~ /0+$ ]]; then
       echo "TRUSTED_PROXIES must not trust every address in production; catch-all CIDR ranges (any address with a /0 prefix length) are not allowed" >&2

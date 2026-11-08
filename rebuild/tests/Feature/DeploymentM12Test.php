@@ -273,6 +273,10 @@ class DeploymentM12Test extends TestCase
             'double-compressed ipv6 fails' => ["TRUSTED_PROXIES=1::2::3\n", 1],
             'oversized ipv6 prefix fails' => ["TRUSTED_PROXIES=::1/129\n", 1],
             'trailing comma still passes' => ["TRUSTED_PROXIES=127.0.0.1,\n", 0],
+            'internal whitespace in an ipv6 entry fails' => ["TRUSTED_PROXIES=127.0.0.1,:: 1\n", 1],
+            'internal whitespace in an ipv4 entry fails' => ["TRUSTED_PROXIES=127. 0.0.1\n", 1],
+            'space after the comma still passes' => ["TRUSTED_PROXIES=127.0.0.1, ::1\n", 0],
+            'spaces around entries still pass' => ["TRUSTED_PROXIES=127.0.0.1 , ::1 \n", 0],
         ];
 
         foreach ($cases as $label => [$env, $expected]) {
