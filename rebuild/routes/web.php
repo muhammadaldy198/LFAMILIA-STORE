@@ -12,6 +12,8 @@ use App\Http\Controllers\AdminContentController;
 use App\Http\Controllers\AdminCustomerController;
 use App\Http\Controllers\AdminDashboardController;
 use App\Http\Controllers\AdminDigiflazzController;
+use App\Http\Controllers\AdminDigiflazzImportController;
+use App\Http\Controllers\AdminDigiflazzSyncController;
 use App\Http\Controllers\AdminFulfillmentController;
 use App\Http\Controllers\AdminHealthController;
 use App\Http\Controllers\AdminIntegrationController;
@@ -347,9 +349,9 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
             Route::delete('/package-groups/{group}', [AdminPackageGroupController::class, 'destroy'])->middleware('throttle:admin-mutation')->name('package-groups.destroy');
             Route::put('/products/{product}/package-groups/ids/reorder', [AdminPackageGroupController::class, 'reorder'])->middleware('throttle:admin-mutation')->name('package-groups.ids.reorder');
             Route::put('/products/{product}/package-groups/reorder', [AdminPackageReorderController::class, 'reorderPackageGroups'])->middleware('throttle:admin-mutation')->name('package-groups.reorder');
-            Route::post('/products/{product}/import', [AdminDigiflazzController::class, 'import'])->name('products.import');
-            Route::post('/packages/{package}/sources/digiflazz', [AdminDigiflazzController::class, 'attachSource'])->middleware('throttle:admin-sensitive')->name('packages.sources.attach');
-            Route::post('/mappings/{mapping}/sync', [AdminDigiflazzController::class, 'syncMapping'])->middleware('throttle:admin-sensitive')->name('mappings.sync');
+            Route::post('/products/{product}/import', [AdminDigiflazzImportController::class, 'import'])->name('products.import');
+            Route::post('/packages/{package}/sources/digiflazz', [AdminDigiflazzImportController::class, 'attachSource'])->middleware('throttle:admin-sensitive')->name('packages.sources.attach');
+            Route::post('/mappings/{mapping}/sync', [AdminDigiflazzSyncController::class, 'syncMapping'])->middleware('throttle:admin-sensitive')->name('mappings.sync');
             Route::post('/categories', [AdminCategoryController::class, 'category'])->middleware('throttle:admin-mutation')->name('categories.store');
             Route::put('/categories/{category}', [AdminCategoryController::class, 'updateCategory'])->middleware('throttle:admin-mutation')->name('categories.update');
             Route::delete('/categories/{category}', [AdminCategoryController::class, 'destroyCategory'])->middleware('throttle:admin-mutation')->name('categories.destroy');
@@ -403,7 +405,7 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
         Route::get('/admin/digiflazz', [AdminDigiflazzController::class, 'index'])->name('admin.digiflazz');
         Route::put('/admin/digiflazz/settings', [AdminDigiflazzController::class, 'settings'])
             ->middleware('throttle:admin-mutation')->name('admin.digiflazz.settings.update');
-        Route::post('/admin/digiflazz/sync', [AdminDigiflazzController::class, 'sync'])->middleware('throttle:admin-sensitive');
+        Route::post('/admin/digiflazz/sync', [AdminDigiflazzSyncController::class, 'sync'])->middleware('throttle:admin-sensitive');
 
         Route::get('/admin/providers', [AdminProviderController::class, 'index'])->name('admin.providers');
         Route::put('/admin/providers/{provider}', [AdminProviderController::class, 'update'])
