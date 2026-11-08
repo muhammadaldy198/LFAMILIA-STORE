@@ -341,6 +341,9 @@ class DeploymentM12Test extends TestCase
             'bcrypt driver with out-of-range rounds fails' => [PHP_BINARY, "HASH_DRIVER=bcrypt\nBCRYPT_ROUNDS=3\n", $config(65536), 1],
             'unsupported driver value is rejected' => [PHP_BINARY, "HASH_DRIVER=argon2idd\n", $config(65536), 1],
             'absurd time cost is rejected before hashing' => [PHP_BINARY, "HASH_TIME=99999\n", $config(65536), 1],
+            'absurd memory is rejected before hashing' => [PHP_BINARY, "HASH_MEMORY=99999999\n", $config(65536), 1],
+            'bom-prefixed first line is still read' => [PHP_BINARY, "\xEF\xBB\xBFHASH_DRIVER=bcrypt\n", $config(1), 0],
+            'bom-prefixed invalid override still fails' => [PHP_BINARY, "\xEF\xBB\xBFHASH_MEMORY=1\n", $config(65536), 1],
             'quoted env override is honoured' => [PHP_BINARY, "HASH_MEMORY=\"65536\"\n", $config(1), 0],
             'php that cannot hash at all fails' => [null, '', $config(65536), 1],
         ];

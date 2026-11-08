@@ -58,10 +58,22 @@ done
 # here too (the framework would only throw after the deploy), and a
 # bcrypt driver round-trips at its effective rounds instead. Absurd
 # cost values are rejected by range checks before any hashing, so the
-# gate itself can never hang on a typo.
+# gate itself can never hang or over-allocate on a typo: the memory
+# ceiling (524288 KiB) is sized for the 4 GiB production host, eight
+# times the pinned default, so an absurd HASH_MEMORY is refused here
+# instead of being handed to password_hash() to allocate. A leading
+# UTF-8 BOM in .env is stripped before parsing, as phpdotenv does, so
+# a first-line override is never silently skipped.
 "${PHP_BIN}" -r '
 $map = [];
-foreach (file($argv[1], FILE_IGNORE_NEW_LINES) ?: [] as $line) {
+$envContents = file_get_contents($argv[1]);
+if ($envContents === false) {
+    exit(1);
+}
+if (str_starts_with($envContents, "\xEF\xBB\xBF")) {
+    $envContents = substr($envContents, 3);
+}
+foreach (explode("\n", $envContents) as $line) {
     $line = trim($line);
     if ($line === "" || $line[0] === "#" || ! str_contains($line, "=")) {
         continue;
@@ -104,7 +116,7 @@ $argon = $config["argon"] ?? [];
 $memory = (int) ($argon["memory"] ?? 65536);
 $time = (int) ($argon["time"] ?? 4);
 $threads = (int) ($argon["threads"] ?? 1);
-if ($memory < 8 || $time < 1 || $time > 16 || $threads < 1 || $threads > 32) {
+if ($memory < 8 || $memory > 524288 || $time < 1 || $time > 16 || $threads < 1 || $threads > 32) {
     exit(1);
 }
 $hash = password_hash("preflight-probe", $algo, [
