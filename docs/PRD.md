@@ -317,7 +317,7 @@ Aturan:
 
 ### 10.1 Prinsip: tidak ada pengembalian dana
 
-LFAMILIA **tidak melayani pengembalian dana (refund)** — keputusan pemilik 2026-10-14, mutlak, tanpa jalur otomatis maupun manual. Tidak ada tombol refund, tidak ada formulir pengajuan refund, dan tidak ada teks untuk pembeli yang menjanjikan uang kembali (kode menegakkan larangan terakhir ini: teks templat yang menjanjikan pengembalian dana ditolak sistem).
+LFAMILIA **tidak melayani pengembalian dana (refund)** — keputusan pemilik 2026-10-14, mutlak, tanpa jalur otomatis maupun manual. Tidak ada jalur refund otomatis maupun manual, dan tidak ada teks untuk pembeli yang menjanjikan uang kembali (kode menegakkan larangan terakhir ini: teks templat yang menjanjikan pengembalian dana ditolak sistem).
 
 Halaman publik `/refund` tetap ada sebagai dokumen hukum; isinya dikelola pemilik dari panel dan bukan bagian dari dokumen ini. Kebijakan toko di bab ini yang berlaku untuk operasional: pesanan bermasalah diselesaikan dengan cara di bawah ini.
 

@@ -2471,13 +2471,13 @@
   },
   "faq.status.04.title": {
     "group": "FAQ/Panduan status",
-    "label": "Gagal",
-    "default": "Gagal"
+    "label": "Gagal / Refund",
+    "default": "Gagal / Refund"
   },
   "faq.status.04.body": {
     "group": "FAQ/Panduan status",
-    "label": "Jika transaksi gagal final, pesanan diperiksa admin untuk diselesaikan. Hubungi bantuan dengan nomor invoice.",
-    "default": "Jika transaksi gagal final, pesanan diperiksa admin untuk diselesaikan. Hubungi bantuan dengan nomor invoice."
+    "label": "Jika transaksi gagal final, tim akan menangani sesuai kebijakan refund.",
+    "default": "Jika transaksi gagal final, tim akan menangani sesuai kebijakan refund."
   },
   "pages.account.attribute.title.682fab7a": {
     "group": "Pages/Account",
@@ -3023,6 +3023,11 @@
     "group": "Components/Support",
     "label": "Pertanyaan produk",
     "default": "Pertanyaan produk"
+  },
+  "support.kind.Pengembalian dana": {
+    "group": "Components/Support",
+    "label": "Pengembalian dana",
+    "default": "Pengembalian dana"
   },
   "support.kind.Bantuan akun": {
     "group": "Components/Support",
