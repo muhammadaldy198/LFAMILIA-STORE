@@ -5,6 +5,8 @@ use App\Http\Controllers\AdminAuditController;
 use App\Http\Controllers\AdminAuthController;
 use App\Http\Controllers\AdminCatalogController;
 use App\Http\Controllers\AdminCatalogMediaController;
+use App\Http\Controllers\AdminCatalogPricingController;
+use App\Http\Controllers\AdminCategoryController;
 use App\Http\Controllers\AdminChoiceSettingsController;
 use App\Http\Controllers\AdminContentController;
 use App\Http\Controllers\AdminCustomerController;
@@ -20,17 +22,25 @@ use App\Http\Controllers\AdminOperationalSettingsController;
 use App\Http\Controllers\AdminOrderCancellationController;
 use App\Http\Controllers\AdminOrderDetailController;
 use App\Http\Controllers\AdminOrdersController;
+use App\Http\Controllers\AdminPackageController;
 use App\Http\Controllers\AdminPackageGroupController;
+use App\Http\Controllers\AdminPackageReorderController;
 use App\Http\Controllers\AdminPasswordConfirmController;
 use App\Http\Controllers\AdminPasswordResetController;
 use App\Http\Controllers\AdminPaymentController;
 use App\Http\Controllers\AdminPresentationController;
+use App\Http\Controllers\AdminProductController;
+use App\Http\Controllers\AdminProductFieldsController;
+use App\Http\Controllers\AdminProductNoticeController;
 use App\Http\Controllers\AdminPromotionController;
 use App\Http\Controllers\AdminProviderController;
+use App\Http\Controllers\AdminProviderMappingController;
 use App\Http\Controllers\AdminReportController;
 use App\Http\Controllers\AdminSearchController;
 use App\Http\Controllers\AdminSettingsController;
+use App\Http\Controllers\AdminStoreAssetController;
 use App\Http\Controllers\AdminSupportController;
+use App\Http\Controllers\AdminVoucherStockController;
 use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\CustomerAccountController;
@@ -320,40 +330,40 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
     Route::get('/admin/catalog', [AdminCatalogController::class, 'index'])
         ->middleware('admin.permission:catalog.manage')->name('admin.catalog.index');
 
-    Route::get('/admin/catalog/categories', [AdminCatalogController::class, 'categories'])
+    Route::get('/admin/catalog/categories', [AdminCategoryController::class, 'categories'])
         ->middleware('admin.permission:catalog.manage')->name('admin.categories.index');
 
     Route::middleware('admin.permission:catalog.manage')->prefix('admin/catalog')
         ->name('admin.catalog.')->group(function (): void {
-            Route::put('/pricing', [AdminCatalogController::class, 'pricing'])
+            Route::put('/pricing', [AdminCatalogPricingController::class, 'pricing'])
                 ->middleware('throttle:admin-sensitive')->name('pricing.update');
             Route::put('/auto-sync', [AdminCatalogController::class, 'autoSync'])
                 ->middleware('throttle:admin-mutation')->name('auto-sync.update');
-            Route::put('/products/{product}/packages/reorder', [AdminCatalogController::class, 'reorderPackages'])->middleware('throttle:admin-mutation')->name('packages.reorder');
+            Route::put('/products/{product}/packages/reorder', [AdminPackageReorderController::class, 'reorderPackages'])->middleware('throttle:admin-mutation')->name('packages.reorder');
             Route::post('/products/{product}/package-groups', [AdminPackageGroupController::class, 'store'])->middleware('throttle:admin-mutation')->name('package-groups.store');
             Route::put('/package-groups/{group}', [AdminPackageGroupController::class, 'update'])->middleware('throttle:admin-mutation')->name('package-groups.update');
             Route::delete('/package-groups/{group}', [AdminPackageGroupController::class, 'destroy'])->middleware('throttle:admin-mutation')->name('package-groups.destroy');
             Route::put('/products/{product}/package-groups/ids/reorder', [AdminPackageGroupController::class, 'reorder'])->middleware('throttle:admin-mutation')->name('package-groups.ids.reorder');
-            Route::put('/products/{product}/package-groups/reorder', [AdminCatalogController::class, 'reorderPackageGroups'])->middleware('throttle:admin-mutation')->name('package-groups.reorder');
+            Route::put('/products/{product}/package-groups/reorder', [AdminPackageReorderController::class, 'reorderPackageGroups'])->middleware('throttle:admin-mutation')->name('package-groups.reorder');
             Route::post('/products/{product}/import', [AdminDigiflazzController::class, 'import'])->name('products.import');
             Route::post('/packages/{package}/sources/digiflazz', [AdminDigiflazzController::class, 'attachSource'])->middleware('throttle:admin-sensitive')->name('packages.sources.attach');
             Route::post('/mappings/{mapping}/sync', [AdminDigiflazzController::class, 'syncMapping'])->middleware('throttle:admin-sensitive')->name('mappings.sync');
-            Route::post('/categories', [AdminCatalogController::class, 'category'])->middleware('throttle:admin-mutation')->name('categories.store');
-            Route::put('/categories/{category}', [AdminCatalogController::class, 'updateCategory'])->middleware('throttle:admin-mutation')->name('categories.update');
-            Route::delete('/categories/{category}', [AdminCatalogController::class, 'destroyCategory'])->middleware('throttle:admin-mutation')->name('categories.destroy');
-            Route::post('/products', [AdminCatalogController::class, 'product'])->middleware('throttle:admin-mutation')->name('products.store');
-            Route::put('/products/{product}', [AdminCatalogController::class, 'updateProduct'])->middleware('throttle:admin-mutation')->name('products.update');
-            Route::delete('/products/{product}', [AdminCatalogController::class, 'destroyProduct'])->middleware('throttle:admin-mutation')->name('products.destroy');
-            Route::post('/products/{product}/packages', [AdminCatalogController::class, 'package'])->middleware('throttle:admin-mutation')->name('packages.store');
-            Route::post('/packages/{package}/voucher-stock', [AdminCatalogController::class, 'voucherStock'])->name('packages.voucher-stock');
-            Route::put('/packages/{package}', [AdminCatalogController::class, 'updatePackage'])->middleware('throttle:admin-mutation')->name('packages.update');
-            Route::delete('/packages/{package}', [AdminCatalogController::class, 'destroyPackage'])->middleware('throttle:admin-mutation')->name('packages.destroy');
-            Route::post('/packages/{package}/duplicate', [AdminCatalogController::class, 'duplicatePackage'])->middleware('throttle:admin-mutation')->name('packages.duplicate');
-            Route::put('/products/{product}/fields', [AdminCatalogController::class, 'fields'])->middleware('throttle:admin-mutation')->name('fields.update');
-            Route::post('/products/{product}/notices', [AdminCatalogController::class, 'storeNotice'])->middleware('throttle:admin-mutation')->name('notices.store');
-            Route::put('/notices/{notice}', [AdminCatalogController::class, 'updateNotice'])->middleware('throttle:admin-mutation')->name('notices.update');
-            Route::delete('/notices/{notice}', [AdminCatalogController::class, 'destroyNotice'])->middleware('throttle:admin-mutation')->name('notices.destroy');
-            Route::put('/mappings/{mapping}', [AdminCatalogController::class, 'mapping'])->middleware('throttle:admin-mutation')->name('mappings.update');
+            Route::post('/categories', [AdminCategoryController::class, 'category'])->middleware('throttle:admin-mutation')->name('categories.store');
+            Route::put('/categories/{category}', [AdminCategoryController::class, 'updateCategory'])->middleware('throttle:admin-mutation')->name('categories.update');
+            Route::delete('/categories/{category}', [AdminCategoryController::class, 'destroyCategory'])->middleware('throttle:admin-mutation')->name('categories.destroy');
+            Route::post('/products', [AdminProductController::class, 'product'])->middleware('throttle:admin-mutation')->name('products.store');
+            Route::put('/products/{product}', [AdminProductController::class, 'updateProduct'])->middleware('throttle:admin-mutation')->name('products.update');
+            Route::delete('/products/{product}', [AdminProductController::class, 'destroyProduct'])->middleware('throttle:admin-mutation')->name('products.destroy');
+            Route::post('/products/{product}/packages', [AdminPackageController::class, 'package'])->middleware('throttle:admin-mutation')->name('packages.store');
+            Route::post('/packages/{package}/voucher-stock', [AdminVoucherStockController::class, 'voucherStock'])->name('packages.voucher-stock');
+            Route::put('/packages/{package}', [AdminPackageController::class, 'updatePackage'])->middleware('throttle:admin-mutation')->name('packages.update');
+            Route::delete('/packages/{package}', [AdminPackageController::class, 'destroyPackage'])->middleware('throttle:admin-mutation')->name('packages.destroy');
+            Route::post('/packages/{package}/duplicate', [AdminPackageController::class, 'duplicatePackage'])->middleware('throttle:admin-mutation')->name('packages.duplicate');
+            Route::put('/products/{product}/fields', [AdminProductFieldsController::class, 'fields'])->middleware('throttle:admin-mutation')->name('fields.update');
+            Route::post('/products/{product}/notices', [AdminProductNoticeController::class, 'storeNotice'])->middleware('throttle:admin-mutation')->name('notices.store');
+            Route::put('/notices/{notice}', [AdminProductNoticeController::class, 'updateNotice'])->middleware('throttle:admin-mutation')->name('notices.update');
+            Route::delete('/notices/{notice}', [AdminProductNoticeController::class, 'destroyNotice'])->middleware('throttle:admin-mutation')->name('notices.destroy');
+            Route::put('/mappings/{mapping}', [AdminProviderMappingController::class, 'mapping'])->middleware('throttle:admin-mutation')->name('mappings.update');
         });
 
     Route::middleware('admin.permission:content.manage')->group(function (): void {
@@ -377,7 +387,7 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
         Route::put('/admin/content/reviews/{review}', [AdminContentController::class, 'updateReview'])->middleware('throttle:admin-mutation')->name('admin.content.reviews.update');
         Route::delete('/admin/content/reviews/{review}', [AdminContentController::class, 'deleteReview'])->middleware('throttle:admin-mutation')->name('admin.content.reviews.delete');
         Route::put('/admin/content/pages/{key}', [AdminContentController::class, 'updatePage'])->middleware('throttle:admin-mutation')->name('admin.content.pages.update');
-        Route::put('/admin/catalog/assets/{asset}', [AdminCatalogController::class, 'asset'])->middleware('throttle:admin-mutation')->name('admin.catalog.assets.update');
+        Route::put('/admin/catalog/assets/{asset}', [AdminStoreAssetController::class, 'asset'])->middleware('throttle:admin-mutation')->name('admin.catalog.assets.update');
     });
 
     // Unggah/hapus gambar dilindungi per jenis objek di controller: katalog butuh
