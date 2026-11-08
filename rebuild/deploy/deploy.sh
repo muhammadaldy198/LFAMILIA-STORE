@@ -41,6 +41,17 @@ git_repo merge --ff-only "origin/${REPO_REF}"
 target_sha="$(git_repo rev-parse HEAD)"
 [[ "${target_sha}" == "${DEPLOY_EXPECTED_SHA}" ]] || { echo "Refusing to deploy ${target_sha}: it does not match DEPLOY_EXPECTED_SHA (${DEPLOY_EXPECTED_SHA}). Pin the reviewed, CI-green commit in ops.env first." >&2; exit 1; }
 
+# The preflight above ran from the previously checked-out tree. Run the
+# target tree's preflight before any target code boots: a guard that only
+# exists in the target (for example the TRUSTED_PROXIES rules) must fail
+# the deploy here, while the previous tree can still be restored, instead
+# of throwing at artisan down or in production traffic after the checkout.
+if ! bash "${DEPLOY_DIR}/preflight.sh"; then
+  echo "Target preflight failed; restoring the previous tree (${previous_sha})." >&2
+  git_repo reset --hard "${previous_sha}"
+  exit 1
+fi
+
 cd "${APP_DIR}"
 "${PHP_BIN}" artisan down --retry=60 --refresh=15
 maintenance=1

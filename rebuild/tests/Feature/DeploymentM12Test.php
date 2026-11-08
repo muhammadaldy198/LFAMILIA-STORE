@@ -110,6 +110,39 @@ class DeploymentM12Test extends TestCase
         }
     }
 
+    public function test_production_boot_rejects_malformed_trusted_proxy_entries(): void
+    {
+        config([
+            'app.debug' => false,
+            'app.url' => 'https://example.test',
+            'session.encrypt' => true,
+            'session.secure' => true,
+            'lfamilia.trusted_hosts' => ['example.test'],
+            'lfamilia.trusted_proxies' => ['bogus'],
+        ]);
+        $this->app->detectEnvironment(fn (): string => 'production');
+
+        try {
+            (new AppServiceProvider($this->app))->boot();
+            $this->fail('Production boot must reject a malformed trusted-proxy entry.');
+        } catch (LogicException $exception) {
+            $this->assertStringContainsString('TRUSTED_PROXIES', $exception->getMessage());
+            $this->assertStringContainsString('CIDR', $exception->getMessage());
+        }
+
+        config(['lfamilia.trusted_proxies' => ['10.0.0.0/0']]);
+        try {
+            (new AppServiceProvider($this->app))->boot();
+            $this->fail('Production boot must reject a catch-all trusted-proxy CIDR.');
+        } catch (LogicException $exception) {
+            $this->assertStringContainsString('CIDR', $exception->getMessage());
+        }
+
+        config(['lfamilia.trusted_proxies' => ['10.0.0.0/8', '2001:db8::/32']]);
+        (new AppServiceProvider($this->app))->boot();
+        $this->addToAssertionCount(1);
+    }
+
     public function test_application_uses_wib_and_deployment_guards_its_cached_configuration(): void
     {
         $this->assertSame('Asia/Jakarta', config('app.timezone'));
@@ -179,6 +212,13 @@ class DeploymentM12Test extends TestCase
         $lastPinCheckAt = strrpos($deploy, 'does not match DEPLOY_EXPECTED_SHA');
         $this->assertNotFalse($mergeAt);
         $this->assertGreaterThan($mergeAt, $lastPinCheckAt, 'The post-merge HEAD must be re-verified against the pin.');
+        $this->assertSame(2, substr_count($deploy, 'bash "${DEPLOY_DIR}/preflight.sh"'), 'Deploy must run preflight twice: from the installed tree before checkout, and from the target tree after the merge.');
+        $targetPreflightAt = strrpos($deploy, 'bash "${DEPLOY_DIR}/preflight.sh"');
+        $downAt = strpos($deploy, '"${PHP_BIN}" artisan down');
+        $this->assertNotFalse($downAt);
+        $this->assertGreaterThan($mergeAt, $targetPreflightAt, 'The target preflight must run after the checkout merge.');
+        $this->assertLessThan($downAt, $targetPreflightAt, 'The target preflight must run before artisan down boots the target code.');
+        $this->assertStringContainsString('git_repo reset --hard "${previous_sha}"', $deploy, 'A failed target preflight must restore the previous tree.');
         $this->assertStringContainsString('DEPLOY_EXPECTED_SHA=', $ops);
         $this->assertStringContainsString('MYSQL_DEFAULTS_FILE=', $ops);
         $this->assertStringContainsString('BACKUP_PASSPHRASE_FILE=', $ops);
@@ -217,6 +257,16 @@ class DeploymentM12Test extends TestCase
             'quoted hash does not hide a wildcard entry' => ["TRUSTED_PROXIES=\"127.0.0.1#note,*\"\n", 1],
             'unquoted hash without a space does not hide a wildcard entry' => ["TRUSTED_PROXIES=127.0.0.1#note,*\n", 1],
             'space hash comment still passes for loopback' => ["TRUSTED_PROXIES=127.0.0.1,::1 # note\n", 0],
+            'malformed entry fails' => ["TRUSTED_PROXIES=bogus\n", 1],
+            'malformed entry among valid proxies fails' => ["TRUSTED_PROXIES=127.0.0.1,bogus\n", 1],
+            'out-of-range octet fails' => ["TRUSTED_PROXIES=999.1.1.1\n", 1],
+            'leading-zero octet fails' => ["TRUSTED_PROXIES=010.0.0.1\n", 1],
+            'oversized ipv4 prefix fails' => ["TRUSTED_PROXIES=10.0.0.0/33\n", 1],
+            'valid ipv4 cidr passes' => ["TRUSTED_PROXIES=10.0.0.0/8\n", 0],
+            'valid ipv6 cidr passes' => ["TRUSTED_PROXIES=2001:db8::/32\n", 0],
+            'double-compressed ipv6 fails' => ["TRUSTED_PROXIES=1::2::3\n", 1],
+            'oversized ipv6 prefix fails' => ["TRUSTED_PROXIES=::1/129\n", 1],
+            'trailing comma still passes' => ["TRUSTED_PROXIES=127.0.0.1,\n", 0],
         ];
 
         foreach ($cases as $label => [$env, $expected]) {

@@ -102,6 +102,59 @@ while IFS= read -r proxies_line; do
       echo "TRUSTED_PROXIES must not contain a wildcard entry in production; list the proxy addresses (e.g. 127.0.0.1,::1)" >&2
       exit 1
     fi
+    if [[ -n "${proxies_entry}" ]] && ! awk -v proxy_entry="${proxies_entry}" '
+      function is_ipv4(addr,    n, octets, i) {
+        n = split(addr, octets, "[.]")
+        if (n != 4) return 0
+        for (i = 1; i <= 4; i++) {
+          if (octets[i] !~ /^[0-9]+$/) return 0
+          if (length(octets[i]) > 3) return 0
+          if (length(octets[i]) > 1 && substr(octets[i], 1, 1) == "0") return 0
+          if (octets[i] + 0 > 255) return 0
+        }
+        return 1
+      }
+      function is_ipv6(addr,    rest, dc, q, flat, n, groups, i, explicit) {
+        if (index(addr, ".") > 0) return 0
+        if (index(addr, ":::") > 0) return 0
+        dc = 0; rest = addr
+        while ((q = index(rest, "::")) > 0) { dc++; rest = substr(rest, q + 2) }
+        if (dc > 1) return 0
+        if (substr(addr, 1, 1) == ":" && substr(addr, 1, 2) != "::") return 0
+        if (substr(addr, length(addr), 1) == ":" && substr(addr, length(addr) - 1, 2) != "::") return 0
+        flat = addr
+        if (dc == 1) { q = index(addr, "::"); flat = substr(addr, 1, q - 1) ":" substr(addr, q + 2) }
+        n = split(flat, groups, ":")
+        explicit = 0
+        for (i = 1; i <= n; i++) {
+          if (groups[i] == "") continue
+          if (groups[i] !~ /^[0-9A-Fa-f]+$/) return 0
+          if (length(groups[i]) > 4) return 0
+          explicit++
+        }
+        if (dc == 1) return explicit <= 7
+        return explicit == 8
+      }
+      BEGIN {
+        n = split(proxy_entry, parts, "/")
+        if (n > 2) exit 1
+        if (n == 2) {
+          if (parts[2] !~ /^[0-9]+$/) exit 1
+          if (parts[2] + 0 == 0) exit 1
+        }
+        if (index(parts[1], ":") > 0) {
+          if (!is_ipv6(parts[1])) exit 1
+          if (n == 2 && parts[2] + 0 > 128) exit 1
+        } else {
+          if (!is_ipv4(parts[1])) exit 1
+          if (n == 2 && parts[2] + 0 > 32) exit 1
+        }
+        exit 0
+      }
+    '; then
+      echo "TRUSTED_PROXIES entries must be IP addresses or CIDR ranges in production; a malformed entry is not allowed" >&2
+      exit 1
+    fi
   done
   if [[ "${proxies_value}" == '*' ]]; then
     echo "TRUSTED_PROXIES must not be the wildcard in production; list the proxy addresses (e.g. 127.0.0.1,::1)" >&2
