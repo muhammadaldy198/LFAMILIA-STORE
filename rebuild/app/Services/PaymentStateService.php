@@ -11,6 +11,8 @@ use Illuminate\Validation\ValidationException;
  * yang masuk dengan memilah pesanan ke OrderPaymentStateService
  * dan topup ke TopupPaymentStateService. Pemanggil lama tetap
  * memakai class ini.
+ * Class ini sendiri tidak menerapkan perubahan keadaan; ia
+ * hanya memilah dan meneruskan ke dua service di baliknya.
  */
 class PaymentStateService
 {

@@ -13,6 +13,8 @@ use Illuminate\Validation\ValidationException;
  * pesanan, pembayaran lunas ditandai beserta imbasnya (poin
  * membership, email, notifikasi), pembayaran dompet diterapkan, dan
  * pesanan kedaluwarsa ditutup beserta pelepasan vouchernya.
+ * Class ini TIDAK menangani topup; keadaan topup ada di
+ * TopupPaymentStateService.
  */
 class OrderPaymentStateService
 {

@@ -10,6 +10,8 @@ use Illuminate\Validation\ValidationException;
  * saldo dompet tujuan, tinjauan pengembalian dana topup ditutup
  * (tanpa memicu pengembalian dana apa pun), dan topup kedaluwarsa
  * ditutup.
+ * Class ini TIDAK menangani pesanan; keadaan pesanan ada di
+ * OrderPaymentStateService.
  */
 class TopupPaymentStateService
 {
