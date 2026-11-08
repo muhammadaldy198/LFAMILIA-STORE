@@ -64,6 +64,16 @@ class FortifyServiceProvider extends ServiceProvider
             $risk->clear('customer', $request->ip(), $identity);
             $request->session()->forget('security.customer_login_challenge');
 
+            // This callback replaces the guard's attempt(), so the login
+            // rehash the guard would have performed must happen here:
+            // upgrade a legacy hash (e.g. bcrypt) to the current default
+            // driver (Argon2id) now that the password has been proven.
+            if (Hash::needsRehash($user->password)) {
+                $user->forceFill([
+                    'password' => Hash::make((string) $request->input('password')),
+                ])->save();
+            }
+
             return $user;
         });
 
