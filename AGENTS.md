@@ -15,7 +15,7 @@ Ada empat lapis. Yang atas menang atas yang bawah.
 | 1 | `docs/PRD.md` | **Aturan produk.** Apa yang dijual, alur, uang, status, refund, larangan. |
 | 2 | `AGENTS.md` (file ini) | **Cara kerja.** Alur, git, deploy, batas VPS, laporan. |
 | 3 | `docs/ADMIN-PANEL.md` | Spesifikasi panel admin (menu, halaman, peran, tampilan). |
-| 4 | `rebuild/*.md`, `.claude/agents/*`, `.claude/skills/*` | **Cara kode bekerja** dan cara teknis mengerjakannya. |
+| 4 | `rebuild/*.md` | **Cara kode bekerja** dan cara teknis mengerjakannya. |
 
 Aturan tambahan:
 
@@ -31,7 +31,7 @@ Aturan tambahan:
 
 - **Pemilik** menentukan arah, menyetujui, dan memutuskan. Pemilik bukan programmer — jelaskan dengan bahasa awam, bukan istilah teknis.
 - **Agen** menulis kode, menguji, dan melapor. Tidak memutuskan aturan bisnis sendiri.
-- Peran spesialis ada di `.claude/agents/` (8 file). Satu tugas = satu peran utama. Ganti peran secara sadar kalau tugasnya berganti; jangan diam-diam mengerjakan pekerjaan peran lain (mis. deploy sambil mengulas).
+- Peran spesialis ada di berkas peran yang disimpan di luar repo (keputusan pemilik 2026-11-08: folder perangkat agen dipindah keluar repo). Satu tugas = satu peran utama. Ganti peran secara sadar kalau tugasnya berganti; jangan diam-diam mengerjakan pekerjaan peran lain (mis. deploy sambil mengulas).
 - **Jangan pernah mengarang pembagian tugas.** Tidak ada "ChatGPT yang menulis, BETOL yang QA". Yang berlaku: siapa pun yang memegang tugas, mengikuti file ini.
 
 ---
@@ -40,7 +40,7 @@ Aturan tambahan:
 
 Skill **tidak** jalan sendiri. Sebelum mulai, baca tabel di bawah, buka `SKILL.md` yang disebut, lalu ikuti. Bukan sekadar menyebut namanya.
 
-Skill ada di `.claude/skills/`.
+Skill disimpan di luar repo, di mesin operator (keputusan pemilik 2026-11-08: folder `.claude/` dipindah keluar repo).
 
 | Tugas | Skill wajib |
 |---|---|
@@ -215,7 +215,7 @@ main → branch fokus → commit terstruktur → PR → CI → review/perbaikan 
 
 ## 10. Peran
 
-`.claude/agents/` berisi satu file per peran. Baca file perannya sebelum mulai.
+Berkas peran disimpan di luar repo, di mesin operator — satu file per peran. Baca file perannya sebelum mulai.
 
 | Peran | File | Dipakai untuk |
 |---|---|---|
@@ -240,8 +240,6 @@ main → branch fokus → commit terstruktur → PR → CI → review/perbaikan 
 | `docs/STATUS.md` | Apa yang sudah jalan, apa yang belum |
 | `docs/archive/` | Dokumen lama — bukan aturan |
 | `rebuild/*.md` | Dokumen teknis per domain (arsitektur, database, auth, produk, checkout, pembayaran, fulfillment, admin, keamanan, testing, deploy) |
-| `.claude/agents/` | Peran |
-| `.claude/skills/` | Cara teknis |
 
 ---
 
