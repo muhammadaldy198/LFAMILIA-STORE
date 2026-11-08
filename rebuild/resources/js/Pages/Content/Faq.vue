@@ -12,7 +12,7 @@ const statuses=[
  ['03','Berhasil','Produk atau layanan sudah berhasil diproses.','green'],
  ['05','Kedaluwarsa','Waktu pembayaran berakhir. Periksa invoice sebelum membuat pesanan baru.','amber'],
  ['06','Dibatalkan','Pesanan dibatalkan. Jika sudah membayar, hubungi bantuan dengan nomor invoice.','red'],
- ['04','Gagal / Refund','Jika transaksi gagal final, tim akan menangani sesuai kebijakan refund.','red'],
+ ['04','Gagal','Jika transaksi gagal final, pesanan diperiksa admin lalu diselesaikan dengan pengiriman ulang. Hubungi bantuan dengan nomor invoice.','red'],
 ];
 </script>
 <template>
