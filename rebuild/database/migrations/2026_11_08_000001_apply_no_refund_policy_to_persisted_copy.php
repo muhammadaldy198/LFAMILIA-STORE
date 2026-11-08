@@ -19,8 +19,9 @@ return new class extends Migration
     /**
      * Saved admin overrides for the FAQ failed-order card would keep showing
      * the old "Gagal / Refund" text, because saved presentation values win
-     * over the defaults. Clear exactly those two overrides so the current
-     * defaults apply; every other saved value is left untouched.
+     * over the defaults. Clear an override only while it still holds the
+     * exact old default text; copy an admin has customised — refund-related
+     * or not — is their content and stays untouched.
      */
     private function clearFaqOverrides(): void
     {
@@ -34,7 +35,20 @@ return new class extends Migration
             return;
         }
 
-        unset($value['text']['faq.status.04.title'], $value['text']['faq.status.04.body']);
+        $oldDefaults = [
+            'faq.status.04.title' => 'Gagal / Refund',
+            'faq.status.04.body' => 'Jika transaksi gagal final, tim akan menangani sesuai kebijakan refund.',
+        ];
+        $changed = false;
+        foreach ($oldDefaults as $key => $oldDefault) {
+            if (($value['text'][$key] ?? null) === $oldDefault) {
+                unset($value['text'][$key]);
+                $changed = true;
+            }
+        }
+        if (! $changed) {
+            return;
+        }
 
         DB::table('system_settings')->where('key', 'store.customer_presentation')
             ->update(['value' => json_encode($value), 'updated_at' => now()]);
