@@ -316,9 +316,9 @@ location ~* ^/(?:storage/logs|bootstrap/cache)/'
       }
       BEGIN {
         n = split(ENVIRON["DENY_PATTERNS"], pats, "\n")
-        subj[1, 1] = "/.env"; subj[1, 2] = "/.git/config"; sc[1] = 2
-        subj[2, 1] = "/files/x.env"; subj[2, 2] = "/files/x.log"; subj[2, 3] = "/files/x.sql"; subj[2, 4] = "/files/x.bak"; subj[2, 5] = "/files/x.ini"; sc[2] = 5
-        subj[3, 1] = "/storage/logs/laravel.log"; subj[3, 2] = "/bootstrap/cache/config.php"; sc[3] = 2
+        subj[1, 1] = "/.env"; subj[1, 2] = "/.git/config"; subj[1, 3] = "/.env.local"; subj[1, 4] = "/.env.production"; subj[1, 5] = "/x/.env"; subj[1, 6] = "/.hidden"; sc[1] = 6
+        subj[2, 1] = "/files/x.env"; subj[2, 2] = "/files/x.log"; subj[2, 3] = "/files/x.sql"; subj[2, 4] = "/files/x.bak"; subj[2, 5] = "/files/x.ini"; subj[2, 6] = "/x.env"; subj[2, 7] = "/uploads/x.sql"; sc[2] = 7
+        subj[3, 1] = "/storage/logs/laravel.log"; subj[3, 2] = "/bootstrap/cache/config.php"; subj[3, 3] = "/bootstrap/cache/views/abc.php"; sc[3] = 3
       }
       {
         line = $0

@@ -262,6 +262,9 @@ class DeploymentM12Test extends TestCase
         $braceNextLine = implode("\n", ["    {$p1}\n    {\n        deny all;\n    }", "    {$p2}\n    {\n        deny all;\n    }", "    {$p3}\n    {\n        deny all;\n    }"]);
         $splitDeny = implode("\n", [$location($p1), "    {$p2} {\n        deny\n        all;\n    }", $location($p3)]);
         $phpShadow = implode("\n", ["    location ~ \\.php$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
+        $envLocalShadow = implode("\n", ["    location ~* \\.env\\.local$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
+        $envProdShadow = implode("\n", ["    location ~* \\.env\\.production$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
+        $uploadsSqlShadow = implode("\n", ["    location ~ ^/uploads/.*\\.sql$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $inClassNegated = implode("\n", ["    location ~* ^/files/[\\D]+\\.env$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $numericBackref = implode("\n", ["    location ~* \\.(env|log)\\1$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $wordClass = implode("\n", ["    location ~* ^/files/\\w+\\.env$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
@@ -299,6 +302,9 @@ class DeploymentM12Test extends TestCase
             'opening brace on the next line still counts' => [$server('lfamilia.com', $braceNextLine), 0],
             'deny split across lines still counts' => [$server('lfamilia.com', $splitDeny), 0],
             'earlier php regex shadows the cache rule' => [$server('lfamilia.com', $phpShadow), 1],
+            'earlier env.local regex shadows the dotfile rule' => [$server('lfamilia.com', $envLocalShadow), 1],
+            'earlier env.production regex shadows the dotfile rule' => [$server('lfamilia.com', $envProdShadow), 1],
+            'uploads-scoped sql regex shadows the extension rule' => [$server('lfamilia.com', $uploadsSqlShadow), 1],
             'negated shorthand inside a character class counts as overlapping' => [$server('lfamilia.com', $inClassNegated), 3],
             'numeric backreference counts as overlapping' => [$server('lfamilia.com', $numericBackref), 3],
             'word-class escape is translated for matching' => [$server('lfamilia.com', $wordClass), 1],
