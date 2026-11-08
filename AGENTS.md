@@ -103,7 +103,7 @@ Tidak semua tugas sampai DEPLOY. Pekerjaan dokumen boleh berhenti setelah merge.
 
 ### Uang & pesanan
 
-- **Refund tidak pernah otomatis.** Tidak ada kode yang memindahkan uang tanpa keputusan admin. Member diselesaikan lewat **penyesuaian saldo oleh Super Admin** (wajib alasan, tercatat di audit). Guest lewat transfer manual di luar sistem.
+- **Tidak ada refund dalam bentuk apa pun** — otomatis maupun manual (keputusan pemilik 2026-10-14; PRD §10). Pesanan bermasalah diselesaikan dengan menyelesaikan pesanannya, bukan mengembalikan uang. Koreksi untuk member hanya lewat **penyesuaian saldo oleh Super Admin** (wajib alasan, tercatat di audit) — mekanisme koreksi internal, bukan refund. Penyelesaian guest diputuskan Super Admin kasus per kasus; transfer manual bukan jalur penyelesaian.
 - **Jangan pernah memicu refund lewat gateway.**
 - **Pengiriman tidak pernah dimulai sebelum pembayaran lunas.**
 - **Tidak ada pengiriman ganda.** Satu pesanan dikirim sekali.
