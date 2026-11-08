@@ -270,6 +270,8 @@ class DeploymentM12Test extends TestCase
         $uploadsSqlShadow = implode("\n", ["    location ~ ^/uploads/.*\\.sql$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $upperEnvShadow = implode("\n", ["    location ~ \\.ENV$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $storageCaseShadow = implode("\n", ["    location ~ ^/Storage/Logs/ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
+        $upperIniShadow = implode("\n", ["    location ~ \\.INI$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
+        $upperEnvLocalShadow = implode("\n", ["    location ~ \\.ENV\\.LOCAL$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $inClassNegated = implode("\n", ["    location ~* ^/files/[\\D]+\\.env$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $numericBackref = implode("\n", ["    location ~* \\.(env|log)\\1$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $wordClass = implode("\n", ["    location ~* ^/files/\\w+\\.env$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
@@ -312,6 +314,8 @@ class DeploymentM12Test extends TestCase
             'uploads-scoped sql regex shadows the extension rule' => [$server('lfamilia.com', $uploadsSqlShadow), 1],
             'uppercase env regex shadows the dotfile and extension rules' => [$server('lfamilia.com', $upperEnvShadow), 2],
             'capitalized storage prefix shadows the directory rule' => [$server('lfamilia.com', $storageCaseShadow), 1],
+            'uppercase ini regex shadows the extension rule' => [$server('lfamilia.com', $upperIniShadow), 1],
+            'uppercase env.local regex shadows the dotfile rule' => [$server('lfamilia.com', $upperEnvLocalShadow), 1],
             'negated shorthand inside a character class counts as overlapping' => [$server('lfamilia.com', $inClassNegated), 3],
             'numeric backreference counts as overlapping' => [$server('lfamilia.com', $numericBackref), 3],
             'word-class escape is translated for matching' => [$server('lfamilia.com', $wordClass), 1],
