@@ -219,6 +219,10 @@ class DeploymentM12Test extends TestCase
         $this->assertGreaterThan($mergeAt, $targetPreflightAt, 'The target preflight must run after the checkout merge.');
         $this->assertLessThan($downAt, $targetPreflightAt, 'The target preflight must run before artisan down boots the target code.');
         $this->assertStringContainsString('git_repo reset --hard "${previous_sha}"', $deploy, 'A failed target preflight must restore the previous tree.');
+        $readme = file_get_contents(base_path('deploy/README.md'));
+        $this->assertStringContainsString('Catatan bootstrap guard TRUSTED_PROXIES', $readme, 'The README must document the first-rollout bootstrap for the trusted-proxies boot guard.');
+        $this->assertStringContainsString('migrasikan `TRUSTED_PROXIES` di `.env` live dari `*`', $readme, 'The bootstrap must require migrating the live TRUSTED_PROXIES value off the wildcard before the first guarded deploy.');
+        $this->assertStringContainsString('SEBELUM menjalankan `deploy.sh`', $readme, 'The bootstrap must require the target preflight to pass before the first guarded deploy runs.');
         $this->assertStringContainsString('DEPLOY_EXPECTED_SHA=', $ops);
         $this->assertStringContainsString('MYSQL_DEFAULTS_FILE=', $ops);
         $this->assertStringContainsString('BACKUP_PASSPHRASE_FILE=', $ops);
