@@ -50,9 +50,16 @@ done
 # script and still break password creation and login rehashing after the
 # deploy, so this is a hard gate, not a warning. It resolves the EFFECTIVE
 # configuration exactly as the application will: the config file's env()
-# calls are answered from the production .env (first occurrence wins,
-# matching the immutable dotenv repository Laravel boots with), so an
-# invalid HASH_* override fails here instead of after the deploy. The
+# calls are answered with Laravel's own precedence - a value exported
+# into the process environment wins (deploy.sh sources ops.env, and
+# artisan config:cache inherits whatever it exports, freezing it into
+# the production config), then the production .env (first occurrence
+# wins, matching the immutable dotenv repository), with Laravel's
+# literal conversions ((null), (true), ...) applied to values from
+# either source; a null Argon cost then falls through to the hasher's
+# own defaults, exactly as the framework's ?? chains resolve it. An
+# invalid HASH_* value from any source fails here instead of after
+# the deploy. The
 # algorithm must be listed by password_algos(), and a real hash must
 # round-trip at the effective cost. An unsupported driver value fails
 # here too (the framework would only throw after the deploy), and a
@@ -93,9 +100,40 @@ foreach (explode("\n", $envContents) as $line) {
         $map[$k] = $v;
     }
 }
-function env($key, $default = null) { global $map; return $map[$key] ?? $default; }
+function env($key, $default = null) {
+    global $map;
+    $value = null;
+    $found = false;
+    foreach ([$_ENV, $_SERVER] as $bag) {
+        if (array_key_exists($key, $bag)) {
+            $value = $bag[$key];
+            $found = true;
+            break;
+        }
+    }
+    if (! $found) {
+        $fromProcess = getenv($key);
+        if ($fromProcess !== false) {
+            $value = $fromProcess;
+            $found = true;
+        }
+    }
+    if (! $found) {
+        if (! array_key_exists($key, $map)) {
+            return $default;
+        }
+        $value = $map[$key];
+    }
+    switch (strtolower((string) $value)) {
+        case "true": case "(true)": return true;
+        case "false": case "(false)": return false;
+        case "empty": case "(empty)": return "";
+        case "null": case "(null)": return null;
+    }
+    return $value;
+}
 $config = require $argv[2];
-$driver = $config["driver"] ?? "bcrypt";
+$driver = array_key_exists("driver", $config) ? $config["driver"] : "bcrypt";
 if (! in_array($driver, ["bcrypt", "argon", "argon2id"], true)) {
     exit(1);
 }
@@ -113,9 +151,9 @@ if (! in_array($algoName, password_algos(), true)) {
     exit(1);
 }
 $argon = $config["argon"] ?? [];
-$memory = (int) ($argon["memory"] ?? 65536);
-$time = (int) ($argon["time"] ?? 4);
-$threads = (int) ($argon["threads"] ?? 1);
+$memory = (int) ($argon["memory"] ?? 1024);
+$time = (int) ($argon["time"] ?? 2);
+$threads = (int) ($argon["threads"] ?? 2);
 if ($memory < 8 || $memory > 524288 || $time < 1 || $time > 16 || $threads < 1 || $threads > 32) {
     exit(1);
 }
