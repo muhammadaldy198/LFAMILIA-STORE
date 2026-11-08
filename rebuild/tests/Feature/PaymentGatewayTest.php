@@ -8,19 +8,16 @@ use App\Jobs\StartFulfillmentJob;
 use App\Models\Category;
 use App\Models\IntegrationCredential;
 use App\Models\Product;
-use App\Models\User;
 use App\Services\FulfillmentService;
 use App\Services\Payment\DokuSignature;
 use App\Services\PaymentStateService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
-use Illuminate\Http\Request;
 use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
-use Illuminate\Support\Facades\URL;
 use Tests\TestCase;
 
 /**
@@ -40,6 +37,7 @@ class PaymentGatewayTest extends TestCase
         $this->withoutMiddleware(ThrottleRequests::class);
         Queue::fake([SendTransactionalEmailJob::class]);
     }
+
     /**
      * @return array{product:Product,package_id:int}
      */
@@ -88,6 +86,7 @@ class PaymentGatewayTest extends TestCase
 
         return ['product' => $product, 'package_id' => $package->id];
     }
+
     private function route(
         string $channel,
         string $gateway,
@@ -130,6 +129,7 @@ class PaymentGatewayTest extends TestCase
             ->where('payment_gateway_id', $gatewayId)
             ->value('id');
     }
+
     /**
      * @return array<string, mixed>
      */
@@ -145,6 +145,7 @@ class PaymentGatewayTest extends TestCase
             'idempotency_key' => $key,
         ];
     }
+
     private function seedMidtransCredential(): void
     {
         IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
@@ -152,6 +153,7 @@ class PaymentGatewayTest extends TestCase
             'is_active' => true,
         ]);
     }
+
     public function test_scheduled_status_verification_recovers_settlement_after_invalid_webhook_signature(): void
     {
         $catalog = $this->catalog();
@@ -222,6 +224,7 @@ class PaymentGatewayTest extends TestCase
         $this->assertSame(1, DB::table('order_events')
             ->where('order_id', $payment->order_id)->where('event_type', 'PAYMENT_VERIFIED')->count());
     }
+
     public function test_midtrans_settlement_is_verified_idempotent_and_stale_pending_cannot_downgrade_paid(): void
     {
         $catalog = $this->catalog();
@@ -302,6 +305,7 @@ class PaymentGatewayTest extends TestCase
         $this->assertSame('PAID', DB::table('orders')->where('id', $row->order_id)->value('status'));
         $this->assertSame('PAID', DB::table('payment_transactions')->where('id', $row->id)->value('status'));
     }
+
     /**
      * Simulate a complete sale without money, production credentials, or provider traffic.
      */
@@ -423,6 +427,7 @@ class PaymentGatewayTest extends TestCase
         $this->assertSame(1, DB::table('order_events')->where('order_id', $payment->order_id)
             ->where('event_type', 'PAYMENT_VERIFIED')->count());
     }
+
     public function test_midtrans_cancel_stays_cancelled_and_stale_pending_cannot_reopen_order(): void
     {
         $catalog = $this->catalog();
@@ -492,6 +497,7 @@ class PaymentGatewayTest extends TestCase
         $this->assertSame('IGNORED_STALE', $result['result']);
         $this->assertSame('CANCELLED', DB::table('orders')->where('id', $payment->order_id)->value('status'));
     }
+
     public function test_midtrans_callback_cannot_override_server_status_challenge(): void
     {
         $catalog = $this->catalog();
@@ -558,6 +564,7 @@ class PaymentGatewayTest extends TestCase
             ->where('order_id', $payment->order_id)
             ->where('event_type', 'PAYMENT_VERIFIED')->count());
     }
+
     public function test_midtrans_rejects_fake_signature(): void
     {
         $this->catalog();
@@ -586,6 +593,7 @@ class PaymentGatewayTest extends TestCase
             ->where('gateway_code', 'MIDTRANS')
             ->where('event_id', 'fake')->count());
     }
+
     public function test_doku_checkout_request_and_signed_callback_mark_order_paid(): void
     {
         $catalog = $this->catalog();
@@ -728,6 +736,7 @@ class PaymentGatewayTest extends TestCase
         $this->assertSame('PAID', DB::table('orders')->where('id', $payment->order_id)->value('status'));
         $this->assertSame('PAID', DB::table('payment_transactions')->where('id', $payment->id)->value('status'));
     }
+
     public function test_midtrans_notifications_with_identical_tuples_for_two_payments_are_both_processed(): void
     {
         $catalog = $this->catalog();
@@ -789,6 +798,7 @@ class PaymentGatewayTest extends TestCase
 
         $this->assertSame(2, DB::table('payment_callbacks')->where('gateway_code', 'MIDTRANS')->count());
     }
+
     public function test_midtrans_duplicate_notification_for_the_same_payment_is_still_rejected(): void
     {
         $catalog = $this->catalog();

@@ -6,14 +6,12 @@ use App\Jobs\SendTransactionalEmailJob;
 use App\Models\Category;
 use App\Models\IntegrationCredential;
 use App\Models\Product;
-use App\Models\User;
 use App\Services\Payment\DokuSignature;
 use App\Services\PaymentRoutingService;
 use App\Services\PaymentService;
 use App\Services\PaymentStateService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\Client\ConnectionException;
-use Illuminate\Http\Request;
 use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -43,6 +41,7 @@ class PaymentCreationRecoveryTest extends TestCase
         $this->withoutMiddleware(ThrottleRequests::class);
         Queue::fake([SendTransactionalEmailJob::class]);
     }
+
     /**
      * @return array{product:Product,package_id:int}
      */
@@ -91,6 +90,7 @@ class PaymentCreationRecoveryTest extends TestCase
 
         return ['product' => $product, 'package_id' => $package->id];
     }
+
     private function route(
         string $channel,
         string $gateway,
@@ -133,6 +133,7 @@ class PaymentCreationRecoveryTest extends TestCase
             ->where('payment_gateway_id', $gatewayId)
             ->value('id');
     }
+
     /**
      * @return array<string, mixed>
      */
@@ -148,6 +149,7 @@ class PaymentCreationRecoveryTest extends TestCase
             'idempotency_key' => $key,
         ];
     }
+
     private function creatingPaymentRow(
         int $routeId,
         ?int $orderId,
@@ -173,6 +175,7 @@ class PaymentCreationRecoveryTest extends TestCase
             'updated_at' => now()->subMinutes($staleMinutes),
         ]);
     }
+
     private function seedMidtransCredential(): void
     {
         IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
@@ -180,6 +183,7 @@ class PaymentCreationRecoveryTest extends TestCase
             'is_active' => true,
         ]);
     }
+
     public function test_uncertain_external_create_is_not_blindly_retried(): void
     {
         $catalog = $this->catalog();
@@ -233,6 +237,7 @@ class PaymentCreationRecoveryTest extends TestCase
         Http::assertSentCount(1);
         $this->assertSame(1, DB::table('payment_transactions')->where('order_id', $orderId)->count());
     }
+
     public function test_connection_exception_marks_payment_unknown_and_notifies_admin(): void
     {
         $catalog = $this->catalog();
@@ -261,6 +266,7 @@ class PaymentCreationRecoveryTest extends TestCase
         $this->assertSame(1, DB::table('admin_notifications')->where('event_type', 'payment.unknown')->count());
         $this->assertSame(1, DB::table('payment_transactions')->where('order_id', $orderId)->count());
     }
+
     public function test_external_create_claim_prevents_duplicate_gateway_request_from_stale_payment_object(): void
     {
         $catalog = $this->catalog();
@@ -319,6 +325,7 @@ class PaymentCreationRecoveryTest extends TestCase
         $this->assertSame('PENDING', $second['status']);
         Http::assertSentCount(1);
     }
+
     public function test_fast_paid_callback_during_create_is_not_downgraded_by_late_create_response(): void
     {
         Queue::fake();
@@ -368,6 +375,7 @@ class PaymentCreationRecoveryTest extends TestCase
             ->firstOrFail();
         $this->assertSame('PAID', $payment->status);
     }
+
     #[DataProvider('adminUnknownStatuses')]
     public function test_admin_can_verify_unknown_midtrans_payment_without_creating_another_payment(
         string $gatewayStatus,
@@ -433,6 +441,7 @@ class PaymentCreationRecoveryTest extends TestCase
             'expired' => ['expire', 'EXPIRED'],
         ];
     }
+
     public function test_admin_unknown_gateway_unreachable_leaves_status_unchanged(): void
     {
         Queue::fake();
@@ -476,6 +485,7 @@ class PaymentCreationRecoveryTest extends TestCase
             ->where('order_id', $order->id)->value('status'));
         $this->assertSame('PENDING_PAYMENT', DB::table('orders')->where('id', $order->id)->value('status'));
     }
+
     public function test_start_order_revalidates_status_from_the_locked_row(): void
     {
         $catalog = $this->catalog();
@@ -507,6 +517,7 @@ class PaymentCreationRecoveryTest extends TestCase
         $this->assertSame(0, DB::table('payment_transactions')->where('order_id', $stale->id)->count());
         $this->assertSame(0, $creates);
     }
+
     public function test_start_order_revalidates_expiry_from_the_locked_row(): void
     {
         $catalog = $this->catalog();
@@ -529,6 +540,7 @@ class PaymentCreationRecoveryTest extends TestCase
         $this->assertSame('EXPIRED', DB::table('orders')->where('id', $stale->id)->value('status'));
         $this->assertSame(0, DB::table('payment_transactions')->where('order_id', $stale->id)->count());
     }
+
     public function test_recovery_redrives_creation_when_gateway_definitively_has_no_transaction(): void
     {
         $catalog = $this->catalog();
@@ -566,6 +578,7 @@ class PaymentCreationRecoveryTest extends TestCase
         $this->assertSame('PENDING', $payment->status);
         $this->assertStringContainsString('recovered-token', (string) $payment->public_payload);
     }
+
     public function test_recovery_adopts_existing_gateway_transaction_without_creating(): void
     {
         $catalog = $this->catalog();
@@ -605,6 +618,7 @@ class PaymentCreationRecoveryTest extends TestCase
         $this->assertSame('PAID', DB::table('payment_transactions')->where('id', $paymentId)->value('status'));
         $this->assertSame('PAID', DB::table('orders')->where('id', $order->id)->value('status'));
     }
+
     public function test_recovery_adopts_pending_gateway_transaction_out_of_creating(): void
     {
         $catalog = $this->catalog();
@@ -638,6 +652,7 @@ class PaymentCreationRecoveryTest extends TestCase
         $this->assertSame('PENDING', DB::table('payment_transactions')->where('id', $paymentId)->value('status'));
         $this->assertSame('PENDING_PAYMENT', DB::table('orders')->where('id', $order->id)->value('status'));
     }
+
     public function test_recovery_terminates_when_order_is_no_longer_payable(): void
     {
         $catalog = $this->catalog();
@@ -676,6 +691,7 @@ class PaymentCreationRecoveryTest extends TestCase
         $this->assertSame(0, DB::table('order_events')
             ->where('order_id', $order->id)->where('event_type', 'PAYMENT_VERIFIED')->count());
     }
+
     public function test_recovery_leaves_fresh_creating_payments_untouched(): void
     {
         $catalog = $this->catalog();
@@ -702,6 +718,7 @@ class PaymentCreationRecoveryTest extends TestCase
         $this->assertSame(0, $statusCalls);
         $this->assertSame('CREATING', DB::table('payment_transactions')->where('id', $paymentId)->value('status'));
     }
+
     public function test_recovery_leaves_row_unchanged_when_gateway_inquiry_is_inconclusive(): void
     {
         $catalog = $this->catalog();
@@ -721,6 +738,7 @@ class PaymentCreationRecoveryTest extends TestCase
         $this->assertSame('inconclusive', $outcome);
         $this->assertSame('CREATING', DB::table('payment_transactions')->where('id', $paymentId)->value('status'));
     }
+
     public function test_recovery_cannot_redrive_the_same_payment_twice(): void
     {
         $catalog = $this->catalog();
@@ -755,6 +773,7 @@ class PaymentCreationRecoveryTest extends TestCase
         $this->assertSame('skipped', $service->recoverStuckCreating($paymentId));
         $this->assertSame(1, $creates);
     }
+
     public function test_recovery_adopts_existing_doku_transaction_without_creating(): void
     {
         $catalog = $this->catalog();
@@ -802,6 +821,7 @@ class PaymentCreationRecoveryTest extends TestCase
         $this->assertSame('PAID', DB::table('payment_transactions')->where('id', $paymentId)->value('status'));
         $this->assertSame('PAID', DB::table('orders')->where('id', $order->id)->value('status'));
     }
+
     public function test_admin_check_payment_on_creating_payment_drives_recovery(): void
     {
         Queue::fake();
@@ -849,6 +869,7 @@ class PaymentCreationRecoveryTest extends TestCase
         $this->assertSame(1, DB::table('audit_logs')->where('action', 'order.payment.checked')
             ->where('target_id', (string) $order->id)->count());
     }
+
     public function test_recovery_redrives_doku_creation_when_gateway_reports_transaction_not_found(): void
     {
         $catalog = $this->catalog();
@@ -919,6 +940,7 @@ class PaymentCreationRecoveryTest extends TestCase
         $this->assertSame('PENDING', $payment->status);
         $this->assertStringContainsString('recovered', (string) $payment->public_payload);
     }
+
     public function test_recovery_processes_creating_rows_older_than_the_reconciler_window(): void
     {
         $catalog = $this->catalog();

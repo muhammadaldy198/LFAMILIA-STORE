@@ -34,6 +34,7 @@ class PaymentWalletTest extends TestCase
         $this->withoutMiddleware(ThrottleRequests::class);
         Queue::fake([SendTransactionalEmailJob::class]);
     }
+
     /**
      * @return array{product:Product,package_id:int}
      */
@@ -82,6 +83,7 @@ class PaymentWalletTest extends TestCase
 
         return ['product' => $product, 'package_id' => $package->id];
     }
+
     private function route(
         string $channel,
         string $gateway,
@@ -124,6 +126,7 @@ class PaymentWalletTest extends TestCase
             ->where('payment_gateway_id', $gatewayId)
             ->value('id');
     }
+
     /**
      * @return array{user:User, order_number:string}
      */
@@ -151,6 +154,7 @@ class PaymentWalletTest extends TestCase
 
         return ['user' => $user, 'order_number' => $checkout->json('order_number')];
     }
+
     public function test_wallet_payment_debits_once_on_idempotent_retry(): void
     {
         $catalog = $this->catalog();
@@ -191,6 +195,7 @@ class PaymentWalletTest extends TestCase
         $this->assertSame('PAID', DB::table('orders')
             ->where('order_number', $checkout->json('order_number'))->value('status'));
     }
+
     public function test_wallet_payment_cannot_overdraw_or_create_ledger_when_balance_is_insufficient(): void
     {
         $catalog = $this->catalog();
@@ -228,6 +233,7 @@ class PaymentWalletTest extends TestCase
         $this->assertSame('REJECTED', DB::table('payment_transactions')
             ->where('idempotency_key', 'm11-wallet-low-payment-0001')->value('status'));
     }
+
     public function test_wallet_payment_via_signed_link_requires_owner_login(): void
     {
         $order = $this->walletOrder('wallet-signed@example.test', 'wallet-signed-order-0001');
@@ -248,6 +254,7 @@ class PaymentWalletTest extends TestCase
             ->where('order_id', DB::table('orders')->where('order_number', $order['order_number'])->value('id'))
             ->count());
     }
+
     public function test_wallet_payment_rejects_other_logged_in_account(): void
     {
         $order = $this->walletOrder('wallet-other@example.test', 'wallet-other-order-0001');
@@ -266,6 +273,7 @@ class PaymentWalletTest extends TestCase
             ->assertUnauthorized()
             ->assertJsonPath('login_url', route('login'));
     }
+
     public function test_wallet_pay_page_via_signed_link_redirects_to_login_with_intended(): void
     {
         $order = $this->walletOrder('wallet-page@example.test', 'wallet-page-order-0001');
@@ -281,6 +289,7 @@ class PaymentWalletTest extends TestCase
         $this->assertStringContainsString('invoice='.$order['order_number'], $intended);
         $this->assertTrue(URL::hasValidSignature(Request::create($intended)));
     }
+
     public function test_wallet_pay_page_opens_for_owner(): void
     {
         $order = $this->walletOrder('wallet-page-owner@example.test', 'wallet-page-owner-order-0001');
@@ -289,6 +298,7 @@ class PaymentWalletTest extends TestCase
 
         $this->actingAs($order['user'])->get($signedPage)->assertOk();
     }
+
     public function test_wallet_pay_page_logs_out_wrong_account_before_login_redirect(): void
     {
         $order = $this->walletOrder('wallet-page-wrong@example.test', 'wallet-page-wrong-order-0001');
@@ -320,6 +330,7 @@ class PaymentWalletTest extends TestCase
         $this->assertStringContainsString('invoice='.$order['order_number'], $intended);
         $this->assertTrue(URL::hasValidSignature(Request::create($intended)));
     }
+
     public function test_wallet_payment_page_with_gateway_params_still_requires_owner(): void
     {
         // Allowlist TIDAK membuat wallet bisa dibayar pakai
@@ -343,6 +354,7 @@ class PaymentWalletTest extends TestCase
         $this->actingAs($other)->get($signedWithParams)->assertRedirect(route('login'));
         $this->actingAs($order['user'])->get($signedWithParams)->assertOk();
     }
+
     public function test_signed_status_link_for_wallet_order_still_requires_owner_login(): void
     {
         // Destination baru TIDAK BOLEH nge-bypass proteksi wallet:
@@ -377,6 +389,7 @@ class PaymentWalletTest extends TestCase
                 ->component('Customer/OrderDetail')
                 ->where('order.order_number', $order['order_number']));
     }
+
     public function test_wallet_checkout_is_blocked_while_topup_refund_review_is_open(): void
     {
         $catalog = $this->catalog();

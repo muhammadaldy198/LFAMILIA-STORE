@@ -36,6 +36,7 @@ class PaymentLinkTest extends TestCase
         $this->withoutMiddleware(ThrottleRequests::class);
         Queue::fake([SendTransactionalEmailJob::class]);
     }
+
     /**
      * @return array{product:Product,package_id:int}
      */
@@ -84,6 +85,7 @@ class PaymentLinkTest extends TestCase
 
         return ['product' => $product, 'package_id' => $package->id];
     }
+
     private function route(
         string $channel,
         string $gateway,
@@ -126,6 +128,7 @@ class PaymentLinkTest extends TestCase
             ->where('payment_gateway_id', $gatewayId)
             ->value('id');
     }
+
     /**
      * @return array<string, mixed>
      */
@@ -141,6 +144,7 @@ class PaymentLinkTest extends TestCase
             'idempotency_key' => $key,
         ];
     }
+
     public function test_gateway_return_url_is_signed_so_logged_out_member_is_not_blocked_after_paying(): void
     {
         $catalog = $this->catalog();
@@ -227,6 +231,7 @@ class PaymentLinkTest extends TestCase
         $this->assertIsString($tampered);
         $this->get($tampered)->assertForbidden();
     }
+
     public function test_gateway_return_url_with_midtrans_result_params_keeps_signature_valid(): void
     {
         $catalog = $this->catalog();
@@ -316,6 +321,7 @@ class PaymentLinkTest extends TestCase
             .'&order_id='.$payment->merchant_reference.'&status_code=200&transaction_status=settlement';
         $this->get($expired)->assertForbidden();
     }
+
     public function test_gateway_return_url_can_be_revisited_with_params(): void
     {
         // Refresh / revisit return URL setelah bayar (param gateway
@@ -363,6 +369,7 @@ class PaymentLinkTest extends TestCase
         $this->get($withParams)->assertOk();
         $this->get($withParams)->assertOk();
     }
+
     public function test_gateway_return_url_outlives_order_deadline_but_remains_temporary(): void
     {
         // Return signatures must remain valid until the provider checkout
@@ -436,6 +443,7 @@ class PaymentLinkTest extends TestCase
             Carbon::setTestNow();
         }
     }
+
     public function test_gateway_return_signature_covers_minimum_five_minute_midtrans_window(): void
     {
         $catalog = $this->catalog();
@@ -509,6 +517,7 @@ class PaymentLinkTest extends TestCase
             Carbon::setTestNow();
         }
     }
+
     public function test_guest_return_url_with_gateway_params_opens_and_unsigned_is_blocked(): void
     {
         // Allowlist berlaku juga untuk jalur guest (bukan hanya
@@ -547,6 +556,7 @@ class PaymentLinkTest extends TestCase
         $this->flushSession();
         $this->get(route('payment.show', ['invoice' => $orderNumber]))->assertForbidden();
     }
+
     public function test_signed_guest_status_sets_guest_session_only_for_its_order(): void
     {
         $catalog = $this->catalog();
@@ -571,6 +581,7 @@ class PaymentLinkTest extends TestCase
         $this->get(route('guest.orders.show', $orderNumber))->assertNotFound();
         $this->get(route('orders.status.signed', ['orderNumber' => $orderNumber]))->assertForbidden();
     }
+
     public function test_signed_status_link_opens_member_order_without_login(): void
     {
         $catalog = $this->catalog();
@@ -644,6 +655,7 @@ class PaymentLinkTest extends TestCase
                 ->component('Customer/OrderDetail')
                 ->where('order.order_number', $orderNumber));
     }
+
     public function test_signed_status_link_opens_expired_order_without_broken_page(): void
     {
         // Order kedaluwarsa / terminal saat CTA diklik → halaman
@@ -704,6 +716,7 @@ class PaymentLinkTest extends TestCase
             Carbon::setTestNow();
         }
     }
+
     public function test_account_order_login_preserves_intended_to_order(): void
     {
         // Alur penuh login-dengan-return-target: logout → buka
@@ -746,6 +759,7 @@ class PaymentLinkTest extends TestCase
                 ->component('Customer/OrderDetail')
                 ->where('order.order_number', $orderNumber));
     }
+
     public function test_signed_status_link_opened_by_other_logged_in_user_with_signature(): void
     {
         // Signature adalah otorisasinya (sama seperti link email):

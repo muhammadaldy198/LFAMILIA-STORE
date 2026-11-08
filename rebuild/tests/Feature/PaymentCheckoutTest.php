@@ -7,7 +7,6 @@ use App\Models\Category;
 use App\Models\IntegrationCredential;
 use App\Models\Product;
 use App\Models\StoreAsset;
-use App\Models\User;
 use App\Services\PaymentRoutingService;
 use App\Services\PaymentStateService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
@@ -39,6 +38,7 @@ class PaymentCheckoutTest extends TestCase
         $this->withoutMiddleware(ThrottleRequests::class);
         Queue::fake([SendTransactionalEmailJob::class]);
     }
+
     /**
      * @return array{product:Product,package_id:int}
      */
@@ -87,6 +87,7 @@ class PaymentCheckoutTest extends TestCase
 
         return ['product' => $product, 'package_id' => $package->id];
     }
+
     private function route(
         string $channel,
         string $gateway,
@@ -129,6 +130,7 @@ class PaymentCheckoutTest extends TestCase
             ->where('payment_gateway_id', $gatewayId)
             ->value('id');
     }
+
     /**
      * @return array<string, mixed>
      */
@@ -144,6 +146,7 @@ class PaymentCheckoutTest extends TestCase
             'idempotency_key' => $key,
         ];
     }
+
     public function test_manual_qris_never_adds_customer_fee_and_gateway_is_not_exposed(): void
     {
         $catalog = $this->catalog();
@@ -168,6 +171,7 @@ class PaymentCheckoutTest extends TestCase
         $this->assertSame('manual_qris', $snapshot['payment']['channel_code']);
         $this->assertSame('MANUAL_QRIS', $snapshot['payment']['gateway_code']);
     }
+
     public function test_manual_qris_pending_alert_is_created_only_after_qr_payment_is_ready(): void
     {
         Storage::fake(config('media-library.disk_name', 'public'));
@@ -203,6 +207,7 @@ class PaymentCheckoutTest extends TestCase
         $this->assertSame(1, DB::table('admin_notifications')
             ->where('event_type', 'payment.manual_qris.pending')->count());
     }
+
     public function test_checkout_quote_and_original_payment_session_remain_accessible(): void
     {
         $catalog = $this->catalog();
@@ -224,6 +229,7 @@ class PaymentCheckoutTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page->component('Payment/Show'));
     }
+
     public function test_payment_page_ignores_redirect_status_query_and_uses_server_state(): void
     {
         $catalog = $this->catalog();
@@ -243,6 +249,7 @@ class PaymentCheckoutTest extends TestCase
                 ->where('payment', null)
             );
     }
+
     public function test_expired_payment_closes_order_releases_voucher_and_late_paid_does_not_reopen(): void
     {
         $catalog = $this->catalog();
@@ -297,6 +304,7 @@ class PaymentCheckoutTest extends TestCase
             ->where('order_id', $order->id)
             ->where('event_type', 'PAYMENT_LATE_VERIFIED')->count());
     }
+
     public function test_second_payment_key_for_same_order_reuses_existing_payment(): void
     {
         $catalog = $this->catalog();
@@ -334,6 +342,7 @@ class PaymentCheckoutTest extends TestCase
         $this->assertSame(1, DB::table('payment_transactions')->where('order_id', $orderId)->count());
         Http::assertSentCount(1);
     }
+
     public function test_admin_can_confirm_manual_qris_once(): void
     {
         $catalog = $this->catalog();
@@ -376,6 +385,7 @@ class PaymentCheckoutTest extends TestCase
         $this->assertSame('PAID', DB::table('payment_transactions')->where('id', $paymentId)->value('status'));
         $this->assertSame(1, DB::table('audit_logs')->where('action', 'payment.manual.confirmed')->count());
     }
+
     public function test_customer_cannot_override_internal_payment_route_or_gateway(): void
     {
         $catalog = $this->catalog();
@@ -430,6 +440,7 @@ class PaymentCheckoutTest extends TestCase
             ->where('idempotency_key', 'm7-route-tamper-order-0001')
             ->count());
     }
+
     public function test_guest_wallet_is_visible_only_as_unavailable_and_cannot_be_quoted(): void
     {
         $catalog = $this->catalog();
@@ -452,6 +463,7 @@ class PaymentCheckoutTest extends TestCase
         ])->assertUnprocessable()
             ->assertJsonValidationErrors(['payment_channel_code']);
     }
+
     public function test_maintenance_gateway_removes_channel_from_public_order_choices(): void
     {
         $this->route('manual_qris', 'MANUAL_QRIS');
@@ -464,6 +476,7 @@ class PaymentCheckoutTest extends TestCase
 
         $this->assertNull(collect($channels)->firstWhere('code', 'manual_qris'));
     }
+
     public function test_quote_and_created_order_share_the_same_server_financial_summary(): void
     {
         $catalog = $this->catalog();
@@ -534,6 +547,7 @@ class PaymentCheckoutTest extends TestCase
         $this->assertSame(0, (int) $persisted->fee_idr);
         $this->assertSame(10000, (int) $persisted->total_idr);
     }
+
     public function test_scheduled_expiry_closes_untouched_order_and_releases_voucher_only_once(): void
     {
         Queue::fake();

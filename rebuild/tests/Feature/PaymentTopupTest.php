@@ -37,6 +37,7 @@ class PaymentTopupTest extends TestCase
         $this->withoutMiddleware(ThrottleRequests::class);
         Queue::fake([SendTransactionalEmailJob::class]);
     }
+
     /**
      * @return array{product:Product,package_id:int}
      */
@@ -85,6 +86,7 @@ class PaymentTopupTest extends TestCase
 
         return ['product' => $product, 'package_id' => $package->id];
     }
+
     private function route(
         string $channel,
         string $gateway,
@@ -127,6 +129,7 @@ class PaymentTopupTest extends TestCase
             ->where('payment_gateway_id', $gatewayId)
             ->value('id');
     }
+
     private function creatingPaymentRow(
         int $routeId,
         ?int $orderId,
@@ -152,6 +155,7 @@ class PaymentTopupTest extends TestCase
             'updated_at' => now()->subMinutes($staleMinutes),
         ]);
     }
+
     private function seedMidtransCredential(): void
     {
         IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
@@ -159,6 +163,7 @@ class PaymentTopupTest extends TestCase
             'is_active' => true,
         ]);
     }
+
     public function test_wallet_topup_paid_callback_credit_is_idempotent_and_fee_is_not_credited(): void
     {
         $user = User::create([
@@ -223,6 +228,7 @@ class PaymentTopupTest extends TestCase
         $this->assertSame('REFUND_REVIEW', DB::table('wallet_topups')->where('id', $topupId)->value('status'));
         $this->assertSame('REFUNDED', DB::table('payment_transactions')->where('id', $paymentId)->value('status'));
     }
+
     public function test_refunded_topup_with_spent_balance_enters_review_and_can_be_reconciled_safely(): void
     {
         $user = User::create([
@@ -314,6 +320,7 @@ class PaymentTopupTest extends TestCase
         $this->assertSame(1, DB::table('admin_notifications')
             ->where('event_type', 'wallet.topup_refund_review_closed')->count());
     }
+
     public function test_recovery_redrives_topup_creation_when_gateway_has_no_transaction(): void
     {
         $routeId = $this->route('qris', 'MIDTRANS', 0, 70, 'qris');
@@ -367,6 +374,7 @@ class PaymentTopupTest extends TestCase
         $this->assertSame($reference, $creates[0]['transaction_details']['order_id']);
         $this->assertSame('PENDING', DB::table('payment_transactions')->where('id', $paymentId)->value('status'));
     }
+
     public function test_topup_payment_start_is_rejected_after_expiry_and_marks_topup_expired(): void
     {
         $routeId = $this->route('qris', 'MIDTRANS', 0, 70, 'qris');
@@ -408,6 +416,7 @@ class PaymentTopupTest extends TestCase
         $this->assertSame(0, DB::table('payment_transactions')->where('wallet_topup_id', $topupId)->count());
         $this->assertSame('EXPIRED', DB::table('wallet_topups')->where('id', $topupId)->value('status'));
     }
+
     public function test_expire_unpaid_topups_command_expires_only_overdue_pending_topups(): void
     {
         $user = User::create([
@@ -445,6 +454,7 @@ class PaymentTopupTest extends TestCase
         $this->assertSame('PENDING_PAYMENT', DB::table('wallet_topups')->where('id', $fresh)->value('status'));
         $this->assertSame('PAID', DB::table('wallet_topups')->where('id', $paidOverdue)->value('status'));
     }
+
     public function test_late_paid_for_terminal_topup_goes_to_review_without_crediting(): void
     {
         $states = app(PaymentStateService::class);
@@ -498,6 +508,7 @@ class PaymentTopupTest extends TestCase
             ]);
         }
     }
+
     public function test_paid_callback_after_topup_deadline_expires_topup_without_crediting(): void
     {
         $user = User::create([
@@ -544,6 +555,7 @@ class PaymentTopupTest extends TestCase
         $this->assertSame(0, (int) DB::table('wallets')->where('id', $wallet->id)->value('balance_idr'));
         $this->assertSame(0, DB::table('wallet_ledger')->where('wallet_id', $wallet->id)->where('source', 'TOPUP')->count());
     }
+
     public function test_refund_review_freeze_is_serialized_on_the_wallet_lock(): void
     {
         $user = User::create([
@@ -644,6 +656,7 @@ class PaymentTopupTest extends TestCase
         $this->assertNotNull($freezeCheckAt, 'wallet checkout must check the refund-review freeze');
         $this->assertLessThan($freezeCheckAt, $payWalletLockAt);
     }
+
     public function test_recovery_terminates_creating_topup_payment_after_the_topup_deadline(): void
     {
         $routeId = $this->route('qris', 'MIDTRANS', 0, 70, 'qris');
@@ -697,6 +710,7 @@ class PaymentTopupTest extends TestCase
         $this->assertSame(0, $creates);
         $this->assertSame('FAILED', DB::table('payment_transactions')->where('id', $paymentId)->value('status'));
     }
+
     public function test_topup_retry_after_expiry_does_not_hand_back_existing_payment_instructions(): void
     {
         $routeId = $this->route('qris', 'MIDTRANS', 0, 70, 'qris');
@@ -755,6 +769,7 @@ class PaymentTopupTest extends TestCase
         $this->assertSame('EXPIRED', DB::table('wallet_topups')->where('id', $topupId)->value('status'));
         $this->assertSame('PENDING', DB::table('payment_transactions')->where('id', $paymentId)->value('status'));
     }
+
     public function test_topup_retry_for_already_expired_topup_does_not_hand_back_payment_instructions(): void
     {
         $routeId = $this->route('qris', 'MIDTRANS', 0, 70, 'qris');
