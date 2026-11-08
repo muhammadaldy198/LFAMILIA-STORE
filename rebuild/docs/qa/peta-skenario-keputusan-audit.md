@@ -10,7 +10,7 @@ Gerbang wajib skill `local-skenario-lanjutan`. Tiap butir: jalur bahagia, jalur 
 | Alasan kosong | 422, tidak ada perubahan |
 | Top up bukan REFUND_REVIEW | 422 "tidak sedang menunggu tinjauan" |
 | Klik dua kali | idempoten: kedua kali 422, saldo tetap, satu audit |
-| Setelah ditutup, member bayar pakai saldo | **berhasil** (kunci di `PaymentStateService:108` tidak lagi memblokir) |
+| Setelah ditutup, member bayar pakai saldo | **berhasil** (kunci di `OrderPaymentStateService` pada `payOrderWithWallet` tidak lagi memblokir) |
 | Admin tanpa izin `payments.manage` | 403 |
 | `resolveTopupRefundReview` masih ada? | **tidak** — method + docblocknya hilang, `grep` kosong |
 | Penyesuaian saldo manual (jalur uang sebenarnya) | tidak berubah perilakunya |
