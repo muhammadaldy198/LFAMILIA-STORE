@@ -64,6 +64,32 @@ class FortifyServiceProvider extends ServiceProvider
             $risk->clear('customer', $request->ip(), $identity);
             $request->session()->forget('security.customer_login_challenge');
 
+            // This callback replaces the guard's attempt(), so the login
+            // rehash the guard would have performed must happen here:
+            // upgrade a legacy hash (e.g. bcrypt) to the current default
+            // driver (Argon2id) now that the password has been proven.
+            if (Hash::needsRehash($user->password)) {
+                $verifiedHash = $user->password;
+                $upgradedHash = Hash::make((string) $request->input('password'));
+
+                // Compare-and-swap: persist the upgrade only if the
+                // stored hash is still the one that was just verified.
+                // A password change that commits in between must win -
+                // overwriting it with a hash of the password submitted
+                // here would silently resurrect the old credential.
+                $swapped = $user->newQuery()
+                    ->where($user->getKeyName(), $user->getKey())
+                    ->where('password', $verifiedHash)
+                    ->update([
+                        'password' => $upgradedHash,
+                        'updated_at' => $user->freshTimestamp(),
+                    ]);
+
+                if ($swapped === 1) {
+                    $user->forceFill(['password' => $upgradedHash]);
+                }
+            }
+
             return $user;
         });
 

@@ -320,6 +320,57 @@ class DeploymentM12Test extends TestCase
         }
     }
 
+    public function test_preflight_argon2id_capability_gate_behaves_against_fixtures(): void
+    {
+        $preflight = file_get_contents(base_path('deploy/preflight.sh'));
+        $block = $this->extractPreflightBlock(
+            $preflight,
+            '# start of argon2id capability check',
+            '# end of argon2id capability check'
+        );
+        // The fixture config mirrors the real config/hashing.php shape:
+        // every value flows through env(), so the gate's dotenv resolution
+        // decides the effective values.
+        $config = fn (int $defaultMemory): string => "<?php return ['driver' => env('HASH_DRIVER', 'argon2id'), 'bcrypt' => ['rounds' => env('BCRYPT_ROUNDS', 12)], 'argon' => ['memory' => env('HASH_MEMORY', {$defaultMemory}), 'time' => env('HASH_TIME', 4), 'threads' => env('HASH_THREADS', 1)]];\n";
+
+        $cases = [
+            'configured cost round-trips' => [PHP_BINARY, '', $config(65536), 0, ''],
+            'invalid env override fails despite a valid config default' => [PHP_BINARY, "HASH_MEMORY=1\n", $config(65536), 1, ''],
+            'valid env override rescues an impossible config default' => [PHP_BINARY, "HASH_MEMORY=65536\n", $config(1), 0, ''],
+            'bcrypt driver round-trips at its own rounds' => [PHP_BINARY, "HASH_DRIVER=bcrypt\n", $config(1), 0, ''],
+            'bcrypt driver with out-of-range rounds fails' => [PHP_BINARY, "HASH_DRIVER=bcrypt\nBCRYPT_ROUNDS=3\n", $config(65536), 1, ''],
+            'unsupported driver value is rejected' => [PHP_BINARY, "HASH_DRIVER=argon2idd\n", $config(65536), 1, ''],
+            'absurd time cost is rejected before hashing' => [PHP_BINARY, "HASH_TIME=99999\n", $config(65536), 1, ''],
+            'absurd memory is rejected before hashing' => [PHP_BINARY, "HASH_MEMORY=99999999\n", $config(65536), 1, ''],
+            'bom-prefixed first line is still read' => [PHP_BINARY, "\xEF\xBB\xBFHASH_DRIVER=bcrypt\n", $config(1), 0, ''],
+            'bom-prefixed invalid override still fails' => [PHP_BINARY, "\xEF\xBB\xBFHASH_MEMORY=1\n", $config(65536), 1, ''],
+            'exported invalid override beats the env file value' => [PHP_BINARY, "HASH_MEMORY=65536\n", $config(65536), 1, "export HASH_MEMORY='1'\n"],
+            'exported valid override beats the env file value' => [PHP_BINARY, "HASH_MEMORY=1\n", $config(65536), 0, "export HASH_MEMORY='65536'\n"],
+            'null driver literal is rejected' => [PHP_BINARY, "HASH_DRIVER=(null)\n", $config(65536), 1, ''],
+            'null memory literal falls through to the hasher default' => [PHP_BINARY, "HASH_MEMORY=(null)\n", $config(65536), 0, ''],
+            'quoted override with a trailing comment is honoured' => [PHP_BINARY, "HASH_MEMORY=\"65536\" # note\n", $config(1), 0, ''],
+            'quoted invalid override with a trailing comment fails' => [PHP_BINARY, "HASH_MEMORY=\"1\" # note\n", $config(65536), 1, ''],
+            'reference to an earlier env entry resolves' => [PHP_BINARY, "HASH_MEMORY_BASE=65536\nHASH_MEMORY=\${HASH_MEMORY_BASE}\n", $config(1), 0, ''],
+            'single-quoted reference is not expanded' => [PHP_BINARY, "HASH_MEMORY_BASE=65536\nHASH_MEMORY='\${HASH_MEMORY_BASE}'\n", $config(65536), 1, ''],
+            'quoted env override is honoured' => [PHP_BINARY, "HASH_MEMORY=\"65536\"\n", $config(1), 0, ''],
+            'php that cannot hash at all fails' => [null, '', $config(65536), 1, ''],
+        ];
+
+        foreach ($cases as $label => [$phpBin, $envContents, $configContents, $expected, $exports]) {
+            $dir = $this->makePreflightFixtureDir([]);
+            mkdir("{$dir}/config", 0777, true);
+            file_put_contents("{$dir}/config/hashing.php", $configContents);
+            file_put_contents("{$dir}/env.txt", $envContents);
+            if ($phpBin === null) {
+                $phpBin = "{$dir}/php-stub";
+                file_put_contents($phpBin, "#!/bin/sh\nexit 1\n");
+                chmod($phpBin, 0755);
+            }
+            file_put_contents("{$dir}/run.sh", "APP_DIR={$dir}\nENV_FILE={$dir}/env.txt\nPHP_BIN={$phpBin}\n{$exports}{$block}\n");
+            $this->assertSame($expected, $this->runBashScript("{$dir}/run.sh"), "Preflight Argon2id capability gate: {$label}.");
+        }
+    }
+
     public function test_preflight_nginx_check_behaves_against_fixtures(): void
     {
         $preflight = file_get_contents(base_path('deploy/preflight.sh'));

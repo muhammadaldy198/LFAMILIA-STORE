@@ -44,6 +44,168 @@ for ext in pdo_mysql redis mbstring openssl; do
     || { echo "Missing PHP extension: ${ext}" >&2; exit 1; }
 done
 
+# start of argon2id capability check
+# The default password hash driver is Argon2id (config/hashing.php). A PHP
+# build without Argon2id support would pass every other check in this
+# script and still break password creation and login rehashing after the
+# deploy, so this is a hard gate, not a warning. It resolves the EFFECTIVE
+# configuration exactly as the application will: the config file's env()
+# calls are answered with Laravel's own precedence - a value exported
+# into the process environment wins (deploy.sh sources ops.env, and
+# artisan config:cache inherits whatever it exports, freezing it into
+# the production config), then the production .env (first occurrence
+# wins, matching the immutable dotenv repository), with Laravel's
+# literal conversions ((null), (true), ...) applied to values from
+# either source; a null Argon cost then falls through to the hasher's
+# own defaults, exactly as the framework's ?? chains resolve it. An
+# invalid HASH_* value from any source fails here instead of after
+# the deploy. The
+# algorithm must be listed by password_algos(), and a real hash must
+# round-trip at the effective cost. An unsupported driver value fails
+# here too (the framework would only throw after the deploy), and a
+# bcrypt driver round-trips at its effective rounds instead. Absurd
+# cost values are rejected by range checks before any hashing, so the
+# gate itself can never hang or over-allocate on a typo: the memory
+# ceiling (524288 KiB) is sized for the 4 GiB production host, eight
+# times the pinned default, so an absurd HASH_MEMORY is refused here
+# instead of being handed to password_hash() to allocate. A leading
+# UTF-8 BOM in .env is stripped before parsing, as phpdotenv does, so
+# a first-line override is never silently skipped.
+"${PHP_BIN}" -r '
+$map = [];
+$envContents = file_get_contents($argv[1]);
+if ($envContents === false) {
+    exit(1);
+}
+if (str_starts_with($envContents, "\xEF\xBB\xBF")) {
+    $envContents = substr($envContents, 3);
+}
+foreach (explode("\n", $envContents) as $line) {
+    $line = trim($line);
+    if ($line === "" || $line[0] === "#" || ! str_contains($line, "=")) {
+        continue;
+    }
+    [$k, $v] = explode("=", $line, 2);
+    $k = trim($k);
+    $v = trim($v);
+    if (str_starts_with($k, "export ")) {
+        $k = trim(substr($k, 7));
+    }
+    $quote = null;
+    if ($v !== "" && ($v[0] === "\"" || $v[0] === "\047")) {
+        $q = $v[0];
+        $close = null;
+        $vlen = strlen($v);
+        for ($i = 1; $i < $vlen; $i++) {
+            if ($q === "\"" && $v[$i] === "\\") {
+                $i++;
+                continue;
+            }
+            if ($v[$i] === $q) {
+                $close = $i;
+                break;
+            }
+        }
+        if ($close !== null) {
+            $rest = trim(substr($v, $close + 1));
+            if ($rest === "" || str_starts_with($rest, "#")) {
+                $quote = $q;
+                $v = substr($v, 1, $close - 1);
+                if ($q === "\"") {
+                    $v = strtr($v, ["\\\"" => "\"", "\\\\" => "\\", "\\n" => "\n", "\\r" => "\r", "\\t" => "\t", "\\\$" => "\0"]);
+                }
+            }
+        }
+    }
+    if ($quote === null && ($pos = strpos($v, " #")) !== false) {
+        $v = trim(substr($v, 0, $pos));
+    }
+    if ($quote !== "\047") {
+        $v = preg_replace_callback("/" . "\\$" . "{([a-zA-Z0-9_.]+)}/", function ($m) use (&$map) {
+            foreach ([$_ENV, $_SERVER] as $bag) {
+                if (array_key_exists($m[1], $bag)) {
+                    return (string) $bag[$m[1]];
+                }
+            }
+            $fromProcess = getenv($m[1]);
+            if ($fromProcess !== false) {
+                return $fromProcess;
+            }
+            return array_key_exists($m[1], $map) ? $map[$m[1]] : $m[0];
+        }, $v);
+        $v = str_replace("\0", "\$", $v);
+    }
+    if (! array_key_exists($k, $map)) {
+        $map[$k] = $v;
+    }
+}
+function env($key, $default = null) {
+    global $map;
+    $value = null;
+    $found = false;
+    foreach ([$_ENV, $_SERVER] as $bag) {
+        if (array_key_exists($key, $bag)) {
+            $value = $bag[$key];
+            $found = true;
+            break;
+        }
+    }
+    if (! $found) {
+        $fromProcess = getenv($key);
+        if ($fromProcess !== false) {
+            $value = $fromProcess;
+            $found = true;
+        }
+    }
+    if (! $found) {
+        if (! array_key_exists($key, $map)) {
+            return $default;
+        }
+        $value = $map[$key];
+    }
+    switch (strtolower((string) $value)) {
+        case "true": case "(true)": return true;
+        case "false": case "(false)": return false;
+        case "empty": case "(empty)": return "";
+        case "null": case "(null)": return null;
+    }
+    return $value;
+}
+$config = require $argv[2];
+$driver = array_key_exists("driver", $config) ? $config["driver"] : "bcrypt";
+if (! in_array($driver, ["bcrypt", "argon", "argon2id"], true)) {
+    exit(1);
+}
+if ($driver === "bcrypt") {
+    $rounds = (int) ($config["bcrypt"]["rounds"] ?? 12);
+    if ($rounds < 4 || $rounds > 20) {
+        exit(1);
+    }
+    $hash = password_hash("preflight-probe", PASSWORD_BCRYPT, ["cost" => $rounds]);
+    exit($hash !== false && password_verify("preflight-probe", $hash) ? 0 : 1);
+}
+$algo = $driver === "argon" ? PASSWORD_ARGON2I : PASSWORD_ARGON2ID;
+$algoName = $driver === "argon" ? "argon2i" : "argon2id";
+if (! in_array($algoName, password_algos(), true)) {
+    exit(1);
+}
+$argon = $config["argon"] ?? [];
+$memory = (int) ($argon["memory"] ?? 1024);
+$time = (int) ($argon["time"] ?? 2);
+$threads = (int) ($argon["threads"] ?? 2);
+if ($memory < 8 || $memory > 524288 || $time < 1 || $time > 16 || $threads < 1 || $threads > 32) {
+    exit(1);
+}
+$hash = password_hash("preflight-probe", $algo, [
+    "memory_cost" => $memory,
+    "time_cost" => $time,
+    "threads" => $threads,
+]);
+exit($hash !== false && password_verify("preflight-probe", $hash) ? 0 : 1);
+' "${ENV_FILE}" "${APP_DIR}/config/hashing.php" \
+  || { echo "PHP Argon2 support is required and must hash at the effective configured cost (see config/hashing.php and HASH_* in .env)" >&2; exit 1; }
+# end of argon2id capability check
+
 for pair in \
   'APP_ENV=production' \
   'APP_DEBUG=false' \
