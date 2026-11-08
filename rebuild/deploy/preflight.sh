@@ -60,9 +60,9 @@ done
 grep -Eq '^APP_KEY=base64:.+$' "${ENV_FILE}" || { echo "APP_KEY must be generated server-side" >&2; exit 1; }
 grep -Eq '^APP_URL=https://' "${ENV_FILE}" || { echo "APP_URL must use HTTPS" >&2; exit 1; }
 grep -Eq '^APP_TRUSTED_HOSTS=.+$' "${ENV_FILE}" || { echo "APP_TRUSTED_HOSTS is required" >&2; exit 1; }
-grep -Eq '^TRUSTED_PROXIES=.+$' "${ENV_FILE}" || { echo "TRUSTED_PROXIES is required" >&2; exit 1; }
+grep -Eq '^[[:space:]]*(export[[:space:]]+)?TRUSTED_PROXIES=.+$' "${ENV_FILE}" || { echo "TRUSTED_PROXIES is required" >&2; exit 1; }
 while IFS= read -r proxies_line; do
-  proxies_raw="${proxies_line#TRUSTED_PROXIES=}"
+  proxies_raw="${proxies_line#*TRUSTED_PROXIES=}"
   proxies_raw="${proxies_raw#"${proxies_raw%%[![:space:]]*}"}"
   proxies_quote="${proxies_raw:0:1}"
   if [[ "${proxies_quote}" == '"' || "${proxies_quote}" == "'" ]]; then
@@ -109,7 +109,7 @@ while IFS= read -r proxies_line; do
     echo "TRUSTED_PROXIES must name at least one proxy in production; an empty value is not allowed" >&2
     exit 1
   fi
-done < <(grep -E '^TRUSTED_PROXIES=' "${ENV_FILE}" || true)
+done < <(grep -E '^[[:space:]]*(export[[:space:]]+)?TRUSTED_PROXIES=' "${ENV_FILE}" || true)
 
 cd "${APP_DIR}"
 COMPOSER_ALLOW_SUPERUSER=1 \
@@ -272,6 +272,7 @@ location ~* ^/(?:storage/logs|bootstrap/cache)/'
             }
             return ""
           }
+          if (ch == "{") return ""
           out = out ch
         }
         return out
@@ -316,9 +317,9 @@ location ~* ^/(?:storage/logs|bootstrap/cache)/'
       }
       BEGIN {
         n = split(ENVIRON["DENY_PATTERNS"], pats, "\n")
-        subj[1, 1] = "/.env"; subj[1, 2] = "/.git/config"; subj[1, 3] = "/.env.local"; subj[1, 4] = "/.env.production"; subj[1, 5] = "/x/.env"; subj[1, 6] = "/.hidden"; sc[1] = 6
-        subj[2, 1] = "/files/x.env"; subj[2, 2] = "/files/x.log"; subj[2, 3] = "/files/x.sql"; subj[2, 4] = "/files/x.bak"; subj[2, 5] = "/files/x.ini"; subj[2, 6] = "/x.env"; subj[2, 7] = "/uploads/x.sql"; sc[2] = 7
-        subj[3, 1] = "/storage/logs/laravel.log"; subj[3, 2] = "/bootstrap/cache/config.php"; subj[3, 3] = "/bootstrap/cache/views/abc.php"; sc[3] = 3
+        subj[1, 1] = "/.env"; subj[1, 2] = "/.git/config"; subj[1, 3] = "/.env.local"; subj[1, 4] = "/.env.production"; subj[1, 5] = "/x/.env"; subj[1, 6] = "/.hidden"; subj[1, 7] = "/.ENV"; sc[1] = 7
+        subj[2, 1] = "/files/x.env"; subj[2, 2] = "/files/x.log"; subj[2, 3] = "/files/x.sql"; subj[2, 4] = "/files/x.bak"; subj[2, 5] = "/files/x.ini"; subj[2, 6] = "/x.env"; subj[2, 7] = "/uploads/x.sql"; subj[2, 8] = "/files/x.LOG"; subj[2, 9] = "/files/X.ENV"; subj[2, 10] = "/files/BACKUP.SQL"; sc[2] = 10
+        subj[3, 1] = "/storage/logs/laravel.log"; subj[3, 2] = "/bootstrap/cache/config.php"; subj[3, 3] = "/bootstrap/cache/views/abc.php"; subj[3, 4] = "/Storage/Logs/laravel.log"; subj[3, 5] = "/Bootstrap/Cache/config.php"; sc[3] = 5
       }
       {
         line = $0
