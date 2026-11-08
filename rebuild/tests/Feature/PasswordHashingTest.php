@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Routing\Middleware\ThrottleRequests;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
@@ -92,6 +93,55 @@ class PasswordHashingTest extends TestCase
         $stored = $user->fresh()->password;
         $this->assertStringStartsWith('$argon2id$', $stored, 'login harus menaikkan hash ke Argon2id');
         $this->assertTrue(Hash::check(self::PASS, $stored));
+    }
+
+    public function test_bcrypt_driver_still_verifies_argon2id_hashes(): void
+    {
+        // If the driver were ever switched back to bcrypt, users whose
+        // hashes were already upgraded must not be locked out: with
+        // algorithm verification on, the bcrypt hasher throws on an
+        // Argon2id hash instead of checking it.
+        $this->assertFalse(config('hashing.bcrypt.verify'));
+
+        $argonHash = Hash::make(self::PASS);
+        $this->assertStringStartsWith('$argon2id$', $argonHash);
+        $this->assertTrue(Hash::driver('bcrypt')->check(self::PASS, $argonHash));
+        $this->assertFalse(Hash::driver('bcrypt')->check('bukan-password-ini', $argonHash));
+    }
+
+    public function test_customer_rehash_does_not_overwrite_a_password_rotated_mid_login(): void
+    {
+        $user = User::create([
+            'name' => 'Pelanggan Rotasi',
+            'email' => 'rotated-customer@example.test',
+            'phone' => '081200000012',
+            'password' => $this->legacyBcryptHash(),
+        ]);
+        $user->forceFill(['email_verified_at' => now()])->save();
+
+        // Simulate a password rotation that commits after the login
+        // callback has loaded and verified this user but before its
+        // rehash write: flip the stored hash the moment the model is
+        // hydrated for the login attempt.
+        $rotatedHash = Hash::make('rotated-password-456');
+        $flipped = false;
+        User::retrieved(function (User $loaded) use (&$flipped, $user, $rotatedHash) {
+            if (! $flipped && $loaded->is($user)) {
+                $flipped = true;
+                DB::table('users')->where('id', $user->id)->update(['password' => $rotatedHash]);
+            }
+        });
+
+        $this->post('/login', [
+            'email' => $user->email,
+            'password' => self::PASS,
+        ])->assertRedirect('/account');
+
+        $this->assertTrue($flipped, 'rotasi harus benar-benar terjadi di tengah login');
+        $stored = DB::table('users')->where('id', $user->id)->value('password');
+        $this->assertSame($rotatedHash, $stored, 'rehash tidak boleh menimpa password yang sudah dirotasi');
+        $this->assertTrue(Hash::check('rotated-password-456', $stored));
+        $this->assertFalse(Hash::check(self::PASS, $stored));
     }
 
     public function test_admin_with_bcrypt_password_logs_in_and_is_rehashed(): void

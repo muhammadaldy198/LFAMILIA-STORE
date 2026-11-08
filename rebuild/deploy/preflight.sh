@@ -91,10 +91,49 @@ foreach (explode("\n", $envContents) as $line) {
     if (str_starts_with($k, "export ")) {
         $k = trim(substr($k, 7));
     }
-    if (strlen($v) >= 2 && ($v[0] === "\"" || $v[0] === "\047") && $v[strlen($v) - 1] === $v[0]) {
-        $v = substr($v, 1, -1);
-    } elseif (($pos = strpos($v, " #")) !== false) {
+    $quote = null;
+    if ($v !== "" && ($v[0] === "\"" || $v[0] === "\047")) {
+        $q = $v[0];
+        $close = null;
+        $vlen = strlen($v);
+        for ($i = 1; $i < $vlen; $i++) {
+            if ($q === "\"" && $v[$i] === "\\") {
+                $i++;
+                continue;
+            }
+            if ($v[$i] === $q) {
+                $close = $i;
+                break;
+            }
+        }
+        if ($close !== null) {
+            $rest = trim(substr($v, $close + 1));
+            if ($rest === "" || str_starts_with($rest, "#")) {
+                $quote = $q;
+                $v = substr($v, 1, $close - 1);
+                if ($q === "\"") {
+                    $v = strtr($v, ["\\\"" => "\"", "\\\\" => "\\", "\\n" => "\n", "\\r" => "\r", "\\t" => "\t", "\\\$" => "\0"]);
+                }
+            }
+        }
+    }
+    if ($quote === null && ($pos = strpos($v, " #")) !== false) {
         $v = trim(substr($v, 0, $pos));
+    }
+    if ($quote !== "\047") {
+        $v = preg_replace_callback("/" . "\\$" . "{([a-zA-Z0-9_.]+)}/", function ($m) use (&$map) {
+            foreach ([$_ENV, $_SERVER] as $bag) {
+                if (array_key_exists($m[1], $bag)) {
+                    return (string) $bag[$m[1]];
+                }
+            }
+            $fromProcess = getenv($m[1]);
+            if ($fromProcess !== false) {
+                return $fromProcess;
+            }
+            return array_key_exists($m[1], $map) ? $map[$m[1]] : $m[0];
+        }, $v);
+        $v = str_replace("\0", "\$", $v);
     }
     if (! array_key_exists($k, $map)) {
         $map[$k] = $v;

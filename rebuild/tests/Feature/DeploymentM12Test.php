@@ -348,6 +348,10 @@ class DeploymentM12Test extends TestCase
             'exported valid override beats the env file value' => [PHP_BINARY, "HASH_MEMORY=1\n", $config(65536), 0, "export HASH_MEMORY='65536'\n"],
             'null driver literal is rejected' => [PHP_BINARY, "HASH_DRIVER=(null)\n", $config(65536), 1, ''],
             'null memory literal falls through to the hasher default' => [PHP_BINARY, "HASH_MEMORY=(null)\n", $config(65536), 0, ''],
+            'quoted override with a trailing comment is honoured' => [PHP_BINARY, "HASH_MEMORY=\"65536\" # note\n", $config(1), 0, ''],
+            'quoted invalid override with a trailing comment fails' => [PHP_BINARY, "HASH_MEMORY=\"1\" # note\n", $config(65536), 1, ''],
+            'reference to an earlier env entry resolves' => [PHP_BINARY, "HASH_MEMORY_BASE=65536\nHASH_MEMORY=\${HASH_MEMORY_BASE}\n", $config(1), 0, ''],
+            'single-quoted reference is not expanded' => [PHP_BINARY, "HASH_MEMORY_BASE=65536\nHASH_MEMORY='\${HASH_MEMORY_BASE}'\n", $config(65536), 1, ''],
             'quoted env override is honoured' => [PHP_BINARY, "HASH_MEMORY=\"65536\"\n", $config(1), 0, ''],
             'php that cannot hash at all fails' => [null, '', $config(65536), 1, ''],
         ];

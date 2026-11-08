@@ -33,7 +33,13 @@ return [
 
     'bcrypt' => [
         'rounds' => env('BCRYPT_ROUNDS', 12),
-        'verify' => env('HASH_VERIFY', true),
+
+        // Algorithm verification stays off (the framework default) so a
+        // hash written by the other algorithm remains verifiable: with
+        // it on, the bcrypt hasher throws on Argon2id hashes instead of
+        // checking them, which would lock out every already-upgraded
+        // user if the driver were ever switched back to bcrypt.
+        'verify' => env('HASH_VERIFY', false),
     ],
 
     /*
