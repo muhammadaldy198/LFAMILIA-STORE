@@ -67,7 +67,7 @@ Skill ada di `.claude/skills/`.
 | Fitur/modul baru | code-scaffolding + skill stack di atas |
 | Deploy/CI | cicd-deployment |
 | Review PR besar | code-tour |
-| Rencana sebelum koding | grill-me + grilling + writing-plans |
+| Rencana sebelum koding | grill-me + writing-plans |
 | Spesifikasi / dokumen keputusan | to-spec + technical-documentation + lfamilia-product-spec |
 | Desain UI/UX | frontend-design + ui-ux-pro-max + popular-web-designs + design-md |
 | Media/upload | medialibrary-development |
