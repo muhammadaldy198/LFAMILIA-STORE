@@ -95,6 +95,6 @@ Bagian ini menyatakan **kode tersedia**, bukan "sudah dipakai pelanggan".
 ## Catatan penting
 
 - **Data di lingkungan lokal adalah data uji**, bukan data produksi.
-- **Refund tidak otomatis.** Member lewat penyesuaian saldo (Super Admin), guest lewat transfer manual.
+- **Tidak ada refund** (PRD §10). Pesanan bermasalah diselesaikan dengan menyelesaikan pesanannya; koreksi untuk member hanya lewat penyesuaian saldo oleh Super Admin, dan penyelesaian guest diputuskan Super Admin kasus per kasus — transfer manual bukan jalur penyelesaian.
 - Semua status di atas berarti "kode tersedia", bukan "sudah terbukti dipakai orang".
 - Keputusan produk terakhir: PRD §23 (penyelarasan Buku Keputusan pemilik, 2026-10-24).
