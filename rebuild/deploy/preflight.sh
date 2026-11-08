@@ -166,6 +166,40 @@ while IFS= read -r proxies_line; do
   fi
 done < <(grep -E '^[[:space:]]*(export[[:space:]]+)?TRUSTED_PROXIES[[:space:]]*=' "${ENV_FILE}" || true)
 
+# The running application reads the frozen configuration cache, not the
+# .env file, once bootstrap/cache/config.php exists. A cache built while
+# TRUSTED_PROXIES still held a value the boot guard rejects (for example
+# the wildcard) would make the first boot of the guarded tree throw even
+# after .env is fixed, so validate the cached value with the same rules.
+proxies_cache_file="${APP_DIR}/bootstrap/cache/config.php"
+if [[ -f "${proxies_cache_file}" ]]; then
+  if ! "${PHP_BIN}" -r '
+    $config = require $argv[1];
+    $value = $config["lfamilia"]["trusted_proxies"] ?? null;
+    if ($value === "*") { exit(1); }
+    if (!is_array($value) || $value === []) { exit(1); }
+    foreach ($value as $entry) {
+      if (!is_string($entry) || $entry === "*") { exit(1); }
+      $parts = explode("/", $entry);
+      if (count($parts) > 2) { exit(1); }
+      $prefix = $parts[1] ?? null;
+      if ($prefix !== null && ($prefix === "" || !ctype_digit($prefix) || (int) $prefix === 0)) { exit(1); }
+      $address = $parts[0];
+      if (str_contains($address, ".") && str_contains($address, ":")) { exit(1); }
+      if (filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false) {
+        if ($prefix !== null && (int) $prefix > 32) { exit(1); }
+      } elseif (filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false) {
+        if ($prefix !== null && (int) $prefix > 128) { exit(1); }
+      } else { exit(1); }
+    }
+    exit(0);
+  ' "${proxies_cache_file}"; then
+    echo "The cached configuration (bootstrap/cache/config.php) holds a TRUSTED_PROXIES value the application will reject at boot; delete the cached configuration file and re-run preflight" >&2
+    exit 1
+  fi
+fi
+# end of cached-config proxy check
+
 cd "${APP_DIR}"
 COMPOSER_ALLOW_SUPERUSER=1 \
 GIT_CONFIG_COUNT=1 \

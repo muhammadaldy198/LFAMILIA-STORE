@@ -223,6 +223,8 @@ class DeploymentM12Test extends TestCase
         $this->assertStringContainsString('Catatan bootstrap guard TRUSTED_PROXIES', $readme, 'The README must document the first-rollout bootstrap for the trusted-proxies boot guard.');
         $this->assertStringContainsString('migrasikan `TRUSTED_PROXIES` di `.env` live dari `*`', $readme, 'The bootstrap must require migrating the live TRUSTED_PROXIES value off the wildcard before the first guarded deploy.');
         $this->assertStringContainsString('SEBELUM menjalankan `deploy.sh`', $readme, 'The bootstrap must require the target preflight to pass before the first guarded deploy runs.');
+        $this->assertStringContainsString('bootstrap/cache/config.php', $readme, 'The bootstrap must cover the frozen configuration cache, whose trusted-proxies value the application actually reads.');
+        $this->assertStringContainsString('holds a TRUSTED_PROXIES value the application will reject at boot', $preflight, 'Preflight must validate the frozen cached trusted-proxies value, not only the .env value.');
         $this->assertStringContainsString('DEPLOY_EXPECTED_SHA=', $ops);
         $this->assertStringContainsString('MYSQL_DEFAULTS_FILE=', $ops);
         $this->assertStringContainsString('BACKUP_PASSPHRASE_FILE=', $ops);
@@ -277,6 +279,39 @@ class DeploymentM12Test extends TestCase
             $dir = $this->makePreflightFixtureDir(['env.txt' => $env]);
             file_put_contents("{$dir}/run.sh", "ENV_FILE={$dir}/env.txt\n{$loop}\n");
             $this->assertSame($expected, $this->runBashScript("{$dir}/run.sh"), "Preflight proxy guard: {$label}.");
+        }
+    }
+
+    public function test_preflight_cached_config_proxy_guard_behaves_against_fixtures(): void
+    {
+        $preflight = file_get_contents(base_path('deploy/preflight.sh'));
+        $block = $this->extractPreflightBlock(
+            $preflight,
+            'proxies_cache_file="${APP_DIR}/bootstrap/cache/config.php"',
+            '# end of cached-config proxy check'
+        );
+        $cache = fn (string $value): string => "<?php return ['lfamilia' => ['trusted_proxies' => {$value}]];\n";
+
+        $cases = [
+            'no cache file passes' => [null, 0],
+            'cached loopback list passes' => [$cache("['127.0.0.1', '::1']"), 0],
+            'cached valid cidrs pass' => [$cache("['10.0.0.0/8', '2001:db8::/32']"), 0],
+            'cached wildcard fails' => [$cache("'*'"), 1],
+            'cached wildcard entry fails' => [$cache("['127.0.0.1', '*']"), 1],
+            'cached malformed entry fails' => [$cache("['bogus']"), 1],
+            'cached catch-all cidr fails' => [$cache("['10.0.0.0/0']"), 1],
+            'cached missing key fails' => ["<?php return ['app' => ['timezone' => 'Asia/Jakarta']];\n", 1],
+            'cached empty list fails' => [$cache('[]'), 1],
+        ];
+
+        foreach ($cases as $label => [$contents, $expected]) {
+            $dir = $this->makePreflightFixtureDir([]);
+            if ($contents !== null) {
+                mkdir("{$dir}/bootstrap/cache", 0777, true);
+                file_put_contents("{$dir}/bootstrap/cache/config.php", $contents);
+            }
+            file_put_contents("{$dir}/run.sh", "APP_DIR={$dir}\nPHP_BIN=".PHP_BINARY."\n{$block}\n");
+            $this->assertSame($expected, $this->runBashScript("{$dir}/run.sh"), "Preflight cached-config proxy guard: {$label}.");
         }
     }
 
