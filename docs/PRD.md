@@ -323,8 +323,8 @@ Halaman publik `/refund` tetap ada sebagai dokumen hukum, dan isinya menyatakan 
 
 ### 10.2 Pesanan gagal diselesaikan, bukan dibatalkan sepihak
 
-- Pesanan yang gagal atau belum pasti dicek ulang otomatis sampai 3 kali (§9), lalu naik ke pemeriksaan admin dan ditahan di status internal BLOCKED (§9.1) sampai ada keputusan manusia.
-- Penyelesaiannya adalah **menyelesaikan pesanannya**: kirim ulang oleh admin, pengiriman manual, atau tindakan operasional lain yang membuat pembeli menerima produk yang ia bayar.
+- Pesanan yang hasilnya belum pasti **bukan gagal** dan tidak boleh dikirim ulang: pengecekan ke penyedia diteruskan dengan `ref_id` yang sama sampai ada hasil final atau batas aman 24 jam; sesudah tiga cek tanpa hasil, admin diperingatkan tetapi pengecekan tidak berhenti (§8.4).
+- Pesanan yang gagal final ditahan untuk keputusan manusia (status internal BLOCKED, §9.2). Penyelesaiannya adalah **menyelesaikan pesanannya**: kirim ulang oleh admin, pengiriman manual, atau tindakan operasional lain yang membuat pembeli menerima produk yang ia bayar. Kirim ulang ke sumber lain hanya sesudah penyedia mengonfirmasi gagal, bukan selagi hasilnya belum pasti (§8.4).
 - Kalau pembeli salah mengisi ID/server/data tujuan dan penyedia sudah mengirim sesuai data itu, pesanan dianggap selesai — itu tanggung jawab pembeli, bukan kegagalan sistem.
 - Berubah pikiran, salah pilih produk/nominal, produk sudah terkirim, kode sudah ditampilkan, akun game diblokir publisher, atau bonus publisher tidak diterima **tidak mengubah apa pun**: tidak ada pengembalian dana untuk alasan-alasan itu maupun alasan lain.
 
