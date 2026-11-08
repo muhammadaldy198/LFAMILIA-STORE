@@ -280,6 +280,13 @@ location ~* ^/(?:storage/logs|bootstrap/cache)/'
         }
         return out
       }
+      function realp1(u,    q) {
+        while ((q = index(u, "/.")) > 0) {
+          if (index(substr(u, q + 2), "well-known") != 1) return 1
+          u = substr(u, q + 2)
+        }
+        return 0
+      }
       function litprefix(p,    out, j, ch, nx, d, inner, q, st, bad) {
         out = ""; j = 1
         if (substr(p, 1, 1) == "^") j = 2
@@ -301,13 +308,13 @@ location ~* ^/(?:storage/logs|bootstrap/cache)/'
               }
               if (st == "(") { bad = 1; break }
               if (st == ")") { d--; q++; if (!d) break; continue }
-              if (st ~ /[.*+?|\[\]$^]/) { bad = 1; break }
+              if (st ~ /[*+?|\[\]$^]/) { bad = 1; break }
               inner = inner st; q++
             }
             if (bad || d != 0) break
             out = out inner; j = q; continue
           }
-          if (ch ~ /[.*+?|\[\]$]/) break
+          if (ch ~ /[*+?|\[\]$]/) break
           out = out ch; j++
         }
         return out
@@ -321,11 +328,12 @@ location ~* ^/(?:storage/logs|bootstrap/cache)/'
           if (pp == "") return 0
           sp = simplify(pp); sci = simp_ci
           if (sp == "") return 1
-          if ((i != 1 || !index(p, ".well-known")) && ((pci || sci) ? match(tolower(p), tolower(sp)) : match(p, sp))) return 1
+          if (i == 1) { if (realp1(p)) return 1 }
+          else if ((pci || sci) ? match(tolower(p), tolower(sp)) : match(p, sp)) return 1
           if (e_caret[k]) {
             for (c = 1; c <= cc[i]; c++) {
               t = p core[i, c]
-              if (i == 1 && index(t, ".well-known")) continue
+              if (i == 1) { if (realp1(t)) return 1; continue }
               if ((pci || sci) ? match(tolower(t), tolower(sp)) : match(t, sp)) return 1
             }
           }
@@ -341,22 +349,22 @@ location ~* ^/(?:storage/logs|bootstrap/cache)/'
         }
         lp = litprefix(p)
         if (lp != "") {
+          pp = ""
+          for (pj = 1; pj <= E; pj++) if (e_prot[pj] == i) { pp = e_pat[pj]; pci = e_ci[pj]; break }
+          sp = (pp != "") ? simplify(pp) : ""; sci = simp_ci
           for (c = 1; c <= cc[i]; c++) {
             t = lp core[i, c]
-            if (i == 1 && index(t, ".well-known")) continue
+            if (i == 1 && !realp1(t)) continue
+            if (i == 3 && sp != "" && !((pci || sci) ? match(tolower(t), tolower(sp)) : match(t, sp))) continue
             if (ci) { if (match(tolower(t), tolower(p))) return 1 }
             else if (match(t, p)) return 1
           }
-          if (!index(lp, ".well-known")) {
-            pp = ""
-            for (pj = 1; pj <= E; pj++) if (e_prot[pj] == i) { pp = e_pat[pj]; pci = e_ci[pj]; break }
-            if (pp != "") {
-              sp = simplify(pp); sci = simp_ci
+          if ((ci && match(tolower(lp), tolower(p))) || (!ci && match(lp, p))) {
+            if (i == 1) { if (realp1(lp)) return 1 }
+            else if (pp != "") {
               if (sp == "") return 1
-              if ((ci && match(tolower(lp), tolower(p))) || (!ci && match(lp, p))) {
-                if ((pci || sci) && match(tolower(lp), tolower(sp))) return 1
-                if (!(pci || sci) && match(lp, sp)) return 1
-              }
+              if ((pci || sci) && match(tolower(lp), tolower(sp))) return 1
+              if (!(pci || sci) && match(lp, sp)) return 1
             }
           }
         }

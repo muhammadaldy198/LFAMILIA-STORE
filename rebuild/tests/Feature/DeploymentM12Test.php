@@ -282,6 +282,9 @@ class DeploymentM12Test extends TestCase
         $exactBackupSql = implode("\n", ["    location = /uploads/backup.sql {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $exactNoDot = implode("\n", ["    location = /uploads/readme {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $caretPrivate = implode("\n", ["    location ^~ /private/ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
+        $exactWkGit = implode("\n", ["    location = /.well-known/.git/config {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
+        $caretWkGit = implode("\n", ["    location ^~ /.well-known/.git/ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
+        $exactAcme = implode("\n", ["    location = /.well-known/acme.txt {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $inClassNegated = implode("\n", ["    location ~* ^/files/[\\D]+\\.env$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $numericBackref = implode("\n", ["    location ~* \\.(env|log)\\1$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $wordClass = implode("\n", ["    location ~* ^/files/\\w+\\.env$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
@@ -334,6 +337,9 @@ class DeploymentM12Test extends TestCase
             'exact backup.sql shadows the extension rule' => [$server('lfamilia.com', $exactBackupSql), 1],
             'exact dotless uri shadows nothing' => [$server('lfamilia.com', $exactNoDot), 0],
             'caret prefix on an unsampled directory shadows the file rules' => [$server('lfamilia.com', $caretPrivate), 2],
+            'exact uri under well-known still shadows the dotfile rule via its git component' => [$server('lfamilia.com', $exactWkGit), 1],
+            'caret prefix under well-known still shadows the file rules via its git component' => [$server('lfamilia.com', $caretWkGit), 2],
+            'acme challenge file under well-known shadows nothing' => [$server('lfamilia.com', $exactAcme), 0],
             'negated shorthand inside a character class counts as overlapping' => [$server('lfamilia.com', $inClassNegated), 3],
             'numeric backreference counts as overlapping' => [$server('lfamilia.com', $numericBackref), 3],
             'word-class escape is translated for matching' => [$server('lfamilia.com', $wordClass), 1],
