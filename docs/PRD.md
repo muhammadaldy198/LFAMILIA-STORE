@@ -257,7 +257,7 @@ Aturan turunan:
 - **Webhook diverifikasi tanda tangannya.** Tanpa verifikasi, payload diabaikan.
 - **Webhook hanya mempercepat**, bukan satu-satunya sumber. Cek ulang tetap dijalankan untuk pesanan yang belum pasti.
 - **Saldo penyedia hanya ditampilkan sebagai angka pantau.** Panel boleh menampilkan saldo Digiflazz apa adanya untuk dilihat admin. **Tidak ada alarm, peringatan otomatis, atau ambang saldo** — tidak ada notifikasi "saldo menipis" ke Telegram/Discord/email.
-- **Batas cek ulang otomatis: 3 kali**, dengan jeda minimal 2 menit antar percobaan. Setelah itu pesanan tidak dicek otomatis lagi dan naik ke pemeriksaan manusia. Artinya kegagalan penyedia biasanya diketahui dalam hitungan menit, bukan hari — jadi klaim "penyedia baru konfirmasi gagal berhari-hari kemudian" tidak dipakai sebagai alasan pengecualian penyelesaian.
+- **Cek ulang hasil yang belum pasti diteruskan** dengan jeda minimal 1 menit (§8.4), sampai ada hasil final atau batas aman 24 jam. Sesudah tiga cek tanpa hasil, admin diberi peringatan, tetapi pengecekan **tidak berhenti**. Sesudah 24 jam tanpa hasil final, pesanan naik ke penanganan manual admin — tanpa pengiriman ulang otomatis. Artinya kegagalan penyedia diketahui paling lambat dalam 24 jam, bukan berhari-hari — jadi klaim "penyedia baru konfirmasi gagal berhari-hari kemudian" tidak dipakai sebagai alasan pengecualian penyelesaian.
 - **Tidak ada ambang peringatan saldo.** Saldo penyedia tidak punya alarm otomatis; admin melihat angkanya sendiri di panel.
 
 ### 8.2 Manual
