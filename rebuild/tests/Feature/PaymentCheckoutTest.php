@@ -8,25 +8,22 @@ use App\Models\IntegrationCredential;
 use App\Models\Product;
 use App\Models\StoreAsset;
 use App\Services\PaymentRoutingService;
-use App\Services\PaymentStateService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Routing\Middleware\ThrottleRequests;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 /**
- * Tes pembayaran seputar checkout dan sesi pembayaran: QRIS
- * manual, sesi pembayaran asal, kedaluwarsa pembayaran, aturan
- * rute dan kutipan harga, serta konfirmasi manual oleh admin.
- * Tes gateway eksternal, dompet, tautan bertanda tangan, topup,
- * dan pemulihan ada di class tes pembayaran masing-masing.
+ * Tes checkout pembayaran: QRIS manual, sesi pembayaran asal,
+ * halaman pembayaran, konfirmasi manual admin, dan aturan rute
+ * serta kutipan yang dilihat pelanggan. Tes kedaluwarsa,
+ * gateway, dompet, tautan, topup, dan pemulihan ada di class
+ * tes masing-masing.
  */
 class PaymentCheckoutTest extends TestCase
 {
@@ -250,99 +247,6 @@ class PaymentCheckoutTest extends TestCase
             );
     }
 
-    public function test_expired_payment_closes_order_releases_voucher_and_late_paid_does_not_reopen(): void
-    {
-        $catalog = $this->catalog();
-        $routeId = $this->route('manual_qris', 'MANUAL_QRIS');
-        $voucherId = DB::table('vouchers')->insertGetId([
-            'code' => 'M7EXPIRE',
-            'discount_type' => 'FIXED',
-            'discount_value' => 1000,
-            'minimum_total_idr' => 0,
-            'total_quota' => 10,
-            'per_customer_limit' => 1,
-            'is_active' => true,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        $payload = $this->guestCheckout(
-            $catalog['package_id'],
-            'manual_qris',
-            'm7-expire-order-0001'
-        );
-        $payload['voucher_code'] = 'M7EXPIRE';
-        $checkout = $this->postJson('/checkout/orders', $payload)->assertCreated();
-        $order = DB::table('orders')->where('order_number', $checkout->json('order_number'))->first();
-
-        $paymentId = DB::table('payment_transactions')->insertGetId([
-            'order_id' => $order->id,
-            'payment_route_id' => $routeId,
-            'gateway_code' => 'MANUAL_QRIS',
-            'channel_code' => 'manual_qris',
-            'merchant_reference' => 'EXPIRE-'.$order->id,
-            'amount_idr' => $order->total_idr,
-            'status' => 'PENDING',
-            'idempotency_key' => 'm7-expire-payment-0001',
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        $states = app(PaymentStateService::class);
-        $states->apply($paymentId, 'EXPIRED');
-
-        $this->assertSame('EXPIRED', DB::table('orders')->where('id', $order->id)->value('status'));
-        $this->assertSame('EXPIRED', DB::table('payment_transactions')->where('id', $paymentId)->value('status'));
-        $this->assertSame('RELEASED', DB::table('voucher_redemptions')
-            ->where('voucher_id', $voucherId)->value('status'));
-
-        $states->apply($paymentId, 'PAID');
-
-        $this->assertSame('EXPIRED', DB::table('orders')->where('id', $order->id)->value('status'));
-        $this->assertSame('PAID', DB::table('payment_transactions')->where('id', $paymentId)->value('status'));
-        $this->assertSame(1, DB::table('order_events')
-            ->where('order_id', $order->id)
-            ->where('event_type', 'PAYMENT_LATE_VERIFIED')->count());
-    }
-
-    public function test_second_payment_key_for_same_order_reuses_existing_payment(): void
-    {
-        $catalog = $this->catalog();
-        $this->route('qris', 'MIDTRANS', 0, 0, 'qris');
-        IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
-            'config_ciphertext' => ['server_key' => 'server-test', 'is_production' => false],
-            'is_active' => true,
-        ]);
-        Http::fake([
-            'https://app.sandbox.midtrans.com/snap/v1/transactions' => Http::response([
-                'token' => 'one-token-only',
-                'redirect_url' => 'https://sandbox.midtrans.test/pay-one',
-            ]),
-        ]);
-
-        $checkout = $this->postJson('/checkout/orders', $this->guestCheckout(
-            $catalog['package_id'],
-            'qris',
-            'm7-one-payment-order-0001'
-        ))->assertCreated();
-
-        $first = $this->postJson('/payments/orders/'.$checkout->json('order_number'), [
-            'idempotency_key' => 'm7-one-payment-key-0001',
-            'access_code' => $checkout->json('access_code'),
-        ])->assertOk();
-
-        $second = $this->postJson('/payments/orders/'.$checkout->json('order_number'), [
-            'idempotency_key' => 'm7-one-payment-key-0002',
-            'access_code' => $checkout->json('access_code'),
-        ])->assertOk();
-
-        $this->assertSame($first->json('payment_id'), $second->json('payment_id'));
-        $this->assertSame('one-token-only', $second->json('instructions.token'));
-        $orderId = DB::table('orders')->where('order_number', $checkout->json('order_number'))->value('id');
-        $this->assertSame(1, DB::table('payment_transactions')->where('order_id', $orderId)->count());
-        Http::assertSentCount(1);
-    }
-
     public function test_admin_can_confirm_manual_qris_once(): void
     {
         $catalog = $this->catalog();
@@ -546,45 +450,6 @@ class PaymentCheckoutTest extends TestCase
         $this->assertSame(1000, (int) $persisted->discount_idr);
         $this->assertSame(0, (int) $persisted->fee_idr);
         $this->assertSame(10000, (int) $persisted->total_idr);
-    }
-
-    public function test_scheduled_expiry_closes_untouched_order_and_releases_voucher_only_once(): void
-    {
-        Queue::fake();
-        $catalog = $this->catalog();
-        $this->route('qris', 'MIDTRANS', 0, 0, 'qris');
-        IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
-            'config_ciphertext' => ['server_key' => 'server-test', 'is_production' => false],
-            'is_active' => true,
-        ]);
-        $voucherId = DB::table('vouchers')->insertGetId([
-            'code' => 'SWEEPER-TEST-'.bin2hex(random_bytes(4)),
-            'discount_type' => 'FIXED',
-            'discount_value' => 1000,
-            'minimum_total_idr' => 0,
-            'total_quota' => 10,
-            'per_customer_limit' => 1,
-            'is_active' => true,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-        $voucherCode = DB::table('vouchers')->where('id', $voucherId)->value('code');
-        $payload = $this->guestCheckout($catalog['package_id'], 'qris', 'sweeper-no-touch-0001');
-        $payload['voucher_code'] = $voucherCode;
-        $checkout = $this->postJson('/checkout/orders', $payload)->assertCreated()
-            ->assertJsonStructure(['expires_at', 'server_now']);
-        $order = DB::table('orders')->where('order_number', $checkout->json('order_number'))->firstOrFail();
-        DB::table('orders')->where('id', $order->id)
-            ->update(['expires_at' => now()->subMinute()]);
-
-        Artisan::call('lfamilia:expire-unpaid-orders');
-        Artisan::call('lfamilia:expire-unpaid-orders');
-
-        $this->assertSame('EXPIRED', DB::table('orders')->where('id', $order->id)->value('status'));
-        $this->assertSame('RELEASED', DB::table('voucher_redemptions')
-            ->where('order_id', $order->id)->value('status'));
-        $this->assertSame(1, DB::table('order_events')->where('order_id', $order->id)
-            ->where('event_type', 'ORDER_EXPIRED')->count());
     }
 
     public function test_public_channel_is_hidden_when_external_gateway_credentials_are_not_ready(): void
