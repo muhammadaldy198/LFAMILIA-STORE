@@ -255,3 +255,18 @@ Sebuah pekerjaan selesai kalau:
 4. Sudah dilihat di layar HP dan desktop (untuk pekerjaan tampilan).
 5. Tidak ada teks dummy, tombol palsu, atau data contoh yang tertinggal.
 6. Laporan menyebut: apa yang berubah, bukti, apa yang tidak berubah, skill yang dipakai/dilewati, dan apa yang masih terbuka.
+
+---
+
+## 13. Standar keterbacaan kode (bahasa manusia)
+
+Kode di repo ini dibaca manusia: pemilik yang bukan programmer, dan programmer yang baru pertama kali masuk. Tulis kode supaya pembaca pertama bisa paham tanpa harus menebak.
+
+- **Nama adalah penjelasan pertama.** Variabel, fungsi, dan class dinamai dengan kata utuh yang menyatakan isinya atau tugasnya. Singkatan hanya yang sudah menjadi istilah umum di repo ini (mis. SKU, PRD) atau konvensi Laravel. Nama seperti `$data2`, `$proses`, atau `handleX` dilarang — kalau pembaca harus membuka isi fungsi untuk tahu maksud namanya, namanya salah.
+- **Satu fungsi satu urusan.** Fungsi yang mengerjakan dua urusan berbeda dipecah. Fungsi yang tidak habis dibaca dalam sekali gulir (kira-kira 50 baris) wajib dipecah, atau diberi alasan tertulis di tempatnya kenapa belum bisa.
+- **Setiap class dibuka dengan penjelasan tugasnya.** Satu-dua kalimat bahasa biasa di atas class: class ini mengurus apa, dan apa yang bukan urusannya. Berlaku untuk class baru dan untuk class lama yang sedang dirapikan.
+- **Komentar menjelaskan alasan, bukan bunyi kode.** Komentar yang mengulang isi kode dihapus. Komentar yang dipertahankan menjelaskan kenapa keputusan itu diambil, batas apa yang dijaga, atau rujukan aturannya (nomor bab PRD atau keputusan pemilik).
+- **File besar tidak dibiarkan tumbuh.** File PHP di atas 500 baris: jangan menambah fitur baru di dalamnya. Pecah dulu kelompok fungsinya ke class sendiri, atau tulis alasan tertulis kenapa belum bisa dipecah. PR yang menyentuh file di atas batas wajib menyebut ukuran file itu di laporannya.
+- **Bahasa kode tetap Inggris**, mengikuti konvensi Laravel dan isi repo sekarang. Komentar dan penjelasan class boleh berbahasa Indonesia bila tujuannya dibaca pemilik. Istilah teknis tidak diterjemahkan paksa.
+- **Merapatkan kode tidak mengubah perilaku.** Pekerjaan keterbacaan hanya memindah, menamai ulang, dan menjelaskan. Perubahan perilaku sekecil apa pun adalah PR terpisah dengan aturannya sendiri.
+- **Pelanggaran standar ini adalah temuan review yang sah**, setara temuan gaya lainnya: nama samar, fungsi raksasa baru, atau file yang melewati batas tanpa alasan harus diperbaiki sebelum merge, bukan dicatat sebagai utang.
