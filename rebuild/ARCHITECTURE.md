@@ -1,104 +1,86 @@
-# Arsitektur aktual LFAMILIA STORE
+# Arsitektur LFAMILIA STORE
 
 > Aturan produk ada di [`docs/PRD.md`](../docs/PRD.md). Dokumen ini menjelaskan **cara kode bekerja**, bukan aturan produk. Kalau berbeda, PRD yang menang.
 
-Dokumen ini menjelaskan implementasi dan operasi yang diverifikasi pada Tahap 4. PRD menjelaskan requirement produk; file ini menjelaskan bentuk runtime yang sekarang.
+## Alur permintaan
 
-## Request flow
+**Pelanggan:** Browser → Cloudflare → Nginx → Laravel/Inertia → MySQL/Redis.
 
-### Customer
+Semua logika bisnis hidup di Laravel. Vue/Inertia hanya tampilan pelanggan. MySQL menyimpan data bisnis; Redis dipakai untuk cache, antrean, dan session.
 
-`Browser → Cloudflare → Nginx → Laravel/Inertia → MySQL/Redis`
+**Admin:** Browser → Cloudflare Access → `/admin` → Laravel Admin.
 
-Laravel adalah source of truth business logic. Vue/Inertia adalah customer UI. MySQL menyimpan data bisnis; Redis dipakai untuk cache, queue, dan session.
+Cloudflare Access hanya lapisan tambahan di depan. Hak akses yang sebenarnya selalu diperiksa Laravel di server — menyembunyikan menu bukan pengaman.
 
-### Admin
+**Panel server (CloudPanel):** Browser → Cloudflare Access → panel.lfamilia.com (Tunnel → localhost:8443) → CloudPanel. Domain utama lfamilia.com berjalan lewat Tunnel-nya sendiri; asal 443 dan panel 8443 memakai sertifikat Cloudflare Origin CA dengan verifikasi TLS.
 
-`Browser → Cloudflare Access → /admin → Laravel Admin`
+## Alur transaksi
 
-Admin tetap memakai authorization Laravel di server. Cloudflare Access adalah lapisan edge tambahan dan bukan pengganti RBAC aplikasi.
+Pelanggan → Checkout → Pesanan → Rute pembayaran → Transaksi pembayaran → callback/rekonsiliasi → Pengiriman → mapping provider.
 
-### CloudPanel
+- Checkout menghitung ulang semua angka di server dan menyimpan snapshot pesanan. Harga katalog yang berubah sesudahnya tidak mengubah pesanan yang sudah dibuat.
+- Pelanggan memilih **channel/metode pembayaran**, bukan gateway internal. Rute pembayaran menentukan gateway yang boleh dipakai sebelum permintaan keluar dibuat.
+- Sesudah permintaan keluar dibuat, status yang belum pasti **tidak** ditebak dan **tidak** diganti gateway begitu saja. Transaksi masuk status `UNKNOWN` dan diselesaikan lewat rekonsiliasi atau callback tervalidasi dari gateway itu sendiri.
 
-`Browser → Cloudflare Access → Cloudflare proxy → panel.lfamilia.com (Tunnel → localhost:8443) → CloudPanel`
+## Rute pembayaran
 
-Pada migrasi 2026-10-29, domain utama menggunakan lfamilia.com melalui Tunnel baru; panel.lfamilia.com dilindungi Cloudflare Access. Origin 443 dan panel 8443 menggunakan Cloudflare Origin CA dengan verifikasi TLS.
+`PaymentRoutingService` memilih rute yang memenuhi semua syarat ini:
 
-## Transaction flow
+- channel aktif;
+- gateway dan rute aktif;
+- gateway tidak sedang maintenance;
+- mendukung keperluan pesanan atau top-up wallet;
+- kredensialnya siap, untuk gateway eksternal yang membutuhkannya.
 
-`Customer → Checkout → Order → Payment route → Payment transaction → callback/reconciliation → Fulfillment → provider mapping`
+Rute diurutkan dari angka `priority` terkecil, lalu ID. Priority 10 dipilih sebelum 20 bila keduanya lolos.
 
-Checkout menghitung ulang data server-side dan membuat snapshot order. Customer memilih **channel/metode pembayaran**, bukan gateway internal. Payment routing menentukan gateway yang eligible sebelum external request.
+Memilih rute **sebelum** permintaan dibuat berbeda dengan memulihkan transaksi **sesudah** permintaan dibuat. `PaymentService` tidak melakukan failover universal sesudah permintaan eksternal yang statusnya belum pasti — transaksi seperti itu direkonsiliasi, bukan diduplikasi.
 
-Setelah external request sudah dibuat, recovery bukan “coba gateway lain begitu saja”. State uncertain harus direkonsiliasi; callback/provider result tervalidasi menjadi sumber status authoritative sesuai implementasi masing-masing gateway/provider.
+## Pengaman pesanan dan pembayaran
 
-## Payment routing
+- Kunci idempotensi + sidik jari (fingerprint) untuk checkout dan untuk pembuatan pembayaran.
+- Penguncian baris (row locking) pada transaksi kritis.
+- Hanya satu pembayaran aktif yang tidak ditolak per pesanan atau top-up.
+- Perubahan status pembayaran terpusat di satu tempat (`PaymentStateService`).
+- Callback tervalidasi dan terdeduplikasi; status akhir (terminal) tidak boleh diturunkan oleh callback lama.
+- Debit/kredit wallet memakai transaksi database, lock, ledger, dan idempotensi.
+- Pesanan menyimpan snapshot biaya, margin, diskon, fee, total, paket, mapping provider, dan rute pembayaran.
+- Peristiwa penting pesanan dicatat di order events/audit untuk penelusuran.
 
-`PaymentRoutingService` memilih route yang:
+## Pengiriman (fulfillment)
 
-- channel-nya aktif;
-- gateway dan route aktif;
-- gateway tidak maintenance;
-- mendukung purpose order atau wallet top-up;
-- mempunyai credential yang dianggap ready untuk gateway eksternal yang memerlukannya.
+Satu nominal hanya boleh punya **satu SKU Digiflazz aktif terpilih**. Tidak ada SKU cadangan yang dipilih otomatis.
 
-Route diurutkan dengan angka `priority` kecil lebih dahulu, lalu ID. Jadi priority 10 dipilih sebelum 20 bila keduanya eligible.
+Calon sumber dipilih sebelum permintaan dikirim, berurutan dari priority terkecil, lalu biaya, lalu ID. Mapping nonaktif, provider nonaktif, SKU yang tidak layak pakai, stok/cut-off bermasalah, adapter yang tidak didukung, atau biaya di atas `max_price` dilewati pada tahap ini.
 
-**Selection sebelum request** berbeda dari **recovery setelah request**. `PaymentService` tidak melakukan universal gateway failover setelah request eksternal yang statusnya belum pasti. Transaksi dapat masuk `UNKNOWN` dan harus diperiksa/reconciled, bukan diduplikasi.
+Sesudah permintaan terkirim:
 
-## Order/payment safety
+- Status `PENDING`, `SENDING`, atau `UNKNOWN` tidak memicu pengiriman ke sumber lain; rekonsiliasi memakai attempt yang sama.
+- **Pengalihan otomatis (failover) dimatikan (PRD §47).** Kegagalan definitif (`FAILED_CONFIRMED`) menahan pesanan di status `BLOCKED` untuk ditangani manual oleh admin/CS — bukan dikirim ulang ke sumber cadangan.
+- Attempt dan mapping yang sudah dipakai tidak boleh diduplikasi.
+- Pelanggan selalu melihat satu nominal/pesanan, bukan daftar provider internal.
 
-Implementasi yang ditemukan di kode:
+Adapter otomatis yang ada hanya Digiflazz dan stok kode internal (voucher lokal). Pesanan bermasalah ditangani manual lewat panel Admin.
 
-- checkout idempotency key + fingerprint;
-- payment idempotency key + request fingerprint;
-- row locking pada transaksi kritis;
-- satu non-rejected payment aktif per order/top-up;
-- payment state transition terpusat;
-- callback tervalidasi dan deduplicated;
-- terminal state tidak boleh didowngrade oleh callback lama;
-- wallet debit/credit memakai transaction, lock, ledger, dan idempotency;
-- order menyimpan snapshot cost, margin, discount, fee, total, package, provider mapping, dan payment route;
-- perubahan katalog/harga setelah order dibuat tidak menulis ulang snapshot order;
-- order events/audit record dipakai untuk tracing state penting.
+## Batas login
 
-## Fulfillment
+Login pelanggan dan login admin terpisah.
 
-Tabel dapat menyimpan beberapa `provider_mappings` historis, tetapi **aturan katalog sekarang hanya mengizinkan satu SKU Digiflazz aktif terpilih per nominal**, tanpa otomatis memilih SKU cadangan.
-
-Candidate dipilih dengan priority kecil lebih dahulu, lalu cost dan ID. Mapping nonaktif, provider nonaktif, SKU yang tidak usable, stok/cut-off bermasalah, adapter yang tidak didukung, atau cost di atas `max_price` dapat dilewati **sebelum request**.
-
-Setelah request:
-
-- `PENDING`, `SENDING`, atau `UNKNOWN` tidak langsung memicu source berikutnya;
-- reconciliation memakai reference attempt yang sama;
-- **auto-switch / failover otomatis dinonaktifkan (PRD §47):** kegagalan definitive (`FAILED_CONFIRMED`) tidak otomatis mengirim ke sumber cadangan, melainkan menahan pesanan pada status `BLOCKED` untuk penanganan manual admin/CS;
-- attempt sebelumnya dan mapping yang sudah dipakai tidak boleh diduplikasi;
-- customer tetap melihat satu nominal/order, bukan daftar provider internal.
-
-Sistem tidak mengimplementasikan failover universal antar-provider; adapter otomatis yang ada adalah Digiflazz dan stok kode internal, sedangkan penanganan pesanan bermasalah dilakukan secara manual melalui panel Admin.
-
-## Auth boundary
-
-Customer auth dan Admin auth terpisah.
-
-- Customer: Fortify web session, register/login/logout, forgot/reset password, Google OAuth via Socialite bila integrasi aktif, profile/account.
-- Admin: guard/table terpisah, role `SUPER_ADMIN` atau `ADMIN`.
-- `ADMIN` memakai permission granular yang diperiksa server-side.
-- `SUPER_ADMIN` memperoleh akses penuh dan operasi super-only.
-- Customer membership tier **bukan RBAC**: BASIC → SILVER → GOLD → DIAMOND → PLATINUM → MAFIA.
+- **Pelanggan:** session web Fortify — daftar, login, logout, lupa/reset kata sandi, Google OAuth lewat Socialite bila integrasinya aktif, profil/akun.
+- **Admin:** guard dan tabel terpisah, peran `SUPER_ADMIN` atau `ADMIN`. `ADMIN` memakai izin granular yang diperiksa di server; `SUPER_ADMIN` berakses penuh termasuk operasi khusus super.
+- Tingkat membership pelanggan (BASIC → SILVER → GOLD → DIAMOND → PLATINUM → MAFIA) bukan peran admin dan tidak memberi hak panel apa pun.
 - OTP WhatsApp tidak digunakan.
 
-## Secret boundary
+## Batas secret
 
-- **Repo/code:** source code, schema, migrations, protocol mapping, validation, business logic.
-- **ENV server:** bootstrap/operational infrastructure configuration seperti APP_KEY, DB/Redis connectivity, deploy paths/service names, backup file locations.
-- **Super Admin → Integrasi:** provider/application credentials yang dikelola aplikasi.
+- **Di repo:** kode sumber, skema, migrasi, pemetaan protokol, validasi, logika bisnis.
+- **Di ENV server:** konfigurasi infrastruktur seperti APP_KEY, koneksi DB/Redis, path deploy, nama service, lokasi berkas backup.
+- **Di panel Super Admin → Integrasi:** kredensial provider dan aplikasi yang dikelola aplikasi, tersimpan terenkripsi di `integration_credentials.config_ciphertext` (encrypted array cast).
 
-`integration_credentials.config_ciphertext` memakai Laravel encrypted array cast. Secret tidak boleh di-hardcode, disimpan di fixture production, masuk log, Markdown, atau commit `.env`.
+Secret tidak boleh di-hardcode, masuk fixture produksi, masuk log, masuk Markdown, atau ter-commit sebagai `.env`.
 
-## Integrasi yang mempunyai dukungan kode/panel
+## Integrasi yang didukung kode dan panel
 
-Digiflazz, KokinPay/nickname tooling, Midtrans, DOKU, Resend, Google OAuth, Telegram, Discord, dan Turnstile ditemukan di implementasi/admin integration workspace.
+Digiflazz, validasi nickname (mesin H2H lewat `NicknameService`), Midtrans, DOKU, Resend, Google OAuth, Telegram, Discord, dan Turnstile.
 
-Keberadaan adapter/panel **bukan bukti** credential production lengkap atau external live transaction sudah lolos. Live provider acceptance tetap tahap terpisah.
+Adanya adapter atau halaman panel **bukan bukti** kredensial produksi lengkap atau transaksi live sudah lolos. Penerimaan live oleh provider adalah tahap terpisah.
