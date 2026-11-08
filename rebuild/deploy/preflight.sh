@@ -167,10 +167,11 @@ if command -v nginx >/dev/null 2>&1; then
       for (i = 1; i <= length(s); i++) {
         c = substr(s, i, 1)
         if (q != "") {
-          if (esc) { esc = 0; out = out " " }
-          else if (c == "\\") { esc = 1; out = out " " }
+          if (esc) { esc = 0; out = out ((c == "{" || c == "}") ? " " : c) }
+          else if (c == "\\") { esc = 1; out = out c }
           else if (c == q) { q = ""; out = out c }
-          else out = out " "
+          else if (c == "{" || c == "}") out = out " "
+          else out = out c
         } else {
           if (c == "#") break
           if (c == "\"" || c == "\047") { q = c; out = out c }
@@ -191,7 +192,7 @@ if command -v nginx >/dev/null 2>&1; then
         sub(/^.*server_name[[:space:]]+/, "", rest)
         sub(/;.*/, "", rest)
         ntok = split(rest, toks, /[[:space:]]+/)
-        for (k = 1; k <= ntok; k++) if (toks[k] == "lfamilia.com" || toks[k] == "www.lfamilia.com") hit = 1
+        for (k = 1; k <= ntok; k++) { tk = toks[k]; if (length(tk) >= 2 && (substr(tk, 1, 1) == "\"" || substr(tk, 1, 1) == "\047")) tk = substr(tk, 2, length(tk) - 2); if (tk == "lfamilia.com" || tk == "www.lfamilia.com") hit = 1 }
       }
       tmp = line; opens = gsub(/\{/, "{", tmp); tmp = line; closes = gsub(/\}/, "}", tmp); depth += opens - closes
       if (depth <= 0) { if (hit) result = result buf; inblock = 0 }
@@ -313,12 +314,21 @@ location ~* ^/(?:storage/logs|bootstrap/cache)/'
       }
       function overlaps(k, i,    p, s, t, ci, lp, c, pj, pp, pci, sp, sci) {
         p = e_pat[k]
-        if (e_caret[k]) {
-          for (s = 1; s <= sc[i]; s++) if (index(subj[i, s], p) == 1) return 1
-          return 0
-        }
-        if (e_exact[k]) {
-          for (s = 1; s <= sc[i]; s++) if (subj[i, s] == p) return 1
+        if (e_caret[k] || e_exact[k]) {
+          for (s = 1; s <= sc[i]; s++) if (e_exact[k] ? (subj[i, s] == p) : (index(subj[i, s], p) == 1)) return 1
+          pp = ""
+          for (pj = 1; pj <= E; pj++) if (e_prot[pj] == i) { pp = e_pat[pj]; pci = e_ci[pj]; break }
+          if (pp == "") return 0
+          sp = simplify(pp); sci = simp_ci
+          if (sp == "") return 1
+          if ((i != 1 || !index(p, ".well-known")) && ((pci || sci) ? match(tolower(p), tolower(sp)) : match(p, sp))) return 1
+          if (e_caret[k]) {
+            for (c = 1; c <= cc[i]; c++) {
+              t = p core[i, c]
+              if (i == 1 && index(t, ".well-known")) continue
+              if ((pci || sci) ? match(tolower(t), tolower(sp)) : match(t, sp)) return 1
+            }
+          }
           return 0
         }
         p = simplify(p)
@@ -333,6 +343,7 @@ location ~* ^/(?:storage/logs|bootstrap/cache)/'
         if (lp != "") {
           for (c = 1; c <= cc[i]; c++) {
             t = lp core[i, c]
+            if (i == 1 && index(t, ".well-known")) continue
             if (ci) { if (match(tolower(t), tolower(p))) return 1 }
             else if (match(t, p)) return 1
           }
@@ -378,10 +389,27 @@ location ~* ^/(?:storage/logs|bootstrap/cache)/'
         core[2, 1] = "x.env"; core[2, 2] = "x.log"; core[2, 3] = "x.sql"; core[2, 4] = "x.bak"; core[2, 5] = "x.ini"; core[2, 6] = "x.ENV"; core[2, 7] = "x.LOG"; core[2, 8] = "x.SQL"; core[2, 9] = "x.BAK"; core[2, 10] = "x.INI"; cc[2] = 10
         core[3, 1] = "laravel.log"; core[3, 2] = "config.php"; core[3, 3] = "x.txt"; core[3, 4] = "x.php"; core[3, 5] = "x.log"; cc[3] = 5
       }
+      function scrub(s,    out, i, c, q, esc) {
+        out = ""; q = ""; esc = 0
+        for (i = 1; i <= length(s); i++) {
+          c = substr(s, i, 1)
+          if (q != "") {
+            if (esc) { esc = 0; out = out ((c == "{" || c == "}") ? " " : c) }
+            else if (c == "\\") { esc = 1; out = out c }
+            else if (c == q) { q = ""; out = out c }
+            else if (c == "{" || c == "}") out = out " "
+            else out = out c
+          } else {
+            if (c == "#") break
+            if (c == "\"" || c == "\047") { q = c; out = out c }
+            else out = out c
+          }
+        }
+        return out
+      }
       {
-        line = $0
+        line = scrub($0)
         if (pending != "") line = pending " " line
-        sub(/#.*/, "", line)
         gsub(/[[:space:]]+/, " ", line)
         gsub(/ ;/, ";", line)
         if (line !~ /[;{}] *$/) { pending = line; next }
@@ -394,6 +422,7 @@ location ~* ^/(?:storage/logs|bootstrap/cache)/'
           if (!li) next
           mod = f[li + 1]; cand = f[li + 2]
           if (mod == "~" || mod == "~*" || mod == "=" || mod == "^~") { pat_text = cand } else { pat_text = mod; mod = "" }
+          if (length(pat_text) >= 2 && (substr(pat_text, 1, 1) == "\"" || substr(pat_text, 1, 1) == "\047") && substr(pat_text, length(pat_text), 1) == substr(pat_text, 1, 1)) pat_text = substr(pat_text, 2, length(pat_text) - 2)
           E++
           e_prot[E] = 0
           for (i = 1; i <= n; i++) if (index(line, pats[i])) { e_prot[E] = i; break }

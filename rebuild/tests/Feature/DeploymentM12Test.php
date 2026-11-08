@@ -160,7 +160,7 @@ class DeploymentM12Test extends TestCase
         $this->assertStringContainsString('cloudpanel-vhost-snippet.conf', $preflight);
         $this->assertStringContainsString('== "lfamilia.com"', $preflight, 'Preflight must scope the nginx deny check to a server block whose server_name contains the exact lfamilia.com hostname token.');
         $this->assertStringContainsString('deny all;', $preflight, 'Preflight must verify the deny directive inside each location, not only the location pattern.');
-        $this->assertStringContainsString('sub(/#.*/, "", line)', $preflight, 'Preflight must ignore commented-out nginx directives when verifying the vhost.');
+        $this->assertStringContainsString('if (c == "#") break', $preflight, 'Preflight must ignore commented-out nginx directives when verifying the vhost.');
         $this->assertStringContainsString('allow [^;]*;', $preflight, 'Preflight must not credit a deny rule that an earlier allow rule overrides.');
         $this->assertStringContainsString('multiline values are not allowed', $preflight, 'Preflight must reject multiline TRUSTED_PROXIES values instead of examining only the assignment line.');
         $this->assertStringContainsString('must name at least one proxy', $preflight, 'Preflight must reject an empty TRUSTED_PROXIES value; the app resolves it to no proxies and the boot guard throws during deploy.');
@@ -278,6 +278,10 @@ class DeploymentM12Test extends TestCase
         $privateBakShadow = implode("\n", ["    location ~ ^/private/.*\\.bak$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $groupedEscapedShadow = implode("\n", ["    location ~ ^(/private/\\.env\\.bak)$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $groupedReadme = implode("\n", ["    location ~ ^(/private/readme)$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
+        $quotedEnvShadow = implode("\n", ["    location ~* \"\\.env$\" {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
+        $exactBackupSql = implode("\n", ["    location = /uploads/backup.sql {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
+        $exactNoDot = implode("\n", ["    location = /uploads/readme {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
+        $caretPrivate = implode("\n", ["    location ^~ /private/ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $inClassNegated = implode("\n", ["    location ~* ^/files/[\\D]+\\.env$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $numericBackref = implode("\n", ["    location ~* \\.(env|log)\\1$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $wordClass = implode("\n", ["    location ~* ^/files/\\w+\\.env$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
@@ -298,12 +302,12 @@ class DeploymentM12Test extends TestCase
             'deny nested in limit_except does not protect' => [$server('lfamilia.com', $nestedDeny), 1],
             'earlier overlapping regex location shadows two rules' => [$server('lfamilia.com', $shadowed), 2],
             'allow nested in limit_except before the deny warns' => [$server('lfamilia.com', $nestedAllow), 1],
-            'earlier caret prefix location shadows the storage rule' => [$server('lfamilia.com', $caretShadow), 1],
-            'earlier exact-match location shadows the dotfile rule' => [$server('lfamilia.com', $exactShadow), 1],
+            'earlier caret prefix location shadows all three rules' => [$server('lfamilia.com', $caretShadow), 3],
+            'earlier exact-match location shadows both rules for that file' => [$server('lfamilia.com', $exactShadow), 2],
             'quoted deny string earns no credit' => [$server('lfamilia.com', $quotedDeny), 1],
             'PCRE group location shadows all three rules' => [$server('lfamilia.com', $pcreShadow), 3],
-            'exact match after the rules still shadows' => [$server('lfamilia.com', $exactAfter), 1],
-            'caret prefix after the rules still shadows' => [$server('lfamilia.com', $caretAfter), 1],
+            'exact match after the rules still shadows both rules for that file' => [$server('lfamilia.com', $exactAfter), 2],
+            'caret prefix after the rules still shadows all three rules' => [$server('lfamilia.com', $caretAfter), 3],
             'allow nested after the deny warns' => [$server('lfamilia.com', $nestedAllowAfter), 1],
             'lookahead group location shadows all three rules' => [$server('lfamilia.com', $lookaheadShadow), 3],
             'escaped paren inside the lookahead still shadows all three rules' => [$server('lfamilia.com', $escapedParenShadow), 3],
@@ -326,6 +330,10 @@ class DeploymentM12Test extends TestCase
             'private-prefixed bak regex shadows the extension rule via derived probes' => [$server('lfamilia.com', $privateBakShadow), 1],
             'grouped escaped literal shadows the dotfile and extension rules' => [$server('lfamilia.com', $groupedEscapedShadow), 2],
             'grouped literal matching nothing protected stays clean' => [$server('lfamilia.com', $groupedReadme), 0],
+            'quoted env regex shadows the dotfile and extension rules' => [$server('lfamilia.com', $quotedEnvShadow), 2],
+            'exact backup.sql shadows the extension rule' => [$server('lfamilia.com', $exactBackupSql), 1],
+            'exact dotless uri shadows nothing' => [$server('lfamilia.com', $exactNoDot), 0],
+            'caret prefix on an unsampled directory shadows the file rules' => [$server('lfamilia.com', $caretPrivate), 2],
             'negated shorthand inside a character class counts as overlapping' => [$server('lfamilia.com', $inClassNegated), 3],
             'numeric backreference counts as overlapping' => [$server('lfamilia.com', $numericBackref), 3],
             'word-class escape is translated for matching' => [$server('lfamilia.com', $wordClass), 1],
