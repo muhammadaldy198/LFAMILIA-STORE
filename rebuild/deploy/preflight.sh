@@ -715,8 +715,10 @@ location ~* ^/(?:storage/logs|bootstrap/cache)/'
             # A return 3xx stated directly at server level (depth 1, not
             # nested in an if or another block on the same line) makes the
             # whole block a redirect; conditional returns inside an if do
-            # not, because the block still serves matching requests.
-            if (sdepth == 1 && match(line, /(^| )return +3[0-9][0-9] /)) { pre = substr(line, 1, RSTART); if (pre !~ /[{}]/) block_redirect = 1 }
+            # not, because the block still serves matching requests. The
+            # match runs on mline (quoted values masked out) so a quoted
+            # string that merely mentions a return cannot fake a redirect.
+            if (sdepth == 1 && match(mline, /(^| )return +3[0-9][0-9] /)) { pre = substr(mline, 1, RSTART); if (pre !~ /[{}]/) block_redirect = 1 }
             tmp = line; o = gsub(/\{/, "{", tmp); tmp = line; c = gsub(/\}/, "}", tmp); sdepth += o - c
             next
           }
