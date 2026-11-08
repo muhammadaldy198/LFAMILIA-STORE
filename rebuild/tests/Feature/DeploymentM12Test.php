@@ -348,6 +348,10 @@ class DeploymentM12Test extends TestCase
         $quotedFakeAllow = implode("\n", ["    {$p1} {\n        add_header X-Notice \"allow all;\" always;\n        deny all;\n    }", $location($p2), $location($p3)]);
         $quotedThenRealDeny = implode("\n", [$location($p1), "    {$p2} {\n        add_header X-Notice \"a;b\" always;\n        deny all;\n    }", $location($p3)]);
         $quotedEscapedFakeDeny = implode("\n", ["    {$p1} {\n        add_header X-Notice \"a\\\"; deny all;\" always;\n    }", $location($p2), $location($p3)]);
+        $multilineFakeDeny = implode("\n", ["    {$p1} {\n        return 200 \"ok;\n        deny all;\n        \";\n    }", $location($p2), $location($p3)]);
+        $multilineRealDeny = implode("\n", ["    {$p1} {\n        return 200 \"ok;\n        deny all;\n        \";\n        deny all;\n    }", $location($p2), $location($p3)]);
+        $multilineFakeAllow = implode("\n", ["    {$p1} {\n        return 200 \"x;\n        allow all;\n        \";\n        deny all;\n    }", $location($p2), $location($p3)]);
+        $httpLevelQuotedBrace = "map \$http_x \$x {\n        default \"a\n        }\";\n    }\nserver {\n    listen 443 ssl;\n    server_name lfamilia.com;\n".$complete."\n}";
         $caretShadow = implode("\n", ["    location ^~ /storage/ {\n    }", $location($p1), $location($p2), $location($p3)]);
         $exactShadow = implode("\n", ["    location = /.env {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $quotedDeny = implode("\n", [$location($p1, 'return 200 "deny all;";'), $location($p2), $location($p3)]);
@@ -442,6 +446,10 @@ class DeploymentM12Test extends TestCase
             'quoted allow value does not void a real deny' => [$server('lfamilia.com', $quotedFakeAllow), 0],
             'real deny after a quoted value still credits' => [$server('lfamilia.com', $quotedThenRealDeny), 0],
             'escaped quote does not expose a fake deny inside a quoted value' => [$server('lfamilia.com', $quotedEscapedFakeDeny), 1],
+            'multiline quoted value does not expose a fake deny' => [$server('lfamilia.com', $multilineFakeDeny), 1],
+            'multiline quoted value beside a real deny stays clean' => [$server('lfamilia.com', $multilineRealDeny), 0],
+            'multiline quoted value does not expose a fake allow' => [$server('lfamilia.com', $multilineFakeAllow), 0],
+            'quoted brace at http level does not corrupt server extraction' => [$httpLevelQuotedBrace, 0],
             'negated shorthand inside a character class counts as overlapping' => [$server('lfamilia.com', $inClassNegated), 3],
             'numeric backreference counts as overlapping' => [$server('lfamilia.com', $numericBackref), 3],
             'word-class escape is translated for matching' => [$server('lfamilia.com', $wordClass), 1],

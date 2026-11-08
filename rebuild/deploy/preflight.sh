@@ -252,19 +252,23 @@ done
 if command -v nginx >/dev/null 2>&1; then
   nginx_dump="$(nginx -T 2>/dev/null || true)"
   vhost_block="$(printf '%s\n' "${nginx_dump}" | awk '
-    function scrub(s,    out, i, c, q, esc) {
-      out = ""; q = ""; esc = 0
+    function scrub(s,    out, i, c, esc) {
+      # The quote state lives in SQ, not a local: nginx keeps a quoted
+      # string open across physical lines, so it carries from one line
+      # to the next. The escape state stays per-line: in the nginx
+      # stream a trailing backslash escapes the newline itself.
+      out = ""; esc = 0
       for (i = 1; i <= length(s); i++) {
         c = substr(s, i, 1)
-        if (q != "") {
+        if (SQ != "") {
           if (esc) { esc = 0; out = out ((c == "{" || c == "}") ? " " : c) }
           else if (c == "\\") { esc = 1; out = out c }
-          else if (c == q) { q = ""; out = out c }
+          else if (c == SQ) { SQ = ""; out = out c }
           else if (c == "{" || c == "}") out = out " "
           else out = out c
         } else {
           if (c == "#") break
-          if (c == "\"" || c == "\047") { q = c; out = out c }
+          if (c == "\"" || c == "\047") { SQ = c; out = out c }
           else out = out c
         }
       }
@@ -487,35 +491,42 @@ location ~* ^/(?:storage/logs|bootstrap/cache)/'
         core[2, 1] = "x.env"; core[2, 2] = "x.log"; core[2, 3] = "x.sql"; core[2, 4] = "x.bak"; core[2, 5] = "x.ini"; core[2, 6] = "x.ENV"; core[2, 7] = "x.LOG"; core[2, 8] = "x.SQL"; core[2, 9] = "x.BAK"; core[2, 10] = "x.INI"; cc[2] = 10
         core[3, 1] = "laravel.log"; core[3, 2] = "config.php"; core[3, 3] = "x.txt"; core[3, 4] = "x.php"; core[3, 5] = "x.log"; cc[3] = 5
       }
-      function scrub(s,    out, i, c, q, esc) {
-        out = ""; q = ""; esc = 0
+      function scrub(s,    out, i, c, esc) {
+        # The quote state lives in SQ, not a local: nginx keeps a quoted
+        # string open across physical lines, so it carries from one line
+        # to the next. The escape state stays per-line: in the nginx
+        # stream a trailing backslash escapes the newline itself.
+        out = ""; esc = 0
         for (i = 1; i <= length(s); i++) {
           c = substr(s, i, 1)
-          if (q != "") {
+          if (SQ != "") {
             if (esc) { esc = 0; out = out ((c == "{" || c == "}") ? " " : c) }
             else if (c == "\\") { esc = 1; out = out c }
-            else if (c == q) { q = ""; out = out c }
+            else if (c == SQ) { SQ = ""; out = out c }
             else if (c == "{" || c == "}") out = out " "
             else out = out c
           } else {
             if (c == "#") break
-            if (c == "\"" || c == "\047") { q = c; out = out c }
+            if (c == "\"" || c == "\047") { SQ = c; out = out c }
             else out = out c
           }
         }
         return out
       }
-      function maskq(s,    out, i, c, q, esc) {
-        out = ""; q = ""; esc = 0
+      function maskq(s,    out, i, c, esc) {
+        # The masking quote state (MQ) carries across lines for the same
+        # reason as the scrub state; the escape state stays per-line, as
+        # in scrub.
+        out = ""; esc = 0
         for (i = 1; i <= length(s); i++) {
           c = substr(s, i, 1)
-          if (q != "") {
+          if (MQ != "") {
             out = out "x"
             if (esc) esc = 0
             else if (c == "\\") esc = 1
-            else if (c == q) q = ""
+            else if (c == MQ) MQ = ""
           } else {
-            if (c == "\"" || c == "\047") { q = c; out = out "x" }
+            if (c == "\"" || c == "\047") { MQ = c; out = out "x" }
             else out = out c
           }
         }
