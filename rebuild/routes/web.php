@@ -31,7 +31,12 @@ use App\Http\Controllers\AdminPackageGroupController;
 use App\Http\Controllers\AdminPackageReorderController;
 use App\Http\Controllers\AdminPasswordConfirmController;
 use App\Http\Controllers\AdminPasswordResetController;
+use App\Http\Controllers\AdminPaymentCategoryController;
+use App\Http\Controllers\AdminPaymentChannelController;
 use App\Http\Controllers\AdminPaymentController;
+use App\Http\Controllers\AdminPaymentManualController;
+use App\Http\Controllers\AdminPaymentPageController;
+use App\Http\Controllers\AdminPaymentRouteController;
 use App\Http\Controllers\AdminPresentationController;
 use App\Http\Controllers\AdminProductController;
 use App\Http\Controllers\AdminProductFieldsController;
@@ -270,47 +275,47 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
     Route::middleware('admin.permission:payments.manage')->prefix('admin/payments')
         ->name('admin.payments.')->group(function (): void {
             Route::get('/', [AdminPaymentController::class, 'index'])->name('index');
-            Route::post('/channels/{channelId}/select-gateway', [AdminPaymentController::class, 'selectGateway'])
+            Route::post('/channels/{channelId}/select-gateway', [AdminPaymentRouteController::class, 'selectGateway'])
                 ->middleware('throttle:admin-sensitive')->name('channels.select-gateway');
-            Route::post('/manual/{paymentId}/confirm', [AdminPaymentController::class, 'confirmManual'])
+            Route::post('/manual/{paymentId}/confirm', [AdminPaymentManualController::class, 'confirmManual'])
                 ->middleware(['throttle:admin-sensitive', 'admin.password.confirm'])->name('manual.confirm');
-            Route::post('/topups/{topupId}/close-review', [AdminPaymentController::class, 'closeRefundReview'])
+            Route::post('/topups/{topupId}/close-review', [AdminPaymentManualController::class, 'closeRefundReview'])
                 ->middleware(['throttle:admin-sensitive', 'admin.password.confirm'])->name('topups.close-review');
-            Route::post('/manual-qris/image', [AdminPaymentController::class, 'uploadManualQris'])
+            Route::post('/manual-qris/image', [AdminPaymentManualController::class, 'uploadManualQris'])
                 ->middleware('throttle:admin-sensitive')->name('manual-qris.image');
-            Route::put('/manual-qris', [AdminPaymentController::class, 'toggleManualQris'])
+            Route::put('/manual-qris', [AdminPaymentManualController::class, 'toggleManualQris'])
                 ->middleware('throttle:admin-sensitive')->name('manual-qris.update');
 
-            Route::put('/page-settings', [AdminPaymentController::class, 'pageSettings'])
+            Route::put('/page-settings', [AdminPaymentPageController::class, 'pageSettings'])
                 ->middleware('throttle:admin-sensitive')->name('page-settings.update');
-            Route::post('/page-settings/header', [AdminPaymentController::class, 'uploadPageHeader'])
+            Route::post('/page-settings/header', [AdminPaymentPageController::class, 'uploadPageHeader'])
                 ->middleware('throttle:admin-sensitive')->name('page-settings.header');
 
         });
 
     Route::middleware(['admin.permission:payments.manage', 'admin.super'])->prefix('admin/payments')
         ->name('admin.payments.')->group(function (): void {
-            Route::post('/categories', [AdminPaymentController::class, 'storeCategory'])
+            Route::post('/categories', [AdminPaymentCategoryController::class, 'storeCategory'])
                 ->middleware('throttle:admin-sensitive')->name('categories.store');
-            Route::put('/categories/{code}', [AdminPaymentController::class, 'updateCategory'])
+            Route::put('/categories/{code}', [AdminPaymentCategoryController::class, 'updateCategory'])
                 ->middleware('throttle:admin-sensitive')->name('categories.update');
-            Route::delete('/categories/{code}', [AdminPaymentController::class, 'destroyCategory'])
+            Route::delete('/categories/{code}', [AdminPaymentCategoryController::class, 'destroyCategory'])
                 ->middleware('throttle:admin-sensitive')->name('categories.destroy');
-            Route::post('/channels/sync', [AdminPaymentController::class, 'syncChannels'])
+            Route::post('/channels/sync', [AdminPaymentRouteController::class, 'syncChannels'])
                 ->middleware('throttle:admin-sensitive')->name('channels.sync');
-            Route::post('/channels', [AdminPaymentController::class, 'storeChannel'])
+            Route::post('/channels', [AdminPaymentChannelController::class, 'storeChannel'])
                 ->middleware('throttle:admin-sensitive')->name('channels.store');
-            Route::put('/channels/{id}', [AdminPaymentController::class, 'channel'])
+            Route::put('/channels/{id}', [AdminPaymentChannelController::class, 'channel'])
                 ->middleware('throttle:admin-sensitive')->name('channels.update');
-            Route::delete('/channels/{id}', [AdminPaymentController::class, 'destroyChannel'])
+            Route::delete('/channels/{id}', [AdminPaymentChannelController::class, 'destroyChannel'])
                 ->middleware('throttle:admin-sensitive')->name('channels.destroy');
-            Route::post('/channels/{id}/logo', [AdminPaymentController::class, 'uploadChannelLogo'])
+            Route::post('/channels/{id}/logo', [AdminPaymentChannelController::class, 'uploadChannelLogo'])
                 ->middleware('throttle:admin-sensitive')->name('channels.logo');
-            Route::put('/gateways/{id}', [AdminPaymentController::class, 'gateway'])
+            Route::put('/gateways/{id}', [AdminPaymentRouteController::class, 'gateway'])
                 ->middleware('throttle:admin-sensitive')->name('gateways.update');
-            Route::put('/routes/{id}', [AdminPaymentController::class, 'updateRoute'])
+            Route::put('/routes/{id}', [AdminPaymentRouteController::class, 'updateRoute'])
                 ->middleware('throttle:admin-sensitive')->name('routes.update');
-            Route::put('/settings', [AdminPaymentController::class, 'settings'])
+            Route::put('/settings', [AdminPaymentPageController::class, 'settings'])
                 ->middleware('throttle:admin-sensitive')->name('settings.update');
         });
     Route::middleware('admin.permission:fulfillment.manage')->prefix('admin/fulfillment')
