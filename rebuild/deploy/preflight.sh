@@ -629,6 +629,10 @@ location ~* ^/(?:storage/logs|bootstrap/cache)/'
       function close_loc() { e_eff[E] = (cur_eff && !nested_allow) ? 1 : 0; inloc = 0 }
       function finalize(    i, j, j0, credited) {
         if (inloc) close_loc()
+        # A block whose server level unconditionally redirects (the www
+        # host) serves no files, so it needs no deny rules and must not
+        # fail the blocks that do serve the site.
+        if (block_redirect) { E = 0; return }
         for (i = 1; i <= n; i++) {
           credited = 0; j0 = 0
           for (j = 1; j <= E; j++) if (e_prot[j] == i) { j0 = j; break }
@@ -702,12 +706,20 @@ location ~* ^/(?:storage/logs|bootstrap/cache)/'
         if (line !~ /[;{}] *$/) { pending = line; next }
         pending = ""
         mline = maskq(line)
-        if (!inloc && line ~ /(^| )server *\{/) { if (started) finalize(); started = 1; next }
+        if (!inloc && line ~ /(^| )server *\{/) { if (started) finalize(); started = 1; sdepth = 1; block_redirect = 0; next }
         if (!inloc) {
           nf = split(line, f, " ")
           li = 0
           for (q = 1; q <= nf; q++) if (f[q] == "location") { li = q; break }
-          if (!li) next
+          if (!li) {
+            # A return 3xx stated directly at server level (depth 1, not
+            # nested in an if or another block on the same line) makes the
+            # whole block a redirect; conditional returns inside an if do
+            # not, because the block still serves matching requests.
+            if (sdepth == 1 && match(line, /(^| )return +3[0-9][0-9] /)) { pre = substr(line, 1, RSTART); if (pre !~ /[{}]/) block_redirect = 1 }
+            tmp = line; o = gsub(/\{/, "{", tmp); tmp = line; c = gsub(/\}/, "}", tmp); sdepth += o - c
+            next
+          }
           mod = f[li + 1]; cand = f[li + 2]
           if (mod == "~" || mod == "~*" || mod == "=" || mod == "^~") { pat_text = cand } else { pat_text = mod; mod = "" }
           if (length(pat_text) >= 2 && (substr(pat_text, 1, 1) == "\"" || substr(pat_text, 1, 1) == "\047") && substr(pat_text, length(pat_text), 1) == substr(pat_text, 1, 1)) pat_text = substr(pat_text, 2, length(pat_text) - 2)
@@ -741,7 +753,7 @@ location ~* ^/(?:storage/logs|bootstrap/cache)/'
         eff_allow = (allow_before || (allow_here && (!scope_deny_here || pa < pd))) ? 1 : 0
         if (scope_deny_here && !scope_deny_seen) { scope_deny_seen = 1; cur_eff = eff_allow ? 0 : 1 }
         if (allow_here && !scope_deny_seen) allow_before = 1
-        tmp = line; o = gsub(/\{/, "{", tmp); tmp = line; c = gsub(/\}/, "}", tmp); ldepth += o - c
+        tmp = line; o = gsub(/\{/, "{", tmp); tmp = line; c = gsub(/\}/, "}", tmp); ldepth += o - c; sdepth += o - c
         if (ldepth <= 0) close_loc()
       }
       END { if (started) finalize(); for (m in missing) print m }
