@@ -277,7 +277,36 @@ location ~* ^/(?:storage/logs|bootstrap/cache)/'
         }
         return out
       }
-      function overlaps(k, i,    p, s, t, ci) {
+      function litprefix(p,    out, j, ch, nx, d, inner, q, st) {
+        out = ""; j = 1
+        if (substr(p, 1, 1) == "^") j = 2
+        while (j <= length(p)) {
+          ch = substr(p, j, 1)
+          if (ch == "\\") {
+            nx = substr(p, j + 1, 1)
+            if (nx ~ /[A-Za-z0-9]/) break
+            out = out nx; j += 2; continue
+          }
+          if (ch == "(") {
+            d = 1; inner = ""; q = j + 1
+            while (q <= length(p) && d > 0) {
+              st = substr(p, q, 1)
+              if (st == "\\") { inner = inner substr(p, q, 2); q += 2; continue }
+              if (st == "(") d++
+              else if (st == ")") { d--; if (!d) break }
+              else inner = inner st
+              q++
+            }
+            if (d != 0) break
+            if (inner ~ /[.*+?|\[\]$^]/) break
+            out = out inner; j = q + 1; continue
+          }
+          if (ch ~ /[.*+?|\[\]$]/) break
+          out = out ch; j++
+        }
+        return out
+      }
+      function overlaps(k, i,    p, s, t, ci, lp, c) {
         p = e_pat[k]
         if (e_caret[k]) {
           for (s = 1; s <= sc[i]; s++) if (index(subj[i, s], p) == 1) return 1
@@ -294,6 +323,14 @@ location ~* ^/(?:storage/logs|bootstrap/cache)/'
           t = subj[i, s]
           if (ci) { if (match(tolower(t), tolower(p))) return 1 }
           else if (match(t, p)) return 1
+        }
+        lp = litprefix(p)
+        if (lp != "") {
+          for (c = 1; c <= cc[i]; c++) {
+            t = lp core[i, c]
+            if (ci) { if (match(tolower(t), tolower(p))) return 1 }
+            else if (match(t, p)) return 1
+          }
         }
         return 0
       }
@@ -317,9 +354,12 @@ location ~* ^/(?:storage/logs|bootstrap/cache)/'
       }
       BEGIN {
         n = split(ENVIRON["DENY_PATTERNS"], pats, "\n")
-        subj[1, 1] = "/.env"; subj[1, 2] = "/.git/config"; subj[1, 3] = "/.env.local"; subj[1, 4] = "/.env.production"; subj[1, 5] = "/x/.env"; subj[1, 6] = "/.hidden"; subj[1, 7] = "/.ENV"; subj[1, 8] = "/.ENV.LOCAL"; subj[1, 9] = "/.ENV.PRODUCTION"; subj[1, 10] = "/x/.ENV"; sc[1] = 10
-        subj[2, 1] = "/files/x.env"; subj[2, 2] = "/files/x.log"; subj[2, 3] = "/files/x.sql"; subj[2, 4] = "/files/x.bak"; subj[2, 5] = "/files/x.ini"; subj[2, 6] = "/x.env"; subj[2, 7] = "/uploads/x.sql"; subj[2, 8] = "/files/x.LOG"; subj[2, 9] = "/files/X.ENV"; subj[2, 10] = "/files/BACKUP.SQL"; subj[2, 11] = "/files/x.ENV"; subj[2, 12] = "/files/x.SQL"; subj[2, 13] = "/files/x.BAK"; subj[2, 14] = "/files/x.INI"; subj[2, 15] = "/x.ENV"; subj[2, 16] = "/uploads/x.SQL"; sc[2] = 16
-        subj[3, 1] = "/storage/logs/laravel.log"; subj[3, 2] = "/bootstrap/cache/config.php"; subj[3, 3] = "/bootstrap/cache/views/abc.php"; subj[3, 4] = "/Storage/Logs/laravel.log"; subj[3, 5] = "/Bootstrap/Cache/config.php"; subj[3, 6] = "/STORAGE/LOGS/laravel.log"; subj[3, 7] = "/BOOTSTRAP/CACHE/config.php"; sc[3] = 7
+        subj[1, 1] = "/.env"; subj[1, 2] = "/.git/config"; subj[1, 3] = "/.env.local"; subj[1, 4] = "/.env.production"; subj[1, 5] = "/.ENV"; subj[1, 6] = "/.ENV.LOCAL"; subj[1, 7] = "/.ENV.PRODUCTION"; subj[1, 8] = "/.hidden"; subj[1, 9] = "/x/.env"; subj[1, 10] = "/x/.env.local"; subj[1, 11] = "/x/.env.production"; subj[1, 12] = "/x/.ENV"; subj[1, 13] = "/x/.git/config"; subj[1, 14] = "/uploads/.env"; subj[1, 15] = "/uploads/.env.local"; subj[1, 16] = "/uploads/.env.production"; subj[1, 17] = "/uploads/.ENV"; sc[1] = 17
+        subj[2, 1] = "/files/x.env"; subj[2, 2] = "/files/x.log"; subj[2, 3] = "/files/x.sql"; subj[2, 4] = "/files/x.bak"; subj[2, 5] = "/files/x.ini"; subj[2, 6] = "/files/x.ENV"; subj[2, 7] = "/files/x.LOG"; subj[2, 8] = "/files/x.SQL"; subj[2, 9] = "/files/x.BAK"; subj[2, 10] = "/files/x.INI"; subj[2, 11] = "/files/X.ENV"; subj[2, 12] = "/files/BACKUP.SQL"; subj[2, 13] = "/x.env"; subj[2, 14] = "/x.log"; subj[2, 15] = "/x.sql"; subj[2, 16] = "/x.bak"; subj[2, 17] = "/x.ini"; subj[2, 18] = "/x.ENV"; subj[2, 19] = "/x.LOG"; subj[2, 20] = "/x.SQL"; subj[2, 21] = "/x.BAK"; subj[2, 22] = "/x.INI"; subj[2, 23] = "/uploads/x.env"; subj[2, 24] = "/uploads/x.log"; subj[2, 25] = "/uploads/x.sql"; subj[2, 26] = "/uploads/x.bak"; subj[2, 27] = "/uploads/x.ini"; subj[2, 28] = "/uploads/x.ENV"; subj[2, 29] = "/uploads/x.LOG"; subj[2, 30] = "/uploads/x.SQL"; subj[2, 31] = "/uploads/x.BAK"; subj[2, 32] = "/uploads/x.INI"; sc[2] = 32
+        subj[3, 1] = "/storage/logs/laravel.log"; subj[3, 2] = "/storage/logs/x.txt"; subj[3, 3] = "/storage/logs/x.php"; subj[3, 4] = "/Storage/Logs/laravel.log"; subj[3, 5] = "/Storage/Logs/x.txt"; subj[3, 6] = "/Storage/Logs/x.php"; subj[3, 7] = "/STORAGE/LOGS/laravel.log"; subj[3, 8] = "/STORAGE/LOGS/x.txt"; subj[3, 9] = "/STORAGE/LOGS/x.php"; subj[3, 10] = "/bootstrap/cache/config.php"; subj[3, 11] = "/bootstrap/cache/x.txt"; subj[3, 12] = "/bootstrap/cache/x.log"; subj[3, 13] = "/bootstrap/cache/views/abc.php"; subj[3, 14] = "/Bootstrap/Cache/config.php"; subj[3, 15] = "/Bootstrap/Cache/x.txt"; subj[3, 16] = "/Bootstrap/Cache/x.log"; subj[3, 17] = "/BOOTSTRAP/CACHE/config.php"; subj[3, 18] = "/BOOTSTRAP/CACHE/x.txt"; subj[3, 19] = "/BOOTSTRAP/CACHE/x.log"; sc[3] = 19
+        core[1, 1] = ".env"; core[1, 2] = ".env.local"; core[1, 3] = ".env.production"; core[1, 4] = ".ENV"; core[1, 5] = ".ENV.LOCAL"; core[1, 6] = ".ENV.PRODUCTION"; core[1, 7] = ".git/config"; core[1, 8] = ".hidden"; cc[1] = 8
+        core[2, 1] = "x.env"; core[2, 2] = "x.log"; core[2, 3] = "x.sql"; core[2, 4] = "x.bak"; core[2, 5] = "x.ini"; core[2, 6] = "x.ENV"; core[2, 7] = "x.LOG"; core[2, 8] = "x.SQL"; core[2, 9] = "x.BAK"; core[2, 10] = "x.INI"; cc[2] = 10
+        core[3, 1] = "laravel.log"; core[3, 2] = "config.php"; core[3, 3] = "x.txt"; core[3, 4] = "x.php"; core[3, 5] = "x.log"; cc[3] = 5
       }
       {
         line = $0

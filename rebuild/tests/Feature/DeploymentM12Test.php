@@ -272,6 +272,8 @@ class DeploymentM12Test extends TestCase
         $storageCaseShadow = implode("\n", ["    location ~ ^/Storage/Logs/ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $upperIniShadow = implode("\n", ["    location ~ \\.INI$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $upperEnvLocalShadow = implode("\n", ["    location ~ \\.ENV\\.LOCAL$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
+        $uploadsIniShadow = implode("\n", ["    location ~ ^/uploads/.*\\.ini$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
+        $privateBakShadow = implode("\n", ["    location ~ ^/private/.*\\.bak$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $inClassNegated = implode("\n", ["    location ~* ^/files/[\\D]+\\.env$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $numericBackref = implode("\n", ["    location ~* \\.(env|log)\\1$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
         $wordClass = implode("\n", ["    location ~* ^/files/\\w+\\.env$ {\n        allow all;\n    }", $location($p1), $location($p2), $location($p3)]);
@@ -313,9 +315,11 @@ class DeploymentM12Test extends TestCase
             'earlier env.production regex shadows the dotfile rule' => [$server('lfamilia.com', $envProdShadow), 1],
             'uploads-scoped sql regex shadows the extension rule' => [$server('lfamilia.com', $uploadsSqlShadow), 1],
             'uppercase env regex shadows the dotfile and extension rules' => [$server('lfamilia.com', $upperEnvShadow), 2],
-            'capitalized storage prefix shadows the directory rule' => [$server('lfamilia.com', $storageCaseShadow), 1],
+            'capitalized storage prefix shadows all three rules' => [$server('lfamilia.com', $storageCaseShadow), 3],
             'uppercase ini regex shadows the extension rule' => [$server('lfamilia.com', $upperIniShadow), 1],
             'uppercase env.local regex shadows the dotfile rule' => [$server('lfamilia.com', $upperEnvLocalShadow), 1],
+            'uploads-scoped ini regex shadows the extension rule' => [$server('lfamilia.com', $uploadsIniShadow), 1],
+            'private-prefixed bak regex shadows the extension rule via derived probes' => [$server('lfamilia.com', $privateBakShadow), 1],
             'negated shorthand inside a character class counts as overlapping' => [$server('lfamilia.com', $inClassNegated), 3],
             'numeric backreference counts as overlapping' => [$server('lfamilia.com', $numericBackref), 3],
             'word-class escape is translated for matching' => [$server('lfamilia.com', $wordClass), 1],
