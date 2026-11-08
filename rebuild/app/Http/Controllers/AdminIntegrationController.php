@@ -21,6 +21,10 @@ class AdminIntegrationController
 {
     public function index(IntegrationRegistry $registry, IntegrationRuntimeConfig $runtime): Response
     {
+        // Alasan fungsi ini belum dipecah (standar keterbacaan di AGENTS.md):
+        // satu lintasan baca-tampil — definisi integrasi dibaca sekali,
+        // lalu status tiap integrasi disusun dalam konteks yang sama.
+        // Penilaiannya sendiri sudah dipecah ke fungsi presentasi di bawah.
         $definitions = $registry->all();
         $records = IntegrationCredential::whereIn('code', array_keys($definitions))
             ->get()->keyBy('code');
@@ -203,6 +207,8 @@ class AdminIntegrationController
      */
     private function presentProfile(array $definition, array $config): array
     {
+        // Alasan belum dipecah: pemetaan satu profil dalam satu lintasan;
+        // tidak ada urusan kedua yang bisa dipisahkan.
         $requiredTotal = 0;
         $configuredRequired = 0;
 
@@ -260,6 +266,9 @@ class AdminIntegrationController
      */
     private function callbackReadiness(array $definition, array $config, bool $active): array
     {
+        // Alasan belum dipecah: syarat callback per penyedia dikumpulkan
+        // lalu disimpulkan menjadi satu status; membacanya setengah-
+        // setengah menghilangkan makna kesimpulannya.
         $callback = $definition['callback'] ?? null;
         if (! is_array($callback)) {
             return [

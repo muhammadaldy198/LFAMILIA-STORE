@@ -17,7 +17,8 @@ use Throwable;
 /**
  * Mengetes integrasi dari panel admin: mencoba koneksi memakai konfigurasi
  * yang tersimpan dan mengirim email percobaan lewat Resend. Hanya super
- * admin. Class ini tidak menyimpan perubahan apa pun.
+ * admin. Kredensial tidak diubah class ini; hasil tes tetap dicatat
+ * sebagai status kesehatan, catatan audit, dan notifikasi kegagalan.
  */
 class AdminIntegrationTestController
 {
@@ -30,6 +31,9 @@ class AdminIntegrationTestController
         AdminAuditService $audit,
         AdminNotificationService $notifications,
     ): JsonResponse {
+        // Alasan belum dipecah: satu urutan tes yang linear — cek
+        // konfigurasi, jalankan tes, catat hasil, lalu jawab; semua
+        // cabang berbagi konteks hasil tes yang sama.
         $this->ensureSuperAdmin($request);
 
         $definition = $registry->get($code);

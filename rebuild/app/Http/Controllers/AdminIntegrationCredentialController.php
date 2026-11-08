@@ -29,6 +29,12 @@ class AdminIntegrationCredentialController
         IntegrationRuntimeConfig $runtime,
         AdminAuditService $audit,
     ): RedirectResponse {
+        // Alasan fungsi ini belum dipecah (standar keterbacaan di AGENTS.md):
+        // satu urutan simpan yang transaksional — pilih lingkungan,
+        // terapkan field, validasi khusus, simpan, lalu catat status dan
+        // audit. Semua langkah berbagi hasil yang sama dan urutannya
+        // harus berhenti utuh bila satu langkah gagal; memecahnya
+        // sekarang berisiko keadaan setengah jalan bocor antar fungsi.
         $this->ensureSuperAdmin($request);
 
         $definition = $registry->get($code);
@@ -216,6 +222,10 @@ class AdminIntegrationCredentialController
      */
     private function applyFields(array $definition, array $existing, array $incoming, array $clearSecrets): array
     {
+        // Alasan belum dipecah: satu lingkaran normalisasi — tiap field
+        // diproses mengikuti aturan jenisnya dalam urutan yang
+        // menentukan hasil akhir; validasi khususnya sudah dipecah ke
+        // fungsi validator sendiri di bawah.
         $config = $existing;
 
         foreach ($definition['fields'] as $key => $field) {
