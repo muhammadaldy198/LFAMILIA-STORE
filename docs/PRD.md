@@ -529,7 +529,7 @@ Detail ada di dokumen terpisah (`ADMIN-PANEL.md`). Yang mengikat di PRD:
 
 ## 19. Yang tidak boleh ada (tidak bisa ditawar)
 
-1. **Refund otomatis.** Tidak ada kode yang memindahkan uang tanpa keputusan admin.
+1. **Refund dalam bentuk apa pun.** Tidak ada pengembalian dana — otomatis maupun manual, dengan atau tanpa keputusan admin. Kegagalan pesanan diselesaikan dengan menyelesaikan pesanannya (§10), bukan dengan mengembalikan uang.
 2. **Pengiriman sebelum lunas.**
 3. **Pengiriman ganda** untuk satu pesanan.
 4. **Failover otomatis ke sumber kedua** saat hasil tidak pasti.
