@@ -9,10 +9,11 @@ return new class extends Migration
     {
         // Saved admin overrides for the FAQ failed-order card would keep
         // showing the old "Gagal / Refund" text, because saved presentation
-        // values win over the defaults. Clear an override only while it
-        // still holds the exact old default text; copy an admin has
-        // customised — refund-related or not — is their content and stays
-        // untouched, as does every other saved value.
+        // values win over the defaults. Clear an override while it still
+        // promises refunds — the exact old default text, or any customised
+        // wording that still mentions a refund or "pengembalian dana".
+        // Customised copy without a refund promise is the admin's content
+        // and stays untouched, as does every other saved value.
         $row = DB::table('system_settings')->where('key', 'store.customer_presentation')->first();
         if ($row === null) {
             return;
@@ -23,13 +24,10 @@ return new class extends Migration
             return;
         }
 
-        $oldDefaults = [
-            'faq.status.04.title' => 'Gagal / Refund',
-            'faq.status.04.body' => 'Jika transaksi gagal final, tim akan menangani sesuai kebijakan refund.',
-        ];
         $changed = false;
-        foreach ($oldDefaults as $key => $oldDefault) {
-            if (($value['text'][$key] ?? null) === $oldDefault) {
+        foreach (['faq.status.04.title', 'faq.status.04.body'] as $key) {
+            $saved = $value['text'][$key] ?? null;
+            if (is_string($saved) && (stripos($saved, 'refund') !== false || stripos($saved, 'pengembalian dana') !== false)) {
                 unset($value['text'][$key]);
                 $changed = true;
             }
