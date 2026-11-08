@@ -7,6 +7,7 @@ use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
@@ -164,6 +165,55 @@ class PasswordHashingTest extends TestCase
         $stored = $admin->fresh()->password;
         $this->assertStringStartsWith('$argon2id$', $stored, 'login admin harus menaikkan hash ke Argon2id');
         $this->assertTrue(Hash::check(self::PASS, $stored));
+    }
+
+    public function test_password_reset_stores_an_argon2id_password(): void
+    {
+        $user = User::create([
+            'name' => 'Pelanggan Reset',
+            'email' => 'reset-customer@example.test',
+            'phone' => '081200000013',
+            'password' => $this->legacyBcryptHash(),
+        ]);
+
+        $token = Password::broker()->createToken($user);
+
+        $this->post('/reset-password', [
+            'token' => $token,
+            'email' => $user->email,
+            'password' => 'reset-password-baru-789',
+            'password_confirmation' => 'reset-password-baru-789',
+        ])->assertRedirect(route('login'));
+
+        $stored = $user->fresh()->password;
+        $this->assertStringStartsWith('$argon2id$', $stored, 'reset kata sandi harus menyimpan hash Argon2id');
+        $this->assertTrue(Hash::check('reset-password-baru-789', $stored));
+        $this->assertFalse(Hash::check(self::PASS, $stored));
+    }
+
+    public function test_customer_password_change_from_a_legacy_hash_stores_argon2id(): void
+    {
+        $user = User::create([
+            'name' => 'Pelanggan Ganti',
+            'email' => 'change-customer@example.test',
+            'phone' => '081200000014',
+            'password' => $this->legacyBcryptHash(),
+        ]);
+        $user->forceFill(['email_verified_at' => now()])->save();
+
+        // The change endpoint first verifies the CURRENT password
+        // (a legacy bcrypt hash through the Argon2id default driver)
+        // and then stores the new one.
+        $this->actingAs($user)->put('/account/password', [
+            'current_password' => self::PASS,
+            'password' => 'password-pengganti-345',
+            'password_confirmation' => 'password-pengganti-345',
+        ])->assertRedirect();
+
+        $stored = $user->fresh()->password;
+        $this->assertStringStartsWith('$argon2id$', $stored, 'ganti kata sandi harus menyimpan hash Argon2id');
+        $this->assertTrue(Hash::check('password-pengganti-345', $stored));
+        $this->assertFalse(Hash::check(self::PASS, $stored));
     }
 
     public function test_registration_stores_an_argon2id_password(): void
