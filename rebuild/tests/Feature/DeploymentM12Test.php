@@ -320,6 +320,36 @@ class DeploymentM12Test extends TestCase
         }
     }
 
+    public function test_preflight_argon2id_capability_gate_behaves_against_fixtures(): void
+    {
+        $preflight = file_get_contents(base_path('deploy/preflight.sh'));
+        $block = $this->extractPreflightBlock(
+            $preflight,
+            '# start of argon2id capability check',
+            '# end of argon2id capability check'
+        );
+        $config = fn (int $memory): string => "<?php return ['argon' => ['memory' => {$memory}, 'time' => 4, 'threads' => 1]];\n";
+
+        $cases = [
+            'configured cost round-trips' => [PHP_BINARY, $config(65536), 0],
+            'impossible configured cost fails' => [PHP_BINARY, $config(1), 1],
+            'php that cannot hash at all fails' => [null, $config(65536), 1],
+        ];
+
+        foreach ($cases as $label => [$phpBin, $contents, $expected]) {
+            $dir = $this->makePreflightFixtureDir([]);
+            mkdir("{$dir}/config", 0777, true);
+            file_put_contents("{$dir}/config/hashing.php", $contents);
+            if ($phpBin === null) {
+                $phpBin = "{$dir}/php-stub";
+                file_put_contents($phpBin, "#!/bin/sh\nexit 1\n");
+                chmod($phpBin, 0755);
+            }
+            file_put_contents("{$dir}/run.sh", "APP_DIR={$dir}\nPHP_BIN={$phpBin}\n{$block}\n");
+            $this->assertSame($expected, $this->runBashScript("{$dir}/run.sh"), "Preflight Argon2id capability gate: {$label}.");
+        }
+    }
+
     public function test_preflight_nginx_check_behaves_against_fixtures(): void
     {
         $preflight = file_get_contents(base_path('deploy/preflight.sh'));

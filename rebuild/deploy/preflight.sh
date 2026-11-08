@@ -44,6 +44,31 @@ for ext in pdo_mysql redis mbstring openssl; do
     || { echo "Missing PHP extension: ${ext}" >&2; exit 1; }
 done
 
+# start of argon2id capability check
+# The default password hash driver is Argon2id (config/hashing.php). A PHP
+# build without Argon2id support would pass every other check in this
+# script and still break password creation and login rehashing after the
+# deploy, so this is a hard gate, not a warning: the algorithm must be
+# listed by password_algos(), and a real hash must round-trip at the cost
+# the target tree is configured with. The config file is loaded with a
+# minimal env() stub so the values exercised are the pinned ones.
+"${PHP_BIN}" -r '
+if (! in_array("argon2id", password_algos(), true)) {
+    exit(1);
+}
+function env($key, $default = null) { return $default; }
+$config = require $argv[1];
+$argon = $config["argon"] ?? [];
+$hash = password_hash("preflight-probe", PASSWORD_ARGON2ID, [
+    "memory_cost" => (int) ($argon["memory"] ?? 65536),
+    "time_cost" => (int) ($argon["time"] ?? 4),
+    "threads" => (int) ($argon["threads"] ?? 1),
+]);
+exit($hash !== false && password_verify("preflight-probe", $hash) ? 0 : 1);
+' "${APP_DIR}/config/hashing.php" \
+  || { echo "PHP Argon2id support is required and must hash at the configured cost (see config/hashing.php)" >&2; exit 1; }
+# end of argon2id capability check
+
 for pair in \
   'APP_ENV=production' \
   'APP_DEBUG=false' \
