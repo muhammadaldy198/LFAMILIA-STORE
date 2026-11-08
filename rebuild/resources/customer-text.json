@@ -3024,11 +3024,6 @@
     "label": "Pertanyaan produk",
     "default": "Pertanyaan produk"
   },
-  "support.kind.Pengembalian dana": {
-    "group": "Components/Support",
-    "label": "Pengembalian dana",
-    "default": "Pengembalian dana"
-  },
   "support.kind.Bantuan akun": {
     "group": "Components/Support",
     "label": "Bantuan akun",

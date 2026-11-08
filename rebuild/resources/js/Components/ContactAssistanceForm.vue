@@ -6,7 +6,7 @@ import SupportMessageActions from './SupportMessageActions.vue';
 const { customerText } = useCustomerPresentation();
 const page = usePage();
 const form = reactive({ kind: 'Kendala transaksi', name: page.props.auth?.user?.name || '', phone: page.props.auth?.user?.phone || '', invoice: '', message: '' });
-const kinds = ['Kendala transaksi', 'Pertanyaan produk', 'Pengembalian dana', 'Bantuan akun', 'Lainnya'];
+const kinds = ['Kendala transaksi', 'Pertanyaan produk', 'Bantuan akun', 'Lainnya'];
 </script>
 <template>
  <section class="lf-contact-assistance">
