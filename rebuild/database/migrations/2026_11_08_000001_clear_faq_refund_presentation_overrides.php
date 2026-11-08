@@ -74,8 +74,6 @@ return new class extends Migration
         $promises = [
             'kebijakan refund', 'kebijakan pengembalian',
             'refund hanya tersedia', 'pengembalian dana hanya tersedia',
-            'pengajuan', 'mengajukan',
-            'ajukan refund', 'ajukan pengembalian',
             'direfund',
         ];
         foreach ($promises as $promise) {
@@ -84,7 +82,13 @@ return new class extends Migration
             }
         }
 
-        return false;
+        // Application wording counts only together with a refund term, so
+        // unrelated guidance ("pengajuan pengecekan", "ajukan pertanyaan")
+        // is never treated as a refund promise.
+        $hasApplicationWord = str_contains($t, 'pengajuan') || str_contains($t, 'mengajukan') || str_contains($t, 'ajukan');
+        $hasRefundTerm = str_contains($t, 'refund') || str_contains($t, 'pengembalian');
+
+        return $hasApplicationWord && $hasRefundTerm;
     }
 
     public function down(): void
