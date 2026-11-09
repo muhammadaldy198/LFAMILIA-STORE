@@ -149,6 +149,39 @@ class AdminOrdersRestorationTest extends TestCase
             ->where('order_id', $orderId)->value('status'));
     }
 
+    public function test_cancellation_waits_for_a_fresh_reconcile_claim_but_not_a_stale_one(): void
+    {
+        $admin = $this->login();
+        Queue::fake();
+        $orderId = $this->order($admin);
+
+        DB::table('orders')->where('id', $orderId)->update(['status' => 'PROCESSING']);
+        DB::table('fulfillment_attempts')->where('order_id', $orderId)->update([
+            'status' => 'UNKNOWN', 'reconcile_claimed_at' => now(), 'updated_at' => now(),
+        ]);
+
+        // Klaim pengecekan baru saja diambil: panggilan provider-nya mungkin
+        // sedang berjalan, jadi pembatalan ditahan.
+        $this->get('/admin/orders/'.$orderId)->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('canCancel', false));
+        $this->withSession(['admin.password_confirmed_at' => time()])
+            ->post('/admin/orders/'.$orderId.'/cancel', [
+                'reason_code' => 'stok_habis', 'confirmed' => true,
+            ])->assertSessionHasErrors('order');
+        $this->assertSame('PROCESSING', DB::table('orders')->where('id', $orderId)->value('status'));
+
+        // Klaim yang sudah lewat jendelanya tidak lagi menahan: pesanan
+        // menggantung tetap bisa dibatalkan (kasus order 111).
+        DB::table('fulfillment_attempts')->where('order_id', $orderId)->update([
+            'reconcile_claimed_at' => now()->subMinutes(2), 'updated_at' => now(),
+        ]);
+        $this->withSession(['admin.password_confirmed_at' => time()])
+            ->post('/admin/orders/'.$orderId.'/cancel', [
+                'reason_code' => 'stok_habis', 'confirmed' => true,
+            ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame('CANCELLED', DB::table('orders')->where('id', $orderId)->value('status'));
+    }
+
     public function test_cancellation_requires_a_reason_choice_and_records_it(): void
     {
         $admin = $this->login();

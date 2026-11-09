@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -37,6 +38,18 @@ class AdminOrderCancellationService
                 if ($attempt->status === 'SENDING') {
                     throw ValidationException::withMessages([
                         'order' => 'Pengiriman sedang dikirim ke provider. Tunggu sampai hasilnya tercatat, lalu batalkan.',
+                    ]);
+                }
+                // Klaim rekonsiliasi yang masih segar berarti panggilan pengecekan
+                // ke provider sedang atau baru saja berjalan (panggilan provider
+                // ber-timeout 15 detik; jendela 60 detik ini — sama di
+                // AdminOrderDetailController — memberi ruang longgar sampai
+                // hasilnya tercatat). Membatalkan di jendela ini bisa membuat
+                // panggilan itu tetap menagih untuk pesanan yang sudah batal.
+                if ($attempt->reconcile_claimed_at !== null
+                    && Carbon::parse($attempt->reconcile_claimed_at)->gt(now()->subSeconds(60))) {
+                    throw ValidationException::withMessages([
+                        'order' => 'Pengecekan hasil provider sedang berjalan untuk pesanan ini. Tunggu sebentar sampai selesai, lalu batalkan.',
                     ]);
                 }
             }
