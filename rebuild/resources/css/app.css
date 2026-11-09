@@ -752,9 +752,9 @@ body:where(:not(.lfx, .lfx *)){margin:0;font-family:Inter,ui-sans-serif,system-u
 .status-failed:where(:not(.lfx, .lfx *)),.status-cancelled:where(:not(.lfx, .lfx *)),.status-expired:where(:not(.lfx, .lfx *)){color:#ff8e96!important}
 .status-refunded:where(:not(.lfx, .lfx *)){color:#ffc564!important}
 
-/* PR12: transaction feed becomes compact stacked rows on phones.
-   No per-field labels: invoice, status, product, total and time are
-   self-evident in place. Keep the desktop five-column table untouched. */
+/* PR12: transaction feed becomes two-line rows on phones.
+   Line 1: invoice + status. Line 2: product + package, total, time.
+   No per-field labels. Keep the desktop five-column table untouched. */
 @media (max-width: 640px) {
   .lf-track-feed .lf-feed-table {
     box-sizing: border-box;
@@ -768,29 +768,45 @@ body:where(:not(.lfx, .lfx *)){margin:0;font-family:Inter,ui-sans-serif,system-u
     min-width: 0;
     width: 100%;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, auto);
-    align-items: start;
-    gap: 5px 10px;
-    padding: 10px 12px;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 3px 8px;
+    padding: 9px 12px;
   }
   .lf-track-feed .lf-feed-row:not(.lf-feed-head) > * {
     min-width: 0;
     overflow-wrap: anywhere;
   }
   .lf-track-feed .lf-feed-row > strong { grid-column: 1; grid-row: 1; }
-  .lf-track-feed .lf-feed-row > span { grid-column: 1 / -1; grid-row: 2; }
-  .lf-track-feed .lf-feed-row > b { grid-column: 1; grid-row: 3; }
   .lf-track-feed .lf-feed-row > em {
-    grid-column: 2;
+    grid-column: 3;
     grid-row: 1;
     justify-self: end;
     text-align: right;
   }
-  .lf-track-feed .lf-feed-row > time {
+  .lf-track-feed .lf-feed-row > span {
+    grid-column: 1;
+    grid-row: 2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .lf-track-feed .lf-feed-row > span small {
+    display: inline;
+    margin-top: 0;
+  }
+  .lf-track-feed .lf-feed-row > span small::before { content: " · "; }
+  .lf-track-feed .lf-feed-row > b {
     grid-column: 2;
-    grid-row: 3;
+    grid-row: 2;
+    justify-self: end;
+  }
+  .lf-track-feed .lf-feed-row > time {
+    grid-column: 3;
+    grid-row: 2;
     justify-self: end;
     text-align: right;
+    color: var(--lf-color-muted);
   }
 }
 /* FAQ parity */
