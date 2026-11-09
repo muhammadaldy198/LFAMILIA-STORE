@@ -325,7 +325,7 @@ class PaymentMidtransTest extends TestCase
             ->where('event_id', 'fake')->count());
     }
 
-    public function test_midtrans_notifications_signed_with_either_signature_key_are_accepted(): void
+    public function test_midtrans_notifications_signed_with_any_configured_signature_key_are_accepted(): void
     {
         $catalog = $this->catalog();
         $this->route('qris', 'MIDTRANS', 0, 70, 'qris');
@@ -333,6 +333,7 @@ class PaymentMidtransTest extends TestCase
             'config_ciphertext' => [
                 'server_key' => 'server-test',
                 'signature_secret_key' => 'signature-secret-test',
+                'previous_signature_secret_key' => 'previous-signature-secret-test',
                 'is_production' => false,
             ],
             'is_active' => true,
@@ -361,9 +362,14 @@ class PaymentMidtransTest extends TestCase
         });
 
         // Since 28 October 2026 Midtrans signs with the Signature Secret Key;
-        // the Server Key is the legacy signer. Both must verify.
-        foreach (['signature-secret-test', 'server-test'] as $signingKey) {
-            $suffix = $signingKey === 'signature-secret-test' ? 'ssk' : 'legacy';
+        // the previous Signature Secret Key covers the regeneration retry
+        // overlap, and the Server Key is the legacy signer. All must verify.
+        $signingKeys = [
+            'ssk' => 'signature-secret-test',
+            'prev' => 'previous-signature-secret-test',
+            'legacy' => 'server-test',
+        ];
+        foreach ($signingKeys as $suffix => $signingKey) {
             $checkout = $this->postJson('/checkout/orders', $this->guestCheckout(
                 $catalog['package_id'], 'qris', 'sig-key-order-'.$suffix
             ))->assertCreated();
