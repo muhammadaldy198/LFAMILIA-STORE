@@ -307,6 +307,8 @@ class CustomerEmailTemplateRenderer
             '',
             $data['after'],
             '',
+            'Untuk pertanyaan, silakan hubungi Customer Service kami di '.($data['support'] !== '' ? $data['support'] : $data['supportLink']).'.',
+            '',
             'Terima kasih atas perhatian dan kepercayaan kamu di '.$data['store'].'.',
             '',
         ];

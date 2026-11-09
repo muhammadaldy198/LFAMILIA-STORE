@@ -84,7 +84,7 @@ class CustomerHtmlEmailTest extends TestCase
             $this->assertStringContainsString('&copy; '.now()->year.' LFAMILIA STORE', $rendered['html'], $event);
             $this->assertStringContainsString('© '.now()->year.' LFAMILIA STORE', $rendered['text'], $event);
             $this->assertSame(1, substr_count($rendered['html'], 'display:block;color:#ffffff'), $event);
-            $this->assertSame($event === 'order_failed' ? 1 : 0, substr_count($rendered['text'], 'support@lfamilia.com'), $event);
+            $this->assertSame($event === 'order_failed' ? 2 : 1, substr_count($rendered['text'], 'support@lfamilia.com'), $event);
             $this->assertSame(0, substr_count($rendered['html'], '>support@lfamilia.com</a>'), $event);
             $this->assertStringContainsString('WIB', $rendered['html'], $event);
             $this->assertStringContainsString('WIB', $rendered['text'], $event);
