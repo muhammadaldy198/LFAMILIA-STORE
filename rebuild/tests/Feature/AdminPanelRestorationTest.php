@@ -284,6 +284,9 @@ class AdminPanelRestorationTest extends TestCase
     {
         $this->login();
         $this->fakeCatalog([$this->row()]);
+        // Saldo cukup besar agar gerbang saldo CheckoutPricing tidak menutup
+        // nominal pada alur terbit + halaman katalog di bawah.
+        Http::fake(['https://digiflazz.test/v1/cek-saldo' => Http::response(['data' => ['deposit' => 1000000]])]);
         app(DigiflazzCatalogService::class)->sync();
         Provider::where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
         $product = $this->product();
@@ -316,7 +319,9 @@ class AdminPanelRestorationTest extends TestCase
             $page->where('packages.0.price_idr', 11000);
         });
         $this->assertDatabaseHas('audit_logs', ['action' => 'catalog.mapping.updated', 'target_id' => (string) $mapping->id]);
-        Http::assertSentCount(1);
+        // Dua panggilan keluar: price-list saat sinkron + satu probe cek-saldo
+        // ter-cache dari gerbang saldo CheckoutPricing di jalur customer.
+        Http::assertSentCount(2);
     }
 
     public function test_publish_import_uses_the_single_customer_field_without_extra_configuration(): void
