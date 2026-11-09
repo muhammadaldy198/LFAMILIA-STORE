@@ -21,7 +21,13 @@ class CheckoutPricing
     private function digiflazzBalanceIdr(): ?int
     {
         if (! $this->digiflazzBalanceLoaded) {
-            $this->digiflazzBalanceIdr = $this->digiflazzMonitor->balanceIdr();
+            try {
+                $this->digiflazzBalanceIdr = $this->digiflazzMonitor->balanceIdr();
+            } catch (\Throwable) {
+                // Kegagalan membaca saldo (cache/konfigurasi/probe) tidak boleh
+                // menutup penjualan: gerbang terbuka, sama seperti saldo null.
+                $this->digiflazzBalanceIdr = null;
+            }
             $this->digiflazzBalanceLoaded = true;
         }
 

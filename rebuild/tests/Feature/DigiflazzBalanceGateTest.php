@@ -111,6 +111,18 @@ class DigiflazzBalanceGateTest extends TestCase
         $this->assertSame(126877, $quote['cost_idr']);
     }
 
+    public function test_balance_read_failure_keeps_the_gate_open(): void
+    {
+        [$package] = $this->digiflazzPackage(126877);
+        $this->mock(AdminDigiflazzMonitorService::class, function ($mock): void {
+            $mock->shouldReceive('balanceIdr')->andThrow(new \RuntimeException('cache down'));
+        });
+
+        $quote = app(CheckoutPricing::class)->forPackage($package->id);
+        $this->assertSame(126877, $quote['cost_idr']);
+        $this->assertArrayHasKey($package->id, app(CheckoutPricing::class)->forPackages([$package->id]));
+    }
+
     public function test_affordable_seller_mapping_is_used_when_the_first_exceeds_balance(): void
     {
         [$package] = $this->digiflazzPackage(126877, 1);
