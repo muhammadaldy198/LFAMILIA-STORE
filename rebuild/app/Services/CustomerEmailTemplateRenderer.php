@@ -303,21 +303,13 @@ class CustomerEmailTemplateRenderer
             ...$lines,
             '',
             $data['ctaLabel'].': '.(str_starts_with($data['ctaUrl'], 'mailto:')
-                ? 'lihat alamat Customer Service di footer' : $data['ctaUrl']),
+                ? substr($data['ctaUrl'], strlen('mailto:')) : $data['ctaUrl']),
             '',
             $data['after'],
             '',
             'Terima kasih atas perhatian dan kepercayaan kamu di '.$data['store'].'.',
             '',
-            'Ini adalah email otomatis, mohon untuk tidak membalas email ini.',
         ];
-        if ($data['support'] !== '') {
-            $lines[] = 'Customer Service: '.$data['support'];
-        }
-        if ($data['hours'] !== '') {
-            $lines[] = 'Jam layanan: '.$data['hours'];
-        }
-        $lines[] = 'LFAMILIA STORE tidak pernah meminta password atau kode OTP kamu.';
         $lines[] = '© '.$data['year'].' '.$data['store'];
 
         return implode("\n", $lines);

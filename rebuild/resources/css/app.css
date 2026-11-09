@@ -752,8 +752,9 @@ body:where(:not(.lfx, .lfx *)){margin:0;font-family:Inter,ui-sans-serif,system-u
 .status-failed:where(:not(.lfx, .lfx *)),.status-cancelled:where(:not(.lfx, .lfx *)),.status-expired:where(:not(.lfx, .lfx *)){color:#ff8e96!important}
 .status-refunded:where(:not(.lfx, .lfx *)){color:#ffc564!important}
 
-/* PR12: transaction feed becomes readable stacked rows on phones.
-   Keep the desktop five-column table untouched. */
+/* PR12: transaction feed becomes compact stacked rows on phones.
+   No per-field labels: invoice, status, product, total and time are
+   self-evident in place. Keep the desktop five-column table untouched. */
 @media (max-width: 640px) {
   .lf-track-feed .lf-feed-table {
     box-sizing: border-box;
@@ -769,8 +770,8 @@ body:where(:not(.lfx, .lfx *)){margin:0;font-family:Inter,ui-sans-serif,system-u
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, auto);
     align-items: start;
-    gap: 7px 10px;
-    padding: 12px;
+    gap: 5px 10px;
+    padding: 10px 12px;
   }
   .lf-track-feed .lf-feed-row:not(.lf-feed-head) > * {
     min-width: 0;
@@ -790,14 +791,6 @@ body:where(:not(.lfx, .lfx *)){margin:0;font-family:Inter,ui-sans-serif,system-u
     grid-row: 3;
     justify-self: end;
     text-align: right;
-  }
-  .lf-track-feed .lf-feed-row [data-mobile-label]::before {
-    display: block;
-    content: attr(data-mobile-label);
-    margin-bottom: 3px;
-    color: var(--lf-color-muted);
-    font-size: 7px;
-    font-weight: 600;
   }
 }
 /* FAQ parity */

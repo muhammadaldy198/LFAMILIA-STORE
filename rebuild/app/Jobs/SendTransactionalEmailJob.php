@@ -103,15 +103,8 @@ class SendTransactionalEmailJob implements ShouldQueue
             $siteUrl = 'https://lfamilia.com';
         }
         $storeName = $escape((string) ($identity['store.name'] ?? 'LFAMILIA STORE'));
-        $supportEmail = (string) (($identity['store.email'] ?? '') ?: 'support@lfamilia.com');
-        $safeEmail = $escape($supportEmail);
         $baseUrl = rtrim($siteUrl, '/');
-        $configuredContact = (string) (($identity['store.support_url'] ?? '') ?: '/contact');
-        $contactUrl = str_starts_with($configuredContact, '/') && ! str_starts_with($configuredContact, '//')
-            ? $baseUrl.$configuredContact
-            : $configuredContact;
         $url = $escape($baseUrl);
-        $contact = $escape($contactUrl);
         $footer = $escape((string) ($assets['footer_banner_desktop']['url'] ?? $baseUrl.'/brand/lfamilia-footer-desktop-wordmark.jpg'));
 
         return '<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
@@ -123,8 +116,7 @@ class SendTransactionalEmailJob implements ShouldQueue
             .'<div style="font-size:15px;line-height:1.8;color:#e2e8f0;overflow-wrap:anywhere">'.$message.'</div>'
             .'<p style="margin:28px 0 0"><a href="'.$url.'" style="display:inline-block;background:#16a6c9;color:#06141d;text-decoration:none;padding:13px 22px;border-radius:8px;font-size:14px;font-weight:bold">Kunjungi '.$storeName.'</a></p>'
             .'</td></tr><tr><td style="padding:0 24px 16px;background:#111923"><div style="border-top:1px solid #263647;padding-top:20px;text-align:center"><a href="'.$url.'" style="display:inline-block;max-width:100%"><img src="'.$footer.'" alt="'.$storeName.'" width="440" style="display:block;width:100%;max-width:440px;height:auto;border:0"></a></div></td></tr><tr><td style="padding:12px 24px 24px;background:#111923">'
-            .'<p style="margin:0 0 10px;font-size:13px;color:#cbd5e1">Butuh bantuan? <a href="mailto:'.$safeEmail.'" style="color:#67d9f5">'.$safeEmail.'</a> · <a href="'.$contact.'" style="color:#67d9f5">Hubungi Kami</a></p>'
-            .'<p style="margin:0;font-size:12px;line-height:1.6;color:#94a3b8">Pesan otomatis dari '.$storeName.'. Jangan pernah membagikan kata sandi, PIN, atau OTP. &copy; '.date('Y').' '.$storeName.'.</p>'
+            .'<p style="margin:0;font-size:12px;line-height:1.6;color:#94a3b8">&copy; '.date('Y').' '.$storeName.'</p>'
             .'</td></tr></table></body></html>';
     }
 

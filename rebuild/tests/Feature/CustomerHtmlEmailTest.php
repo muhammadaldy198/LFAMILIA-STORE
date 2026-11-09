@@ -77,11 +77,15 @@ class CustomerHtmlEmailTest extends TestCase
             $this->assertStringContainsString('https://lfamilia.com/brand/lfamilia-logo-email.png', $rendered['html'], $event);
             $this->assertStringContainsString('Subjek '.$event, $rendered['html'], $event);
             $this->assertStringContainsString('Subjek '.$event, $rendered['text'], $event);
-            $this->assertStringContainsString('LFAMILIA STORE tidak pernah meminta password atau kode OTP kamu.', $rendered['html'], $event);
-            $this->assertStringContainsString('LFAMILIA STORE tidak pernah meminta password atau kode OTP kamu.', $rendered['text'], $event);
+            $this->assertStringNotContainsString('LFAMILIA STORE tidak pernah meminta password atau kode OTP kamu.', $rendered['html'], $event);
+            $this->assertStringNotContainsString('LFAMILIA STORE tidak pernah meminta password atau kode OTP kamu.', $rendered['text'], $event);
+            $this->assertStringNotContainsString('Ini adalah email otomatis', $rendered['html'], $event);
+            $this->assertStringNotContainsString('Ini adalah email otomatis', $rendered['text'], $event);
+            $this->assertStringContainsString('&copy; '.now()->year.' LFAMILIA STORE', $rendered['html'], $event);
+            $this->assertStringContainsString('© '.now()->year.' LFAMILIA STORE', $rendered['text'], $event);
             $this->assertSame(1, substr_count($rendered['html'], 'display:block;color:#ffffff'), $event);
-            $this->assertSame(1, substr_count($rendered['text'], 'support@lfamilia.com'), $event);
-            $this->assertSame(1, substr_count($rendered['html'], '>support@lfamilia.com</a>'), $event);
+            $this->assertSame($event === 'order_failed' ? 1 : 0, substr_count($rendered['text'], 'support@lfamilia.com'), $event);
+            $this->assertSame(0, substr_count($rendered['html'], '>support@lfamilia.com</a>'), $event);
             $this->assertStringContainsString('WIB', $rendered['html'], $event);
             $this->assertStringContainsString('WIB', $rendered['text'], $event);
         }

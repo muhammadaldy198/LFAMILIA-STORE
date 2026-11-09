@@ -108,14 +108,17 @@ class GuestOrderController
 
     private function publicEvents(int $orderId): array
     {
-        return DB::table('order_events')->where('order_id', $orderId)
-            ->orderBy('id')->get(['id', 'event_type', 'from_status', 'to_status', 'created_at'])
-            ->map(fn ($event): array => [
-                'id' => (int) $event->id,
-                'label' => $this->statuses->eventLabel((string) $event->event_type, $event->to_status),
-                'from_status' => $event->from_status ? $this->statuses->value((string) $event->from_status) : null,
-                'to_status' => $event->to_status ? $this->statuses->value((string) $event->to_status) : null,
-                'created_at' => Carbon::parse($event->created_at, 'UTC')->toIso8601String(),
-            ])->all();
+        return $this->statuses->collapseAdjacent(
+            DB::table('order_events')->where('order_id', $orderId)
+                ->orderBy('id')->get(['id', 'event_type', 'from_status', 'to_status', 'created_at'])
+                ->map(fn ($event): array => [
+                    'id' => (int) $event->id,
+                    'label' => $this->statuses->eventLabel((string) $event->event_type, $event->to_status),
+                    'from_status' => $event->from_status ? $this->statuses->value((string) $event->from_status) : null,
+                    'to_status' => $event->to_status ? $this->statuses->value((string) $event->to_status) : null,
+                    'created_at' => Carbon::parse($event->created_at, 'UTC')->toIso8601String(),
+                ])->all(),
+            'to_status'
+        );
     }
 }

@@ -132,6 +132,48 @@ class GuestOrderTest extends TestCase
         $this->assertNull($statuses->note('EXPIRED', true));
     }
 
+    public function test_public_timeline_names_payment_success_and_collapses_repeat_heartbeats(): void
+    {
+        $statuses = app(PublicOrderStatusService::class);
+        $this->assertSame('Pembayaran Berhasil', $statuses->eventLabel('PAYMENT_VERIFIED', 'PAID'));
+        $this->assertSame('Menunggu hasil dari penyedia', $statuses->eventLabel('FULFILLMENT_PENDING', 'PROCESSING'));
+        $this->assertSame('Diproses', $statuses->eventLabel('FULFILLMENT_QUEUED', 'PROCESSING'));
+
+        $orderId = $this->guestOrder('LFTRACK-TIMELINE-100');
+        DB::table('orders')->where('id', $orderId)->update([
+            'status' => 'SUCCESS', 'paid_at' => '2026-11-03 06:47:00',
+        ]);
+        $rows = [];
+        foreach ([
+            ['ORDER_CREATED', null, 'PENDING_PAYMENT', '2026-11-03 06:45:46'],
+            ['PAYMENT_VERIFIED', 'PENDING_PAYMENT', 'PAID', '2026-11-03 06:47:00'],
+            ['FULFILLMENT_QUEUED', 'PAID', 'PROCESSING', '2026-11-03 06:47:01'],
+            ['FULFILLMENT_PENDING', 'PROCESSING', 'PROCESSING', '2026-11-03 06:47:02'],
+            ['FULFILLMENT_UNKNOWN', 'PROCESSING', 'PROCESSING', '2026-11-03 06:47:20'],
+            ['FULFILLMENT_UNKNOWN', 'PROCESSING', 'PROCESSING', '2026-11-03 06:47:40'],
+            ['FULFILLMENT_SUCCEEDED', 'PROCESSING', 'SUCCESS', '2026-11-03 06:48:02'],
+        ] as $i => [$type, $from, $to, $at]) {
+            $rows[] = [
+                'order_id' => $orderId, 'event_type' => $type,
+                'correlation_id' => 'timeline-'.$i, 'from_status' => $from,
+                'to_status' => $to, 'created_at' => $at,
+            ];
+        }
+        DB::table('order_events')->insert($rows);
+
+        $expected = [
+            'Menunggu Pembayaran', 'Pembayaran Berhasil', 'Diproses',
+            'Menunggu hasil dari penyedia', 'Diproses', 'Terkirim',
+        ];
+        $tracking = $this->postJson('/orders/track/search', ['query' => 'LFTRACK-TIMELINE-100'])
+            ->assertOk();
+        $this->assertSame($expected, array_column($tracking->json('order.events'), 'label'));
+
+        $guest = $this->withSession(['guest_order_id' => $orderId])
+            ->get('/orders/guest/LFTRACK-TIMELINE-100/events')->assertOk();
+        $this->assertSame($expected, array_column($guest->json('events'), 'label'));
+    }
+
     public function test_public_tracking_and_guest_events_emit_utc_iso_timestamps_for_wib_rendering(): void
     {
         $orderId = $this->guestOrder('LFTRACK-UTC-100');
