@@ -12,17 +12,22 @@ class AdminOrderCancellationService
     {
         DB::transaction(function () use ($orderId, $adminId, $reason): void {
             $order = DB::table('orders')->where('id', $orderId)->lockForUpdate()->first();
-            if (! $order || ! in_array($order->status, ['PAID', 'FAILED', 'BLOCKED'], true)) {
+            if (! $order || ! in_array($order->status, ['PAID', 'PROCESSING', 'FAILED', 'BLOCKED'], true)) {
                 throw ValidationException::withMessages([
                     'order' => 'Pesanan tidak dapat dibatalkan pada status sekarang.',
                 ]);
             }
             $attempts = DB::table('fulfillment_attempts')->where('order_id', $orderId)
                 ->orderBy('id')->lockForUpdate()->get();
+            // Satu-satunya penghalang keras: pengiriman yang sudah BERHASIL tidak
+            // pernah bisa dibatalkan. Status percobaan lain — termasuk UNKNOWN yang
+            // menggantung tanpa kepastian provider — ditutup oleh pembatalan ini;
+            // hasil provider yang datang terlambat diabaikan oleh penjaga status
+            // CANCELLED di layanan pemenuhan, jadi pesanan batal tidak hidup lagi.
             foreach ($attempts as $attempt) {
-                if (! in_array($attempt->status, ['FAILED_CONFIRMED', 'MANUAL_FAILED', 'BLOCKED'], true)) {
+                if ($attempt->status === 'SUCCESS') {
                     throw ValidationException::withMessages([
-                        'order' => 'Pengiriman masih berjalan atau belum pasti. Pastikan hasil provider sebelum membatalkan.',
+                        'order' => 'Pesanan sudah terkirim dan tidak dapat dibatalkan.',
                     ]);
                 }
             }
