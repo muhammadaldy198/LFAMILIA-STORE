@@ -221,6 +221,13 @@ class FulfillmentSendingService
             return;
         }
 
+        // Gerbang terakhir sebelum panggilan provider: transaksi persiapan di
+        // atas sudah commit, jadi pembatalan yang mendarat di celah ini tidak
+        // terlihat oleh pemeriksaan status di dalamnya.
+        if ($this->support->attemptCancelled($attemptId)) {
+            return;
+        }
+
         if ($context['provider_code'] === 'VOUCHER_STOCK') {
             try {
                 $this->support->fulfillVoucherStock($context['attempt_id'], $context['stock_key']);

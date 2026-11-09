@@ -124,6 +124,31 @@ class AdminOrdersRestorationTest extends TestCase
             ->where('order_id', $orderId)->where('event_type', 'FULFILLMENT_CLOSED_BY_CANCELLATION')->count());
     }
 
+    public function test_cancellation_waits_while_attempt_is_sending(): void
+    {
+        $admin = $this->login();
+        Queue::fake();
+        $orderId = $this->order($admin);
+
+        // Panggilan provider sedang berjalan: membatalkan sekarang bisa membuat
+        // provider tetap menagih dan mengirim untuk pesanan yang sudah batal.
+        DB::table('orders')->where('id', $orderId)->update(['status' => 'PROCESSING']);
+        DB::table('fulfillment_attempts')->where('order_id', $orderId)->update([
+            'status' => 'SENDING', 'updated_at' => now(),
+        ]);
+
+        $this->get('/admin/orders/'.$orderId)->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('canCancel', false));
+
+        $this->withSession(['admin.password_confirmed_at' => time()])
+            ->post('/admin/orders/'.$orderId.'/cancel', [
+                'reason_code' => 'stok_habis', 'confirmed' => true,
+            ])->assertSessionHasErrors('order');
+        $this->assertSame('PROCESSING', DB::table('orders')->where('id', $orderId)->value('status'));
+        $this->assertSame('SENDING', DB::table('fulfillment_attempts')
+            ->where('order_id', $orderId)->value('status'));
+    }
+
     public function test_cancellation_requires_a_reason_choice_and_records_it(): void
     {
         $admin = $this->login();

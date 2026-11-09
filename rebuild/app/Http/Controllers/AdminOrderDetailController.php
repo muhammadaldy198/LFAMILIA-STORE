@@ -80,7 +80,7 @@ class AdminOrderDetailController
             'canResendDelivery' => $canResendDelivery,
             'canCancel' => strtoupper((string) $request->user('admin')?->role) === 'SUPER_ADMIN'
                 && in_array($row->status, ['PAID', 'PROCESSING', 'FAILED', 'BLOCKED'], true)
-                && $attempts->every(fn (array $a): bool => $a['status'] !== 'SUCCESS'),
+                && $attempts->every(fn (array $a): bool => ! in_array($a['status'], ['SUCCESS', 'SENDING'], true)),
             'canCheckFulfillment' => $canFulfill && in_array($row->status, ['PAID', 'PROCESSING'], true)
                 && in_array($attempts->first()['status'] ?? '', ['PENDING', 'UNKNOWN', 'SENDING'], true),
             'payments' => DB::table('payment_transactions')->where('order_id', $id)->orderByDesc('id')

@@ -11,6 +11,7 @@ use App\Models\IntegrationCredential;
 use App\Models\Product;
 use App\Services\DigiflazzAutoSources;
 use App\Services\FulfillmentService;
+use App\Services\FulfillmentSupportService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\Client\Factory;
 use Illuminate\Support\Facades\Artisan;
@@ -272,6 +273,28 @@ class FulfillmentTest extends TestCase
             ],
             'is_active' => true,
         ]);
+    }
+
+    public function test_send_gate_reports_cancelled_attempt_or_order(): void
+    {
+        Queue::fake();
+        $this->credentials();
+        $catalog = $this->automaticCatalog();
+        $orderId = $this->paidOrder($catalog);
+        app(FulfillmentService::class)->startOrder($orderId);
+        $attemptId = (int) DB::table('fulfillment_attempts')->where('order_id', $orderId)->value('id');
+
+        $gate = app(FulfillmentSupportService::class);
+        $this->assertFalse($gate->attemptCancelled($attemptId));
+
+        DB::table('orders')->where('id', $orderId)->update(['status' => 'CANCELLED']);
+        $this->assertTrue($gate->attemptCancelled($attemptId));
+
+        DB::table('orders')->where('id', $orderId)->update(['status' => 'PROCESSING']);
+        DB::table('fulfillment_attempts')->where('id', $attemptId)->update(['status' => 'CANCELLED']);
+        $this->assertTrue($gate->attemptCancelled($attemptId));
+
+        $this->assertTrue($gate->attemptCancelled($attemptId + 999999));
     }
 
     public function test_digiflazz_success_uses_server_snapshot_and_creates_only_one_attempt(): void

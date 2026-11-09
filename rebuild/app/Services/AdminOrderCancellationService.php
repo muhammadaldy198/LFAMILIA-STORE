@@ -19,15 +19,24 @@ class AdminOrderCancellationService
             }
             $attempts = DB::table('fulfillment_attempts')->where('order_id', $orderId)
                 ->orderBy('id')->lockForUpdate()->get();
-            // Satu-satunya penghalang keras: pengiriman yang sudah BERHASIL tidak
-            // pernah bisa dibatalkan. Status percobaan lain — termasuk UNKNOWN yang
-            // menggantung tanpa kepastian provider — ditutup oleh pembatalan ini;
-            // hasil provider yang datang terlambat diabaikan oleh penjaga status
-            // CANCELLED di layanan pemenuhan, jadi pesanan batal tidak hidup lagi.
+            // Dua penghalang keras: pengiriman yang sudah BERHASIL tidak pernah
+            // bisa dibatalkan, dan pengiriman yang sedang DIKIRIM (SENDING) harus
+            // menunggu hasilnya tercatat — membatalkan di tengah panggilan
+            // provider bisa membuat provider tetap menagih dan mengirim untuk
+            // pesanan yang sudah batal. Status percobaan lain — termasuk UNKNOWN
+            // yang menggantung tanpa kepastian provider — ditutup oleh pembatalan
+            // ini; hasil provider yang datang terlambat diabaikan oleh penjaga
+            // status CANCELLED di layanan pemenuhan, jadi pesanan batal tidak
+            // hidup lagi.
             foreach ($attempts as $attempt) {
                 if ($attempt->status === 'SUCCESS') {
                     throw ValidationException::withMessages([
                         'order' => 'Pesanan sudah terkirim dan tidak dapat dibatalkan.',
+                    ]);
+                }
+                if ($attempt->status === 'SENDING') {
+                    throw ValidationException::withMessages([
+                        'order' => 'Pengiriman sedang dikirim ke provider. Tunggu sampai hasilnya tercatat, lalu batalkan.',
                     ]);
                 }
             }
