@@ -115,7 +115,7 @@ class IntegrationRegistry
                         'label' => 'Kunci rahasia tanda tangan',
                         'secret' => true,
                         'required' => false,
-                        'help' => 'Signature Secret Key dari Access Keys Midtrans. Sejak 28 Oktober 2026 notifikasi pembayaran ditandatangani dengan kunci ini, bukan kunci server; tanpa kunci ini notifikasi Midtrans ditolak sebagai tanda tangan tidak sah.',
+                        'help' => 'Signature Secret Key dari Access Keys Midtrans. Sejak 28 Oktober 2026 Midtrans menandatangani notifikasi pembayaran dengan kunci ini, bukan kunci server. Kunci server tetap diterima sebagai cadangan, tetapi akun yang sudah membuat kunci server baru wajib mengisi kunci ini agar notifikasinya tidak ditolak.',
                     ],
                 ],
                 'callback' => [
