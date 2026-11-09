@@ -48,13 +48,6 @@
 <tr><td style="padding-top:13px;font-size:14px;line-height:1.7;color:#333333">Untuk pertanyaan, silakan hubungi <a href="{{ $supportLink }}" style="color:#2f7de1;text-decoration:underline">Customer Service kami</a>.</td></tr>
 <tr><td style="padding-top:10px;font-size:14px;line-height:1.6;color:#333333">Terima kasih atas perhatian dan kepercayaan kamu di {{ $store }}.</td></tr>
 <tr><td style="padding-top:20px;font-size:12px;line-height:1.7;color:#888888">
-Ini adalah email otomatis, mohon untuk tidak membalas email ini.
-@if ($support !== '')
-Untuk menghubungi kami, silakan hubungi <a href="mailto:{{ $support }}" style="color:#2f7de1">{{ $support }}</a>@if ($hours !== '') ({{ $hours }})@endif.
-@elseif ($hours !== '')
-Jam layanan: {{ $hours }}.
-@endif
-<br>LFAMILIA STORE tidak pernah meminta password atau kode OTP kamu.<br>
 &copy; {{ $year }} {{ $store }}
 </td></tr>
 </table>

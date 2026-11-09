@@ -143,6 +143,8 @@ try {
     }
 
     // PR12: recent transactions may never force the entire 390px page wide.
+    // The feed stays a five-column table; on phones it scrolls sideways
+    // inside its own container (owner decision, PR #384 round 3).
     // The fixture is local and may have no public feed yet; add synthetic rows
     // to exercise the exact production markup with several transactions.
     await send('Emulation.setDeviceMetricsOverride',{width:390,height:900,deviceScaleFactor:1,mobile:true});
@@ -162,15 +164,15 @@ try {
     const feedMetric=await evaluate('(()=>{const table=document.querySelector(".lf-feed-table");const rect=table.getBoundingClientRect();' +
       'const rows=[...table.querySelectorAll(".lf-feed-row:not(.lf-feed-head)")];' +
       'const boxes=rows.map(row=>({width:row.getBoundingClientRect().width,columns:[...row.children].map(el=>{const r=el.getBoundingClientRect();return {left:r.left,right:r.right,width:r.width,visible:getComputedStyle(el).display!=="none"};})}));' +
-      'return {viewport:innerWidth,doc:document.documentElement.scrollWidth,tableLeft:rect.left,tableRight:rect.right,rows:boxes};})()');
+      'return {viewport:innerWidth,doc:document.documentElement.scrollWidth,tableLeft:rect.left,tableRight:rect.right,tableScrollWidth:table.scrollWidth,tableClientWidth:table.clientWidth,rows:boxes};})()');
     if(feedMetric.doc>feedMetric.viewport||feedMetric.tableRight>feedMetric.viewport+1||
-       feedMetric.rows.some(r=>r.width>feedMetric.viewport||r.columns.length!==5||
-           r.columns.some(c=>!c.visible||c.left<feedMetric.tableLeft-1||c.right>feedMetric.tableRight+1))) {
-        throw Error('PR12 transactions overflow mobile viewport '+JSON.stringify(feedMetric));
+       feedMetric.tableScrollWidth<=feedMetric.tableClientWidth||
+       feedMetric.rows.some(r=>r.columns.length!==5||r.columns.some(c=>!c.visible))) {
+        throw Error('PR12 transactions must stay a sideways-scrollable table inside the mobile viewport '+JSON.stringify(feedMetric));
     }
     const feedAfter=(await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true})).data;
     await writeFile(pr12Folder+'/transactions-after-390.png',Buffer.from(feedAfter,'base64'));
-    console.log('PASS PR12 /orders/check mobile five-field stacked feed '+JSON.stringify({rows:feedMetric.rows.length,doc:feedMetric.doc}));
+    console.log('PASS PR12 /orders/check mobile five-field sideways-scrollable feed '+JSON.stringify({rows:feedMetric.rows.length,doc:feedMetric.doc}));
     // PR 3 F7/F8: actual DOM hit targets, header interactions, and popular title.
     // "before" PNGs reconstruct the pre-PR CSS measurements; "after" is actual CSS.
     const pr3Folder = 'ergonomics-visual-results';

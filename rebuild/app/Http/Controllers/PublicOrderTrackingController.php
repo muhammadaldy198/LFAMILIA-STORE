@@ -185,15 +185,18 @@ class PublicOrderTrackingController
     {
         $payment = DB::table('payment_transactions')->where('order_id', $order->id)
             ->orderByDesc('id')->first(['status']);
-        $events = DB::table('order_events')->where('order_id', $order->id)
-            ->orderBy('id')->get(['id', 'event_type', 'from_status', 'to_status', 'created_at'])
-            ->map(fn (object $event): array => [
-                'id' => (int) $event->id,
-                'source' => $this->eventSource((string) $event->event_type),
-                'status' => $event->to_status ? $this->statuses->slug((string) $event->to_status) : null,
-                'label' => $this->statuses->eventLabel((string) $event->event_type, $event->to_status),
-                'createdAt' => $this->utcIso($event->created_at),
-            ])->values()->all();
+        $events = $this->statuses->collapseAdjacent(
+            DB::table('order_events')->where('order_id', $order->id)
+                ->orderBy('id')->get(['id', 'event_type', 'from_status', 'to_status', 'created_at'])
+                ->map(fn (object $event): array => [
+                    'id' => (int) $event->id,
+                    'source' => $this->eventSource((string) $event->event_type),
+                    'status' => $event->to_status ? $this->statuses->slug((string) $event->to_status) : null,
+                    'label' => $this->statuses->eventLabel((string) $event->event_type, $event->to_status),
+                    'createdAt' => $this->utcIso($event->created_at),
+                ])->values()->all(),
+            'status'
+        );
 
         return [
             'referenceId' => $revealReference

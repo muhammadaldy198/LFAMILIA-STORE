@@ -38,6 +38,17 @@ final class PublicOrderStatusService
 
     public function eventLabel(string $eventType, mixed $toStatus): string
     {
+        // Milestone events carry their own customer wording; the status
+        // bucket alone would call a verified payment "Diproses".
+        $eventLabel = match (strtoupper($eventType)) {
+            'PAYMENT_VERIFIED' => 'Pembayaran Berhasil',
+            'FULFILLMENT_PENDING' => 'Menunggu hasil dari penyedia',
+            default => null,
+        };
+        if ($eventLabel !== null) {
+            return $eventLabel;
+        }
+
         if (is_string($toStatus) && $toStatus !== '') {
             return $this->label($toStatus);
         }
@@ -46,6 +57,30 @@ final class PublicOrderStatusService
             'ORDER_CREATED' => 'Pesanan dibuat',
             default => 'Status pesanan diperbarui',
         };
+    }
+
+    /**
+     * Drop adjacent timeline rows that repeat the same public state.
+     * Provider heartbeats can fire many times without a status change;
+     * customers should see each distinct public state once, in order.
+     *
+     * @param  list<array<string, mixed>>  $rows
+     * @return list<array<string, mixed>>
+     */
+    public function collapseAdjacent(array $rows, string $statusKey): array
+    {
+        $collapsed = [];
+        $previousKey = null;
+        foreach ($rows as $row) {
+            $key = (string) ($row['source'] ?? '').'|'.(string) ($row['label'] ?? '').'|'.(string) ($row[$statusKey] ?? '');
+            if ($key === $previousKey) {
+                continue;
+            }
+            $collapsed[] = $row;
+            $previousKey = $key;
+        }
+
+        return $collapsed;
     }
 
     public function note(string $status, bool $wasPaid): ?string

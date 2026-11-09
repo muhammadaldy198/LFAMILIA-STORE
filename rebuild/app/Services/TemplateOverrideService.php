@@ -202,11 +202,12 @@ class TemplateOverrideService
                 }
             }
         }
-        // Support address is supplied exclusively by the global shop settings and footer.
-        // A literal email address in customer copy would duplicate it or become stale.
+        // Support address is supplied exclusively by the global shop settings and
+        // rendered automatically. A literal email address in customer copy would
+        // duplicate it or become stale.
         if ($definition['group'] === 'email' && preg_match('/[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}/iu', $subject."\n".$body)) {
             throw ValidationException::withMessages([
-                'body' => 'Alamat email tidak boleh ditulis langsung di template pelanggan. Kontak support tetap di footer; gunakan hanya placeholder yang tersedia.',
+                'body' => 'Alamat email tidak boleh ditulis langsung di template pelanggan. Kontak support dirender otomatis dari pengaturan toko; gunakan hanya placeholder yang tersedia.',
             ]);
         }
         if (preg_match('/\brefund\b|pengembalian\s+dana|uang\s+kembali/iu', $subject."\n".$body)) {
