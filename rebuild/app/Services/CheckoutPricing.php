@@ -8,6 +8,38 @@ use Illuminate\Validation\ValidationException;
 
 class CheckoutPricing
 {
+    private ?int $digiflazzBalanceIdr = null;
+
+    private bool $digiflazzBalanceLoaded = false;
+
+    public function __construct(private readonly AdminDigiflazzMonitorService $digiflazzMonitor) {}
+
+    /**
+     * Saldo Digiflazz dibaca paling banyak sekali per instance (di belakangnya
+     * ada cache 60 detik milik monitor). Null berarti saldo tidak terbaca.
+     */
+    private function digiflazzBalanceIdr(): ?int
+    {
+        if (! $this->digiflazzBalanceLoaded) {
+            $this->digiflazzBalanceIdr = $this->digiflazzMonitor->balanceIdr();
+            $this->digiflazzBalanceLoaded = true;
+        }
+
+        return $this->digiflazzBalanceIdr;
+    }
+
+    /**
+     * Gerbang saldo untuk jalur customer: nominal Digiflazz yang harga
+     * seller-nya melebihi saldo toko tidak boleh ditawarkan sama sekali —
+     * pesanannya pasti menggantung karena provider menolak saat saldo
+     * kurang (kasus order 111). Saldo tidak terbaca (null) membuka gerbang:
+     * gangguan sesaat tidak boleh mengosongkan toko.
+     */
+    private function withinDigiflazzBalance(?int $balanceIdr, int $sellerPriceIdr): bool
+    {
+        return $balanceIdr === null || $sellerPriceIdr <= $balanceIdr;
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -95,7 +127,12 @@ class CheckoutPricing
             $mappingQuery->lockForUpdate();
         }
 
-        $eligibleMappings = $mappingQuery->get()->filter(function (object $candidate): bool {
+        $rawMappings = $mappingQuery->get();
+        // Pratinjau admin ($includeInactive) tidak digerbang saldo: admin harus
+        // tetap bisa melihat dan memeriksa semua nominal.
+        $balanceIdr = ! $includeInactive && $rawMappings->contains('provider_code', 'DIGIFLAZZ')
+            ? $this->digiflazzBalanceIdr() : null;
+        $eligibleMappings = $rawMappings->filter(function (object $candidate) use ($balanceIdr): bool {
             if ($candidate->provider_code === 'VOUCHER_STOCK') {
                 $config = is_string($candidate->fulfillment_config)
                     ? (json_decode($candidate->fulfillment_config, true) ?: [])
@@ -117,7 +154,7 @@ class CheckoutPricing
             $candidate->cost_idr = (int) $item->price_idr;
             $candidate->is_manual_price = false;
 
-            return true;
+            return $this->withinDigiflazzBalance($balanceIdr, (int) $item->price_idr);
         })->values();
 
         return $this->quoteForContext($context, $eligibleMappings);
@@ -204,9 +241,12 @@ class CheckoutPricing
         $items = $skus === [] ? collect() : DB::table('digiflazz_catalog_items')
             ->whereIn('buyer_sku_code', $skus)->get()->keyBy('buyer_sku_code');
         $quotes = [];
+        // Gerbang saldo yang sama seperti forPackage(): hanya jalur customer.
+        $balanceIdr = ! $includeInactivePackages && $mappings->flatten(1)->contains('provider_code', 'DIGIFLAZZ')
+            ? $this->digiflazzBalanceIdr() : null;
 
         foreach ($contexts as $id => $context) {
-            $eligible = $mappings->get($id, collect())->filter(function (object $candidate) use ($items): bool {
+            $eligible = $mappings->get($id, collect())->filter(function (object $candidate) use ($items, $balanceIdr): bool {
                 if ($candidate->provider_code === 'VOUCHER_STOCK') {
                     $config = is_string($candidate->fulfillment_config)
                         ? (json_decode($candidate->fulfillment_config, true) ?: [])
@@ -226,7 +266,7 @@ class CheckoutPricing
                 $candidate->cost_idr = (int) $item->price_idr;
                 $candidate->is_manual_price = false;
 
-                return true;
+                return $this->withinDigiflazzBalance($balanceIdr, (int) $item->price_idr);
             })->values();
 
             try {
