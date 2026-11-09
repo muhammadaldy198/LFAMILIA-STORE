@@ -17,7 +17,9 @@ class TransactionalEmailTemplateTest extends TestCase
         $this->assertStringContainsString('LFAMILIA STORE', $html);
         $this->assertStringContainsString('https://lfamilia.com', $html);
         $this->assertStringContainsString('&copy; '.date('Y').' LFAMILIA STORE', $html);
-        $this->assertStringNotContainsString('support@lfamilia.com', $html);
+        $this->assertStringContainsString('support@lfamilia.com', $html);
+        $this->assertStringNotContainsString('Pesan otomatis dari', $html);
+        $this->assertStringNotContainsString('Jangan pernah membagikan kata sandi', $html);
         $this->assertStringContainsString('lfamilia-footer-desktop-wordmark.jpg', $html);
         $this->assertStringContainsString('&lt;script&gt;alert(1)&lt;/script&gt;', $html);
         $this->assertStringContainsString("Hello &lt;b&gt;customer&lt;/b&gt;<br>\nSecond line", $html);
