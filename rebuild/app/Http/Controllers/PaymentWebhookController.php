@@ -33,13 +33,7 @@ class PaymentWebhookController
             abort_unless(isset($payload[$key]) && is_scalar($payload[$key]), 400);
         }
 
-        $expected = hash('sha512',
-            (string) $payload['order_id'].
-            (string) $payload['status_code'].
-            (string) $payload['gross_amount'].
-            (string) $config['server_key']
-        );
-        if (hash_equals($expected, (string) $payload['signature_key']) === false) {
+        if ($this->midtransSignatureMatches($config, $payload) === false) {
             $this->logRejected('MIDTRANS', 'INVALID_SIGNATURE');
             abort(401);
         }
@@ -208,6 +202,40 @@ class PaymentWebhookController
         });
 
         return response()->json(['status' => $processed ? 'ok' : 'duplicate']);
+    }
+
+    /**
+     * Since 28 October 2026 Midtrans signs notifications with the separate
+     * Signature Secret Key instead of the Server Key. Accept a signature made
+     * with either key so accounts holding both (or only the legacy Server Key)
+     * keep verifying, as Midtrans's own migration guidance prescribes.
+     *
+     * @param  array<string, mixed>  $config
+     * @param  array<string, mixed>  $payload
+     */
+    private function midtransSignatureMatches(array $config, array $payload): bool
+    {
+        $candidateKeys = [];
+        foreach (['signature_secret_key', 'server_key'] as $field) {
+            $candidate = trim((string) ($config[$field] ?? ''));
+            if ($candidate !== '' && ! in_array($candidate, $candidateKeys, true)) {
+                $candidateKeys[] = $candidate;
+            }
+        }
+
+        foreach ($candidateKeys as $candidateKey) {
+            $expected = hash('sha512',
+                (string) $payload['order_id'].
+                (string) $payload['status_code'].
+                (string) $payload['gross_amount'].
+                $candidateKey
+            );
+            if (hash_equals($expected, (string) $payload['signature_key'])) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function logRejected(string $gateway, string $reason, ?int $paymentId = null): void

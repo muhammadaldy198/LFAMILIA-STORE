@@ -111,6 +111,12 @@ class IntegrationRegistry
                         'required' => false,
                         'help' => 'Kunci aplikasi Midtrans Production untuk flow Snap.',
                     ],
+                    'signature_secret_key' => [
+                        'label' => 'Kunci rahasia tanda tangan',
+                        'secret' => true,
+                        'required' => false,
+                        'help' => 'Signature Secret Key dari Access Keys Midtrans. Sejak 28 Oktober 2026 notifikasi pembayaran ditandatangani dengan kunci ini, bukan kunci server; tanpa kunci ini notifikasi Midtrans ditolak sebagai tanda tangan tidak sah.',
+                    ],
                 ],
                 'callback' => [
                     'label' => 'Pemberitahuan Midtrans',

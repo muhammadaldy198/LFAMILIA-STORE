@@ -325,6 +325,109 @@ class PaymentMidtransTest extends TestCase
             ->where('event_id', 'fake')->count());
     }
 
+    public function test_midtrans_notifications_signed_with_either_signature_key_are_accepted(): void
+    {
+        $catalog = $this->catalog();
+        $this->route('qris', 'MIDTRANS', 0, 70, 'qris');
+        IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
+            'config_ciphertext' => [
+                'server_key' => 'server-test',
+                'signature_secret_key' => 'signature-secret-test',
+                'is_production' => false,
+            ],
+            'is_active' => true,
+        ]);
+        Http::fake(function ($request) {
+            if (str_contains($request->url(), 'snap/v1/transactions')) {
+                return Http::response(['token' => 'sig-token', 'redirect_url' => 'https://example.test/pay']);
+            }
+            if (preg_match('#/v2/(.+)/status$#', $request->url(), $matches)) {
+                $reference = rawurldecode($matches[1]);
+                $local = DB::table('payment_transactions')
+                    ->where('merchant_reference', $reference)->firstOrFail();
+
+                return Http::response([
+                    'transaction_id' => 'sig-transaction',
+                    'transaction_status' => 'settlement',
+                    'status_code' => '200',
+                    'order_id' => $reference,
+                    'gross_amount' => number_format((int) $local->amount_idr, 2, '.', ''),
+                    'fraud_status' => 'accept',
+                    'settlement_time' => '2026-11-09 10:00:00',
+                ]);
+            }
+
+            return Http::response([], 404);
+        });
+
+        // Since 28 October 2026 Midtrans signs with the Signature Secret Key;
+        // the Server Key is the legacy signer. Both must verify.
+        foreach (['signature-secret-test', 'server-test'] as $signingKey) {
+            $suffix = $signingKey === 'signature-secret-test' ? 'ssk' : 'legacy';
+            $checkout = $this->postJson('/checkout/orders', $this->guestCheckout(
+                $catalog['package_id'], 'qris', 'sig-key-order-'.$suffix
+            ))->assertCreated();
+            $this->postJson('/payments/orders/'.$checkout->json('order_number'), [
+                'idempotency_key' => 'sig-key-payment-'.$suffix,
+                'access_code' => $checkout->json('access_code'),
+            ])->assertOk();
+            $payment = DB::table('payment_transactions')
+                ->where('idempotency_key', 'sig-key-payment-'.$suffix)->firstOrFail();
+
+            $gross = number_format((int) $payment->amount_idr, 2, '.', '');
+            $notification = [
+                'transaction_id' => 'sig-transaction',
+                'transaction_status' => 'settlement',
+                'status_code' => '200',
+                'order_id' => $payment->merchant_reference,
+                'gross_amount' => $gross,
+                'fraud_status' => 'accept',
+                'settlement_time' => '2026-11-09 10:00:00',
+            ];
+            $notification['signature_key'] = hash('sha512',
+                $notification['order_id'].$notification['status_code'].$notification['gross_amount'].$signingKey
+            );
+
+            $this->postJson('/api/payments/midtrans/notification', $notification)
+                ->assertOk()->assertJsonPath('status', 'ok');
+            $this->assertSame('PAID', DB::table('payment_transactions')
+                ->where('id', $payment->id)->value('status'));
+        }
+    }
+
+    public function test_midtrans_notification_signed_with_an_unrelated_key_is_rejected_when_signature_secret_key_is_configured(): void
+    {
+        $this->catalog();
+        Log::spy();
+        IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
+            'config_ciphertext' => [
+                'server_key' => 'server-test',
+                'signature_secret_key' => 'signature-secret-test',
+            ],
+            'is_active' => true,
+        ]);
+
+        $notification = [
+            'transaction_id' => 'fake',
+            'transaction_status' => 'settlement',
+            'status_code' => '200',
+            'order_id' => 'fake-order',
+            'gross_amount' => '10000.00',
+        ];
+        $notification['signature_key'] = hash('sha512',
+            $notification['order_id'].$notification['status_code'].$notification['gross_amount'].'unrelated-key'
+        );
+
+        $this->postJson('/api/payments/midtrans/notification', $notification)
+            ->assertUnauthorized();
+
+        Log::shouldHaveReceived('warning')->once()->with('Payment webhook rejected', [
+            'gateway' => 'MIDTRANS',
+            'reason' => 'INVALID_SIGNATURE',
+            'payment_transaction_id' => null,
+        ]);
+    }
+
     public function test_midtrans_notifications_with_identical_tuples_for_two_payments_are_both_processed(): void
     {
         $catalog = $this->catalog();
