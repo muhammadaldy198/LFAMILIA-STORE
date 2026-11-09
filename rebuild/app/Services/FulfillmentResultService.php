@@ -105,6 +105,13 @@ class FulfillmentResultService
                 return;
             }
 
+            // Gerbang yang sama seperti pengiriman awal: klaim rekonsiliasi
+            // sudah commit, jadi pembatalan bisa mendarat di celah sebelum
+            // panggilan ini dan tidak boleh tetap memicu transaksi provider.
+            if ($this->support->attemptCancelled($attemptId)) {
+                return;
+            }
+
             try {
                 $response = $this->digiflazz->transact($request, $attemptId);
             } catch (ValidationException $exception) {

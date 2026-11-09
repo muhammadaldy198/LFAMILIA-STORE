@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -12,17 +13,43 @@ class AdminOrderCancellationService
     {
         DB::transaction(function () use ($orderId, $adminId, $reason): void {
             $order = DB::table('orders')->where('id', $orderId)->lockForUpdate()->first();
-            if (! $order || ! in_array($order->status, ['PAID', 'FAILED', 'BLOCKED'], true)) {
+            if (! $order || ! in_array($order->status, ['PAID', 'PROCESSING', 'FAILED', 'BLOCKED'], true)) {
                 throw ValidationException::withMessages([
                     'order' => 'Pesanan tidak dapat dibatalkan pada status sekarang.',
                 ]);
             }
             $attempts = DB::table('fulfillment_attempts')->where('order_id', $orderId)
                 ->orderBy('id')->lockForUpdate()->get();
+            // Dua penghalang keras: pengiriman yang sudah BERHASIL tidak pernah
+            // bisa dibatalkan, dan pengiriman yang sedang DIKIRIM (SENDING) harus
+            // menunggu hasilnya tercatat — membatalkan di tengah panggilan
+            // provider bisa membuat provider tetap menagih dan mengirim untuk
+            // pesanan yang sudah batal. Status percobaan lain — termasuk UNKNOWN
+            // yang menggantung tanpa kepastian provider — ditutup oleh pembatalan
+            // ini; hasil provider yang datang terlambat diabaikan oleh penjaga
+            // status CANCELLED di layanan pemenuhan, jadi pesanan batal tidak
+            // hidup lagi.
             foreach ($attempts as $attempt) {
-                if (! in_array($attempt->status, ['FAILED_CONFIRMED', 'MANUAL_FAILED', 'BLOCKED'], true)) {
+                if ($attempt->status === 'SUCCESS') {
                     throw ValidationException::withMessages([
-                        'order' => 'Pengiriman masih berjalan atau belum pasti. Pastikan hasil provider sebelum membatalkan.',
+                        'order' => 'Pesanan sudah terkirim dan tidak dapat dibatalkan.',
+                    ]);
+                }
+                if ($attempt->status === 'SENDING') {
+                    throw ValidationException::withMessages([
+                        'order' => 'Pengiriman sedang dikirim ke provider. Tunggu sampai hasilnya tercatat, lalu batalkan.',
+                    ]);
+                }
+                // Klaim rekonsiliasi yang masih segar berarti panggilan pengecekan
+                // ke provider sedang atau baru saja berjalan (panggilan provider
+                // ber-timeout 15 detik; jendela 60 detik ini — sama di
+                // AdminOrderDetailController — memberi ruang longgar sampai
+                // hasilnya tercatat). Membatalkan di jendela ini bisa membuat
+                // panggilan itu tetap menagih untuk pesanan yang sudah batal.
+                if ($attempt->reconcile_claimed_at !== null
+                    && Carbon::parse($attempt->reconcile_claimed_at)->gt(now()->subSeconds(60))) {
+                    throw ValidationException::withMessages([
+                        'order' => 'Pengecekan hasil provider sedang berjalan untuk pesanan ini. Tunggu sebentar sampai selesai, lalu batalkan.',
                     ]);
                 }
             }

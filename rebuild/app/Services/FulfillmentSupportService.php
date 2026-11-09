@@ -13,7 +13,8 @@ use Illuminate\Validation\ValidationException;
  * Kotak alat bersama pemenuhan pesanan: mencatat event dan korelasi,
  * membaca dan memeriksa mapping provider, membuat attempt, menandai
  * attempt terblokir atau tidak pasti, mengeskalasi rekonsiliasi yang
- * macet, dan memenuhi pesanan dari stok voucher. Class ini TIDAK
+ * macet, memeriksa apakah attempt atau pesanannya sudah dibatalkan,
+ * dan memenuhi pesanan dari stok voucher. Class ini TIDAK
  * mengirim pesanan ke provider, TIDAK menerapkan hasil provider,
  * dan TIDAK menjalankan tindakan manual admin; ketiganya ada di
  * service pemenuhan masing-masing.
@@ -200,6 +201,25 @@ class FulfillmentSupportService
         }
 
         return $maxPrice;
+    }
+
+    /**
+     * Gerbang terakhir sebelum panggilan provider: pembatalan bisa mendarat
+     * sesudah konteks pengiriman atau rekonsiliasi disiapkan tetapi sebelum
+     * panggilan provider benar-benar dilakukan. Attempt atau order yang
+     * sudah CANCELLED tidak boleh lagi memicu panggilan itu — provider akan
+     * menagih dan mengirim untuk pesanan yang sudah batal, dan hasilnya
+     * akan dibuang oleh penjaga status CANCELLED.
+     */
+    public function attemptCancelled(int $attemptId): bool
+    {
+        $attempt = DB::table('fulfillment_attempts')->where('id', $attemptId)
+            ->first(['status', 'order_id']);
+        if (! $attempt || $attempt->status === 'CANCELLED') {
+            return true;
+        }
+
+        return DB::table('orders')->where('id', $attempt->order_id)->value('status') === 'CANCELLED';
     }
 
     public function markBlocked(int $attemptId, string $reason): void
