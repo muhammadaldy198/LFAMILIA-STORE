@@ -470,7 +470,7 @@ class CheckoutTest extends TestCase
             ->where('idempotency_key', $payload['idempotency_key'])->count());
     }
 
-    public function test_kokinpay_is_not_called_again_during_order_creation(): void
+    public function test_legacy_validation_credential_is_not_called_during_order_creation(): void
     {
         $catalog = $this->catalog([
             'nickname_check_enabled' => true,
@@ -509,7 +509,7 @@ class CheckoutTest extends TestCase
         Http::assertNothingSent();
     }
 
-    public function test_invalid_kokinpay_nickname_is_advisory_and_order_is_created(): void
+    public function test_legacy_validation_credential_does_not_block_order_creation(): void
     {
         $catalog = $this->catalog([
             'nickname_check_enabled' => true,

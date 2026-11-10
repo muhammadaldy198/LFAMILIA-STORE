@@ -43,14 +43,14 @@ class AdminM9Test extends TestCase
         ]);
     }
 
-    public function test_admin_menu_includes_account_validation_and_no_staff_role(): void
+    public function test_admin_menu_includes_game_codes_and_no_staff_role(): void
     {
         $super = $this->superAdmin();
         $menu = app(AdminPermissionService::class)->menu($super);
 
         $this->assertSame([
             'Dashboard', 'Pesanan', 'Pengiriman', 'Promo', 'Produk', 'Kategori', 'Banner & Konten',
-            'Tampilan Toko', 'Digiflazz', 'Validasi Akun', 'Provider', 'Pembayaran', 'Laporan', 'Pelanggan',
+            'Tampilan Toko', 'Digiflazz', 'Kode Game', 'Provider', 'Pembayaran', 'Laporan', 'Pelanggan',
             'Layanan Pelanggan', 'Notifikasi', 'Template Email & Notifikasi', 'Integrasi', 'Kesehatan Sistem', 'Catatan Audit',
             'Admin & Akses', 'Pengaturan',
         ], collect($menu)->pluck('label')->all());

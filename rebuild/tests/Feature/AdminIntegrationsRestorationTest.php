@@ -67,7 +67,7 @@ class AdminIntegrationsRestorationTest extends TestCase
 
         $response->assertInertia(fn (Assert $page) => $page
             ->component('Admin/Integrations')
-            ->has('integrations', 9)
+            ->has('integrations', 8)
             ->where('integrations', function ($integrations): bool {
                 $midtrans = collect($integrations)->firstWhere('code', 'midtrans');
                 $sandbox = collect($midtrans['environment_profiles']['sandbox']['fields'] ?? [])

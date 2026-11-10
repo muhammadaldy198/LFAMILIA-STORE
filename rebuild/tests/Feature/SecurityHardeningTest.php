@@ -3,9 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\AdminUser;
-use App\Models\IntegrationCredential;
 use App\Models\User;
-use App\Services\AccountValidationConfig;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -30,41 +28,8 @@ class SecurityHardeningTest extends TestCase
         $this->assertFalse($admin->isFillable('is_active'));
     }
 
-    public function test_account_validation_rejects_local_and_private_endpoints(): void
-    {
-        foreach (['https://localhost', 'https://127.0.0.1', 'https://10.0.0.1', 'https://169.254.169.254'] as $url) {
-            IntegrationCredential::updateOrCreate(
-                ['code' => 'kokinpay'],
-                [
-                    'is_active' => true,
-                    'config_ciphertext' => [
-                        'api_key' => 'test-secret',
-                        'base_url' => $url,
-                        'nickname_path' => '/nickname',
-                        'region_path' => '/region',
-                        'pln_path' => '/pln',
-                    ],
-                ]
-            );
-
-            $this->assertNull(app(AccountValidationConfig::class)->active(), $url.' must be rejected');
-        }
-    }
-
-    public function test_account_validation_rejects_hostname_that_resolves_to_private_ip(): void
-    {
-        IntegrationCredential::create([
-            'code' => 'kokinpay',
-            'is_active' => true,
-            'config_ciphertext' => [
-                'api_key' => 'test-secret',
-                'base_url' => 'https://localhost.localhost',
-                'nickname_path' => '/nickname',
-                'region_path' => '/region',
-                'pln_path' => '/pln',
-            ],
-        ]);
-
-        $this->assertNull(app(AccountValidationConfig::class)->active());
-    }
+    // The SSRF endpoint guard that used to live in AccountValidationConfig
+    // was deleted together with that class and the retired kokinpay
+    // integration (owner's order, 11 Nov 2026): no code path resolves an
+    // admin-entered validation endpoint any more.
 }

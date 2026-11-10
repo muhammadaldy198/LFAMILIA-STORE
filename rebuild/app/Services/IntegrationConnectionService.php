@@ -19,9 +19,6 @@ class IntegrationConnectionService
         try {
             return match ($code) {
                 'digiflazz' => $this->digiflazz($config),
-                'kokinpay' => $this->unverified(
-                    'Credential Validasi Akun dikonfigurasi, tetapi adapter saat ini tidak mempunyai probe non-finansial universal yang aman.'
-                ),
                 'midtrans' => $this->midtrans($config, $environment),
                 'doku' => $this->unverified(
                     'Credential DOKU dikonfigurasi, tetapi adapter pembayaran tidak mempunyai probe non-finansial yang dapat membuktikan credential tanpa membuat payment.'

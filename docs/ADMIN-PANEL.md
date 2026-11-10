@@ -80,7 +80,7 @@ Sidebar 216px, gelap, berkelompok; di HP jadi laci. Urutan, label, kelompok, dan
 | Konten | Banner & Konten | `/admin/content` | `content.manage` |
 | Konten | Tampilan Toko | `/admin/content/presentation` | `content.manage` |
 | Integrasi | Digiflazz | `/admin/digiflazz` | `providers.manage` |
-| Integrasi | Validasi Akun | `/admin/nickname-tools` | Super Admin |
+| Integrasi | Kode Game | `/admin/nickname-tools` | Super Admin |
 | Integrasi | Provider | `/admin/providers` | `providers.manage` |
 | Keuangan | Pembayaran | `/admin/payments` | `payments.manage` |
 | Keuangan | Laporan | `/admin/reports` | `reports.view` |
@@ -189,13 +189,13 @@ Format tiap halaman: **untuk apa · isi · aksi · catatan**. Nama berkas Vue ad
 **Aksi.** Sinkron daftar harga (`POST /admin/digiflazz/sync` — memengaruhi **seluruh katalog**), impor ke produk (tautan ke Produk), simpan pengaturan pemantauan, terapkan/hapus filter.
 **Catatan.** Sinkron otomatis berjalan tiap 5 menit lewat penjadwal. Sinkron manual dan otomatis memakai jalur yang sama.
 
-### 4.11 Validasi Akun — `/admin/nickname-tools`
+### 4.11 Kode Game — `/admin/nickname-tools`
 `AdminNicknameController` · Super Admin · `NicknameTools.vue`
 
-**Untuk apa.** Menguji layanan cek nama akun game.
-**Isi.** Empat tab: **Cek nama game**, **Cek server**, **Cek PLN**, **Daftar kode game**. Hasil pemeriksaan dan alamat layanan yang dipakai.
-**Aksi.** Cek data (`POST /admin/nickname-tools/check`), tambah/ubah/hapus/urutkan kode game.
-**Catatan.** Kode game di sini yang dipakai `customer_no_template` di Produk.
+**Untuk apa.** Mengatur daftar kode game yang menghubungkan produk toko ke layanan cek nama panggilan H2H.
+**Isi.** Daftar kode game: dukungan cek nama, kebutuhan server, cek region, status, dan jumlah produk yang memakai tiap kode.
+**Aksi.** Tambah/ubah/hapus/urutkan kode game.
+**Catatan.** Kode game di sini yang dibaca checkout saat memeriksa akun pembeli (lewat H2H). Alat cek manual dan integrasi Validasi Akun (kokinpay) dihapus pada 11 Nov 2026 atas keputusan pemilik; pemeriksaan manual memakai portal H2H.
 
 ### 4.12 Provider — `/admin/providers`
 `AdminProviderController` · `providers.manage` · `Providers.vue`
@@ -257,7 +257,7 @@ Format tiap halaman: **untuk apa · isi · aksi · catatan**. Nama berkas Vue ad
 `AdminIntegrationController` · Super Admin · `Integrations.vue`
 
 **Untuk apa.** Memasang kunci sambungan layanan.
-**Isi.** Sembilan tab: Digiflazz, Validasi Akun, Midtrans Snap, DOKU Checkout, Resend Email, Google OAuth, Notifikasi Telegram, Notifikasi Discord, Cloudflare Turnstile. Tiap tab: status, tiga kotak keadaan, kolom kredensial, alamat callback untuk disalin, petunjuk lipatan alamat otomatis.
+**Isi.** Delapan tab: Digiflazz, Midtrans Snap, DOKU Checkout, Resend Email, Google OAuth, Notifikasi Telegram, Notifikasi Discord, Cloudflare Turnstile. Tiap tab: status, tiga kotak keadaan, kolom kredensial, alamat callback untuk disalin, petunjuk lipatan alamat otomatis.
 **Aksi.** Simpan integrasi (`PUT /admin/integrations/{code}`), tes koneksi (`POST /admin/integrations/{code}/test`), kirim email uji (Resend), salin alamat callback, hapus data akses.
 **Catatan.** Kredensial tidak pernah ditampilkan; kosong = pertahankan, isi = ganti. Tes koneksi tidak memakai transaksi nyata. DOKU tidak bisa diaktifkan tanpa keputusan tertulis.
 
@@ -329,7 +329,7 @@ Dua peran: **Super Admin** dan **Admin**. 14 izin di `AdminPermissionService::DE
 | `settings.manage` | Pengaturan non-secret |
 | `notifications.view` | Notifikasi |
 
-**Super Admin saja (tanpa izin terpisah):** Admin & Akses, Integrasi, Kesehatan Sistem, Catatan Audit, Validasi Akun, penyesuaian saldo pelanggan.
+**Super Admin saja (tanpa izin terpisah):** Admin & Akses, Integrasi, Kesehatan Sistem, Catatan Audit, Kode Game, penyesuaian saldo pelanggan.
 
 Aturan:
 

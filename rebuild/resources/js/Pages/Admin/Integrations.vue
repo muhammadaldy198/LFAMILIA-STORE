@@ -176,7 +176,7 @@ const sendTestEmail = async () => {
             <div class="adm-card-head">
                 <div>
                     <h2>Mulai jualan top up</h2>
-                    <p>Urutan pengisian: Digiflazz untuk produk, Validasi Akun untuk cek nama panggilan, lalu Midtrans atau DOKU untuk pembayaran.</p>
+                    <p>Urutan pengisian: Digiflazz untuk produk, lalu Midtrans atau DOKU untuk pembayaran.</p>
                 </div>
             </div>
             <div class="adm-card-body">
@@ -261,10 +261,6 @@ const sendTestEmail = async () => {
                         </button>
                     </label>
                 </div>
-
-                <p v-if="current.code === 'kokinpay' && current.environment_live" class="adm-alert bad">
-                    Mode produksi aktif. Validasi nama panggilan akan memakai kuota layanan sungguhan.
-                </p>
 
                 <div v-if="current.code === 'resend'" class="adm-block full" style="margin-top:10px">
                     <strong>Kirim email uji</strong>
