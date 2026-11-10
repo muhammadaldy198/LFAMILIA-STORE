@@ -333,7 +333,6 @@ class PaymentMidtransTest extends TestCase
             'config_ciphertext' => [
                 'server_key' => 'server-test',
                 'signature_secret_key' => 'signature-secret-test',
-                'previous_signature_secret_key' => 'previous-signature-secret-test',
                 'is_production' => false,
             ],
             'is_active' => true,
@@ -362,11 +361,9 @@ class PaymentMidtransTest extends TestCase
         });
 
         // Since 28 October 2026 Midtrans signs with the Signature Secret Key;
-        // the previous Signature Secret Key covers the regeneration retry
-        // overlap, and the Server Key is the legacy signer. All must verify.
+        // the Server Key is the legacy signer. Both must verify.
         $signingKeys = [
             'ssk' => 'signature-secret-test',
-            'prev' => 'previous-signature-secret-test',
             'legacy' => 'server-test',
         ];
         foreach ($signingKeys as $suffix => $signingKey) {
@@ -422,6 +419,44 @@ class PaymentMidtransTest extends TestCase
         ];
         $notification['signature_key'] = hash('sha512',
             $notification['order_id'].$notification['status_code'].$notification['gross_amount'].'unrelated-key'
+        );
+
+        $this->postJson('/api/payments/midtrans/notification', $notification)
+            ->assertUnauthorized();
+
+        Log::shouldHaveReceived('warning')->once()->with('Payment webhook rejected', [
+            'gateway' => 'MIDTRANS',
+            'reason' => 'INVALID_SIGNATURE',
+            'payment_transaction_id' => null,
+        ]);
+    }
+
+    public function test_midtrans_notification_signed_with_a_stored_previous_signature_secret_key_is_rejected(): void
+    {
+        $this->catalog();
+        Log::spy();
+        // A credential saved while the previous-key field still existed can
+        // keep the retired value in storage. It must no longer verify: the
+        // field was removed on the owner's order (11 Nov 2026), so only the
+        // current Signature Secret Key and the Server Key remain accepted.
+        IntegrationCredential::updateOrCreate(['code' => 'midtrans'], [
+            'config_ciphertext' => [
+                'server_key' => 'server-test',
+                'signature_secret_key' => 'signature-secret-test',
+                'previous_signature_secret_key' => 'previous-signature-secret-test',
+            ],
+            'is_active' => true,
+        ]);
+
+        $notification = [
+            'transaction_id' => 'fake',
+            'transaction_status' => 'settlement',
+            'status_code' => '200',
+            'order_id' => 'fake-order',
+            'gross_amount' => '10000.00',
+        ];
+        $notification['signature_key'] = hash('sha512',
+            $notification['order_id'].$notification['status_code'].$notification['gross_amount'].'previous-signature-secret-test'
         );
 
         $this->postJson('/api/payments/midtrans/notification', $notification)

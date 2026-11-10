@@ -207,10 +207,11 @@ class PaymentWebhookController
     /**
      * Since 28 October 2026 Midtrans signs notifications with the separate
      * Signature Secret Key instead of the Server Key. Accept a signature made
-     * with the current or previous Signature Secret Key, or with the Server
-     * Key, so accounts in transition keep verifying — including the retry
-     * overlap after a Signature Secret Key regeneration — as Midtrans's own
-     * migration guidance prescribes.
+     * with the current Signature Secret Key or with the Server Key, so
+     * accounts whose Signature Secret Key still equals their pre-migration
+     * Server Key keep verifying. There is deliberately no previous-key slot:
+     * the owner removed it (11 Nov 2026) so the form carries one signature
+     * key, and a regenerated key simply replaces the stored one.
      *
      * @param  array<string, mixed>  $config
      * @param  array<string, mixed>  $payload
@@ -218,7 +219,7 @@ class PaymentWebhookController
     private function midtransSignatureMatches(array $config, array $payload): bool
     {
         $candidateKeys = [];
-        foreach (['signature_secret_key', 'previous_signature_secret_key', 'server_key'] as $field) {
+        foreach (['signature_secret_key', 'server_key'] as $field) {
             $candidate = trim((string) ($config[$field] ?? ''));
             if ($candidate !== '' && ! in_array($candidate, $candidateKeys, true)) {
                 $candidateKeys[] = $candidate;
