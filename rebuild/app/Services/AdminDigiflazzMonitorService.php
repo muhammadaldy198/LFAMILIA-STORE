@@ -87,16 +87,6 @@ class AdminDigiflazzMonitorService
         })];
     }
 
-    /**
-     * Saldo Digiflazz saat ini (rupiah) dari pembacaan cache yang sama dengan
-     * monitor admin; null bila integrasi belum dikonfigurasi atau saldo
-     * sedang tidak bisa dibaca — pemanggil menentukan sikapnya atas null.
-     */
-    public function balanceIdr(): ?int
-    {
-        return $this->connection(true)['balance_idr'] ?? null;
-    }
-
     public function health(object $item, ?array $settings = null): array
     {
         $settings ??= $this->settings();
