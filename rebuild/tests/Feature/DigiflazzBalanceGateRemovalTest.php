@@ -10,10 +10,14 @@ use App\Services\AdminDigiflazzMonitorService;
 use App\Services\CheckoutPricing;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
-class DigiflazzBalanceGateTest extends TestCase
+/**
+ * Keputusan pemilik 10 Nov 2026 (mencabut PR #386): saldo Digiflazz hanya
+ * angka pantau panel. Nominal tidak lagi disembunyikan dari customer atau
+ * ditolak saat checkout hanya karena harga seller melebihi saldo toko.
+ */
+class DigiflazzBalanceGateRemovalTest extends TestCase
 {
     use DatabaseTransactions;
 
@@ -30,18 +34,18 @@ class DigiflazzBalanceGateTest extends TestCase
 
         $product ??= Product::create([
             'category_id' => $category->id,
-            'name' => 'Produk Gerbang Saldo '.$this->suffix,
-            'slug' => 'produk-gerbang-saldo-'.$this->suffix.'-'.$priority,
+            'name' => 'Produk Tanpa Gerbang Saldo '.$this->suffix,
+            'slug' => 'produk-tanpa-gerbang-saldo-'.$this->suffix.'-'.$priority,
             'fulfillment_mode' => 'AUTO_PROVIDER',
             'margin_percent' => 12,
             'price_markup_type' => 'PERCENT',
             'price_markup_fixed_idr' => 0,
             'is_active' => true,
         ]);
-        $sku = 'GATE-'.$this->suffix.'-'.$priority;
+        $sku = 'NOGATE-'.$this->suffix.'-'.$priority;
         $package = $product->packages()->create([
-            'code' => 'GATE'.$this->suffix.$priority,
-            'name' => 'Nominal Gerbang '.$priority,
+            'code' => 'NOGATE'.$this->suffix.$priority,
+            'name' => 'Nominal Tanpa Gerbang '.$priority,
             'pricing_mode' => 'PERCENT',
             'margin_percent' => 12,
             'is_active' => true,
@@ -64,71 +68,43 @@ class DigiflazzBalanceGateTest extends TestCase
         return [$package, $mapping];
     }
 
-    private function balance(?int $balanceIdr): void
+    /**
+     * Sisa jebakan mutasi: bila suatu hari CheckoutPricing kembali membaca
+     * saldo, mock ini membuat gerbang lama menutup (saldo 28.000 < harga
+     * seller) dan tes di bawah gagal. Pada kode tanpa gerbang, mock ini
+     * tidak pernah terpakai.
+     */
+    private function balanceWouldCloseTheOldGate(): void
     {
-        $this->mock(AdminDigiflazzMonitorService::class, function ($mock) use ($balanceIdr): void {
-            $mock->shouldReceive('balanceIdr')->andReturn($balanceIdr);
+        $this->mock(AdminDigiflazzMonitorService::class, function ($mock): void {
+            $mock->shouldReceive('balanceIdr')->andReturn(28000);
         });
     }
 
-    public function test_nominal_priced_above_balance_is_not_offered_to_customers(): void
+    public function test_nominal_priced_above_store_balance_is_offered_to_customers(): void
     {
+        // Harga seller 126.877 — jauh di atas saldo toko pada kasus order 111
+        // (Rp28.803). Tanpa gerbang, nominal tetap ditawarkan ke customer.
+        $this->balanceWouldCloseTheOldGate();
         [$package] = $this->digiflazzPackage(126877);
-        $this->balance(28000);
 
-        // Checkout customer ditolak dengan pesan ketersediaan yang sudah ada.
-        try {
-            app(CheckoutPricing::class)->forPackage($package->id);
-            $this->fail('Nominal di atas saldo tidak boleh bisa di-checkout.');
-        } catch (ValidationException $exception) {
-            $this->assertArrayHasKey('package_id', $exception->errors());
-        }
+        $quote = app(CheckoutPricing::class)->forPackage($package->id);
+        $this->assertSame(126877, $quote['cost_idr']);
 
-        // Daftar nominal customer tidak memuatnya sama sekali (aturan D11).
-        $this->assertSame([], app(CheckoutPricing::class)->forPackages([$package->id]));
+        $this->assertArrayHasKey($package->id, app(CheckoutPricing::class)->forPackages([$package->id]));
 
-        // Pratinjau admin tidak digerbang: nominal tetap bisa diperiksa admin.
+        // Pratinjau admin tetap tersedia seperti sebelumnya.
         $preview = app(CheckoutPricing::class)->previewForPackage($package->id);
         $this->assertSame(126877, $preview['cost_idr']);
     }
 
-    public function test_nominal_priced_within_balance_is_offered(): void
+    public function test_seller_choice_follows_priority_not_balance(): void
     {
-        [$package] = $this->digiflazzPackage(126877);
-        $this->balance(200000);
-
-        $quote = app(CheckoutPricing::class)->forPackage($package->id);
-        $this->assertSame(126877, $quote['cost_idr']);
-        $this->assertArrayHasKey($package->id, app(CheckoutPricing::class)->forPackages([$package->id]));
-    }
-
-    public function test_unreadable_balance_keeps_the_gate_open(): void
-    {
-        [$package] = $this->digiflazzPackage(126877);
-        $this->balance(null);
-
-        $quote = app(CheckoutPricing::class)->forPackage($package->id);
-        $this->assertSame(126877, $quote['cost_idr']);
-    }
-
-    public function test_balance_read_failure_keeps_the_gate_open(): void
-    {
-        [$package] = $this->digiflazzPackage(126877);
-        $this->mock(AdminDigiflazzMonitorService::class, function ($mock): void {
-            $mock->shouldReceive('balanceIdr')->andThrow(new \RuntimeException('cache down'));
-        });
-
-        $quote = app(CheckoutPricing::class)->forPackage($package->id);
-        $this->assertSame(126877, $quote['cost_idr']);
-        $this->assertArrayHasKey($package->id, app(CheckoutPricing::class)->forPackages([$package->id]));
-    }
-
-    public function test_affordable_seller_mapping_is_used_when_the_first_exceeds_balance(): void
-    {
-        [$package] = $this->digiflazzPackage(126877, 1);
+        $this->balanceWouldCloseTheOldGate();
+        [$package, $first] = $this->digiflazzPackage(126877, 1);
 
         $provider = Provider::where('code', 'DIGIFLAZZ')->firstOrFail();
-        $cheapSku = 'GATE-'.$this->suffix.'-CHEAP';
+        $cheapSku = 'NOGATE-'.$this->suffix.'-CHEAP';
         $cheap = ProviderMapping::create([
             'product_package_id' => $package->id,
             'provider_id' => $provider->id,
@@ -143,10 +119,21 @@ class DigiflazzBalanceGateTest extends TestCase
         $this->seedCheckoutDigiflazzCatalog($package->id);
         DB::table('digiflazz_catalog_items')->where('buyer_sku_code', $cheapSku)
             ->update(['price_idr' => 20000, 'synced_at' => now()]);
-        $this->balance(28000);
+
+        // Seller prioritas pertama menang walau harganya jauh di atas saldo
+        // yang dulu akan menyaringnya keluar.
+        $quote = app(CheckoutPricing::class)->forPackage($package->id);
+        $this->assertSame($first->id, $quote['provider_mapping_id']);
+        $this->assertSame(126877, $quote['cost_idr']);
+        $this->assertNotSame($cheap->id, $quote['provider_mapping_id']);
+    }
+
+    public function test_nominal_priced_within_balance_is_still_offered(): void
+    {
+        [$package] = $this->digiflazzPackage(20000);
 
         $quote = app(CheckoutPricing::class)->forPackage($package->id);
-        $this->assertSame($cheap->id, $quote['provider_mapping_id']);
         $this->assertSame(20000, $quote['cost_idr']);
+        $this->assertArrayHasKey($package->id, app(CheckoutPricing::class)->forPackages([$package->id]));
     }
 }
