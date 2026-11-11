@@ -446,7 +446,7 @@ test('checkout locks nominal selection until the account data is complete', () =
     assert.match(product, /document\.getElementById\('lfx-payment'\)\?\.scrollIntoView\(\{ behavior: 'smooth', block: 'start' \}\);/);
     // Locked cards stay tappable (the tap is the guidance trigger) and are
     // visibly dimmed, with a hint above the grid.
-    assert.match(product, /locked:nominalLocked&&String\(selectedPackageId\)!==String\(item\.id\)/);
+    assert.match(product, /locked:nominalLocked&&item\.is_available!==false&&!packageDisabled\(item\)&&String\(selectedPackageId\)!==String\(item\.id\)/);
     assert.match(product, /<p v-if="nominalLocked" class="lfx-hint"><span>i<\/span> Isi data akun dulu untuk memilih nominal\.<\/p>/);
     assert.match(css, /\.lfx \.lfx-nominal\.locked\{opacity:\.55\}/);
 });

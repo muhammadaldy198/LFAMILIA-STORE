@@ -1114,7 +1114,7 @@ function closeReview() { summaryOpen.value = false; closeConfirmation(); }
                   <div v-if="itemsGroup.name" class="lfx-subtitle"><img v-if="itemsGroup.image_url" :src="itemsGroup.image_url" :alt="itemsGroup.name" width="34" height="34" loading="lazy" decoding="async" style="width:34px;height:34px;object-fit:cover;border-radius:8px"><span v-else class="lfx-mini-star">✦</span><h3>{{itemsGroup.name}}</h3><small>{{itemsGroup.items.length}} pilihan</small></div>
                   <div class="lfx-nominal-grid" role="radiogroup" :aria-label="itemsGroup.name || 'Pilih nominal'">
                     <div v-for="item in itemsGroup.items" :key="item.id"
-                      class="lfx-nominal" :class="{selected:String(selectedPackageId)===String(item.id),unavailable:item.is_available===false||packageDisabled(item),locked:nominalLocked&&String(selectedPackageId)!==String(item.id)}"
+                      class="lfx-nominal" :class="{selected:String(selectedPackageId)===String(item.id),unavailable:item.is_available===false||packageDisabled(item),locked:nominalLocked&&item.is_available!==false&&!packageDisabled(item)&&String(selectedPackageId)!==String(item.id)}"
                       role="radio" :aria-checked="String(selectedPackageId)===String(item.id)"
                       :aria-disabled="item.is_available===false||packageDisabled(item)" :tabindex="item.is_available===false||packageDisabled(item)?-1:0"
                       @click="choosePackage(item)"
