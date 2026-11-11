@@ -1054,6 +1054,24 @@ watch([guestEmail, guestPhone], () => {
     if (canQuote.value) contactQuoteTimer = window.setTimeout(() => { void loadQuote(); }, 350);
 });
 
+/**
+ * Drop a guided account error only once its own field passes local
+ * validation; errors for fields that are still incomplete stay visible
+ * while the buyer works through the form.
+ */
+function pruneResolvedAccountErrors() {
+    const remaining = localAccountErrors();
+    const next = { ...errors.value };
+    let changed = false;
+    for (const key of Object.keys(next)) {
+        if (key.startsWith('customer_input.') && !(key in remaining)) {
+            delete next[key];
+            changed = true;
+        }
+    }
+    if (changed) errors.value = next;
+}
+
 let nicknameAutoTimer;
 watch(() => props.fields.filter(field => field.type !== 'password').map((field) => String(customerInput[field.field_key] || '')), () => {
     accountValidationRequest += 1;
@@ -1062,7 +1080,7 @@ watch(() => props.fields.filter(field => field.type !== 'password').map((field) 
     nicknameResult.value = null;
     selectedSavedId.value = '';
     invalidateConfirmation();
-    errors.value = withoutAccountErrors();
+    pruneResolvedAccountErrors();
     nicknameChecking.value = false;
     if (nicknameAutoTimer) window.clearTimeout(nicknameAutoTimer);
     if (isVoucherProduct.value || !props.product.nickname_check_enabled || !requiredFieldsComplete.value) return;
@@ -1078,18 +1096,7 @@ watch(() => props.fields.filter(field => field.type !== 'password').map((field) 
  * follows an unlocked, valid form through selection and payment.
  */
 watch(() => props.fields.filter(field => field.type === 'password').map((field) => String(customerInput[field.field_key] || '')), () => {
-    const remaining = localAccountErrors();
-    const next = { ...errors.value };
-    let changed = false;
-    for (const field of props.fields || []) {
-        if (field.type !== 'password') continue;
-        const key = 'customer_input.' + field.field_key;
-        if (key in next && !(key in remaining)) {
-            delete next[key];
-            changed = true;
-        }
-    }
-    if (changed) errors.value = next;
+    pruneResolvedAccountErrors();
 });
 
 const channelQuotes = ref({});

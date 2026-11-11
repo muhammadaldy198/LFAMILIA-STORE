@@ -460,11 +460,16 @@ test('locked nominal cards stay clickable for automation and assistive tech', ()
     assert.doesNotMatch(product, /:aria-disabled="[^"]*nominalLocked/);
 });
 
-test('guided password errors clear on password input without nickname validation', () => {
+test('guided account errors clear per field once that field is valid', () => {
     const product = read('Pages/Catalog/Show.vue');
-    assert.match(product, /watch\(\(\) => props\.fields\.filter\(field => field\.type === 'password'\)/);
-    assert.match(product, /if \(field\.type !== 'password'\) continue;/);
+    // One pruning helper serves both input watchers: an error survives
+    // until its own field passes local validation, and the password
+    // watcher never routes the secret through nickname validation.
+    assert.match(product, /function pruneResolvedAccountErrors\(\)/);
     assert.match(product, /delete next\[key\];/);
+    assert.match(product, /watch\(\(\) => props\.fields\.filter\(field => field\.type === 'password'\)[\s\S]*?pruneResolvedAccountErrors\(\);/);
+    // Both input watchers prune; neither blanket-wipes account errors.
+    assert.equal((product.match(/pruneResolvedAccountErrors\(\);/g) || []).length, 2);
 });
 
 test('deep-linked nominal pre-selection does not bypass the account gate', () => {
