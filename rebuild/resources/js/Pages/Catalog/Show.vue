@@ -260,6 +260,10 @@ const hasAccountStep = computed(() => !isVoucherProduct.value && (props.fields |
  */
 const accountComplete = computed(() => Object.keys(localAccountErrors()).length === 0);
 const nominalLocked = computed(() => hasAccountStep.value && !accountComplete.value);
+// A deep-linked pre-selection (?package=) must not bypass the gate: while
+// the account form is incomplete the seed is dropped, and the buyer picks
+// the nominal after filling in the account data like everyone else.
+if (nominalLocked.value) selectedPackageId.value = '';
 const firstCheckoutError = computed(() => {
     for (const messages of Object.values(errors.value || {})) {
         if (Array.isArray(messages) && messages.length) return messages[0];

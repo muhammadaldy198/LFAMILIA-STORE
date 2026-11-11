@@ -466,3 +466,8 @@ test('guided password errors clear on password input without nickname validation
     assert.match(product, /if \(field\.type !== 'password'\) continue;/);
     assert.match(product, /delete next\[key\];/);
 });
+
+test('deep-linked nominal pre-selection does not bypass the account gate', () => {
+    const product = read('Pages/Catalog/Show.vue');
+    assert.match(product, /if \(nominalLocked\.value\) selectedPackageId\.value = '';/);
+});
