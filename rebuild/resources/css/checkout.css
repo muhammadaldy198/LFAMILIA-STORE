@@ -155,8 +155,6 @@
 
 .lfx .lfx-nominal{font:inherit;cursor:pointer}
 .lfx .lfx-nominal.unavailable{cursor:not-allowed;opacity:.4}
-.lfx .lfx-nominal.locked{opacity:.55}
-.lfx .lfx-nominal.locked:hover{transform:none}
 .lfx .lfx-nominal:focus-visible{outline:2px solid #c4dcff;outline-offset:2px}
 .lfx .lfx-item-art{width:29px;height:29px;object-fit:contain;border-radius:5px;flex:0 0 auto}
 @media(max-width:1023px){.lfx .lfx-nominal-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}

@@ -444,11 +444,12 @@ test('checkout locks nominal selection until the account data is complete', () =
     // A successful choice moves the buyer down to the payment section.
     assert.match(product, /if \(hasAccountStep\.value\) scrollToPayment\(\);/);
     assert.match(product, /document\.getElementById\('lfx-payment'\)\?\.scrollIntoView\(\{ behavior: 'smooth', block: 'start' \}\);/);
-    // Locked cards stay tappable (the tap is the guidance trigger) and are
-    // visibly dimmed, with a hint above the grid.
-    assert.match(product, /locked:nominalLocked&&item\.is_available!==false&&!packageDisabled\(item\)&&String\(selectedPackageId\)!==String\(item\.id\)/);
+    // Locked cards stay tappable (the tap is the guidance trigger), with a
+    // hint above the grid. The owner's rule (11 Nov 2026): locked means
+    // only "cannot be chosen" — no dimming or opacity styling at all.
     assert.match(product, /<p v-if="nominalLocked" class="lfx-hint"><span>i<\/span> Isi data akun dulu untuk memilih nominal\.<\/p>/);
-    assert.match(css, /\.lfx \.lfx-nominal\.locked\{opacity:\.55\}/);
+    assert.doesNotMatch(product, /locked:/);
+    assert.doesNotMatch(css, /lfx-nominal\.locked/);
 });
 
 test('locked nominal cards stay clickable for automation and assistive tech', () => {
