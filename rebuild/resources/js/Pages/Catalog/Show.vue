@@ -1067,6 +1067,27 @@ watch(() => props.fields.filter(field => field.type !== 'password').map((field) 
     }, 700);
 });
 
+/**
+ * Password fields stay out of the nickname watcher on purpose (the secret
+ * is never sent for validation), but their guided "wajib diisi" error must
+ * still clear once the buyer fills them in — otherwise the stale error
+ * follows an unlocked, valid form through selection and payment.
+ */
+watch(() => props.fields.filter(field => field.type === 'password').map((field) => String(customerInput[field.field_key] || '')), () => {
+    const remaining = localAccountErrors();
+    const next = { ...errors.value };
+    let changed = false;
+    for (const field of props.fields || []) {
+        if (field.type !== 'password') continue;
+        const key = 'customer_input.' + field.field_key;
+        if (key in next && !(key in remaining)) {
+            delete next[key];
+            changed = true;
+        }
+    }
+    if (changed) errors.value = next;
+});
+
 const channelQuotes = ref({});
 watch(() => currentQuoteSignature(), () => { channelQuotes.value = {}; });
 const reviewQuote = computed(() => confirmOpen.value ? confirmationSnapshot.value?.quote : quote.value);

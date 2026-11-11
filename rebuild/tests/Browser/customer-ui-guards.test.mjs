@@ -458,3 +458,10 @@ test('locked nominal cards stay clickable for automation and assistive tech', ()
     // because the tap itself is what guides the buyer to the account form.
     assert.doesNotMatch(product, /:aria-disabled="[^"]*nominalLocked/);
 });
+
+test('guided password errors clear on password input without nickname validation', () => {
+    const product = read('Pages/Catalog/Show.vue');
+    assert.match(product, /watch\(\(\) => props\.fields\.filter\(field => field\.type === 'password'\)/);
+    assert.match(product, /if \(field\.type !== 'password'\) continue;/);
+    assert.match(product, /delete next\[key\];/);
+});
