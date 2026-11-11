@@ -72,9 +72,18 @@ try{
  }
  const page=await observedPage({viewport:{width:390,height:844}});
  await page.goto(base+'/catalog/browser-checkout-game');
+ // Owner's checkout order: a nominal stays locked until the account data
+ // is filled. Tapping a locked nominal must not select it and must send
+ // the buyer back up to the account form.
+ await page.locator('.lfx-nominal').first().click();
+ await page.waitForFunction(()=>{const a=document.querySelector('#lfx-account');const r=a&&a.getBoundingClientRect();return r&&r.top>=-1&&r.top<140;});
+ if(await page.locator('.lfx-nominal.selected').count())throw Error('Locked nominal must not be selectable before account data');
+ if(!(await page.locator('.lfx-bottom-amount strong').textContent()).includes('Rp 0'))throw Error('Locked nominal must not change the total');
+ await page.locator('#lfx-account input').first().fill('12345678');
  await page.locator('.lfx-nominal').first().click();
  await page.waitForFunction(()=>/Rp/.test(document.querySelector('.lfx-bottom-amount strong')?.textContent||''));
- await page.locator('#lfx-account input').first().fill('12345678');
+ // Choosing a nominal after the account data moves the buyer down to payment.
+ await page.waitForFunction(()=>{const p=document.querySelector('#lfx-payment');const r=p&&p.getBoundingClientRect();return r&&r.top>=-1&&r.top<140;});
  await page.locator('#lfx-contact input[type=tel]').fill('081234567890');
  await page.locator('#lfx-contact input[type=email]').fill('visual-customer@example.test');
  await page.waitForTimeout(700);
@@ -117,6 +126,7 @@ try{
  await customer.locator('.lf-payment-group-main').filter({hasText:'E-Wallet'}).click();
  const paymentBackground=await customer.locator('.lfx-payment-method-card').first().evaluate(e=>getComputedStyle(e).backgroundImage);
  if(!paymentBackground.includes('62, 97, 135') || !paymentBackground.includes('49, 74, 103'))throw Error('Saved card palette did not reach payment methods: '+paymentBackground);
+ await customer.locator('#lfx-account input').first().fill('12345678');
  await customer.locator('.lfx-nominal').first().click();
  await customer.locator('.lfx-voucher-browse').click();await customer.locator('.lfx-offer-modal').waitFor();
  const voucherBackground=await customer.locator('.lfx-offer-modal').evaluate(e=>getComputedStyle(e).backgroundImage);

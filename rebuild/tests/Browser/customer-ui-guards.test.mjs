@@ -430,3 +430,49 @@ test('verified nickname uses a one-line flagged success without changing the reg
     assert.match(product, /v-else-if="regionWarning" class="lfx-region-banner lfx-region-mismatch" role="alert"/);
     assert.match(product, /\.lfx-region-line \{[^}]*color:#a7f3c4;[^}]*white-space:nowrap;[^}]*overflow-x:auto/);
 });
+
+test('checkout locks nominal selection until the account data is complete', () => {
+    const product = read('Pages/Catalog/Show.vue');
+    const css = readFileSync(new URL('../../resources/css/checkout.css', import.meta.url), 'utf8');
+    // The gate reuses the submission's own account validation and never
+    // applies to products without an account step (vouchers).
+    assert.match(product, /const accountComplete = computed\(\(\) => Object\.keys\(localAccountErrors\(\)\)\.length === 0\);/);
+    assert.match(product, /const nominalLocked = computed\(\(\) => hasAccountStep\.value && !accountComplete\.value\);/);
+    // A tap on a locked nominal guides the buyer back up instead of selecting.
+    assert.match(product, /if \(nominalLocked\.value\) \{\s+guideToAccount\(\);\s+return;\s+\}/);
+    assert.match(product, /accountEl\.scrollIntoView\(\{ behavior: 'smooth', block: 'start' \}\);/);
+    // A successful choice moves the buyer down to the payment section.
+    assert.match(product, /if \(hasAccountStep\.value\) scrollToPayment\(\);/);
+    assert.match(product, /document\.getElementById\('lfx-payment'\)\?\.scrollIntoView\(\{ behavior: 'smooth', block: 'start' \}\);/);
+    // Locked cards stay tappable (the tap is the guidance trigger), with a
+    // hint above the grid. The owner's rule (11 Nov 2026): locked means
+    // only "cannot be chosen" — no dimming or opacity styling at all.
+    assert.match(product, /<p v-if="nominalLocked" class="lfx-hint"><span>i<\/span> Isi data akun dulu untuk memilih nominal\.<\/p>/);
+    assert.doesNotMatch(product, /locked:/);
+    assert.doesNotMatch(css, /lfx-nominal\.locked/);
+});
+
+test('locked nominal cards stay clickable for automation and assistive tech', () => {
+    const product = read('Pages/Catalog/Show.vue');
+    // Playwright (and some assistive tech) refuses to activate elements
+    // with aria-disabled=true; a locked card must stay activatable
+    // because the tap itself is what guides the buyer to the account form.
+    assert.doesNotMatch(product, /:aria-disabled="[^"]*nominalLocked/);
+});
+
+test('guided account errors clear per field once that field is valid', () => {
+    const product = read('Pages/Catalog/Show.vue');
+    // One pruning helper serves both input watchers: an error survives
+    // until its own field passes local validation, and the password
+    // watcher never routes the secret through nickname validation.
+    assert.match(product, /function pruneResolvedAccountErrors\(\)/);
+    assert.match(product, /delete next\[key\];/);
+    assert.match(product, /watch\(\(\) => props\.fields\.filter\(field => field\.type === 'password'\)[\s\S]*?pruneResolvedAccountErrors\(\);/);
+    // Both input watchers prune; neither blanket-wipes account errors.
+    assert.equal((product.match(/pruneResolvedAccountErrors\(\);/g) || []).length, 2);
+});
+
+test('deep-linked nominal pre-selection does not bypass the account gate', () => {
+    const product = read('Pages/Catalog/Show.vue');
+    assert.match(product, /if \(nominalLocked\.value\) selectedPackageId\.value = '';/);
+});

@@ -55,7 +55,8 @@ Pembeli bisa **tanpa akun (guest)** atau **dengan akun (member)**. Guest wajib m
 ## 3. Alur utama
 
 ```
-Pilih produk → pilih nominal → isi data tujuan → (cek nama, jika tersedia)
+Pilih produk → isi data tujuan → (cek nama, jika tersedia) → pilih nominal → pilih pembayaran
+(Nominal terkunci sampai data tujuan terisi; mengetuk nominal yang terkunci menggulir pembeli kembali ke data tujuan. Sesudah nominal dipilih, halaman menggulir ke pembayaran. Keputusan pemilik 11 Nov 2026.)
       ↓
 Checkout: server hitung harga, voucher, biaya kanal → pesanan dibuat (status: menunggu pembayaran)
       ↓
@@ -159,12 +160,13 @@ Kalau pembeli salah mengisi ID/server, dan penyedia sudah mengirim sesuai data i
 
 Urutan yang mengikat:
 
-1. Pembeli memilih produk dan nominal.
-2. Mengisi data tujuan.
-3. Server menghitung: harga dasar, diskon voucher, biaya kanal, total.
-4. Pembeli memilih metode pembayaran yang **sedang aktif**.
-5. Pesanan dibuat dengan nomor unik dan masa berlaku.
-6. Pembayaran disiapkan; pembeli diarahkan ke halaman bayar.
+1. Pembeli memilih produk.
+2. Mengisi data tujuan. Nominal terkunci sampai data tujuan terisi lengkap; mengetuk nominal yang terkunci menggulir pembeli kembali ke data tujuan (keputusan pemilik 11 Nov 2026).
+3. Pembeli memilih nominal; halaman menggulir ke bagian metode pembayaran.
+4. Server menghitung: harga dasar, diskon voucher, biaya kanal, total.
+5. Pembeli memilih metode pembayaran yang **sedang aktif**.
+6. Pesanan dibuat dengan nomor unik dan masa berlaku.
+7. Pembayaran disiapkan; pembeli diarahkan ke halaman bayar.
 
 Aturan:
 

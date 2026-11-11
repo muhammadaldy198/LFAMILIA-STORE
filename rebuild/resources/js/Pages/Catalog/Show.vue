@@ -251,6 +251,19 @@ const summarySubtotal = computed(() => quote.value?.subtotal_idr ?? selectedPack
 const displayTotal = computed(() => quote.value?.total_idr ?? null);
 const isVoucherProduct = computed(() => String(props.product?.category_slug || '').toLowerCase() === 'voucher');
 const hasAccountStep = computed(() => !isVoucherProduct.value && (props.fields || []).length > 0);
+/**
+ * The owner's checkout order (11 Nov 2026): a nominal may only be chosen
+ * after the account data is filled in. The gate is the same local account
+ * validation the order submission uses, so a nominal never unlocks for
+ * data the checkout would reject. Products without an account step
+ * (vouchers) are never locked.
+ */
+const accountComplete = computed(() => Object.keys(localAccountErrors()).length === 0);
+const nominalLocked = computed(() => hasAccountStep.value && !accountComplete.value);
+// A deep-linked pre-selection (?package=) must not bypass the gate: while
+// the account form is incomplete the seed is dropped, and the buyer picks
+// the nominal after filling in the account data like everyone else.
+if (nominalLocked.value) selectedPackageId.value = '';
 const firstCheckoutError = computed(() => {
     for (const messages of Object.values(errors.value || {})) {
         if (Array.isArray(messages) && messages.length) return messages[0];
@@ -705,8 +718,37 @@ async function checkNickname() {
     return promise;
 }
 
+/**
+ * Send a buyer who taps a locked nominal back to the account form: show
+ * which fields are missing, scroll up to the form, and focus the first
+ * field that still needs data.
+ */
+function guideToAccount() {
+    errors.value = { ...withoutAccountErrors(), ...localAccountErrors() };
+    const accountEl = document.getElementById('lfx-account');
+    if (!accountEl) return;
+    accountEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const firstInvalidIndex = (props.fields || []).findIndex((field) => fieldError(field.field_key));
+    window.setTimeout(() => {
+        const labels = accountEl.querySelectorAll('.lfx-field-grid .lfx-field');
+        const label = (firstInvalidIndex >= 0 ? labels[firstInvalidIndex] : null) || labels[0];
+        label?.querySelector('input, select')?.focus({ preventScroll: true });
+    }, 450);
+}
+
+/** Move the buyer to the payment section once a nominal is chosen. */
+function scrollToPayment() {
+    void nextTick(() => {
+        document.getElementById('lfx-payment')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+}
+
 function choosePackage(item) {
     if (item.is_available === false || packageDisabled(item) || busy.value === 'order' || busy.value === 'payment') return;
+    if (nominalLocked.value) {
+        guideToAccount();
+        return;
+    }
     selectedPackageId.value = String(item.id);
     if (errors.value.voucher_code?.[0] === 'Pilih nominal terlebih dahulu untuk melihat voucher yang tersedia.') {
         const { voucher_code: _voucherCodeError, ...remainingErrors } = errors.value;
@@ -714,6 +756,7 @@ function choosePackage(item) {
     }
     invalidateQuote();
     if (canQuote.value) void loadQuote();
+    if (hasAccountStep.value) scrollToPayment();
 }
 
 async function choosePayment(code) {
@@ -1011,6 +1054,24 @@ watch([guestEmail, guestPhone], () => {
     if (canQuote.value) contactQuoteTimer = window.setTimeout(() => { void loadQuote(); }, 350);
 });
 
+/**
+ * Drop a guided account error only once its own field passes local
+ * validation; errors for fields that are still incomplete stay visible
+ * while the buyer works through the form.
+ */
+function pruneResolvedAccountErrors() {
+    const remaining = localAccountErrors();
+    const next = { ...errors.value };
+    let changed = false;
+    for (const key of Object.keys(next)) {
+        if (key.startsWith('customer_input.') && !(key in remaining)) {
+            delete next[key];
+            changed = true;
+        }
+    }
+    if (changed) errors.value = next;
+}
+
 let nicknameAutoTimer;
 watch(() => props.fields.filter(field => field.type !== 'password').map((field) => String(customerInput[field.field_key] || '')), () => {
     accountValidationRequest += 1;
@@ -1019,13 +1080,23 @@ watch(() => props.fields.filter(field => field.type !== 'password').map((field) 
     nicknameResult.value = null;
     selectedSavedId.value = '';
     invalidateConfirmation();
-    errors.value = withoutAccountErrors();
+    pruneResolvedAccountErrors();
     nicknameChecking.value = false;
     if (nicknameAutoTimer) window.clearTimeout(nicknameAutoTimer);
     if (isVoucherProduct.value || !props.product.nickname_check_enabled || !requiredFieldsComplete.value) return;
     nicknameAutoTimer = window.setTimeout(() => {
         void checkNickname();
     }, 700);
+});
+
+/**
+ * Password fields stay out of the nickname watcher on purpose (the secret
+ * is never sent for validation), but their guided "wajib diisi" error must
+ * still clear once the buyer fills them in — otherwise the stale error
+ * follows an unlocked, valid form through selection and payment.
+ */
+watch(() => props.fields.filter(field => field.type === 'password').map((field) => String(customerInput[field.field_key] || '')), () => {
+    pruneResolvedAccountErrors();
 });
 
 const channelQuotes = ref({});
@@ -1069,6 +1140,7 @@ function closeReview() { summaryOpen.value = false; closeConfirmation(); }
             <section id="lfx-nominal" class="lfx-panel">
               <header class="lfx-panel-header"><span class="lfx-number">2</span><div><h2>{{customerText("checkout.nominal_title", "Pilih Nominal")}}</h2></div></header>
               <div class="lfx-panel-content">
+                <p v-if="nominalLocked" class="lfx-hint"><span>i</span> Isi data akun dulu untuk memilih nominal.</p>
                 <div v-if="packageTabs.length" class="lfx-category-tabs" role="tablist" aria-label="Kategori dari LFAMILIA"><button v-for="item in packageTabs" :key="item" role="tab" :aria-selected="(activePackageTab||packageTabs[0])===item" :class="{active:(activePackageTab||packageTabs[0])===item}" @click="activePackageTab=item">{{item}}</button></div>
                 <section v-for="itemsGroup in visiblePackageGroups" :key="itemsGroup.name||'default'" class="lfx-nominal-group">
                   <div v-if="itemsGroup.name" class="lfx-subtitle"><img v-if="itemsGroup.image_url" :src="itemsGroup.image_url" :alt="itemsGroup.name" width="34" height="34" loading="lazy" decoding="async" style="width:34px;height:34px;object-fit:cover;border-radius:8px"><span v-else class="lfx-mini-star">✦</span><h3>{{itemsGroup.name}}</h3><small>{{itemsGroup.items.length}} pilihan</small></div>
@@ -1077,9 +1149,9 @@ function closeReview() { summaryOpen.value = false; closeConfirmation(); }
                       class="lfx-nominal" :class="{selected:String(selectedPackageId)===String(item.id),unavailable:item.is_available===false||packageDisabled(item)}"
                       role="radio" :aria-checked="String(selectedPackageId)===String(item.id)"
                       :aria-disabled="item.is_available===false||packageDisabled(item)" :tabindex="item.is_available===false||packageDisabled(item)?-1:0"
-                      @click="item.is_available!==false&&!packageDisabled(item)&&choosePackage(item)"
-                      @keydown.enter.prevent="item.is_available!==false&&!packageDisabled(item)&&choosePackage(item)"
-                      @keydown.space.prevent="item.is_available!==false&&!packageDisabled(item)&&choosePackage(item)">
+                      @click="choosePackage(item)"
+                      @keydown.enter.prevent="choosePackage(item)"
+                      @keydown.space.prevent="choosePackage(item)">
                       <span class="lfx-check" aria-hidden="true">{{String(selectedPackageId)===String(item.id)?'✓':''}}</span>
                       <span class="lfx-nominal-top">
                         <span class="lfx-nominal-name"><strong>{{item.name}}</strong><small>{{item.group_name||product.name}}</small></span>
