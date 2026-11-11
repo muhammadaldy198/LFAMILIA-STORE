@@ -10,6 +10,7 @@ use App\Models\Product;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class AdminNicknameToolsTest extends TestCase
@@ -156,7 +157,12 @@ class AdminNicknameToolsTest extends TestCase
         $this->assertSame($ids, $actual);
     }
 
-    public function test_validation_page_exposes_non_secret_config_only(): void
+    /**
+     * The retired kokinpay credential stays inert: the page no longer
+     * receives a validation config prop at all, so neither the stored
+     * secret nor the legacy base URL can leak into the browser.
+     */
+    public function test_game_code_page_no_longer_exposes_validation_config(): void
     {
         $this->login();
         IntegrationCredential::create([
@@ -174,6 +180,21 @@ class AdminNicknameToolsTest extends TestCase
         $response = $this->get('/admin/nickname-tools')->assertOk();
 
         $response->assertDontSee('must-not-leak-secret');
-        $response->assertSee('example.com');
+        $response->assertDontSee('example.com');
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('Admin/NicknameTools')
+            ->has('gameCodes')
+            ->missing('validationConfig'));
+    }
+
+    public function test_manual_check_endpoint_is_gone(): void
+    {
+        $this->login();
+
+        $this->postJson('/admin/nickname-tools/check', [
+            'action' => 'game',
+            'game_code' => 'free-fire',
+            'user_id' => '123456',
+        ])->assertNotFound();
     }
 }

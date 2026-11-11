@@ -21,7 +21,7 @@ Satu-satunya sumber menu adalah `AdminPermissionService::menu()`. Urutan dan kel
 **Transaksi** — Pesanan · Pengiriman · Promo
 **Katalog** — Produk · Kategori
 **Konten** — Banner & Konten · Tampilan Toko
-**Integrasi** — Digiflazz · Validasi Akun *(khusus super)* · Provider
+**Integrasi** — Digiflazz · Kode Game *(khusus super)* · Provider
 **Keuangan** — Pembayaran · Laporan
 **Pelanggan** — Pelanggan · Layanan Pelanggan
 **Sistem** — Notifikasi · Template Email & Notifikasi · Integrasi *(khusus super)* · Kesehatan Sistem *(khusus super)* · Catatan Audit *(khusus super)*
@@ -38,7 +38,7 @@ Satu-satunya sumber menu adalah `AdminPermissionService::menu()`. Urutan dan kel
 - **Banner & Konten** — aset dan konten etalase; bukan tempat menyimpan secret.
 - **Tampilan Toko** — pengaturan tampilan etalase.
 - **Digiflazz** — monitor katalog dan sinkronisasi; kredensialnya tetap di Integrasi, bukan di sini.
-- **Validasi Akun** — perkakas pemeriksa nickname dan kode game.
+- **Kode Game** — daftar kode game untuk cek nickname produk lewat H2H.
 - **Provider** — registry provider dan kesehatan mapping; bukan editor secret.
 - **Pembayaran** — channel, keadaan gateway, maintenance, routing, QRIS Manual, dan kontrol top-up. Kredensial tidak dimasukkan lewat rute pembayaran.
 - **Laporan** — angka operasional; keuangan sensitif dibatasi untuk Super Admin.

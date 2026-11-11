@@ -63,7 +63,7 @@ class AdminPermissionService
             ['label' => 'Banner & Konten', 'href' => '/admin/content', 'group' => 'Konten', 'permission' => 'content.manage'],
             ['label' => 'Tampilan Toko', 'href' => '/admin/content/presentation', 'group' => 'Konten', 'permission' => 'content.manage'],
             ['label' => 'Digiflazz', 'href' => '/admin/digiflazz', 'group' => 'Integrasi', 'permission' => 'providers.manage'],
-            ['label' => 'Validasi Akun', 'href' => '/admin/nickname-tools', 'group' => 'Integrasi', 'permission' => null, 'super_only' => true],
+            ['label' => 'Kode Game', 'href' => '/admin/nickname-tools', 'group' => 'Integrasi', 'permission' => null, 'super_only' => true],
             ['label' => 'Provider', 'href' => '/admin/providers', 'group' => 'Integrasi', 'permission' => 'providers.manage'],
             ['label' => 'Pembayaran', 'href' => '/admin/payments', 'group' => 'Keuangan', 'permission' => 'payments.manage'],
             ['label' => 'Laporan', 'href' => '/admin/reports', 'group' => 'Keuangan', 'permission' => 'reports.view'],

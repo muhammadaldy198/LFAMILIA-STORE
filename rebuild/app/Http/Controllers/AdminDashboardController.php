@@ -146,7 +146,7 @@ class AdminDashboardController
             $records = IntegrationCredential::get(['code', 'is_active'])->keyBy('code');
             $health = DB::table('system_settings')->where('key', 'like', 'integration.health.%')->pluck('value', 'key');
             foreach ($registry->all() as $code => $definition) {
-                if (! $finance && ! (($canProviders && in_array($code, ['digiflazz', 'kokinpay'], true)) || ($permissions->allows($admin, 'payments.manage') && in_array($code, ['midtrans', 'doku'], true)))) {
+                if (! $finance && ! (($canProviders && in_array($code, ['digiflazz'], true)) || ($permissions->allows($admin, 'payments.manage') && in_array($code, ['midtrans', 'doku'], true)))) {
                     continue;
                 }
                 $active = (bool) ($records->get($code)?->is_active);

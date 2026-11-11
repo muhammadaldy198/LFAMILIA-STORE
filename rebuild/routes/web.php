@@ -260,8 +260,6 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
     Route::middleware('admin.super')->prefix('admin/nickname-tools')
         ->name('admin.nickname-tools.')->group(function (): void {
             Route::get('/', [AdminNicknameController::class, 'index'])->name('index');
-            Route::post('/check', [AdminNicknameController::class, 'check'])
-                ->middleware('throttle:admin-sensitive')->name('check');
             Route::post('/game-codes', [AdminNicknameController::class, 'storeGameCode'])
                 ->middleware('throttle:admin-sensitive')->name('game-codes.store');
             Route::put('/game-codes/reorder', [AdminNicknameController::class, 'reorderGameCodes'])

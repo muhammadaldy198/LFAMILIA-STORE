@@ -74,7 +74,7 @@ class AdminHealthRestorationTest extends TestCase
         $response->assertInertia(fn (Assert $page) => $page
             ->component('Admin/Health')
             ->has('checks', 8)
-            ->has('integrations', 9)
+            ->has('integrations', 8)
             ->has('gateways', 4)
             ->where('integrations.0.code', 'digiflazz')
             ->where('integrations.0.status', 'HEALTHY')
@@ -156,7 +156,7 @@ class AdminHealthRestorationTest extends TestCase
             'tested_at' => now()->toIso8601String(),
         ]);
         $this->get('/admin/health')->assertOk()->assertInertia(
-            fn (Assert $page) => $page->where('integrations.3.status', 'CONFIGURED')
+            fn (Assert $page) => $page->where('integrations.2.status', 'CONFIGURED')
         );
         $this->setSetting('integration.health.doku', [
             'status' => 'DOWN',
@@ -165,7 +165,7 @@ class AdminHealthRestorationTest extends TestCase
             'tested_at' => now()->toIso8601String(),
         ]);
         $this->get('/admin/health')->assertOk()->assertInertia(
-            fn (Assert $page) => $page->where('integrations.3.status', 'DOWN')->where('summary.overall', 'DOWN')
+            fn (Assert $page) => $page->where('integrations.2.status', 'DOWN')->where('summary.overall', 'DOWN')
         );
     }
 
@@ -224,9 +224,9 @@ class AdminHealthRestorationTest extends TestCase
         $response = $this->get('/admin/health')->assertOk();
 
         $response->assertInertia(fn (Assert $page) => $page
-            ->where('integrations.3.code', 'doku')
-            ->where('integrations.3.status', 'MAINTENANCE')
-            ->where('integrations.3.message', 'Gateway sedang dalam mode maintenance.'));
+            ->where('integrations.2.code', 'doku')
+            ->where('integrations.2.status', 'MAINTENANCE')
+            ->where('integrations.2.message', 'Gateway sedang dalam mode maintenance.'));
 
         $this->assertStringNotContainsString('health-doku-secret', $response->getContent());
     }

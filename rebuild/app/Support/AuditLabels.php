@@ -26,8 +26,8 @@ final class AuditLabels
         'review' => 'Banner & Konten',
         'faq' => 'Banner & Konten',
         'digiflazz' => 'Digiflazz',
-        'nickname' => 'Validasi Akun',
-        'nickname_game_code' => 'Validasi Akun',
+        'nickname' => 'Kode Game',
+        'nickname_game_code' => 'Kode Game',
         'provider' => 'Penyedia',
         'payment' => 'Pembayaran',
         'customer' => 'Pelanggan',
@@ -213,10 +213,10 @@ final class AuditLabels
         'customer.membership.updated' => 'Pelanggan — tingkatan pelanggan diperbarui',
         'customer.wallet.adjusted' => 'Pelanggan — saldo pelanggan disesuaikan',
 
-        'nickname_game_code.created' => 'Validasi Akun — kode game ditambahkan',
-        'nickname_game_code.updated' => 'Validasi Akun — kode game diperbarui',
-        'nickname_game_code.deleted' => 'Validasi Akun — kode game dihapus',
-        'nickname_game_code.reordered' => 'Validasi Akun — urutan kode game diubah',
+        'nickname_game_code.created' => 'Kode Game — kode game ditambahkan',
+        'nickname_game_code.updated' => 'Kode Game — kode game diperbarui',
+        'nickname_game_code.deleted' => 'Kode Game — kode game dihapus',
+        'nickname_game_code.reordered' => 'Kode Game — urutan kode game diubah',
 
         'provider.updated' => 'Penyedia — penyedia layanan diperbarui',
 

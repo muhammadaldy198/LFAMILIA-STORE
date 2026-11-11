@@ -6,7 +6,6 @@ use App\Models\Category;
 use App\Models\IntegrationCredential;
 use App\Models\NicknameGameCode;
 use App\Models\Product;
-use App\Services\AccountValidationConfig;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -50,23 +49,6 @@ class CheckoutAccountValidationTest extends TestCase
         ]);
 
         return $product;
-    }
-
-    public function test_testing_dns_fallback_is_restricted_to_explicit_fixture_host(): void
-    {
-        IntegrationCredential::create([
-            'code' => 'kokinpay',
-            'config_ciphertext' => [
-                'api_key' => 'test-secret',
-                'base_url' => 'https://no-dns-record.invalid',
-                'nickname_path' => '/nickname',
-                'region_path' => '/region',
-                'pln_path' => '/pln',
-            ],
-            'is_active' => true,
-        ]);
-
-        $this->assertNull(app(AccountValidationConfig::class)->active());
     }
 
     public function test_account_validation_rejects_missing_required_field(): void

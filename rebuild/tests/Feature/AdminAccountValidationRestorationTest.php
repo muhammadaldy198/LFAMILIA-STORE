@@ -4,12 +4,10 @@ namespace Tests\Feature;
 
 use App\Models\AdminUser;
 use App\Models\Category;
-use App\Models\IntegrationCredential;
 use App\Models\NicknameGameCode;
 use App\Models\Product;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class AdminAccountValidationRestorationTest extends TestCase
@@ -176,65 +174,6 @@ class AdminAccountValidationRestorationTest extends TestCase
         ]);
     }
 
-    public function test_region_check_follows_editable_database_flag_instead_of_hardcoded_game_name(): void
-    {
-        $this->actingAs($this->superAdmin(), 'admin');
-
-        NicknameGameCode::where('code', 'mobile-legends')->update([
-            'supports_nickname_check' => true,
-            'requires_region_check' => false,
-        ]);
-        NicknameGameCode::where('code', 'free-fire')->update([
-            'supports_nickname_check' => true,
-            'requires_server' => true,
-            'requires_region_check' => true,
-        ]);
-
-        IntegrationCredential::updateOrCreate(
-            ['code' => 'kokinpay'],
-            [
-                'config_ciphertext' => [
-                    'api_key' => 'test-secret',
-                    'base_url' => 'https://example.com',
-                    'nickname_path' => '/nickname',
-                    'region_path' => '/region',
-                    'pln_path' => '/pln',
-                ],
-                'is_active' => true,
-            ],
-        );
-
-        Http::fake([
-            'https://example.com/nickname' => Http::response([
-                'status' => true,
-                'data' => ['nickname' => 'FreeFirePlayer'],
-            ]),
-            'https://example.com/region' => Http::response([
-                'status' => true,
-                'data' => ['region' => 'ID'],
-            ]),
-        ]);
-
-        $this->postJson('/admin/nickname-tools/check', [
-            'action' => 'region',
-            'game_code' => 'free-fire',
-            'user_id' => '123456',
-            'server' => '9001',
-        ])->assertOk()
-            ->assertJsonPath('nickname', 'FreeFirePlayer')
-            ->assertJsonPath('region', 'ID');
-
-        $this->postJson('/admin/nickname-tools/check', [
-            'action' => 'region',
-            'game_code' => 'mobile-legends',
-            'user_id' => '123456',
-            'server' => '9001',
-        ])->assertUnprocessable()
-            ->assertJsonValidationErrors(['game_code']);
-
-        Http::assertSentCount(2);
-    }
-
     public function test_regular_admin_cannot_mutate_account_validation_rules(): void
     {
         $admin = $this->createAdmin([
@@ -369,12 +308,5 @@ class AdminAccountValidationRestorationTest extends TestCase
         $this->assertFalse($row->supports_nickname_check);
         $this->assertFalse($row->requires_server);
         $this->assertFalse($row->requires_region_check);
-
-        $this->postJson('/admin/nickname-tools/check', [
-            'action' => 'game',
-            'game_code' => $row->code,
-            'user_id' => '123456',
-        ])->assertUnprocessable()
-            ->assertJsonValidationErrors(['game_code']);
     }
 }

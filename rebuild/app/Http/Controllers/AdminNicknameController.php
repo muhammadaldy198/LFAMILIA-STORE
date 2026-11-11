@@ -3,9 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\NicknameGameCode;
-use App\Services\AccountValidationConfig;
 use App\Services\AdminAuditService;
-use App\Services\AdminNicknameToolsService;
+use App\Services\AdminGameCodeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -13,77 +12,20 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
-use RuntimeException;
 
 class AdminNicknameController
 {
     public function index(
-        AdminNicknameToolsService $tools,
-        AccountValidationConfig $config,
+        AdminGameCodeService $gameCodes,
     ): Response {
         return Inertia::render('Admin/NicknameTools', [
-            'gameCodes' => $tools->gameCodes(),
-            'validationConfig' => $config->summary(),
+            'gameCodes' => $gameCodes->gameCodes(),
         ]);
-    }
-
-    public function check(Request $request, AdminNicknameToolsService $tools): JsonResponse
-    {
-        $data = $request->validate([
-            'action' => ['required', Rule::in(['game', 'region', 'pln'])],
-            'game_code' => ['nullable', 'string', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/', 'max:100'],
-            'user_id' => ['nullable', 'string', 'min:2', 'max:80'],
-            'server' => ['nullable', 'string', 'max:40'],
-            'customer_number' => ['nullable', 'regex:/^\d{11,12}$/'],
-        ]);
-
-        try {
-            if ($data['action'] === 'game') {
-                validator($data, [
-                    'game_code' => ['required'],
-                    'user_id' => ['required'],
-                ])->validate();
-
-                $result = $tools->checkGame(
-                    $data['game_code'],
-                    $data['user_id'],
-                    $data['server'] ?? null,
-                );
-
-                return response()->json(['ok' => true, ...$result])
-                    ->header('Cache-Control', 'no-store');
-            }
-
-            if ($data['action'] === 'region') {
-                validator($data, [
-                    'game_code' => ['required'],
-                    'user_id' => ['required'],
-                    'server' => ['required'],
-                ])->validate();
-
-                return response()->json([
-                    'ok' => true,
-                    ...$tools->checkRegion($data['game_code'], $data['user_id'], $data['server']),
-                ])->header('Cache-Control', 'no-store');
-            }
-
-            validator($data, ['customer_number' => ['required']])->validate();
-
-            return response()->json([
-                'ok' => true,
-                'customer_name' => $tools->checkPln($data['customer_number']),
-            ])->header('Cache-Control', 'no-store');
-        } catch (ValidationException $exception) {
-            throw $exception;
-        } catch (RuntimeException $exception) {
-            return response()->json(['message' => $exception->getMessage()], 503)
-                ->header('Cache-Control', 'no-store');
-        }
     }
 
     public function storeGameCode(
         Request $request,
-        AdminNicknameToolsService $tools,
+        AdminGameCodeService $tools,
         AdminAuditService $audit,
     ): JsonResponse {
         $data = $this->validatedGameCode($request);
@@ -106,7 +48,7 @@ class AdminNicknameController
     public function updateGameCode(
         Request $request,
         NicknameGameCode $gameCode,
-        AdminNicknameToolsService $tools,
+        AdminGameCodeService $tools,
         AdminAuditService $audit,
     ): JsonResponse {
         $before = $gameCode->toArray();
@@ -169,7 +111,7 @@ class AdminNicknameController
     public function destroyGameCode(
         Request $request,
         NicknameGameCode $gameCode,
-        AdminNicknameToolsService $tools,
+        AdminGameCodeService $tools,
         AdminAuditService $audit,
     ): JsonResponse {
         $usage = DB::table('products')
@@ -198,7 +140,7 @@ class AdminNicknameController
 
     public function reorderGameCodes(
         Request $request,
-        AdminNicknameToolsService $tools,
+        AdminGameCodeService $tools,
         AdminAuditService $audit,
     ): JsonResponse {
         $data = $request->validate([
@@ -281,7 +223,7 @@ class AdminNicknameController
         return $data;
     }
 
-    private function gameCodesResponse(AdminNicknameToolsService $tools, int $status = 200): JsonResponse
+    private function gameCodesResponse(AdminGameCodeService $tools, int $status = 200): JsonResponse
     {
         return response()->json([
             'ok' => true,

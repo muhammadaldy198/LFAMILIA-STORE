@@ -305,7 +305,7 @@ class AdminProductController
                 ->first();
             if (! $nicknameGame) {
                 throw ValidationException::withMessages([
-                    'nickname_game_code' => 'Pilih game aktif yang mendukung cek nickname di menu Validasi Akun.',
+                    'nickname_game_code' => 'Pilih game aktif yang mendukung cek nickname di menu Kode Game.',
                 ]);
             }
 

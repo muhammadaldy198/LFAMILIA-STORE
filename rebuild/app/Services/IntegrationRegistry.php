@@ -48,45 +48,6 @@ class IntegrationRegistry
                 ],
                 'note' => 'Khusus transaksi Digiflazz Production menggunakan API key yang aktif.',
             ],
-            'kokinpay' => [
-                'name' => 'Validasi Akun',
-                'group' => 'Pengecekan akun',
-                'description' => 'API pengecekan nickname, region MLBB, dan pelanggan PLN.',
-                'environment_note' => 'Integrasi hanya memakai endpoint layanan yang aktif.',
-                'fields' => [
-                    'api_key' => [
-                        'label' => 'Kunci akses',
-                        'secret' => true,
-                        'required' => true,
-                        'help' => 'Kunci akses layanan validasi akun.',
-                    ],
-                    'base_url' => [
-                        'label' => 'Alamat layanan',
-                        'secret' => false,
-                        'required' => true,
-                        'help' => 'Alamat dasar API validasi. Wajib HTTPS.',
-                    ],
-                    'nickname_path' => [
-                        'label' => 'Alamat cek nama panggilan',
-                        'secret' => false,
-                        'required' => true,
-                        'help' => 'Path endpoint cek nickname, misalnya /api/check-nickname.',
-                    ],
-                    'region_path' => [
-                        'label' => 'Alamat cek server MLBB',
-                        'secret' => false,
-                        'required' => true,
-                        'help' => 'Path endpoint cek region MLBB.',
-                    ],
-                    'pln_path' => [
-                        'label' => 'Alamat cek pelanggan PLN',
-                        'secret' => false,
-                        'required' => true,
-                        'help' => 'Path endpoint cek nama pelanggan PLN.',
-                    ],
-                ],
-                'note' => 'Hanya game yang ditandai mendukung cek nickname yang memakai integrasi ini saat checkout.',
-            ],
             'midtrans' => [
                 'name' => 'Midtrans Snap',
                 'group' => 'Pembayaran',
