@@ -1116,7 +1116,7 @@ function closeReview() { summaryOpen.value = false; closeConfirmation(); }
                     <div v-for="item in itemsGroup.items" :key="item.id"
                       class="lfx-nominal" :class="{selected:String(selectedPackageId)===String(item.id),unavailable:item.is_available===false||packageDisabled(item),locked:nominalLocked&&String(selectedPackageId)!==String(item.id)}"
                       role="radio" :aria-checked="String(selectedPackageId)===String(item.id)"
-                      :aria-disabled="item.is_available===false||packageDisabled(item)||nominalLocked" :tabindex="item.is_available===false||packageDisabled(item)?-1:0"
+                      :aria-disabled="item.is_available===false||packageDisabled(item)" :tabindex="item.is_available===false||packageDisabled(item)?-1:0"
                       @click="choosePackage(item)"
                       @keydown.enter.prevent="choosePackage(item)"
                       @keydown.space.prevent="choosePackage(item)">

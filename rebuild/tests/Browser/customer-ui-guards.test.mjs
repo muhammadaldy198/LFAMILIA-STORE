@@ -450,3 +450,11 @@ test('checkout locks nominal selection until the account data is complete', () =
     assert.match(product, /<p v-if="nominalLocked" class="lfx-hint"><span>i<\/span> Isi data akun dulu untuk memilih nominal\.<\/p>/);
     assert.match(css, /\.lfx \.lfx-nominal\.locked\{opacity:\.55\}/);
 });
+
+test('locked nominal cards stay clickable for automation and assistive tech', () => {
+    const product = read('Pages/Catalog/Show.vue');
+    // Playwright (and some assistive tech) refuses to activate elements
+    // with aria-disabled=true; a locked card must stay activatable
+    // because the tap itself is what guides the buyer to the account form.
+    assert.doesNotMatch(product, /:aria-disabled="[^"]*nominalLocked/);
+});
