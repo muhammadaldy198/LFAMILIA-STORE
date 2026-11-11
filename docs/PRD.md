@@ -55,7 +55,8 @@ Pembeli bisa **tanpa akun (guest)** atau **dengan akun (member)**. Guest wajib m
 ## 3. Alur utama
 
 ```
-Pilih produk → pilih nominal → isi data tujuan → (cek nama, jika tersedia)
+Pilih produk → isi data tujuan → (cek nama, jika tersedia) → pilih nominal → pilih pembayaran
+(Nominal terkunci sampai data tujuan terisi; mengetuk nominal yang terkunci menggulir pembeli kembali ke data tujuan. Sesudah nominal dipilih, halaman menggulir ke pembayaran. Keputusan pemilik 11 Nov 2026.)
       ↓
 Checkout: server hitung harga, voucher, biaya kanal → pesanan dibuat (status: menunggu pembayaran)
       ↓

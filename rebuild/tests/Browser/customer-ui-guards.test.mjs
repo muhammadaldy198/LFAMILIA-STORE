@@ -430,3 +430,23 @@ test('verified nickname uses a one-line flagged success without changing the reg
     assert.match(product, /v-else-if="regionWarning" class="lfx-region-banner lfx-region-mismatch" role="alert"/);
     assert.match(product, /\.lfx-region-line \{[^}]*color:#a7f3c4;[^}]*white-space:nowrap;[^}]*overflow-x:auto/);
 });
+
+test('checkout locks nominal selection until the account data is complete', () => {
+    const product = read('Pages/Catalog/Show.vue');
+    const css = readFileSync(new URL('../../resources/css/checkout.css', import.meta.url), 'utf8');
+    // The gate reuses the submission's own account validation and never
+    // applies to products without an account step (vouchers).
+    assert.match(product, /const accountComplete = computed\(\(\) => Object\.keys\(localAccountErrors\(\)\)\.length === 0\);/);
+    assert.match(product, /const nominalLocked = computed\(\(\) => hasAccountStep\.value && !accountComplete\.value\);/);
+    // A tap on a locked nominal guides the buyer back up instead of selecting.
+    assert.match(product, /if \(nominalLocked\.value\) \{\s+guideToAccount\(\);\s+return;\s+\}/);
+    assert.match(product, /accountEl\.scrollIntoView\(\{ behavior: 'smooth', block: 'start' \}\);/);
+    // A successful choice moves the buyer down to the payment section.
+    assert.match(product, /if \(hasAccountStep\.value\) scrollToPayment\(\);/);
+    assert.match(product, /document\.getElementById\('lfx-payment'\)\?\.scrollIntoView\(\{ behavior: 'smooth', block: 'start' \}\);/);
+    // Locked cards stay tappable (the tap is the guidance trigger) and are
+    // visibly dimmed, with a hint above the grid.
+    assert.match(product, /locked:nominalLocked&&String\(selectedPackageId\)!==String\(item\.id\)/);
+    assert.match(product, /<p v-if="nominalLocked" class="lfx-hint"><span>i<\/span> Isi data akun dulu untuk memilih nominal\.<\/p>/);
+    assert.match(css, /\.lfx \.lfx-nominal\.locked\{opacity:\.55\}/);
+});
