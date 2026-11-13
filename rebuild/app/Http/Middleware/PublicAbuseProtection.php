@@ -48,13 +48,6 @@ class PublicAbuseProtection
 
     private function limit(Request $request, string $scope, int $maxAttempts, int $decaySeconds): void
     {
-        $ipKey = 'public-abuse:'.$scope.':ip:'.$request->ip();
-        if ($this->limiter->tooManyAttempts($ipKey, $maxAttempts * 4)) {
-            throw ValidationException::withMessages([
-                'email' => 'Terlalu banyak percobaan. Coba lagi beberapa saat lagi.',
-            ]);
-        }
-
         $email = strtolower(trim((string) $request->input('email', '')));
         $key = 'public-abuse:'.$scope.':'.hash('sha256', $request->ip().'|'.$email);
 
@@ -64,7 +57,13 @@ class PublicAbuseProtection
             ]);
         }
 
-        $this->limiter->hit($ipKey, $decaySeconds);
+        $ipKey = 'public-abuse:'.$scope.':ip:'.$request->ip();
+        if ($this->limiter->hit($ipKey, $decaySeconds) > $maxAttempts * 4) {
+            throw ValidationException::withMessages([
+                'email' => 'Terlalu banyak percobaan. Coba lagi beberapa saat lagi.',
+            ]);
+        }
+
         $this->limiter->hit($key, $decaySeconds);
     }
 }
