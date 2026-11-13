@@ -9,6 +9,12 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\Response;
 
+/**
+ * Middleware untuk membatasi penyalahgunaan rute publik sensitif (register, login, password recovery).
+ * Menggabungkan pembatasan frekuensi per email, bucket kuota per alamat IP untuk mencegah email spraying,
+ * serta verifikasi Cloudflare Turnstile sebelum mencatat konsumsi kuota IP.
+ * Bukan untuk mengurus otorisasi sesi atau verifikasi kredensial pengguna.
+ */
 class PublicAbuseProtection
 {
     public function __construct(

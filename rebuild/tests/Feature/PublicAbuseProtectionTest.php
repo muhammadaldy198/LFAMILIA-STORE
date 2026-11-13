@@ -10,6 +10,12 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
+/**
+ * Menguji perlindungan rate limit pada rute publik yang sensitif (register dan reset password).
+ * Memverifikasi batas percobaan per email, batas semburan per IP (mencegah email spraying),
+ * serta memastikan kegagalan verifikasi Turnstile tidak menghabiskan kuota IP bersama.
+ * Bukan untuk menguji alur otentikasi sesi atau logika checkout.
+ */
 class PublicAbuseProtectionTest extends TestCase
 {
     protected function setUp(): void
