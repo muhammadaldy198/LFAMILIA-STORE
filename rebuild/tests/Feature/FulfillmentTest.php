@@ -1637,19 +1637,36 @@ class FulfillmentTest extends TestCase
     public function test_successful_order_cannot_be_reverted_by_late_provider_failure(): void
     {
         Queue::fake();
-        $catalog = $this->automaticCatalog(sku: 'DF-TERMINAL-SUCCESS');
-        $orderId = $this->createPaidOrder($catalog);
+        $sku = 'DF-TERMINAL-SUCCESS';
+        $catalog = $this->automaticCatalog(sku: $sku);
+        $orderId = $this->paidOrder($catalog);
 
         $service = app(FulfillmentService::class);
-        $attemptId = $service->startOrder($orderId);
+        $service->startOrder($orderId);
+        $attempt = DB::table('fulfillment_attempts')->where('order_id', $orderId)->firstOrFail();
+        $ref = 'FUL-'.DB::table('orders')->where('id', $orderId)->value('order_number').'-1';
 
+        DB::table('fulfillment_attempts')->where('id', $attempt->id)->update([
+            'status' => 'PENDING',
+            'request_payload' => json_encode([
+                'ref_id' => $ref,
+                'buyer_sku_code' => $sku,
+                'customer_no' => '1234567890',
+                'max_price' => 12000,
+            ], JSON_THROW_ON_ERROR),
+        ]);
+
+        $delivery = json_encode(['code' => 'SN-MANUAL-123'], JSON_THROW_ON_ERROR);
         DB::table('orders')->where('id', $orderId)->update([
             'status' => 'SUCCESS',
-            'delivery_payload' => json_encode(['code' => 'SN-MANUAL-123'], JSON_THROW_ON_ERROR),
+            'delivery_payload' => $delivery,
             'updated_at' => now(),
         ]);
 
-        $applied = $service->applyProviderResult($attemptId, [
+        $service->applyProviderResult((int) $attempt->id, [
+            'ref_id' => $ref,
+            'buyer_sku_code' => $sku,
+            'customer_no' => '1234567890',
             'status' => 'Gagal',
             'rc' => '02',
             'message' => 'Buyer SKU out of stock',
@@ -1657,7 +1674,7 @@ class FulfillmentTest extends TestCase
             'price' => 0,
         ], 'webhook');
 
-        $this->assertFalse($applied);
         $this->assertSame('SUCCESS', DB::table('orders')->where('id', $orderId)->value('status'));
+        $this->assertSame($delivery, DB::table('orders')->where('id', $orderId)->value('delivery_payload'));
     }
 }
