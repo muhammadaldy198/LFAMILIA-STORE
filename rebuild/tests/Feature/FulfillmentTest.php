@@ -1675,6 +1675,9 @@ class FulfillmentTest extends TestCase
         ], 'webhook');
 
         $this->assertSame('SUCCESS', DB::table('orders')->where('id', $orderId)->value('status'));
-        $this->assertSame($delivery, DB::table('orders')->where('id', $orderId)->value('delivery_payload'));
+        $this->assertSame(
+            ['code' => 'SN-MANUAL-123'],
+            json_decode((string) DB::table('orders')->where('id', $orderId)->value('delivery_payload'), true)
+        );
     }
 }
