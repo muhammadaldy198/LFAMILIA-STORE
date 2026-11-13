@@ -22,6 +22,11 @@ use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
+/**
+ * Pengujian fitur pemenuhan otomatis dan rekonsiliasi Digiflazz:
+ * memvalidasi alur pembuatan attempt, sanitasi payload, penanganan
+ * status sukses/gagal, idempotensi webhook, serta proteksi terminal state.
+ */
 class FulfillmentTest extends TestCase
 {
     use DatabaseTransactions;
@@ -1627,5 +1632,52 @@ class FulfillmentTest extends TestCase
         Http::assertSentCount(1);
         $this->assertSame('PENDING', DB::table('fulfillment_attempts')->where('id', $newId)->value('status'));
         $this->assertSame('BLOCKED', DB::table('fulfillment_attempts')->where('id', $legacy->id)->value('status'));
+    }
+
+    public function test_successful_order_cannot_be_reverted_by_late_provider_failure(): void
+    {
+        Queue::fake();
+        $sku = 'DF-TERMINAL-SUCCESS';
+        $catalog = $this->automaticCatalog(sku: $sku);
+        $orderId = $this->paidOrder($catalog);
+
+        $service = app(FulfillmentService::class);
+        $service->startOrder($orderId);
+        $attempt = DB::table('fulfillment_attempts')->where('order_id', $orderId)->firstOrFail();
+        $ref = 'FUL-'.DB::table('orders')->where('id', $orderId)->value('order_number').'-1';
+
+        DB::table('fulfillment_attempts')->where('id', $attempt->id)->update([
+            'status' => 'PENDING',
+            'request_payload' => json_encode([
+                'ref_id' => $ref,
+                'buyer_sku_code' => $sku,
+                'customer_no' => '1234567890',
+                'max_price' => 12000,
+            ], JSON_THROW_ON_ERROR),
+        ]);
+
+        $delivery = json_encode(['code' => 'SN-MANUAL-123'], JSON_THROW_ON_ERROR);
+        DB::table('orders')->where('id', $orderId)->update([
+            'status' => 'SUCCESS',
+            'delivery_payload' => $delivery,
+            'updated_at' => now(),
+        ]);
+
+        $service->applyProviderResult((int) $attempt->id, [
+            'ref_id' => $ref,
+            'buyer_sku_code' => $sku,
+            'customer_no' => '1234567890',
+            'status' => 'Gagal',
+            'rc' => '02',
+            'message' => 'Buyer SKU out of stock',
+            'sn' => '',
+            'price' => 0,
+        ], 'webhook');
+
+        $this->assertSame('SUCCESS', DB::table('orders')->where('id', $orderId)->value('status'));
+        $this->assertSame(
+            ['code' => 'SN-MANUAL-123'],
+            json_decode((string) DB::table('orders')->where('id', $orderId)->value('delivery_payload'), true)
+        );
     }
 }

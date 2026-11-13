@@ -203,7 +203,7 @@ class FulfillmentResultService
                 || ($incoming === 'PENDING' && $responseCode === '00')) {
                 $incoming = 'UNKNOWN';
             }
-            if ($attempt->status === 'SUCCESS') {
+            if ($attempt->status === 'SUCCESS' || $order->status === 'SUCCESS') {
                 return false;
             }
             if ($attempt->status === 'FAILED_CONFIRMED') {

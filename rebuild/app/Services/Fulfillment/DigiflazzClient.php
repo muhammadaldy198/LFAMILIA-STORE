@@ -8,6 +8,12 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
+/**
+ * Klien HTTP integrasi provider Digiflazz: mengelola autentikasi
+ * MD5 transaksi, payload transaksi ke endpoint /v1/transaction,
+ * serta resolusi rahasia webhook. Class ini TIDAK memvalidasi
+ * alur state order internal aplikasi dan TIDAK mengubah data tabel order.
+ */
 class DigiflazzClient
 {
     public function __construct(private readonly IntegrationRuntimeConfig $runtime) {}
