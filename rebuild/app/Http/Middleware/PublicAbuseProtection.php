@@ -25,18 +25,15 @@ class PublicAbuseProtection
         $path = trim($request->path(), '/');
 
         if ($path === 'register') {
-            $this->limit($request, 'register', 5, 600);
-            $this->turnstile->verify($request, 'register');
+            $this->enforce($request, 'register', 5, 600, 'register');
         } elseif ($path === 'forgot-password') {
-            $this->limit($request, 'forgot-password', 5, 600);
-            $this->turnstile->verify($request, 'forgot_password');
+            $this->enforce($request, 'forgot-password', 5, 600, 'forgot_password');
         } elseif ($path === 'admin/forgot-password') {
-            $this->limit($request, 'admin-forgot-password', 3, 600);
-            $this->turnstile->verify($request, 'admin_forgot_password');
+            $this->enforce($request, 'admin-forgot-password', 3, 600, 'admin_forgot_password');
         } elseif ($path === 'admin/reset-password') {
-            $this->limit($request, 'admin-reset-password', 5, 600);
+            $this->enforce($request, 'admin-reset-password', 5, 600);
         } elseif ($path === 'reset-password') {
-            $this->limit($request, 'reset-password', 5, 600);
+            $this->enforce($request, 'reset-password', 5, 600);
         } elseif ($path === 'login') {
             $this->turnstile->verify($request, 'customer_login');
         } elseif ($path === 'admin/login') {
@@ -46,24 +43,35 @@ class PublicAbuseProtection
         return $next($request);
     }
 
-    private function limit(Request $request, string $scope, int $maxAttempts, int $decaySeconds): void
+    private function enforce(Request $request, string $scope, int $maxAttempts, int $decaySeconds, ?string $turnstileAction = null): void
     {
-        $email = strtolower(trim((string) $request->input('email', '')));
-        $key = 'public-abuse:'.$scope.':'.hash('sha256', $request->ip().'|'.$email);
+        $ipKey = 'public-abuse:'.$scope.':ip:'.$request->ip();
 
-        if ($this->limiter->tooManyAttempts($key, $maxAttempts)) {
+        if ($this->limiter->tooManyAttempts($ipKey, $maxAttempts * 4)) {
             throw ValidationException::withMessages([
                 'email' => 'Terlalu banyak percobaan. Coba lagi beberapa saat lagi.',
             ]);
         }
 
-        $ipKey = 'public-abuse:'.$scope.':ip:'.$request->ip();
+        $email = strtolower(trim((string) $request->input('email', '')));
+        $emailKey = 'public-abuse:'.$scope.':'.hash('sha256', $request->ip().'|'.$email);
+
+        if ($this->limiter->tooManyAttempts($emailKey, $maxAttempts)) {
+            throw ValidationException::withMessages([
+                'email' => 'Terlalu banyak percobaan. Coba lagi beberapa saat lagi.',
+            ]);
+        }
+
+        $this->limiter->hit($emailKey, $decaySeconds);
+
+        if ($turnstileAction !== null) {
+            $this->turnstile->verify($request, $turnstileAction);
+        }
+
         if ($this->limiter->hit($ipKey, $decaySeconds) > $maxAttempts * 4) {
             throw ValidationException::withMessages([
                 'email' => 'Terlalu banyak percobaan. Coba lagi beberapa saat lagi.',
             ]);
         }
-
-        $this->limiter->hit($key, $decaySeconds);
     }
 }

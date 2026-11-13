@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Http\Middleware\PublicAbuseProtection;
+use App\Services\TurnstileService;
+use Illuminate\Cache\RateLimiter as CacheRateLimiter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
@@ -15,6 +17,7 @@ class PublicAbuseProtectionTest extends TestCase
         parent::setUp();
         RateLimiter::clear('public-abuse:reset-password:ip:198.51.100.42');
         RateLimiter::clear('public-abuse:reset-password:ip:198.51.100.43');
+        RateLimiter::clear('public-abuse:admin-forgot-password:ip:198.51.100.44');
     }
 
     public function test_blocks_ip_spraying_different_emails(): void
@@ -65,5 +68,33 @@ class PublicAbuseProtectionTest extends TestCase
         ], server: ['REMOTE_ADDR' => $ip]);
 
         $middleware->handle($blockedRequest, fn () => response('ok'));
+    }
+
+    public function test_failed_turnstile_does_not_consume_shared_ip_bucket(): void
+    {
+        $turnstile = $this->createMock(TurnstileService::class);
+        $turnstile->expects($this->exactly(15))
+            ->method('verify')
+            ->willThrowException(ValidationException::withMessages(['turnstile_token' => 'Invalid challenge']));
+
+        $middleware = new PublicAbuseProtection(app(CacheRateLimiter::class), $turnstile);
+        $ip = '198.51.100.44';
+
+        // Send 15 failed Turnstile requests with different emails (admin-forgot-password maxAttempts * 4 = 12)
+        for ($i = 0; $i < 15; $i++) {
+            $request = Request::create('/admin/forgot-password', 'POST', [
+                'email' => "admin{$i}@example.com",
+            ], server: ['REMOTE_ADDR' => $ip]);
+
+            try {
+                $middleware->handle($request, fn () => response('ok'));
+                $this->fail('Expected ValidationException from Turnstile');
+            } catch (ValidationException $e) {
+                $this->assertArrayHasKey('turnstile_token', $e->errors());
+            }
+        }
+
+        // Shared IP bucket must NOT be debited because turnstile failed
+        $this->assertSame(0, RateLimiter::attempts('public-abuse:admin-forgot-password:ip:'.$ip));
     }
 }
