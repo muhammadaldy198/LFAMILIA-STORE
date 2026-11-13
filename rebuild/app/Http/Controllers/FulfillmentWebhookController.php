@@ -8,6 +8,14 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
+/**
+ * Controller webhook provider Digiflazz: memvalidasi tanda tangan
+ * X-Hub-Signature dan header X-Digiflazz-Event, mengklaim idempotensi
+ * event callback pada tabel fulfillment_callbacks, dan meneruskan hasil
+ * status transaksi ke FulfillmentService. Controller ini TIDAK
+ * memproses logika internal pesanan secara langsung dan TIDAK mengirim
+ * request transaksi keluar.
+ */
 class FulfillmentWebhookController
 {
     public function digiflazz(

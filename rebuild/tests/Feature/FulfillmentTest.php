@@ -22,6 +22,11 @@ use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
+/**
+ * Pengujian fitur pemenuhan otomatis dan rekonsiliasi Digiflazz:
+ * memvalidasi alur pembuatan attempt, sanitasi payload, penanganan
+ * status sukses/gagal, idempotensi webhook, serta proteksi terminal state.
+ */
 class FulfillmentTest extends TestCase
 {
     use DatabaseTransactions;
@@ -1627,5 +1632,32 @@ class FulfillmentTest extends TestCase
         Http::assertSentCount(1);
         $this->assertSame('PENDING', DB::table('fulfillment_attempts')->where('id', $newId)->value('status'));
         $this->assertSame('BLOCKED', DB::table('fulfillment_attempts')->where('id', $legacy->id)->value('status'));
+    }
+
+    public function test_successful_order_cannot_be_reverted_by_late_provider_failure(): void
+    {
+        Queue::fake();
+        $catalog = $this->automaticCatalog(sku: 'DF-TERMINAL-SUCCESS');
+        $orderId = $this->createPaidOrder($catalog);
+
+        $service = app(FulfillmentService::class);
+        $attemptId = $service->startOrder($orderId);
+
+        DB::table('orders')->where('id', $orderId)->update([
+            'status' => 'SUCCESS',
+            'delivery_payload' => json_encode(['code' => 'SN-MANUAL-123'], JSON_THROW_ON_ERROR),
+            'updated_at' => now(),
+        ]);
+
+        $applied = $service->applyProviderResult($attemptId, [
+            'status' => 'Gagal',
+            'rc' => '02',
+            'message' => 'Buyer SKU out of stock',
+            'sn' => '',
+            'price' => 0,
+        ], 'webhook');
+
+        $this->assertFalse($applied);
+        $this->assertSame('SUCCESS', DB::table('orders')->where('id', $orderId)->value('status'));
     }
 }
