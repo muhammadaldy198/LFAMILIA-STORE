@@ -16,10 +16,9 @@ use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 /**
- * Tes pemulihan pembuatan pembayaran DOKU: adopsi transaksi
- * DOKU yang sudah ada dan pembuatan ulang ketika DOKU
- * melaporkan transaksi tidak ditemukan. Tes pemulihan
- * gateway lain ada di PaymentCreationRecoveryTest.
+ * Tes pemulihan pembuatan dan rekonsiliasi berkala pembayaran DOKU:
+ * adopsi transaksi DOKU yang tertahan di CREATING, redrive pembuatan
+ * ulang, serta penyelesaian transaksi PENDING yang terlewat oleh webhook.
  */
 class PaymentDokuRecoveryTest extends TestCase
 {
@@ -283,5 +282,60 @@ class PaymentDokuRecoveryTest extends TestCase
         $payment = DB::table('payment_transactions')->where('id', $paymentId)->firstOrFail();
         $this->assertSame('PENDING', $payment->status);
         $this->assertStringContainsString('recovered', (string) $payment->public_payload);
+    }
+
+    public function test_reconcile_pending_payments_resolves_stuck_doku_payment(): void
+    {
+        $catalog = $this->catalog();
+        $routeId = $this->route('virtual_account', 'DOKU', 2500, 0, null, [
+            'api_path' => '/checkout/v1/payment',
+            'public_paths' => ['payment_url' => 'response.payment.url'],
+        ]);
+        IntegrationCredential::updateOrCreate(['code' => 'doku'], [
+            'config_ciphertext' => [
+                'client_id' => 'MCH-TEST',
+                'secret_key' => 'doku-secret',
+                'base_url' => 'https://api-sandbox.doku.test',
+            ],
+            'is_active' => true,
+        ]);
+        $checkout = $this->postJson('/checkout/orders', $this->guestCheckout(
+            $catalog['package_id'], 'virtual_account', 'pr4-reconcile-doku-order'
+        ))->assertCreated();
+        $order = DB::table('orders')->where('order_number', $checkout->json('order_number'))->firstOrFail();
+        $reference = 'PAY-PR4-DOKU-RECON-'.strtoupper(bin2hex(random_bytes(3)));
+
+        $paymentId = DB::table('payment_transactions')->insertGetId([
+            'order_id' => (int) $order->id,
+            'wallet_topup_id' => null,
+            'payment_route_id' => $routeId,
+            'gateway_code' => 'DOKU',
+            'channel_code' => 'virtual_account',
+            'merchant_reference' => $reference,
+            'amount_idr' => (int) $order->total_idr,
+            'status' => 'PENDING',
+            'request_fingerprint' => hash('sha256', $reference),
+            'idempotency_key' => 'pr4-'.strtolower($reference),
+            'created_at' => now()->subMinutes(5),
+            'updated_at' => now()->subMinutes(5),
+        ]);
+
+        Http::fake(function ($request) use ($reference, $order) {
+            if ($request->method() === 'GET' && str_contains($request->url(), '/orders/v1/status/')) {
+                return Http::response([
+                    'order' => ['invoice_number' => $reference, 'amount' => (int) $order->total_idr],
+                    'transaction' => ['status' => 'SUCCESS'],
+                ]);
+            }
+
+            return Http::response([], 404);
+        });
+
+        Artisan::call('lfamilia:reconcile-pending-payments');
+
+        $this->assertSame('PAID', DB::table('payment_transactions')->where('id', $paymentId)->value('status'));
+        $this->assertSame('PAID', DB::table('orders')->where('id', $order->id)->value('status'));
+        $this->assertSame(1, DB::table('order_events')
+            ->where('order_id', $order->id)->where('event_type', 'PAYMENT_VERIFIED')->count());
     }
 }
