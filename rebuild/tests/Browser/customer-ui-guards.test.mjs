@@ -444,12 +444,27 @@ test('checkout locks nominal selection until the account data is complete', () =
     // A successful choice moves the buyer down to the payment section.
     assert.match(product, /if \(hasAccountStep\.value\) scrollToPayment\(\);/);
     assert.match(product, /document\.getElementById\('lfx-payment'\)\?\.scrollIntoView\(\{ behavior: 'smooth', block: 'start' \}\);/);
-    // Locked cards stay tappable (the tap is the guidance trigger), with a
-    // hint above the grid. The owner's rule (11 Nov 2026): locked means
-    // only "cannot be chosen" — no dimming or opacity styling at all.
-    assert.match(product, /<p v-if="nominalLocked" class="lfx-hint"><span>i<\/span> Isi data akun dulu untuk memilih nominal\.<\/p>/);
+    // Locked cards stay tappable (the tap is the guidance trigger). The
+    // owner's rule (11 Nov 2026): locked means only "cannot be chosen" —
+    // no dimming or opacity styling at all. The hint line that used to sit
+    // above the grid was removed on the owner's later order (screenshot
+    // 11 Nov 2026, executed 14 Nov 2026): the scroll-up guidance on tap
+    // replaces it, so the hint must never come back.
+    assert.doesNotMatch(product, /Isi data akun dulu untuk memilih nominal/);
     assert.doesNotMatch(product, /locked:/);
     assert.doesNotMatch(css, /lfx-nominal\.locked/);
+});
+
+test('checkout presents required account errors as one shared line and drops the label info icon', () => {
+    const product = read('Pages/Catalog/Show.vue');
+    // Required-but-empty errors render once as a shared line; the
+    // classifier keys off the identical wording the local validator and
+    // the server validator both generate per field.
+    assert.match(product, /function isRequiredAccountError\(field, message\)/);
+    assert.match(product, /<p v-if="hasRequiredAccountError" class="lfx-error">Data akun wajib diisi\.<\/p>/);
+    assert.match(product, /<p v-for="entry in specificAccountErrors"/);
+    // The hover-only info icon on account field labels is gone for good.
+    assert.doesNotMatch(product, /<i title="Pastikan data akun benar">/);
 });
 
 test('locked nominal cards stay clickable for automation and assistive tech', () => {
