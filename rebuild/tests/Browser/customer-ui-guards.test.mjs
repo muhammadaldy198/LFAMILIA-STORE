@@ -469,6 +469,9 @@ test('checkout presents required account errors as one shared line and drops the
     // shows (Codex P2 on PR #395): it skips panel-covered account errors,
     // while the confirmation modal keeps the translating banner.
     assert.match(product, /const firstPageError = computed\(\(\) =>/);
+    // …but only while the account panel is actually shown: on the
+    // Keterangan tab the panel unmounts and the banner must speak again.
+    assert.match(product, /const panelShown = hasAccountStep\.value && activeTab\.value === 'transaction';/);
     assert.equal((product.match(/\{\{firstPageError\}\}/g) || []).length, 1);
     assert.equal((product.match(/\{\{firstCheckoutError\}\}/g) || []).length, 1);
 });

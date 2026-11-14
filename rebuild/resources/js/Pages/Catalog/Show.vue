@@ -278,20 +278,27 @@ const firstCheckoutError = computed(() => {
 });
 
 /**
- * Page-level alert: account-field errors already render inside the
- * account panel (required ones merged into one line, the rest per
- * field), so the banner skips every entry whose field the panel covers
- * and only surfaces errors that have no other home — an unknown-field
- * server error, package, payment, voucher. The confirmation modal
- * keeps firstCheckoutError: it has no account panel.
+ * Page-level alert: while the account panel is on screen, account-field
+ * errors already render inside it (required ones merged into one line,
+ * the rest per field), so the banner skips every entry whose field the
+ * panel covers and only surfaces errors that have no other home — an
+ * unknown-field server error, package, payment, voucher. While the
+ * panel is unmounted (the Keterangan tab replaces the transaction
+ * sections), the banner is the errors' only home and speaks for the
+ * panel, merged wording included. The confirmation modal keeps
+ * firstCheckoutError: it has no account panel either.
  */
 const firstPageError = computed(() => {
+    const panelShown = hasAccountStep.value && activeTab.value === 'transaction';
     for (const [key, messages] of Object.entries(errors.value || {})) {
         const message = Array.isArray(messages) ? messages[0] : (typeof messages === 'string' ? messages : '');
         if (!message) continue;
         if (key.startsWith('customer_input.')) {
-            const fieldKey = key.slice('customer_input.'.length);
-            if ((props.fields || []).some((item) => item.field_key === fieldKey)) continue;
+            const field = (props.fields || []).find((item) => item.field_key === key.slice('customer_input.'.length));
+            if (field) {
+                if (panelShown) continue;
+                return isRequiredAccountError(field, message) ? 'Data akun wajib diisi.' : message;
+            }
         }
         return message;
     }
