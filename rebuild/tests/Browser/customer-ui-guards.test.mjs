@@ -461,7 +461,7 @@ test('checkout presents required account errors as one shared line and drops the
     // classifier keys off the identical wording the local validator and
     // the server validator both generate per field.
     assert.match(product, /function isRequiredAccountError\(field, message\)/);
-    assert.match(product, /<p v-if="hasRequiredAccountError" class="lfx-error">Data akun wajib diisi\.<\/p>/);
+    assert.match(product, /<p v-if="hasRequiredAccountError" role="alert" class="lfx-error">Data akun wajib diisi\.<\/p>/);
     assert.match(product, /<p v-for="entry in specificAccountErrors"/);
     // The hover-only info icon on account field labels is gone for good.
     assert.doesNotMatch(product, /<i title="Pastikan data akun benar">/);
@@ -472,6 +472,10 @@ test('checkout presents required account errors as one shared line and drops the
     // …but only while the account panel is actually shown: on the
     // Keterangan tab the panel unmounts and the banner must speak again.
     assert.match(product, /const panelShown = hasAccountStep\.value && activeTab\.value === 'transaction';/);
+    // The panel's own error lines are live regions (Codex P2 on PR #395):
+    // with the visual banner suppressed on the Transaksi tab, screen
+    // readers still get the announcement when the errors appear.
+    assert.match(product, /<p v-for="entry in specificAccountErrors" :key="entry\.field\.field_key" role="alert" class="lfx-error">/);
     assert.equal((product.match(/\{\{firstPageError\}\}/g) || []).length, 1);
     assert.equal((product.match(/\{\{firstCheckoutError\}\}/g) || []).length, 1);
 });
