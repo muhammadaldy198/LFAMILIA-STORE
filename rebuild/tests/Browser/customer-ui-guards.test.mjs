@@ -465,6 +465,12 @@ test('checkout presents required account errors as one shared line and drops the
     assert.match(product, /<p v-for="entry in specificAccountErrors"/);
     // The hover-only info icon on account field labels is gone for good.
     assert.doesNotMatch(product, /<i title="Pastikan data akun benar">/);
+    // The page-level alert must not repeat what the account panel already
+    // shows (Codex P2 on PR #395): it skips panel-covered account errors,
+    // while the confirmation modal keeps the translating banner.
+    assert.match(product, /const firstPageError = computed\(\(\) =>/);
+    assert.equal((product.match(/\{\{firstPageError\}\}/g) || []).length, 1);
+    assert.equal((product.match(/\{\{firstCheckoutError\}\}/g) || []).length, 1);
 });
 
 test('locked nominal cards stay clickable for automation and assistive tech', () => {

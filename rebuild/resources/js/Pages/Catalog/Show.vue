@@ -277,6 +277,27 @@ const firstCheckoutError = computed(() => {
     return '';
 });
 
+/**
+ * Page-level alert: account-field errors already render inside the
+ * account panel (required ones merged into one line, the rest per
+ * field), so the banner skips every entry whose field the panel covers
+ * and only surfaces errors that have no other home — an unknown-field
+ * server error, package, payment, voucher. The confirmation modal
+ * keeps firstCheckoutError: it has no account panel.
+ */
+const firstPageError = computed(() => {
+    for (const [key, messages] of Object.entries(errors.value || {})) {
+        const message = Array.isArray(messages) ? messages[0] : (typeof messages === 'string' ? messages : '');
+        if (!message) continue;
+        if (key.startsWith('customer_input.')) {
+            const fieldKey = key.slice('customer_input.'.length);
+            if ((props.fields || []).some((item) => item.field_key === fieldKey)) continue;
+        }
+        return message;
+    }
+    return '';
+});
+
 // Honor group priority independently from legacy tab navigation.
 const packageGroups = computed(() => orderedPackageGroups(props.packages || [], props.product?.package_tabs || [], props.packageGroups));
 const packageTabs = computed(() => props.product?.package_tabs_enabled
@@ -1139,7 +1160,7 @@ function closeReview() { summaryOpen.value = false; closeConfirmation(); }
       <div class="lfx-product-intro"><div class="lfx-breadcrumb"><Link href="/">Beranda</Link><span>›</span><span>{{product.category_name}}</span><span>›</span><strong>{{product.name}}</strong></div><div class="lfx-overline">DIGITAL TOP UP · PREMIUM EXPERIENCE</div><h1>{{product.name}}</h1><p>{{product.publisher||'LFAMILIA STORE'}}</p></div><div class="lfx-trust"><span><b>⚡</b> Proses Cepat</span><span><b>✧</b> {{customerText("checkout.support_label", "Layanan Chat 24/7")}}</span><span><b>◷</b> Pembayaran Aman</span></div>
 
     </div></section>
-    <div class="lfx-container lfx-content"><p v-if="firstCheckoutError" role="alert" class="lfx-error">{{firstCheckoutError}}</p><div v-if="requiresEmailVerification" role="alert" class="lfx-error">Belum menerima email? <button type="button" :disabled="verificationResending" @click="resendVerificationEmail">Kirim ulang link verifikasi</button> atau <a href="/email/verify">buka halaman verifikasi</a>.<span v-if="verificationResendStatus"> {{verificationResendStatus}}</span></div>
+    <div class="lfx-container lfx-content"><p v-if="firstPageError" role="alert" class="lfx-error">{{firstPageError}}</p><div v-if="requiresEmailVerification" role="alert" class="lfx-error">Belum menerima email? <button type="button" :disabled="verificationResending" @click="resendVerificationEmail">Kirim ulang link verifikasi</button> atau <a href="/email/verify">buka halaman verifikasi</a>.<span v-if="verificationResendStatus"> {{verificationResendStatus}}</span></div>
       <div class="lfx-mobile-tabs"><button :class="{active:activeTab==='transaction'}" @click="activeTab='transaction'">Transaksi</button><button :class="{active:activeTab==='details'}" @click="activeTab='details'">Keterangan</button></div>
       <div class="lfx-layout">
         <div class="lfx-sections">
