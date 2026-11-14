@@ -265,9 +265,14 @@ const nominalLocked = computed(() => hasAccountStep.value && !accountComplete.va
 // the nominal after filling in the account data like everyone else.
 if (nominalLocked.value) selectedPackageId.value = '';
 const firstCheckoutError = computed(() => {
-    for (const messages of Object.values(errors.value || {})) {
-        if (Array.isArray(messages) && messages.length) return messages[0];
-        if (typeof messages === 'string' && messages) return messages;
+    for (const [key, messages] of Object.entries(errors.value || {})) {
+        const message = Array.isArray(messages) ? messages[0] : (typeof messages === 'string' ? messages : '');
+        if (!message) continue;
+        if (key.startsWith('customer_input.')) {
+            const field = (props.fields || []).find((item) => item.field_key === key.slice('customer_input.'.length));
+            if (isRequiredAccountError(field, message)) return 'Data akun wajib diisi.';
+        }
+        return message;
     }
     return '';
 });
@@ -536,6 +541,23 @@ function nominalLabel(label, productName) {
 function fieldError(key) {
     return errors.value['customer_input.' + key]?.[0];
 }
+
+/**
+ * Required-but-empty account errors are generated per field — locally and
+ * by the server validator, both with the identical "<Label> wajib diisi."
+ * wording — but they are presented as one shared line. The per-field keys
+ * stay in `errors`: the nominal gate, the scroll-to-first-invalid-field
+ * behaviour and error pruning all key off them; only the wording merges.
+ */
+function isRequiredAccountError(field, message) {
+    return Boolean(field?.is_required) && message === field.label + ' wajib diisi.';
+}
+
+const hasRequiredAccountError = computed(() => (props.fields || []).some((field) => isRequiredAccountError(field, fieldError(field.field_key))));
+
+const specificAccountErrors = computed(() => (props.fields || [])
+    .map((field) => ({ field, message: fieldError(field.field_key) }))
+    .filter((entry) => entry.message && !isRequiredAccountError(entry.field, entry.message)));
 
 function accountInputSignature() {
     return JSON.stringify((props.fields || []).filter(field => field.type !== 'password').map((field) => [
@@ -1122,10 +1144,10 @@ function closeReview() { summaryOpen.value = false; closeConfirmation(); }
       <div class="lfx-layout">
         <div class="lfx-sections">
           <template v-if="activeTab==='transaction'">
-            <section v-if="hasAccountStep" id="lfx-account" class="lfx-panel"><header class="lfx-panel-header"><span class="lfx-number">1</span><div><h2>{{customerText("checkout.account_title", "Data Akun")}}</h2></div></header><div class="lfx-panel-content"><label v-if="savedAccountItems.length" class="lfx-field lfx-saved-account"><span>Akun tersimpan</span><select v-model="selectedSavedId" @change="chooseSavedAccount(selectedSavedId)"><option value="">Isi manual</option><option v-for="saved in savedAccountItems" :key="saved.id" :value="String(saved.id)">{{saved.label}}{{saved.nickname?' · '+saved.nickname:''}}</option></select></label><div class="lfx-field-grid" :class="{single:fields.length===1}"><label v-for="field in fields" :key="field.field_key" class="lfx-field"><span>{{field.label}} <b v-if="field.is_required">*</b><i title="Pastikan data akun benar">ⓘ</i></span>
+            <section v-if="hasAccountStep" id="lfx-account" class="lfx-panel"><header class="lfx-panel-header"><span class="lfx-number">1</span><div><h2>{{customerText("checkout.account_title", "Data Akun")}}</h2></div></header><div class="lfx-panel-content"><label v-if="savedAccountItems.length" class="lfx-field lfx-saved-account"><span>Akun tersimpan</span><select v-model="selectedSavedId" @change="chooseSavedAccount(selectedSavedId)"><option value="">Isi manual</option><option v-for="saved in savedAccountItems" :key="saved.id" :value="String(saved.id)">{{saved.label}}{{saved.nickname?' · '+saved.nickname:''}}</option></select></label><div class="lfx-field-grid" :class="{single:fields.length===1}"><label v-for="field in fields" :key="field.field_key" class="lfx-field"><span>{{field.label}} <b v-if="field.is_required">*</b></span>
 <select v-if="field.type==='select'" v-model="customerInput[field.field_key]" :required="field.is_required"><option value="" disabled>{{field.placeholder || 'Pilih '+field.label}}</option><option v-for="option in field.options||[]" :key="option.value" :value="option.value">{{option.label}}</option></select>
 <span v-else-if="field.type==='password'" class="lfx-password-field"><input v-model="customerInput[field.field_key]" :type="passwordVisible[field.field_key]?'text':'password'" :placeholder="field.placeholder||'Masukkan '+field.label" :required="field.is_required" maxlength="64" autocomplete="new-password"/><button type="button" :aria-label="(passwordVisible[field.field_key]?'Sembunyikan ':'Lihat ')+field.label" :aria-pressed="Boolean(passwordVisible[field.field_key])" @click.prevent="passwordVisible[field.field_key]=!passwordVisible[field.field_key]">{{passwordVisible[field.field_key]?'Sembunyikan':'Lihat'}}</button></span>
-<input v-else v-model="customerInput[field.field_key]" :placeholder="field.placeholder||'Masukkan '+field.label" :type="['email','tel'].includes(field.type)?field.type:'text'" :required="field.is_required" maxlength="255" autocomplete="off"/></label></div><p v-for="field in fields.filter(x=>fieldError(x.field_key))" :key="field.field_key" class="lfx-error">{{fieldError(field.field_key)}}</p><div v-if="nicknameChecking" class="lfx-hint">Memeriksa akun…</div>
+<input v-else v-model="customerInput[field.field_key]" :placeholder="field.placeholder||'Masukkan '+field.label" :type="['email','tel'].includes(field.type)?field.type:'text'" :required="field.is_required" maxlength="255" autocomplete="off"/></label></div><p v-if="hasRequiredAccountError" class="lfx-error">Data akun wajib diisi.</p><p v-for="entry in specificAccountErrors" :key="entry.field.field_key" class="lfx-error">{{entry.message}}</p><div v-if="nicknameChecking" class="lfx-hint">Memeriksa akun…</div>
 <div v-else-if="regionWarning" class="lfx-region-banner lfx-region-mismatch" role="alert">
   <strong>{{nicknameResult?.nickname || 'Akun'}} · {{regionName(nicknameResult?.region)}}</strong>
   <span v-if="product.nickname_required_region">Region tidak cocok. Produk ini khusus akun {{regionName(product.nickname_required_region)}}.</span>
@@ -1140,7 +1162,6 @@ function closeReview() { summaryOpen.value = false; closeConfirmation(); }
             <section id="lfx-nominal" class="lfx-panel">
               <header class="lfx-panel-header"><span class="lfx-number">2</span><div><h2>{{customerText("checkout.nominal_title", "Pilih Nominal")}}</h2></div></header>
               <div class="lfx-panel-content">
-                <p v-if="nominalLocked" class="lfx-hint"><span>i</span> Isi data akun dulu untuk memilih nominal.</p>
                 <div v-if="packageTabs.length" class="lfx-category-tabs" role="tablist" aria-label="Kategori dari LFAMILIA"><button v-for="item in packageTabs" :key="item" role="tab" :aria-selected="(activePackageTab||packageTabs[0])===item" :class="{active:(activePackageTab||packageTabs[0])===item}" @click="activePackageTab=item">{{item}}</button></div>
                 <section v-for="itemsGroup in visiblePackageGroups" :key="itemsGroup.name||'default'" class="lfx-nominal-group">
                   <div v-if="itemsGroup.name" class="lfx-subtitle"><img v-if="itemsGroup.image_url" :src="itemsGroup.image_url" :alt="itemsGroup.name" width="34" height="34" loading="lazy" decoding="async" style="width:34px;height:34px;object-fit:cover;border-radius:8px"><span v-else class="lfx-mini-star">✦</span><h3>{{itemsGroup.name}}</h3><small>{{itemsGroup.items.length}} pilihan</small></div>
