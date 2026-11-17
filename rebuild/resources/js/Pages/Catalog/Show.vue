@@ -272,6 +272,18 @@ const nominalLocked = computed(() => hasAccountStep.value && !accountComplete.va
 // the account form is incomplete the seed is dropped, and the buyer picks
 // the nominal after filling in the account data like everyone else.
 if (nominalLocked.value) selectedPackageId.value = '';
+
+// A WDP deep link must not bypass the info panel: if the seed survived the
+// account gate and points to a WDP package, show the panel instead of selecting.
+if (selectedPackageId.value) {
+    const seededPackage = (props.packages || []).find(item => String(item.id) === String(selectedPackageId.value));
+    if (seededPackage?.is_wdp === true) {
+        pendingWdpPackage.value = seededPackage;
+        wdpInfoOpen.value = true;
+        selectedPackageId.value = '';
+    }
+}
+
 const firstCheckoutError = computed(() => {
     for (const [key, messages] of Object.entries(errors.value || {})) {
         const message = Array.isArray(messages) ? messages[0] : (typeof messages === 'string' ? messages : '');
@@ -810,6 +822,14 @@ function confirmWdpSelection() {
         return;
     }
     const item = pendingWdpPackage.value;
+    
+    // Race guard: if the pending package became disabled or unavailable while
+    // the panel was open (e.g. nickname check result arrived), do not select it.
+    if (item.is_available === false || packageDisabled(item)) {
+        closeWdpInfo();
+        return;
+    }
+    
     closeWdpInfo();
     selectedPackageId.value = String(item.id);
     if (errors.value.voucher_code?.[0] === 'Pilih nominal terlebih dahulu untuk melihat voucher yang tersedia.') {

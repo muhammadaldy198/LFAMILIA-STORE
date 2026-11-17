@@ -536,4 +536,10 @@ test('PR2 WDP panel uses exact locked text and is_wdp flag without inventing beh
     assert.match(product, /const currentIsWdp = selectedPackage\.value\?\.is_wdp === true;/);
     assert.match(product, /const targetIsWdp = item\.is_wdp === true;/);
     assert.match(product, /if \(targetIsWdp && \(!currentIsWdp \|\| String\(selectedPackageId\.value\) !== String\(item\.id\)\)\) \{/);
+    
+    // TEMUAN 1: Deep link WDP diarahkan ke panel, tidak langsung terpilih
+    assert.match(product, /if \(selectedPackageId\.value\) \{[\s\S]*?const seededPackage = \(props\.packages \|\| \[\]\)\.find\(item => String\(item\.id\) === String\(selectedPackageId\.value\)\);[\s\S]*?if \(seededPackage\?\.is_wdp === true\) \{[\s\S]*?pendingWdpPackage\.value = seededPackage;[\s\S]*?wdpInfoOpen\.value = true;[\s\S]*?selectedPackageId\.value = '';[\s\S]*?\}[\s\S]*?\}/);
+    
+    // TEMUAN 2: confirmWdpSelection mengecek ulang packageDisabled dan is_available
+    assert.match(product, /function confirmWdpSelection\(\) \{[\s\S]*?if \(item\.is_available === false \|\| packageDisabled\(item\)\) \{[\s\S]*?closeWdpInfo\(\);[\s\S]*?return;[\s\S]*?\}/);
 });
