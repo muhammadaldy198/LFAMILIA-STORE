@@ -355,17 +355,13 @@ test('QRIS heading and channel explanation wrap without mid-word truncation', ()
 });
 
 
-test('F14 Keterangan remains one tab and separates description, reviews and FAQ', () => {
+test('F14/PR3 Keterangan keeps one tab (v-else) with description, reviews and FAQ as separate panels in order', () => {
     const product = read('Pages/Catalog/Show.vue');
-    const css = readFileSync(new URL('../../resources/css/checkout.css', import.meta.url), 'utf8');
-    assert.match(product, /v-else class="lfx-panel lfx-details lf-product-details"/);
+    assert.match(product, /<template v-else>\s*<section class="lfx-panel lfx-details lfx-panel-description">/);
     const description = product.indexOf('lf-product-description-legacy');
     const reviews = product.indexOf('lf-product-review-section lf-review-legacy');
     const faq = product.indexOf('lf-product-faq lf-product-faq-legacy');
     assert.ok(description >= 0 && reviews > description && faq > reviews);
-    assert.match(css, /\.lfx \.lf-product-details > \.lf-product-review-section/);
-    assert.match(css, /\.lfx \.lf-product-details > \.lf-product-faq-legacy/);
-    assert.match(css, /border-top: 2px solid/);
 });
 
 
@@ -547,4 +543,42 @@ test('PR2 WDP panel uses exact locked text and is_wdp flag without inventing beh
     // dan status checkout yang berubah selama persiapan membuat snapshot basi dan dibatalkan
     assert.match(product, /const preparedStateSignature = confirmationStateSignature\(\);/);
     assert.match(product, /if \(wdpInfoOpen\.value \|\| confirmationStateSignature\(\) !== preparedStateSignature\) return;/);
+});
+
+test('PR3 product page splits Keterangan into three panels with hardcoded two-layer FAQ', () => {
+    const product = read('Pages/Catalog/Show.vue');
+    const controller = readFileSync(new URL('../../app/Http/Controllers/CatalogController.php', import.meta.url), 'utf8');
+    const faq = readFileSync(new URL('../../app/Support/ProductFaq.php', import.meta.url), 'utf8');
+
+    // (a) tiga panel terpisah, tanpa nomor langkah
+    assert.match(product, /lfx-panel-description"><header class="lfx-panel-header lfx-panel-header-plain"><div><h2>Deskripsi \{\{product\.name\}\}<\/h2>/);
+    assert.equal((product.match(/Deskripsi \{\{product\.name\}\}/g) || []).length, 1);
+    assert.match(product, /lfx-panel-reviews"><header class="lfx-panel-header lfx-panel-header-plain"><div><h2>\{\{ customerText\("pages\.catalog\.show\.d4d282c6", "Ulasan & rating"\) \}\}<\/h2>/);
+    assert.equal((product.match(/d4d282c6/g) || []).length, 1);
+    assert.match(product, /lfx-panel-faq"><header class="lfx-panel-header lfx-panel-header-plain"><div><h2>\{\{ customerText\("pages\.catalog\.show\.cc3c98ca", "Pertanyaan umum"\) \}\}<\/h2>/);
+    assert.doesNotMatch(product, /lf-product-details"/);
+
+    // (b) string FAQ terkunci
+    assert.ok(faq.includes("'Apa batas pembelian Weekly Diamond Pass?'"));
+    assert.ok(faq.includes("'Apakah saya bisa meminta pengembalian dana (refund)?'"));
+    assert.ok(faq.includes("'Bagaimana cara memakai kode voucher?', 'answer' => 'Masukkan kode di kolom voucher diskon sebelum membayar, tekan gunakan, dan potongan harganya langsung tampil di ringkasan pesanan.'"));
+    assert.ok(faq.includes('sesuai yang sedang aktif'));
+    assert.ok(faq.includes('invoice pesanan dikirim ke email kamu'));
+    assert.ok(faq.includes('nomor invoice atau nomor WhatsApp yang kamu pakai saat checkout'));
+    assert.ok(!faq.includes('kode akses'));
+    assert.ok(faq.includes('Diproses manual oleh admin toko setelah pembayaran terkonfirmasi'));
+    assert.ok(!faq.includes('dikirim ke keduanya'));
+    assert.ok(faq.includes('bila kegagalannya sudah terkonfirmasi, memproses pengiriman ulang'));
+    assert.ok(faq.includes('setelah kegagalannya terkonfirmasi, dukungan memproses pengiriman ulang'));
+    assert.equal((faq.match(/'question' =>/g) || []).length, 17);
+
+    // (c) tidak lagi memakai prop faqs dari database
+    assert.doesNotMatch(product, /faqs\.slice/);
+    assert.doesNotMatch(product, /^\s*faqs: Array/m);
+    assert.match(product, /v-for="\(faq, index\) in productFaqs"/);
+    assert.doesNotMatch(product, /slice\(0,4\)/);
+
+    // (d) controller memakai ProductFaq
+    assert.ok(controller.includes('ProductFaq::forProduct($product)'));
+    assert.doesNotMatch(controller, /'faqs' =>/);
 });

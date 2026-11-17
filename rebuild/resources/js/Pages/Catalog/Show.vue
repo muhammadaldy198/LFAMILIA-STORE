@@ -28,7 +28,7 @@ const props = defineProps({
     savedAccounts: Array,
     reviews: Array,
     reviewStats: Object,
-    faqs: Array,
+    productFaqs: Array,
     initialPackageId: { type: String, default: '' },
     regionAlternatives: { type: Array, default: () => [] },
 });
@@ -1287,17 +1287,18 @@ function closeReview() { summaryOpen.value = false; closeConfirmation(); }
             <section class="lfx-panel" id="lfx-voucher"><header class="lfx-panel-header"><span class="lfx-number">4</span><div><h2>{{customerText("checkout.voucher_title", "Voucher Diskon")}}</h2></div></header><div class="lfx-panel-content"><div class="lfx-voucher-input"><span>⌗</span><input  :value="voucherCode" @input="updateVoucherInput($event.target.value)" maxlength="100" placeholder="Masukkan kode voucher" aria-label="Kode voucher diskon" autocapitalize="characters" @keyup.enter="loadQuote"/><button @click="loadQuote">Gunakan</button></div><p v-if="errors.voucher_code" class="lfx-error">{{errors.voucher_code[0]}}</p><div v-if="quote?.voucher_code" class="lfx-applied"><span>✓</span><div><strong>{{quote.voucher_code}} berhasil dipakai</strong><small>Diskon {{formatIdr(reviewQuote?.voucher_discount_idr || 0)}}</small></div><button @click="updateVoucherInput('');loadQuote()">Hapus</button></div><button class="lfx-voucher-browse" @click="openVoucherPicker"><span>♧</span><strong>Lihat voucher yang tersedia</strong><b>→</b></button></div></section>
             <section id="lfx-contact" class="lfx-panel"><header class="lfx-panel-header"><span class="lfx-number">5</span><div><h2>{{customerText("checkout.contact_title", "Detail Kontak")}}</h2></div></header><div class="lfx-panel-content"><div class="lfx-field-grid"><label class="lfx-field"><span>Nomor WhatsApp <b>*</b></span><div class="lfx-phone-entry"><div class="lfx-country-control"><button type="button" class="lfx-country-trigger" :disabled="Boolean(customer)" :aria-expanded="phoneCountryOpen" aria-label="Pilih kode negara" @click="phoneCountryOpen=!phoneCountryOpen" @keydown="onPhoneCountryKeydown"><img :src="phoneCountryFlag(phoneCountry)" :alt="phoneCountry.iso" class="lfx-flag" width="20" height="14"><span>+{{phoneCountry.dial}}</span><span aria-hidden="true">⌄</span></button></div><input :value="guestPhone" @input="guestPhone=normalizeWhatsapp($event.target.value)" :readonly="Boolean(customer)" type="tel" inputmode="tel" placeholder="81234567890"/><div v-if="phoneCountryOpen" class="lfx-country-menu"><input v-model="phoneCountrySearch" class="lfx-country-search" type="search" placeholder="Cari negara..." aria-label="Cari negara" @keydown="onPhoneCountryKeydown"/><div class="lfx-country-options"><button v-for="country in filteredPhoneCountries" :key="country.iso" type="button" class="lfx-country-option" @click="selectPhoneCountry(country)"><img :src="phoneCountryFlag(country)" :alt="country.iso" class="lfx-flag" width="20" height="14"><span>{{country.name}}</span><span>+{{country.dial}}</span></button><p v-if="!filteredPhoneCountries.length" class="lfx-country-empty">Negara tidak ditemukan</p></div></div></div></label><label class="lfx-field"><span>Email <b>*</b></span><input v-model="guestEmail" :readonly="Boolean(customer)" type="email" placeholder="nama@email.com"/></label></div><div class="lfx-hint"><span>i</span> {{customerText("pages.catalog.show.efbf2ce0", "Kami hanya memakai kontak untuk invoice dan status transaksi.")}}</div></div></section>
           </template>
-<section v-else class="lfx-panel lfx-details lf-product-details">
+<template v-else>
+        <section class="lfx-panel lfx-details lfx-panel-description"><header class="lfx-panel-header lfx-panel-header-plain"><div><h2>Deskripsi {{product.name}}</h2></div></header><div class="lfx-panel-content">
             <article class="lf-product-description lf-product-description-legacy">
-                <h2>Deskripsi {{product.name}}</h2>
                 <p>{{product.description || ('Top up ' + product.name + ' cepat, aman, dan diproses otomatis setelah pembayaran berhasil.')}}</p>
             </article>
+        </div></section>
 
+        <section class="lfx-panel lfx-details lfx-panel-reviews"><header class="lfx-panel-header lfx-panel-header-plain"><div><h2>{{ customerText("pages.catalog.show.d4d282c6", "Ulasan & rating") }}</h2></div></header><div class="lfx-panel-content">
             <section class="lf-product-review-section lf-review-legacy">
                 <div class="lf-review-legacy-head">
                     <div>
                         <p class="lf-eyebrow">{{ customerText("pages.catalog.show.cd75c0db", "PENILAIAN PELANGGAN") }}</p>
-                        <h2>{{ customerText("pages.catalog.show.d4d282c6", "Ulasan & rating") }}</h2>
                         <p>{{ customerText("pages.catalog.show.c47f9331", "Ulasan hanya dapat dibuat setelah pembelian berhasil. Akun dan pembeli guest sama-sama bisa memberi ulasan terverifikasi.") }}</p>
                     </div>
                     <div class="lf-review-average">
@@ -1362,17 +1363,19 @@ function closeReview() { summaryOpen.value = false; closeConfirmation(); }
                     </div>
                 </div>
             </section>
+        </div></section>
 
-            <article v-if="faqs?.length" class="lf-product-faq lf-product-faq-legacy">
-                <h2>{{ customerText("pages.catalog.show.cc3c98ca", "Pertanyaan umum") }}</h2>
+        <section v-if="productFaqs?.length" class="lfx-panel lfx-details lfx-panel-faq"><header class="lfx-panel-header lfx-panel-header-plain"><div><h2>{{ customerText("pages.catalog.show.cc3c98ca", "Pertanyaan umum") }}</h2></div></header><div class="lfx-panel-content">
+            <article class="lf-product-faq lf-product-faq-legacy">
                 <div>
-                    <details v-for="faq in faqs.slice(0,4)" :key="faq.id">
+                    <details v-for="(faq, index) in productFaqs" :key="index + ':' + faq.question">
                         <summary>{{faq.question}}</summary>
                         <p>{{faq.answer}}</p>
                     </details>
                 </div>
             </article>
-        </section>
+        </div></section>
+        </template>
         </div>
 
 
