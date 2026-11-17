@@ -551,8 +551,10 @@ test('PR3 product page splits Keterangan into three panels with hardcoded two-la
     const faq = readFileSync(new URL('../../app/Support/ProductFaq.php', import.meta.url), 'utf8');
 
     // (a) tiga panel terpisah, tanpa nomor langkah
-    assert.match(product, /lfx-panel-description"><header class="lfx-panel-header lfx-panel-header-plain"><div><h2>Deskripsi<\/h2>/);
+    assert.match(product, /lfx-panel-description"><header class="lfx-panel-header lfx-panel-header-plain"><div><h2>Deskripsi \{\{product\.name\}\}<\/h2>/);
+    assert.equal((product.match(/Deskripsi \{\{product\.name\}\}/g) || []).length, 1);
     assert.match(product, /lfx-panel-reviews"><header class="lfx-panel-header lfx-panel-header-plain"><div><h2>\{\{ customerText\("pages\.catalog\.show\.d4d282c6", "Ulasan & rating"\) \}\}<\/h2>/);
+    assert.equal((product.match(/d4d282c6/g) || []).length, 1);
     assert.match(product, /lfx-panel-faq"><header class="lfx-panel-header lfx-panel-header-plain"><div><h2>\{\{ customerText\("pages\.catalog\.show\.cc3c98ca", "Pertanyaan umum"\) \}\}<\/h2>/);
     assert.doesNotMatch(product, /lf-product-details"/);
 

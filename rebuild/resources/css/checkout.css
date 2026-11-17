@@ -426,11 +426,6 @@
 
 /* Keterangan: Deskripsi, Ulasan & rating, dan FAQ adalah tiga panel terpisah tanpa nomor langkah. */
 .lfx .lfx-panel-header.lfx-panel-header-plain{grid-template-columns:minmax(0,1fr)}
-.lfx .lfx-details .lf-review-legacy-head h2 {
-  font-size: 16px;
-  font-weight: 800;
-  line-height: 1.4;
-}
 
 /* PR 6 F16: keep rating and review count visually distinct, even at 360px. */
 .lfx .lf-review-average {
