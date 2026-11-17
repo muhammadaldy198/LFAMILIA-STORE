@@ -140,10 +140,18 @@ const confirmOpen = ref(false);
 const agreed = ref(false);
 const confirmationSnapshot = ref(null);
 const summaryOpen = ref(false);
+const wdpInfoOpen = ref(false);
+const pendingWdpPackage = ref(null);
 let dialogReturnFocus;
 let dialogPreviousOverflow = '';
 function onDialogKey(event) {
-    if (event.key === 'Escape') { if (busy.value === 'order' || busy.value === 'payment') return; voucherOpen.value = false; closeReview(); return; }
+    if (event.key === 'Escape') { 
+        if (busy.value === 'order' || busy.value === 'payment') return; 
+        voucherOpen.value = false; 
+        closeReview(); 
+        closeWdpInfo();
+        return; 
+    }
     if (event.key !== 'Tab') return;
     const dialog = document.querySelector('.lfx-offer-modal, .lfx-modal[role="dialog"]');
     const focusable = [...(dialog?.querySelectorAll('button:not(:disabled), input:not(:disabled), a[href], select:not(:disabled), [tabindex="0"]') || [])];
@@ -152,7 +160,7 @@ function onDialogKey(event) {
     if (event.shiftKey && (document.activeElement === first || !dialog.contains(document.activeElement))) { event.preventDefault(); last.focus(); }
     else if (!event.shiftKey && (document.activeElement === last || !dialog.contains(document.activeElement))) { event.preventDefault(); first.focus(); }
 }
-watch(() => summaryOpen.value || confirmOpen.value || voucherOpen.value, async open => {
+watch(() => summaryOpen.value || confirmOpen.value || voucherOpen.value || wdpInfoOpen.value, async open => {
     if (open) {
         dialogReturnFocus = document.activeElement;
         dialogPreviousOverflow = document.documentElement.style.overflow;
@@ -791,12 +799,49 @@ function scrollToPayment() {
     });
 }
 
+function closeWdpInfo() {
+    wdpInfoOpen.value = false;
+    pendingWdpPackage.value = null;
+}
+
+function confirmWdpSelection() {
+    if (!pendingWdpPackage.value) {
+        closeWdpInfo();
+        return;
+    }
+    const item = pendingWdpPackage.value;
+    closeWdpInfo();
+    selectedPackageId.value = String(item.id);
+    if (errors.value.voucher_code?.[0] === 'Pilih nominal terlebih dahulu untuk melihat voucher yang tersedia.') {
+        const { voucher_code: _voucherCodeError, ...remainingErrors } = errors.value;
+        errors.value = remainingErrors;
+    }
+    invalidateQuote();
+    if (canQuote.value) void loadQuote();
+    if (hasAccountStep.value) scrollToPayment();
+}
+
+function cancelWdpSelection() {
+    closeWdpInfo();
+}
+
 function choosePackage(item) {
     if (item.is_available === false || packageDisabled(item) || busy.value === 'order' || busy.value === 'payment') return;
     if (nominalLocked.value) {
         guideToAccount();
         return;
     }
+    
+    // Deteksi WDP: tampilkan panel info jika paket yang dipilih adalah WDP atau berpindah antar WDP
+    const currentIsWdp = selectedPackage.value?.is_wdp === true;
+    const targetIsWdp = item.is_wdp === true;
+    
+    if (targetIsWdp && (!currentIsWdp || String(selectedPackageId.value) !== String(item.id))) {
+        pendingWdpPackage.value = item;
+        wdpInfoOpen.value = true;
+        return;
+    }
+    
     selectedPackageId.value = String(item.id);
     if (errors.value.voucher_code?.[0] === 'Pilih nominal terlebih dahulu untuk melihat voucher yang tersedia.') {
         const { voucher_code: _voucherCodeError, ...remainingErrors } = errors.value;
@@ -1085,7 +1130,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
     if (checkoutClockTimer) window.clearInterval(checkoutClockTimer);
-    if (summaryOpen.value || confirmOpen.value || voucherOpen.value) document.documentElement.style.overflow = dialogPreviousOverflow;
+    if (summaryOpen.value || confirmOpen.value || voucherOpen.value || wdpInfoOpen.value) document.documentElement.style.overflow = dialogPreviousOverflow;
     window.removeEventListener('keydown', onDialogKey);
     if (contactQuoteTimer) window.clearTimeout(contactQuoteTimer);
     if (nicknameAutoTimer) window.clearTimeout(nicknameAutoTimer);
@@ -1343,6 +1388,23 @@ function closeReview() { summaryOpen.value = false; closeConfirmation(); }
 
 
   <CheckoutVoucherModal v-if="voucherOpen" :vouchers="vouchers" :loading="voucherLoading" :error="voucherError" @close="voucherOpen=false" @apply="applyVoucher"/>
+  
+  <div v-if="wdpInfoOpen" class="lfx-modal-backdrop" @click.self="cancelWdpSelection">
+    <div class="lfx-modal" role="dialog" aria-modal="true" aria-labelledby="wdp-info-title">
+      <div class="lfx-modal-header">
+        <div><small>INFORMASI PENTING</small><h2 id="wdp-info-title">Sebelum Beli Weekly Diamond Pass</h2></div>
+        <button type="button" aria-label="Tutup informasi" @click="cancelWdpSelection">×</button>
+      </div>
+      <div class="lfx-modal-description">
+        <p>Weekly Diamond Pass ada batas pembelian dari Moonton, ngikutin kuota di akun kamu. Cek dulu di dalam game: buka logo diamond, pilih Weekly Diamond Pass — angka kecil di samping sisa hari itu sisa kuota kamu. Contoh (2/10) artinya masih bisa beli 2x lagi. Kalau (0/10), jangan checkout dulu karena WDP barunya bisa gagal masuk.</p>
+      </div>
+      <div class="lfx-modal-buttons">
+        <button type="button" @click="cancelWdpSelection">Cek Nanti</button>
+        <button type="button" class="lfx-primary" @click="confirmWdpSelection">Sudah Saya Cek, Lanjut</button>
+      </div>
+    </div>
+  </div>
+  
   <div v-if="summaryOpen || confirmOpen" class="lfx-modal-backdrop" @click.self="closeReview">
     <div class="lfx-modal" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
       <div class="lfx-modal-header">

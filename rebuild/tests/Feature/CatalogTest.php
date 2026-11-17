@@ -1378,3 +1378,105 @@ class CatalogTest extends TestCase
         $this->assertFalse($package->fresh()->is_active);
     }
 }
+
+    public function test_mobile_legends_weekly_diamond_pass_packages_are_marked_is_wdp(): void
+    {
+        $category = Category::where('slug', 'game')->firstOrFail();
+        DB::table('providers')->where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
+        $providerId = DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
+        
+        $product = Product::create([
+            'category_id' => $category->id,
+            'name' => 'Mobile Legends',
+            'slug' => 'mobile-legends-wdp-test',
+            'fulfillment_mode' => 'AUTO_PROVIDER',
+            'margin_percent' => 10,
+            'is_active' => true,
+            'nickname_game_code' => 'mobile-legends',
+            'nickname_check_enabled' => true,
+            'nickname_user_field_key' => 'user_id',
+            'nickname_server_field_key' => 'zone_id',
+        ]);
+        
+        $wdpPackage = $product->packages()->create([
+            'code' => 'WDP-X1',
+            'name' => 'Weekly Diamond Pass x1',
+            'nominal_value' => 1,
+            'is_active' => true,
+        ]);
+        ProviderMapping::create([
+            'product_package_id' => $wdpPackage->id,
+            'provider_id' => $providerId,
+            'external_sku' => 'MLWDP',
+            'cost_idr' => 20000,
+            'store_cost_idr' => 20000,
+            'is_active' => true,
+        ]);
+        
+        $regularPackage = $product->packages()->create([
+            'code' => '86D',
+            'name' => '86 Diamond',
+            'nominal_value' => 86,
+            'is_active' => true,
+        ]);
+        ProviderMapping::create([
+            'product_package_id' => $regularPackage->id,
+            'provider_id' => $providerId,
+            'external_sku' => 'MLBB86',
+            'cost_idr' => 18000,
+            'store_cost_idr' => 18000,
+            'is_active' => true,
+        ]);
+        
+        $this->get('/catalog/'.$product->slug)->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Catalog/Show')
+                ->where('product.name', 'Mobile Legends')
+                ->has('packages', 2)
+                ->where('packages.0.is_wdp', true)
+                ->where('packages.0.name', 'Weekly Diamond Pass x1')
+                ->where('packages.1.is_wdp', false)
+                ->where('packages.1.name', '86 Diamond')
+            );
+    }
+    
+    public function test_non_mobile_legends_products_have_is_wdp_false(): void
+    {
+        $category = Category::where('slug', 'game')->firstOrFail();
+        DB::table('providers')->where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
+        $providerId = DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
+        
+        $product = Product::create([
+            'category_id' => $category->id,
+            'name' => 'Free Fire',
+            'slug' => 'free-fire-wdp-test',
+            'fulfillment_mode' => 'AUTO_PROVIDER',
+            'margin_percent' => 10,
+            'is_active' => true,
+            'nickname_game_code' => 'free-fire',
+        ]);
+        
+        $package = $product->packages()->create([
+            'code' => 'FF100',
+            'name' => 'Membership Mingguan',
+            'nominal_value' => 1,
+            'is_active' => true,
+        ]);
+        ProviderMapping::create([
+            'product_package_id' => $package->id,
+            'provider_id' => $providerId,
+            'external_sku' => 'FF100',
+            'cost_idr' => 15000,
+            'store_cost_idr' => 15000,
+            'is_active' => true,
+        ]);
+        
+        $this->get('/catalog/'.$product->slug)->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Catalog/Show')
+                ->where('product.name', 'Free Fire')
+                ->has('packages', 1)
+                ->where('packages.0.is_wdp', false)
+                ->where('packages.0.name', 'Membership Mingguan')
+            );
+    }
