@@ -1381,8 +1381,7 @@ class CatalogTest extends TestCase
     public function test_mobile_legends_weekly_diamond_pass_packages_are_marked_is_wdp(): void
     {
         $category = Category::where('slug', 'game')->firstOrFail();
-        DB::table('providers')->where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
-        $providerId = DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
+        $providerId = $this->activateDigiflazzProvider();
 
         $product = Product::create([
             'category_id' => $category->id,
@@ -1397,37 +1396,8 @@ class CatalogTest extends TestCase
             'nickname_server_field_key' => 'zone_id',
         ]);
 
-        $wdpPackage = $product->packages()->create([
-            'code' => 'WDP-X1',
-            'name' => 'Weekly Diamond Pass x1',
-            'nominal_value' => 1,
-            'is_active' => true,
-        ]);
-        ProviderMapping::create([
-            'product_package_id' => $wdpPackage->id,
-            'provider_id' => $providerId,
-            'external_sku' => 'MLWDP',
-            'cost_idr' => 20000,
-            'store_cost_idr' => 20000,
-            'is_active' => true,
-        ]);
-        $this->seedCheckoutDigiflazzCatalog($wdpPackage->id);
-
-        $regularPackage = $product->packages()->create([
-            'code' => '86D',
-            'name' => '86 Diamond',
-            'nominal_value' => 86,
-            'is_active' => true,
-        ]);
-        ProviderMapping::create([
-            'product_package_id' => $regularPackage->id,
-            'provider_id' => $providerId,
-            'external_sku' => 'MLBB86',
-            'cost_idr' => 18000,
-            'store_cost_idr' => 18000,
-            'is_active' => true,
-        ]);
-        $this->seedCheckoutDigiflazzCatalog($regularPackage->id);
+        $this->addPurchasablePackage($product, $providerId, 'WDP-X1', 'Weekly Diamond Pass x1', 1, 'MLWDP', 20000);
+        $this->addPurchasablePackage($product, $providerId, '86D', '86 Diamond', 86, 'MLBB86', 18000);
 
         $this->get('/catalog/'.$product->slug)->assertOk()
             ->assertInertia(fn (Assert $page) => $page
@@ -1444,8 +1414,7 @@ class CatalogTest extends TestCase
     public function test_non_mobile_legends_products_have_is_wdp_false(): void
     {
         $category = Category::where('slug', 'game')->firstOrFail();
-        DB::table('providers')->where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
-        $providerId = DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
+        $providerId = $this->activateDigiflazzProvider();
 
         $product = Product::create([
             'category_id' => $category->id,
@@ -1457,21 +1426,7 @@ class CatalogTest extends TestCase
             'nickname_game_code' => 'free-fire',
         ]);
 
-        $package = $product->packages()->create([
-            'code' => 'FF100',
-            'name' => 'Membership Mingguan',
-            'nominal_value' => 1,
-            'is_active' => true,
-        ]);
-        ProviderMapping::create([
-            'product_package_id' => $package->id,
-            'provider_id' => $providerId,
-            'external_sku' => 'FF100',
-            'cost_idr' => 15000,
-            'store_cost_idr' => 15000,
-            'is_active' => true,
-        ]);
-        $this->seedCheckoutDigiflazzCatalog($package->id);
+        $this->addPurchasablePackage($product, $providerId, 'FF100', 'Membership Mingguan', 1, 'FF100', 15000);
 
         $this->get('/catalog/'.$product->slug)->assertOk()
             ->assertInertia(fn (Assert $page) => $page
@@ -1481,5 +1436,31 @@ class CatalogTest extends TestCase
                 ->where('packages.0.is_wdp', false)
                 ->where('packages.0.name', 'Membership Mingguan')
             );
+    }
+
+    private function activateDigiflazzProvider(): int
+    {
+        DB::table('providers')->where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
+
+        return (int) DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
+    }
+
+    private function addPurchasablePackage(Product $product, int $providerId, string $code, string $name, int $nominalValue, string $sku, int $costIdr): void
+    {
+        $package = $product->packages()->create([
+            'code' => $code,
+            'name' => $name,
+            'nominal_value' => $nominalValue,
+            'is_active' => true,
+        ]);
+        ProviderMapping::create([
+            'product_package_id' => $package->id,
+            'provider_id' => $providerId,
+            'external_sku' => $sku,
+            'cost_idr' => $costIdr,
+            'store_cost_idr' => $costIdr,
+            'is_active' => true,
+        ]);
+        $this->seedCheckoutDigiflazzCatalog($package->id);
     }
 }

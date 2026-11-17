@@ -999,6 +999,9 @@ async function prepareOrder() {
     if (!currentQuote) return;
 
     confirmationSnapshot.value = await buildConfirmationSnapshot(currentQuote);
+    // If the WDP info panel opened while this preparation was in flight, the
+    // buyer is deciding on a different package — do not open confirmation too.
+    if (wdpInfoOpen.value) return;
     agreed.value = false;
     confirmOpen.value = true;
 }
