@@ -111,7 +111,6 @@ const ticketLabel = value => ({
                         <dt>Nama</dt><dd>{{ customer.name }}</dd>
                         <dt>Email</dt><dd>{{ customer.email || 'Belum diisi' }}</dd>
                         <dt>Nomor telepon</dt><dd>{{ customer.phone || 'Belum diisi' }}</dd>
-                        <dt>Papan peringkat</dt><dd>{{ customer.leaderboard_opt_in ? 'Ikut ditampilkan' : 'Tidak ikut' }}</dd>
                         <dt>Aktivitas terakhir</dt><dd>{{ wibDateTime(customer.last_active_at || customer.created_at) }}</dd>
                     </dl>
                 </div>
