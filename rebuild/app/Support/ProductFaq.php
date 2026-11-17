@@ -37,20 +37,27 @@ final class ProductFaq
     /** @var list<array{question: string, answer: string}> */
     private const GENERAL = [
         ['question' => 'Berapa lama top up saya diproses?', 'answer' => 'Otomatis setelah pembayaran terkonfirmasi — umumnya beberapa menit. Kalau sedang antre di provider bisa lebih lama; pantau terus lewat halaman status pesanan.'],
-        ['question' => 'Metode pembayaran apa saja yang tersedia?', 'answer' => 'QRIS, GoPay, Virtual Account, dan saldo LFAMILIA Coin. Biaya admin (kalau ada) selalu tampil jelas di ringkasan sebelum kamu menekan tombol pesan — tidak ada biaya tambahan yang muncul sesudahnya.'],
-        ['question' => 'Bisakah membeli tanpa membuat akun?', 'answer' => 'Bisa. Checkout tamu cukup memakai email dan nomor WhatsApp yang aktif — invoice dan kode akses pesanan dikirim ke keduanya, jadi pastikan tidak salah ketik.'],
-        ['question' => 'Bagaimana cara memeriksa status pesanan saya?', 'answer' => 'Buka halaman cek status pesanan, lalu masukkan nomor invoice dan kode akses dari email atau WhatsApp kamu. Kalau kamu punya akun, semua pesananmu juga tampil di menu pesanan saya setelah login.'],
+        ['question' => 'Metode pembayaran apa saja yang tersedia?', 'answer' => 'Pilihan metode pembayaran tampil lengkap di langkah pembayaran saat kamu checkout (antara lain QRIS, GoPay, Virtual Account, dan saldo LFAMILIA Coin, sesuai yang sedang aktif). Biaya admin (kalau ada) selalu tampil jelas di ringkasan sebelum kamu menekan tombol pesan — tidak ada biaya tambahan yang muncul sesudahnya.'],
+        ['question' => 'Bisakah membeli tanpa membuat akun?', 'answer' => 'Bisa. Checkout tamu cukup memakai email dan nomor WhatsApp yang aktif — invoice dan kode akses pesanan dikirim ke email kamu, jadi pastikan emailnya tidak salah ketik.'],
+        ['question' => 'Bagaimana cara memeriksa status pesanan saya?', 'answer' => 'Buka halaman cek status pesanan, lalu masukkan nomor invoice dan kode akses dari email kamu. Kalau kamu punya akun, semua pesananmu juga tampil di menu pesanan saya setelah login.'],
         ['question' => 'Pembayaran saya berhasil tapi pesanan belum masuk. Apa yang harus saya lakukan?', 'answer' => 'Tunggu beberapa menit, lalu cek status pesananmu. Bila statusnya gagal, hubungi dukungan lewat halaman bantuan dan sertakan nomor invoice kamu — tim kami akan memproses pengiriman ulang ke akun tujuan yang sama.'],
         ['question' => 'Apakah saya bisa meminta pengembalian dana (refund)?', 'answer' => 'Semua pembelian yang sudah diproses bersifat final dan tidak dapat dikembalikan. Pesanan yang gagal terkirim diselesaikan lewat dukungan dengan pengiriman ulang ke akun tujuan yang sama, bukan pengembalian dana — jadi periksa kembali data akunmu sebelum membayar.'],
         ['question' => 'Saya salah memasukkan ID akun. Bisakah pesanan dibatalkan atau dipindahkan?', 'answer' => 'Pesanan yang sudah terkirim mengikuti data yang kamu masukkan dan tidak bisa ditarik kembali atau dipindahkan ke akun lain. Kalau pesananmu belum terkirim, segera hubungi dukungan — perubahan hanya mungkin selama pesanan belum diproses ke provider.'],
         ['question' => 'Bagaimana cara memakai kode voucher?', 'answer' => 'Masukkan kode di kolom voucher diskon sebelum membayar, tekan gunakan, dan potongan harganya langsung tampil di ringkasan pesanan.'],
     ];
 
+    private const MANUAL_PROCESSING_ANSWER = 'Diproses manual oleh admin toko setelah pembayaran terkonfirmasi. Waktunya bisa lebih lama daripada produk otomatis — pantau terus lewat halaman status pesanan.';
+
     /**
      * @return list<array{question: string, answer: string}>
      */
     public static function forProduct(Product $product): array
     {
-        return [...(self::GAME_SPECIFIC[$product->slug] ?? []), ...self::GENERAL];
+        $general = self::GENERAL;
+        if ($product->fulfillment_mode === 'MANUAL') {
+            $general[0]['answer'] = self::MANUAL_PROCESSING_ANSWER;
+        }
+
+        return [...(self::GAME_SPECIFIC[$product->slug] ?? []), ...$general];
     }
 }

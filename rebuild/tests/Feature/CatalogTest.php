@@ -13,6 +13,7 @@ use App\Models\StoreAsset;
 use App\Services\CheckoutPricing;
 use App\Services\DigiflazzCatalogImport;
 use App\Support\OptimizedMedia;
+use App\Support\ProductFaq;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -1460,6 +1461,15 @@ class CatalogTest extends TestCase
         $page = $this->productFaqQuestions('delta-force-garena', 'Delta Force Garena');
         $this->assertCount(8, $page);
         $this->assertSame('Berapa lama top up saya diproses?', $page[0]);
+    }
+
+    public function test_product_faq_processing_answer_follows_fulfillment_mode(): void
+    {
+        $auto = ProductFaq::forProduct(new Product(['slug' => 'delta-force-garena', 'fulfillment_mode' => 'AUTO_PROVIDER']));
+        $manual = ProductFaq::forProduct(new Product(['slug' => 'delta-force-garena', 'fulfillment_mode' => 'MANUAL']));
+        $this->assertSame($auto[0]['question'], $manual[0]['question']);
+        $this->assertStringStartsWith('Otomatis setelah pembayaran terkonfirmasi', $auto[0]['answer']);
+        $this->assertStringStartsWith('Diproses manual oleh admin toko', $manual[0]['answer']);
     }
 
     /** @return list<string> */
