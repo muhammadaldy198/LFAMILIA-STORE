@@ -12,8 +12,10 @@ use Throwable;
  * Rp1.000 belanja (dibulatkan ke bawah), hanya bila belanja minimal
  * Rp150.000. 1 coin = Rp1 saldo dompet, jadi coin ditulis sebagai kredit
  * ledger dompet biasa dengan sumber CASHBACK. Keputusan pemilik: berlaku
- * untuk semua metode bayar, tamu tidak dapat, tanpa masa berlaku dan
- * tanpa batas pakai.
+ * untuk semua metode bayar, tanpa masa berlaku dan tanpa batas pakai.
+ * Pesanan tamu dapat coin bila email tamunya cocok dengan akun terdaftar
+ * (aktif); coin masuk ke dompet akun itu. Risiko salah ketik email
+ * ditanggung pembeli (keputusan pemilik) — sengaja tanpa verifikasi.
  *
  * Class ini TIDAK mengubah status pesanan, TIDAK memotong saldo, dan
  * TIDAK mengirim notifikasi. Earn adalah efek samping: kegagalannya
@@ -93,8 +95,13 @@ class CashbackCoinService
     {
         return DB::transaction(function () use ($orderId): int {
             $order = DB::table('orders')->where('id', $orderId)->lockForUpdate()
-                ->first(['id', 'user_id', 'status', 'snapshot']);
-            if (! $order || $order->user_id === null || $order->status !== 'SUCCESS') {
+                ->first(['id', 'user_id', 'guest_email', 'status', 'snapshot']);
+            if (! $order || $order->status !== 'SUCCESS') {
+                return 0;
+            }
+
+            $recipientUserId = $this->recipientUserId($order);
+            if ($recipientUserId === null) {
                 return 0;
             }
 
@@ -112,8 +119,32 @@ class CashbackCoinService
                 return 0;
             }
 
-            return $this->creditWallet((int) $order->id, (int) $order->user_id, $coins);
+            return $this->creditWallet((int) $order->id, $recipientUserId, $coins);
         }, 3);
+    }
+
+    /**
+     * Penerima coin: pemilik pesanan member (jalur utama). Untuk pesanan
+     * tamu, akun aktif yang emailnya sama persis (tanpa beda huruf besar
+     * kecil) dengan guest_email. Tidak ada akun yang cocok adalah keadaan
+     * normal, jadi dilewati tanpa log.
+     */
+    private function recipientUserId(object $order): ?int
+    {
+        if ($order->user_id !== null) {
+            return (int) $order->user_id;
+        }
+
+        $guestEmail = strtolower(trim((string) $order->guest_email));
+        if ($guestEmail === '') {
+            return null;
+        }
+
+        $userId = DB::table('users')->whereNull('deleted_at')
+            ->whereRaw('LOWER(email) = ?', [$guestEmail])
+            ->orderBy('id')->value('id');
+
+        return $userId === null ? null : (int) $userId;
     }
 
     /**

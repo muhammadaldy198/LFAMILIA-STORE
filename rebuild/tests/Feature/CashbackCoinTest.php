@@ -25,8 +25,8 @@ use Tests\TestCase;
 
 /**
  * Tes cashback LFAMILIA Coin: 1 coin per Rp1.000 basis belanja (subtotal
- * setelah voucher, tanpa biaya kanal), minimal Rp150.000, hanya member,
- * hanya pesanan SUCCESS, masuk tepat sekali dari jalur SUCCESS mana pun,
+ * setelah voucher, tanpa biaya kanal), minimal Rp150.000, untuk member
+ * atau tamu yang emailnya cocok dengan akun terdaftar, hanya pesanan SUCCESS, masuk tepat sekali dari jalur SUCCESS mana pun,
  * dan lencana "+{n} Coin" di payload kartu paket katalog. Aturan bayar
  * saldo wajib penuh sudah dikunci di PaymentWalletTest.
  */
@@ -115,13 +115,14 @@ class CashbackCoinTest extends TestCase
         int $voucherIdr = 0,
         int $feeIdr = 0,
         string $gatewayCode = 'MIDTRANS',
+        string $guestEmail = 'tamu-coin@example.test',
     ): int {
         $catalog = $this->catalogRows();
 
         return (int) DB::table('orders')->insertGetId([
             'order_number' => 'LF-CB-'.strtoupper((string) Str::ulid()),
             'user_id' => $userId,
-            'guest_email' => $userId === null ? 'tamu-coin@example.test' : null,
+            'guest_email' => $userId === null ? $guestEmail : null,
             'guest_phone' => $userId === null ? '081234567890' : null,
             'product_id' => $catalog['product_id'],
             'product_package_id' => $catalog['package_id'],
@@ -202,15 +203,69 @@ class CashbackCoinTest extends TestCase
         $this->assertSame(0, $this->cashbackRowCount($orderId));
     }
 
-    public function test_guest_success_order_earns_nothing(): void
+    public function test_guest_success_order_without_a_matching_account_earns_nothing(): void
     {
-        $orderId = $this->order(null, 'SUCCESS', 153908);
+        $orderId = $this->order(null, 'SUCCESS', 153908, guestEmail: 'tanpa-akun-coin@example.test');
+        $this->assertFalse(DB::table('users')->whereRaw('LOWER(email) = ?', ['tanpa-akun-coin@example.test'])->exists());
         $ledgerBefore = DB::table('wallet_ledger')->count();
 
         $this->assertSame(0, $this->earn($orderId));
 
         $this->assertSame(0, $this->cashbackRowCount($orderId));
         $this->assertSame($ledgerBefore, DB::table('wallet_ledger')->count());
+    }
+
+    public function test_guest_order_with_an_email_matching_an_account_credits_that_account(): void
+    {
+        $account = $this->member('Tamu.Cocok@Example.test', 1000);
+        $orderId = $this->order(null, 'SUCCESS', 153908, guestEmail: 'tamu.cocok@example.test');
+
+        $this->assertSame(153, $this->earn($orderId));
+
+        $this->assertSame(1153, $this->walletBalance($account->id));
+        $entry = DB::table('wallet_ledger')->where('source', 'CASHBACK')
+            ->where('reference_type', 'ORDER')->where('reference_id', (string) $orderId)->sole();
+        $this->assertSame((int) DB::table('wallets')->where('user_id', $account->id)->value('id'), (int) $entry->wallet_id);
+        $this->assertSame(1000, (int) $entry->balance_before_idr);
+        $this->assertSame([1153, 'cashback:order:'.$orderId], [(int) $entry->balance_after_idr, $entry->idempotency_key]);
+    }
+
+    public function test_guest_order_with_a_matching_account_below_minimum_earns_nothing(): void
+    {
+        $account = $this->member('tamu-kecil@example.test', 1000);
+        $orderId = $this->order(null, 'SUCCESS', 149999, guestEmail: 'tamu-kecil@example.test');
+
+        $this->assertSame(0, $this->earn($orderId));
+
+        $this->assertSame(1000, $this->walletBalance($account->id));
+        $this->assertSame(0, $this->cashbackRowCount($orderId));
+    }
+
+    public function test_repeated_earn_for_a_guest_email_order_credits_exactly_once(): void
+    {
+        $account = $this->member('tamu-ulang@example.test');
+        $orderId = $this->order(null, 'SUCCESS', 153908, guestEmail: 'tamu-ulang@example.test');
+        $service = app(CashbackCoinService::class);
+
+        $this->assertSame(153, $service->earnForOrder($orderId));
+        $this->assertSame(0, $service->earnForOrder($orderId));
+        $this->assertSame(0, $service->earnForOrderSafely($orderId));
+
+        $this->assertSame(153, $this->walletBalance($account->id));
+        $this->assertSame(1, $this->cashbackRowCount($orderId));
+    }
+
+    public function test_member_order_is_credited_to_its_owner_not_by_email(): void
+    {
+        $owner = $this->member('pemilik-order@example.test');
+        $sameEmailElsewhere = $this->member('email-lain@example.test');
+        $orderId = $this->order($owner->id, 'SUCCESS', 153908); // guest_email sengaja menunjuk akun lain:
+        DB::table('orders')->where('id', $orderId)->update(['guest_email' => 'email-lain@example.test']);
+
+        $this->assertSame(153, $this->earn($orderId));
+
+        $this->assertSame(153, $this->walletBalance($owner->id));
+        $this->assertSame(0, $this->walletBalance($sameEmailElsewhere->id));
     }
 
     public function test_voucher_discount_reduces_the_basis(): void
@@ -405,8 +460,7 @@ class CashbackCoinTest extends TestCase
 
     private function purchasablePackage(Product $product, int $providerId, string $code, int $priceIdr): void
     {
-        // Markup patok 0: harga jual kartu = modal Digiflazz, jadi angka
-        // lencana bisa diuji persis tanpa bergantung pada persen markup.
+        // Markup patok 0: harga kartu = modal Digiflazz, angka lencana bisa diuji persis.
         $package = $product->packages()->create([
             'code' => $code, 'name' => 'Paket '.$code, 'nominal_value' => $priceIdr,
             'pricing_mode' => 'FIXED', 'margin_fixed_idr' => 0, 'is_active' => true,
