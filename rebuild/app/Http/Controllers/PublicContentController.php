@@ -71,31 +71,45 @@ class PublicContentController
         return SeoMetadata::render('Content/Legal', ['page' => $page]);
     }
 
+    /**
+     * Keputusan pemilik: semua order SUCCESS dihitung, member maupun tamu, dikelompokkan per email
+     * pembeli (email akun untuk member, guest_email untuk tamu). Yang tampil hanya alias samaran.
+     */
     public function leaderboard(Request $request): Response
     {
         $period = $request->query('period') === 'all' ? 'all' : 'month';
-        $query = DB::table('users as users')
-            ->join('orders as orders', 'orders.user_id', '=', 'users.id')
-            ->whereNull('users.deleted_at')
-            ->where('users.leaderboard_opt_in', true)
+        $emailKey = 'LOWER(COALESCE(users.email, orders.guest_email))';
+        $entries = DB::table('orders as orders')
+            ->leftJoin('users as users', fn ($join) => $join
+                ->on('users.id', '=', 'orders.user_id')
+                ->whereNull('users.deleted_at'))
             ->where('orders.status', 'SUCCESS')
             ->when($period === 'month', fn ($q) => $q->where('orders.created_at', '>=', now()->startOfMonth()))
-            ->groupBy('users.id', 'users.name')
+            ->whereRaw("NULLIF({$emailKey}, '') IS NOT NULL")
+            ->groupBy(DB::raw($emailKey))
             ->orderByDesc(DB::raw('SUM(orders.total_idr)'))
             ->orderByDesc(DB::raw('COUNT(orders.id)'))
             ->limit(20)
             ->get([
-                'users.name',
+                DB::raw("{$emailKey} as buyer_email"),
                 DB::raw('COUNT(orders.id) as order_count'),
                 DB::raw('SUM(orders.total_idr) as total_spent'),
             ])->values()->map(fn ($row, int $index): array => [
                 'rank' => $index + 1,
-                'name' => $this->leaderboardName((string) $row->name),
+                'name' => $this->leaderboardAlias((string) $row->buyer_email),
                 'order_count' => (int) $row->order_count,
                 'total_spent' => (int) $row->total_spent,
             ]);
 
-        return SeoMetadata::render('Content/Leaderboard', ['entries' => $query, 'period' => $period]);
+        return SeoMetadata::render('Content/Leaderboard', ['entries' => $entries, 'period' => $period]);
+    }
+
+    /** Alias samaran sama dengan dinding ulasan: 3 huruf pertama local part + 9 bintang. */
+    private function leaderboardAlias(string $email): string
+    {
+        $localPart = strstr($email, '@', true);
+
+        return mb_substr($localPart === false ? $email : $localPart, 0, 3).'*********';
     }
 
     public function tool(string $tool): Response
@@ -180,17 +194,6 @@ class PublicContentController
             ],
             'updatedAt' => now()->toIso8601String(),
         ]);
-    }
-
-    private function leaderboardName(string $name): string
-    {
-        $words = preg_split('/\s+/', trim($name)) ?: [];
-        $words = array_values(array_filter($words, fn (string $word): bool => $word !== ''));
-        if (count($words) < 2) {
-            return $words[0] ?? 'Pelanggan';
-        }
-
-        return $words[0].' '.mb_strtoupper(mb_substr($words[count($words) - 1], 0, 1)).'.';
     }
 
     public function promo(): Response

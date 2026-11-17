@@ -8,7 +8,7 @@ import PhoneCountryPicker from '../../Components/PhoneCountryPicker.vue';
 
 const props = defineProps({ customer: Object, hasPassword: Boolean, hasGoogle: Boolean });
 const page = usePage();
-const profile = useForm({ name: props.customer.name, email: props.customer.email, phone: props.customer.phone, leaderboard_opt_in: Boolean(props.customer.leaderboard_opt_in), current_password: '' });
+const profile = useForm({ name: props.customer.name, email: props.customer.email, phone: props.customer.phone, current_password: '' });
 const password = useForm({ current_password: '', password: '', password_confirmation: '' });
 const removal = useForm({ confirmation: '', password: '' });
 const updatePassword = () => { if (!password.processing) password.put('/account/password', { onFinish: () => password.reset() }); };
@@ -35,10 +35,6 @@ const remove = () => {
             <label class="block">Nomor HP
                 <PhoneCountryPicker v-model="profile.phone" required :invalid="Boolean(profile.errors.phone)" />
                 <span v-if="profile.errors.phone" class="text-sm text-red-300">{{ profile.errors.phone }}</span>
-            </label>
-            <label class="flex items-center justify-between gap-4 rounded-xl border border-slate-800 bg-slate-950/40 p-4">
-                <span><strong class="block text-sm">{{ customerText("pages.customer.profile.db175326", "Tampil di leaderboard") }}</strong><small class="mt-1 block text-xs text-slate-400">{{ customerText("pages.customer.profile.8c806ec", "Jika aktif, hanya nama singkat yang ditampilkan. Email, telepon, dan data game tidak pernah ditampilkan.") }}</small></span>
-                <input v-model="profile.leaderboard_opt_in" type="checkbox" class="size-5 accent-lime-400">
             </label>
             <label v-if="hasPassword" class="block">Kata sandi saat ini (wajib jika mengubah email atau nomor HP)
                 <input v-model="profile.current_password" type="password" autocomplete="current-password" class="mt-1 block w-full rounded-md bg-slate-800 p-3 focus:outline-cyan-300">

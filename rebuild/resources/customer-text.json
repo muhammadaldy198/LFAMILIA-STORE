@@ -1229,16 +1229,6 @@
     "label": "Data akun",
     "default": "Data akun"
   },
-  "pages.customer.profile.db175326": {
-    "group": "Pages/Customer/Profile",
-    "label": "Tampil di leaderboard",
-    "default": "Tampil di leaderboard"
-  },
-  "pages.customer.profile.8c806ec": {
-    "group": "Pages/Customer/Profile",
-    "label": "Jika aktif, hanya nama singkat yang ditampilkan. Email, telepon, dan data game tidak pernah ditampilkan.",
-    "default": "Jika aktif, hanya nama singkat yang ditampilkan. Email, telepon, dan data game tidak pernah ditampilkan."
-  },
   "pages.customer.profile.1c30598a": {
     "group": "Pages/Customer/Profile",
     "label": "Kata sandi saat ini (wajib jika mengubah email)",

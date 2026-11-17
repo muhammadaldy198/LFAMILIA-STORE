@@ -42,7 +42,7 @@ class CustomerAccountController
     public function profile(Request $request): Response
     {
         return Inertia::render('Customer/Profile', [
-            'customer' => $request->user()->only('name', 'email', 'phone', 'leaderboard_opt_in'),
+            'customer' => $request->user()->only('name', 'email', 'phone'),
             'hasPassword' => (bool) $request->user()->password,
             'hasGoogle' => (bool) $request->user()->google_sub,
         ]);
@@ -57,7 +57,6 @@ class CustomerAccountController
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
             'phone' => ['required', 'regex:/^\+?[0-9]{10,16}$/'],
             'current_password' => ['nullable', 'string'],
-            'leaderboard_opt_in' => ['sometimes', 'boolean'],
         ]);
         $email = $data['email'];
         $normalized = CreateNewUser::normalizePhone($data['phone']);
@@ -98,9 +97,6 @@ class CustomerAccountController
                     'email' => $email,
                     'phone' => $data['phone'],
                     'phone_normalized' => $normalized,
-                    'leaderboard_opt_in' => array_key_exists('leaderboard_opt_in', $data)
-                        ? (bool) $data['leaderboard_opt_in']
-                        : (bool) $user->leaderboard_opt_in,
                     'email_verified_at' => $emailChanged ? null : $user->email_verified_at,
                 ];
                 if ($passwordlessEmailChange) {
