@@ -54,7 +54,7 @@ const periodCards = computed(() => {
         cards.push(
             ['Omzet', rupiah(m.paid_revenue_idr), 'pesanan yang sudah dibayar'],
             ['Laba kotor', rupiah(m.gross_profit_idr), 'omzet dikurangi modal dan biaya'],
-            ['Diskon diberikan', rupiah(m.discount_idr), 'voucher dan tingkat member'],
+            ['Diskon diberikan', rupiah(m.discount_idr), 'voucher'],
         );
     }
     return cards;
