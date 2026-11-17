@@ -381,6 +381,8 @@ test('product FAQ renders one accordion card per question, one open at a time, w
     // Semua tertutup secara bawaan; klik kartu terbuka menutupnya; klik kartu lain menggantikannya.
     assert.match(product, /const openFaqIndex = ref\(null\);/);
     assert.match(product, /openFaqIndex\.value = openFaqIndex\.value === index \? null : index;/);
+    // Pindah produk lewat Inertia (komponen dipakai ulang) menutup semua kartu lagi.
+    assert.match(product, /watch\(\(\) => props\.product\?\.slug, \(\) => \{ openFaqIndex\.value = null; \}\);/);
 
     // Kotak tunggal lama hilang; tiap kartu punya kotaknya sendiri.
     assert.match(css, /\.lfx \.lf-product-faq\{display:flex;flex-direction:column;gap:10px\}/);

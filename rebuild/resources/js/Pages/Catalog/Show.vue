@@ -189,6 +189,8 @@ const openFaqIndex = ref(null);
 const toggleFaq = index => {
     openFaqIndex.value = openFaqIndex.value === index ? null : index;
 };
+// Inertia memakai ulang komponen ini saat pindah ke produk lain; tutup semua kartu agar FAQ produk baru tidak tampil terbuka sendiri.
+watch(() => props.product?.slug, () => { openFaqIndex.value = null; });
 
 /** Show region warnings only for the currently entered account. */
 const regionWarning = computed(() => accountValidationSignature.value === accountInputSignature()
