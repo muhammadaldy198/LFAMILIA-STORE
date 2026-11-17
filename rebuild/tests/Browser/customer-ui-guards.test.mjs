@@ -563,7 +563,9 @@ test('PR3 product page splits Keterangan into three panels with hardcoded two-la
     assert.ok(faq.includes("'Apakah saya bisa meminta pengembalian dana (refund)?'"));
     assert.ok(faq.includes("'Bagaimana cara memakai kode voucher?', 'answer' => 'Masukkan kode di kolom voucher diskon sebelum membayar, tekan gunakan, dan potongan harganya langsung tampil di ringkasan pesanan.'"));
     assert.ok(faq.includes('sesuai yang sedang aktif'));
-    assert.ok(faq.includes('invoice dan kode akses pesanan dikirim ke email kamu'));
+    assert.ok(faq.includes('invoice pesanan dikirim ke email kamu'));
+    assert.ok(faq.includes('nomor invoice atau nomor WhatsApp yang kamu pakai saat checkout'));
+    assert.ok(!faq.includes('kode akses'));
     assert.ok(faq.includes('Diproses manual oleh admin toko setelah pembayaran terkonfirmasi'));
     assert.ok(!faq.includes('dikirim ke keduanya'));
     assert.ok(faq.includes('bila kegagalannya sudah terkonfirmasi, memproses pengiriman ulang'));
