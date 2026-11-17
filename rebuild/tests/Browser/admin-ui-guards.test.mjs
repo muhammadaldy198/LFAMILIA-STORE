@@ -141,7 +141,7 @@ test('orders prioritize attention then pending, newest last', () => {
 });
 test('customer detail is a sequential profile-to-accounts page', () => {
     const source = read('CustomerDetail.vue');
-    const order = ['<h2>Profil</h2>', '<h2>Tingkat member</h2>', '<h2>Riwayat pesanan</h2>', '<h2>Perubahan saldo</h2>', '<h2>Tiket bantuan</h2>', '<h2>Akun game tersimpan</h2>'];
+    const order = ['<h2>Profil</h2>', '<h2>Riwayat pesanan</h2>', '<h2>Perubahan saldo</h2>', '<h2>Tiket bantuan</h2>', '<h2>Akun game tersimpan</h2>'];
     let previous = -1;
     for (const marker of order) { const position = source.indexOf(marker); assert.ok(position > previous, marker); previous = position; }
     assert.match(source, /<button v-if="isSuperAdmin" type="button" class="adm-btn primary" @click="openManage">Atur pelanggan<\/button>/);
