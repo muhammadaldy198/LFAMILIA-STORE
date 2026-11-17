@@ -466,6 +466,33 @@ function formatDateId(value) {
     return date.toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta', day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+function formatCountId(value) {
+    return Number(value || 0).toLocaleString('id-ID');
+}
+
+const reviewClockFormat = new Intl.DateTimeFormat('id-ID', {
+    timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+});
+
+/** Review-only timestamp, e.g. "17 Nov 2026, 19.24" (WIB). Reuses formatDateId unchanged and appends the clock. */
+function formatReviewTime(value) {
+    const day = formatDateId(value);
+    if (!day) return '';
+    const part = Object.fromEntries(reviewClockFormat.formatToParts(new Date(value)).map(item => [item.type, item.value]));
+    return `${day}, ${part.hour}.${part.minute}`;
+}
+
+const reviewAverageLabel = computed(() => props.reviewStats?.total ? Number(props.reviewStats.average || 0).toFixed(1) : '–');
+
+const reviewDistribution = computed(() => {
+    const counts = props.reviewStats?.distribution || {};
+    const total = Number(props.reviewStats?.total || 0);
+    return [5, 4, 3, 2, 1].map((star) => {
+        const count = Number(counts[star] || 0);
+        return { star, count, percent: total > 0 ? Math.min(100, Math.round((count / total) * 1000) / 10) : 0 };
+    });
+});
+
 function normalizeWhatsapp(value) {
     const text = String(value || '');
     const hasPlus = text.trim().startsWith('+');
@@ -1295,73 +1322,57 @@ function closeReview() { summaryOpen.value = false; closeConfirmation(); }
         </div></section>
 
         <section class="lfx-panel lfx-details lfx-panel-reviews"><header class="lfx-panel-header lfx-panel-header-plain"><div><h2>{{ customerText("pages.catalog.show.d4d282c6", "Ulasan & rating") }}</h2></div></header><div class="lfx-panel-content">
-            <section class="lf-product-review-section lf-review-legacy">
-                <div class="lf-review-legacy-head">
-                    <div>
-                        <p class="lf-eyebrow">{{ customerText("pages.catalog.show.cd75c0db", "PENILAIAN PELANGGAN") }}</p>
-                        <p>{{ customerText("pages.catalog.show.c47f9331", "Ulasan hanya dapat dibuat setelah pembelian berhasil. Akun dan pembeli guest sama-sama bisa memberi ulasan terverifikasi.") }}</p>
-                    </div>
-                    <div class="lf-review-average">
-                        <span>★</span>
-                        <strong>{{reviewStats?.total ? Number(reviewStats.average || 0).toFixed(1) : '–'}}</strong>
-                        <small>{{reviewStats?.total || 0}} ulasan</small>
-                    </div>
+            <section class="lf-product-review-section lf-review-legacy lf-review-live">
+                <div class="lf-review-hero">
+                    <p class="lf-review-hero-score"><span class="lf-review-hero-star" aria-hidden="true">★</span><strong>{{reviewAverageLabel}}</strong><small>/ 5.0</small></p>
+                    <p class="lf-review-hero-total">dari {{formatCountId(reviewStats?.total || 0)}} ulasan</p>
                 </div>
 
-                <div class="lf-review-legacy-grid">
-                    <form v-if="customer" class="lf-review-form" @submit.prevent="submitReview">
-                        <div class="lf-review-form-intro">
-                            <span class="lf-review-message-icon">
-                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg>
-                            </span>
-                            <div>
-                                <h3>{{ customerText("pages.catalog.show.c8372e3c", "Bagikan pengalamanmu") }}</h3>
-                                <p>{{ customerText("pages.catalog.show.a0486d80", "Pembelian dari akunmu akan diverifikasi otomatis.") }}</p>
-                            </div>
-                        </div>
+                <ul class="lf-review-bars" aria-label="Sebaran rating">
+                    <li v-for="row in reviewDistribution" :key="row.star">
+                        <span class="lf-review-bar-label">{{row.star}} ★</span>
+                        <span class="lf-review-bar-track" aria-hidden="true"><span class="lf-review-bar-fill" :style="{ width: row.percent + '%' }"></span></span>
+                        <span class="lf-review-bar-count">{{formatCountId(row.count)}}</span>
+                    </li>
+                </ul>
 
-                        <div class="lf-review-stars-input">
-                            <button v-for="value in [1,2,3,4,5]" :key="value" type="button" :aria-label="value + ' bintang'" :class="{active:value<=reviewRating}" @click="reviewRating=value">★</button>
+                <div class="lf-review-list">
+                    <article v-for="review in reviews" :key="review.id" class="lf-review-row">
+                        <div class="lf-review-row-head">
+                            <strong>{{review.display_name}}</strong>
+                            <time v-if="review.published_at || review.created_at" :datetime="review.published_at || review.created_at">{{formatReviewTime(review.published_at || review.created_at)}}</time>
                         </div>
-
-                        <input v-model="reviewTitle" maxlength="100" :placeholder="customerText('pages.catalog.show.attribute.placeholder.5f3aed05', 'Masukkan judul singkat (opsional)')">
-                        <textarea v-model="reviewBody" required minlength="5" maxlength="1200" :placeholder="customerText('pages.catalog.show.attribute.placeholder.98e9ee9', 'Ceritakan pengalaman transaksimu')"></textarea>
-                        <p v-if="reviewMessage" class="lf-review-success">{{reviewMessage}}</p>
-                        <p v-if="reviewError" class="lf-review-error">{{reviewError}}</p>
-                        <button class="lf-review-submit" :disabled="reviewSaving">{{reviewSaving ? 'Menyimpan...' : 'Simpan ulasan'}}</button>
-                    </form>
-                    <div v-else class="lf-review-form lf-review-guest-secure">
-                        <div class="lf-review-form-intro">
-                            <span class="lf-review-message-icon">
-                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg>
-                            </span>
-                            <div>
-                                <h3>{{ customerText("pages.catalog.show.2f7670c2", "Ulasan guest tetap tersedia") }}</h3>
-                                <p>{{ customerText("pages.catalog.show.958a1e28", "Buka status pesanan memakai invoice + kode akses aman. Setelah pesanan Berhasil, formulir ulasan tersedia di halaman pesanan itu.") }}</p>
-                            </div>
+                        <div class="lf-review-row-meta">
+                            <span class="lf-review-row-stars" role="img" :aria-label="review.rating + ' dari 5 bintang'"><span v-for="value in [1,2,3,4,5]" :key="value" :class="value <= review.rating ? 'on' : 'off'" aria-hidden="true">★</span></span>
+                            <span v-if="review.verified_purchase" class="lf-review-row-verified">✓ {{ customerText("pages.catalog.show.5c206dfe", "Pembelian terverifikasi") }}</span>
                         </div>
-                        <Link href="/orders/check" class="lf-review-submit lf-review-secure-link">{{ customerText("pages.catalog.show.19b24f16", "Buka status pesanan") }}</Link>
-                    </div>
-
-                    <div class="lf-review-list">
-                        <article v-for="review in reviews" :key="review.id">
-                            <div class="lf-review-card-head">
-                                <div>
-                                    <strong>{{review.display_name}}</strong>
-                                    <span v-if="review.verified_purchase" class="lf-review-verified">
-                                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 12 2 2 4-4"/><path d="M12 2l2.1 2.1 3-.1.9 2.8 2.5 1.7-1 2.8 1 2.8-2.5 1.7-.9 2.8-3-.1L12 22l-2.1-2.1-3 .1-.9-2.8-2.5-1.7 1-2.8-1-2.8L6 7.2 6.9 4l3 .1z"/></svg>
-                                        {{ customerText("pages.catalog.show.5c206dfe", "Pembelian terverifikasi") }}
-                                    </span>
-                                </div>
-                                <span class="lf-review-rating">★ {{review.rating}}</span>
-                            </div>
-                            <h3 v-if="review.title">{{review.title}}</h3>
-                            <p>{{review.body}}</p>
-                            <time v-if="review.published_at || review.created_at">{{formatDateId(review.published_at || review.created_at)}}</time>
-                        </article>
-                        <div v-if="!reviews?.length" class="lf-review-empty">{{ customerText("pages.catalog.show.97359d9e", "Belum ada ulasan untuk produk ini.") }}</div>
-                    </div>
+                        <h3 v-if="review.title">{{review.title}}</h3>
+                        <p>{{review.body}}</p>
+                    </article>
+                    <div v-if="!reviews?.length" class="lf-review-empty">{{ customerText("pages.catalog.show.97359d9e", "Belum ada ulasan untuk produk ini.") }}</div>
                 </div>
+
+                <form v-if="customer" class="lf-review-form" @submit.prevent="submitReview">
+                    <div class="lf-review-form-intro">
+                        <span class="lf-review-message-icon">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg>
+                        </span>
+                        <div>
+                            <h3>{{ customerText("pages.catalog.show.c8372e3c", "Bagikan pengalamanmu") }}</h3>
+                            <p>{{ customerText("pages.catalog.show.a0486d80", "Pembelian dari akunmu akan diverifikasi otomatis.") }}</p>
+                        </div>
+                    </div>
+
+                    <div class="lf-review-stars-input">
+                        <button v-for="value in [1,2,3,4,5]" :key="value" type="button" :aria-label="value + ' bintang'" :class="{active:value<=reviewRating}" @click="reviewRating=value">★</button>
+                    </div>
+
+                    <input v-model="reviewTitle" maxlength="100" :placeholder="customerText('pages.catalog.show.attribute.placeholder.5f3aed05', 'Masukkan judul singkat (opsional)')">
+                    <textarea v-model="reviewBody" required minlength="5" maxlength="1200" :placeholder="customerText('pages.catalog.show.attribute.placeholder.98e9ee9', 'Ceritakan pengalaman transaksimu')"></textarea>
+                    <p v-if="reviewMessage" class="lf-review-success">{{reviewMessage}}</p>
+                    <p v-if="reviewError" class="lf-review-error">{{reviewError}}</p>
+                    <button class="lf-review-submit" :disabled="reviewSaving">{{reviewSaving ? 'Menyimpan...' : 'Simpan ulasan'}}</button>
+                </form>
             </section>
         </div></section>
 

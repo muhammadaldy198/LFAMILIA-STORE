@@ -18,6 +18,7 @@ use App\Services\PaymentRoutingService;
 use App\Services\StorefrontContentService;
 use App\Support\OptimizedMedia;
 use App\Support\ProductFaq;
+use App\Support\ReviewWall;
 use App\Support\SeoMetadata;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -307,7 +308,7 @@ class CatalogController
         $user = auth('web')->user();
         $reviews = ProductReview::where('product_id', $product->id)->where('is_active', true)
             ->where(fn ($query) => $query->whereNull('published_at')->orWhere('published_at', '<=', now()))
-            ->orderByDesc('published_at')->orderByDesc('id')->limit(30)
+            ->orderByDesc('published_at')->orderByDesc('id')->limit(5)
             ->get(['id', 'display_name', 'rating', 'title', 'body', 'published_at', 'created_at'])
             ->map(fn (ProductReview $review): array => [
                 ...$review->only('id', 'display_name', 'rating', 'title', 'body'),
@@ -317,6 +318,39 @@ class CatalogController
             ]);
         $reviewStats = ProductReview::where('product_id', $product->id)->where('is_active', true)
             ->selectRaw('COUNT(*) as total, COALESCE(AVG(rating), 0) as average')->first();
+        // Same filter as total/average so the star bars always add up to the headline count.
+        $ratingCounts = ProductReview::where('product_id', $product->id)->where('is_active', true)
+            ->selectRaw('rating, COUNT(*) as aggregate')->groupBy('rating')
+            ->pluck('aggregate', 'rating');
+        $reviewDistribution = [];
+        foreach ([5, 4, 3, 2, 1] as $star) {
+            $reviewDistribution[$star] = (int) ($ratingCounts[$star] ?? 0);
+        }
+        $reviewStatsPayload = [
+            'total' => (int) ($reviewStats?->total ?? 0),
+            'average' => round((float) ($reviewStats?->average ?? 0), 1),
+            'distribution' => $reviewDistribution,
+        ];
+        // Dinding ulasan (ReviewWall) digabung dengan ulasan asli dari database:
+        // total, sebaran bintang, dan daftar terbaru adalah gabungan keduanya.
+        $wall = ReviewWall::forProduct($product, now()->toImmutable());
+        if ($wall !== null) {
+            $databaseTotal = $reviewStatsPayload['total'];
+            $databasePoints = (int) round(((float) ($reviewStats?->average ?? 0)) * $databaseTotal);
+            $mergedTotal = $databaseTotal + $wall['total'];
+            foreach ([5, 4, 3, 2, 1] as $star) {
+                $reviewDistribution[$star] += $wall['distribution'][$star];
+            }
+            $reviewStatsPayload = [
+                'total' => $mergedTotal,
+                'average' => $mergedTotal > 0 ? round(($databasePoints + $wall['points']) / $mergedTotal, 1) : 0.0,
+                'distribution' => $reviewDistribution,
+            ];
+            $reviews = $reviews->concat($wall['entries'])
+                ->sortByDesc(fn (array $review): int => strtotime($review['published_at'] ?? $review['created_at'] ?? '') ?: 0)
+                ->take(5)
+                ->values();
+        }
         $savedAccounts = $user ? SavedGameAccount::where('user_id', $user->id)
             ->where('product_id', $product->id)->orderByDesc('id')->get()
             ->map(fn (SavedGameAccount $saved): array => [
@@ -390,10 +424,7 @@ class CatalogController
                 })->values(),
             'savedAccounts' => $savedAccounts,
             'reviews' => $reviews,
-            'reviewStats' => [
-                'total' => (int) ($reviewStats?->total ?? 0),
-                'average' => round((float) ($reviewStats?->average ?? 0), 1),
-            ],
+            'reviewStats' => $reviewStatsPayload,
             'productFaqs' => ProductFaq::forProduct($product),
             'initialPackageId' => $request->filled('package')
                 ? (string) ($packages->first(fn (array $item): bool => $item['is_available'] === true
