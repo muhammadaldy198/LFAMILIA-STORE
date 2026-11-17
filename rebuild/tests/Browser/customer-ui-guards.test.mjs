@@ -566,6 +566,8 @@ test('PR3 product page splits Keterangan into three panels with hardcoded two-la
     assert.ok(faq.includes('invoice dan kode akses pesanan dikirim ke email kamu'));
     assert.ok(faq.includes('Diproses manual oleh admin toko setelah pembayaran terkonfirmasi'));
     assert.ok(!faq.includes('dikirim ke keduanya'));
+    assert.ok(faq.includes('bila kegagalannya sudah terkonfirmasi, memproses pengiriman ulang'));
+    assert.ok(faq.includes('setelah kegagalannya terkonfirmasi, dukungan memproses pengiriman ulang'));
     assert.equal((faq.match(/'question' =>/g) || []).length, 17);
 
     // (c) tidak lagi memakai prop faqs dari database
