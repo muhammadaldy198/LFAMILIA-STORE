@@ -21,6 +21,7 @@ class FulfillmentManualService
         private readonly TransactionalEmailService $emails,
         private readonly FulfillmentSupportService $support,
         private readonly FulfillmentSendingService $sending,
+        private readonly CashbackCoinService $cashback,
     ) {}
 
     private const DEFINITIVE_DIGIFLAZZ_FAILURE_CODES = [
@@ -345,6 +346,7 @@ class FulfillmentManualService
                 'order',
                 $order->id
             );
+            $this->cashback->earnAfterCommit((int) $order->id);
             $this->emails->queueOrderCompleted((int) $order->id, 'manual');
         }, 3);
     }
