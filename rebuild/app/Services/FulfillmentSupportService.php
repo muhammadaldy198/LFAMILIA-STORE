@@ -27,6 +27,7 @@ class FulfillmentSupportService
         private readonly VoucherStockService $voucherStock,
         private readonly AdminNotificationService $notifications,
         private readonly TransactionalEmailService $emails,
+        private readonly CashbackCoinService $cashback,
     ) {}
 
     public function event(int $orderId, string $type, ?string $from, ?string $to, array $metadata): void
@@ -393,6 +394,7 @@ class FulfillmentSupportService
                 $order->id
             );
             $this->emails->queueOrderCompleted((int) $order->id, 'stock');
+            $this->cashback->earnAfterCommit((int) $order->id);
         }, 3);
     }
 

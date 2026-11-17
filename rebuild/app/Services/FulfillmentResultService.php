@@ -24,6 +24,7 @@ class FulfillmentResultService
         private readonly AdminNotificationService $notifications,
         private readonly TransactionalEmailService $emails,
         private readonly FulfillmentSupportService $support,
+        private readonly CashbackCoinService $cashback,
     ) {}
 
     public function reconcileAttempt(int $attemptId, bool $manual = false): void
@@ -301,6 +302,7 @@ class FulfillmentResultService
                     $order->id
                 );
                 $this->emails->queueOrderCompleted((int) $order->id, 'digiflazz');
+                $this->cashback->earnAfterCommit((int) $order->id);
 
                 return false;
             }
