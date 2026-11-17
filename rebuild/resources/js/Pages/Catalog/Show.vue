@@ -1273,7 +1273,7 @@ function closeReview() { summaryOpen.value = false; closeConfirmation(); }
                         <img v-if="item.image_url" class="lfx-item-art" :src="item.image_url" alt="" loading="lazy" decoding="async" width="128" height="128"/>
                         <span v-else class="lfx-diamond" aria-hidden="true">✦</span>
                       </span>
-                      <span class="lfx-nominal-bottom"><b>{{item.is_available===false?'Tidak tersedia':packageDisabled(item)?'Tidak memenuhi syarat':formatIdr(item.price_idr)}}</b><span class="lfx-nominal-tags"><span v-if="customer&&item.cashback_coin>0&&item.is_available!==false&&!packageDisabled(item)" class="lfx-coin-pill">+{{item.cashback_coin}}<span class="lfx-coin-unit"> Coin</span></span><small v-if="String(selectedPackageId)===String(item.id)">DIPILIH</small></span></span>
+                      <span class="lfx-nominal-bottom"><b>{{item.is_available===false?'Tidak tersedia':packageDisabled(item)?'Tidak memenuhi syarat':formatIdr(item.price_idr)}}</b><span class="lfx-nominal-tags"><span v-if="item.cashback_coin>0&&item.is_available!==false&&!packageDisabled(item)" class="lfx-coin-pill">+{{item.cashback_coin}}<span class="lfx-coin-unit"> Coin</span></span><small v-if="String(selectedPackageId)===String(item.id)">DIPILIH</small></span></span>
                     </div>
                   </div>
                 </section>

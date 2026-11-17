@@ -595,22 +595,9 @@ test('cashback coin pill sits right of the price, only when cashback_coin > 0, a
     assert.ok(row.indexOf('formatIdr(item.price_idr)') < row.indexOf('lfx-coin-pill'));
     assert.ok(row.indexOf('lfx-coin-pill') < row.indexOf('DIPILIH'));
 
-    // Pill hanya dirender untuk pelanggan login (prop customer null untuk tamu,
-    // tamu tidak pernah dapat coin) dan bila backend memberi cashback_coin > 0.
-    assert.match(product, /^\s*customer: Object,$/m);
-    assert.ok(controller.includes("'customer' => $user ? ["), 'prop customer harus null untuk tamu');
-    assert.match(row, /<\/b><span class="lfx-nominal-tags"><span v-if="customer&&item\.cashback_coin>0&&item\.is_available!==false&&!packageDisabled\(item\)" class="lfx-coin-pill">\+\{\{item\.cashback_coin\}\}<span class="lfx-coin-unit"> Coin<\/span><\/span>/);
+    // Pill hanya dirender bila backend memberi cashback_coin > 0 (dan harga tampil).
+    assert.match(row, /<\/b><span class="lfx-nominal-tags"><span v-if="item\.cashback_coin>0&&item\.is_available!==false&&!packageDisabled\(item\)" class="lfx-coin-pill">\+\{\{item\.cashback_coin\}\}<span class="lfx-coin-unit"> Coin<\/span><\/span>/);
     assert.equal((product.match(/class="lfx-coin-pill"/g) || []).length, 1);
-
-    // Evaluasi syarat v-if pill apa adanya: tamu tidak melihat pill, member melihatnya.
-    const pillCondition = row.match(/<span v-if="([^"]+)" class="lfx-coin-pill">/)[1];
-    const showsPill = new Function('customer', 'item', 'packageDisabled', `return Boolean(${pillCondition});`);
-    const item = { cashback_coin: 153, is_available: true };
-    const enabled = () => false;
-    assert.equal(showsPill(null, item, enabled), false, 'tamu tidak boleh melihat pill coin');
-    assert.equal(showsPill({ name: 'Member' }, item, enabled), true, 'member tetap melihat pill coin');
-    assert.equal(showsPill({ name: 'Member' }, { ...item, cashback_coin: 0 }, enabled), false);
-    assert.equal(showsPill({ name: 'Member' }, item, () => true), false);
 
     // Teks DIPILIH tetap ada saat kartu terpilih.
     assert.match(row, /<small v-if="String\(selectedPackageId\)===String\(item\.id\)">DIPILIH<\/small><\/span><\/span>$/);
