@@ -43,7 +43,6 @@ class AdminSupportRestorationTest extends TestCase
             'phone' => $phone,
             'phone_normalized' => CreateNewUser::normalizePhone($phone),
             'password' => Hash::make('customer-support-password'),
-            'membership_tier_code' => 'BASIC',
         ]);
     }
 

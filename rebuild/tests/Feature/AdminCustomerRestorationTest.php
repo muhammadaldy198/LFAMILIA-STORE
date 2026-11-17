@@ -41,9 +41,6 @@ class AdminCustomerRestorationTest extends TestCase
 
     private function customer(array $overrides = []): User
     {
-        $tier = $overrides['membership_tier_code'] ?? 'BASIC';
-        unset($overrides['membership_tier_code']);
-
         $user = User::create(array_replace([
             'name' => 'Customer Test',
             'email' => bin2hex(random_bytes(8)).'@example.test',
@@ -56,7 +53,7 @@ class AdminCustomerRestorationTest extends TestCase
         $trusted = array_intersect_key(array_replace([
             'email_verified_at' => now(),
         ], $overrides), array_flip(['email_verified_at', 'google_sub', 'last_active_at']));
-        $user->forceFill(array_merge($trusted, ['membership_tier_code' => $tier]))->saveQuietly();
+        $user->forceFill($trusted)->saveQuietly();
 
         return $user;
     }
@@ -69,19 +66,17 @@ class AdminCustomerRestorationTest extends TestCase
             'name' => 'Alya Gold',
             'email' => 'alya-gold@example.test',
             'phone' => '081299991111',
-            'membership_tier_code' => 'GOLD',
             'google_sub' => 'google-secret-subject-never-render',
             'last_active_at' => now(),
         ]);
         $this->customer([
             'name' => 'Other Customer',
             'email_verified_at' => null,
-            'membership_tier_code' => 'BASIC',
         ]);
 
         DB::table('wallets')->where('user_id', $target->id)->update(['balance_idr' => 25000]);
 
-        $this->get('/admin/customers?q=081299991111&tier=GOLD&verification=verified&activity=active_30d')
+        $this->get('/admin/customers?q=081299991111&verification=verified&activity=active_30d')
             ->assertOk()
             ->assertDontSee('google-secret-subject-never-render')
             ->assertInertia(fn (Assert $page) => $page
@@ -93,9 +88,11 @@ class AdminCustomerRestorationTest extends TestCase
                 ->where('customers.data.0.google_linked', true)
                 ->where('customers.data.0.email_verified', true)
                 ->where('customers.data.0.balance_idr', 25000)
-                ->where('customers.data.0.membership_tier_code', 'GOLD')
+                ->missing('customers.data.0.membership_tier_code')
+                ->missing('customers.data.0.membership_mode')
                 ->has('summary')
-                ->has('membershipTiers'));
+                ->missing('membershipTiers')
+                ->missing('membershipRules'));
     }
 
     public function test_customer_summary_uses_page_scoped_aggregates_without_correlated_queries(): void
@@ -218,6 +215,10 @@ class AdminCustomerRestorationTest extends TestCase
                 ->component('Admin/CustomerDetail')
                 ->where('customer.id', $user->id)
                 ->where('customer.google_linked', true)
+                ->missing('customer.membership_tier_code')
+                ->missing('customer.membership_mode')
+                ->missing('membershipProfile')
+                ->missing('membershipTiers')
                 ->has('orders.data', 1)
                 ->has('topups', 1)
                 ->has('tickets', 1)
@@ -241,10 +242,6 @@ class AdminCustomerRestorationTest extends TestCase
             'amount_idr' => 5000,
             'reason' => 'Koreksi saldo',
             'idempotency_key' => 'customer-denied-wallet-0001',
-        ])->assertForbidden();
-
-        $this->put('/admin/customers/'.$user->id.'/membership', [
-            'membership_tier_code' => 'SILVER',
         ])->assertForbidden();
 
         $this->delete('/admin/customers/'.$user->id)->assertForbidden();
@@ -362,30 +359,14 @@ class AdminCustomerRestorationTest extends TestCase
         $this->assertSame(1, DB::table('wallet_ledger')->where('wallet_id', $user->wallet->id)->count());
     }
 
-    public function test_super_admin_membership_can_switch_manual_and_back_to_automatic(): void
+    public function test_membership_assignment_route_is_gone_for_super_admin(): void
     {
         $this->login('SUPER_ADMIN');
         $user = $this->customer();
 
         $this->put('/admin/customers/'.$user->id.'/membership', [
             'membership_tier_code' => 'SILVER',
-        ])->assertRedirect()->assertSessionHasNoErrors();
-
-        $user->refresh();
-        $this->assertSame('MANUAL', $user->membership_mode);
-        $this->assertSame('SILVER', $user->membership_tier_code);
-        $this->assertSame('SILVER', $user->membership_override_code);
-
-        $this->put('/admin/customers/'.$user->id.'/membership', [
-            'membership_tier_code' => 'AUTO',
-        ])->assertRedirect()->assertSessionHasNoErrors();
-
-        $user->refresh();
-        $this->assertSame('AUTO', $user->membership_mode);
-        $this->assertNull($user->membership_override_code);
-        $this->assertSame(2, DB::table('audit_logs')
-            ->where('action', 'customer.membership.updated')
-            ->where('target_id', (string) $user->id)->count());
+        ])->assertNotFound();
     }
 
     public function test_empty_account_deletion_purges_saved_game_account_personal_data(): void

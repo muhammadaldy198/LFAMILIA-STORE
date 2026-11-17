@@ -57,7 +57,7 @@ Bagian ini menyatakan **kode tersedia**, bukan "sudah dipakai pelanggan".
 - Guest: belanja, lacak pesanan dengan kode akses, tiket bantuan
 - Member: profil, nomor WhatsApp, riwayat, saldo, tiket, akun game tersimpan, notifikasi
 - Ulasan pembeli: terbit langsung, admin dapat menghapus permanen
-- Tingkatan member 6 (BASIC…MAFIA), naik dari total belanja; diskon per tingkat diatur admin
+- Tidak ada tingkatan member (sistem tingkat BASIC…MAFIA dihapus; keputusan pemilik)
 - Leaderboard anonim (opt-in)
 - Login email (verifikasi link) + Google
 

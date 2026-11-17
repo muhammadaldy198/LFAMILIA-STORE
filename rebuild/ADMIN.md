@@ -9,7 +9,7 @@ Panel admin memakai Laravel + Vue/Inertia. Hak akses selalu diperiksa di server;
 - **SUPER_ADMIN** — semua izin, termasuk operasi khusus super.
 - **ADMIN** — hanya izin granular yang diberikan kepadanya.
 
-Tidak ada peran Staff yang aktif. Tingkat membership pelanggan (BASIC sampai MAFIA) bukan peran admin.
+Tidak ada peran Staff yang aktif.
 
 Izin granular didefinisikan di `AdminPermissionService` dan mencakup dashboard, pesanan, pengiriman, katalog, konten, provider, pembayaran, pelanggan, voucher, dukungan, laporan, pengaturan, dan notifikasi.
 
@@ -42,7 +42,7 @@ Satu-satunya sumber menu adalah `AdminPermissionService::menu()`. Urutan dan kel
 - **Provider** — registry provider dan kesehatan mapping; bukan editor secret.
 - **Pembayaran** — channel, keadaan gateway, maintenance, routing, QRIS Manual, dan kontrol top-up. Kredensial tidak dimasukkan lewat rute pembayaran.
 - **Laporan** — angka operasional; keuangan sensitif dibatasi untuk Super Admin.
-- **Pelanggan** — profil, riwayat, tingkat membership, dan operasi wallet sesuai peran. Penyesuaian saldo hanya lewat alur resmi yang berledger.
+- **Pelanggan** — profil, riwayat, dan operasi wallet sesuai peran. Penyesuaian saldo hanya lewat alur resmi yang berledger.
 - **Layanan Pelanggan** — tiket, percakapan, dan balasan cepat.
 - **Notifikasi** — notifikasi operasional panel.
 - **Template Email & Notifikasi** — templat pesan keluar.

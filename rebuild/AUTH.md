@@ -25,13 +25,9 @@ Super Admin awal dibuat secara interaktif dengan command aplikasi; tidak ada boo
 
 `ADMIN` memakai permission granular dan authorization selalu diperiksa server-side. Menyembunyikan menu di Vue bukan authorization.
 
-## Customer tier bukan Admin role
+## Akun customer bukan Admin role
 
-Membership customer:
-
-BASIC → SILVER → GOLD → DIAMOND → PLATINUM → MAFIA
-
-Tier ini dipakai untuk customer membership/benefit/pricing dan tidak memberi akses Admin.
+Akun customer tidak memberi akses Admin. Customer tidak punya tingkatan membership; sistem tingkatan sudah dihapus.
 
 ## Session/security
 

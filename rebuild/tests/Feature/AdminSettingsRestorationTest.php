@@ -60,48 +60,19 @@ class AdminSettingsRestorationTest extends TestCase
                 ->has('summary'));
     }
 
-    public function test_membership_rules_are_managed_from_customers_and_saved_with_existing_guard(): void
+    public function test_membership_rule_management_is_gone_from_customers_and_settings(): void
     {
         $this->login();
-        DB::table('membership_tiers')->where('code', 'SILVER')->update([
-            'requirements' => json_encode(['minimum_spend_idr' => 100000, 'legacy_flag' => true], JSON_THROW_ON_ERROR),
-            'benefits' => json_encode(['discount_bps' => 150, 'benefit_notes' => 'Prioritas layanan', 'legacy_benefit' => 'keep'], JSON_THROW_ON_ERROR),
-        ]);
 
         $this->get('/admin/customers')->assertOk()->assertInertia(fn (Assert $page) => $page
             ->component('Admin/Customers')
-            ->has('membershipRules', 6)
-            ->where('membershipRules.1.code', 'SILVER')
-            ->where('membershipRules.1.minimum_spend_idr', 100000)
-            ->where('membershipRules.1.discount_percent', 1.5)
-            ->where('membershipRules.1.benefit_notes', 'Prioritas layanan')
-            ->where('membershipRules.1.has_legacy_requirements', true)
-            ->where('membershipRules.1.has_legacy_benefits', true));
+            ->missing('membershipRules')
+            ->missing('membershipTiers')
+            ->missing('canManageMembershipRules'));
 
         $this->put('/admin/settings/membership/SILVER', [
-            'is_active' => true, 'minimum_spend_idr' => 150000, 'discount_percent' => 2, 'benefit_notes' => 'Dukungan prioritas',
-        ])->assertRedirect()->assertSessionHasNoErrors();
-
-        $this->assertEqualsCanonicalizing(['minimum_spend_idr' => 150000, 'legacy_flag' => true], json_decode((string) DB::table('membership_tiers')->where('code', 'SILVER')->value('requirements'), true));
-        $this->assertEqualsCanonicalizing(['discount_bps' => 200, 'benefit_notes' => 'Dukungan prioritas', 'legacy_benefit' => 'keep'], json_decode((string) DB::table('membership_tiers')->where('code', 'SILVER')->value('benefits'), true));
-    }
-
-    public function test_regular_admin_with_settings_permission_can_edit_membership_rules(): void
-    {
-        $this->login('ADMIN', ['settings.manage', 'customers.view']);
-
-        $this->get('/admin/customers')->assertOk()->assertInertia(fn (Assert $page) => $page
-            ->component('Admin/Customers')
-            ->where('canManageMembershipRules', true));
-    }
-
-    public function test_regular_admin_without_settings_permission_cannot_edit_membership_rules(): void
-    {
-        $this->login('ADMIN', ['customers.view']);
-
-        $this->get('/admin/customers')->assertOk()->assertInertia(fn (Assert $page) => $page
-            ->component('Admin/Customers')
-            ->where('canManageMembershipRules', false));
+            'is_active' => true, 'minimum_spend_idr' => 150000, 'discount_percent' => 2, 'benefit_notes' => '',
+        ])->assertNotFound();
     }
 
     public function test_regular_admin_with_permission_can_manage_settings_but_cannot_export(): void
@@ -202,68 +173,6 @@ class AdminSettingsRestorationTest extends TestCase
         ]))->assertSessionHasErrors(['instagram_url', 'support_url']);
     }
 
-    public function test_friendly_membership_update_preserves_legacy_metadata_and_is_audited(): void
-    {
-        $admin = $this->login();
-
-        DB::table('membership_tiers')->where('code', 'GOLD')->update([
-            'requirements' => json_encode([
-                'minimum_spend_idr' => 100000,
-                'legacy_requirement' => 'keep',
-            ], JSON_THROW_ON_ERROR),
-            'benefits' => json_encode([
-                'discount_bps' => 100,
-                'legacy_benefit' => 'keep',
-            ], JSON_THROW_ON_ERROR),
-        ]);
-
-        $this->put('/admin/settings/membership/GOLD', [
-            'is_active' => true,
-            'minimum_spend_idr' => 250000,
-            'discount_percent' => 2.75,
-            'benefit_notes' => "Prioritas layanan\nBonus promo tertentu",
-        ])->assertRedirect()->assertSessionHasNoErrors();
-
-        $tier = DB::table('membership_tiers')->where('code', 'GOLD')->firstOrFail();
-        $requirements = json_decode((string) $tier->requirements, true, 512, JSON_THROW_ON_ERROR);
-        $benefits = json_decode((string) $tier->benefits, true, 512, JSON_THROW_ON_ERROR);
-
-        $this->assertSame(250000, $requirements['minimum_spend_idr']);
-        $this->assertSame('keep', $requirements['legacy_requirement']);
-        $this->assertSame(275, $benefits['discount_bps']);
-        $this->assertSame('keep', $benefits['legacy_benefit']);
-        $this->assertSame("Prioritas layanan\nBonus promo tertentu", $benefits['benefit_notes']);
-
-        $this->assertDatabaseHas('audit_logs', [
-            'actor_type' => 'admin_user',
-            'actor_id' => (string) $admin->id,
-            'action' => 'membership_tier.updated',
-            'target_type' => 'membership_tier',
-            'target_id' => 'GOLD',
-        ]);
-    }
-
-    public function test_legacy_membership_json_payload_remains_compatible(): void
-    {
-        $this->login();
-
-        $this->put('/admin/settings/membership/SILVER', [
-            'is_active' => true,
-            'requirements' => '{"minimum_spend_idr":150000}',
-            'benefits' => '{"discount_bps":225}',
-        ])->assertRedirect()->assertSessionHasNoErrors();
-
-        $tier = DB::table('membership_tiers')->where('code', 'SILVER')->firstOrFail();
-        $this->assertSame(
-            ['minimum_spend_idr' => 150000],
-            json_decode((string) $tier->requirements, true, 512, JSON_THROW_ON_ERROR)
-        );
-        $this->assertSame(
-            ['discount_bps' => 225],
-            json_decode((string) $tier->benefits, true, 512, JSON_THROW_ON_ERROR)
-        );
-    }
-
     public function test_safe_configuration_export_is_super_only_audited_and_excludes_credentials(): void
     {
         $admin = $this->login();
@@ -297,6 +206,7 @@ class AdminSettingsRestorationTest extends TestCase
         $this->assertStringNotContainsString('should-never-export', $content);
         $this->assertStringNotContainsString('super-secret-value', $content);
         $this->assertStringNotContainsString('integration_credentials', $content);
+        $this->assertStringNotContainsString('membership_tiers', $content);
 
         $this->assertDatabaseHas('audit_logs', [
             'actor_id' => (string) $admin->id,
@@ -312,11 +222,5 @@ class AdminSettingsRestorationTest extends TestCase
 
         $this->get('/admin/settings')->assertForbidden();
         $this->put('/admin/settings', $this->storePayload())->assertForbidden();
-        $this->put('/admin/settings/membership/SILVER', [
-            'is_active' => true,
-            'minimum_spend_idr' => 100000,
-            'discount_percent' => 1,
-            'benefit_notes' => '',
-        ])->assertForbidden();
     }
 }

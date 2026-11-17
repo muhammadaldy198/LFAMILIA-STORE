@@ -164,7 +164,6 @@ class AdminM9Test extends TestCase
             'email_verified_at' => now(),
             'phone' => '081234567890',
             'password' => Hash::make('VeryStrongPassword123!'),
-            'membership_tier_code' => 'BASIC',
         ]);
 
         $admin = $this->admin(['dashboard.view', 'customers.view', 'customers.wallet']);
@@ -290,7 +289,7 @@ class AdminM9Test extends TestCase
         $this->assertTrue($super->is_active);
     }
 
-    public function test_membership_configuration_and_manual_tier_change_are_audited(): void
+    public function test_removed_membership_admin_routes_return_not_found_even_for_super_admin(): void
     {
         $super = $this->superAdmin();
         $this->actingAs($super, 'admin');
@@ -299,28 +298,11 @@ class AdminM9Test extends TestCase
             'is_active' => true,
             'requirements' => '{"minimum_spend_idr":100000}',
             'benefits' => '{"discount_bps":100}',
-        ])->assertRedirect();
+        ])->assertNotFound();
 
-        $tier = DB::table('membership_tiers')->where('code', 'SILVER')->first();
-        $this->assertStringContainsString('minimum_spend_idr', (string) $tier->requirements);
-        $this->assertSame(1, DB::table('audit_logs')
-            ->where('action', 'membership_tier.updated')->where('target_id', 'SILVER')->count());
-
-        $user = User::create([
-            'name' => 'Member User',
-            'email' => 'member-'.bin2hex(random_bytes(4)).'@example.test',
-            'email_verified_at' => now(),
-            'phone' => '081234567899',
-            'password' => Hash::make('VeryStrongPassword123!'),
-            'membership_tier_code' => 'BASIC',
-        ]);
-        $this->put('/admin/customers/'.$user->id.'/membership', [
+        $this->put('/admin/customers/1/membership', [
             'membership_tier_code' => 'SILVER',
-        ])->assertRedirect();
-
-        $this->assertSame('SILVER', $user->fresh()->membership_tier_code);
-        $this->assertSame(1, DB::table('audit_logs')
-            ->where('action', 'customer.membership.updated')->where('target_id', (string) $user->id)->count());
+        ])->assertNotFound();
     }
 
     public function test_auth_email_notifications_are_queued_for_resend_delivery(): void
@@ -331,7 +313,6 @@ class AdminM9Test extends TestCase
             'email' => 'mail-'.bin2hex(random_bytes(4)).'@example.test',
             'phone' => '081234567811',
             'password' => Hash::make('VeryStrongPassword123!'),
-            'membership_tier_code' => 'BASIC',
         ]);
 
         $user->sendEmailVerificationNotification();

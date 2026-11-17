@@ -15,7 +15,6 @@ const links=[
  {href:'/account/codes',label:'Kode'},
  {href:'/account/game-accounts',label:'Akun Game'},
  {href:'/account/notifications',label:'Notifikasi'},
- {href:'/account/membership',label:'Membership'},
  {href:'/account/tickets',label:'Tiket'},
  {href:'/account/profile',label:'Profil'},
 ];

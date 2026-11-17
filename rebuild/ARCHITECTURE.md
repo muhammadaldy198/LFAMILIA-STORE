@@ -68,7 +68,7 @@ Login pelanggan dan login admin terpisah.
 
 - **Pelanggan:** session web Fortify — daftar, login, logout, lupa/reset kata sandi, Google OAuth lewat Socialite bila integrasinya aktif, profil/akun.
 - **Admin:** guard dan tabel terpisah, peran `SUPER_ADMIN` atau `ADMIN`. `ADMIN` memakai izin granular yang diperiksa di server; `SUPER_ADMIN` berakses penuh termasuk operasi khusus super.
-- Tingkat membership pelanggan (BASIC → SILVER → GOLD → DIAMOND → PLATINUM → MAFIA) bukan peran admin dan tidak memberi hak panel apa pun.
+- Akun pelanggan tidak memberi hak panel apa pun; hak panel hanya datang dari akun admin.
 - OTP WhatsApp tidak digunakan.
 
 ## Batas secret

@@ -4,10 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Services\AdminAuditService;
-use App\Services\AdminPermissionService;
 use App\Services\CustomerAccountDeletion;
 use App\Services\CustomerCleanupService;
-use App\Services\MembershipService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -23,8 +21,6 @@ class AdminCustomerController
     {
         $filters = $request->validate([
             'q' => ['nullable', 'string', 'max:100'],
-            'tier' => ['nullable', 'string', 'max:20'],
-            'membership_mode' => ['nullable', Rule::in(['AUTO', 'MANUAL'])],
             'verification' => ['nullable', Rule::in(['verified', 'unverified'])],
             'activity' => ['nullable', Rule::in(['active_30d', 'inactive_30d'])],
             'orders' => ['nullable', Rule::in(['with_orders', 'without_orders'])],
@@ -33,8 +29,6 @@ class AdminCustomerController
 
         $filters = [
             'q' => mb_substr(trim((string) ($filters['q'] ?? '')), 0, 100),
-            'tier' => strtoupper(trim((string) ($filters['tier'] ?? ''))),
-            'membership_mode' => strtoupper(trim((string) ($filters['membership_mode'] ?? ''))),
             'verification' => (string) ($filters['verification'] ?? ''),
             'activity' => (string) ($filters['activity'] ?? ''),
             'orders' => (string) ($filters['orders'] ?? ''),
@@ -52,8 +46,6 @@ class AdminCustomerController
                         ->orWhere('users.phone', 'like', $like);
                 });
             })
-            ->when($filters['tier'] !== '', fn ($query) => $query->where('users.membership_tier_code', $filters['tier']))
-            ->when($filters['membership_mode'] !== '', fn ($query) => $query->where('users.membership_mode', $filters['membership_mode']))
             ->when($filters['verification'] === 'verified', fn ($query) => $query->whereNotNull('users.email_verified_at'))
             ->when($filters['verification'] === 'unverified', fn ($query) => $query->whereNull('users.email_verified_at'))
             ->when($filters['activity'] === 'active_30d', fn ($query) => $query->whereRaw('COALESCE(users.last_active_at, users.created_at) >= ?', [now()->subDays(30)]))
@@ -72,10 +64,6 @@ class AdminCustomerController
                 'users.phone',
                 'users.email_verified_at',
                 'users.google_sub',
-                'users.membership_tier_code',
-                'users.membership_mode',
-                'users.membership_override_code',
-                'users.membership_progress_bonus_idr',
                 'users.leaderboard_opt_in',
                 'users.last_active_at',
                 'users.created_at',
@@ -124,12 +112,6 @@ class AdminCustomerController
                 'phone' => $row->phone,
                 'email_verified' => $row->email_verified_at !== null,
                 'google_linked' => filled($row->google_sub),
-                'membership_tier_code' => (string) $row->membership_tier_code,
-                'membership_mode' => (string) $row->membership_mode,
-                'membership_assignment' => $row->membership_mode === 'MANUAL'
-                    ? ($row->membership_override_code ?: $row->membership_tier_code)
-                    : 'AUTO',
-                'membership_progress_bonus_idr' => (int) $row->membership_progress_bonus_idr,
                 'leaderboard_opt_in' => (bool) $row->leaderboard_opt_in,
                 'balance_idr' => (int) ($row->balance_idr ?? 0),
                 'order_count' => (int) ($orders?->order_count ?? 0),
@@ -151,28 +133,8 @@ class AdminCustomerController
 
         return Inertia::render('Admin/Customers', [
             'isSuperAdmin' => $request->user('admin')?->role === 'SUPER_ADMIN',
-            'canManageMembershipRules' => app(AdminPermissionService::class)->allows($request->user('admin'), 'settings.manage'),
             'customers' => $customers,
             'filters' => $filters,
-            'membershipTiers' => DB::table('membership_tiers')
-                ->where('is_active', true)->orderBy('rank')->get(['code', 'rank']),
-            'membershipRules' => DB::table('membership_tiers')->orderBy('rank')->get()
-                ->map(function (object $tier): array {
-                    $requirements = json_decode((string) $tier->requirements, true) ?: [];
-                    $benefits = json_decode((string) $tier->benefits, true) ?: [];
-
-                    return [
-                        'code' => (string) $tier->code,
-                        'is_internal' => in_array((string) $tier->code, MembershipService::INTERNAL_CODES, true),
-                        'rank' => (int) $tier->rank,
-                        'is_active' => (bool) $tier->is_active,
-                        'minimum_spend_idr' => max(0, (int) ($requirements['minimum_spend_idr'] ?? 0)),
-                        'discount_percent' => round(max(0, min(10000, (int) ($benefits['discount_bps'] ?? 0))) / 100, 2),
-                        'benefit_notes' => (string) ($benefits['benefit_notes'] ?? ''),
-                        'has_legacy_requirements' => count(array_diff_key($requirements, ['minimum_spend_idr' => true])) > 0,
-                        'has_legacy_benefits' => count(array_diff_key($benefits, ['discount_bps' => true, 'benefit_notes' => true])) > 0,
-                    ];
-                })->values(),
             'cleanupSettings' => app(CustomerCleanupService::class)->settings(),
             'summary' => [
                 'total' => (clone $activeUsers)->count(),
@@ -188,11 +150,10 @@ class AdminCustomerController
         ]);
     }
 
-    public function show(Request $request, int $userId, MembershipService $membership): Response
+    public function show(Request $request, int $userId): Response
     {
         $user = User::query()->whereNull('deleted_at')->findOrFail($userId);
         $wallet = $user->wallet;
-        $membershipProfile = $membership->profile($user);
 
         $orders = DB::table('orders')
             ->join('products', 'products.id', '=', 'orders.product_id')
@@ -258,18 +219,10 @@ class AdminCustomerController
                 'email_verified_at' => $user->email_verified_at,
                 'google_linked' => filled($user->google_sub),
                 'has_password' => filled($user->password),
-                'membership_tier_code' => $user->membership_tier_code,
-                'membership_mode' => $user->membership_mode,
-                'membership_assignment' => $user->membership_mode === 'MANUAL'
-                    ? ($user->membership_override_code ?: $user->membership_tier_code)
-                    : 'AUTO',
                 'leaderboard_opt_in' => (bool) $user->leaderboard_opt_in,
                 'last_active_at' => $user->last_active_at,
                 'created_at' => $user->created_at,
             ],
-            'membershipProfile' => $membershipProfile,
-            'membershipTiers' => DB::table('membership_tiers')
-                ->where('is_active', true)->orderBy('rank')->get(['code', 'rank']),
             'balanceIdr' => (int) ($wallet?->balance_idr ?? 0),
             'orders' => $orders,
             'ledger' => $ledger,
@@ -426,48 +379,5 @@ class AdminCustomerController
         return back()->with('status', $applied
             ? 'Saldo pelanggan berhasil disesuaikan.'
             : 'Kunci ini sudah pernah diproses untuk pelanggan ini; saldo tidak ditambah lagi.');
-    }
-
-    public function updateMembership(
-        Request $request,
-        int $userId,
-        AdminAuditService $audit,
-        MembershipService $membership,
-    ): RedirectResponse {
-        $data = $request->validate([
-            'membership_tier_code' => ['required', 'string', 'max:20'],
-        ]);
-        $value = strtoupper(trim((string) $data['membership_tier_code']));
-        if ($value !== 'AUTO'
-            && ! DB::table('membership_tiers')->where('code', $value)->where('is_active', true)->exists()) {
-            throw ValidationException::withMessages([
-                'membership_tier_code' => 'Tier membership tidak valid.',
-            ]);
-        }
-
-        $user = User::query()->whereNull('deleted_at')->findOrFail($userId);
-        $before = $user->only([
-            'membership_tier_code',
-            'membership_mode',
-            'membership_override_code',
-            'membership_progress_bonus_idr',
-        ]);
-        $membership->setMode($user, $value);
-        $after = $user->fresh()->only([
-            'membership_tier_code',
-            'membership_mode',
-            'membership_override_code',
-            'membership_progress_bonus_idr',
-        ]);
-        $audit->record(
-            $request,
-            'customer.membership.updated',
-            'user',
-            $userId,
-            $before,
-            $after,
-        );
-
-        return back()->with('status', 'Membership pelanggan diperbarui.');
     }
 }

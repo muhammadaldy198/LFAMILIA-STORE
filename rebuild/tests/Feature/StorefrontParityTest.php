@@ -362,7 +362,6 @@ class StorefrontParityTest extends TestCase
             'email_verified_at' => now(),
             'phone' => '081234567890',
             'password' => Hash::make('VeryStrongPassword123!'),
-            'membership_tier_code' => 'BASIC',
         ]);
 
         $this->actingAs($user);

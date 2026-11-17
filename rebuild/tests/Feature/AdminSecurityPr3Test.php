@@ -3,10 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\AdminUser;
-use App\Models\MembershipTier;
-use App\Models\User;
 use App\Services\AdminManualOrderService;
-use App\Services\MembershipService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -27,17 +24,6 @@ class AdminSecurityPr3Test extends TestCase
             'role' => $role,
             'permissions' => $role === 'SUPER_ADMIN' ? null : $permissions,
             'is_active' => true,
-        ]);
-    }
-
-    private function customer(): User
-    {
-        return User::create([
-            'name' => 'Security membership customer',
-            'email' => 'pr3-member-'.bin2hex(random_bytes(5)).'@example.test',
-            'password' => Hash::make('PR3-member-test-password'),
-            'membership_tier_code' => 'BASIC',
-            'membership_mode' => 'AUTO',
         ]);
     }
 
@@ -114,154 +100,6 @@ class AdminSecurityPr3Test extends TestCase
 
         $staff = $this->admin('ADMIN', ['orders.view']);
         $this->actingAs($staff, 'admin')->withSession(['admin.password_confirmed_at' => time()])->post('/admin/orders/manual', [...$payload, 'idempotency_key' => (string) Str::uuid()])->assertForbidden();
-    }
-
-    public function test_auto_membership_never_selects_internal_mafia_even_when_minimum_is_zero(): void
-    {
-        $user = $this->customer();
-        $mafia = MembershipTier::where('code', 'MAFIA')->firstOrFail();
-        $mafia->forceFill(['requirements' => ['minimum_spend_idr' => 0]])->save();
-        $platinum = MembershipTier::where('code', 'PLATINUM')->firstOrFail();
-        $platinum->forceFill(['requirements' => ['minimum_spend_idr' => 1000000], 'is_active' => true])->save();
-
-        $service = app(MembershipService::class);
-        $this->assertSame('BASIC', $service->sync($user)['code']);
-        $this->assertSame('BASIC', $user->fresh()->membership_tier_code);
-
-        $user->forceFill(['membership_progress_bonus_idr' => 2000000])->save();
-        $profile = $service->sync($user);
-        $this->assertSame('PLATINUM', $profile['code']);
-        $this->assertSame('PLATINUM', $user->fresh()->membership_tier_code);
-        $this->assertNull($profile['next_code']);
-    }
-
-    public function test_auto_floor_preserves_saved_tier_until_silver_minimum_is_reached(): void
-    {
-        $user = $this->customer();
-        MembershipTier::where('code', 'BASIC')->firstOrFail()->forceFill(['is_active' => false])->save();
-        MembershipTier::where('code', 'SILVER')->firstOrFail()->forceFill(['requirements' => ['minimum_spend_idr' => 100000], 'is_active' => true])->save();
-        $service = app(MembershipService::class);
-
-        $this->assertSame('BASIC', $service->sync($user)['code']);
-        $this->assertSame('BASIC', $user->fresh()->membership_tier_code);
-        $user->forceFill(['membership_progress_bonus_idr' => 100000])->save();
-        $this->assertSame('SILVER', $service->sync($user)['code']);
-    }
-
-    public function test_internal_tier_rejects_both_minimum_inputs_and_allows_other_updates(): void
-    {
-        $admin = $this->admin();
-        $this->actingAs($admin, 'admin');
-
-        $this->put('/admin/settings/membership/MAFIA', [
-            'is_active' => true, 'minimum_spend_idr' => 0,
-            'discount_percent' => 0, 'benefit_notes' => 'Manual only',
-        ])->assertSessionHasErrors('minimum_spend_idr');
-
-        $this->put('/admin/settings/membership/MAFIA', [
-            'is_active' => true, 'requirements' => '{"minimum_spend_idr":0}',
-            'benefits' => '{"benefit_notes":"manual"}',
-        ])->assertSessionHasErrors('requirements');
-
-        $this->put('/admin/settings/membership/MAFIA', [
-            'is_active' => true, 'discount_percent' => 0, 'benefit_notes' => 'Internal only',
-        ])->assertRedirect()->assertSessionHasNoErrors();
-        $tier = MembershipTier::where('code', 'MAFIA')->firstOrFail();
-        $this->assertSame('Internal only', $tier->benefits['benefit_notes']);
-
-        $this->put('/admin/settings/membership/MAFIA', [
-            'is_active' => false,
-        ])->assertRedirect()->assertSessionHasNoErrors();
-        $this->assertFalse(MembershipTier::where('code', 'MAFIA')->firstOrFail()->is_active);
-
-        $this->put('/admin/settings/membership/MAFIA', [
-            'is_active' => true, 'requirements' => '{"notes":"manual only"}',
-            'benefits' => '{"benefit_notes":"still internal"}',
-        ])->assertRedirect()->assertSessionHasNoErrors();
-    }
-
-    public function test_manual_mafia_assignment_keeps_its_existing_discount(): void
-    {
-        $user = $this->customer();
-        $service = app(MembershipService::class);
-        $service->setMode($user, 'MAFIA');
-        $this->assertSame('MAFIA', $service->sync($user)['code']);
-        $this->assertSame('MAFIA', $service->discount($user, 100000)['tier_code']);
-    }
-
-    public function test_switching_manual_mafia_to_auto_revokes_internal_pricing_without_eligible_floor(): void
-    {
-        $user = $this->customer();
-        $mafia = MembershipTier::where('code', 'MAFIA')->firstOrFail();
-        $mafia->forceFill(['benefits' => ['discount_bps' => 2500]])->save();
-        MembershipTier::where('code', 'BASIC')->firstOrFail()->forceFill(['is_active' => false])->save();
-        MembershipTier::where('code', 'SILVER')->firstOrFail()->forceFill([
-            'requirements' => ['minimum_spend_idr' => 100000],
-            'is_active' => true,
-        ])->save();
-
-        $service = app(MembershipService::class);
-        $service->setMode($user, 'MAFIA');
-        $this->assertSame(25000, $service->discount($user, 100000)['amount_idr']);
-
-        $service->setMode($user, 'AUTO');
-        $profile = $service->sync($user);
-        $this->assertSame('AUTO', $profile['mode']);
-        $this->assertSame('BASIC', $profile['code']);
-        $this->assertNull($user->fresh()->membership_override_code);
-        $this->assertSame(0, $service->discount($user, 100000)['amount_idr']);
-    }
-
-    public function test_inactive_manual_gold_is_not_restored_when_returning_to_auto(): void
-    {
-        $user = $this->customer();
-        $gold = MembershipTier::where('code', 'GOLD')->firstOrFail();
-        $gold->forceFill(['benefits' => ['discount_bps' => 2000]])->save();
-        MembershipTier::where('code', 'BASIC')->firstOrFail()->forceFill(['is_active' => false])->save();
-        MembershipTier::where('code', 'SILVER')->firstOrFail()->forceFill([
-            'requirements' => ['minimum_spend_idr' => 100000],
-            'is_active' => true,
-        ])->save();
-
-        $service = app(MembershipService::class);
-        $service->setMode($user, 'GOLD');
-        $this->assertSame(20000, $service->discount($user, 100000)['amount_idr']);
-
-        $gold->forceFill(['is_active' => false])->save();
-        $service->setMode($user, 'AUTO');
-        $profile = $service->sync($user);
-        $this->assertSame('AUTO', $profile['mode']);
-        $this->assertSame('BASIC', $profile['code']);
-        $this->assertSame('BASIC', $user->fresh()->membership_tier_code);
-        $this->assertSame(0, $service->discount($user, 100000)['amount_idr']);
-    }
-
-    public function test_active_manual_gold_must_requalify_before_auto_fallback(): void
-    {
-        $user = $this->customer();
-        $gold = MembershipTier::where('code', 'GOLD')->firstOrFail();
-        $gold->forceFill([
-            'requirements' => ['minimum_spend_idr' => 200000],
-            'benefits' => ['discount_bps' => 2000],
-            'is_active' => true,
-        ])->save();
-        MembershipTier::where('code', 'BASIC')->firstOrFail()->forceFill(['is_active' => false])->save();
-        MembershipTier::where('code', 'SILVER')->firstOrFail()->forceFill([
-            'requirements' => ['minimum_spend_idr' => 100000],
-            'is_active' => true,
-        ])->save();
-
-        $service = app(MembershipService::class);
-        $service->setMode($user, 'GOLD');
-        $this->assertSame(20000, $service->discount($user, 100000)['amount_idr']);
-
-        $service->setMode($user, 'AUTO');
-        $profile = $service->sync($user);
-        $this->assertSame('AUTO', $profile['mode']);
-        $this->assertSame(0, $profile['progress_bonus_idr']);
-        $this->assertSame('BASIC', $profile['code']);
-        $this->assertSame('BASIC', $user->fresh()->membership_tier_code);
-        $this->assertSame(0, $service->discount($user, 100000)['amount_idr']);
     }
 
     public function test_orders_view_without_customers_view_can_see_contact_on_order_detail_only(): void

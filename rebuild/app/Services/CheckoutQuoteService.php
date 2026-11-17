@@ -17,7 +17,6 @@ class CheckoutQuoteService
     public function __construct(
         private readonly CheckoutPricing $pricing,
         private readonly PaymentRoutingService $paymentRouting,
-        private readonly MembershipService $membership,
         private readonly CheckoutVoucherService $vouchers,
     ) {}
 
@@ -34,9 +33,6 @@ class CheckoutQuoteService
         // tersedia — syarat lingkup harga dan keberadaan voucher yang
         // bersarang membentuk satu makna daftar yang ditawarkan.
         $price = $this->pricing->forPackage($packageId);
-        $member = $user
-            ? $this->membership->discount($user, $price['subtotal_idr'])
-            : ['amount_idr' => 0, 'tier_code' => null, 'discount_bps' => 0, 'profile' => null];
         $now = now();
 
         $candidates = DB::table('vouchers')
@@ -75,8 +71,7 @@ class CheckoutQuoteService
                     $user,
                     $guestEmail,
                     $guestPhone,
-                    false,
-                    (int) $member['amount_idr']
+                    false
                 );
             } catch (ValidationException) {
                 continue;
@@ -110,17 +105,13 @@ class CheckoutQuoteService
         ?string $guestPhone,
     ): array {
         $price = $this->pricing->forPackage($packageId);
-        $member = $user
-            ? $this->membership->discount($user, $price['subtotal_idr'])
-            : ['amount_idr' => 0, 'tier_code' => null, 'discount_bps' => 0, 'profile' => null];
         $voucher = $this->vouchers->voucher(
             $voucherCode,
             $price,
             $user,
             $guestEmail,
             $guestPhone,
-            false,
-            (int) $member['amount_idr']
+            false
         );
         $route = $this->paymentRouting->resolve($paymentChannelCode, false, 'order');
         if ($route['gateway_code'] === 'WALLET' && ! $user) {
@@ -128,17 +119,18 @@ class CheckoutQuoteService
                 'payment_channel_code' => 'Saldo hanya tersedia untuk akun customer.',
             ]);
         }
-        $discount = (int) $member['amount_idr'] + (int) $voucher['discount_idr'];
+        $discount = (int) $voucher['discount_idr'];
         $chargeable = $price['subtotal_idr'] - $discount;
         $fee = $this->paymentRouting->fee($chargeable, $route);
 
         return [
             'subtotal_idr' => $price['subtotal_idr'],
-            'member_discount_idr' => (int) $member['amount_idr'],
+            // Member fields stay as zeros (tiers were removed) so quote readers keep the same shape.
+            'member_discount_idr' => 0,
             'voucher_discount_idr' => (int) $voucher['discount_idr'],
             'discount_idr' => $discount,
-            'member_tier_code' => $member['tier_code'],
-            'member_discount_bps' => (int) $member['discount_bps'],
+            'member_tier_code' => null,
+            'member_discount_bps' => 0,
             'fee_idr' => $fee,
             'total_idr' => $chargeable + $fee,
             'voucher_code' => $voucher['code'],

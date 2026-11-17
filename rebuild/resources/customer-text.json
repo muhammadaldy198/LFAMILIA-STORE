@@ -1199,46 +1199,6 @@
     "label": "Belum ada pesanan.",
     "default": "Belum ada pesanan."
   },
-  "pages.customer.membership.3bd46fd8": {
-    "group": "Pages/Customer/Membership",
-    "label": "MEMBERSHIP LFAMILIA",
-    "default": "MEMBERSHIP LFAMILIA"
-  },
-  "pages.customer.membership.2352a1f5": {
-    "group": "Pages/Customer/Membership",
-    "label": "Diskon member",
-    "default": "Diskon member"
-  },
-  "pages.customer.membership.b121577a": {
-    "group": "Pages/Customer/Membership",
-    "label": "Progress tier",
-    "default": "Progress tier"
-  },
-  "pages.customer.membership.6e5fc58f": {
-    "group": "Pages/Customer/Membership",
-    "label": "Tier berikutnya",
-    "default": "Tier berikutnya"
-  },
-  "pages.customer.membership.75777733": {
-    "group": "Pages/Customer/Membership",
-    "label": "Level tertinggi / manual",
-    "default": "Level tertinggi / manual"
-  },
-  "pages.customer.membership.ca5f365d": {
-    "group": "Pages/Customer/Membership",
-    "label": "Tier kamu",
-    "default": "Tier kamu"
-  },
-  "pages.customer.membership.18a2de33": {
-    "group": "Pages/Customer/Membership",
-    "label": "Syarat",
-    "default": "Syarat"
-  },
-  "pages.customer.membership.7e8c4c8d": {
-    "group": "Pages/Customer/Membership",
-    "label": "Diskon",
-    "default": "Diskon"
-  },
   "pages.customer.notifications.66f6ee7d": {
     "group": "Pages/Customer/Notifications",
     "label": "AKTIVITAS",
@@ -1901,8 +1861,8 @@
   },
   "pages.auth.register.c9cff19d": {
     "group": "Pages/Auth/Register",
-    "label": "Buat akun untuk saldo, riwayat pesanan, membership, dan layanan pelanggan.",
-    "default": "Buat akun untuk saldo, riwayat pesanan, membership, dan layanan pelanggan."
+    "label": "Buat akun untuk saldo, riwayat pesanan, dan layanan pelanggan.",
+    "default": "Buat akun untuk saldo, riwayat pesanan, dan layanan pelanggan."
   },
   "pages.auth.register.1b5da681": {
     "group": "Pages/Auth/Register",
@@ -1936,8 +1896,8 @@
   },
   "pages.auth.login.6a59b134": {
     "group": "Pages/Auth/Login",
-    "label": "Masuk untuk melihat saldo, pesanan, membership, tiket, dan profilmu.",
-    "default": "Masuk untuk melihat saldo, pesanan, membership, tiket, dan profilmu."
+    "label": "Masuk untuk melihat saldo, pesanan, tiket, dan profilmu.",
+    "default": "Masuk untuk melihat saldo, pesanan, tiket, dan profilmu."
   },
   "pages.auth.login.43352167": {
     "group": "Pages/Auth/Login",
@@ -2364,11 +2324,6 @@
     "label": "Notifikasi",
     "default": "Notifikasi"
   },
-  "navigation.account./account/membership": {
-    "group": "Navigation/account",
-    "label": "Membership",
-    "default": "Membership"
-  },
   "navigation.account./account/tickets": {
     "group": "Navigation/account",
     "label": "Tiket",
@@ -2653,11 +2608,6 @@
     "group": "Pages/Customer/Orders",
     "label": "Label akses: Halaman pesanan",
     "default": "Halaman pesanan"
-  },
-  "pages.customer.membership.attribute.title.fb25e0f9": {
-    "group": "Pages/Customer/Membership",
-    "label": "Judul/tab: Membership",
-    "default": "Membership"
   },
   "pages.customer.notifications.attribute.title.b4d63cec": {
     "group": "Pages/Customer/Notifications",

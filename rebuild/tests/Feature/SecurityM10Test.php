@@ -249,7 +249,6 @@ class SecurityM10Test extends TestCase
             'email' => 'login-risk@example.test',
             'phone' => '081234567891',
             'password' => Hash::make('CorrectPassword123!'),
-            'membership_tier_code' => 'BASIC',
         ]);
 
         // Configured Turnstile is verified on the very first login attempt.

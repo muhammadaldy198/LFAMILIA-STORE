@@ -3,12 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Actions\Fortify\CreateNewUser;
-use App\Models\MembershipTier;
 use App\Models\Product;
 use App\Models\User;
 use App\Models\Wallet;
 use App\Services\CustomerAccountDeletion;
-use App\Services\MembershipService;
 use App\Services\PaymentRoutingService;
 use App\Services\PublicOrderStatusService;
 use App\Services\StorefrontContentService;
@@ -34,7 +32,7 @@ class CustomerAccountController
         $wallet = Wallet::firstOrCreate(['user_id' => $user->id]);
 
         return Inertia::render('Account', [
-            'customer' => $user->only('id', 'name', 'email', 'phone', 'membership_tier_code'),
+            'customer' => $user->only('id', 'name', 'email', 'phone'),
             'balanceIdr' => (int) $wallet->balance_idr,
             'orderCount' => DB::table('orders')->where('user_id', $user->id)->count(),
             'ticketCount' => DB::table('support_tickets')->where('user_id', $user->id)->count(),
@@ -404,34 +402,5 @@ class CustomerAccountController
             ->take(50)->values();
 
         return Inertia::render('Customer/Notifications', ['items' => $items]);
-    }
-
-    public function membership(Request $request, MembershipService $membership): Response
-    {
-        $user = $request->user();
-        $profile = $membership->sync($user);
-
-        // MAFIA is private: only its holder may receive this tier in an Inertia response.
-        // Keep membership computation and admin visibility unchanged.
-        $isMafia = $profile['code'] === 'MAFIA';
-        $visibleTiers = MembershipTier::query()
-            ->where('is_active', true)
-            ->when(! $isMafia, fn ($query) => $query->where('code', '!=', 'MAFIA'))
-            ->orderBy('rank')
-            ->get(['code', 'rank', 'requirements', 'benefits']);
-
-        // Customer-facing progression ends at PLATINUM even if an admin
-        // accidentally configures a minimum-spend requirement for MAFIA.
-        if (! $isMafia && ($profile['code'] === 'PLATINUM' || $profile['next_code'] === 'MAFIA')) {
-            $profile['next_code'] = null;
-            $profile['next_target_idr'] = null;
-            $profile['remaining_to_next_idr'] = 0;
-        }
-
-        return Inertia::render('Customer/Membership', [
-            'currentCode' => $profile['code'],
-            'profile' => $profile,
-            'tiers' => $visibleTiers,
-        ]);
     }
 }

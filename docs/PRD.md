@@ -358,7 +358,7 @@ Halaman publik `/refund` tetap ada sebagai dokumen hukum; isinya dikelola pemili
 - Bisa belanja tanpa mendaftar.
 - Melacak pesanan cukup memakai **nomor HP/WhatsApp**, tanpa akun atau kode akses wajib. Nomor pesanan dapat digunakan sebagai alternatif.
 - Bisa menghubungi bantuan (tiket guest didukung).
-- **Tidak punya saldo, tidak punya riwayat permanen, tidak punya tingkatan member.**
+- **Tidak punya saldo dan tidak punya riwayat permanen.**
 - **Email dan nomor HP guest pada pesanan dibersihkan setelah pesanan berumur lebih dari 30 hari** (dihitung sejak pembuatan pesanan). Catatan transaksi tetap disimpan; data member tidak dihapus oleh job ini.
 
 ### 11.2 Member
@@ -373,24 +373,10 @@ Halaman publik `/refund` tetap ada sebagai dokumen hukum; isinya dikelola pemili
 
 ### 11.3 Tingkatan member
 
-Tingkat naik berdasarkan **total belanja lunas** (pesanan berstatus dibayar/diproses/berhasil):
+**Tidak ada.** Sistem tingkatan member (BASIC sampai MAFIA) dihapus seluruhnya atas keputusan pemilik: tidak ada tingkat, diskon tingkat, halaman Membership, atau pengaturan tingkat di panel. Harga yang dibayar pembeli hanya dipengaruhi voucher dan biaya pembayaran.
 
-| Tingkat | Syarat total belanja | Tampil ke pelanggan |
-|---|---|---|
-| **BASIC** | akun baru, Rp 0 | ya |
-| **SILVER** | Rp 500.000 | ya |
-| **GOLD** | Rp 5.000.000 | ya |
-| **DIAMOND** | Rp 20.000.000 | ya |
-| **PLATINUM** | Rp 50.000.000 | ya |
-| **MAFIA** | tidak dijual | **tidak** |
-
-Aturan:
-
-- **MAFIA adalah tingkat internal.** Hanya untuk akun uji/akun internal pemilik toko di sisi pelanggan. Tidak pernah tampil di halaman tingkatan, tidak pernah muncul sebagai target berikutnya, dan tidak bisa dicapai lewat belanja.
-- Angka di atas dapat diubah admin per tingkat (ambang belanja dan besar diskon), tetapi **urutan tingkat tidak berubah**.
-- Tingkat bisa dipaksa manual oleh admin untuk satu pelanggan; pemaksaan itu tercatat di audit log.
-- **Besar diskon per tingkat tidak ditetapkan di dokumen ini** — diatur dan diisi admin lewat panel; bawaannya kosong (tanpa diskon) sampai admin mengisi.
-- **Tingkat bukan hak akses admin.** Akun admin di panel dan akun pelanggan adalah dua sistem terpisah dan tidak boleh dicampur, walau memakai email yang sama.
+- **Akun pelanggan bukan hak akses admin.** Akun admin di panel dan akun pelanggan adalah dua sistem terpisah dan tidak boleh dicampur, walau memakai email yang sama.
+- Snapshot harga pesanan lama masih memuat `member_discount_idr` dan data tingkat sebagai catatan riwayat; pesanan baru menyimpan `member_discount_idr` 0 dan `membership` null.
 
 ### 11.4 Saldo
 
@@ -573,7 +559,7 @@ Konsekuensi yang mengikat:
 Tidak ada saat ini. Dua butir terakhir ditutup pada 2026-10-24:
 
 1. **Kanal notifikasi admin** — diputuskan **Telegram dan Discord** (lihat §15). Ini berbeda dari tautan Discord di footer yang sudah terpasang.
-2. **Diskon per tingkatan member** — bukan angka tetap; **diatur dan diisi admin lewat panel** (lihat §11.3).
+2. ~~Diskon per tingkatan member~~ — tidak lagi relevan: sistem tingkatan member dihapus (lihat §11.3).
 
 ---
 
@@ -581,6 +567,7 @@ Tidak ada saat ini. Dua butir terakhir ditutup pada 2026-10-24:
 
 | Tanggal | Keputusan |
 |---|---|
+| 2026-11-17 | **Sistem tingkatan member dihapus seluruhnya** (keputusan pemilik): semua tingkat tidak punya syarat maupun manfaat, diskon selalu Rp 0, dan tidak ada pelanggan yang pernah menerima manfaat. Tabel `membership_tiers`, kolom tingkat di `users`, halaman Membership, dan pengaturan tingkat di panel dihapus. Kolom snapshot diskon member di tabel `orders` tetap sebagai catatan riwayat (nilainya 0). |
 | 2026-10-25 | Penegasan model **tepat satu SKU Digiflazz terpilih per nominal**, tanpa SKU cadangan otomatis termasuk sebelum request, dan `max_price` selalu sama persis dengan harga modal toko SKU tersebut. Jalur impor/migrasi lama, pemeriksaan admin, dan dokumentasi agen diselaraskan. Status Midtrans settlement/capture memerlukan verifikasi hasil sukses; status Digiflazz dan response code (termasuk timeout yang telah membentuk transaksi) harus konsisten sebelum penyelesaian pesanan. |
 | 2026-10-24 | Penyelarasan dengan Buku Keputusan pemilik (PRD v2.1). Harga: sistem tiga harga (seller → modal toko → harga jual); modal dibentuk sekali saat impor (+2%), jual bawaan +10% disimpan sebagai margin nominal; **markup tingkat produk dihapus**; aturan khusus ML ×1,06 (2026-10-12) **dicabut** — semua produk ikut bawaan impor, persen bisa diubah per nominal sesudahnya. Pembulatan ke atas. Batas harga kirim = **persis modal toko tertinggi** SKU aktif (tambahan +1% dihapus). Sinkronisasi: tiap **15 menit**, seluruh katalog; nominal tanpa sumber aktif dinonaktifkan sinkronisasi; pemetaan belum pernah dipakai dihapus, yang pernah dipakai dinonaktifkan; nominal tidak tersedia **disembunyikan total** dari pembeli (termasuk data basi > 24 jam). Nama nominal impor **tanpa nama game** untuk semua produk. DOKU sekarang gateway independen setara Midtrans sesuai keputusan 2026-10-25; tidak ada perpindahan gateway otomatis. Biaya kanal: prinsip gross-up ditanggung pembeli; saldo & QRIS manual nol; angka per kanal di dokumen pembayaran. Pembayaran belum pasti: ditandai UNKNOWN, dicek admin ke gateway, pembeli diberi peringatan tertulis (bukan larangan). Status BLOCKED **tidak tampil** ke pelanggan (dipetakan ke Gagal). Verifikasi email: **link ketat** — belum verifikasi tidak bisa login; sesudah login wajib nomor WhatsApp; satu nomor satu akun. Diskon tingkatan member diatur admin. Notifikasi admin: Telegram **dan** Discord. Ulasan pembeli: terbit langsung, admin bisa hapus permanen. Perbedaan PRD vs kode diputuskan **kasus per kasus** oleh pemilik (§0); §19 tetap mutlak. |
 | 2026-10-22 | PRD ditulis ulang. Status pelanggan dikunci 6. DOKU ditandai belum dipakai. Pengembalian dana: manual, member lewat penyesuaian saldo, guest lewat transfer. |

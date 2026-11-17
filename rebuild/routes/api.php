@@ -13,7 +13,6 @@ Route::middleware(['auth:sanctum', 'throttle:api-account'])->get('/account', fun
     return response()->json([
         'id' => $user->id,
         'name' => $user->name,
-        'membership_tier' => $user->membership_tier_code,
         'balance_idr' => (int) $wallet->balance_idr,
     ]);
 });

@@ -56,7 +56,7 @@ class CustomerAuthTest extends TestCase
 
         $user = User::where('email', 'customer@example.test')->firstOrFail();
         $this->assertTrue(Hash::check('secure-password-123', $user->password));
-        $this->assertSame('BASIC', $user->membership_tier_code);
+        $this->assertArrayNotHasKey('membership_tier_code', $user->getAttributes());
         $this->assertSame('6281234567891', $user->phone_normalized);
         $this->assertNull($user->email_verified_at);
         $this->assertGuest('web');

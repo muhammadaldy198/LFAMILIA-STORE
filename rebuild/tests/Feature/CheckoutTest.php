@@ -587,15 +587,10 @@ class CheckoutTest extends TestCase
             ->assertJsonMissingPath('buyer_sku_code');
     }
 
-    public function test_customer_cannot_override_membership_or_voucher_discount_state(): void
+    public function test_customer_cannot_override_voucher_discount_state(): void
     {
         $catalog = $this->catalog();
         $fields = [
-            'member_discount_idr' => 999999,
-            'member_tier_code' => 'MAFIA',
-            'member_discount_bps' => 10000,
-            'membership_tier_code' => 'MAFIA',
-            'membership_discount_idr' => 999999,
             'voucher_id' => 999999,
             'voucher_discount_idr' => 999999,
             'voucher_redemption_id' => 999999,
@@ -625,81 +620,147 @@ class CheckoutTest extends TestCase
             ->count());
     }
 
-    public function test_membership_and_voucher_discounts_are_recalculated_and_stack_server_side(): void
+    /**
+     * Membership tiers were removed. Totals must equal subtotal minus the
+     * voucher discount only, with the legacy member fields fixed at zero so
+     * old readers of the quote/order response keep working.
+     */
+    public function test_logged_in_checkout_total_has_no_member_discount_without_voucher(): void
     {
         $catalog = $this->catalog();
+        $user = $this->verifiedCustomer('no-voucher');
 
-        DB::table('membership_tiers')->where('code', 'SILVER')->update([
-            'is_active' => true,
-            'requirements' => json_encode(['minimum_spend_idr' => 0], JSON_THROW_ON_ERROR),
-            'benefits' => json_encode(['discount_bps' => 1000], JSON_THROW_ON_ERROR),
-            'updated_at' => now(),
-        ]);
+        $this->actingAs($user)->postJson('/checkout/quote', [
+            'package_id' => $catalog['package_id'],
+            'payment_channel_code' => 'manual_qris',
+            'voucher_code' => null,
+        ])->assertOk()
+            ->assertJsonPath('subtotal_idr', 11000)
+            ->assertJsonPath('member_discount_idr', 0)
+            ->assertJsonPath('member_tier_code', null)
+            ->assertJsonPath('member_discount_bps', 0)
+            ->assertJsonPath('voucher_discount_idr', 0)
+            ->assertJsonPath('discount_idr', 0)
+            ->assertJsonPath('total_idr', 11000);
 
-        $user = User::create([
-            'name' => 'Stage 74 Member',
-            'email' => 'stage74-member-'.bin2hex(random_bytes(4)).'@example.test',
-            'phone' => '081234567899',
-            'password' => Hash::make('StrongPassword123!'),
-        ]);
-        // D7: checkout mensyaratkan email terverifikasi.
-        $user->forceFill(['email_verified_at' => now()]);
-        $user->forceFill([
-            'membership_mode' => 'MANUAL',
-            'membership_override_code' => 'SILVER',
-            'membership_tier_code' => 'SILVER',
-        ])->save();
+        $order = $this->actingAs($user)->postJson('/checkout/orders', [
+            'package_id' => $catalog['package_id'],
+            'payment_channel_code' => 'manual_qris',
+            'customer_input' => ['user_id' => '123456', 'zone_id' => '9876'],
+            'idempotency_key' => 'checkout-login-no-voucher-0001',
+        ])->assertCreated()
+            ->assertJsonPath('subtotal_idr', 11000)
+            ->assertJsonPath('member_discount_idr', 0)
+            ->assertJsonPath('discount_idr', 0)
+            ->assertJsonPath('total_idr', 11000);
 
-        $voucherId = DB::table('vouchers')->insertGetId([
-            'code' => 'STACK50',
-            'discount_type' => 'PERCENT',
-            'discount_value' => 50,
-            'minimum_total_idr' => 0,
-            'is_active' => true,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+        $row = DB::table('orders')->where('order_number', $order->json('order_number'))->firstOrFail();
+        $snapshot = json_decode($row->snapshot, true, 512, JSON_THROW_ON_ERROR);
+        $this->assertSame(11000, (int) $row->total_idr);
+        $this->assertSame(0, (int) $row->discount_idr);
+        $this->assertSame(0, $snapshot['pricing']['member_discount_idr']);
+        $this->assertNull($snapshot['membership']);
+    }
 
-        $quote = $this->actingAs($user)->postJson('/checkout/quote', [
+    public function test_logged_in_checkout_total_with_voucher_is_subtotal_minus_voucher_only(): void
+    {
+        $catalog = $this->catalog();
+        $user = $this->verifiedCustomer('with-voucher');
+        $voucherId = $this->percentVoucher('STACK50', 50);
+
+        $this->actingAs($user)->postJson('/checkout/quote', [
             'package_id' => $catalog['package_id'],
             'payment_channel_code' => 'manual_qris',
             'voucher_code' => 'stack50',
         ])->assertOk()
             ->assertJsonPath('subtotal_idr', 11000)
-            ->assertJsonPath('member_discount_idr', 1100)
-            ->assertJsonPath('member_tier_code', 'SILVER')
-            ->assertJsonPath('member_discount_bps', 1000)
-            ->assertJsonPath('voucher_discount_idr', 4950)
-            ->assertJsonPath('discount_idr', 6050)
-            ->assertJsonPath('total_idr', 4950);
-
-        $this->assertSame(4950, $quote->json('voucher_discount_idr'));
+            ->assertJsonPath('member_discount_idr', 0)
+            ->assertJsonPath('voucher_discount_idr', 5500)
+            ->assertJsonPath('discount_idr', 5500)
+            ->assertJsonPath('total_idr', 5500);
 
         $order = $this->actingAs($user)->postJson('/checkout/orders', [
             'package_id' => $catalog['package_id'],
             'payment_channel_code' => 'manual_qris',
             'customer_input' => ['user_id' => '123456', 'zone_id' => '9876'],
             'voucher_code' => 'STACK50',
-            'idempotency_key' => 'checkout-member-voucher-0001',
+            'idempotency_key' => 'checkout-login-voucher-0001',
         ])->assertCreated()
             ->assertJsonPath('subtotal_idr', 11000)
-            ->assertJsonPath('member_discount_idr', 1100)
-            ->assertJsonPath('voucher_discount_idr', 4950)
-            ->assertJsonPath('discount_idr', 6050)
-            ->assertJsonPath('member_tier_code', 'SILVER')
-            ->assertJsonPath('member_discount_bps', 1000)
+            ->assertJsonPath('member_discount_idr', 0)
+            ->assertJsonPath('voucher_discount_idr', 5500)
+            ->assertJsonPath('discount_idr', 5500)
             ->assertJsonPath('fee_idr', 0)
-            ->assertJsonPath('total_idr', 4950)
+            ->assertJsonPath('total_idr', 5500)
             ->assertJsonPath('voucher_code', 'STACK50')
             ->assertJsonPath('payment_channel_code', 'manual_qris');
 
         $row = DB::table('orders')->where('order_number', $order->json('order_number'))->firstOrFail();
         $snapshot = json_decode($row->snapshot, true, 512, JSON_THROW_ON_ERROR);
-        $this->assertSame(1100, $snapshot['membership']['discount_idr']);
-        $this->assertSame(4950, $snapshot['voucher']['discount_type'] === 'PERCENT'
-            ? $snapshot['pricing']['voucher_discount_idr']
-            : -1);
+        $this->assertSame(5500, (int) $row->total_idr);
+        $this->assertSame(5500, $snapshot['pricing']['voucher_discount_idr']);
+        $this->assertSame(0, $snapshot['pricing']['member_discount_idr']);
         $this->assertSame($voucherId, (int) $row->voucher_id);
+    }
+
+    public function test_guest_checkout_total_is_unchanged_with_and_without_voucher(): void
+    {
+        $catalog = $this->catalog();
+        $this->percentVoucher('STACK50', 50);
+        $guest = ['guest_email' => 'guest-total@example.test', 'guest_phone' => '081234567890'];
+
+        $this->postJson('/checkout/quote', [
+            'package_id' => $catalog['package_id'],
+            'payment_channel_code' => 'manual_qris',
+            'voucher_code' => null,
+            ...$guest,
+        ])->assertOk()
+            ->assertJsonPath('member_discount_idr', 0)
+            ->assertJsonPath('discount_idr', 0)
+            ->assertJsonPath('total_idr', 11000);
+
+        $this->postJson('/checkout/quote', [
+            'package_id' => $catalog['package_id'],
+            'payment_channel_code' => 'manual_qris',
+            'voucher_code' => 'STACK50',
+            ...$guest,
+        ])->assertOk()
+            ->assertJsonPath('member_discount_idr', 0)
+            ->assertJsonPath('voucher_discount_idr', 5500)
+            ->assertJsonPath('discount_idr', 5500)
+            ->assertJsonPath('total_idr', 5500);
+
+        $this->postJson('/checkout/orders', $this->guestPayload($catalog['package_id'], 'checkout-guest-total-0001'))
+            ->assertCreated()
+            ->assertJsonPath('member_discount_idr', 0)
+            ->assertJsonPath('total_idr', 11000);
+    }
+
+    private function verifiedCustomer(string $label): User
+    {
+        $user = User::create([
+            'name' => 'Checkout Customer '.$label,
+            'email' => 'checkout-'.$label.'-'.bin2hex(random_bytes(4)).'@example.test',
+            'phone' => '081234567899',
+            'password' => Hash::make('StrongPassword123!'),
+        ]);
+        // D7: checkout mensyaratkan email terverifikasi.
+        $user->forceFill(['email_verified_at' => now()])->save();
+
+        return $user;
+    }
+
+    private function percentVoucher(string $code, int $percent): int
+    {
+        return DB::table('vouchers')->insertGetId([
+            'code' => $code,
+            'discount_type' => 'PERCENT',
+            'discount_value' => $percent,
+            'minimum_total_idr' => 0,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
     }
 
     public function test_voucher_picker_uses_checkout_scope_limits_and_customer_usage_rules(): void

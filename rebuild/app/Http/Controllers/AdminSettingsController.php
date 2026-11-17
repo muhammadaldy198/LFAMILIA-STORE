@@ -3,13 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Services\AdminAuditService;
-use App\Services\MembershipService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -148,105 +146,10 @@ class AdminSettingsController
         return back()->with('status', 'Pengaturan toko berhasil disimpan.');
     }
 
-    public function updateTier(
-        Request $request,
-        string $code,
-        AdminAuditService $audit,
-    ): RedirectResponse {
-        $tier = DB::table('membership_tiers')->where('code', strtoupper($code))->first();
-        abort_unless($tier, 404);
-
-        $data = $request->validate([
-            'is_active' => ['required', 'boolean'],
-            'minimum_spend_idr' => ['nullable', 'integer', 'min:0', 'max:1000000000000'],
-            'discount_percent' => ['nullable', 'numeric', 'min:0', 'max:100', 'decimal:0,2'],
-            'benefit_notes' => ['nullable', 'string', 'max:1000'],
-            'requirements' => ['nullable', 'string', 'max:10000'],
-            'benefits' => ['nullable', 'string', 'max:10000'],
-        ]);
-
-        $before = [
-            'code' => (string) $tier->code,
-            'rank' => (int) $tier->rank,
-            'is_active' => (bool) $tier->is_active,
-            'requirements' => $this->jsonArray($tier->requirements),
-            'benefits' => $this->jsonArray($tier->benefits),
-        ];
-
-        $requirements = $before['requirements'];
-        $benefits = $before['benefits'];
-
-        $internalTier = in_array((string) $tier->code, MembershipService::INTERNAL_CODES, true);
-        if ($internalTier && $request->exists('minimum_spend_idr')) {
-            throw ValidationException::withMessages([
-                'minimum_spend_idr' => 'Tier internal tidak boleh memiliki syarat minimum transaksi.',
-            ]);
-        }
-
-        if ($request->filled('requirements')) {
-            $requirements = $this->jsonPayload($data['requirements'] ?? null, 'requirements');
-            if ($internalTier && array_key_exists('minimum_spend_idr', $requirements)) {
-                throw ValidationException::withMessages([
-                    'requirements' => 'Tier internal tidak boleh memiliki syarat minimum transaksi.',
-                ]);
-            }
-        } elseif ($request->exists('minimum_spend_idr')) {
-            $requirements['minimum_spend_idr'] = (int) ($data['minimum_spend_idr'] ?? 0);
-        } elseif (! $internalTier) {
-            throw ValidationException::withMessages([
-                'minimum_spend_idr' => 'Minimum transaksi membership wajib dikirim.',
-            ]);
-        }
-
-        if ($request->filled('benefits')) {
-            $benefits = $this->jsonPayload($data['benefits'] ?? null, 'benefits');
-        } elseif ($request->exists('discount_percent') || $request->exists('benefit_notes')) {
-            $benefits['discount_bps'] = (int) round(((float) ($data['discount_percent'] ?? 0)) * 100);
-
-            $notes = trim((string) ($data['benefit_notes'] ?? ''));
-            if ($notes === '') {
-                unset($benefits['benefit_notes']);
-            } else {
-                $benefits['benefit_notes'] = $notes;
-            }
-        } elseif (! $internalTier) {
-            throw ValidationException::withMessages([
-                'discount_percent' => 'Diskon membership wajib dikirim.',
-            ]);
-        }
-
-        DB::table('membership_tiers')->where('id', $tier->id)->update([
-            'is_active' => $data['is_active'],
-            'requirements' => json_encode($requirements, JSON_THROW_ON_ERROR),
-            'benefits' => json_encode($benefits, JSON_THROW_ON_ERROR),
-            'updated_at' => now(),
-        ]);
-
-        $after = [
-            'code' => (string) $tier->code,
-            'rank' => (int) $tier->rank,
-            'is_active' => (bool) $data['is_active'],
-            'requirements' => $requirements,
-            'benefits' => $benefits,
-        ];
-
-        $audit->record(
-            $request,
-            'membership_tier.updated',
-            'membership_tier',
-            (string) $tier->code,
-            $before,
-            $after
-        );
-
-        return back()->with('status', 'Pengaturan membership '.$tier->code.' berhasil disimpan.');
-    }
-
     public function exportConfiguration(Request $request, AdminAuditService $audit): JsonResponse
     {
         $tables = [
             'system_settings',
-            'membership_tiers',
             'categories',
             'products',
             'product_packages',
@@ -322,51 +225,10 @@ class AdminSettingsController
         );
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    private function jsonPayload(?string $value, string $field): array
-    {
-        if ($value === null || trim($value) === '') {
-            return [];
-        }
-
-        $decoded = json_decode($value, true);
-        if (! is_array($decoded) || json_last_error() !== JSON_ERROR_NONE) {
-            throw ValidationException::withMessages([
-                $field => 'Format pengaturan lama tidak valid.',
-            ]);
-        }
-
-        return $decoded;
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
     private function hostMatches(string $url, array $allowed): bool
     {
         $host = strtolower(rtrim((string) parse_url($url, PHP_URL_HOST), '.'));
 
         return in_array($host, $allowed, true);
-    }
-
-    private function jsonArray(mixed $value): array
-    {
-        if (is_array($value)) {
-            return $value;
-        }
-
-        if (is_object($value)) {
-            return (array) $value;
-        }
-
-        if (! is_string($value) || trim($value) === '') {
-            return [];
-        }
-
-        $decoded = json_decode($value, true);
-
-        return is_array($decoded) ? $decoded : [];
     }
 }

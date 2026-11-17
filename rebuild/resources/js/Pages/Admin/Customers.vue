@@ -9,11 +9,8 @@ import { withSensitive } from '../../lib/sensitivePrompt';
 
 const props = defineProps({
     isSuperAdmin: Boolean,
-    canManageMembershipRules: Boolean,
     customers: { type: Object, default: () => ({ data: [], links: [] }) },
     filters: { type: Object, default: () => ({}) },
-    membershipTiers: { type: Array, default: () => [] },
-    membershipRules: { type: Array, default: () => [] },
     cleanupSettings: { type: Object, default: () => ({}) },
     summary: { type: Object, default: () => ({}) },
 });
@@ -22,8 +19,7 @@ const tab = ref('list');
 const rows = computed(() => (Array.isArray(props.customers?.data) ? props.customers.data : []));
 
 const filter = reactive({
-    q: props.filters?.q || '', tier: props.filters?.tier || '',
-    membership_mode: props.filters?.membership_mode || '', verification: props.filters?.verification || '',
+    q: props.filters?.q || '', verification: props.filters?.verification || '',
     activity: props.filters?.activity || '', orders: props.filters?.orders || '',
     per_page: Number(props.filters?.per_page || 25),
 });
@@ -34,12 +30,9 @@ const apply = () => {
     ), { preserveState: true, preserveScroll: true });
 };
 const reset = () => {
-    Object.assign(filter, { q: '', tier: '', membership_mode: '', verification: '', activity: '', orders: '', per_page: 25 });
+    Object.assign(filter, { q: '', verification: '', activity: '', orders: '', per_page: 25 });
     apply();
 };
-
-const tiers = computed(() => [...props.membershipRules].sort((a, b) => a.rank - b.rank));
-const tierName = code => code === 'AUTO' ? 'Otomatis' : code;
 
 // ---------- atur pelanggan ----------
 const editor = ref(null);
@@ -48,23 +41,11 @@ const errors = ref({});
 const openEditor = row => {
     editor.value = {
         row,
-        mode: row.membership_mode === 'MANUAL' ? (row.membership_assignment || 'BASIC') : 'AUTO',
         amount_idr: '',
         reason: '',
         idempotency_key: crypto.randomUUID(),
     };
     errors.value = {};
-};
-const saveMembership = () => {
-    if (!editor.value) return;
-    busy.value = true;
-    router.put('/admin/customers/' + editor.value.row.id + '/membership', {
-        membership_tier_code: editor.value.mode,
-    }, {
-        preserveScroll: true,
-        onError: bag => { errors.value = bag; },
-        onFinish: () => { busy.value = false; },
-    });
 };
 const saveBalance = () => {
     if (!editor.value) return;
@@ -116,29 +97,6 @@ const runCleanup = () => {
     router.post('/admin/customers/cleanup/run', {}, { preserveScroll: true });
 };
 
-// ---------- tingkat member ----------
-const tierEditor = ref(null);
-const openTier = tier => {
-    if (!props.canManageMembershipRules) return;
-    tierEditor.value = { ...tier };
-    errors.value = {};
-};
-const saveTier = () => {
-    const tier = tierEditor.value;
-    busy.value = true;
-    const payload = {
-        is_active: Boolean(tier.is_active),
-        discount_percent: Number(tier.discount_percent || 0),
-        benefit_notes: tier.benefit_notes || '',
-    };
-    if (!tier.is_internal) payload.minimum_spend_idr = Number(tier.minimum_spend_idr || 0);
-    router.put('/admin/settings/membership/' + encodeURIComponent(tier.code), payload, {
-        preserveScroll: true,
-        onError: bag => { errors.value = bag; },
-        onSuccess: () => { tierEditor.value = null; },
-        onFinish: () => { busy.value = false; },
-    });
-};
 </script>
 
 <template>
@@ -147,7 +105,7 @@ const saveTier = () => {
         <header class="adm-head">
             <div>
                 <h1>Pelanggan</h1>
-                <p>Cari pelanggan, pantau saldo, dan atur tingkat member toko.</p>
+                <p>Cari pelanggan, pantau saldo, dan atur akun pelanggan toko.</p>
             </div>
             <div class="adm-head-actions">
                 <button type="button" class="adm-btn" @click="router.reload({ preserveScroll: true })">Muat ulang</button>
@@ -165,7 +123,7 @@ const saveTier = () => {
 
         <div class="adm-tabs" role="tablist" aria-label="Bagian pelanggan">
             <button type="button" role="tab" :aria-selected="tab === 'list'" @click="tab = 'list'">Daftar pelanggan</button>
-            <button type="button" role="tab" :aria-selected="tab === 'tiers'" @click="tab = 'tiers'">Tingkat member</button>
+            <button type="button" role="tab" :aria-selected="tab === 'cleanup'" @click="tab = 'cleanup'">Pembersihan akun</button>
         </div>
 
         <!-- Daftar pelanggan -->
@@ -175,13 +133,6 @@ const saveTier = () => {
                     <label class="adm-field search">
                         <span>Cari pelanggan</span>
                         <input v-model="filter.q" class="adm-input" maxlength="100" placeholder="Nama, email, atau nomor WhatsApp">
-                    </label>
-                    <label class="adm-field narrow">
-                        <span>Tingkat</span>
-                        <select v-model="filter.tier" class="adm-select">
-                            <option value="">Semua tingkat</option>
-                            <option v-for="tier in tiers" :key="tier.code" :value="tier.code">{{ tier.code }}</option>
-                        </select>
                     </label>
                     <label class="adm-field narrow">
                         <span>Status email</span>
@@ -199,14 +150,6 @@ const saveTier = () => {
                         <button type="button" class="adm-btn link" @click="advanced = !advanced">Filter lanjutan</button>
                     </div>
                     <template v-if="advanced">
-                        <label class="adm-field narrow">
-                            <span>Cara penetapan</span>
-                            <select v-model="filter.membership_mode" class="adm-select">
-                                <option value="">Semua</option>
-                                <option value="AUTO">Otomatis</option>
-                                <option value="MANUAL">Ditetapkan admin</option>
-                            </select>
-                        </label>
                         <label class="adm-field narrow">
                             <span>Aktivitas</span>
                             <select v-model="filter.activity" class="adm-select">
@@ -236,7 +179,7 @@ const saveTier = () => {
                     <table class="adm-table">
                         <thead>
                             <tr>
-                                <th>Pelanggan</th><th>Tingkat</th><th style="text-align:right">Saldo</th>
+                                <th>Pelanggan</th><th style="text-align:right">Saldo</th>
                                 <th style="text-align:right">Pesanan</th><th>Terakhir aktif</th><th>Status</th><th>Tindakan</th>
                             </tr>
                         </thead>
@@ -246,12 +189,6 @@ const saveTier = () => {
                                     <Link :href="'/admin/customers/' + row.id" style="font-weight:600">{{ row.name }}</Link>
                                     <div class="adm-note">{{ row.email || 'Tanpa email' }}</div>
                                     <div class="adm-note">{{ row.phone || 'Tanpa nomor' }}</div>
-                                </td>
-                                <td>
-                                    <span class="adm-tag" :class="row.membership_mode === 'MANUAL' ? 'info' : 'plain'">
-                                        {{ tierName(row.membership_assignment || row.membership_tier_code) }}
-                                    </span>
-                                    <div v-if="row.membership_mode === 'MANUAL'" class="adm-note">Ditetapkan admin</div>
                                 </td>
                                 <td style="text-align:right">{{ rupiah(row.balance_idr) }}</td>
                                 <td style="text-align:right">
@@ -284,35 +221,8 @@ const saveTier = () => {
             </section>
         </template>
 
-        <!-- Tingkat member -->
+        <!-- Pembersihan akun kosong -->
         <template v-else>
-            <section class="adm-card">
-                <div class="adm-card-head">
-                    <div>
-                        <h2>Tingkat member</h2>
-                        <p>Minimum dihitung dari total transaksi berhasil. MAFIA hanya dapat ditetapkan admin dan tidak pernah ditampilkan ke pelanggan.</p>
-                    </div>
-                </div>
-                <div class="adm-scroll">
-                    <table class="adm-table">
-                        <thead>
-                            <tr><th>Tingkat</th><th style="text-align:right">Minimum transaksi</th><th style="text-align:right">Diskon</th><th>Manfaat tambahan</th><th>Status</th><th>Tindakan</th></tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for="tier in tiers" :key="tier.code">
-                                <td><strong>{{ tier.rank }}. {{ tier.code }}</strong><div v-if="tier.code === 'MAFIA'" class="adm-note">Hanya di panel</div></td>
-                                <td style="text-align:right">{{ tier.is_internal ? 'Tidak berlaku' : rupiah(tier.minimum_spend_idr) }}</td>
-                                <td style="text-align:right">{{ tier.discount_percent }}%</td>
-                                <td class="adm-note">{{ tier.benefit_notes || '—' }}</td>
-                                <td><span class="adm-tag" :class="tier.is_active ? 'ok' : 'bad'">{{ tier.is_active ? 'Aktif' : 'Nonaktif' }}</span></td>
-                                <td><button type="button" class="adm-btn sm" :disabled="!canManageMembershipRules" @click="openTier(tier)">Ubah</button></td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-                <p v-if="!tiers.length" class="adm-empty">Belum ada tingkat member.</p>
-            </section>
-
             <section class="adm-card">
                 <div class="adm-card-head">
                     <div>
@@ -346,26 +256,9 @@ const saveTier = () => {
 
         <!-- pop-up atur pelanggan -->
         <AdminModal :open="!!editor" :title="'Atur ' + (editor?.row?.name || 'pelanggan')"
-            description="Tingkat member dan penyesuaian saldo. Keduanya dicatat di Catatan Audit."
+            description="Penyesuaian saldo dicatat di Catatan Audit."
             @update:open="value => { if (!value) editor = null; }">
             <div v-if="editor" class="adm-grid">
-                <div class="adm-block full">
-                    <strong>Tingkat member</strong>
-                    <div class="adm-grid">
-                        <label class="adm-field">
-                            <span>Tingkat</span>
-                            <select v-model="editor.mode" class="adm-select">
-                                <option value="AUTO">Otomatis dari transaksi</option>
-                                <option v-for="tier in tiers" :key="tier.code" :value="tier.code">{{ tier.code }}</option>
-                            </select>
-                            <span class="hint">MAFIA hanya bisa ditetapkan di sini, tidak pernah muncul ke pelanggan.</span>
-                        </label>
-                        <div class="adm-field" style="align-self:end">
-                            <button type="button" class="adm-btn primary" :disabled="busy" @click="saveMembership">Simpan tingkat</button>
-                        </div>
-                    </div>
-                </div>
-
                 <div class="adm-block full">
                     <strong>Penyesuaian saldo</strong>
                     <p class="adm-note">Saldo saat ini: {{ rupiah(editor.row.balance_idr) }}</p>
@@ -389,36 +282,6 @@ const saveTier = () => {
             </div>
             <template #footer>
                 <button type="button" class="adm-btn" @click="editor = null">Tutup</button>
-            </template>
-        </AdminModal>
-
-        <!-- pop-up tingkat -->
-        <AdminModal :open="!!tierEditor" :title="'Ubah tingkat ' + (tierEditor?.code || '')"
-            description="Syarat, diskon, dan manfaat berlaku untuk semua pelanggan di tingkat ini."
-            @update:open="value => { if (!value) tierEditor = null; }">
-            <div v-if="tierEditor" class="adm-grid">
-                <label v-if="!tierEditor.is_internal" class="adm-field">
-                    <span>Minimum total transaksi berhasil (Rp)</span>
-                    <input v-model.number="tierEditor.minimum_spend_idr" type="number" min="0" class="adm-input">
-                    <span class="hint">Isi 0 bila tidak ada minimum.</span>
-                </label>
-                <p v-else class="adm-note">Tier internal hanya dapat diberikan secara manual, tanpa minimum transaksi.</p>
-                <label class="adm-field">
-                    <span>Diskon untuk pelanggan tingkat ini (%)</span>
-                    <input v-model.number="tierEditor.discount_percent" type="number" min="0" max="100" step="0.01" class="adm-input">
-                </label>
-                <label class="adm-field full">
-                    <span>Manfaat tambahan</span>
-                    <input v-model="tierEditor.benefit_notes" class="adm-input" maxlength="1000" placeholder="Contoh: prioritas layanan">
-                </label>
-                <label class="adm-switch-row full">
-                    <button type="button" class="adm-switch" role="switch" :aria-checked="tierEditor.is_active" @click="tierEditor.is_active = !tierEditor.is_active" />
-                    Tingkat ini dipakai
-                </label>
-            </div>
-            <template #footer>
-                <button type="button" class="adm-btn" @click="tierEditor = null">Batal</button>
-                <button type="button" class="adm-btn primary" :disabled="busy" @click="saveTier">Simpan tingkat</button>
             </template>
         </AdminModal>
 

@@ -10,8 +10,6 @@ import { withSensitive } from '../../lib/sensitivePrompt';
 const props = defineProps({
     isSuperAdmin: Boolean,
     customer: { type: Object, required: true },
-    membershipProfile: { type: Object, default: null },
-    membershipTiers: { type: Array, default: () => [] },
     balanceIdr: { type: Number, default: 0 },
     orders: { type: Object, default: () => ({ data: [], links: [] }) },
     ledger: { type: Array, default: () => [] },
@@ -26,26 +24,13 @@ const managing = ref(false);
 const busy = ref('');
 const errors = ref({});
 const wallet = reactive({ amount_idr: '', reason: '', idempotency_key: crypto.randomUUID() });
-const membership = ref(props.customer?.membership_assignment || 'AUTO');
 
 const openManage = () => {
-    membership.value = props.customer?.membership_assignment || 'AUTO';
     wallet.amount_idr = '';
     wallet.reason = '';
     wallet.idempotency_key = crypto.randomUUID();
     errors.value = {};
     managing.value = true;
-};
-
-const saveMembership = () => {
-    busy.value = 'membership';
-    router.put('/admin/customers/' + props.customer.id + '/membership', {
-        membership_tier_code: membership.value,
-    }, {
-        preserveScroll: true,
-        onError: bag => { errors.value = bag; },
-        onFinish: () => { busy.value = ''; },
-    });
 };
 
 const adjustWallet = () => {
@@ -126,29 +111,9 @@ const ticketLabel = value => ({
                         <dt>Nama</dt><dd>{{ customer.name }}</dd>
                         <dt>Email</dt><dd>{{ customer.email || 'Belum diisi' }}</dd>
                         <dt>Nomor telepon</dt><dd>{{ customer.phone || 'Belum diisi' }}</dd>
-                        <dt>Tingkat member</dt><dd>{{ customer.membership_tier_code }} · {{ customer.membership_mode === 'MANUAL' ? 'ditetapkan admin' : 'otomatis dari transaksi' }}</dd>
                         <dt>Papan peringkat</dt><dd>{{ customer.leaderboard_opt_in ? 'Ikut ditampilkan' : 'Tidak ikut' }}</dd>
                         <dt>Aktivitas terakhir</dt><dd>{{ wibDateTime(customer.last_active_at || customer.created_at) }}</dd>
                     </dl>
-                </div>
-            </div>
-
-            <div class="adm-card">
-                <div class="adm-card-head"><div><h2>Tingkat member</h2></div></div>
-                <div class="adm-card-body">
-                    <template v-if="membershipProfile">
-                        <dl class="adm-kv">
-                            <dt>Tingkat aktif</dt><dd><span class="adm-tag" :class="membershipProfile.code === 'MAFIA' ? 'info' : 'ok'">{{ membershipProfile.code }}</span></dd>
-                            <dt>Diskon member</dt><dd>{{ (Number(membershipProfile.discount_bps || 0) / 100).toLocaleString('id-ID', { maximumFractionDigits: 2 }) }}%</dd>
-                            <dt>Belanja tercatat</dt><dd>{{ rupiah(membershipProfile.lifetime_spend_idr) }}</dd>
-                            <dt>Progress</dt><dd>{{ rupiah(membershipProfile.progress_idr) }}</dd>
-                        </dl>
-                        <p class="adm-note" style="margin-top:8px">
-                            <template v-if="membershipProfile.next_code">Menuju {{ membershipProfile.next_code }}, kurang {{ rupiah(membershipProfile.remaining_to_next_idr) }}.</template>
-                            <template v-else>Tidak ada tingkat berikutnya.</template>
-                        </p>
-                    </template>
-                    <p v-else class="adm-note">Data tingkat member belum tersedia.</p>
                 </div>
             </div>
         </section>
@@ -245,25 +210,8 @@ const ticketLabel = value => ({
         </section>
 
         <AdminModal v-model:open="managing" :title="'Atur ' + customer.name"
-            description="Tingkat member dan penyesuaian saldo. Keduanya dicatat di Catatan Audit.">
+            description="Penyesuaian saldo dicatat di Catatan Audit.">
             <div class="adm-grid">
-                <div class="adm-block full">
-                    <strong>Tingkat member</strong>
-                    <div class="adm-grid">
-                        <label class="adm-field">
-                            <span>Tingkat</span>
-                            <select v-model="membership" class="adm-select">
-                                <option value="AUTO">Otomatis dari transaksi</option>
-                                <option v-for="tier in membershipTiers" :key="tier.code" :value="tier.code">{{ tier.code }}</option>
-                            </select>
-                            <span class="hint">MAFIA hanya bisa ditetapkan di sini, tidak pernah muncul ke pelanggan.</span>
-                        </label>
-                        <div class="adm-field" style="align-self:end">
-                            <button type="button" class="adm-btn primary" :disabled="busy === 'membership'" @click="saveMembership">Simpan tingkat</button>
-                        </div>
-                    </div>
-                </div>
-
                 <div class="adm-block full">
                     <strong>Penyesuaian saldo</strong>
                     <p class="adm-note">Saldo saat ini: {{ rupiah(balanceIdr) }}</p>
