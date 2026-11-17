@@ -98,7 +98,7 @@ class ReviewWallTest extends TestCase
             $this->assertMatchesRegularExpression('/^[A-Za-z]{3}\*{9}$/', $entry['display_name']);
             $this->assertGreaterThanOrEqual(1, $entry['rating']);
             $this->assertLessThanOrEqual(5, $entry['rating']);
-            $this->assertTrue($entry['verified_purchase']);
+            $this->assertFalse($entry['verified_purchase']);
             $this->assertNotSame('', $entry['body']);
         }
     }

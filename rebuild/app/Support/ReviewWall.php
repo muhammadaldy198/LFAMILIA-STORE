@@ -174,7 +174,8 @@ class ReviewWall
             'body' => $body,
             'published_at' => $published->toIso8601String(),
             'created_at' => $published->toIso8601String(),
-            'verified_purchase' => true,
+            // Entri dinding bukan pembelian: tidak boleh berlabel terverifikasi.
+            'verified_purchase' => false,
         ];
     }
 
