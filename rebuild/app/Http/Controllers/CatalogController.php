@@ -16,6 +16,7 @@ use App\Services\OperationalSettings;
 use App\Services\PaymentRoutingService;
 use App\Services\StorefrontContentService;
 use App\Support\OptimizedMedia;
+use App\Support\ProductFaq;
 use App\Support\SeoMetadata;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -270,7 +271,6 @@ class CatalogController
         string $slug,
         CheckoutPricing $pricing,
         PaymentRoutingService $paymentRouting,
-        StorefrontContentService $content,
     ): Response {
         $product = Product::with(['category', 'media', 'packageGroups.media'])->where('slug', $slug)
             ->where('is_active', true)
@@ -392,7 +392,7 @@ class CatalogController
                 'total' => (int) ($reviewStats?->total ?? 0),
                 'average' => round((float) ($reviewStats?->average ?? 0), 1),
             ],
-            'faqs' => $content->faqs()->take(6)->values(),
+            'productFaqs' => ProductFaq::forProduct($product),
             'initialPackageId' => $request->filled('package')
                 ? (string) ($packages->first(fn (array $item): bool => $item['is_available'] === true
                     && (
