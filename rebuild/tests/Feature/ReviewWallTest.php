@@ -74,19 +74,21 @@ class ReviewWallTest extends TestCase
 
     public function test_newest_entry_is_fresh_during_busy_hours_and_never_in_the_future(): void
     {
+        // [momen, batas umur entri terbaru] — jam sepi 00-06 peluangnya dibagi 6,
+        // jadi entri terbaru wajar berumur beberapa jam; jam ramai harus segar.
         $moments = [
-            $this->anchor()->addDays(2)->setTime(19, 37),
-            $this->anchor()->addDays(5)->setTime(12, 15),
-            $this->anchor()->addDays(9)->setTime(21, 3),
-            $this->anchor()->addDays(4)->setTime(3, 12),
+            [$this->anchor()->addDays(2)->setTime(19, 37), 90],
+            [$this->anchor()->addDays(5)->setTime(12, 15), 90],
+            [$this->anchor()->addDays(9)->setTime(21, 3), 90],
+            [$this->anchor()->addDays(4)->setTime(3, 12), 240],
         ];
-        foreach ($moments as $now) {
+        foreach ($moments as [$now, $maxAge]) {
             $wall = $this->wall('mobile-legends', $now);
             $this->assertNotEmpty($wall['entries']);
             $newest = CarbonImmutable::parse($wall['entries'][0]['published_at']);
             $this->assertLessThanOrEqual($now->timestamp, $newest->timestamp, 'entry in the future at '.$now);
             $ageMinutes = ($now->timestamp - $newest->timestamp) / 60;
-            $this->assertLessThanOrEqual(90, $ageMinutes, 'newest entry too old at '.$now.': '.$ageMinutes.' min');
+            $this->assertLessThanOrEqual($maxAge, $ageMinutes, 'newest entry too old at '.$now.': '.$ageMinutes.' min');
         }
     }
 
@@ -101,6 +103,48 @@ class ReviewWallTest extends TestCase
             $this->assertFalse($entry['verified_purchase']);
             $this->assertNotSame('', $entry['body']);
         }
+    }
+
+    public function test_entries_never_repeat_a_body_within_one_render(): void
+    {
+        $moments = [
+            $this->anchor()->addDays(1)->setTime(20, 5),
+            $this->anchor()->addDays(3)->setTime(12, 40),
+            $this->anchor()->addDays(7)->setTime(21, 15),
+            $this->anchor()->addDays(2)->setTime(2, 30),
+        ];
+        foreach (array_keys(self::BASE) as $slug) {
+            foreach ($moments as $now) {
+                $wall = $this->wall($slug, $now);
+                $bodies = array_column($wall['entries'], 'body');
+                $this->assertSame(
+                    count($bodies),
+                    count(array_unique($bodies)),
+                    "duplicate review body for {$slug} at {$now}: ".implode(' | ', $bodies),
+                );
+                $pairs = array_map(
+                    fn (array $entry): string => $entry['display_name'].'#'.$entry['body'],
+                    $wall['entries'],
+                );
+                $this->assertSame(count($pairs), count(array_unique($pairs)), "duplicate entry for {$slug} at {$now}");
+            }
+        }
+    }
+
+    public function test_bodies_vary_across_renders(): void
+    {
+        $seen = [];
+        for ($day = 1; $day <= 4; $day++) {
+            foreach ([9, 14, 20] as $hour) {
+                $wall = $this->wall('mobile-legends', $this->anchor()->addDays($day)->setTime($hour, 25));
+                foreach ($wall['entries'] as $entry) {
+                    $seen[$entry['body']] = true;
+                }
+            }
+        }
+        // Bank ML berisi 16 teks; hash yang sehat menyebar ke sebagian besar bank
+        // dalam 12 render (hash lemah menumpuk di 1-2 teks yang sama berulang).
+        $this->assertGreaterThanOrEqual(8, count($seen), 'bodies barely vary: '.implode(' | ', array_keys($seen)));
     }
 
     public function test_bank_contains_no_forbidden_words(): void
