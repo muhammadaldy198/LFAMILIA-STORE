@@ -1377,4 +1377,90 @@ class CatalogTest extends TestCase
         ])->assertSessionHasErrors('is_active');
         $this->assertFalse($package->fresh()->is_active);
     }
+
+    public function test_mobile_legends_weekly_diamond_pass_packages_are_marked_is_wdp(): void
+    {
+        $category = Category::where('slug', 'game')->firstOrFail();
+        $providerId = $this->activateDigiflazzProvider();
+
+        $product = Product::create([
+            'category_id' => $category->id,
+            'name' => 'Mobile Legends',
+            'slug' => 'mobile-legends-wdp-test',
+            'fulfillment_mode' => 'AUTO_PROVIDER',
+            'margin_percent' => 10,
+            'is_active' => true,
+            'nickname_game_code' => 'mobile-legends',
+            'nickname_check_enabled' => true,
+            'nickname_user_field_key' => 'user_id',
+            'nickname_server_field_key' => 'zone_id',
+        ]);
+
+        $this->addPurchasablePackage($product, $providerId, 'WDP-X1', 'Weekly Diamond Pass x1', 1, 'MLWDP', 20000);
+        $this->addPurchasablePackage($product, $providerId, '86D', '86 Diamond', 86, 'MLBB86', 18000);
+
+        $this->get('/catalog/'.$product->slug)->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Catalog/Show')
+                ->where('product.name', 'Mobile Legends')
+                ->has('packages', 2)
+                ->where('packages.0.is_wdp', true)
+                ->where('packages.0.name', 'Weekly Diamond Pass x1')
+                ->where('packages.1.is_wdp', false)
+                ->where('packages.1.name', '86 Diamond')
+            );
+    }
+
+    public function test_non_mobile_legends_products_have_is_wdp_false(): void
+    {
+        $category = Category::where('slug', 'game')->firstOrFail();
+        $providerId = $this->activateDigiflazzProvider();
+
+        $product = Product::create([
+            'category_id' => $category->id,
+            'name' => 'Free Fire',
+            'slug' => 'free-fire-wdp-test',
+            'fulfillment_mode' => 'AUTO_PROVIDER',
+            'margin_percent' => 10,
+            'is_active' => true,
+            'nickname_game_code' => 'free-fire',
+        ]);
+
+        $this->addPurchasablePackage($product, $providerId, 'FF100', 'Membership Mingguan', 1, 'FF100', 15000);
+
+        $this->get('/catalog/'.$product->slug)->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Catalog/Show')
+                ->where('product.name', 'Free Fire')
+                ->has('packages', 1)
+                ->where('packages.0.is_wdp', false)
+                ->where('packages.0.name', 'Membership Mingguan')
+            );
+    }
+
+    private function activateDigiflazzProvider(): int
+    {
+        DB::table('providers')->where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
+
+        return (int) DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
+    }
+
+    private function addPurchasablePackage(Product $product, int $providerId, string $code, string $name, int $nominalValue, string $sku, int $costIdr): void
+    {
+        $package = $product->packages()->create([
+            'code' => $code,
+            'name' => $name,
+            'nominal_value' => $nominalValue,
+            'is_active' => true,
+        ]);
+        ProviderMapping::create([
+            'product_package_id' => $package->id,
+            'provider_id' => $providerId,
+            'external_sku' => $sku,
+            'cost_idr' => $costIdr,
+            'store_cost_idr' => $costIdr,
+            'is_active' => true,
+        ]);
+        $this->seedCheckoutDigiflazzCatalog($package->id);
+    }
 }

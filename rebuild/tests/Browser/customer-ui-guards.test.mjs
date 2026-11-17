@@ -504,3 +504,47 @@ test('deep-linked nominal pre-selection does not bypass the account gate', () =>
     const product = read('Pages/Catalog/Show.vue');
     assert.match(product, /if \(nominalLocked\.value\) selectedPackageId\.value = '';/);
 });
+
+test('PR2 WDP panel uses exact locked text and is_wdp flag without inventing behavior', () => {
+    const product = read('Pages/Catalog/Show.vue');
+    
+    // Panel ditrigger oleh is_wdp flag dari backend
+    assert.match(product, /pendingWdpPackage\.value = item;/);
+    assert.match(product, /wdpInfoOpen\.value = true;/);
+    
+    // Judul panel terkunci
+    assert.match(product, /<h2 id="wdp-info-title">Sebelum Beli Weekly Diamond Pass<\/h2>/);
+    
+    // Isi panel terkunci (teks lengkap dalam satu string)
+    assert.match(product, /Weekly Diamond Pass ada batas pembelian dari Moonton, ngikutin kuota di akun kamu\. Cek dulu di dalam game: buka logo diamond, pilih Weekly Diamond Pass — angka kecil di samping sisa hari itu sisa kuota kamu\. Contoh \(2\/10\) artinya masih bisa beli 2x lagi\. Kalau \(0\/10\), jangan checkout dulu karena WDP barunya bisa gagal masuk\./);
+    
+    // Kedua tombol dengan label terkunci
+    assert.match(product, /<button type="button" @click="cancelWdpSelection">Cek Nanti<\/button>/);
+    assert.match(product, /<button type="button" class="lfx-primary" @click="confirmWdpSelection">Sudah Saya Cek, Lanjut<\/button>/);
+    
+    // Perilaku "Cek Nanti" membatalkan pilihan
+    assert.match(product, /function cancelWdpSelection\(\) \{[\s\S]*?closeWdpInfo\(\);[\s\S]*?\}/);
+    assert.match(product, /function closeWdpInfo\(\) \{[\s\S]*?wdpInfoOpen\.value = false;[\s\S]*?pendingWdpPackage\.value = null;[\s\S]*?\}/);
+    
+    // Perilaku "Sudah Saya Cek, Lanjut" mempertahankan pilihan dan scroll ke pembayaran
+    assert.match(product, /function confirmWdpSelection\(\) \{[\s\S]*?selectedPackageId\.value = String\(item\.id\);[\s\S]*?scrollToPayment\(\);[\s\S]*?\}/);
+    
+    // Escape juga membatalkan (lewat closeWdpInfo di onDialogKey)
+    assert.match(product, /closeWdpInfo\(\);/);
+    
+    // Panel muncul saat memilih WDP (currentIsWdp -> targetIsWdp transition)
+    assert.match(product, /const currentIsWdp = selectedPackage\.value\?\.is_wdp === true;/);
+    assert.match(product, /const targetIsWdp = item\.is_wdp === true;/);
+    assert.match(product, /if \(targetIsWdp && \(!currentIsWdp \|\| String\(selectedPackageId\.value\) !== String\(item\.id\)\)\) \{/);
+    
+    // TEMUAN 1: Deep link WDP diarahkan ke panel, tidak langsung terpilih
+    assert.match(product, /if \(selectedPackageId\.value\) \{[\s\S]*?const seededPackage = \(props\.packages \|\| \[\]\)\.find\(item => String\(item\.id\) === String\(selectedPackageId\.value\)\);[\s\S]*?if \(seededPackage\?\.is_wdp === true\) \{[\s\S]*?pendingWdpPackage\.value = seededPackage;[\s\S]*?wdpInfoOpen\.value = true;[\s\S]*?selectedPackageId\.value = '';[\s\S]*?\}[\s\S]*?\}/);
+    
+    // TEMUAN 2: confirmWdpSelection mengecek ulang packageDisabled dan is_available
+    assert.match(product, /function confirmWdpSelection\(\) \{[\s\S]*?if \(item\.is_available === false \|\| packageDisabled\(item\)\) \{[\s\S]*?closeWdpInfo\(\);[\s\S]*?return;[\s\S]*?\}/);
+
+    // Panel WDP yang terbuka membatalkan penyelesaian prepareOrder (tidak ada dua dialog bersamaan),
+    // dan status checkout yang berubah selama persiapan membuat snapshot basi dan dibatalkan
+    assert.match(product, /const preparedStateSignature = confirmationStateSignature\(\);/);
+    assert.match(product, /if \(wdpInfoOpen\.value \|\| confirmationStateSignature\(\) !== preparedStateSignature\) return;/);
+});

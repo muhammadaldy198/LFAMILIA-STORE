@@ -282,17 +282,20 @@ class CatalogController
             ->orderByRaw('nominal_value IS NULL')
             ->orderBy('sort_order')->orderBy('nominal_value')->orderBy('id')->get();
         $previewPrices = $pricing->forPackages($packageRows->pluck('id')->all());
+        $isWdpProduct = strtolower(trim((string) $product->nickname_game_code)) === 'mobile-legends';
         $packages = app(CatalogNominalOrder::class)->sort($packageRows)
-            ->map(function (ProductPackage $package) use ($previewPrices): array {
+            ->map(function (ProductPackage $package) use ($previewPrices, $isWdpProduct): array {
                 $quote = $previewPrices[$package->id] ?? null;
                 $available = $quote !== null;
                 $price = $quote['subtotal_idr'] ?? null;
+                $isWdp = $isWdpProduct && str_contains(strtolower($package->name), 'weekly diamond pass');
 
                 return [
                     ...$package->only('id', 'name', 'note', 'group_name', 'nominal_value'),
                     'image_url' => OptimizedMedia::url($package, 'image', 'card'),
                     'is_available' => $available,
                     'price_idr' => $price,
+                    'is_wdp' => $isWdp,
                 ];
             })
             // D11: nominal yang tidak bisa dibeli tidak tampil sama sekali.
