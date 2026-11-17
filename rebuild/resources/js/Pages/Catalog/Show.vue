@@ -184,6 +184,11 @@ const reviewBody = ref('');
 const reviewSaving = ref(false);
 const reviewMessage = ref('');
 const reviewError = ref('');
+// Accordion FAQ: paling banyak satu kartu terbuka; null berarti semua tertutup.
+const openFaqIndex = ref(null);
+const toggleFaq = index => {
+    openFaqIndex.value = openFaqIndex.value === index ? null : index;
+};
 
 /** Show region warnings only for the currently entered account. */
 const regionWarning = computed(() => accountValidationSignature.value === accountInputSignature()
@@ -1377,14 +1382,15 @@ function closeReview() { summaryOpen.value = false; closeConfirmation(); }
         </div></section>
 
         <section v-if="productFaqs?.length" class="lfx-panel lfx-details lfx-panel-faq"><header class="lfx-panel-header lfx-panel-header-plain"><div><h2>{{ customerText("pages.catalog.show.cc3c98ca", "Pertanyaan umum") }}</h2></div></header><div class="lfx-panel-content">
-            <article class="lf-product-faq lf-product-faq-legacy">
-                <div>
-                    <details v-for="(faq, index) in productFaqs" :key="index + ':' + faq.question">
-                        <summary>{{faq.question}}</summary>
-                        <p>{{faq.answer}}</p>
-                    </details>
+            <div class="lf-product-faq">
+                <div v-for="(faq, index) in productFaqs" :key="index + ':' + faq.question" class="lf-faq-card" :class="{open: openFaqIndex === index}">
+                    <button type="button" class="lf-faq-question" :aria-expanded="openFaqIndex === index" :aria-controls="'lf-faq-answer-' + index" @click="toggleFaq(index)">
+                        <span>{{ faq.question }}</span>
+                        <svg class="lf-faq-chevron" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                    </button>
+                    <div v-show="openFaqIndex === index" :id="'lf-faq-answer-' + index" class="lf-faq-answer"><p>{{ faq.answer }}</p></div>
                 </div>
-            </article>
+            </div>
         </div></section>
         </template>
         </div>
