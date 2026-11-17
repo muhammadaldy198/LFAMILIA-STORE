@@ -582,3 +582,34 @@ test('PR3 product page splits Keterangan into three panels with hardcoded two-la
     assert.ok(controller.includes('ProductFaq::forProduct($product)'));
     assert.doesNotMatch(controller, /'faqs' =>/);
 });
+
+test('cashback coin pill sits right of the price, only when cashback_coin > 0, and DIPILIH stays', () => {
+    const product = read('Pages/Catalog/Show.vue');
+    const css = readFileSync(new URL('../../resources/css/checkout.css', import.meta.url), 'utf8');
+    const controller = readFileSync(new URL('../../app/Http/Controllers/CatalogController.php', import.meta.url), 'utf8');
+    const bottom = product.match(/<span class="lfx-nominal-bottom">[\s\S]*?DIPILIH<\/small><\/span><\/span>/);
+    assert.ok(bottom, 'baris harga kartu nominal tidak ditemukan');
+    const row = bottom[0];
+
+    // Urutan posisi B: harga <b>, lalu pill, lalu DIPILIH di paling kanan.
+    assert.ok(row.indexOf('formatIdr(item.price_idr)') < row.indexOf('lfx-coin-pill'));
+    assert.ok(row.indexOf('lfx-coin-pill') < row.indexOf('DIPILIH'));
+
+    // Pill hanya dirender bila backend memberi cashback_coin > 0 (dan harga tampil).
+    assert.match(row, /<\/b><span class="lfx-nominal-tags"><span v-if="item\.cashback_coin>0&&item\.is_available!==false&&!packageDisabled\(item\)" class="lfx-coin-pill">\+\{\{item\.cashback_coin\}\}<span class="lfx-coin-unit"> Coin<\/span><\/span>/);
+    assert.equal((product.match(/class="lfx-coin-pill"/g) || []).length, 1);
+
+    // Teks DIPILIH tetap ada saat kartu terpilih.
+    assert.match(row, /<small v-if="String\(selectedPackageId\)===String\(item\.id\)">DIPILIH<\/small><\/span><\/span>$/);
+
+    // Saat terpilih, kata "Coin" disembunyikan visual saja (pill menyingkat jadi "+{n}").
+    assert.match(css, /\.lfx \.lfx-nominal\.selected \.lfx-coin-unit\{position:absolute;width:1px;height:1px;[^}]*clip:rect\(0 0 0 0\)/);
+    assert.match(css, /\.lfx \.lfx-coin-pill\{[^}]*flex:0 0 auto;[^}]*background:rgba\(16,185,129,\.16\);color:#34d399;/);
+    // Grup pill + DIPILIH rata kanan; angka coin tidak dipotong, baris boleh turun.
+    assert.match(css, /\.lfx \.lfx-nominal-tags\{margin-left:auto;[^}]*flex:0 0 auto\}/);
+    assert.match(css, /\.lfx \.lfx-nominal-bottom\{flex-wrap:wrap;row-gap:2px;padding-block:4px\}/);
+    assert.doesNotMatch(css, /\.lfx \.lfx-coin-pill\{[^}]*overflow:hidden/);
+
+    // Angka lencana memakai aturan earn yang sama di backend.
+    assert.ok(controller.includes("'cashback_coin' => CashbackCoinService::coinsForAmount((int) ($price ?? 0)),"));
+});

@@ -9,6 +9,7 @@ use App\Models\ProductPackage;
 use App\Models\ProductReview;
 use App\Models\SavedGameAccount;
 use App\Models\StoreAsset;
+use App\Services\CashbackCoinService;
 use App\Services\CatalogNominalOrder;
 use App\Services\CheckoutPricing;
 use App\Services\NicknameService;
@@ -296,6 +297,7 @@ class CatalogController
                     'is_available' => $available,
                     'price_idr' => $price,
                     'is_wdp' => $isWdp,
+                    'cashback_coin' => CashbackCoinService::coinsForAmount((int) ($price ?? 0)),
                 ];
             })
             // D11: nominal yang tidak bisa dibeli tidak tampil sama sekali.
