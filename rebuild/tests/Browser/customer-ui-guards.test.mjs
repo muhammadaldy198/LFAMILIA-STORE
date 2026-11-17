@@ -543,6 +543,8 @@ test('PR2 WDP panel uses exact locked text and is_wdp flag without inventing beh
     // TEMUAN 2: confirmWdpSelection mengecek ulang packageDisabled dan is_available
     assert.match(product, /function confirmWdpSelection\(\) \{[\s\S]*?if \(item\.is_available === false \|\| packageDisabled\(item\)\) \{[\s\S]*?closeWdpInfo\(\);[\s\S]*?return;[\s\S]*?\}/);
 
-    // Panel WDP yang terbuka membatalkan penyelesaian prepareOrder (tidak ada dua dialog bersamaan)
-    assert.match(product, /if \(wdpInfoOpen\.value\) return;/);
+    // Panel WDP yang terbuka membatalkan penyelesaian prepareOrder (tidak ada dua dialog bersamaan),
+    // dan status checkout yang berubah selama persiapan membuat snapshot basi dan dibatalkan
+    assert.match(product, /const preparedStateSignature = confirmationStateSignature\(\);/);
+    assert.match(product, /if \(wdpInfoOpen\.value \|\| confirmationStateSignature\(\) !== preparedStateSignature\) return;/);
 });
