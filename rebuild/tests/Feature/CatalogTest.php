@@ -1411,6 +1411,7 @@ class CatalogTest extends TestCase
             'store_cost_idr' => 20000,
             'is_active' => true,
         ]);
+        $this->seedCheckoutDigiflazzCatalog($wdpPackage->id);
 
         $regularPackage = $product->packages()->create([
             'code' => '86D',
@@ -1426,6 +1427,7 @@ class CatalogTest extends TestCase
             'store_cost_idr' => 18000,
             'is_active' => true,
         ]);
+        $this->seedCheckoutDigiflazzCatalog($regularPackage->id);
 
         $this->get('/catalog/'.$product->slug)->assertOk()
             ->assertInertia(fn (Assert $page) => $page
@@ -1469,6 +1471,7 @@ class CatalogTest extends TestCase
             'store_cost_idr' => 15000,
             'is_active' => true,
         ]);
+        $this->seedCheckoutDigiflazzCatalog($package->id);
 
         $this->get('/catalog/'.$product->slug)->assertOk()
             ->assertInertia(fn (Assert $page) => $page
