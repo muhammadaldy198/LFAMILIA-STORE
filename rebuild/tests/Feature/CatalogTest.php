@@ -1377,14 +1377,13 @@ class CatalogTest extends TestCase
         ])->assertSessionHasErrors('is_active');
         $this->assertFalse($package->fresh()->is_active);
     }
-}
 
     public function test_mobile_legends_weekly_diamond_pass_packages_are_marked_is_wdp(): void
     {
         $category = Category::where('slug', 'game')->firstOrFail();
         DB::table('providers')->where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
         $providerId = DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
-        
+
         $product = Product::create([
             'category_id' => $category->id,
             'name' => 'Mobile Legends',
@@ -1397,7 +1396,7 @@ class CatalogTest extends TestCase
             'nickname_user_field_key' => 'user_id',
             'nickname_server_field_key' => 'zone_id',
         ]);
-        
+
         $wdpPackage = $product->packages()->create([
             'code' => 'WDP-X1',
             'name' => 'Weekly Diamond Pass x1',
@@ -1412,7 +1411,7 @@ class CatalogTest extends TestCase
             'store_cost_idr' => 20000,
             'is_active' => true,
         ]);
-        
+
         $regularPackage = $product->packages()->create([
             'code' => '86D',
             'name' => '86 Diamond',
@@ -1427,7 +1426,7 @@ class CatalogTest extends TestCase
             'store_cost_idr' => 18000,
             'is_active' => true,
         ]);
-        
+
         $this->get('/catalog/'.$product->slug)->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Catalog/Show')
@@ -1439,13 +1438,13 @@ class CatalogTest extends TestCase
                 ->where('packages.1.name', '86 Diamond')
             );
     }
-    
+
     public function test_non_mobile_legends_products_have_is_wdp_false(): void
     {
         $category = Category::where('slug', 'game')->firstOrFail();
         DB::table('providers')->where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
         $providerId = DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
-        
+
         $product = Product::create([
             'category_id' => $category->id,
             'name' => 'Free Fire',
@@ -1455,7 +1454,7 @@ class CatalogTest extends TestCase
             'is_active' => true,
             'nickname_game_code' => 'free-fire',
         ]);
-        
+
         $package = $product->packages()->create([
             'code' => 'FF100',
             'name' => 'Membership Mingguan',
@@ -1470,7 +1469,7 @@ class CatalogTest extends TestCase
             'store_cost_idr' => 15000,
             'is_active' => true,
         ]);
-        
+
         $this->get('/catalog/'.$product->slug)->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Catalog/Show')
@@ -1480,3 +1479,4 @@ class CatalogTest extends TestCase
                 ->where('packages.0.name', 'Membership Mingguan')
             );
     }
+}
