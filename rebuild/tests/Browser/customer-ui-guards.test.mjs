@@ -360,8 +360,37 @@ test('F14/PR3 Keterangan keeps one tab (v-else) with description, reviews and FA
     assert.match(product, /<template v-else>\s*<section class="lfx-panel lfx-details lfx-panel-description">/);
     const description = product.indexOf('lf-product-description-legacy');
     const reviews = product.indexOf('lf-product-review-section lf-review-legacy');
-    const faq = product.indexOf('lf-product-faq lf-product-faq-legacy');
+    const faq = product.indexOf('<div class="lf-product-faq">');
     assert.ok(description >= 0 && reviews > description && faq > reviews);
+});
+
+test('product FAQ renders one accordion card per question, one open at a time, without <details>', () => {
+    const product = read('Pages/Catalog/Show.vue');
+    const css = readFileSync(new URL('../../resources/css/checkout.css', import.meta.url), 'utf8');
+    const faqPanel = product.slice(product.indexOf('lfx-panel-faq'), product.indexOf('</section>', product.indexOf('lfx-panel-faq')));
+    assert.ok(faqPanel.length > 0);
+
+    assert.ok(!product.includes('lf-product-faq-legacy'));
+    assert.ok(!faqPanel.includes('<details'), 'FAQ list still uses <details>');
+    assert.ok(!faqPanel.includes('<summary'), 'FAQ list still uses <summary>');
+    assert.match(faqPanel, /<div class="lf-product-faq">\s*<div v-for="\(faq, index\) in productFaqs" :key="index \+ ':' \+ faq\.question" class="lf-faq-card" :class="\{open: openFaqIndex === index\}">/);
+    assert.match(faqPanel, /<button type="button" class="lf-faq-question" :aria-expanded="openFaqIndex === index"[^>]*@click="toggleFaq\(index\)">/);
+    assert.match(faqPanel, /<svg class="lf-faq-chevron"[^>]*stroke="currentColor"/);
+    assert.match(faqPanel, /<div v-show="openFaqIndex === index"[^>]*class="lf-faq-answer"><p>\{\{ faq\.answer \}\}<\/p><\/div>/);
+
+    // Semua tertutup secara bawaan; klik kartu terbuka menutupnya; klik kartu lain menggantikannya.
+    assert.match(product, /const openFaqIndex = ref\(null\);/);
+    assert.match(product, /openFaqIndex\.value = openFaqIndex\.value === index \? null : index;/);
+    // Pindah produk lewat Inertia (komponen dipakai ulang) menutup semua kartu lagi.
+    assert.match(product, /watch\(\(\) => props\.product\?\.slug, \(\) => \{ openFaqIndex\.value = null; \}\);/);
+
+    // Kotak tunggal lama hilang; tiap kartu punya kotaknya sendiri.
+    assert.match(css, /\.lfx \.lf-product-faq\{display:flex;flex-direction:column;gap:10px\}/);
+    assert.doesNotMatch(css, /\.lfx \.lf-product-faq\{[^}]*(padding|border|background)/);
+    assert.doesNotMatch(css, /,\.lfx \.lf-product-faq\{/);
+    assert.match(css, /\.lfx \.lf-faq-card\{border:1px solid var\(--edge\);border-radius:12px;background:var\(--lf-color-surface\);overflow:hidden\}/);
+    assert.match(css, /\.lfx \.lf-faq-card\.open \.lf-faq-chevron\{transform:rotate\(180deg\)\}/);
+    assert.match(css, /\.lfx \.lf-faq-question:focus-visible\{outline:2px solid var\(--lf-color-primary\);outline-offset:-2px\}/);
 });
 
 

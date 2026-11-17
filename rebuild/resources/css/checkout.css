@@ -390,7 +390,15 @@
 .lfx .lfx-agreement input{margin-right:6px;accent-color:var(--lf-color-primary)}
 .lfx .lf-review-legacy-head,.lfx .lf-review-card-head{display:flex;justify-content:space-between;gap:15px}
 .lfx .lf-review-legacy-grid,.lfx .lf-review-list{display:grid;gap:16px}
-.lfx .lf-review-form,.lfx .lf-product-faq{padding:16px;border:1px solid var(--edge);border-radius:12px;background:var(--lf-color-surface)}
+.lfx .lf-review-form{padding:16px;border:1px solid var(--edge);border-radius:12px;background:var(--lf-color-surface)}
+.lfx .lf-product-faq{display:flex;flex-direction:column;gap:10px}
+.lfx .lf-faq-card{border:1px solid var(--edge);border-radius:12px;background:var(--lf-color-surface);overflow:hidden}
+.lfx .lf-faq-question{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;background:transparent;border:0;text-align:left;color:var(--lf-color-text);font-size:13px;font-weight:700;cursor:pointer}
+.lfx .lf-faq-question:focus-visible{outline:2px solid var(--lf-color-primary);outline-offset:-2px}
+.lfx .lf-faq-chevron{flex-shrink:0;color:var(--lf-color-muted);transition:transform .2s}
+.lfx .lf-faq-card.open .lf-faq-chevron{transform:rotate(180deg)}
+.lfx .lf-faq-answer p{padding:0 16px 14px;margin:0}
+@media(prefers-reduced-motion:reduce){.lfx .lf-faq-chevron{transition:none}}
 .lfx .lf-review-form input,.lfx .lf-review-form textarea{display:block;width:100%;padding:12px;margin-block:12px;border:1px solid var(--edge);border-radius:8px;background:var(--lf-color-background-alt);color:var(--bright)}
 .lfx .lf-review-stars-input button{color:var(--lf-color-muted);background:transparent;border:0;font-size:24px}
 .lfx .lf-review-stars-input button.active{color:var(--lf-color-highlight)}
