@@ -307,7 +307,7 @@ class CatalogController
         $user = auth('web')->user();
         $reviews = ProductReview::where('product_id', $product->id)->where('is_active', true)
             ->where(fn ($query) => $query->whereNull('published_at')->orWhere('published_at', '<=', now()))
-            ->orderByDesc('published_at')->orderByDesc('id')->limit(30)
+            ->orderByDesc('published_at')->orderByDesc('id')->limit(5)
             ->get(['id', 'display_name', 'rating', 'title', 'body', 'published_at', 'created_at'])
             ->map(fn (ProductReview $review): array => [
                 ...$review->only('id', 'display_name', 'rating', 'title', 'body'),
@@ -317,6 +317,14 @@ class CatalogController
             ]);
         $reviewStats = ProductReview::where('product_id', $product->id)->where('is_active', true)
             ->selectRaw('COUNT(*) as total, COALESCE(AVG(rating), 0) as average')->first();
+        // Same filter as total/average so the star bars always add up to the headline count.
+        $ratingCounts = ProductReview::where('product_id', $product->id)->where('is_active', true)
+            ->selectRaw('rating, COUNT(*) as aggregate')->groupBy('rating')
+            ->pluck('aggregate', 'rating');
+        $reviewDistribution = [];
+        foreach ([5, 4, 3, 2, 1] as $star) {
+            $reviewDistribution[$star] = (int) ($ratingCounts[$star] ?? 0);
+        }
         $savedAccounts = $user ? SavedGameAccount::where('user_id', $user->id)
             ->where('product_id', $product->id)->orderByDesc('id')->get()
             ->map(fn (SavedGameAccount $saved): array => [
@@ -393,6 +401,7 @@ class CatalogController
             'reviewStats' => [
                 'total' => (int) ($reviewStats?->total ?? 0),
                 'average' => round((float) ($reviewStats?->average ?? 0), 1),
+                'distribution' => $reviewDistribution,
             ],
             'productFaqs' => ProductFaq::forProduct($product),
             'initialPackageId' => $request->filled('package')

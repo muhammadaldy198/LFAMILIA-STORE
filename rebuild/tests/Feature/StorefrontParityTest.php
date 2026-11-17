@@ -412,6 +412,79 @@ class StorefrontParityTest extends TestCase
             ])->assertUnprocessable();
     }
 
+    public function test_product_page_lists_five_newest_reviews_with_consistent_stats_and_distribution(): void
+    {
+        $catalog = $this->catalog();
+        $product = $catalog['product'];
+        $suffix = strtoupper(bin2hex(random_bytes(3)));
+
+        // Eight active reviews, newest first: ratings 5,5,5,4,3,1,5,5 → total 8, sum 33, average 4.125 → 4.1.
+        $ratings = [5, 5, 5, 4, 3, 1, 5, 5];
+        $ids = [];
+        foreach ($ratings as $index => $rating) {
+            $orderId = $this->guestOrder($product, $catalog['package_id'], 'LF261117-RV'.$suffix.$index);
+            $ids[] = ProductReview::create([
+                'order_id' => $orderId,
+                'product_id' => $product->id,
+                'display_name' => 'Pembeli '.$index,
+                'rating' => $rating,
+                'title' => $index === 0 ? 'Mantap' : null,
+                'body' => 'Isi ulasan nomor '.$index,
+                'is_active' => true,
+                'published_at' => now()->subMinutes(10 * ($index + 1)),
+            ])->id;
+        }
+        // Hidden review (newest of all) must not appear in the list or any count.
+        ProductReview::create([
+            'order_id' => $this->guestOrder($product, $catalog['package_id'], 'LF261117-RV'.$suffix.'X'),
+            'product_id' => $product->id,
+            'display_name' => 'Disembunyikan',
+            'rating' => 2,
+            'body' => 'Tidak tampil',
+            'is_active' => false,
+            'published_at' => now()->subMinute(),
+        ]);
+
+        $this->get('/catalog/'.$product->slug)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Catalog/Show')
+                ->has('reviews', 5)
+                ->where('reviews.0.id', $ids[0])
+                ->where('reviews.1.id', $ids[1])
+                ->where('reviews.2.id', $ids[2])
+                ->where('reviews.3.id', $ids[3])
+                ->where('reviews.4.id', $ids[4])
+                ->where('reviews.0.title', 'Mantap')
+                ->where('reviews.0.verified_purchase', true)
+                ->where('reviewStats.total', 8)
+                ->where('reviewStats.average', 4.1)
+                ->where('reviewStats.distribution.5', 5)
+                ->where('reviewStats.distribution.4', 1)
+                ->where('reviewStats.distribution.3', 1)
+                ->where('reviewStats.distribution.2', 0)
+                ->where('reviewStats.distribution.1', 1)
+                ->etc());
+    }
+
+    public function test_product_page_without_reviews_reports_zero_distribution(): void
+    {
+        $catalog = $this->catalog();
+
+        $this->get('/catalog/'.$catalog['product']->slug)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Catalog/Show')
+                ->has('reviews', 0)
+                ->where('reviewStats.total', 0)
+                ->where('reviewStats.distribution.5', 0)
+                ->where('reviewStats.distribution.4', 0)
+                ->where('reviewStats.distribution.3', 0)
+                ->where('reviewStats.distribution.2', 0)
+                ->where('reviewStats.distribution.1', 0)
+                ->etc());
+    }
+
     public function test_login_can_immediately_save_game_account_and_quote_checkout_without_reload(): void
     {
         $this->withServerVariables(['REMOTE_ADDR' => '192.0.2.182']);

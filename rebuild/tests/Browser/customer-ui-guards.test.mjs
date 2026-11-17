@@ -367,10 +367,65 @@ test('F14/PR3 Keterangan keeps one tab (v-else) with description, reviews and FA
 
 test('F16 review count uses a separate line and supports zero reviews', () => {
     const product = read('Pages/Catalog/Show.vue');
+    assert.match(product, /<p class="lf-review-hero-total">dari \{\{formatCountId\(reviewStats\?\.total \|\| 0\)\}\} ulasan<\/p>/);
+    assert.match(product, /props\.reviewStats\?\.total \? Number\(props\.reviewStats\.average \|\| 0\)\.toFixed\(1\) : '–'/);
+    assert.match(product, /Belum ada ulasan untuk produk ini\./);
+});
+
+test('review panel: centred hero, star bars, flat list of 5, member form after the list, no guest box', () => {
+    const product = read('Pages/Catalog/Show.vue');
     const css = readFileSync(new URL('../../resources/css/checkout.css', import.meta.url), 'utf8');
-    assert.match(product, /reviewStats\?\.total \|\| 0\}\} ulasan/);
-    assert.match(css, /\.lfx \.lf-review-average > small \{[^}]*grid-column: 1 \/ -1/s);
-    assert.match(css, /\.lfx \.lf-review-average \{[^}]*row-gap: 2px/s);
+    const controller = readFileSync(new URL('../../app/Http/Controllers/CatalogController.php', import.meta.url), 'utf8');
+    const panel = product.slice(product.indexOf('lfx-panel-reviews'), product.indexOf('lfx-panel-faq'));
+    assert.ok(panel.length > 0);
+
+    // A1: guest box, old eyebrow, old explanation and old average box are gone.
+    for (const removed of ['lf-review-guest-secure', 'lf-review-secure-link', '/orders/check', 'cd75c0db', 'PENILAIAN PELANGGAN', 'c47f9331', 'lf-review-average', 'lf-review-legacy-head']) {
+        assert.ok(!panel.includes(removed), 'review panel still contains ' + removed);
+    }
+    assert.doesNotMatch(css, /\.lf-review-average/);
+
+    // A2: big centred hero + "/ 5.0".
+    assert.match(panel, /<div class="lf-review-hero">\s*<p class="lf-review-hero-score"><span class="lf-review-hero-star" aria-hidden="true">★<\/span><strong>\{\{reviewAverageLabel\}\}<\/strong><small>\/ 5\.0<\/small><\/p>/);
+    assert.match(css, /\.lfx \.lf-review-hero\{[^}]*justify-items:center[^}]*text-align:center/);
+    assert.match(css, /\.lfx \.lf-review-hero-score strong\{[^}]*color:#fde047;font-size:44px/);
+    assert.match(product, /Number\(value \|\| 0\)\.toLocaleString\('id-ID'\)/);
+
+    // A3: five bars from reviewStats.distribution.
+    assert.match(product, /props\.reviewStats\?\.distribution/);
+    assert.match(product, /\[5, 4, 3, 2, 1\]\.map\(\(star\)/);
+    assert.match(css, /\.lfx \.lf-review-bar-track\{[^}]*background:rgba\(255,255,255,\.08\)/);
+    assert.match(css, /\.lfx \.lf-review-bar-fill\{[^}]*background:#fde047/);
+    assert.match(controller, /'distribution' => \$reviewDistribution/);
+
+    // A4: flat rows, no old card classes, review-only time format, list limited to 5.
+    assert.match(panel, /<article v-for="review in reviews" :key="review\.id" class="lf-review-row">/);
+    assert.ok(!panel.includes('lf-review-card-head') && !panel.includes('lf-review-rating') && !panel.includes('lf-review-verified"'));
+    assert.doesNotMatch(css, /\.lfx \.lf-review-list article\b/);
+    assert.match(css, /\.lfx \.lf-review-list \.lf-review-row\{[^}]*border:0;border-bottom:1px solid rgba\(255,255,255,\.07\);border-radius:0;background:none/);
+    assert.match(css, /\.lfx \.lf-review-list \.lf-review-row:last-of-type\{border-bottom:0\}/);
+    assert.match(css, /\.lfx \.lf-review-row-stars \.on\{color:#fde047\}/);
+    assert.match(css, /\.lfx \.lf-review-row-stars \.off\{color:rgba\(255,255,255,\.18\)\}/);
+    assert.match(css, /\.lfx \.lf-review-row-verified\{color:#a9e34d/);
+    assert.match(panel, /formatReviewTime\(review\.published_at \|\| review\.created_at\)/);
+    assert.match(product, /function formatDateId\(value\) \{\n    if \(!value\) return '';\n    const date = new Date\(value\);\n    if \(Number\.isNaN\(date\.getTime\(\)\)\) return '';\n    return date\.toLocaleDateString\('id-ID', \{ timeZone: 'Asia\/Jakarta', day: 'numeric', month: 'short', year: 'numeric' \}\);\n\}/);
+    assert.match(controller, /->orderByDesc\('published_at'\)->orderByDesc\('id'\)->limit\(5\)/);
+
+    // A5: member form kept and placed after the list; guests get no replacement box.
+    const list = panel.indexOf('<div class="lf-review-list">');
+    const form = panel.indexOf('<form v-if="customer" class="lf-review-form" @submit.prevent="submitReview">');
+    assert.ok(list >= 0 && form > list);
+    assert.doesNotMatch(panel, /v-else class="lf-review-form/);
+});
+
+test('review time keeps formatDateId output and appends the WIB clock', () => {
+    const product = read('Pages/Catalog/Show.vue');
+    const source = product.slice(product.indexOf('function formatDateId(value)'), product.indexOf('const reviewAverageLabel'));
+    const formatReviewTime = new Function(source.replace(/function formatCountId[\s\S]*?\n}\n/, '') + '\nreturn formatReviewTime;')();
+    assert.equal(formatReviewTime('2026-11-17T12:24:00+00:00'), '17 Nov 2026, 19.24');
+    assert.equal(formatReviewTime('2026-11-17T17:05:00Z'), '18 Nov 2026, 00.05');
+    assert.equal(formatReviewTime(null), '');
+    assert.equal(formatReviewTime('bukan tanggal'), '');
 });
 
 
