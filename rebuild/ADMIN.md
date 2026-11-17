@@ -9,7 +9,7 @@ Panel admin memakai Laravel + Vue/Inertia. Hak akses selalu diperiksa di server;
 - **SUPER_ADMIN** — semua izin, termasuk operasi khusus super.
 - **ADMIN** — hanya izin granular yang diberikan kepadanya.
 
-Tidak ada peran Staff yang aktif. Tingkat membership pelanggan (BASIC sampai MAFIA) bukan peran admin.
+Tidak ada peran Staff yang aktif.
 
 Izin granular didefinisikan di `AdminPermissionService` dan mencakup dashboard, pesanan, pengiriman, katalog, konten, provider, pembayaran, pelanggan, voucher, dukungan, laporan, pengaturan, dan notifikasi.
 
@@ -42,7 +42,7 @@ Satu-satunya sumber menu adalah `AdminPermissionService::menu()`. Urutan dan kel
 - **Provider** — registry provider dan kesehatan mapping; bukan editor secret.
 - **Pembayaran** — channel, keadaan gateway, maintenance, routing, QRIS Manual, dan kontrol top-up. Kredensial tidak dimasukkan lewat rute pembayaran.
 - **Laporan** — angka operasional; keuangan sensitif dibatasi untuk Super Admin.
-- **Pelanggan** — profil, riwayat, tingkat membership, dan operasi wallet sesuai peran. Penyesuaian saldo hanya lewat alur resmi yang berledger.
+- **Pelanggan** — profil, riwayat, dan operasi wallet sesuai peran. Penyesuaian saldo hanya lewat alur resmi yang berledger.
 - **Layanan Pelanggan** — tiket, percakapan, dan balasan cepat.
 - **Notifikasi** — notifikasi operasional panel.
 - **Template Email & Notifikasi** — templat pesan keluar.
@@ -68,7 +68,7 @@ Sistem desain admin hidup di `resources/css/admin.css` dan hanya berlaku di shel
 
 Halaman kerja produk memakai URL `/admin/catalog?edit=<id>`; daftar produk tertutup selama editor terbuka. Lima tab editor: Informasi, Nominal & Harga, Sumber, Tampilan Produk, Data Pelanggan. Tab Sumber berisi daftar mapping (modal toko yang bisa diedit, aktif/nonaktif, prioritas, sinkron per mapping) dan saklar sinkron otomatis seluruh katalog. Nominal dirender 25 per halaman dan form detail hanya untuk nominal terpilih. Daftar produk dipaginasi di server, 25 per halaman — peramban hanya menerima metadata paginasi, bukan seluruh katalog.
 
-Halaman Pembayaran memisahkan Channel, Gateway, Routing, QRIS Manual, Top Up Saldo, Tampilan Halaman, dan Transaksi. Detail pelanggan memisahkan Profil, Tier, Pesanan, Saldo & Top Up, Tiket, dan Akun Game. Semua permintaan, pemeriksaan hak, konfirmasi saldo, ledger, status integrasi, dan pelestarian kredensial tetap lewat backend yang ada.
+Halaman Pembayaran memisahkan Channel, Gateway, Routing, QRIS Manual, Top Up Saldo, Tampilan Halaman, dan Transaksi. Detail pelanggan memisahkan Profil, Pesanan, Saldo & Top Up, Tiket, dan Akun Game. Semua permintaan, pemeriksaan hak, konfirmasi saldo, ledger, status integrasi, dan pelestarian kredensial tetap lewat backend yang ada.
 
 Media memakai endpoint Spatie yang ada. Gambar terpilih bisa dipratinjau sebelum diunggah, galat unggahan tampil di tempat, dan penghapusan meminta konfirmasi. Mengunggah favicon otomatis mengaktifkan aset itu dan memperbarui favicon Admin dan etalase.
 

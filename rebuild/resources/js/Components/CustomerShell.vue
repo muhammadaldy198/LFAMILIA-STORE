@@ -22,7 +22,6 @@ const supportPosition = ref(null);
 let supportDrag = null;
 const logged = computed(() => Boolean(page.props.auth?.user));
 const balanceIdr = computed(() => Number(page.props.auth?.user?.balance_idr || 0));
-const membershipTier = computed(() => page.props.auth?.user?.membership_tier_code || 'BASIC');
 const money = (value) => 'Rp' + Number(value || 0).toLocaleString('id-ID');
 const currentYear = new Date().getFullYear();
 const storefront = computed(() => page.props.storefront || {});
@@ -267,7 +266,7 @@ function endSupportDrag(event) {
             <template v-if="logged">
                 <div class="lf-drawer-profile">
                     <span>{{String(page.props.auth?.user?.name||'L').slice(0,1).toUpperCase()}}</span>
-                    <div><strong>{{page.props.auth?.user?.name}}</strong><small>{{membershipTier}} · Akun aktif</small></div>
+                    <div><strong>{{page.props.auth?.user?.name}}</strong><small>Akun aktif</small></div>
                 </div>
                 <div class="lf-drawer-balance">
                     <span>{{ customerText("components.customershell.2e5a0e59", "Saldo LFAMILIA") }}</span>

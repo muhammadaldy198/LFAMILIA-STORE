@@ -3,16 +3,15 @@
 namespace App\Services;
 
 use App\Jobs\StartFulfillmentJob;
-use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
  * Menerapkan keadaan pembayaran PESANAN: status masuk diterapkan ke
- * pesanan, pembayaran lunas ditandai beserta imbasnya (poin
- * membership, email, notifikasi), pembayaran dompet diterapkan, dan
- * pesanan kedaluwarsa ditutup beserta pelepasan vouchernya.
+ * pesanan, pembayaran lunas ditandai beserta imbasnya (email,
+ * notifikasi), pembayaran dompet diterapkan, dan pesanan kedaluwarsa
+ * ditutup beserta pelepasan vouchernya.
  * Class ini TIDAK menangani topup; keadaan topup ada di
  * TopupPaymentStateService.
  */
@@ -21,7 +20,6 @@ class OrderPaymentStateService
     public function __construct(
         private readonly AdminNotificationService $notifications,
         private readonly TransactionalEmailService $emails,
-        private readonly MembershipService $membership,
     ) {}
 
     public function applyOrder(object $payment, string $incomingStatus, array $metadata): array
@@ -112,9 +110,9 @@ class OrderPaymentStateService
     private function markOrderPaid(object $payment, object $order, array $metadata): array
     {
         // Alasan belum dipecah: satu rangkaian imbas lunas — status,
-        // poin membership, email, dan notifikasi harus terjadi
-        // sebagai satu kesatuan hasil; memisahkannya membuat imbas
-        // lunas terbaca setengah-setengah.
+        // email, dan notifikasi harus terjadi sebagai satu kesatuan
+        // hasil; memisahkannya membuat imbas lunas terbaca
+        // setengah-setengah.
         if ($order->status === 'REFUND') {
             return ['result' => 'IGNORED_ORDER_STATE', 'status' => 'REFUND'];
         }
@@ -143,12 +141,6 @@ class OrderPaymentStateService
             'paid_at' => now(),
             'updated_at' => now(),
         ]);
-        if ($order->user_id !== null) {
-            $user = User::find((int) $order->user_id);
-            if ($user) {
-                $this->membership->sync($user);
-            }
-        }
         DB::table('voucher_redemptions')->where('order_id', $order->id)
             ->where('status', 'RESERVED')->update([
                 'status' => 'REDEEMED',

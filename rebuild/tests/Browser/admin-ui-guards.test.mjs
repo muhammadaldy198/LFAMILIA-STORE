@@ -40,7 +40,7 @@ test('admin props are null-safe across dashboard, presentation, Digiflazz', () =
     for (const key of ['recentOrders', 'integrations', 'notifications', 'activities']) {
         assert.ok(dash.includes(key + ': { type: Array, default: () => [] }'), key);
     }
-    assert.match(read('CustomerDetail.vue'), /v-if="membershipProfile"/);
+    assert.doesNotMatch(read('CustomerDetail.vue'), /membership/i);
     const view = read('Presentation.vue');
     assert.match(view, /props\.presentation\?\.typography \|\| \{\}/);
     assert.match(view, /props\.presentation\?\.text \|\| \{\}/);
@@ -70,9 +70,8 @@ test('catalog keeps stored-cost fallback and wide tables scroll on mobile', () =
     assert.doesNotMatch(source, /customer_no_template: item\.customer_no_template/);
     assert.match(repo('resources/css/admin.css'), /\.adm-table \{ min-width: 760px; \}/);
     const customers = read('Customers.vue');
-    assert.match(customers, /canManageMembershipRules: Boolean/);
-    assert.match(customers, /:aria-selected="tab === 'tiers'"/);
-    assert.match(customers, /<AdminModal :open="!!tierEditor"/);
+    assert.doesNotMatch(customers, /membership|tierEditor/i);
+    assert.match(customers, /:aria-selected="tab === 'cleanup'"/);
 });
 test('dashboard chart shows orders and revenue while orders split payment and process columns', () => {
     const dash = read('Dashboard.vue');
@@ -142,7 +141,7 @@ test('orders prioritize attention then pending, newest last', () => {
 });
 test('customer detail is a sequential profile-to-accounts page', () => {
     const source = read('CustomerDetail.vue');
-    const order = ['<h2>Profil</h2>', '<h2>Tingkat member</h2>', '<h2>Riwayat pesanan</h2>', '<h2>Perubahan saldo</h2>', '<h2>Tiket bantuan</h2>', '<h2>Akun game tersimpan</h2>'];
+    const order = ['<h2>Profil</h2>', '<h2>Riwayat pesanan</h2>', '<h2>Perubahan saldo</h2>', '<h2>Tiket bantuan</h2>', '<h2>Akun game tersimpan</h2>'];
     let previous = -1;
     for (const marker of order) { const position = source.indexOf(marker); assert.ok(position > previous, marker); previous = position; }
     assert.match(source, /<button v-if="isSuperAdmin" type="button" class="adm-btn primary" @click="openManage">Atur pelanggan<\/button>/);

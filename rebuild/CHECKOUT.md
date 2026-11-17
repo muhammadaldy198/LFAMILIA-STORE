@@ -11,7 +11,7 @@ Checkout adalah server-authoritative. Browser tidak dipercaya sebagai sumber cos
 3. Pilih package/nominal.
 4. Customer memilih payment channel publik.
 5. Backend resolve provider mapping dan payment route.
-6. Backend hitung membership + voucher + payment fee.
+6. Backend hitung voucher + payment fee.
 7. Customer mengonfirmasi ringkasan server.
 8. Backend membuat order secara idempotent di MySQL transaction.
 9. Order menyimpan snapshot dan masuk `PENDING_PAYMENT`.
@@ -25,18 +25,17 @@ Unique constraint MySQL menjadi proteksi tambahan terhadap race.
 
 ## Pricing/snapshot
 
-Di dalam transaction, backend mengunci/revalidasi package/provider mapping, customer input, membership, voucher, dan payment route lalu menghitung:
+Di dalam transaction, backend mengunci/revalidasi package/provider mapping, customer input, voucher, dan payment route lalu menghitung:
 
 - modal toko (satu mapping/SKU terpilih untuk nominal Digiflazz);
 - markup jual yang berlaku (nominal → game → global; harga rupiah dibulatkan ke atas);
-- membership discount;
 - voucher discount;
 - payment fee;
 - final total.
 
 Harga jual = modal toko × markup; tidak ada pembulatan "cantik". Nominal dengan modal toko yang harga seller provider-nya sedang naik di atas modal toko dianggap tidak eligible, sehingga tidak tampil di halaman produk dan tidak bisa dibeli sampai harganya kembali ke dalam batas.
 
-Snapshot order menyimpan product/package/provider/payment/pricing/membership/voucher/customer input yang dipakai saat order dibuat. Harga order tidak berubah hanya karena setting katalog/provider berubah kemudian.
+Snapshot order menyimpan product/package/provider/payment/pricing/voucher/customer input yang dipakai saat order dibuat. Harga order tidak berubah hanya karena setting katalog/provider berubah kemudian.
 
 Voucher reservation dibuat secara atomic dan mengikuti quota/per-customer/scope/period/minimum rule.
 

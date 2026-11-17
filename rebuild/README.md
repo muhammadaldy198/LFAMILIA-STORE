@@ -31,7 +31,7 @@ Flow dan boundary ada di [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Status implementasi
 
-Kode repository sudah mencakup auth customer/Admin, katalog, checkout, voucher/membership, payment routing, wallet/top-up, Manual QRIS, callback/reconciliation, fulfillment Digiflazz/manual/stok kode, customer support, admin panel, audit log, system health, security middleware, backup/restore tooling, dan CI.
+Kode repository sudah mencakup auth customer/Admin, katalog, checkout, voucher, payment routing, wallet/top-up, Manual QRIS, callback/reconciliation, fulfillment Digiflazz/manual/stok kode, customer support, admin panel, audit log, system health, security middleware, backup/restore tooling, dan CI.
 
 **Kode integrasi tersedia tidak sama dengan credential production sudah dikonfigurasi atau live E2E provider sudah lolos.** Credential provider dikelola melalui Super Admin → Integrasi.
 

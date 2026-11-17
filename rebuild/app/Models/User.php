@@ -99,7 +99,6 @@ class User extends Authenticatable implements MustVerifyEmailContract
             'email_verified_at' => 'datetime',
             'last_active_at' => 'datetime',
             'leaderboard_opt_in' => 'boolean',
-            'membership_progress_bonus_idr' => 'integer',
         ];
     }
 }

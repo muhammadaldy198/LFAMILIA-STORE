@@ -5,18 +5,19 @@ namespace Tests\Feature;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class DatabaseSchemaTest extends TestCase
 {
     use DatabaseTransactions;
 
-    public function test_membership_order_and_provider_registry_match_the_prd(): void
+    public function test_provider_registry_matches_the_prd_and_membership_schema_is_gone(): void
     {
-        $this->assertSame(
-            ['BASIC', 'SILVER', 'GOLD', 'DIAMOND', 'PLATINUM', 'MAFIA'],
-            DB::table('membership_tiers')->orderBy('rank')->pluck('code')->all()
-        );
+        $this->assertFalse(Schema::hasTable('membership_tiers'));
+        foreach (['membership_tier_code', 'membership_mode', 'membership_override_code', 'membership_progress_bonus_idr'] as $column) {
+            $this->assertFalse(Schema::hasColumn('users', $column), $column);
+        }
 
         $this->assertSame(
             ['DIGIFLAZZ', 'MANUAL', 'VOUCHER_STOCK'],

@@ -187,7 +187,6 @@ class GoogleAuthTest extends TestCase
             'phone' => '081234567890',
             'phone_normalized' => '6281234567890',
             'password' => Hash::make('password-strong-123'),
-            'membership_tier_code' => 'BASIC',
         ]);
 
         // Same number via 62... prefix — registration must reject it

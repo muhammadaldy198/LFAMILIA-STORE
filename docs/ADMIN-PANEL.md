@@ -225,15 +225,15 @@ Format tiap halaman: **untuk apa · isi · aksi · catatan**. Nama berkas Vue ad
 `AdminCustomerController` · `customers.view` · `Customers.vue`
 
 **Untuk apa.** Melihat dan mengatur pelanggan.
-**Isi.** Dua tab: **Daftar pelanggan** (ringkasan, filter, tabel: nama, kontak, tingkat, total belanja, pesanan berhasil, saldo, tiket terbuka, status) dan **Tingkat member** (ambang belanja + diskon per tingkat, catatan manfaat).
-**Aksi.** Buka detail, atur ambang & diskon tiap tingkatan (`PUT /admin/settings/membership/{code}`, bila `canManageMembershipRules`), atur pembersihan akun kosong (`PUT /admin/customers/cleanup/settings`, `POST /admin/customers/cleanup/run`), terapkan filter.
-**Catatan.** MAFIA adalah tingkat internal; tidak pernah ditampilkan sebagai tingkatan ke pelanggan.
+**Isi.** Dua tab: **Daftar pelanggan** (ringkasan, filter, tabel: nama, kontak, saldo, pesanan, terakhir aktif, status email, tiket terbuka) dan **Pembersihan akun** (pengaturan pembersihan akun kosong).
+**Aksi.** Buka detail, atur pelanggan (penyesuaian saldo), atur pembersihan akun kosong (`PUT /admin/customers/cleanup/settings`, `POST /admin/customers/cleanup/run`), terapkan filter.
+**Catatan.** Toko tidak punya tingkatan member; tidak ada kolom, filter, atau pengaturan tingkat di halaman ini.
 
 ### 4.16 Detail Pelanggan — `/admin/customers/{userId}`
 `AdminCustomerController@show` · `customers.view` · `CustomerDetail.vue`
 
 **Untuk apa.** Melihat satu pelanggan dari profil sampai uangnya.
-**Isi.** Tujuh bagian berurutan: Profil, Tingkat member, Riwayat pesanan, Perubahan saldo, Riwayat top up, Tiket bantuan, Akun game tersimpan. Ringkasan total belanja, pesanan berhasil, saldo.
+**Isi.** Enam bagian berurutan: Profil, Riwayat pesanan, Perubahan saldo, Riwayat top up, Tiket bantuan, Akun game tersimpan. Ringkasan total belanja, pesanan berhasil, saldo.
 **Aksi.** Atur pelanggan (pop-up), **penyesuaian saldo** (Super Admin, pop-up + konfirmasi kata sandi, alasan wajib, arah tambah/kurang), hapus pelanggan bila `deletable`, buka tiket/pesanan.
 **Catatan.** Namanya "Penyesuaian saldo", bukan "Refund". Batas jumlah dan alasan divalidasi di klien dan server.
 
@@ -291,7 +291,7 @@ Format tiap halaman: **untuk apa · isi · aksi · catatan**. Nama berkas Vue ad
 **Untuk apa.** Identitas toko dan ekspor konfigurasi.
 **Isi.** Toko & kontak (nama, tagline, legal, registrasi, WhatsApp, Instagram, email, Discord, alamat, jam operasional); ringkasan kelengkapan; ekspor pengaturan (Super Admin).
 **Aksi.** Simpan pengaturan toko (`PUT /admin/settings`), unduh konfigurasi (`GET /admin/configuration/export`).
-**Catatan.** Discord di sini untuk tautan footer toko, bukan notifikasi admin. Tingkatan member diatur di menu Pelanggan.
+**Catatan.** Discord di sini untuk tautan footer toko, bukan notifikasi admin.
 
 ---
 

@@ -8,7 +8,7 @@ MySQL 8 adalah database bisnis runtime LFAMILIA STORE. Schema dikelola melalui L
 
 Identity/catalog:
 
-- `users`, `admin_users`, `membership_tiers`
+- `users`, `admin_users`
 - `categories`, `products`, `product_packages`, `product_input_fields`
 - `providers`, `provider_mappings`
 - Spatie `media` dan store/content tables terkait

@@ -36,7 +36,7 @@ class HandleInertiaRequests extends Middleware
 
                 return [
                     'user' => [
-                        ...$user->only('id', 'name', 'email', 'phone', 'membership_tier_code', 'leaderboard_opt_in'),
+                        ...$user->only('id', 'name', 'email', 'phone', 'leaderboard_opt_in'),
                         'email_verified' => $user->hasVerifiedEmail(),
                         'balance_idr' => (int) $wallet->balance_idr,
                     ],

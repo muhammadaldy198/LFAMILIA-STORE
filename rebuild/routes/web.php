@@ -194,7 +194,6 @@ Route::middleware('auth:web')->group(function (): void {
             ->middleware('throttle:wallet-topup')->name('account.wallet.topups.quote');
         Route::post('/account/wallet/topups', [WalletTopupController::class, 'store'])
             ->middleware('throttle:wallet-topup')->name('account.wallet.topups.store');
-        Route::get('/account/membership', [CustomerAccountController::class, 'membership'])->name('account.membership');
         Route::get('/account/codes', [CustomerAccountController::class, 'codes'])->name('account.codes');
         Route::get('/account/game-accounts', [CustomerAccountController::class, 'gameAccounts'])->name('account.game-accounts');
         Route::get('/account/notifications', [CustomerAccountController::class, 'notifications'])->name('account.notifications');
@@ -444,8 +443,6 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
             ->middleware('throttle:admin-sensitive')->name('admin.customers.destroy');
         Route::post('/admin/customers/{userId}/wallet', [AdminCustomerController::class, 'adjustWallet'])
             ->middleware(['throttle:admin-sensitive', 'admin.password.confirm'])->name('admin.customers.wallet');
-        Route::put('/admin/customers/{userId}/membership', [AdminCustomerController::class, 'updateMembership'])
-            ->middleware('throttle:admin-sensitive')->name('admin.customers.membership');
     });
 
     Route::middleware('admin.permission:catalog.manage')->prefix('admin/vouchers')
@@ -508,8 +505,6 @@ Route::middleware(['auth:admin', 'admin.role'])->group(function (): void {
             ->middleware(['admin.super', 'throttle:admin-sensitive'])->name('admin.operational-settings.update');
         Route::put('/admin/settings', [AdminSettingsController::class, 'updateStore'])
             ->middleware('throttle:admin-sensitive')->name('admin.settings.update');
-        Route::put('/admin/settings/membership/{code}', [AdminSettingsController::class, 'updateTier'])
-            ->middleware('throttle:admin-sensitive')->name('admin.settings.membership.update');
     });
 
     Route::middleware('admin.super')->group(function (): void {

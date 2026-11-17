@@ -12,6 +12,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Queue;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class CustomerAreaTest extends TestCase
@@ -111,7 +112,12 @@ class CustomerAreaTest extends TestCase
         $this->actingAs($owner, 'web');
         $this->get('/account')->assertOk();
         $this->get('/account/wallet')->assertOk();
-        $this->get('/account/membership')->assertOk();
+        $this->get('/account/membership')->assertNotFound();
+        $this->get('/account')->assertInertia(fn (Assert $page) => $page
+            ->component('Account')
+            ->has('customer.id')
+            ->missing('customer.membership_tier_code')
+            ->missing('auth.user.membership_tier_code'));
         $this->get('/account/orders')->assertOk();
         $this->get('/account/orders/'.$ownOrder)->assertOk();
         $this->get('/account/orders/'.$otherOrder)->assertNotFound();

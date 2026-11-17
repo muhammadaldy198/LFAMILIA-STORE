@@ -326,7 +326,7 @@ try {
     const qrisAfter=(await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false})).data;
     await writeFile(pr12Folder+'/logo-qris-after-390.png',Buffer.from(qrisAfter,'base64'));
 
-    const accountPages=['/account','/account/wallet','/account/orders','/account/tickets','/account/profile','/account/membership','/account/game-accounts','/account/codes','/account/notifications'];
+    const accountPages=['/account','/account/wallet','/account/orders','/account/tickets','/account/profile','/account/game-accounts','/account/codes','/account/notifications'];
     for(const width of [360,390,1440]){
         await send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:width<640});
         for(const path of accountPages)await inspect(path,width);

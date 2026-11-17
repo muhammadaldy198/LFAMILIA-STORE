@@ -27,7 +27,6 @@ class CheckoutCreationService
         private readonly CheckoutInputValidator $inputValidator,
         private readonly GuestOrderAccess $guestAccess,
         private readonly PaymentRoutingService $paymentRouting,
-        private readonly MembershipService $membership,
         private readonly AdminNotificationService $notifications,
         private readonly TransactionalEmailService $emails,
         private readonly RegionCheckProof $regionProof,
@@ -102,17 +101,13 @@ class CheckoutCreationService
                     $data['region_proof'] ?? null,
                     $this->nicknameService->eligibilityFamilies($lockedProduct),
                 );
-                $member = $user
-                    ? $this->membership->discount($user, $price['subtotal_idr'])
-                    : ['amount_idr' => 0, 'tier_code' => null, 'discount_bps' => 0, 'profile' => null];
                 $voucher = $this->vouchers->voucher(
                     $data['voucher_code'] ?? null,
                     $price,
                     $user,
                     $data['guest_email'] ?? null,
                     $data['guest_phone'] ?? null,
-                    true,
-                    (int) $member['amount_idr']
+                    true
                 );
                 $paymentRoute = $this->paymentRouting->resolve(
                     $data['payment_channel_code'],
@@ -125,7 +120,7 @@ class CheckoutCreationService
                     ]);
                 }
 
-                $discount = (int) $member['amount_idr'] + (int) $voucher['discount_idr'];
+                $discount = (int) $voucher['discount_idr'];
                 $chargeable = $price['subtotal_idr'] - $discount;
                 $fee = $this->paymentRouting->fee($chargeable, $paymentRoute);
                 $total = $chargeable + $fee;
@@ -191,7 +186,8 @@ class CheckoutCreationService
                         'margin_percent' => $price['margin_percent'],
                         'cost_idr' => $price['cost_idr'],
                         'margin_idr' => $price['margin_idr'],
-                        'member_discount_idr' => (int) $member['amount_idr'],
+                        // Kept at 0 (not computed) for old snapshot readers.
+                        'member_discount_idr' => 0,
                         'voucher_discount_idr' => (int) $voucher['discount_idr'],
                         'discount_idr' => $discount,
                         'fee_idr' => $fee,
@@ -205,11 +201,9 @@ class CheckoutCreationService
                         'gateway_id' => $paymentRoute['gateway_id'],
                         'gateway_code' => $paymentRoute['gateway_code'],
                     ],
-                    'membership' => $user ? [
-                        'tier_code' => $member['tier_code'],
-                        'discount_bps' => (int) $member['discount_bps'],
-                        'discount_idr' => (int) $member['amount_idr'],
-                    ] : null,
+                    // Membership tiers were removed; the key stays null so old
+                    // readers of the order snapshot keep the same shape.
+                    'membership' => null,
                     'voucher' => $voucher['snapshot'],
                     'customer_input' => $publicInput,
                     'nickname' => $nickname,

@@ -140,7 +140,6 @@ class CreateNewUser implements CreatesNewUsers
                 'phone' => $input['phone'],
                 'phone_normalized' => $input['phone_normalized'],
                 'password' => Hash::make($input['password']),
-                'membership_tier_code' => 'BASIC',
             ]));
         } catch (QueryException $exception) {
             if (($exception->errorInfo[1] ?? null) === 1062) {

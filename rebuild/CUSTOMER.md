@@ -4,13 +4,11 @@
 
 ## Registered customer
 
-Area account yang diimplementasikan mencakup profile, password/account actions, wallet dan ledger, membership tier, riwayat/detail order, support ticket, serta saved game account sesuai route/controller aktual.
+Area account yang diimplementasikan mencakup profile, password/account actions, wallet dan ledger, riwayat/detail order, support ticket, serta saved game account sesuai route/controller aktual.
 
 Wallet customer dibuat/diambil server-side dan tidak boleh negatif. Perubahan saldo operasional menggunakan ledger dan transaction/locking; customer tidak dapat mengubah saldo dengan mengirim nominal arbitrer.
 
-Membership memakai tabel/config tier dan tetap terpisah dari Admin RBAC:
-
-BASIC → SILVER → GOLD → DIAMOND → PLATINUM → MAFIA.
+Customer tidak punya tingkatan membership. Akun customer tetap terpisah dari Admin RBAC.
 
 ## Guest
 
