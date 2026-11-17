@@ -128,14 +128,21 @@ class ReviewWall
         $currentTick = (int) floor(($now->timestamp - $anchor->timestamp) / self::TICK_SECONDS);
         $entries = [];
 
+        $usedBodies = [];
         for ($tick = $currentTick; $tick > $currentTick - 400 && count($entries) < self::MAX_ENTRIES; $tick--) {
             $tickTime = $anchor->addSeconds($tick * self::TICK_SECONDS);
             if (self::unit($slug.'|tick|'.$tick) >= $probability * self::nightFactor($tickTime)) {
                 continue;
             }
-            $entries[] = self::entry($slug, $bank, $tick, $tickTime, 0, $now);
+            $entry = self::entry($slug, $bank, $tick, $tickTime, 0, $now, $usedBodies);
+            if ($entry !== null) {
+                $entries[] = $entry;
+            }
             if (count($entries) < self::MAX_ENTRIES && self::unit($slug.'|tick-extra|'.$tick) < 0.15) {
-                $entries[] = self::entry($slug, $bank, $tick, $tickTime, 1, $now);
+                $extra = self::entry($slug, $bank, $tick, $tickTime, 1, $now, $usedBodies);
+                if ($extra !== null) {
+                    $entries[] = $extra;
+                }
             }
         }
 
@@ -144,19 +151,36 @@ class ReviewWall
         return array_slice($entries, 0, self::MAX_ENTRIES);
     }
 
-    /** Satu entri dinding; semua pilihan (nama, rating, teks, menit) dari hash (slug, tick, slot). */
-    private static function entry(string $slug, array $bank, int $tick, CarbonImmutable $tickTime, int $slot, CarbonImmutable $now): array
+    /**
+     * Satu entri dinding; semua pilihan (nama, rating, teks, menit) dari hash (slug, tick, slot).
+     * Teks yang sudah tampil di render yang sama tidak boleh berulang: pilihan teks
+     * digeser deterministik (salt retry) dan entri dibatalkan (null) bila tetap tabrakan.
+     */
+    private static function entry(string $slug, array $bank, int $tick, CarbonImmutable $tickTime, int $slot, CarbonImmutable $now, array &$usedBodies): ?array
     {
         $rating = self::weightedRating(self::unit($slug.'|rating|'.$tick.'|'.$slot));
         $name = ReviewBank::NAMES[(int) (self::unit($slug.'|name|'.$tick.'|'.$slot) * count(ReviewBank::NAMES))];
+        $pool = $rating >= 4 ? $bank['bodies'] : ReviewBank::NEUTRAL_BODIES;
+
+        $body = null;
+        for ($attempt = 0; $attempt < 6; $attempt++) {
+            $salt = $attempt === 0 ? '' : '|retry|'.$attempt;
+            $candidate = $pool[(int) (self::unit($slug.'|body|'.$tick.'|'.$slot.$salt) * count($pool))];
+            if (! isset($usedBodies[$candidate])) {
+                $body = $candidate;
+                break;
+            }
+        }
+        if ($body === null) {
+            return null;
+        }
+        $usedBodies[$body] = true;
 
         if ($rating >= 4) {
-            $body = $bank['bodies'][(int) (self::unit($slug.'|body|'.$tick.'|'.$slot) * count($bank['bodies']))];
             $title = self::unit($slug.'|title|'.$tick.'|'.$slot) < 0.4
                 ? $bank['titles'][(int) (self::unit($slug.'|titlepick|'.$tick.'|'.$slot) * count($bank['titles']))]
                 : null;
         } else {
-            $body = ReviewBank::NEUTRAL_BODIES[(int) (self::unit($slug.'|body|'.$tick.'|'.$slot) * count(ReviewBank::NEUTRAL_BODIES))];
             $title = null;
         }
 
@@ -205,9 +229,13 @@ class ReviewWall
         return CarbonImmutable::parse(self::ANCHOR, self::TIMEZONE);
     }
 
-    /** Hash deterministik ke rentang [0, 1); stabil lintas proses dan mesin. */
+    /**
+     * Hash deterministik ke rentang [0, 1); stabil lintas proses dan mesin.
+     * Wajib sha256: crc32 difusinya lemah untuk kunci yang hanya beda angka tick,
+     * nilainya mengumpul dan pilihan nama/teks berulang antar-entri.
+     */
     private static function unit(string $key): float
     {
-        return ((float) sprintf('%u', crc32($key))) / 4294967295.0;
+        return hexdec(substr(hash('sha256', $key), 0, 8)) / 4294967295.0;
     }
 }
