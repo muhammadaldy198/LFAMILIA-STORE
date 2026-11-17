@@ -346,8 +346,8 @@ class FulfillmentManualService
                 'order',
                 $order->id
             );
-            $this->emails->queueOrderCompleted((int) $order->id, 'manual');
             $this->cashback->earnAfterCommit((int) $order->id);
+            $this->emails->queueOrderCompleted((int) $order->id, 'manual');
         }, 3);
     }
 

@@ -301,8 +301,8 @@ class FulfillmentResultService
                     'order',
                     $order->id
                 );
-                $this->emails->queueOrderCompleted((int) $order->id, 'digiflazz');
                 $this->cashback->earnAfterCommit((int) $order->id);
+                $this->emails->queueOrderCompleted((int) $order->id, 'digiflazz');
 
                 return false;
             }

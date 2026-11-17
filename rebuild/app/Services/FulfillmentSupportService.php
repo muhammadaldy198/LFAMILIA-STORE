@@ -393,8 +393,8 @@ class FulfillmentSupportService
                 'order',
                 $order->id
             );
-            $this->emails->queueOrderCompleted((int) $order->id, 'stock');
             $this->cashback->earnAfterCommit((int) $order->id);
+            $this->emails->queueOrderCompleted((int) $order->id, 'stock');
         }, 3);
     }
 
