@@ -90,6 +90,7 @@ jobs:
       - name: Audit frontend dependencies
         # Temporary single-advisory waiver for GHSA-fc5q-39xc-vjpf (picomatch,
         # no patched release exists yet). See scripts/ci/npm-audit-gate.mjs.
+        timeout-minutes: 5
         run: node scripts/ci/npm-audit-gate.mjs
 
       - name: Validate local Git hooks
