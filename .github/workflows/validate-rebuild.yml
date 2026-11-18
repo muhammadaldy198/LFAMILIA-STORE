@@ -87,6 +87,9 @@ jobs:
           HUSKY: 0
         run: npm ci
 
+      - name: Test npm audit gate
+        run: node --test scripts/ci/npm-audit-gate.test.mjs
+
       - name: Audit frontend dependencies
         # Temporary single-advisory waiver for GHSA-fc5q-39xc-vjpf (picomatch,
         # no patched release exists yet). See scripts/ci/npm-audit-gate.mjs.
