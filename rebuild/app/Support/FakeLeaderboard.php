@@ -119,9 +119,27 @@ class FakeLeaderboard
     private static function entry(string $localPart, int $slot, string $period, string $date, array $prices, ?int $cap, int $emptyBoardTop): array
     {
         $seed = "{$period}|{$date}|{$slot}";
+        $basket = self::basketFor($prices, $cap, $seed);
 
-        // Keranjang rata-rata dari pool paket wajar; bila ada pagar, pilihan
-        // dibatasi paket yang harganya tidak melewati pagar itu sendiri.
+        [$orderCount, $total] = $cap === null
+            ? self::emptyBoardFigures($slot, $emptyBoardTop, $basket, $seed)
+            : self::cappedFigures($cap, $basket, $seed);
+
+        return [
+            'name' => self::alias($localPart.'@gmail.com'),
+            'order_count' => $orderCount,
+            'total_spent' => self::plausibleTotal($total, $orderCount, $prices, $cap, $seed),
+        ];
+    }
+
+    /**
+     * Keranjang rata-rata dari pool paket wajar; bila ada pagar, pilihan
+     * dibatasi paket yang harganya tidak melewati pagar itu sendiri.
+     *
+     * @param  list<int>  $prices
+     */
+    private static function basketFor(array $prices, ?int $cap, string $seed): int
+    {
         $pool = $cap === null ? $prices : array_values(array_filter($prices, fn (int $price): bool => $price <= $cap));
         if ($pool === []) {
             $pool = $prices;
@@ -131,40 +149,68 @@ class FakeLeaderboard
         for ($pick = 0; $pick < $basketPicks; $pick++) {
             $basket += $pool[(int) (self::unit("board|price|{$seed}|{$pick}") * count($pool))];
         }
-        $basket = max(1, intdiv($basket, $basketPicks));
 
-        if ($cap === null) {
-            // Papan kosong: total menurun mengikuti pangkat 0.82 per slot
-            // dari tambatan atas, lalu dijangkarkan ulang ke jumlah pesanan
-            // × keranjang — tanpa jangkar ini, ekor papan (slot besar)
-            // meluruh sampai di bawah harga paket termurah sementara
-            // jumlah pesanannya terpaksa 1, pasangan yang mustahil.
-            $total = (int) round($emptyBoardTop * (0.82 ** $slot) * (0.92 + self::unit("board|frac|{$seed}") * 0.08));
-            $orderCount = max(1, (int) round($total / $basket));
-            $total = (int) round($orderCount * $basket * (1 + self::unit("board|jitter|{$seed}") * 0.03));
-            if ($total > self::EMPTY_BOARD_TOP_MAX) {
-                $orderCount = max(1, intdiv(self::EMPTY_BOARD_TOP_MAX, $basket));
-                $total = $orderCount * $basket;
-            }
-        } else {
-            $total = (int) floor($cap * (0.25 + self::unit("board|frac|{$seed}") * 0.65));
-            $orderCount = max(1, (int) round($total / $basket));
-            $total = (int) round($orderCount * $basket * (1 + self::unit("board|jitter|{$seed}") * 0.03));
-            if ($total >= $cap) {
-                // Jangkar ulang bisa menyentuh pagar pada pagar kecil:
-                // turunkan tepat di bawahnya, sesuaikan jumlah pesanan.
-                $total = $cap - 1 - (int) (self::unit("board|deround|{$seed}") * 99);
-                $orderCount = max(1, intdiv($total, $basket));
-            }
+        return max(1, intdiv($basket, $basketPicks));
+    }
+
+    /**
+     * Pasangan (jumlah pesanan, total) untuk papan kosong: total menurun
+     * mengikuti pangkat 0.82 per slot dari tambatan atas, lalu
+     * dijangkarkan ulang ke jumlah pesanan × keranjang — tanpa jangkar
+     * ini, ekor papan (slot besar) meluruh sampai di bawah harga paket
+     * termurah sementara jumlah pesanannya terpaksa 1, pasangan yang
+     * mustahil.
+     *
+     * @return array{0: int, 1: int}
+     */
+    private static function emptyBoardFigures(int $slot, int $emptyBoardTop, int $basket, string $seed): array
+    {
+        $total = (int) round($emptyBoardTop * (0.82 ** $slot) * (0.92 + self::unit("board|frac|{$seed}") * 0.08));
+        $orderCount = max(1, (int) round($total / $basket));
+        $total = (int) round($orderCount * $basket * (1 + self::unit("board|jitter|{$seed}") * 0.03));
+        if ($total > self::EMPTY_BOARD_TOP_MAX) {
+            $orderCount = max(1, intdiv(self::EMPTY_BOARD_TOP_MAX, $basket));
+            $total = $orderCount * $basket;
         }
 
+        return [$orderCount, $total];
+    }
+
+    /**
+     * Pasangan (jumlah pesanan, total) di bawah pagar pembeli asli
+     * teratas: total adalah pecahan 25%–90% dari pagar, dijangkarkan
+     * ulang ke jumlah pesanan × keranjang; jangkar yang menyentuh pagar
+     * diturunkan tepat di bawahnya dan jumlah pesanannya disesuaikan.
+     *
+     * @return array{0: int, 1: int}
+     */
+    private static function cappedFigures(int $cap, int $basket, string $seed): array
+    {
+        $total = (int) floor($cap * (0.25 + self::unit("board|frac|{$seed}") * 0.65));
+        $orderCount = max(1, (int) round($total / $basket));
+        $total = (int) round($orderCount * $basket * (1 + self::unit("board|jitter|{$seed}") * 0.03));
+        if ($total >= $cap) {
+            $total = $cap - 1 - (int) (self::unit("board|deround|{$seed}") * 99);
+            $orderCount = max(1, intdiv($total, $basket));
+        }
+
+        return [$orderCount, $total];
+    }
+
+    /**
+     * Sentuhan akhir kewajaran total: angka ribuan bulat digeser sedikit
+     * supaya tidak terkesan dibuat-buat, dan total tidak boleh di bawah
+     * jumlah pesanan × harga paket termurah (satu pesanan tidak mungkin
+     * lebih murah dari paket termurah). Pengaman pagar tetap menang:
+     * tambahan lantai tidak pernah boleh menyentuh pagar.
+     *
+     * @param  list<int>  $prices
+     */
+    private static function plausibleTotal(int $total, int $orderCount, array $prices, ?int $cap, string $seed): int
+    {
         if ($total % 1000 === 0) {
             $total -= 1 + (int) (self::unit("board|deround|{$seed}") * 99);
         }
-        // Lantai kewajaran: total tidak boleh di bawah jumlah pesanan ×
-        // harga paket termurah (satu pesanan tidak mungkin lebih murah
-        // dari paket termurah). Pengaman pagar tetap menang: tambahan
-        // lantai tidak pernah boleh menyentuh pagar.
         $plausibleFloor = $orderCount * min($prices);
         if ($total < $plausibleFloor) {
             $total = $plausibleFloor + (int) (self::unit("board|deround|{$seed}") * 97);
@@ -172,13 +218,8 @@ class FakeLeaderboard
                 $total = $cap - 1;
             }
         }
-        $total = max(1, $total);
 
-        return [
-            'name' => self::alias($localPart.'@gmail.com'),
-            'order_count' => $orderCount,
-            'total_spent' => $total,
-        ];
+        return max(1, $total);
     }
 
     /**
