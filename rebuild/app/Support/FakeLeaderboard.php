@@ -217,6 +217,13 @@ class FakeLeaderboard
             if ($cap !== null && $total >= $cap) {
                 $total = $cap - 1;
             }
+            if ($cap === null && $total > self::EMPTY_BOARD_TOP_MAX) {
+                // Langit-langit papan kosong berlaku juga sesudah kenaikan
+                // lantai: menjepit ke langit-langit tidak melanggar lantai,
+                // karena jumlah pesanan × paket termurah tidak pernah
+                // melewati langit-langit itu sendiri.
+                $total = self::EMPTY_BOARD_TOP_MAX;
+            }
         }
 
         return max(1, $total);

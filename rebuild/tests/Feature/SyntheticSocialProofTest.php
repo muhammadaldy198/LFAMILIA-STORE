@@ -37,22 +37,27 @@ class SyntheticSocialProofTest extends TestCase
      */
     private function buyablePackage(): int
     {
+        return $this->buyablePackageWithCost(10_000, 10);
+    }
+
+    private function buyablePackageWithCost(int $costIdr, int $marginPercent): int
+    {
         $suffix = bin2hex(random_bytes(6));
         DB::table('providers')->where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
         $product = DB::table('products')->insertGetId([
             'category_id' => DB::table('categories')->where('slug', 'game')->value('id'),
             'name' => 'Game '.$suffix, 'slug' => 'syn-product-'.$suffix, 'is_active' => true,
-            'fulfillment_mode' => 'AUTO_PROVIDER', 'margin_percent' => 10,
+            'fulfillment_mode' => 'AUTO_PROVIDER', 'margin_percent' => $marginPercent,
         ]);
         $package = DB::table('product_packages')->insertGetId([
             'product_id' => $product, 'code' => 'SYN-'.$suffix, 'name' => 'Paket '.$suffix,
-            'is_active' => true, 'pricing_mode' => 'PERCENT', 'margin_percent' => 10,
+            'is_active' => true, 'pricing_mode' => 'PERCENT', 'margin_percent' => $marginPercent,
         ]);
         DB::table('provider_mappings')->insert([
             'product_package_id' => $package,
             'provider_id' => DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id'),
             'external_sku' => 'SYN-SKU-'.$suffix,
-            'cost_idr' => 10_000, 'max_price_idr' => 12_000, 'priority' => 1, 'is_active' => true,
+            'cost_idr' => $costIdr, 'max_price_idr' => (int) ($costIdr * 1.2), 'priority' => 1, 'is_active' => true,
             'created_at' => now(), 'updated_at' => now(),
         ]);
         $this->seedCheckoutDigiflazzCatalog($package);
@@ -344,6 +349,30 @@ class SyntheticSocialProofTest extends TestCase
         $this->assertCount(20, $entries);
         foreach ($entries as $entry) {
             $this->assertGreaterThanOrEqual($entry['order_count'] * 11_000, $entry['total_spent']);
+        }
+    }
+
+    public function test_fake_leaderboard_empty_board_ceiling_survives_the_plausibility_raise(): void
+    {
+        // Skenario P3 Codex: pool berisi satu harga saja, Rp100.000 —
+        // batas atas katalog wajar. Pada tanggal-tanggal bertambatan
+        // tinggi, slot teratas terjangkar tepat di langit-langit papan
+        // kosong (5 × Rp100.000); kenaikan lantai kewajaran sesudahnya
+        // tidak boleh menembus langit-langit itu. Sapuan setahun penuh
+        // memastikan tanggal-tanggal pojok itu benar-benar terlewati.
+        $package = $this->buyablePackageWithCost(100_000, 0);
+        DB::table('product_packages')->where('id', '!=', $package)->update(['is_active' => false]);
+        Cache::forget('synthetic:priced-catalog:v1');
+        $this->assertSame([100_000], array_column(FakeOrderFeed::modestCatalog(), 'price'));
+
+        $day = CarbonImmutable::parse('2026-01-01 13:00:00', 'UTC');
+        for ($i = 0; $i < 365; $i++) {
+            $entries = FakeLeaderboard::entries(20, 'month', $day->addDays($i), null);
+            $this->assertCount(20, $entries);
+            foreach ($entries as $entry) {
+                $this->assertLessThanOrEqual(500_000, $entry['total_spent']);
+                $this->assertGreaterThanOrEqual($entry['order_count'] * 100_000, $entry['total_spent']);
+            }
         }
     }
 
