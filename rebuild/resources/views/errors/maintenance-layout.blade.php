@@ -30,10 +30,6 @@
         .meta { display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin:20px 0 24px; }
         .chip { background:#fff;border:2px solid #F3E3CF;border-radius:14px;padding:9px 14px;font-size:13.5px;font-weight:600;color:#4A5878; }
         .chip b { color:#1F2A44; }
-        .actions { display:flex;gap:12px;flex-wrap:wrap;justify-content:center; }
-        .btn { font-weight:700;font-size:15.5px;text-decoration:none;padding:15px 26px;border-radius:999px;border:2px solid #1F2A44; }
-        .btn.primary { background:#EE4B4B;color:#fff;box-shadow:0 5px 0 #1F2A44; }
-        .btn.ghost { background:#fff;color:#1F2A44;box-shadow:0 5px 0 #EBDCC4; }
         footer { text-align:center;padding:18px 16px 20px;font-size:13px;color:#93A0B8;position:relative;z-index:2; }
     </style>
 </head>
@@ -52,10 +48,10 @@
         <div class="meta">
             <span class="chip">🛡️ Pesananmu <b>aman tersimpan</b></span>
         </div>
-        <div class="actions">
-            <a class="btn primary" href="{{ route('guest.orders.lookup') }}">Cek pesanan</a>
-            <a class="btn ghost" href="{{ route('catalog.index') }}">Kembali ke beranda</a>
-        </div>
+        {{-- Tanpa tombol navigasi (keputusan pemilik 19 Nov 2026): selama
+             maintenance seluruh toko menjawab 503, jadi tombol ke lacak
+             pesanan atau beranda hanya memutar pengunjung kembali ke
+             halaman ini. --}}
     </main>
     <footer>© 2026 LFAMILIA STORE — Lagi dibenerin, bukan lagi kabur. 😄</footer>
 </body>

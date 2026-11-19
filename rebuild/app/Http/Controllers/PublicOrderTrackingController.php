@@ -229,6 +229,13 @@ class PublicOrderTrackingController
     {
         $real = DB::table('orders')
             ->whereNotNull('orders.paid_at')
+            // Feed bersifat "live" (keputusan pemilik 19 Nov 2026): pesanan
+            // asli hanya tampil bila dibayar dalam 24 jam terakhir, diukur
+            // dari paid_at — momen transaksinya (pembuatan pesanan selalu
+            // berdekatan dengan pembayaran pada alur toko ini). Yang lebih
+            // tua tidak ditampilkan di sini; lacak pesanan pribadi tidak
+            // terpengaruh.
+            ->where('orders.paid_at', '>=', CarbonImmutable::now()->subDay())
             ->join('products', 'products.id', '=', 'orders.product_id')
             ->join('product_packages', 'product_packages.id', '=', 'orders.product_package_id')
             ->orderByDesc('orders.id')->limit(20)
@@ -252,8 +259,8 @@ class PublicOrderTrackingController
 
         // Pelengkap sintetis (keputusan pemilik): dihitung deterministik dari
         // katalog live oleh FakeOrderFeed, tanpa baris database. Pesanan asli
-        // selalu tampil semua; sintetis hanya mengisi sisa tempat, lalu
-        // gabungan diurutkan ulang dari yang paling baru.
+        // dalam jendela 24 jam selalu tampil semua; sintetis hanya mengisi
+        // sisa tempat, lalu gabungan diurutkan ulang dari yang paling baru.
         $synthetic = FakeOrderFeed::entries(
             20 - count($real),
             CarbonImmutable::now(),

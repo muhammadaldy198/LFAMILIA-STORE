@@ -124,6 +124,28 @@ class SyntheticSocialProofTest extends TestCase
         $this->assertSame($ordersBefore, DB::table('orders')->count());
     }
 
+    public function test_feed_only_shows_real_orders_from_the_last_day(): void
+    {
+        // Keputusan pemilik 19 Nov 2026: feed bersifat "live" — pesanan
+        // asli yang lebih tua dari 24 jam tidak tampil lagi di feed
+        // (tempatnya diisi sintetis); lacak pesanan pribadi tidak berubah.
+        $package = $this->buyablePackage();
+        $this->paidOrder('LFSYN260101-FRESH0001A', $package, 75_000);
+        $old = $this->paidOrder('LFSYN260101-OLD000001B', $package, 75_000);
+        DB::table('orders')->where('id', $old)->update([
+            'created_at' => now()->subDays(2),
+            'paid_at' => now()->subDays(2),
+            'updated_at' => now()->subDays(2),
+        ]);
+
+        $feed = $this->get('/orders/track/feed')->assertOk()->json('transactions');
+
+        $this->assertCount(20, $feed);
+        $maskedIds = array_column($feed, 'maskedReferenceId');
+        $this->assertContains($this->mask('LFSYN260101-FRESH0001A'), $maskedIds);
+        $this->assertNotContains($this->mask('LFSYN260101-OLD000001B'), $maskedIds);
+    }
+
     public function test_feed_synthetic_entries_use_live_catalog_prices_and_public_statuses(): void
     {
         $package = $this->buyablePackage();
