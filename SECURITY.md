@@ -6,7 +6,7 @@ Dokumen ini menjelaskan cara proyek LFAMILIA-STORE menangani keamanan dan cara m
 
 Jalur resmi pelaporan adalah **GitHub Private Vulnerability Reporting** di repo ini (tab **Security** > **Report a vulnerability**; pengaturannya ada di **Settings > Security**).
 
-Jalur Private Vulnerability Reporting diaktifkan oleh pemilik repo di Settings > Security; bila tombol Report a vulnerability belum muncul di tab Security, fitur itu belum aktif. Formulir dukungan di situs toko hanya melayani pelanggan yang memiliki pesanan, jadi bukan jalur untuk laporan keamanan. Tetap jangan membuka issue publik untuk kerentanan.
+Jalur Private Vulnerability Reporting aktif di repo ini: gunakan tombol Report a vulnerability di tab Security untuk melapor. Formulir dukungan di situs toko hanya melayani pelanggan yang memiliki pesanan, jadi bukan jalur untuk laporan keamanan. Tetap jangan membuka issue publik untuk kerentanan.
 
 - Jangan membuka issue publik, pull request publik, atau diskusi publik untuk kerentanan.
 - Sertakan langkah reproduksi, dampak, dan jalur berkas yang terkait bila diketahui.
