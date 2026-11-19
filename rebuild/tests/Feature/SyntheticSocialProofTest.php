@@ -315,10 +315,16 @@ class SyntheticSocialProofTest extends TestCase
         $entries = FakeLeaderboard::entries(20, 'month', $now, null);
 
         $this->assertCount(20, $entries);
+        // Invarian kewajaran (temuan Codex pada PR perbaikan ini): total
+        // tidak pernah di bawah jumlah pesanan × harga paket termurah —
+        // ekor papan tidak boleh menampilkan 1 pesanan seharga di bawah
+        // paket termurah yang ada.
+        $minPrice = min(array_column(FakeOrderFeed::modestCatalog(), 'price'));
         foreach ($entries as $entry) {
             $this->assertLessThanOrEqual(500_000, $entry['total_spent']);
             $this->assertGreaterThan(0, $entry['total_spent']);
             $this->assertGreaterThan(0, $entry['order_count']);
+            $this->assertGreaterThanOrEqual($entry['order_count'] * $minPrice, $entry['total_spent']);
         }
     }
 }

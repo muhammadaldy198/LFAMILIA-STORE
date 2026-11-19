@@ -134,10 +134,17 @@ class FakeLeaderboard
 
         if ($cap === null) {
             // Papan kosong: total menurun mengikuti pangkat 0.82 per slot
-            // dari tambatan atas; jitter ±8% selalu lebih kecil dari jarak
-            // antar slot (0.82), jadi urutan antar slot tidak tertukar.
+            // dari tambatan atas, lalu dijangkarkan ulang ke jumlah pesanan
+            // × keranjang — tanpa jangkar ini, ekor papan (slot besar)
+            // meluruh sampai di bawah harga paket termurah sementara
+            // jumlah pesanannya terpaksa 1, pasangan yang mustahil.
             $total = (int) round($emptyBoardTop * (0.82 ** $slot) * (0.92 + self::unit("board|frac|{$seed}") * 0.08));
             $orderCount = max(1, (int) round($total / $basket));
+            $total = (int) round($orderCount * $basket * (1 + self::unit("board|jitter|{$seed}") * 0.03));
+            if ($total > self::EMPTY_BOARD_TOP_MAX) {
+                $orderCount = max(1, intdiv(self::EMPTY_BOARD_TOP_MAX, $basket));
+                $total = $orderCount * $basket;
+            }
         } else {
             $total = (int) floor($cap * (0.25 + self::unit("board|frac|{$seed}") * 0.65));
             $orderCount = max(1, (int) round($total / $basket));
@@ -152,6 +159,17 @@ class FakeLeaderboard
 
         if ($total % 1000 === 0) {
             $total -= 1 + (int) (self::unit("board|deround|{$seed}") * 99);
+        }
+        // Lantai kewajaran: total tidak boleh di bawah jumlah pesanan ×
+        // harga paket termurah (satu pesanan tidak mungkin lebih murah
+        // dari paket termurah). Pengaman pagar tetap menang: tambahan
+        // lantai tidak pernah boleh menyentuh pagar.
+        $plausibleFloor = $orderCount * min($prices);
+        if ($total < $plausibleFloor) {
+            $total = $plausibleFloor + (int) (self::unit("board|deround|{$seed}") * 97);
+            if ($cap !== null && $total >= $cap) {
+                $total = $cap - 1;
+            }
         }
         $total = max(1, $total);
 
