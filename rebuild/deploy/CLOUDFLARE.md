@@ -5,19 +5,19 @@
 ## Zone, DNS, dan Tunnel
 
 - Domain utama: `https://lfamilia.com`, `www.lfamilia.com` (redirect canonical ke apex).
-- CloudPanel: `panel.lfamilia.com` via Cloudflare Access.
+- Panel server: tidak ada (CloudPanel dihapus 19 Nov 2026); `panel.lfamilia.com` tinggal konfigurasi Cloudflare Access tanpa layanan panel di origin.
 - Ketiga record DNS merupakan proxied CNAME ke tunnel `lfamilia-origin-20261028` (ID `f23b8901-3ef5-4ac0-9613-284ff7f7a6d5`).
-- Ingress `lfamilia.com` dan `www.lfamilia.com` → `https://127.0.0.1:443` (Origin SNI `lfamilia.com`); `panel.lfamilia.com` → `https://127.0.0.1:8443`.
+- Ingress `lfamilia.com` dan `www.lfamilia.com` → `https://127.0.0.1:443` (Origin SNI `lfamilia.com`); `panel.lfamilia.com` → `https://127.0.0.1:8443` (rute Tunnel masih tercatat, tetapi listener 8443 sudah tidak ada sejak CloudPanel dihapus 19 Nov 2026 — tidak ada layanan panel di origin).
 - Origin HTTPS memverifikasi CA bundle dan hostname dengan `noTLSVerify: false`; ingress terakhir `http_status:404`.
 - DNSSEC aktif; SSL mode **Full (strict)**; Always Use HTTPS **on**; minimum TLS **1.2**; TLS 1.3 **on**.
 - Satu-satunya domain customer yang didukung adalah `lfamilia.com` beserta alias `www.lfamilia.com`. Tidak ada fallback atau routing kompatibilitas domain sebelumnya.
 
 ## Proteksi aplikasi
 
-- Cloudflare Access: `lfamilia.com/admin` (owner/admin) dan `panel.lfamilia.com` (owner); CloudPanel session 4 jam, admin 24 jam.
+- Cloudflare Access: `lfamilia.com/admin` (owner/admin) dan `panel.lfamilia.com` (owner); sesi admin 24 jam.
 - WAF memblokir scanner umum, membatasi webhook Digiflazz ke IP yang ditentukan di aturan, dan mengecualikan callback yang dipilih dari Managed Free WAF (validasi signature/provider tetap WAJIB di Laravel).
 - Cache bypass pada `/api/`, `/admin`, `/account`, `/checkout`, `/payment`, `/orders`, `/auth/` dan rute sensitif lain.
-- Nginx website dan clp-nginx panel adalah dua instance berbeda; port 443/8443 tidak diekspos secara publik. Pada VPS hanya SSH publik sesuai laporan pemelihara VPS.
+- Sejak CloudPanel dihapus (19 Nov 2026) hanya ada satu instance Nginx untuk website; port 8443 panel sudah tidak ada dan port 443 tidak diekspos secara publik (akses lewat Tunnel). Pada VPS hanya SSH publik sesuai laporan pemelihara VPS.
 - PHP dan MySQL/Redis dijalankan di origin, bukan Workers atau Pages.
 
 ## Email dan integrasi

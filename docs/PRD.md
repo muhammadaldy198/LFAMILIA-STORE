@@ -388,8 +388,8 @@ Halaman publik `/refund` tetap ada sebagai dokumen hukum; isinya dikelola pemili
 
 ### 11.5 Leaderboard
 
-- Berisi alias anonim, bukan nama asli/email/telepon.
-- Hanya member yang **memilih ikut** (opt-in).
+- Peringkat berdasarkan email pembeli (email akun atau email tamu saat checkout) dari pesanan SUCCESS; nama tampil adalah alias samaran dari email (3 huruf pertama bagian depan email + 9 bintang), bukan nama asli/email utuh/telepon.
+- Otomatis untuk semua pembeli, tanpa opt-in.
 - Bisa bulan ini atau sepanjang waktu.
 
 ---
@@ -503,7 +503,7 @@ Detail ada di dokumen terpisah (`ADMIN-PANEL.md`). Yang mengikat di PRD:
 
 ## 18. Aturan teknis yang mengikat
 
-1. **Stack:** Laravel 12, Inertia, Vue 3, Tailwind, MySQL, di VPS dengan CloudPanel.
+1. **Stack:** Laravel 12, Inertia, Vue 3, Tailwind, MySQL, di VPS dengan nginx tanpa panel (CloudPanel dihapus 19 Nov 2026).
 2. **Uang selalu bilangan bulat rupiah.** Tidak ada floating point untuk uang.
 3. **Semua perubahan uang lewat ledger** dengan kunci idempotensi.
 4. **Semua endpoint yang mengubah data punya proteksi CSRF** dan otorisasi server-side.

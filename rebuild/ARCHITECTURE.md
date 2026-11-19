@@ -12,7 +12,7 @@ Semua logika bisnis hidup di Laravel. Vue/Inertia hanya tampilan pelanggan. MySQ
 
 Cloudflare Access hanya lapisan tambahan di depan. Hak akses yang sebenarnya selalu diperiksa Laravel di server — menyembunyikan menu bukan pengaman.
 
-**Panel server (CloudPanel):** Browser → Cloudflare Access → panel.lfamilia.com (Tunnel → localhost:8443) → CloudPanel. Domain utama lfamilia.com berjalan lewat Tunnel-nya sendiri; asal 443 dan panel 8443 memakai sertifikat Cloudflare Origin CA dengan verifikasi TLS.
+**Panel server:** tidak ada. CloudPanel dihapus 19 Nov 2026; server dikelola langsung lewat SSH dan systemd (nginx dari repo nginx.org). Domain utama lfamilia.com berjalan lewat Tunnel-nya sendiri; asal 443 memakai sertifikat Cloudflare Origin CA dengan verifikasi TLS.
 
 ## Alur transaksi
 
