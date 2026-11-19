@@ -697,3 +697,143 @@ test('cashback coin pill sits right of the price, only when cashback_coin > 0, a
     // Angka lencana memakai aturan earn yang sama di backend.
     assert.ok(controller.includes("'cashback_coin' => CashbackCoinService::coinsForAmount((int) ($price ?? 0)),"));
 });
+
+// ---- PR #406: podium leaderboard (keadaan kosong, 1/2/3 entri, daftar sisa) ----
+// Ekspresi computed diambil dari sumber Leaderboard.vue lalu dijalankan dengan data
+// contoh, jadi yang diuji adalah perilaku nyata, bukan sekadar teks kelas.
+const leaderboardSource = () => read('Pages/Content/Leaderboard.vue');
+const leaderboardTemplate = () => leaderboardSource().split('<template>')[1] || '';
+const lbEntries = n => Array.from({ length: n }, (_, i) => ({ rank: i + 1, name: 'Alias ' + (i + 1), total_spent: (n - i) * 1000, order_count: n - i }));
+const lbComputed = name => {
+    const match = leaderboardSource().match(new RegExp('const ' + name + ' = computed\\(\\(\\) => (.+)\\);\\n'));
+    assert.ok(match, 'computed ' + name + ' tidak ditemukan di Leaderboard.vue');
+    return match[1];
+};
+const lbState = entries => {
+    const props = { entries };
+    const podium = { value: new Function('props', 'return ' + lbComputed('podium'))(props) };
+    const rest = { value: new Function('props', 'return ' + lbComputed('rest'))(props) };
+    const podiumClass = new Function('podium', 'return ' + lbComputed('podiumClass'))(podium);
+    return { podium: podium.value, rest: rest.value, podiumClass, entries };
+};
+const lbCssRule = selector => {
+    const css = readFileSync(new URL('../../resources/css/app.css', import.meta.url), 'utf8');
+    const prefix = selector + ':where(:not(.lfx, .lfx *)){';
+    const lines = css.split('\n').filter(line => line.startsWith(prefix));
+    assert.equal(lines.length, 1, 'aturan dasar ' + selector + ' harus tepat satu');
+    const body = lines[0].slice(prefix.length, lines[0].lastIndexOf('}'));
+    return Object.fromEntries(body.split(';').filter(Boolean).map(decl => {
+        const i = decl.indexOf(':');
+        return [decl.slice(0, i).trim(), decl.slice(i + 1).trim()];
+    }));
+};
+
+test('PR406 podium: empty state hides the podium and keeps the empty block for 0 entries', () => {
+    const template = leaderboardTemplate();
+    assert.match(template, /<ol v-if="podium\.length" class="lf-podium" :class="podiumClass">/);
+    assert.equal((template.match(/class="lf-podium"/g) || []).length, 1);
+    const rankingIf = template.match(/<div v-if="([^"]+)" class="lf-ranking">/);
+    assert.ok(rankingIf, 'blok .lf-ranking dengan v-if tidak ditemukan');
+    assert.match(template, /<div v-if="!entries\?\.length" class="lf-empty">\{\{ customerText\("pages\.content\.leaderboard\.8aacad7d", "Belum ada peringkat\."\) \}\}<\/div>/);
+    // v-if memakai truthiness, jadi hasil ekspresi dinormalisasi ke boolean.
+    const showRanking = state => Boolean(new Function('rest', 'entries', 'return ' + rankingIf[1])(state.rest, state.entries));
+
+    for (const entries of [[], undefined, null]) {
+        const state = lbState(entries);
+        assert.equal(state.podium.length, 0, 'podium harus kosong untuk ' + JSON.stringify(entries));
+        assert.equal(state.rest.length, 0);
+        assert.equal(showRanking(state), true, 'blok kosong harus tampil untuk ' + JSON.stringify(entries));
+    }
+    // 1-3 entri: hanya podium, tanpa wadah daftar dan tanpa pesan kosong.
+    for (const n of [1, 2, 3]) assert.equal(showRanking(lbState(lbEntries(n))), false, n + ' entri tidak boleh merender .lf-ranking');
+    // >3 entri: wadah daftar tampil untuk sisa peringkat.
+    assert.equal(showRanking(lbState(lbEntries(5))), true);
+});
+
+test('PR406 podium: podium takes only rank <= 3 and rest only rank > 3, as separate computeds', () => {
+    assert.equal(lbComputed('podium'), '(props.entries || []).filter(e => e.rank <= 3)');
+    assert.equal(lbComputed('rest'), '(props.entries || []).filter(e => e.rank > 3)');
+    for (const n of [1, 2, 3, 4, 20]) {
+        const state = lbState(lbEntries(n));
+        assert.deepEqual(state.podium.map(e => e.rank), [1, 2, 3].slice(0, Math.min(n, 3)), 'podium untuk ' + n + ' entri');
+        assert.deepEqual(state.rest.map(e => e.rank), Array.from({ length: Math.max(n - 3, 0) }, (_, i) => i + 4), 'rest untuk ' + n + ' entri');
+    }
+    // Daftar sisa hanya mengulang `rest`, tidak pernah seluruh entries.
+    const template = leaderboardTemplate();
+    assert.match(template, /<article v-for="e in rest" :key="e\.rank">/);
+    assert.doesNotMatch(template, /v-for="e in entries"/);
+});
+
+test('PR406 podium: podiumClass is is-count-1 / is-count-2 / none for 1 / 2 / 3 entries', () => {
+    assert.equal(lbState(lbEntries(1)).podiumClass, 'is-count-1');
+    assert.equal(lbState(lbEntries(2)).podiumClass, 'is-count-2');
+    assert.equal(lbState(lbEntries(3)).podiumClass, null);
+    // Entri peringkat 4+ tidak memengaruhi kelas jumlah podium.
+    assert.equal(lbState(lbEntries(20)).podiumClass, null);
+});
+
+test('PR406 podium: v-for keeps data order (rank ascending) with one is-rank-<rank> class per entry', () => {
+    const source = leaderboardSource();
+    const template = leaderboardTemplate();
+    assert.match(template, /<li v-for="e in podium" :key="e\.rank" :class="\['lf-podium-col', 'is-rank-' \+ e\.rank\]">/);
+    assert.doesNotMatch(source, /\.sort\(|\.reverse\(|toSorted|toReversed/);
+    const classOf = new Function('e', 'return ' + template.match(/<li v-for="e in podium" :key="e\.rank" :class="([^"]+)">/)[1]);
+    for (const n of [1, 2, 3]) {
+        const classes = lbState(lbEntries(n)).podium.map(e => classOf(e).join(' '));
+        assert.deepEqual(classes, ['lf-podium-col is-rank-1', 'lf-podium-col is-rank-2', 'lf-podium-col is-rank-3'].slice(0, n));
+    }
+});
+
+test('PR406 podium: CSS places ranks 2-1-3 for 3 entries and centres 1 or 2 entries', () => {
+    const base = lbCssRule('.lf-podium');
+    assert.equal(base['grid-template-columns'], 'repeat(3,minmax(0,1fr))');
+    assert.equal(lbCssRule('.lf-podium-col.is-rank-1')['grid-column'], '2');
+    assert.equal(lbCssRule('.lf-podium-col.is-rank-2')['grid-column'], '1');
+    assert.equal(lbCssRule('.lf-podium-col.is-rank-3')['grid-column'], '3');
+    const one = lbCssRule('.lf-podium.is-count-1');
+    assert.equal(one['grid-template-columns'], 'minmax(0,240px)');
+    assert.equal(one['justify-content'], 'center');
+    assert.equal(lbCssRule('.lf-podium.is-count-1 .lf-podium-col.is-rank-1')['grid-column'], '1');
+    const two = lbCssRule('.lf-podium.is-count-2');
+    assert.equal(two['grid-template-columns'], 'repeat(2,minmax(0,240px))');
+    assert.equal(two['justify-content'], 'center');
+
+    // Simulasi penempatan: setiap peringkat harus mendapat kolom unik di dalam grid.
+    const columnCount = tpl => {
+        const repeat = tpl.match(/^repeat\((\d+),/);
+        return repeat ? Number(repeat[1]) : tpl.split(/\s+(?![^(]*\))/).length;
+    };
+    const placement = n => {
+        const cls = lbState(lbEntries(n)).podiumClass;
+        const grid = cls ? lbCssRule('.lf-podium.' + cls) : base;
+        const cols = columnCount(grid['grid-template-columns']);
+        const visual = [];
+        for (let rank = 1; rank <= n; rank++) {
+            let col = Number(lbCssRule('.lf-podium-col.is-rank-' + rank)['grid-column']);
+            if (cls === 'is-count-1' && rank === 1) col = Number(lbCssRule('.lf-podium.is-count-1 .lf-podium-col.is-rank-1')['grid-column']);
+            assert.ok(col >= 1 && col <= cols, 'peringkat ' + rank + ' keluar dari grid ' + cols + ' kolom (kolom ' + col + ')');
+            assert.equal(visual[col - 1], undefined, 'dua peringkat berbagi kolom ' + col);
+            visual[col - 1] = rank;
+        }
+        return { cols, visual };
+    };
+    assert.deepEqual(placement(1), { cols: 1, visual: [1] });
+    assert.deepEqual(placement(2), { cols: 2, visual: [2, 1] });
+    assert.deepEqual(placement(3), { cols: 3, visual: [2, 1, 3] });
+
+    // Media query hanya mengubah ukuran, bukan kolom atau penempatan.
+    const css = readFileSync(new URL('../../resources/css/app.css', import.meta.url), 'utf8');
+    const media = css.split('\n').find(line => line.startsWith('@media(min-width:768px){.lf-podium:'));
+    assert.ok(media, 'media query podium tidak ditemukan');
+    assert.doesNotMatch(media, /grid-template-columns|grid-column/);
+});
+
+test('PR406 podium: crown only for rank 1 and no medal emoji in the template', () => {
+    const source = leaderboardSource();
+    const template = leaderboardTemplate();
+    assert.match(template, /<svg v-if="e\.rank === 1" class="lf-podium-crown" viewBox="0 0 24 16" aria-hidden="true">/);
+    assert.equal((template.match(/lf-podium-crown/g) || []).length, 1);
+    assert.doesNotMatch(source, /🥇|🥈|🥉/u);
+    const crownIf = new Function('e', 'return ' + template.match(/<svg v-if="([^"]+)" class="lf-podium-crown"/)[1]);
+    assert.deepEqual(lbEntries(3).map(e => crownIf(e)), [true, false, false]);
+});
