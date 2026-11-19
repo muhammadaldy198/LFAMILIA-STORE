@@ -85,7 +85,10 @@ class FakeOrderFeed
         $created = $tickStart->subMinutes($ageMinutes)->addSeconds($jitterSeconds);
         if ($created->greaterThan($now)) {
             // Jendela berjalan belum selesai: jangan tampilkan waktu masa depan.
-            $created = $now->subSeconds(20 + $index * 37);
+            // Mundur dari awal tick (bukan dari $now) supaya nilainya sama untuk
+            // semua request dalam tick yang sama, selalu di masa lalu, dan tetap
+            // UTC seperti baris pesanan asli.
+            $created = $tickStart->subSeconds(20 + $index * 37);
         }
 
         $masked = null;

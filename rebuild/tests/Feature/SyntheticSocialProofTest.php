@@ -150,6 +150,24 @@ class SyntheticSocialProofTest extends TestCase
         $this->assertNotContains($first[0]['maskedReferenceId'], array_column($excluded, 'maskedReferenceId'));
     }
 
+    public function test_fake_order_feed_future_clamp_is_tick_fixed_and_utc(): void
+    {
+        $this->pricedPackage();
+        $statuses = app(PublicOrderStatusService::class);
+        // Tick 5983753 (mulai 2026-11-19 22:05:00 UTC), indeks 3: umur 2 menit
+        // dengan jitter 153 detik — waktu mentahnya 33 detik melewati awal
+        // tick, jadi pagar anti-masa-depan pasti bekerja pada dua $now di bawah.
+        $early = CarbonImmutable::parse('2026-11-20 05:05:10', 'Asia/Jakarta');
+        $later = CarbonImmutable::parse('2026-11-20 05:05:20', 'Asia/Jakarta');
+
+        $first = FakeOrderFeed::entries(4, $early, [], $statuses);
+        $second = FakeOrderFeed::entries(4, $later, [], $statuses);
+
+        $this->assertCount(4, $first);
+        $this->assertSame('2026-11-19T22:02:49+00:00', $first[3]['createdAt']);
+        $this->assertSame($first, $second);
+    }
+
     /** @return array<int, array{rank: int, name: string, order_count: int, total_spent: int}> */
     private function board(string $period = 'all'): array
     {
