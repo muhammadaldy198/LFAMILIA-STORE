@@ -10,7 +10,7 @@ Direktori `rebuild/` adalah runtime aplikasi LFAMILIA STORE yang aktif. Narasi l
 - Vue 3 / Inertia.js v2 / TailwindCSS v4
 - MySQL 8
 - Redis untuk cache, queue, dan session
-- Nginx pada VPS/CloudPanel
+- Nginx pada VPS (tanpa panel)
 - Fortify + Sanctum
 - Spatie Media Library
 

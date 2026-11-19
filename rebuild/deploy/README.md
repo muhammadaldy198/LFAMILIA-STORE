@@ -1,6 +1,6 @@
 # Production deployment & operations
 
-Runtime production adalah Laravel 12 / PHP 8.4 / MySQL 8 / Redis di VPS dengan Nginx/CloudPanel. Production source ref adalah `main`.
+Runtime production adalah Laravel 12 / PHP 8.4 / MySQL 8 / Redis di VPS dengan Nginx (tanpa panel; CloudPanel dihapus 19 Nov 2026). Production source ref adalah `main`.
 
 ## Server-only configuration
 

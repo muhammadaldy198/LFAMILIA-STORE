@@ -41,12 +41,12 @@ Redirect frontend tidak pernah menjadi bukti paid.
 
 ## Server security — current infrastructure, 2026-10-29
 
-Berdasarkan laporan BETOL, origin berada di VPS baru dengan CloudPanel dan nginx, MySQL/Redis lokal, queue/scheduler, sertifikat Cloudflare Origin CA untuk HTTPS (443) dan panel (8443), serta firewall yang tidak mengekspos port HTTP/HTTPS/panel secara publik. Detail firewall, proses, dan layanan harus diverifikasi ulang oleh BETOL dari VPS; jangan menyamakan laporan VPS sebelumnya dengan keadaan server baru.
+Berdasarkan laporan BETOL, origin berada di VPS dengan nginx (repo nginx.org; CloudPanel dihapus 19 Nov 2026 sehingga tidak ada panel server), MySQL/Redis lokal, queue/scheduler, sertifikat Cloudflare Origin CA untuk HTTPS (443), serta firewall yang tidak mengekspos port HTTP/HTTPS secara publik. Detail firewall, proses, dan layanan harus diverifikasi ulang oleh BETOL dari VPS; jangan menyamakan laporan VPS sebelumnya dengan keadaan server baru.
 
 ## Cloudflare — verified API, 2026-10-29
 
 - Domain customer tunggal: `lfamilia.com` (alias `www.lfamilia.com`).
-- CloudPanel: `panel.lfamilia.com`, terlindungi Cloudflare Access.
+- Panel server: tidak ada (CloudPanel dihapus 19 Nov 2026); `panel.lfamilia.com` tinggal konfigurasi Cloudflare Access tanpa layanan panel di origin.
 - Website `/admin`: terlindungi Cloudflare Access **dan** otorisasi Laravel.
 - Ketiga hostname memakai CNAME proxied ke Tunnel `lfamilia-origin-20261028`.
 - TLS **Full (strict)**, TLS minimum **1.2**, DNSSEC **aktif**, origin `noTLSVerify:false` dengan CA pool.

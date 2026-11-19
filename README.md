@@ -8,7 +8,7 @@ Repo ini berisi satu aplikasi yang aktif: toko online LFAMILIA di folder `rebuil
 - Vue 3 + Inertia.js v2 + TailwindCSS v4
 - MySQL 8
 - Redis untuk cache, antrean, dan session
-- Nginx di VPS, dikelola lewat CloudPanel
+- Nginx di VPS, dikelola langsung tanpa panel (CloudPanel dihapus 19 Nov 2026)
 - Cloudflare di depan sebagai pelindung dan penyalur trafik
 - Laravel Fortify + Sanctum untuk login
 - Spatie Media Library untuk berkas gambar

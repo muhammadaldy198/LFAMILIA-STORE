@@ -58,7 +58,7 @@ Bagian ini menyatakan **kode tersedia**, bukan "sudah dipakai pelanggan".
 - Member: profil, nomor WhatsApp, riwayat, saldo, tiket, akun game tersimpan, notifikasi
 - Ulasan pembeli: terbit langsung, admin dapat menghapus permanen
 - Tidak ada tingkatan member (sistem tingkat BASIC…MAFIA dihapus; keputusan pemilik)
-- Leaderboard anonim (opt-in)
+- Leaderboard pembeli berdasarkan email (otomatis untuk semua pembeli, tanpa opt-in)
 - Login email (verifikasi link) + Google
 
 **Konten & komunikasi**
