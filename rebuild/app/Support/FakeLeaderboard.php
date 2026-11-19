@@ -62,10 +62,11 @@ class FakeLeaderboard
         $date = $now->setTimezone(self::TIMEZONE)->format('Y-m-d');
         $personas = self::rotatedPersonas($period, $date);
         $cap = $realTopTotal === null ? null : (int) floor($realTopTotal * 0.92);
-        if ($cap !== null && $cap < min($prices)) {
-            // Pagar berada di bawah paket termurah: tidak ada total sintetis
-            // yang masuk akal di bawah harga satu paket termurah — papan
-            // dibiarkan murni asli daripada menampilkan pembeli yang mustahil.
+        if ($cap !== null && $cap <= min($prices)) {
+            // Pagar tidak melebihi paket termurah: satu-satunya total yang
+            // mungkin adalah tepat di pagar itu sendiri, dan pagar adalah
+            // batas keras yang tidak boleh dicapai — papan dibiarkan murni
+            // asli daripada menampilkan pembeli yang mustahil.
             return [];
         }
         $emptyBoardTop = self::EMPTY_BOARD_TOP_MIN

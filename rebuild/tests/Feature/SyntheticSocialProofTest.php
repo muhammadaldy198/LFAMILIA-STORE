@@ -8,6 +8,7 @@ use App\Support\FakeLeaderboard;
 use App\Support\FakeOrderFeed;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
@@ -326,5 +327,38 @@ class SyntheticSocialProofTest extends TestCase
             $this->assertGreaterThan(0, $entry['order_count']);
             $this->assertGreaterThanOrEqual($entry['order_count'] * $minPrice, $entry['total_spent']);
         }
+    }
+
+    public function test_fake_leaderboard_with_a_single_price_pool_never_goes_below_that_price(): void
+    {
+        // Skenario persis temuan Codex: pool hanya berisi satu harga
+        // (Rp11.000). Ekor papan kosong tidak boleh jatuh di bawah harga
+        // itu, berapa pun meluruhnya pangkat 0.82 per slot.
+        $package = $this->buyablePackage();
+        DB::table('product_packages')->where('id', '!=', $package)->update(['is_active' => false]);
+        Cache::forget('synthetic:priced-catalog:v1');
+        $now = CarbonImmutable::parse('2026-11-19 13:00:00', 'UTC');
+
+        $entries = FakeLeaderboard::entries(20, 'month', $now, null);
+
+        $this->assertCount(20, $entries);
+        foreach ($entries as $entry) {
+            $this->assertGreaterThanOrEqual($entry['order_count'] * 11_000, $entry['total_spent']);
+        }
+    }
+
+    public function test_fake_leaderboard_skips_fill_when_the_cap_equals_the_cheapest_package(): void
+    {
+        // Pagar tepat sama dengan paket termurah (kasus Codex: total asli
+        // Rp11.957, paket termurah Rp11.000, pagar Rp11.000): tidak ada
+        // total sintetis yang masuk akal di bawah pagar itu, jadi papan
+        // tidak diisi sama sekali.
+        $this->buyablePackage();
+        $now = CarbonImmutable::parse('2026-11-19 13:00:00', 'UTC');
+        $minPrice = min(array_column(FakeOrderFeed::modestCatalog(), 'price'));
+        $realTop = (int) ceil($minPrice / 0.92);
+        $this->assertSame($minPrice, (int) floor($realTop * 0.92));
+
+        $this->assertSame([], FakeLeaderboard::entries(5, 'month', $now, $realTop));
     }
 }
