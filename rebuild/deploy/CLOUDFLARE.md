@@ -7,7 +7,7 @@
 - Domain utama: `https://lfamilia.com`, `www.lfamilia.com` (redirect canonical ke apex).
 - Panel server: tidak ada (CloudPanel dihapus 19 Nov 2026); `panel.lfamilia.com` tinggal konfigurasi Cloudflare Access tanpa layanan panel di origin.
 - Ketiga record DNS merupakan proxied CNAME ke tunnel `lfamilia-origin-20261028` (ID `f23b8901-3ef5-4ac0-9613-284ff7f7a6d5`).
-- Ingress `lfamilia.com` dan `www.lfamilia.com` → `https://127.0.0.1:443` (Origin SNI `lfamilia.com`); `panel.lfamilia.com` → `https://127.0.0.1:8443`.
+- Ingress `lfamilia.com` dan `www.lfamilia.com` → `https://127.0.0.1:443` (Origin SNI `lfamilia.com`); `panel.lfamilia.com` → `https://127.0.0.1:8443` (rute Tunnel masih tercatat, tetapi listener 8443 sudah tidak ada sejak CloudPanel dihapus 19 Nov 2026 — tidak ada layanan panel di origin).
 - Origin HTTPS memverifikasi CA bundle dan hostname dengan `noTLSVerify: false`; ingress terakhir `http_status:404`.
 - DNSSEC aktif; SSL mode **Full (strict)**; Always Use HTTPS **on**; minimum TLS **1.2**; TLS 1.3 **on**.
 - Satu-satunya domain customer yang didukung adalah `lfamilia.com` beserta alias `www.lfamilia.com`. Tidak ada fallback atau routing kompatibilitas domain sebelumnya.
