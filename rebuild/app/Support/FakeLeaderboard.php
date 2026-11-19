@@ -36,10 +36,14 @@ class FakeLeaderboard
         'doni.setiawan', 'tika.rahma', 'budi.santoso', 'salsa.putri',
     ];
 
-    /** Rentang total teratas bila belum ada pembeli asli sama sekali. */
-    private const EMPTY_BOARD_TOP_MIN = 2_500_000;
+    /**
+     * Rentang total teratas bila belum ada pembeli asli sama sekali —
+     * sengaja seukuran belanja top up wajar (keputusan pemilik 19 Nov
+     * 2026: total sintetis jangan yang mahal-mahal).
+     */
+    private const EMPTY_BOARD_TOP_MIN = 150_000;
 
-    private const EMPTY_BOARD_TOP_MAX = 6_000_000;
+    private const EMPTY_BOARD_TOP_MAX = 500_000;
 
     /**
      * @return list<array{name: string, order_count: int, total_spent: int}>
@@ -98,11 +102,15 @@ class FakeLeaderboard
     }
 
     /**
-     * Satu entri sintetis. Total = jumlah pesanan × keranjang rata-rata dari
-     * harga paket live + jitter, dibulatkan supaya tidak berakhiran 000
-     * persis, lalu dipagari: tidak pernah mencapai total pembeli asli
-     * teratas (cap), dan jumlah pesanan diturunkan bila total terpagar
-     * tidak lagi masuk akal untuk jumlah itu.
+     * Satu entri sintetis. Total ditentukan DULU sebagai pecahan
+     * deterministik dari pagarnya, jumlah pesanan diturunkan dari total
+     * itu. Urutan ini penting (perbaikan 19 Nov 2026): rumus lama
+     * menghitung total dari jumlah pesanan × keranjang, hasilnya hampir
+     * selalu melewati pagar lalu terpangkas ke angka pagar yang sama
+     * persis — papan tampil seragam. Pecahan 25%–90% dari pagar
+     * menyebarkan total ke seluruh rentang di bawah pembeli asli teratas,
+     * dan total dijangkarkan ulang ke jumlah pesanan × keranjang supaya
+     * pasangan (transaksi, total) tetap masuk akal.
      *
      * @param  list<int>  $prices
      * @return array{name: string, order_count: int, total_spent: int}
@@ -110,35 +118,42 @@ class FakeLeaderboard
     private static function entry(string $localPart, int $slot, string $period, string $date, array $prices, ?int $cap, int $emptyBoardTop): array
     {
         $seed = "{$period}|{$date}|{$slot}";
-        $orderCount = 3 + (int) (self::unit("board|count|{$seed}") * 43);
-        if ($period === 'all') {
-            $orderCount *= 2 + (int) (self::unit("board|allfactor|{$seed}") * 3);
-        }
 
+        // Keranjang rata-rata dari pool paket wajar; bila ada pagar, pilihan
+        // dibatasi paket yang harganya tidak melewati pagar itu sendiri.
+        $pool = $cap === null ? $prices : array_values(array_filter($prices, fn (int $price): bool => $price <= $cap));
+        if ($pool === []) {
+            $pool = $prices;
+        }
         $basket = 0;
         $basketPicks = 1 + (int) (self::unit("board|picks|{$seed}") * 3);
         for ($pick = 0; $pick < $basketPicks; $pick++) {
-            $basket += $prices[(int) (self::unit("board|price|{$seed}|{$pick}") * count($prices))];
+            $basket += $pool[(int) (self::unit("board|price|{$seed}|{$pick}") * count($pool))];
         }
-        $basket = intdiv($basket, $basketPicks);
+        $basket = max(1, intdiv($basket, $basketPicks));
 
-        $total = (int) round($orderCount * $basket * (1 + self::unit("board|jitter|{$seed}") * 0.03));
+        if ($cap === null) {
+            // Papan kosong: total menurun mengikuti pangkat 0.82 per slot
+            // dari tambatan atas; jitter ±8% selalu lebih kecil dari jarak
+            // antar slot (0.82), jadi urutan antar slot tidak tertukar.
+            $total = (int) round($emptyBoardTop * (0.82 ** $slot) * (0.92 + self::unit("board|frac|{$seed}") * 0.08));
+            $orderCount = max(1, (int) round($total / $basket));
+        } else {
+            $total = (int) floor($cap * (0.25 + self::unit("board|frac|{$seed}") * 0.65));
+            $orderCount = max(1, (int) round($total / $basket));
+            $total = (int) round($orderCount * $basket * (1 + self::unit("board|jitter|{$seed}") * 0.03));
+            if ($total >= $cap) {
+                // Jangkar ulang bisa menyentuh pagar pada pagar kecil:
+                // turunkan tepat di bawahnya, sesuaikan jumlah pesanan.
+                $total = $cap - 1 - (int) (self::unit("board|deround|{$seed}") * 99);
+                $orderCount = max(1, intdiv($total, $basket));
+            }
+        }
+
         if ($total % 1000 === 0) {
             $total -= 1 + (int) (self::unit("board|deround|{$seed}") * 99);
         }
-
-        if ($cap === null) {
-            // Papan kosong: entri teratas ditambatkan ke rentang yang wajar,
-            // entri berikutnya menurun mengikuti pangkat 0.82 per slot.
-            $floor = (int) floor($emptyBoardTop * (0.82 ** $slot));
-            $total = max($total, $floor);
-        } else {
-            $total = min($total, $cap);
-        }
         $total = max(1, $total);
-
-        $maxPlausibleCount = max(1, intdiv($total, min($prices)));
-        $orderCount = min($orderCount, $maxPlausibleCount);
 
         return [
             'name' => self::alias($localPart.'@gmail.com'),
@@ -148,9 +163,10 @@ class FakeLeaderboard
     }
 
     /**
-     * Harga efektif paket live dari katalog bersama FakeOrderFeed (sudah
-     * dihargai CheckoutPricing dan ter-cache per tick), untuk keranjang
-     * rata-rata dan pagar kewajaran jumlah pesanan.
+     * Harga efektif paket live dari katalog wajar bersama FakeOrderFeed
+     * (sudah dihargai CheckoutPricing, ter-cache per tick, dan disaring ke
+     * ≤ MODEST_PRICE_CAP_IDR), untuk keranjang rata-rata dan pagar
+     * kewajaran jumlah pesanan.
      *
      * @return list<int>
      */
@@ -158,7 +174,7 @@ class FakeLeaderboard
     {
         return array_map(
             fn (array $package): int => $package['price'],
-            FakeOrderFeed::pricedCatalog(),
+            FakeOrderFeed::modestCatalog(),
         );
     }
 

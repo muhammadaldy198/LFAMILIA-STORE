@@ -140,8 +140,12 @@ class SyntheticSocialProofTest extends TestCase
         $livePrices = array_map(fn (array $quote): int => (int) $quote['subtotal_idr'], $quotes);
         $this->assertContains(11_000, $livePrices);
         foreach ($synthetic as $item) {
-            $this->assertContains($item['status'], ['success', 'processing']);
+            // Keputusan pemilik 19 Nov 2026: entri sintetis selalu "Terkirim"
+            // (tidak ada lagi "Diproses" karangan) dan hanya dari paket
+            // berharga wajar — tidak ada pesanan mahal karangan.
+            $this->assertSame('success', $item['status']);
             $this->assertContains($item['total'], $livePrices);
+            $this->assertLessThanOrEqual(FakeOrderFeed::MODEST_PRICE_CAP_IDR, $item['total']);
         }
     }
 
@@ -280,6 +284,41 @@ class SyntheticSocialProofTest extends TestCase
         foreach ($first as $entry) {
             $this->assertLessThanOrEqual(92_000, $entry['total_spent']);
             $this->assertGreaterThan(0, $entry['total_spent']);
+        }
+    }
+
+    public function test_fake_leaderboard_totals_spread_below_the_cap_instead_of_clustering_on_it(): void
+    {
+        $this->buyablePackage();
+        $now = CarbonImmutable::parse('2026-11-19 13:00:00', 'UTC');
+        // Cerminan papan produksi 19 Nov 2026: total asli teratas Rp183.931
+        // membuat hampir semua entri sintetis terpangkas ke pagar yang sama
+        // (Rp169.216) — papan tampil seragam. Regresi: total wajib tersebar.
+        $entries = FakeLeaderboard::entries(19, 'month', $now, 183_931);
+
+        $this->assertCount(19, $entries);
+        $totals = array_column($entries, 'total_spent');
+        foreach ($entries as $entry) {
+            $this->assertLessThan(183_931, $entry['total_spent']);
+            $this->assertLessThanOrEqual(169_216, $entry['total_spent']);
+            $this->assertGreaterThan(0, $entry['order_count']);
+        }
+        $this->assertGreaterThanOrEqual(5, count(array_unique($totals)));
+        $this->assertLessThanOrEqual(3, max(array_count_values($totals)));
+    }
+
+    public function test_fake_leaderboard_on_an_empty_board_stays_within_modest_totals(): void
+    {
+        $this->buyablePackage();
+        $now = CarbonImmutable::parse('2026-11-19 13:00:00', 'UTC');
+
+        $entries = FakeLeaderboard::entries(20, 'month', $now, null);
+
+        $this->assertCount(20, $entries);
+        foreach ($entries as $entry) {
+            $this->assertLessThanOrEqual(500_000, $entry['total_spent']);
+            $this->assertGreaterThan(0, $entry['total_spent']);
+            $this->assertGreaterThan(0, $entry['order_count']);
         }
     }
 }
