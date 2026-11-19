@@ -6,7 +6,7 @@ Dokumen ini menjelaskan cara proyek LFAMILIA-STORE menangani keamanan dan cara m
 
 Jalur resmi pelaporan adalah **GitHub Private Vulnerability Reporting** di repo ini (tab **Security** > **Report a vulnerability**; pengaturannya ada di **Settings > Security**).
 
-Bila fitur Private Vulnerability Reporting belum aktif di repo ini, gunakan formulir dukungan di situs toko (lfamilia.com/support) dan sampaikan bahwa laporanmu adalah laporan keamanan; tetap jangan membuka issue publik untuk kerentanan.
+Jalur Private Vulnerability Reporting diaktifkan oleh pemilik repo di Settings > Security; bila tombol Report a vulnerability belum muncul di tab Security, fitur itu belum aktif. Formulir dukungan di situs toko hanya melayani pelanggan yang memiliki pesanan, jadi bukan jalur untuk laporan keamanan. Tetap jangan membuka issue publik untuk kerentanan.
 
 - Jangan membuka issue publik, pull request publik, atau diskusi publik untuk kerentanan.
 - Sertakan langkah reproduksi, dampak, dan jalur berkas yang terkait bila diketahui.
@@ -35,7 +35,7 @@ Aplikasi web LFAMILIA-STORE (Laravel 12 + Vue/Inertia), mencakup:
 
 **e. Gerbang admin.** Guard `admin` terpisah dari guard pelanggan (`config/auth.php`). Middleware `EnsureAdminRole` mengizinkan admin aktif dengan peran `SUPER_ADMIN` atau `ADMIN`; `EnsureSuperAdmin` hanya `SUPER_ADMIN` aktif. Penolakan berupa HTTP 403. (`app/Http/Middleware/EnsureAdminRole.php`, `app/Http/Middleware/EnsureSuperAdmin.php`)
 
-**f. Penjaga boot produksi.** Di lingkungan `production`, aplikasi melempar exception (menolak berjalan) bila `SESSION_ENCRYPT` tidak aktif, cookie sesi tidak secure, `APP_TRUSTED_HOSTS` kosong, `TRUSTED_PROXIES` kosong, berisi wildcard `*`, atau berisi entri yang bukan IP/CIDR valid, atau bila `APP_URL` bukan HTTPS. (`app/Providers/AppServiceProvider.php`)
+**f. Penjaga boot produksi.** Di lingkungan `production`, aplikasi melempar exception (menolak berjalan) bila `SESSION_ENCRYPT` tidak aktif, cookie sesi tidak secure, `APP_TRUSTED_HOSTS` kosong, `TRUSTED_PROXIES` kosong, berisi wildcard `*`, atau berisi entri yang bukan IP/CIDR valid, bila `APP_DEBUG` aktif, atau bila `APP_URL` bukan HTTPS. (`app/Providers/AppServiceProvider.php`)
 
 **g. Redaksi log audit admin.** Daftar kolom yang disensor mencakup `access_token`, `private_key`, `bearer_token`, `webhook_secret`, dan lainnya. (`app/Services/AdminAuditService.php`)
 
