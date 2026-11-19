@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Services\PublicOrderStatusService;
+use App\Support\FakeOrderFeed;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -225,7 +227,7 @@ class PublicOrderTrackingController
 
     private function recentTransactions(): array
     {
-        return DB::table('orders')
+        $real = DB::table('orders')
             ->whereNotNull('orders.paid_at')
             ->join('products', 'products.id', '=', 'orders.product_id')
             ->join('product_packages', 'product_packages.id', '=', 'orders.product_package_id')
@@ -243,6 +245,29 @@ class PublicOrderTrackingController
                 'statusNote' => $this->statuses->note((string) $order->status, $order->paid_at !== null),
                 'createdAt' => $this->utcIso($order->created_at),
             ])->values()->all();
+
+        if (count($real) >= 20) {
+            return $real;
+        }
+
+        // Pelengkap sintetis (keputusan pemilik): dihitung deterministik dari
+        // katalog live oleh FakeOrderFeed, tanpa baris database. Pesanan asli
+        // selalu tampil semua; sintetis hanya mengisi sisa tempat, lalu
+        // gabungan diurutkan ulang dari yang paling baru.
+        $synthetic = FakeOrderFeed::entries(
+            20 - count($real),
+            CarbonImmutable::now(),
+            array_column($real, 'maskedReferenceId'),
+            $this->statuses,
+        );
+        if ($synthetic === []) {
+            return $real;
+        }
+
+        $merged = array_merge($real, $synthetic);
+        usort($merged, fn (array $a, array $b): int => strcmp((string) $b['createdAt'], (string) $a['createdAt']));
+
+        return array_slice($merged, 0, 20);
     }
 
     private function utcIso(?string $value): ?string

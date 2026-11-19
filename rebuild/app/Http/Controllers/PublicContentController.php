@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\NewsArticle;
 use App\Services\StorefrontContentService;
+use App\Support\FakeLeaderboard;
 use App\Support\OptimizedMedia;
 use App\Support\SeoMetadata;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -101,15 +103,44 @@ class PublicContentController
                 'total_spent' => (int) $row->total_spent,
             ]);
 
+        if ($entries->count() < 20) {
+            // Pelengkap sintetis (keputusan pemilik): dihitung deterministik
+            // oleh FakeLeaderboard, tanpa baris database. Nilai pembeli asli
+            // tidak diubah; sintetis hanya mengisi sisa tempat dan totalnya
+            // selalu dipagari di bawah total pembeli asli teratas.
+            $list = $entries->all();
+            $synthetic = FakeLeaderboard::entries(
+                20 - count($list),
+                $period,
+                CarbonImmutable::now(),
+                $list[0]['total_spent'] ?? null,
+            );
+            if ($synthetic !== []) {
+                $merged = array_merge($list, $synthetic);
+                usort($merged, fn (array $a, array $b): int => ($b['total_spent'] <=> $a['total_spent']) ?: ($b['order_count'] <=> $a['order_count']));
+                $entries = [];
+                foreach (array_slice($merged, 0, 20) as $index => $entry) {
+                    $entries[] = [
+                        'rank' => $index + 1,
+                        'name' => $entry['name'],
+                        'order_count' => $entry['order_count'],
+                        'total_spent' => $entry['total_spent'],
+                    ];
+                }
+            }
+        }
+
         return SeoMetadata::render('Content/Leaderboard', ['entries' => $entries, 'period' => $period]);
     }
 
-    /** Alias samaran sama dengan dinding ulasan: 3 huruf pertama local part + 9 bintang. */
+    /**
+     * Alias samaran sama dengan dinding ulasan: 3 huruf pertama local part + 9 bintang.
+     * Rumusnya tinggal di FakeLeaderboard::alias supaya pembeli asli dan entri
+     * sintetis tidak pernah memakai rumus yang berbeda.
+     */
     private function leaderboardAlias(string $email): string
     {
-        $localPart = strstr($email, '@', true);
-
-        return mb_substr($localPart === false ? $email : $localPart, 0, 3).'*********';
+        return FakeLeaderboard::alias($email);
     }
 
     public function tool(string $tool): Response
