@@ -2,8 +2,10 @@
 
 namespace App\Support;
 
+use App\Services\CheckoutPricing;
 use App\Services\PublicOrderStatusService;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -45,7 +47,7 @@ class FakeOrderFeed
             return [];
         }
 
-        $catalog = self::catalog();
+        $catalog = self::pricedCatalog();
         if ($catalog === []) {
             return [];
         }
@@ -72,7 +74,7 @@ class FakeOrderFeed
      * hash (tick, indeks). Tabrakan masked id digeser deterministik (salt
      * retry); entri dibatalkan (null) bila tetap tabrakan.
      *
-     * @param  list<array{product_name: string, package_name: string, sell_price_idr: int}>  $catalog
+     * @param  list<array{product_name: string, package_name: string, price: int}>  $catalog
      * @param  array<string, bool>  $usedMaskedIds
      */
     private static function entry(array $catalog, int $tick, CarbonImmutable $tickStart, int $index, array $usedMaskedIds, PublicOrderStatusService $statuses, CarbonImmutable $now): ?array
@@ -108,7 +110,7 @@ class FakeOrderFeed
             'maskedReferenceId' => $masked,
             'productName' => $package['product_name'],
             'packageLabel' => $package['package_name'],
-            'total' => $package['sell_price_idr'],
+            'total' => $package['price'],
             'status' => $statuses->slug($rawStatus),
             'statusNote' => $statuses->note($rawStatus, true),
             'createdAt' => $created->toIso8601String(),
@@ -137,37 +139,61 @@ class FakeOrderFeed
     }
 
     /**
-     * Katalog live (read-only): paket aktif dari produk aktif berharga jual > 0.
+     * Katalog live (read-only): paket aktif dari produk aktif yang BISA dibeli,
+     * dihargai dengan harga efektif CheckoutPricing — sumber yang sama dengan
+     * halaman produk (subtotal_idr). Wajib lewat mesin harga ini: mayoritas
+     * paket toko memakai mode PERCENT/FIXED dengan sell_price_idr null, jadi
+     * membaca kolom harga mentah akan mengosongkan katalog. Hasilnya di-cache
+     * 5 menit, selaras tick, supaya endpoint umpan yang di-poll pengunjung
+     * tidak menghitung ulang ratusan kuotasi pada setiap request. Dipakai
+     * bersama oleh FakeLeaderboard.
      *
-     * @return list<array{product_name: string, package_name: string, sell_price_idr: int}>
+     * @return list<array{product_name: string, package_name: string, price: int}>
      */
-    private static function catalog(): array
+    public static function pricedCatalog(): array
     {
-        return DB::table('product_packages')
-            ->join('products', 'products.id', '=', 'product_packages.product_id')
-            ->where('product_packages.is_active', true)
-            ->where('products.is_active', true)
-            ->where('product_packages.sell_price_idr', '>', 0)
-            ->orderBy('product_packages.id')
-            ->get([
-                'products.name as product_name',
-                'product_packages.name as package_name',
-                'product_packages.sell_price_idr',
-            ])
-            ->map(fn (object $row): array => [
-                'product_name' => (string) $row->product_name,
-                'package_name' => (string) $row->package_name,
-                'sell_price_idr' => (int) $row->sell_price_idr,
-            ])
-            ->all();
+        return Cache::remember('synthetic:priced-catalog:v1', self::TICK_SECONDS, function (): array {
+            $rows = DB::table('product_packages')
+                ->join('products', 'products.id', '=', 'product_packages.product_id')
+                ->where('product_packages.is_active', true)
+                ->where('products.is_active', true)
+                ->orderBy('product_packages.id')
+                ->get([
+                    'product_packages.id',
+                    'products.name as product_name',
+                    'product_packages.name as package_name',
+                ]);
+            if ($rows->isEmpty()) {
+                return [];
+            }
+
+            $quotes = app(CheckoutPricing::class)->forPackages($rows->pluck('id')->all());
+
+            $catalog = [];
+            foreach ($rows as $row) {
+                $price = (int) ($quotes[$row->id]['subtotal_idr'] ?? 0);
+                if ($price > 0) {
+                    $catalog[] = [
+                        'product_name' => (string) $row->product_name,
+                        'package_name' => (string) $row->package_name,
+                        'price' => $price,
+                    ];
+                }
+            }
+
+            return $catalog;
+        });
     }
 
     /**
-     * Hash deterministik ke rentang [0, 1); sama dengan ReviewWall::unit.
-     * Wajib sha256: crc32 difusinya lemah untuk kunci yang hanya beda angka tick.
+     * Hash deterministik ke rentang [0, 1) — ketat di bawah 1: pembagi 2^32
+     * memastikan hasil tidak pernah tepat 1.0 (yang akan mengindeks satu
+     * melewati elemen terakhir pada pilihan berbasis unit() * count()).
+     * Sama dengan ReviewWall::unit kecuali pembagi ini. Wajib sha256:
+     * crc32 difusinya lemah untuk kunci yang hanya beda angka tick.
      */
     private static function unit(string $key): float
     {
-        return hexdec(substr(hash('sha256', $key), 0, 8)) / 4294967295.0;
+        return hexdec(substr(hash('sha256', $key), 0, 8)) / 4294967296.0;
     }
 }

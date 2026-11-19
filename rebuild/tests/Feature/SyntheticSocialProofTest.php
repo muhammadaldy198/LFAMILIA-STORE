@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Services\CheckoutPricing;
 use App\Services\PublicOrderStatusService;
 use App\Support\FakeLeaderboard;
 use App\Support\FakeOrderFeed;
@@ -28,19 +29,34 @@ class SyntheticSocialProofTest extends TestCase
         Queue::fake();
     }
 
-    /** Paket aktif berharga jual > 0: bahan katalog live untuk generator sintetis. */
-    private function pricedPackage(int $price = 50_000): int
+    /**
+     * Paket yang benar-benar bisa dibeli (pola fixture CheckoutTest): mode
+     * PERCENT dengan sell_price_idr NULL — seperti mayoritas katalog toko —
+     * modal Digiflazz Rp10.000 + margin 10% → harga efektif Rp11.000.
+     */
+    private function buyablePackage(): int
     {
         $suffix = bin2hex(random_bytes(6));
-        $category = DB::table('categories')->insertGetId(['name' => 'Game '.$suffix, 'slug' => 'syn-game-'.$suffix]);
+        DB::table('providers')->where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
         $product = DB::table('products')->insertGetId([
-            'category_id' => $category, 'name' => 'Game '.$suffix, 'slug' => 'syn-product-'.$suffix, 'is_active' => true,
+            'category_id' => DB::table('categories')->where('slug', 'game')->value('id'),
+            'name' => 'Game '.$suffix, 'slug' => 'syn-product-'.$suffix, 'is_active' => true,
+            'fulfillment_mode' => 'AUTO_PROVIDER', 'margin_percent' => 10,
         ]);
-
-        return DB::table('product_packages')->insertGetId([
+        $package = DB::table('product_packages')->insertGetId([
             'product_id' => $product, 'code' => 'SYN-'.$suffix, 'name' => 'Paket '.$suffix,
-            'is_active' => true, 'sell_price_idr' => $price,
+            'is_active' => true, 'pricing_mode' => 'PERCENT', 'margin_percent' => 10,
         ]);
+        DB::table('provider_mappings')->insert([
+            'product_package_id' => $package,
+            'provider_id' => DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id'),
+            'external_sku' => 'SYN-SKU-'.$suffix,
+            'cost_idr' => 10_000, 'max_price_idr' => 12_000, 'priority' => 1, 'is_active' => true,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $this->seedCheckoutDigiflazzCatalog($package);
+
+        return $package;
     }
 
     private function paidOrder(string $number, int $packageId, int $total, ?string $guestEmail = null, string $status = 'SUCCESS'): int
@@ -73,7 +89,7 @@ class SyntheticSocialProofTest extends TestCase
 
     public function test_feed_fills_to_twenty_and_keeps_every_real_paid_order(): void
     {
-        $package = $this->pricedPackage();
+        $package = $this->buyablePackage();
         $numbers = ['LFSYN260101-REAL00001A', 'LFSYN260101-REAL00002B', 'LFSYN260101-REAL00003C'];
         foreach ($numbers as $number) {
             $this->paidOrder($number, $package, 75_000);
@@ -104,7 +120,7 @@ class SyntheticSocialProofTest extends TestCase
 
     public function test_feed_synthetic_entries_use_live_catalog_prices_and_public_statuses(): void
     {
-        $package = $this->pricedPackage(50_000);
+        $package = $this->buyablePackage();
         $this->paidOrder('LFSYN260101-REAL00009Z', $package, 75_000);
 
         $feed = $this->get('/orders/track/feed')->assertOk()->json('transactions');
@@ -114,9 +130,15 @@ class SyntheticSocialProofTest extends TestCase
         ));
 
         $this->assertNotEmpty($synthetic);
-        $livePrices = DB::table('product_packages')
-            ->where('is_active', true)->where('sell_price_idr', '>', 0)
-            ->pluck('sell_price_idr')->map(fn (mixed $price): int => (int) $price)->all();
+        // Paket fixture bermode PERCENT dengan sell_price_idr NULL (seperti
+        // mayoritas katalog toko): generator wajib tetap mengisinya lewat
+        // harga efektif CheckoutPricing, bukan kolom harga mentah.
+        $this->assertNull(DB::table('product_packages')->where('id', $package)->value('sell_price_idr'));
+        $quotes = app(CheckoutPricing::class)->forPackages(
+            DB::table('product_packages')->where('is_active', true)->pluck('id')->all(),
+        );
+        $livePrices = array_map(fn (array $quote): int => (int) $quote['subtotal_idr'], $quotes);
+        $this->assertContains(11_000, $livePrices);
         foreach ($synthetic as $item) {
             $this->assertContains($item['status'], ['success', 'processing']);
             $this->assertContains($item['total'], $livePrices);
@@ -125,7 +147,7 @@ class SyntheticSocialProofTest extends TestCase
 
     public function test_feed_without_active_catalog_stays_pure_real(): void
     {
-        $package = $this->pricedPackage();
+        $package = $this->buyablePackage();
         $this->paidOrder('LFSYN260101-REAL00007Y', $package, 75_000);
         DB::table('product_packages')->update(['is_active' => false]);
 
@@ -136,7 +158,7 @@ class SyntheticSocialProofTest extends TestCase
 
     public function test_fake_order_feed_is_deterministic_within_a_tick(): void
     {
-        $this->pricedPackage();
+        $this->buyablePackage();
         $now = CarbonImmutable::parse('2026-11-19 13:00:00', 'UTC');
         $statuses = app(PublicOrderStatusService::class);
 
@@ -152,7 +174,7 @@ class SyntheticSocialProofTest extends TestCase
 
     public function test_fake_order_feed_future_clamp_is_tick_fixed_and_utc(): void
     {
-        $this->pricedPackage();
+        $this->buyablePackage();
         $statuses = app(PublicOrderStatusService::class);
         // Tick 5983753 (mulai 2026-11-19 22:05:00 UTC), indeks 3: umur 2 menit
         // dengan jitter 153 detik — waktu mentahnya 33 detik melewati awal
@@ -178,7 +200,7 @@ class SyntheticSocialProofTest extends TestCase
 
     public function test_leaderboard_fill_keeps_real_top_buyer_first_with_exact_total(): void
     {
-        $package = $this->pricedPackage();
+        $package = $this->buyablePackage();
         $bigTotal = 900_000_000_000;
         $this->paidOrder('LFSYN260101-BOARD0001A', $package, $bigTotal, 'topbuyer@example.test');
 
@@ -200,7 +222,7 @@ class SyntheticSocialProofTest extends TestCase
 
     public function test_leaderboard_without_any_orders_shows_twenty_synthetic_entries(): void
     {
-        $this->pricedPackage();
+        $this->buyablePackage();
 
         $entries = $this->board();
 
@@ -220,7 +242,7 @@ class SyntheticSocialProofTest extends TestCase
 
     public function test_leaderboard_without_active_catalog_stays_pure_real(): void
     {
-        $package = $this->pricedPackage();
+        $package = $this->buyablePackage();
         $this->paidOrder('LFSYN260101-BOARD0002B', $package, 123_000, 'onlybuyer@example.test');
         DB::table('product_packages')->update(['is_active' => false]);
 
@@ -231,9 +253,23 @@ class SyntheticSocialProofTest extends TestCase
         $this->assertSame(123_000, $entries[0]['total_spent']);
     }
 
+    public function test_leaderboard_skips_fill_when_cap_is_below_the_cheapest_package(): void
+    {
+        $package = $this->buyablePackage();
+        // Total asli Rp11.500 → pagar sintetis 0.92 × 11.500 = Rp10.580, di
+        // bawah paket termurah (Rp11.000): tidak ada pembeli sintetis yang
+        // masuk akal, jadi papan dibiarkan berisi pembeli asli saja.
+        $this->paidOrder('LFSYN260101-BOARD0003C', $package, 11_500, 'smallbuyer@example.test');
+
+        $entries = $this->board();
+
+        $this->assertCount(1, $entries);
+        $this->assertSame(11_500, $entries[0]['total_spent']);
+    }
+
     public function test_fake_leaderboard_is_deterministic_and_respects_the_real_top_cap(): void
     {
-        $this->pricedPackage(40_000);
+        $this->buyablePackage();
         $now = CarbonImmutable::parse('2026-11-19 13:00:00', 'UTC');
 
         $first = FakeLeaderboard::entries(5, 'month', $now, 100_000);

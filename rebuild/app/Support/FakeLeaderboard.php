@@ -3,7 +3,6 @@
 namespace App\Support;
 
 use Carbon\CarbonImmutable;
-use Illuminate\Support\Facades\DB;
 
 /**
  * Entri sintetis pelengkap papan peringkat pembeli: dihitung deterministik
@@ -59,6 +58,12 @@ class FakeLeaderboard
         $date = $now->setTimezone(self::TIMEZONE)->format('Y-m-d');
         $personas = self::rotatedPersonas($period, $date);
         $cap = $realTopTotal === null ? null : (int) floor($realTopTotal * 0.92);
+        if ($cap !== null && $cap < min($prices)) {
+            // Pagar berada di bawah paket termurah: tidak ada total sintetis
+            // yang masuk akal di bawah harga satu paket termurah — papan
+            // dibiarkan murni asli daripada menampilkan pembeli yang mustahil.
+            return [];
+        }
         $emptyBoardTop = self::EMPTY_BOARD_TOP_MIN
             + (int) (self::unit("board|top|{$period}|{$date}") * (self::EMPTY_BOARD_TOP_MAX - self::EMPTY_BOARD_TOP_MIN));
 
@@ -143,30 +148,27 @@ class FakeLeaderboard
     }
 
     /**
-     * Harga jual paket aktif dari produk aktif (read-only), untuk keranjang
+     * Harga efektif paket live dari katalog bersama FakeOrderFeed (sudah
+     * dihargai CheckoutPricing dan ter-cache per tick), untuk keranjang
      * rata-rata dan pagar kewajaran jumlah pesanan.
      *
      * @return list<int>
      */
     private static function catalogPrices(): array
     {
-        return DB::table('product_packages')
-            ->join('products', 'products.id', '=', 'product_packages.product_id')
-            ->where('product_packages.is_active', true)
-            ->where('products.is_active', true)
-            ->where('product_packages.sell_price_idr', '>', 0)
-            ->orderBy('product_packages.id')
-            ->pluck('product_packages.sell_price_idr')
-            ->map(fn (mixed $price): int => (int) $price)
-            ->all();
+        return array_map(
+            fn (array $package): int => $package['price'],
+            FakeOrderFeed::pricedCatalog(),
+        );
     }
 
     /**
-     * Hash deterministik ke rentang [0, 1); sama dengan ReviewWall::unit.
-     * Wajib sha256: crc32 difusinya lemah untuk kunci yang hanya beda angka tick.
+     * Hash deterministik ke rentang [0, 1) — ketat di bawah 1 (pembagi 2^32);
+     * sama dengan FakeOrderFeed::unit. Wajib sha256: crc32 difusinya lemah
+     * untuk kunci yang hanya beda tanggal.
      */
     private static function unit(string $key): float
     {
-        return hexdec(substr(hash('sha256', $key), 0, 8)) / 4294967295.0;
+        return hexdec(substr(hash('sha256', $key), 0, 8)) / 4294967296.0;
     }
 }
