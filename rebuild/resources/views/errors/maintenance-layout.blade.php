@@ -5,10 +5,9 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="robots" content="noindex,nofollow">
     <title>@yield('code') — {{ config('app.name', 'LFAMILIA STORE') }}</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;800&family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
     <style>
+        @font-face { font-family:'Bricolage Grotesque';src:url('{{ asset('fonts/bricolage-grotesque.woff2') }}') format('woff2');font-weight:200 800;font-style:normal;font-display:swap; }
+        @font-face { font-family:'Plus Jakarta Sans';src:url('{{ asset('fonts/plus-jakarta-sans.woff2') }}') format('woff2');font-weight:200 800;font-style:normal;font-display:swap; }
         * { margin:0;padding:0;box-sizing:border-box; }
         body { min-height:100vh;font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:#fff;color:#1F2A44;display:flex;flex-direction:column;position:relative;overflow-x:hidden; }
         .dot { position:absolute;border-radius:50%;opacity:.5; }
@@ -51,7 +50,6 @@
         <h1>Sabar ya, lagi <span class="red">dibenerin</span> bentar lagi beres!</h1>
         <p class="lead">@yield('message')</p>
         <div class="meta">
-            <span class="chip">🕐 Estimasi <b>±15 menit</b></span>
             <span class="chip">🛡️ Pesananmu <b>aman tersimpan</b></span>
         </div>
         <div class="actions">
