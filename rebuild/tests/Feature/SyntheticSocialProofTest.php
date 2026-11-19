@@ -8,6 +8,7 @@ use App\Support\FakeLeaderboard;
 use App\Support\FakeOrderFeed;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
@@ -36,22 +37,27 @@ class SyntheticSocialProofTest extends TestCase
      */
     private function buyablePackage(): int
     {
+        return $this->buyablePackageWithCost(10_000, 10);
+    }
+
+    private function buyablePackageWithCost(int $costIdr, int $marginPercent): int
+    {
         $suffix = bin2hex(random_bytes(6));
         DB::table('providers')->where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
         $product = DB::table('products')->insertGetId([
             'category_id' => DB::table('categories')->where('slug', 'game')->value('id'),
             'name' => 'Game '.$suffix, 'slug' => 'syn-product-'.$suffix, 'is_active' => true,
-            'fulfillment_mode' => 'AUTO_PROVIDER', 'margin_percent' => 10,
+            'fulfillment_mode' => 'AUTO_PROVIDER', 'margin_percent' => $marginPercent,
         ]);
         $package = DB::table('product_packages')->insertGetId([
             'product_id' => $product, 'code' => 'SYN-'.$suffix, 'name' => 'Paket '.$suffix,
-            'is_active' => true, 'pricing_mode' => 'PERCENT', 'margin_percent' => 10,
+            'is_active' => true, 'pricing_mode' => 'PERCENT', 'margin_percent' => $marginPercent,
         ]);
         DB::table('provider_mappings')->insert([
             'product_package_id' => $package,
             'provider_id' => DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id'),
             'external_sku' => 'SYN-SKU-'.$suffix,
-            'cost_idr' => 10_000, 'max_price_idr' => 12_000, 'priority' => 1, 'is_active' => true,
+            'cost_idr' => $costIdr, 'max_price_idr' => (int) ($costIdr * 1.2), 'priority' => 1, 'is_active' => true,
             'created_at' => now(), 'updated_at' => now(),
         ]);
         $this->seedCheckoutDigiflazzCatalog($package);
@@ -140,8 +146,12 @@ class SyntheticSocialProofTest extends TestCase
         $livePrices = array_map(fn (array $quote): int => (int) $quote['subtotal_idr'], $quotes);
         $this->assertContains(11_000, $livePrices);
         foreach ($synthetic as $item) {
-            $this->assertContains($item['status'], ['success', 'processing']);
+            // Keputusan pemilik 19 Nov 2026: entri sintetis selalu "Terkirim"
+            // (tidak ada lagi "Diproses" karangan) dan hanya dari paket
+            // berharga wajar — tidak ada pesanan mahal karangan.
+            $this->assertSame('success', $item['status']);
             $this->assertContains($item['total'], $livePrices);
+            $this->assertLessThanOrEqual(FakeOrderFeed::MODEST_PRICE_CAP_IDR, $item['total']);
         }
     }
 
@@ -281,5 +291,103 @@ class SyntheticSocialProofTest extends TestCase
             $this->assertLessThanOrEqual(92_000, $entry['total_spent']);
             $this->assertGreaterThan(0, $entry['total_spent']);
         }
+    }
+
+    public function test_fake_leaderboard_totals_spread_below_the_cap_instead_of_clustering_on_it(): void
+    {
+        $this->buyablePackage();
+        $now = CarbonImmutable::parse('2026-11-19 13:00:00', 'UTC');
+        // Cerminan papan produksi 19 Nov 2026: total asli teratas Rp183.931
+        // membuat hampir semua entri sintetis terpangkas ke pagar yang sama
+        // (Rp169.216) — papan tampil seragam. Regresi: total wajib tersebar.
+        $entries = FakeLeaderboard::entries(19, 'month', $now, 183_931);
+
+        $this->assertCount(19, $entries);
+        $totals = array_column($entries, 'total_spent');
+        foreach ($entries as $entry) {
+            $this->assertLessThan(183_931, $entry['total_spent']);
+            $this->assertLessThanOrEqual(169_216, $entry['total_spent']);
+            $this->assertGreaterThan(0, $entry['order_count']);
+        }
+        $this->assertGreaterThanOrEqual(5, count(array_unique($totals)));
+        $this->assertLessThanOrEqual(3, max(array_count_values($totals)));
+    }
+
+    public function test_fake_leaderboard_on_an_empty_board_stays_within_modest_totals(): void
+    {
+        $this->buyablePackage();
+        $now = CarbonImmutable::parse('2026-11-19 13:00:00', 'UTC');
+
+        $entries = FakeLeaderboard::entries(20, 'month', $now, null);
+
+        $this->assertCount(20, $entries);
+        // Invarian kewajaran (temuan Codex pada PR perbaikan ini): total
+        // tidak pernah di bawah jumlah pesanan × harga paket termurah —
+        // ekor papan tidak boleh menampilkan 1 pesanan seharga di bawah
+        // paket termurah yang ada.
+        $minPrice = min(array_column(FakeOrderFeed::modestCatalog(), 'price'));
+        foreach ($entries as $entry) {
+            $this->assertLessThanOrEqual(500_000, $entry['total_spent']);
+            $this->assertGreaterThan(0, $entry['total_spent']);
+            $this->assertGreaterThan(0, $entry['order_count']);
+            $this->assertGreaterThanOrEqual($entry['order_count'] * $minPrice, $entry['total_spent']);
+        }
+    }
+
+    public function test_fake_leaderboard_with_a_single_price_pool_never_goes_below_that_price(): void
+    {
+        // Skenario persis temuan Codex: pool hanya berisi satu harga
+        // (Rp11.000). Ekor papan kosong tidak boleh jatuh di bawah harga
+        // itu, berapa pun meluruhnya pangkat 0.82 per slot.
+        $package = $this->buyablePackage();
+        DB::table('product_packages')->where('id', '!=', $package)->update(['is_active' => false]);
+        Cache::forget('synthetic:priced-catalog:v1');
+        $now = CarbonImmutable::parse('2026-11-19 13:00:00', 'UTC');
+
+        $entries = FakeLeaderboard::entries(20, 'month', $now, null);
+
+        $this->assertCount(20, $entries);
+        foreach ($entries as $entry) {
+            $this->assertGreaterThanOrEqual($entry['order_count'] * 11_000, $entry['total_spent']);
+        }
+    }
+
+    public function test_fake_leaderboard_empty_board_ceiling_survives_the_plausibility_raise(): void
+    {
+        // Skenario P3 Codex: pool berisi satu harga saja, Rp100.000 —
+        // batas atas katalog wajar. Pada tanggal-tanggal bertambatan
+        // tinggi, slot teratas terjangkar tepat di langit-langit papan
+        // kosong (5 × Rp100.000); kenaikan lantai kewajaran sesudahnya
+        // tidak boleh menembus langit-langit itu. Sapuan setahun penuh
+        // memastikan tanggal-tanggal pojok itu benar-benar terlewati.
+        $package = $this->buyablePackageWithCost(100_000, 0);
+        DB::table('product_packages')->where('id', '!=', $package)->update(['is_active' => false]);
+        Cache::forget('synthetic:priced-catalog:v1');
+        $this->assertSame([100_000], array_column(FakeOrderFeed::modestCatalog(), 'price'));
+
+        $day = CarbonImmutable::parse('2026-01-01 13:00:00', 'UTC');
+        for ($i = 0; $i < 365; $i++) {
+            $entries = FakeLeaderboard::entries(20, 'month', $day->addDays($i), null);
+            $this->assertCount(20, $entries);
+            foreach ($entries as $entry) {
+                $this->assertLessThanOrEqual(500_000, $entry['total_spent']);
+                $this->assertGreaterThanOrEqual($entry['order_count'] * 100_000, $entry['total_spent']);
+            }
+        }
+    }
+
+    public function test_fake_leaderboard_skips_fill_when_the_cap_equals_the_cheapest_package(): void
+    {
+        // Pagar tepat sama dengan paket termurah (kasus Codex: total asli
+        // Rp11.957, paket termurah Rp11.000, pagar Rp11.000): tidak ada
+        // total sintetis yang masuk akal di bawah pagar itu, jadi papan
+        // tidak diisi sama sekali.
+        $this->buyablePackage();
+        $now = CarbonImmutable::parse('2026-11-19 13:00:00', 'UTC');
+        $minPrice = min(array_column(FakeOrderFeed::modestCatalog(), 'price'));
+        $realTop = (int) ceil($minPrice / 0.92);
+        $this->assertSame($minPrice, (int) floor($realTop * 0.92));
+
+        $this->assertSame([], FakeLeaderboard::entries(5, 'month', $now, $realTop));
     }
 }

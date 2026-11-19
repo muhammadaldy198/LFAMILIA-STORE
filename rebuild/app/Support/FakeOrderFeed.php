@@ -27,8 +27,13 @@ class FakeOrderFeed
 
     private const TICK_SECONDS = 300;
 
-    /** Peluang status SUCCESS; sisanya PROCESSING. */
-    private const SUCCESS_WEIGHT = 0.85;
+    /**
+     * Batas harga paket yang boleh jadi bahan entri sintetis (keputusan
+     * pemilik 19 Nov 2026): umpan hanya menampilkan pesanan seharga paket
+     * top up wajar, bukan paket mahal jutaan. Dipakai bersama
+     * FakeLeaderboard untuk keranjang rata-ratanya.
+     */
+    public const MODEST_PRICE_CAP_IDR = 100_000;
 
     /** Umur entri sintetis: 2 menit sampai 12 jam sebelum awal tick. */
     private const MIN_AGE_MINUTES = 2;
@@ -47,7 +52,7 @@ class FakeOrderFeed
             return [];
         }
 
-        $catalog = self::pricedCatalog();
+        $catalog = self::modestCatalog();
         if ($catalog === []) {
             return [];
         }
@@ -80,7 +85,9 @@ class FakeOrderFeed
     private static function entry(array $catalog, int $tick, CarbonImmutable $tickStart, int $index, array $usedMaskedIds, PublicOrderStatusService $statuses, CarbonImmutable $now): ?array
     {
         $package = $catalog[(int) (self::unit("feed|pkg|{$tick}|{$index}") * count($catalog))];
-        $rawStatus = self::unit("feed|status|{$tick}|{$index}") < self::SUCCESS_WEIGHT ? 'SUCCESS' : 'PROCESSING';
+        // Keputusan pemilik 19 Nov 2026: entri sintetis selalu tampil
+        // "Terkirim" — status Diproses hanya untuk pesanan asli.
+        $rawStatus = 'SUCCESS';
 
         $ageMinutes = self::MIN_AGE_MINUTES + (int) (self::unit("feed|age|{$tick}|{$index}") * (self::MAX_AGE_MINUTES - self::MIN_AGE_MINUTES));
         $jitterSeconds = (int) (self::unit("feed|jitter|{$tick}|{$index}") * 240);
@@ -183,6 +190,24 @@ class FakeOrderFeed
 
             return $catalog;
         });
+    }
+
+    /**
+     * Katalog live yang disaring ke paket berharga wajar (≤
+     * MODEST_PRICE_CAP_IDR): satu-satunya bahan entri sintetis umpan dan
+     * keranjang leaderboard. Menyaring hasil pricedCatalog yang sudah
+     * ter-cache, jadi biayanya hanya menyaring ratusan baris di memori.
+     * Kosong berarti tidak ada entri sintetis sama sekali — lebih baik
+     * murni data asli daripada menampilkan pesanan mahal karangan.
+     *
+     * @return list<array{product_name: string, package_name: string, price: int}>
+     */
+    public static function modestCatalog(): array
+    {
+        return array_values(array_filter(
+            self::pricedCatalog(),
+            fn (array $package): bool => $package['price'] <= self::MODEST_PRICE_CAP_IDR,
+        ));
     }
 
     /**
