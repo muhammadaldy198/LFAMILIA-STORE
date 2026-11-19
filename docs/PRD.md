@@ -388,8 +388,8 @@ Halaman publik `/refund` tetap ada sebagai dokumen hukum; isinya dikelola pemili
 
 ### 11.5 Leaderboard
 
-- Berisi alias anonim, bukan nama asli/email/telepon.
-- Hanya member yang **memilih ikut** (opt-in).
+- Peringkat berdasarkan email pembeli (email akun atau email tamu saat checkout) dari pesanan SUCCESS; nama tampil adalah alias samaran dari email (3 huruf pertama bagian depan email + 9 bintang), bukan nama asli/email utuh/telepon.
+- Otomatis untuk semua pembeli, tanpa opt-in.
 - Bisa bulan ini atau sepanjang waktu.
 
 ---
