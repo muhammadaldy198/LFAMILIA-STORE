@@ -1,10 +1,12 @@
 # Kebijakan Keamanan
 
-Dokumen ini menjelaskan cara proyek LFAMILIA-STORE menangani keamanan dan cara melaporkan kerentanan. Isinya juga menjadi acuan reviewer keamanan (termasuk reviewer otomatis) agar review menyasar hal yang benar. Semua jalur berkas di bawah relatif terhadap folder `rebuild/` (aplikasi Laravel). Rincian teknis tambahan ada di [`rebuild/SECURITY.md`](rebuild/SECURITY.md).
+Dokumen ini menjelaskan cara proyek LFAMILIA-STORE menangani keamanan dan cara melaporkan kerentanan. Isinya juga menjadi acuan reviewer keamanan (termasuk reviewer otomatis) agar review menyasar hal yang benar. Semua jalur berkas aplikasi di bawah relatif terhadap folder `rebuild/` (aplikasi Laravel); rujukan tingkat repo ditulis dari root repo. Rincian teknis tambahan ada di [`rebuild/SECURITY.md`](rebuild/SECURITY.md).
 
 ## 1. Melaporkan Kerentanan
 
 Jalur resmi pelaporan adalah **GitHub Private Vulnerability Reporting** di repo ini (tab **Security** > **Report a vulnerability**; pengaturannya ada di **Settings > Security**).
+
+Bila fitur Private Vulnerability Reporting belum aktif di repo ini, gunakan formulir dukungan di situs toko (lfamilia.com/support) dan sampaikan bahwa laporanmu adalah laporan keamanan; tetap jangan membuka issue publik untuk kerentanan.
 
 - Jangan membuka issue publik, pull request publik, atau diskusi publik untuk kerentanan.
 - Sertakan langkah reproduksi, dampak, dan jalur berkas yang terkait bila diketahui.
@@ -27,7 +29,7 @@ Aplikasi web LFAMILIA-STORE (Laravel 12 + Vue/Inertia), mencakup:
 
 **b. Webhook Digiflazz.** Header `X-Hub-Signature` diverifikasi dengan HMAC (`sha1=` + `hash_hmac('sha1', ...)`) dan `hash_equals`, memakai `webhook_secret` dari kredensial terenkripsi. `User-Agent` wajib `Digiflazz-Hookshot`, header `X-Digiflazz-Event` hanya boleh `create` atau `update`. Pemrosesan idempoten lewat tabel `fulfillment_callbacks` (satu event per hash event+payload) dan hanya untuk `ref_id` yang punya percobaan fulfillment lokal. (`app/Http/Controllers/FulfillmentWebhookController.php`) Lapisan jaringan tambahan: Cloudflare WAF membatasi webhook Digiflazz ke IP yang ditentukan di aturan (lihat `rebuild/deploy/CLOUDFLARE.md`); validasi signature di Laravel tetap wajib.
 
-**c. Kredensial integrasi.** Disimpan di tabel `integration_credentials`, kolom `config_ciphertext`, dengan cast `encrypted:array` (enkripsi Laravel berbasis `APP_KEY`); kolom itu juga `hidden` pada model. Integrasi yang dibaca dari tabel ini: Midtrans, DOKU, Digiflazz, Resend, Turnstile, Google OAuth, dan Kokinpay. Panel admin tidak menampilkan nilai kolom bertanda rahasia (nilai dikirim sebagai `null`). (`app/Models/IntegrationCredential.php`, `app/Http/Controllers/AdminIntegrationController.php`)
+**c. Kredensial integrasi.** Disimpan di tabel `integration_credentials`, kolom `config_ciphertext`, dengan cast `encrypted:array` (enkripsi Laravel berbasis `APP_KEY`); kolom itu juga `hidden` pada model. Integrasi yang kredensialnya dikelola lewat tabel ini, sesuai daftar di IntegrationRegistry: Midtrans, DOKU, Digiflazz, Resend, Google OAuth, Telegram, Discord, dan Turnstile. Panel admin tidak menampilkan nilai kolom bertanda rahasia (nilai dikirim sebagai `null`). (`app/Models/IntegrationCredential.php`, `app/Http/Controllers/AdminIntegrationController.php`)
 
 **d. Tautan bertanda tangan wajib kedaluwarsa.** Tautan status/pembayaran dibuat dengan `URL::temporarySignedRoute`. Tautan pesanan memakai `expires_at` pesanan, tautan dari template pesan admin berlaku 20 menit, dan tautan status bertanda tangan memakai `expires_at` bila masih di masa depan, selain itu `now()+30 menit`. Tautan bertanda tangan tanpa expiry tidak boleh dibuat. (`app/Http/Controllers/GuestOrderController.php`, `app/Http/Controllers/PaymentPageController.php`, `app/Http/Controllers/CustomerOrderController.php`, `app/Http/Controllers/AdminMessageTemplatesController.php`)
 
