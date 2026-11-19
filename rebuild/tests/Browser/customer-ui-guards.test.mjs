@@ -713,11 +713,11 @@ const lbState = entries => {
     const props = { entries };
     const podium = { value: new Function('props', 'return ' + lbComputed('podium'))(props) };
     const rest = { value: new Function('props', 'return ' + lbComputed('rest'))(props) };
-    const podiumClass = new Function('podium', 'return ' + lbComputed('podiumClass'))(podium);
-    return { podium: podium.value, rest: rest.value, podiumClass, entries };
+    return { podium: podium.value, rest: rest.value, entries };
 };
+const lbCss = () => readFileSync(new URL('../../resources/css/app.css', import.meta.url), 'utf8');
 const lbCssRule = selector => {
-    const css = readFileSync(new URL('../../resources/css/app.css', import.meta.url), 'utf8');
+    const css = lbCss();
     const prefix = selector + ':where(:not(.lfx, .lfx *)){';
     const lines = css.split('\n').filter(line => line.startsWith(prefix));
     assert.equal(lines.length, 1, 'aturan dasar ' + selector + ' harus tepat satu');
@@ -730,7 +730,7 @@ const lbCssRule = selector => {
 
 test('PR406 podium: empty state hides the podium and keeps the empty block for 0 entries', () => {
     const template = leaderboardTemplate();
-    assert.match(template, /<ol v-if="podium\.length" class="lf-podium" :class="podiumClass">/);
+    assert.match(template, /<ol v-if="podium\.length" class="lf-podium">/);
     assert.equal((template.match(/class="lf-podium"/g) || []).length, 1);
     const rankingIf = template.match(/<div v-if="([^"]+)" class="lf-ranking">/);
     assert.ok(rankingIf, 'blok .lf-ranking dengan v-if tidak ditemukan');
@@ -764,12 +764,16 @@ test('PR406 podium: podium takes only rank <= 3 and rest only rank > 3, as separ
     assert.doesNotMatch(template, /v-for="e in entries"/);
 });
 
-test('PR406 podium: podiumClass is is-count-1 / is-count-2 / none for 1 / 2 / 3 entries', () => {
-    assert.equal(lbState(lbEntries(1)).podiumClass, 'is-count-1');
-    assert.equal(lbState(lbEntries(2)).podiumClass, 'is-count-2');
-    assert.equal(lbState(lbEntries(3)).podiumClass, null);
-    // Entri peringkat 4+ tidak memengaruhi kelas jumlah podium.
-    assert.equal(lbState(lbEntries(20)).podiumClass, null);
+test('PR406 podium: no count-based modifier (spec: fixed 3-slot podium, owner decision 19 Nov 2026)', () => {
+    // Pengubah kolom per jumlah entri (is-count-*) sengaja ditolak: kerangka podium selalu 3 slot.
+    assert.doesNotMatch(lbCss(), /is-count-/);
+    const source = leaderboardSource();
+    assert.doesNotMatch(source, /podiumClass/);
+    assert.doesNotMatch(source, /is-count-/);
+    // Elemen podium hanya memakai kelas statis, tanpa binding :class.
+    const podiumTag = leaderboardTemplate().match(/<ol\b[^>]*\bclass="lf-podium"[^>]*>/);
+    assert.ok(podiumTag, 'elemen <ol class="lf-podium"> tidak ditemukan');
+    assert.doesNotMatch(podiumTag[0], /:class=|v-bind:class=/);
 });
 
 test('PR406 podium: v-for keeps data order (rank ascending) with one is-rank-<rank> class per entry', () => {
@@ -784,45 +788,36 @@ test('PR406 podium: v-for keeps data order (rank ascending) with one is-rank-<ra
     }
 });
 
-test('PR406 podium: CSS places ranks 2-1-3 for 3 entries and centres 1 or 2 entries', () => {
+test('PR406 podium: fixed 3-column grid; 1 entry = centre only, 2 entries = left + centre with right empty, 3 entries = 2-1-3', () => {
     const base = lbCssRule('.lf-podium');
     assert.equal(base['grid-template-columns'], 'repeat(3,minmax(0,1fr))');
     assert.equal(lbCssRule('.lf-podium-col.is-rank-1')['grid-column'], '2');
     assert.equal(lbCssRule('.lf-podium-col.is-rank-2')['grid-column'], '1');
     assert.equal(lbCssRule('.lf-podium-col.is-rank-3')['grid-column'], '3');
-    const one = lbCssRule('.lf-podium.is-count-1');
-    assert.equal(one['grid-template-columns'], 'minmax(0,240px)');
-    assert.equal(one['justify-content'], 'center');
-    assert.equal(lbCssRule('.lf-podium.is-count-1 .lf-podium-col.is-rank-1')['grid-column'], '1');
-    const two = lbCssRule('.lf-podium.is-count-2');
-    assert.equal(two['grid-template-columns'], 'repeat(2,minmax(0,240px))');
-    assert.equal(two['justify-content'], 'center');
 
-    // Simulasi penempatan: setiap peringkat harus mendapat kolom unik di dalam grid.
-    const columnCount = tpl => {
-        const repeat = tpl.match(/^repeat\((\d+),/);
-        return repeat ? Number(repeat[1]) : tpl.split(/\s+(?![^(]*\))/).length;
-    };
+    // Simulasi penempatan dari state nyata: peringkat yang ter-render (hasil computed podium)
+    // diletakkan di kolom CSS-nya; grid selalu 3 kolom, slot tanpa entri tetap kosong.
+    const cols = Number(base['grid-template-columns'].match(/^repeat\((\d+),/)[1]);
     const placement = n => {
-        const cls = lbState(lbEntries(n)).podiumClass;
-        const grid = cls ? lbCssRule('.lf-podium.' + cls) : base;
-        const cols = columnCount(grid['grid-template-columns']);
-        const visual = [];
-        for (let rank = 1; rank <= n; rank++) {
-            let col = Number(lbCssRule('.lf-podium-col.is-rank-' + rank)['grid-column']);
-            if (cls === 'is-count-1' && rank === 1) col = Number(lbCssRule('.lf-podium.is-count-1 .lf-podium-col.is-rank-1')['grid-column']);
+        const rendered = lbState(lbEntries(n)).podium.map(e => e.rank);
+        const visual = Array(cols).fill(null);
+        for (const rank of rendered) {
+            const col = Number(lbCssRule('.lf-podium-col.is-rank-' + rank)['grid-column']);
             assert.ok(col >= 1 && col <= cols, 'peringkat ' + rank + ' keluar dari grid ' + cols + ' kolom (kolom ' + col + ')');
-            assert.equal(visual[col - 1], undefined, 'dua peringkat berbagi kolom ' + col);
+            assert.equal(visual[col - 1], null, 'dua peringkat berbagi kolom ' + col);
             visual[col - 1] = rank;
         }
-        return { cols, visual };
+        return { cols, rendered, visual };
     };
-    assert.deepEqual(placement(1), { cols: 1, visual: [1] });
-    assert.deepEqual(placement(2), { cols: 2, visual: [2, 1] });
-    assert.deepEqual(placement(3), { cols: 3, visual: [2, 1, 3] });
+    // 1 entri: hanya rank 1, di kolom tengah.
+    assert.deepEqual(placement(1), { cols: 3, rendered: [1], visual: [null, 1, null] });
+    // 2 entri: rank 2 kiri, rank 1 tengah, kolom kanan kosong, tidak ada elemen rank 3.
+    assert.deepEqual(placement(2), { cols: 3, rendered: [1, 2], visual: [2, 1, null] });
+    // 3 entri: visual 2-1-3.
+    assert.deepEqual(placement(3), { cols: 3, rendered: [1, 2, 3], visual: [2, 1, 3] });
 
     // Media query hanya mengubah ukuran, bukan kolom atau penempatan.
-    const css = readFileSync(new URL('../../resources/css/app.css', import.meta.url), 'utf8');
+    const css = lbCss();
     const media = css.split('\n').find(line => line.startsWith('@media(min-width:768px){.lf-podium:'));
     assert.ok(media, 'media query podium tidak ditemukan');
     assert.doesNotMatch(media, /grid-template-columns|grid-column/);

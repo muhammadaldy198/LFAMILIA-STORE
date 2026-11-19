@@ -14,8 +14,6 @@ const money = v => 'Rp' + Number(v || 0).toLocaleString('id-ID');
 // Podium hanya memakai entry asli rank 1-3; tidak ada entry pengisi.
 // Urutan DOM tetap 1-2-3 (pembaca layar), urutan visual 2-1-3 diatur CSS.
 const podium = computed(() => (props.entries || []).filter(e => e.rank <= 3));
-// Kolom grid mengikuti jumlah entri podium; 3 entri tanpa kelas pengubah.
-const podiumClass = computed(() => (podium.value.length < 3 ? 'is-count-' + podium.value.length : null));
 const rest = computed(() => (props.entries || []).filter(e => e.rank > 3));
 const initial = name => String(name || '?').charAt(0).toUpperCase();
 </script>
@@ -32,7 +30,7 @@ const initial = name => String(name || '?').charAt(0).toUpperCase();
                 <Link href="/leaderboard?period=all" :class="{ active: period === 'all' }">{{ customerText("pages.content.leaderboard.c8930ae0", "Sepanjang waktu") }}</Link>
             </div>
 
-            <ol v-if="podium.length" class="lf-podium" :class="podiumClass">
+            <ol v-if="podium.length" class="lf-podium">
                 <li v-for="e in podium" :key="e.rank" :class="['lf-podium-col', 'is-rank-' + e.rank]">
                     <div class="lf-podium-avatar">
                         <svg v-if="e.rank === 1" class="lf-podium-crown" viewBox="0 0 24 16" aria-hidden="true"><path d="M2 14 0 3l6.5 4.5L12 0l5.5 7.5L24 3l-2 11z" /></svg>

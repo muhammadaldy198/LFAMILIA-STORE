@@ -315,10 +315,6 @@ body:where(:not(.lfx, .lfx *)){margin:0;font-family:Inter,ui-sans-serif,system-u
 .lf-ranking article>span:where(:not(.lfx, .lfx *)){color:var(--lf-lime-2);font-size:11px;font-weight:850}
 /* leaderboard podium: aksen medali hanya di podium, sisanya token lf- */
 .lf-podium:where(:not(.lfx, .lfx *)){--lf-medal:var(--lf-color-muted);display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:end;gap:8px;max-width:620px;margin:22px auto 0;padding:0;list-style:none}
-/* podium 1-2 entri: hanya kolom terisi yang memesan ruang, terpusat; 3 entri memakai aturan dasar di atas */
-.lf-podium.is-count-1:where(:not(.lfx, .lfx *)){grid-template-columns:minmax(0,240px);justify-content:center}
-.lf-podium.is-count-2:where(:not(.lfx, .lfx *)){grid-template-columns:repeat(2,minmax(0,240px));justify-content:center}
-.lf-podium.is-count-1 .lf-podium-col.is-rank-1:where(:not(.lfx, .lfx *)){grid-column:1}
 .lf-podium-col:where(:not(.lfx, .lfx *)){min-width:0;display:flex;flex-direction:column;align-items:center;text-align:center}
 .lf-podium-col.is-rank-1:where(:not(.lfx, .lfx *)){--lf-medal:#f2c94c;--lf-step-h:128px;grid-column:2;grid-row:1}
 .lf-podium-col.is-rank-2:where(:not(.lfx, .lfx *)){--lf-medal:#c9d3e1;--lf-step-h:92px;grid-column:1;grid-row:1}
