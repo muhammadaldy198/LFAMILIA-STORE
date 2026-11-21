@@ -1,1 +1,1 @@
-Bukti screenshot PR #417 (artifact CI run 44902222210 = sebelum, 44902693746 = sesudah). Branch ini hanya untuk gambar; boleh dihapus setelah PR selesai.
+Bukti screenshot PR #417. before = run 44902222210 (sebelum perbaikan), after = run 44902693746 (versi 44px, sudah dikoreksi pemilik), after-40px = run 44904094754 (versi final 40px). Branch ini hanya untuk gambar; boleh dihapus setelah PR selesai.

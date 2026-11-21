@@ -1,0 +1,1010 @@
+[
+  {
+    "product": "mobile-legends",
+    "slug": "browser-checkout-game",
+    "viewport": "desktop",
+    "width": 1440,
+    "height": 900,
+    "errors": [],
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "panels": [
+      {
+        "id": "lfx-account",
+        "number": "1",
+        "title": "Data Akun"
+      },
+      {
+        "id": "lfx-nominal",
+        "number": "2",
+        "title": "Pilih Nominal"
+      },
+      {
+        "id": "lfx-payment",
+        "number": "3",
+        "title": "Pilih Pembayaran"
+      },
+      {
+        "id": "lfx-voucher",
+        "number": "4",
+        "title": "Voucher Diskon"
+      },
+      {
+        "id": "lfx-contact",
+        "number": "5",
+        "title": "Detail Kontak"
+      }
+    ],
+    "account": {
+      "columns": "653.688px 653.688px",
+      "single": false,
+      "fields": [
+        {
+          "control": "input:text",
+          "labelX": 59.31,
+          "labelY": 740.33,
+          "labelWidth": 653.69,
+          "controlWidth": 653.69,
+          "controlHeight": 40,
+          "fontSize": "16px",
+          "paddingInline": "12px 13px"
+        },
+        {
+          "control": "input:text",
+          "labelX": 727,
+          "labelY": 740.33,
+          "labelWidth": 653.69,
+          "controlWidth": 653.69,
+          "controlHeight": 40,
+          "fontSize": "16px",
+          "paddingInline": "12px 13px"
+        }
+      ]
+    },
+    "contact": {
+      "columns": "653.688px 653.688px",
+      "single": false,
+      "fields": [
+        {
+          "control": "input:tel",
+          "labelX": 59.31,
+          "labelY": 1935.58,
+          "labelWidth": 653.69,
+          "controlWidth": 557.38,
+          "controlHeight": 40,
+          "fontSize": "16px",
+          "paddingInline": "12px 13px"
+        },
+        {
+          "control": "input:email",
+          "labelX": 727,
+          "labelY": 1935.58,
+          "labelWidth": 653.69,
+          "controlWidth": 653.69,
+          "controlHeight": 40,
+          "fontSize": "16px",
+          "paddingInline": "12px 13px"
+        }
+      ]
+    }
+  },
+  {
+    "product": "mobile-legends",
+    "slug": "browser-checkout-game",
+    "viewport": "mobile",
+    "width": 390,
+    "height": 844,
+    "errors": [],
+    "scrollWidth": 390,
+    "innerWidth": 390,
+    "panels": [
+      {
+        "id": "lfx-account",
+        "number": "1",
+        "title": "Data Akun"
+      },
+      {
+        "id": "lfx-nominal",
+        "number": "2",
+        "title": "Pilih Nominal"
+      },
+      {
+        "id": "lfx-payment",
+        "number": "3",
+        "title": "Pilih Pembayaran"
+      },
+      {
+        "id": "lfx-voucher",
+        "number": "4",
+        "title": "Voucher Diskon"
+      },
+      {
+        "id": "lfx-contact",
+        "number": "5",
+        "title": "Detail Kontak"
+      }
+    ],
+    "account": {
+      "columns": "163.5px 163.5px",
+      "single": false,
+      "fields": [
+        {
+          "control": "input:text",
+          "labelX": 27,
+          "labelY": 524.28,
+          "labelWidth": 163.5,
+          "controlWidth": 163.5,
+          "controlHeight": 40,
+          "fontSize": "16px",
+          "paddingInline": "12px 13px"
+        },
+        {
+          "control": "input:text",
+          "labelX": 199.5,
+          "labelY": 524.28,
+          "labelWidth": 163.5,
+          "controlWidth": 163.5,
+          "controlHeight": 40,
+          "fontSize": "16px",
+          "paddingInline": "12px 13px"
+        }
+      ]
+    },
+    "contact": {
+      "columns": "336px",
+      "single": false,
+      "fields": [
+        {
+          "control": "input:tel",
+          "labelX": 27,
+          "labelY": 1489.84,
+          "labelWidth": 336,
+          "controlWidth": 231.23,
+          "controlHeight": 36,
+          "fontSize": "16px",
+          "paddingInline": "12px 13px"
+        },
+        {
+          "control": "input:email",
+          "labelX": 27,
+          "labelY": 1559.23,
+          "labelWidth": 336,
+          "controlWidth": 336,
+          "controlHeight": 36,
+          "fontSize": "16px",
+          "paddingInline": "12px 13px"
+        }
+      ]
+    }
+  },
+  {
+    "product": "mobile-legends",
+    "slug": "browser-checkout-game",
+    "viewport": "mobile-360",
+    "width": 360,
+    "height": 780,
+    "errors": [],
+    "scrollWidth": 360,
+    "innerWidth": 360,
+    "panels": [
+      {
+        "id": "lfx-account",
+        "number": "1",
+        "title": "Data Akun"
+      },
+      {
+        "id": "lfx-nominal",
+        "number": "2",
+        "title": "Pilih Nominal"
+      },
+      {
+        "id": "lfx-payment",
+        "number": "3",
+        "title": "Pilih Pembayaran"
+      },
+      {
+        "id": "lfx-voucher",
+        "number": "4",
+        "title": "Voucher Diskon"
+      },
+      {
+        "id": "lfx-contact",
+        "number": "5",
+        "title": "Detail Kontak"
+      }
+    ],
+    "account": {
+      "columns": "148.5px 148.5px",
+      "single": false,
+      "fields": [
+        {
+          "control": "input:text",
+          "labelX": 27,
+          "labelY": 543.09,
+          "labelWidth": 148.5,
+          "controlWidth": 148.5,
+          "controlHeight": 40,
+          "fontSize": "16px",
+          "paddingInline": "12px 13px"
+        },
+        {
+          "control": "input:text",
+          "labelX": 184.5,
+          "labelY": 543.09,
+          "labelWidth": 148.5,
+          "controlWidth": 148.5,
+          "controlHeight": 40,
+          "fontSize": "16px",
+          "paddingInline": "12px 13px"
+        }
+      ]
+    },
+    "contact": {
+      "columns": "306px",
+      "single": false,
+      "fields": [
+        {
+          "control": "input:tel",
+          "labelX": 27,
+          "labelY": 1524.66,
+          "labelWidth": 306,
+          "controlWidth": 201.23,
+          "controlHeight": 36,
+          "fontSize": "16px",
+          "paddingInline": "12px 13px"
+        },
+        {
+          "control": "input:email",
+          "labelX": 27,
+          "labelY": 1594.05,
+          "labelWidth": 306,
+          "controlWidth": 306,
+          "controlHeight": 36,
+          "fontSize": "16px",
+          "paddingInline": "12px 13px"
+        }
+      ]
+    }
+  },
+  {
+    "product": "genshin-impact",
+    "slug": "browser-steps-two-fields",
+    "viewport": "desktop",
+    "width": 1440,
+    "height": 900,
+    "errors": [],
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "panels": [
+      {
+        "id": "lfx-account",
+        "number": "1",
+        "title": "Data Akun"
+      },
+      {
+        "id": "lfx-nominal",
+        "number": "2",
+        "title": "Pilih Nominal"
+      },
+      {
+        "id": "lfx-payment",
+        "number": "3",
+        "title": "Pilih Pembayaran"
+      },
+      {
+        "id": "lfx-voucher",
+        "number": "4",
+        "title": "Voucher Diskon"
+      },
+      {
+        "id": "lfx-contact",
+        "number": "5",
+        "title": "Detail Kontak"
+      }
+    ],
+    "account": {
+      "columns": "653.688px 653.688px",
+      "single": false,
+      "fields": [
+        {
+          "control": "input:text",
+          "labelX": 59.31,
+          "labelY": 740.33,
+          "labelWidth": 653.69,
+          "controlWidth": 653.69,
+          "controlHeight": 40,
+          "fontSize": "16px",
+          "paddingInline": "12px 13px"
+        },
+        {
+          "control": "select:select-one",
+          "labelX": 727,
+          "labelY": 740.33,
+          "labelWidth": 653.69,
+          "controlWidth": 653.69,
+          "controlHeight": 40,
+          "fontSize": "16px",
+          "paddingInline": "12px 12px"
+        }
+      ]
+    },
+    "contact": {
+      "columns": "653.688px 653.688px",
+      "single": false,
+      "fields": [
+        {
+          "control": "input:tel",
+          "labelX": 59.31,
+          "labelY": 1935.58,
+          "labelWidth": 653.69,
+          "controlWidth": 557.38,
+          "controlHeight": 40,
+          "fontSize": "16px",
+          "paddingInline": "12px 13px"
+        },
+        {
+          "control": "input:email",
+          "labelX": 727,
+          "labelY": 1935.58,
+          "labelWidth": 653.69,
+          "controlWidth": 653.69,
+          "controlHeight": 40,
+          "fontSize": "16px",
+          "paddingInline": "12px 13px"
+        }
+      ]
+    }
+  },
+  {
+    "product": "genshin-impact",
+    "slug": "browser-steps-two-fields",
+    "viewport": "mobile",
+    "width": 390,
+    "height": 844,
+    "errors": [],
+    "scrollWidth": 390,
+    "innerWidth": 390,
+    "panels": [
+      {
+        "id": "lfx-account",
+        "number": "1",
+        "title": "Data Akun"
+      },
+      {
+        "id": "lfx-nominal",
+        "number": "2",
+        "title": "Pilih Nominal"
+      },
+      {
+        "id": "lfx-payment",
+        "number": "3",
+        "title": "Pilih Pembayaran"
+      },
+      {
+        "id": "lfx-voucher",
+        "number": "4",
+        "title": "Voucher Diskon"
+      },
+      {
+        "id": "lfx-contact",
+        "number": "5",
+        "title": "Detail Kontak"
+      }
+    ],
+    "account": {
+      "columns": "163.5px 163.5px",
+      "single": false,
+      "fields": [
+        {
+          "control": "input:text",
+          "labelX": 27,
+          "labelY": 524.28,
+          "labelWidth": 163.5,
+          "controlWidth": 163.5,
+          "controlHeight": 40,
+          "fontSize": "16px",
+          "paddingInline": "12px 13px"
+        },
+        {
+          "control": "select:select-one",
+          "labelX": 199.5,
+          "labelY": 524.28,
+          "labelWidth": 163.5,
+          "controlWidth": 163.5,
+          "controlHeight": 40,
+          "fontSize": "16px",
+          "paddingInline": "12px 12px"
+        }
+      ]
+    },
+    "contact": {
+      "columns": "336px",
+      "single": false,
+      "fields": [
+        {
+          "control": "input:tel",
+          "labelX": 27,
+          "labelY": 1489.84,
+          "labelWidth": 336,
+          "controlWidth": 231.23,
+          "controlHeight": 36,
+          "fontSize": "16px",
+          "paddingInline": "12px 13px"
+        },
+        {
+          "control": "input:email",
+          "labelX": 27,
+          "labelY": 1559.23,
+          "labelWidth": 336,
+          "controlWidth": 336,
+          "controlHeight": 36,
+          "fontSize": "16px",
+          "paddingInline": "12px 13px"
+        }
+      ]
+    }
+  },
+  {
+    "product": "genshin-impact",
+    "slug": "browser-steps-two-fields",
+    "viewport": "mobile-360",
+    "width": 360,
+    "height": 780,
+    "errors": [],
+    "scrollWidth": 360,
+    "innerWidth": 360,
+    "panels": [
+      {
+        "id": "lfx-account",
+        "number": "1",
+        "title": "Data Akun"
+      },
+      {
+        "id": "lfx-nominal",
+        "number": "2",
+        "title": "Pilih Nominal"
+      },
+      {
+        "id": "lfx-payment",
+        "number": "3",
+        "title": "Pilih Pembayaran"
+      },
+      {
+        "id": "lfx-voucher",
+        "number": "4",
+        "title": "Voucher Diskon"
+      },
+      {
+        "id": "lfx-contact",
+        "number": "5",
+        "title": "Detail Kontak"
+      }
+    ],
+    "account": {
+      "columns": "148.5px 148.5px",
+      "single": false,
+      "fields": [
+        {
+          "control": "input:text",
+          "labelX": 27,
+          "labelY": 513.09,
+          "labelWidth": 148.5,
+          "controlWidth": 148.5,
+          "controlHeight": 40,
+          "fontSize": "16px",
+          "paddingInline": "12px 13px"
+        },
+        {
+          "control": "select:select-one",
+          "labelX": 184.5,
+          "labelY": 513.09,
+          "labelWidth": 148.5,
+          "controlWidth": 148.5,
+          "controlHeight": 40,
+          "fontSize": "16px",
+          "paddingInline": "12px 12px"
+        }
+      ]
+    },
+    "contact": {
+      "columns": "306px",
+      "single": false,
+      "fields": [
+        {
+          "control": "input:tel",
+          "labelX": 27,
+          "labelY": 1494.66,
+          "labelWidth": 306,
+          "controlWidth": 201.23,
+          "controlHeight": 36,
+          "fontSize": "16px",
+          "paddingInline": "12px 13px"
+        },
+        {
+          "control": "input:email",
+          "labelX": 27,
+          "labelY": 1564.05,
+          "labelWidth": 306,
+          "controlWidth": 306,
+          "controlHeight": 36,
+          "fontSize": "16px",
+          "paddingInline": "12px 13px"
+        }
+      ]
+    }
+  },
+  {
+    "product": "google-play",
+    "slug": "browser-steps-voucher",
+    "viewport": "desktop",
+    "width": 1440,
+    "height": 900,
+    "errors": [],
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "panels": [
+      {
+        "id": "lfx-nominal",
+        "number": "1",
+        "title": "Pilih Nominal"
+      },
+      {
+        "id": "lfx-payment",
+        "number": "2",
+        "title": "Pilih Pembayaran"
+      },
+      {
+        "id": "lfx-voucher",
+        "number": "3",
+        "title": "Voucher Diskon"
+      },
+      {
+        "id": "lfx-contact",
+        "number": "4",
+        "title": "Detail Kontak"
+      }
+    ],
+    "account": null,
+    "contact": {
+      "columns": "653.688px 653.688px",
+      "single": false,
+      "fields": [
+        {
+          "control": "input:tel",
+          "labelX": 59.31,
+          "labelY": 1715.28,
+          "labelWidth": 653.69,
+          "controlWidth": 557.38,
+          "controlHeight": 40,
+          "fontSize": "16px",
+          "paddingInline": "12px 13px"
+        },
+        {
+          "control": "input:email",
+          "labelX": 727,
+          "labelY": 1715.28,
+          "labelWidth": 653.69,
+          "controlWidth": 653.69,
+          "controlHeight": 40,
+          "fontSize": "16px",
+          "paddingInline": "12px 13px"
+        }
+      ]
+    }
+  },
+  {
+    "product": "google-play",
+    "slug": "browser-steps-voucher",
+    "viewport": "mobile",
+    "width": 390,
+    "height": 844,
+    "errors": [],
+    "scrollWidth": 390,
+    "innerWidth": 390,
+    "panels": [
+      {
+        "id": "lfx-nominal",
+        "number": "1",
+        "title": "Pilih Nominal"
+      },
+      {
+        "id": "lfx-payment",
+        "number": "2",
+        "title": "Pilih Pembayaran"
+      },
+      {
+        "id": "lfx-voucher",
+        "number": "3",
+        "title": "Voucher Diskon"
+      },
+      {
+        "id": "lfx-contact",
+        "number": "4",
+        "title": "Detail Kontak"
+      }
+    ],
+    "account": null,
+    "contact": {
+      "columns": "336px",
+      "single": false,
+      "fields": [
+        {
+          "control": "input:tel",
+          "labelX": 27,
+          "labelY": 1312.86,
+          "labelWidth": 336,
+          "controlWidth": 231.23,
+          "controlHeight": 36,
+          "fontSize": "16px",
+          "paddingInline": "12px 13px"
+        },
+        {
+          "control": "input:email",
+          "labelX": 27,
+          "labelY": 1382.25,
+          "labelWidth": 336,
+          "controlWidth": 336,
+          "controlHeight": 36,
+          "fontSize": "16px",
+          "paddingInline": "12px 13px"
+        }
+      ]
+    }
+  },
+  {
+    "product": "google-play",
+    "slug": "browser-steps-voucher",
+    "viewport": "mobile-360",
+    "width": 360,
+    "height": 780,
+    "errors": [],
+    "scrollWidth": 360,
+    "innerWidth": 360,
+    "panels": [
+      {
+        "id": "lfx-nominal",
+        "number": "1",
+        "title": "Pilih Nominal"
+      },
+      {
+        "id": "lfx-payment",
+        "number": "2",
+        "title": "Pilih Pembayaran"
+      },
+      {
+        "id": "lfx-voucher",
+        "number": "3",
+        "title": "Voucher Diskon"
+      },
+      {
+        "id": "lfx-contact",
+        "number": "4",
+        "title": "Detail Kontak"
+      }
+    ],
+    "account": null,
+    "contact": {
+      "columns": "306px",
+      "single": false,
+      "fields": [
+        {
+          "control": "input:tel",
+          "labelX": 27,
+          "labelY": 1331.67,
+          "labelWidth": 306,
+          "controlWidth": 201.23,
+          "controlHeight": 36,
+          "fontSize": "16px",
+          "paddingInline": "12px 13px"
+        },
+        {
+          "control": "input:email",
+          "labelX": 27,
+          "labelY": 1401.06,
+          "labelWidth": 306,
+          "controlWidth": 306,
+          "controlHeight": 36,
+          "fontSize": "16px",
+          "paddingInline": "12px 13px"
+        }
+      ]
+    }
+  },
+  {
+    "product": "three-fields",
+    "slug": "browser-genshin-field-types",
+    "viewport": "desktop",
+    "width": 1440,
+    "height": 900,
+    "errors": [],
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "panels": [
+      {
+        "id": "lfx-account",
+        "number": "1",
+        "title": "Data Akun"
+      },
+      {
+        "id": "lfx-nominal",
+        "number": "2",
+        "title": "Pilih Nominal"
+      },
+      {
+        "id": "lfx-payment",
+        "number": "3",
+        "title": "Pilih Pembayaran"
+      },
+      {
+        "id": "lfx-voucher",
+        "number": "4",
+        "title": "Voucher Diskon"
+      },
+      {
+        "id": "lfx-contact",
+        "number": "5",
+        "title": "Detail Kontak"
+      }
+    ],
+    "account": {
+      "columns": "653.688px 653.688px",
+      "single": false,
+      "fields": [
+        {
+          "control": "input:text",
+          "labelX": 59.31,
+          "labelY": 740.33,
+          "labelWidth": 653.69,
+          "controlWidth": 653.69,
+          "controlHeight": 40,
+          "fontSize": "16px",
+          "paddingInline": "12px 13px"
+        },
+        {
+          "control": "select:select-one",
+          "labelX": 727,
+          "labelY": 740.33,
+          "labelWidth": 653.69,
+          "controlWidth": 653.69,
+          "controlHeight": 40,
+          "fontSize": "16px",
+          "paddingInline": "12px 12px"
+        },
+        {
+          "control": "input:password",
+          "labelX": 59.31,
+          "labelY": 821.52,
+          "labelWidth": 653.69,
+          "controlWidth": 653.69,
+          "controlHeight": 40,
+          "fontSize": "16px",
+          "paddingInline": "12px 102px"
+        }
+      ]
+    },
+    "contact": {
+      "columns": "653.688px 653.688px",
+      "single": false,
+      "fields": [
+        {
+          "control": "input:tel",
+          "labelX": 59.31,
+          "labelY": 2016.77,
+          "labelWidth": 653.69,
+          "controlWidth": 557.38,
+          "controlHeight": 40,
+          "fontSize": "16px",
+          "paddingInline": "12px 13px"
+        },
+        {
+          "control": "input:email",
+          "labelX": 727,
+          "labelY": 2016.77,
+          "labelWidth": 653.69,
+          "controlWidth": 653.69,
+          "controlHeight": 40,
+          "fontSize": "16px",
+          "paddingInline": "12px 13px"
+        }
+      ]
+    }
+  },
+  {
+    "product": "three-fields",
+    "slug": "browser-genshin-field-types",
+    "viewport": "mobile",
+    "width": 390,
+    "height": 844,
+    "errors": [],
+    "scrollWidth": 390,
+    "innerWidth": 390,
+    "panels": [
+      {
+        "id": "lfx-account",
+        "number": "1",
+        "title": "Data Akun"
+      },
+      {
+        "id": "lfx-nominal",
+        "number": "2",
+        "title": "Pilih Nominal"
+      },
+      {
+        "id": "lfx-payment",
+        "number": "3",
+        "title": "Pilih Pembayaran"
+      },
+      {
+        "id": "lfx-voucher",
+        "number": "4",
+        "title": "Voucher Diskon"
+      },
+      {
+        "id": "lfx-contact",
+        "number": "5",
+        "title": "Detail Kontak"
+      }
+    ],
+    "account": {
+      "columns": "163.5px 163.5px",
+      "single": false,
+      "fields": [
+        {
+          "control": "input:text",
+          "labelX": 27,
+          "labelY": 524.28,
+          "labelWidth": 163.5,
+          "controlWidth": 163.5,
+          "controlHeight": 40,
+          "fontSize": "16px",
+          "paddingInline": "12px 13px"
+        },
+        {
+          "control": "select:select-one",
+          "labelX": 199.5,
+          "labelY": 524.28,
+          "labelWidth": 163.5,
+          "controlWidth": 163.5,
+          "controlHeight": 40,
+          "fontSize": "16px",
+          "paddingInline": "12px 12px"
+        },
+        {
+          "control": "input:password",
+          "labelX": 27,
+          "labelY": 597.67,
+          "labelWidth": 163.5,
+          "controlWidth": 163.5,
+          "controlHeight": 40,
+          "fontSize": "16px",
+          "paddingInline": "12px 102px"
+        }
+      ]
+    },
+    "contact": {
+      "columns": "336px",
+      "single": false,
+      "fields": [
+        {
+          "control": "input:tel",
+          "labelX": 27,
+          "labelY": 1563.23,
+          "labelWidth": 336,
+          "controlWidth": 231.23,
+          "controlHeight": 36,
+          "fontSize": "16px",
+          "paddingInline": "12px 13px"
+        },
+        {
+          "control": "input:email",
+          "labelX": 27,
+          "labelY": 1632.63,
+          "labelWidth": 336,
+          "controlWidth": 336,
+          "controlHeight": 36,
+          "fontSize": "16px",
+          "paddingInline": "12px 13px"
+        }
+      ]
+    }
+  },
+  {
+    "product": "three-fields",
+    "slug": "browser-genshin-field-types",
+    "viewport": "mobile-360",
+    "width": 360,
+    "height": 780,
+    "errors": [],
+    "scrollWidth": 360,
+    "innerWidth": 360,
+    "panels": [
+      {
+        "id": "lfx-account",
+        "number": "1",
+        "title": "Data Akun"
+      },
+      {
+        "id": "lfx-nominal",
+        "number": "2",
+        "title": "Pilih Nominal"
+      },
+      {
+        "id": "lfx-payment",
+        "number": "3",
+        "title": "Pilih Pembayaran"
+      },
+      {
+        "id": "lfx-voucher",
+        "number": "4",
+        "title": "Voucher Diskon"
+      },
+      {
+        "id": "lfx-contact",
+        "number": "5",
+        "title": "Detail Kontak"
+      }
+    ],
+    "account": {
+      "columns": "148.5px 148.5px",
+      "single": false,
+      "fields": [
+        {
+          "control": "input:text",
+          "labelX": 27,
+          "labelY": 513.09,
+          "labelWidth": 148.5,
+          "controlWidth": 148.5,
+          "controlHeight": 40,
+          "fontSize": "16px",
+          "paddingInline": "12px 13px"
+        },
+        {
+          "control": "select:select-one",
+          "labelX": 184.5,
+          "labelY": 513.09,
+          "labelWidth": 148.5,
+          "controlWidth": 148.5,
+          "controlHeight": 40,
+          "fontSize": "16px",
+          "paddingInline": "12px 12px"
+        },
+        {
+          "control": "input:password",
+          "labelX": 27,
+          "labelY": 586.48,
+          "labelWidth": 148.5,
+          "controlWidth": 148.5,
+          "controlHeight": 40,
+          "fontSize": "16px",
+          "paddingInline": "12px 102px"
+        }
+      ]
+    },
+    "contact": {
+      "columns": "306px",
+      "single": false,
+      "fields": [
+        {
+          "control": "input:tel",
+          "labelX": 27,
+          "labelY": 1568.05,
+          "labelWidth": 306,
+          "controlWidth": 201.23,
+          "controlHeight": 36,
+          "fontSize": "16px",
+          "paddingInline": "12px 13px"
+        },
+        {
+          "control": "input:email",
+          "labelX": 27,
+          "labelY": 1637.44,
+          "labelWidth": 306,
+          "controlWidth": 306,
+          "controlHeight": 36,
+          "fontSize": "16px",
+          "paddingInline": "12px 13px"
+        }
+      ]
+    }
+  }
+]
