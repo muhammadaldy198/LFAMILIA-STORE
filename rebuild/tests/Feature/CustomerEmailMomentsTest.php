@@ -362,7 +362,7 @@ class CustomerEmailMomentsTest extends TestCase
             'currency' => 'IDR',
             'customer_input' => json_encode(['user_id' => '123456', 'zone_id' => '7890'], JSON_THROW_ON_ERROR),
             'snapshot' => json_encode([
-                'product' => ['id' => $catalog['product']->id, 'name' => $catalog['product']->name, 'category_id' => $catalog['product']->category_id, 'fulfillment_mode' => 'AUTO_PROVIDER'],
+                'product' => ['id' => $catalog['product']->id, 'name' => $catalog['product']->name, 'category_id' => $catalog['product']->category_id, 'category_slug' => $catalog['product']->category->slug, 'fulfillment_mode' => 'AUTO_PROVIDER'],
                 'package' => ['id' => $catalog['package_id'], 'name' => '100 Diamonds'],
                 'provider' => ['mapping_id' => $catalog['mapping_id'], 'code' => 'DIGIFLAZZ', 'sku' => 'EML-SKU', 'cost_idr' => 10000, 'max_price_idr' => 12000],
                 'pricing' => ['cost_idr' => 10000, 'total_idr' => 11000],
@@ -442,7 +442,7 @@ class CustomerEmailMomentsTest extends TestCase
             'currency' => 'IDR',
             'customer_input' => json_encode(['user_id' => '123456', 'zone_id' => '7890'], JSON_THROW_ON_ERROR),
             'snapshot' => json_encode([
-                'product' => ['id' => $catalog['product']->id, 'name' => $catalog['product']->name, 'category_id' => $catalog['product']->category_id, 'fulfillment_mode' => 'AUTO_PROVIDER'],
+                'product' => ['id' => $catalog['product']->id, 'name' => $catalog['product']->name, 'category_id' => $catalog['product']->category_id, 'category_slug' => $catalog['product']->category->slug, 'fulfillment_mode' => 'AUTO_PROVIDER'],
                 'package' => ['id' => $catalog['package_id'], 'name' => '100 Diamonds'],
                 'provider' => ['mapping_id' => $catalog['mapping_id'], 'code' => 'DIGIFLAZZ', 'sku' => 'EML-SKU', 'cost_idr' => 10000, 'max_price_idr' => 12000],
                 'pricing' => ['cost_idr' => 10000, 'total_idr' => 11000],
@@ -519,7 +519,7 @@ class CustomerEmailMomentsTest extends TestCase
             'currency' => 'IDR',
             'customer_input' => json_encode(['user_id' => '123456', 'zone_id' => '7890'], JSON_THROW_ON_ERROR),
             'snapshot' => json_encode([
-                'product' => ['id' => $catalog['product']->id, 'name' => $catalog['product']->name, 'category_id' => $catalog['product']->category_id, 'fulfillment_mode' => 'AUTO_PROVIDER'],
+                'product' => ['id' => $catalog['product']->id, 'name' => $catalog['product']->name, 'category_id' => $catalog['product']->category_id, 'category_slug' => $catalog['product']->category->slug, 'fulfillment_mode' => 'AUTO_PROVIDER'],
                 'package' => ['id' => $catalog['package_id'], 'name' => '100 Diamonds'],
                 'provider' => ['mapping_id' => $catalog['mapping_id'], 'code' => 'DIGIFLAZZ', 'sku' => 'EML-SKU', 'cost_idr' => 10000, 'max_price_idr' => 12000],
                 'pricing' => ['cost_idr' => 10000, 'total_idr' => 11000],
@@ -589,7 +589,7 @@ class CustomerEmailMomentsTest extends TestCase
             'currency' => 'IDR',
             'customer_input' => json_encode(['user_id' => '123456', 'zone_id' => '7890'], JSON_THROW_ON_ERROR),
             'snapshot' => json_encode([
-                'product' => ['id' => $catalog['product']->id, 'name' => $catalog['product']->name, 'category_id' => $catalog['product']->category_id, 'fulfillment_mode' => 'AUTO_PROVIDER'],
+                'product' => ['id' => $catalog['product']->id, 'name' => $catalog['product']->name, 'category_id' => $catalog['product']->category_id, 'category_slug' => $catalog['product']->category->slug, 'fulfillment_mode' => 'AUTO_PROVIDER'],
                 'package' => ['id' => $catalog['package_id'], 'name' => '100 Diamonds'],
                 'provider' => ['mapping_id' => $catalog['mapping_id'], 'code' => 'DIGIFLAZZ', 'sku' => 'EML-SKU', 'cost_idr' => 10000, 'max_price_idr' => 12000],
                 'pricing' => ['cost_idr' => 10000, 'total_idr' => 11000],
@@ -632,6 +632,75 @@ class CustomerEmailMomentsTest extends TestCase
                 && str_contains($job->text, 'belum tersedia dari penyedia')
                 && ! str_contains($job->text, 'Kode voucher:')
                 && ! str_contains($job->text, 'tukarkan sendiri');
+        });
+    }
+
+    public function test_order_completed_email_stays_voucher_when_category_slug_is_renamed(): void
+    {
+        IntegrationCredential::updateOrCreate(['code' => 'digiflazz'], [
+            'config_ciphertext' => [
+                'username' => 'buyer-test',
+                'api_key' => 'api-secret',
+                'webhook_secret' => 'webhook-secret',
+                'base_url' => 'https://digiflazz.test',
+                'testing' => true,
+            ],
+            'is_active' => true,
+        ]);
+        $catalog = $this->catalog('voucher');
+        $orderId = DB::table('orders')->insertGetId([
+            'order_number' => 'ORD-EMAIL-RENAMED-'.bin2hex(random_bytes(4)),
+            'guest_email' => 'moments-renamed@example.test',
+            'guest_phone' => '081234567890',
+            'product_id' => $catalog['product']->id,
+            'product_package_id' => $catalog['package_id'],
+            'provider_mapping_id' => $catalog['mapping_id'],
+            'status' => 'PAID',
+            'currency' => 'IDR',
+            'customer_input' => json_encode(['user_id' => '123456', 'zone_id' => '7890'], JSON_THROW_ON_ERROR),
+            'snapshot' => json_encode([
+                'product' => ['id' => $catalog['product']->id, 'name' => $catalog['product']->name, 'category_id' => $catalog['product']->category_id, 'category_slug' => $catalog['product']->category->slug, 'fulfillment_mode' => 'AUTO_PROVIDER'],
+                'package' => ['id' => $catalog['package_id'], 'name' => '100 Diamonds'],
+                'provider' => ['mapping_id' => $catalog['mapping_id'], 'code' => 'DIGIFLAZZ', 'sku' => 'EML-SKU', 'cost_idr' => 10000, 'max_price_idr' => 12000],
+                'pricing' => ['cost_idr' => 10000, 'total_idr' => 11000],
+                'customer_input' => ['user_id' => '123456', 'zone_id' => '7890'],
+            ], JSON_THROW_ON_ERROR),
+            'cost_idr' => 10000,
+            'margin_idr' => 1000,
+            'discount_idr' => 0,
+            'fee_idr' => 0,
+            'total_idr' => 11000,
+            'idempotency_key' => 'email-moments-renamed-'.bin2hex(random_bytes(6)),
+            'paid_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        // Admin mengganti slug kategori voucher SELAGI order
+        // berjalan — klasifikasi di snapshot tidak boleh ikut
+        // berubah: SN tetap tampil sebagai kode voucher.
+        DB::table('categories')->where('slug', 'voucher')->update(['slug' => 'voucher-diubah']);
+        $this->seedCheckoutDigiflazzCatalog($catalog['package_id']);
+        Http::fake(fn ($request) => Http::response(['data' => [
+            'ref_id' => $request->data()['ref_id'],
+            'customer_no' => $request->data()['customer_no'],
+            'buyer_sku_code' => $request->data()['buyer_sku_code'],
+            'message' => 'Sukses',
+            'status' => 'Sukses',
+            'rc' => '00',
+            'sn' => 'PB-VOUCHER-888',
+            'price' => 10000,
+        ]]));
+
+        $service = app(FulfillmentService::class);
+        $service->startOrder($orderId);
+        $attempt = DB::table('fulfillment_attempts')->where('order_id', $orderId)->first();
+        $service->sendAttempt((int) $attempt->id);
+
+        $this->assertSame('SUCCESS', DB::table('orders')->where('id', $orderId)->value('status'));
+        Queue::assertPushed(SendTransactionalEmailJob::class, function (SendTransactionalEmailJob $job): bool {
+            return $job->recipient === 'moments-renamed@example.test'
+                && str_contains($job->text, 'Kode voucher: PB-VOUCHER-888')
+                && ! str_contains($job->text, 'No. Referensi Pengiriman');
         });
     }
 
@@ -790,7 +859,7 @@ class CustomerEmailMomentsTest extends TestCase
             'currency' => 'IDR',
             'customer_input' => json_encode(['user_id' => '123456', 'zone_id' => '7890'], JSON_THROW_ON_ERROR),
             'snapshot' => json_encode([
-                'product' => ['id' => $catalog['product']->id, 'name' => $catalog['product']->name, 'category_id' => $catalog['product']->category_id, 'fulfillment_mode' => 'AUTO_PROVIDER'],
+                'product' => ['id' => $catalog['product']->id, 'name' => $catalog['product']->name, 'category_id' => $catalog['product']->category_id, 'category_slug' => $catalog['product']->category->slug, 'fulfillment_mode' => 'AUTO_PROVIDER'],
                 'package' => ['id' => $catalog['package_id'], 'name' => '100 Diamonds'],
                 'provider' => ['mapping_id' => $catalog['mapping_id'], 'code' => 'DIGIFLAZZ', 'sku' => 'EML-SKU', 'cost_idr' => 10000, 'max_price_idr' => 12000],
                 'customer_input' => ['user_id' => '123456', 'zone_id' => '7890'],
@@ -862,7 +931,7 @@ class CustomerEmailMomentsTest extends TestCase
             'currency' => 'IDR',
             'customer_input' => json_encode(['user_id' => '123456', 'zone_id' => '7890'], JSON_THROW_ON_ERROR),
             'snapshot' => json_encode([
-                'product' => ['id' => $catalog['product']->id, 'name' => $catalog['product']->name, 'category_id' => $catalog['product']->category_id, 'fulfillment_mode' => 'AUTO_PROVIDER'],
+                'product' => ['id' => $catalog['product']->id, 'name' => $catalog['product']->name, 'category_id' => $catalog['product']->category_id, 'category_slug' => $catalog['product']->category->slug, 'fulfillment_mode' => 'AUTO_PROVIDER'],
                 'package' => ['id' => $catalog['package_id'], 'name' => '100 Diamonds'],
                 'provider' => ['mapping_id' => $catalog['mapping_id'], 'code' => 'DIGIFLAZZ', 'sku' => 'EML-SKU', 'cost_idr' => 10000, 'max_price_idr' => 12000],
                 'customer_input' => ['user_id' => '123456', 'zone_id' => '7890'],

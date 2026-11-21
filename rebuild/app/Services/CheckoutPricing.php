@@ -50,7 +50,8 @@ class CheckoutPricing
                 'products.slug as product_slug',
                 'products.category_id',
                 'products.fulfillment_mode',
-                'categories.name as category_name'
+                'categories.name as category_name',
+                'categories.slug as category_slug'
             );
 
         if ($lock) {
@@ -164,7 +165,8 @@ class CheckoutPricing
                 'products.slug as product_slug',
                 'products.category_id',
                 'products.fulfillment_mode',
-                'categories.name as category_name'
+                'categories.name as category_name',
+                'categories.slug as category_slug'
             );
         $contexts = $contextsQuery->get()->keyBy('package_id');
         if ($contexts->isEmpty()) {
@@ -324,6 +326,7 @@ class CheckoutPricing
             'product_slug' => $context->product_slug,
             'category_id' => (int) $context->category_id,
             'category_name' => $context->category_name,
+            'category_slug' => $context->category_slug,
             'fulfillment_mode' => $context->fulfillment_mode,
             'margin_percent' => (string) ($mapping->provider_code === 'DIGIFLAZZ'
                 ? (($context->digiflazz_markup_mode ?? $context->pricing_mode) === 'FIXED' ? '0'
