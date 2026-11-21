@@ -302,14 +302,19 @@ class FulfillmentResultService
                     $order->id
                 );
                 $this->cashback->earnAfterCommit((int) $order->id);
-                // Produk kategori voucher: SN Digiflazz adalah kode
-                // redeemable yang ditukarkan sendiri oleh pembeli —
-                // email penyelesaian harus menampilkannya sebagai kode
+                // Jenis email mengikuti klasifikasi produk SAAT ORDER
+                // DIBUAT (snapshot), bukan kategori produk saat ini:
+                // admin bisa memindah produk atau mengganti slug
+                // selagi order berjalan, dan email harus mengikuti
+                // produk yang dibeli pembeli. Produk kategori voucher:
+                // SN Digiflazz adalah kode redeemable yang ditukarkan
+                // sendiri oleh pembeli — tampilkan sebagai kode
                 // voucher, bukan nomor referensi pengiriman top up.
-                $deliveryKind = DB::table('products')
-                    ->join('categories', 'categories.id', '=', 'products.category_id')
-                    ->where('products.id', $order->product_id)
-                    ->value('categories.slug') === 'voucher' ? 'voucher' : 'digiflazz';
+                $snapshot = $this->support->json($order->snapshot);
+                $snapshotCategoryId = (int) ($snapshot['product']['category_id'] ?? 0);
+                $voucherCategoryId = (int) DB::table('categories')->where('slug', 'voucher')->value('id');
+                $deliveryKind = $voucherCategoryId > 0 && $snapshotCategoryId === $voucherCategoryId
+                    ? 'voucher' : 'digiflazz';
                 $this->emails->queueOrderCompleted((int) $order->id, $deliveryKind);
 
                 return false;

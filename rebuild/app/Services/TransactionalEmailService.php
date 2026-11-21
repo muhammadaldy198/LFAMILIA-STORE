@@ -206,15 +206,22 @@ class TransactionalEmailService
         $redeemableCode = $isVoucher
             ? ($details['delivery_code'] ?? $details['delivery_reference'])
             : $details['delivery_code'];
+        // Provider bisa melaporkan sukses tanpa SN: order tetap
+        // SUCCESS, tetapi email voucher tanpa kode tidak boleh
+        // menjanjikan kode — arahkan pembeli ke CS.
+        $voucherCodeMissing = $isVoucher && $redeemableCode === null;
+        $promisesCode = $isStock || ($isVoucher && ! $voucherCodeMissing);
 
         $lines = [
             'Halo,',
             '',
-            $isRedeemable
+            $promisesCode
                 ? 'Pesananmu sudah selesai diproses. Kode produkmu ada di bawah — tukarkan sendiri:'
-                : ($isManual
-                    ? 'Pesananmu sudah selesai diproses dan sudah kami kirimkan secara manual:'
-                    : 'Pesananmu sudah selesai diproses dan item sudah terkirim ke akun tujuan:'),
+                : ($voucherCodeMissing
+                    ? 'Pesananmu sudah selesai diproses:'
+                    : ($isManual
+                        ? 'Pesananmu sudah selesai diproses dan sudah kami kirimkan secara manual:'
+                        : 'Pesananmu sudah selesai diproses dan item sudah terkirim ke akun tujuan:')),
             '',
             'Nomor Invoice: '.$details['invoice'],
             'Produk: '.$details['product'].' — '.$details['package'],
@@ -239,11 +246,13 @@ class TransactionalEmailService
         $lines = [...$lines,
             'Total Transaksi: '.$this->rupiah($details['total']),
             '',
-            $isRedeemable
+            $promisesCode
                 ? 'Simpan kode ini baik-baik — jangan dibagikan ke orang lain. Kode ini yang ditukarkan untuk memakai produkmu; kode tidak terkirim otomatis ke akun game. Kalau kode tidak bisa ditukarkan, sampaikan nomor invoice di atas ke CS kami.'
-                : ($isManual
-                    ? 'Pengiriman sudah kami lakukan secara manual. Kalau ada yang belum sesuai, sampaikan nomor invoice di atas ke CS kami.'
-                    : 'Silakan periksa saldo di dalam game. Kalau belum masuk setelah beberapa menit, sampaikan nomor invoice dan nomor referensi di atas ke CS kami.'),
+                : ($voucherCodeMissing
+                    ? 'Kode voucher untuk pesanan ini belum tersedia dari penyedia. Sampaikan nomor invoice di atas ke CS kami, kode kamu akan kami bantu teruskan.'
+                    : ($isManual
+                        ? 'Pengiriman sudah kami lakukan secara manual. Kalau ada yang belum sesuai, sampaikan nomor invoice di atas ke CS kami.'
+                        : 'Silakan periksa saldo di dalam game. Kalau belum masuk setelah beberapa menit, sampaikan nomor invoice dan nomor referensi di atas ke CS kami.')),
             '',
             'Lihat detail pesanan: '.$this->trackingUrl(),
             '',
@@ -252,11 +261,13 @@ class TransactionalEmailService
 
         $this->queueForOrder(
             $orderId,
-            $isRedeemable
+            $promisesCode
                 ? 'Pesanan selesai — kode '.$details['package'].' sudah siap ditukarkan'
-                : ($isManual
-                    ? 'Pesanan selesai — '.$details['package'].' sudah dikirim'
-                    : 'Pesanan selesai — '.$details['package'].' sudah masuk ke akunmu'),
+                : ($voucherCodeMissing
+                    ? 'Pesanan selesai — '.$details['package'].' sudah diproses'
+                    : ($isManual
+                        ? 'Pesanan selesai — '.$details['package'].' sudah dikirim'
+                        : 'Pesanan selesai — '.$details['package'].' sudah masuk ke akunmu')),
             implode("\n", $lines),
             'order_completed',
             [

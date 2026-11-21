@@ -132,6 +132,13 @@ class CustomerHtmlEmailTest extends TestCase
         $this->assertStringContainsString('REDEEM-ABC', $voucher['text']);
         $this->assertStringNotContainsString('MUST-NOT-SHOW', $voucher['html']);
 
+        $voucherNoCode = $renderer->render('order_completed', 'Selesai', '', 'guest@example.test', [
+            ...$this->orderContext(), 'delivery_kind' => 'voucher', 'delivery_code' => '',
+            'delivery_reference' => 'REF-ONLY',
+        ]);
+        $this->assertStringNotContainsString('Tukarkan sendiri', $voucherNoCode['html']);
+        $this->assertStringContainsString('belum tersedia dari penyedia', $voucherNoCode['html']);
+
         $manual = $renderer->render('order_completed', 'Selesai', '', 'guest@example.test', [
             ...$this->orderContext(), 'delivery_kind' => 'manual', 'delivery_code' => 'Bukti foto dikirim',
             'delivery_note' => 'Cek inbox', 'delivery_reference' => 'MUST-NOT-SHOW',
