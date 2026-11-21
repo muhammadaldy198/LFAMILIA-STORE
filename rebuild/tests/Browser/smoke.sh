@@ -28,6 +28,7 @@ php artisan cache:clear >/dev/null
 php artisan storage:link >/dev/null
 
 php tests/Browser/fixture.php >/tmp/lfamilia-browser-fixture.log
+php tests/Browser/step-numbers-fixture.php >>/tmp/lfamilia-browser-fixture.log
 
 setsid php artisan serve --no-reload --host=127.0.0.1 --port=8000 >"${LOG_FILE}" 2>&1 &
 SERVER_PID=$!
@@ -116,6 +117,8 @@ if has_stage checkout; then
   }
   echo "Capturing select/password checkout screenshots for desktop and mobile"
   timeout --signal=TERM --kill-after=10s 2m node tests/Browser/catalog-fields-visual.mjs "$CHROME_BIN"
+  echo "Capturing step numbers and Data Akun field widths (desktop, 390, 360)"
+  timeout --signal=TERM --kill-after=10s 3m node tests/Browser/catalog-steps-visual.mjs "$CHROME_BIN"
   echo "Running checkout Lab comparison across ten viewports"
   if ! timeout --signal=TERM --kill-after=10s 5m node tests/Browser/checkout-visual.mjs "$CHROME_BIN"; then
     echo "Browser server HTTP errors:"

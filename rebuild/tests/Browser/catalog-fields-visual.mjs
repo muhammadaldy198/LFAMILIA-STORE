@@ -52,8 +52,9 @@ try {
             passwordHeight: document.querySelector('#lfx-account input[autocomplete="new-password"]')?.getBoundingClientRect().height,
         }));
         assert.ok(geometry.scrollWidth <= geometry.width + 1, 'horizontal overflow');
-        assert.ok(geometry.selectHeight >= 44, 'select touch target');
-        assert.ok(geometry.passwordHeight >= 44, 'password touch target');
+        // Keputusan pemilik PR #417: semua kontrol grid Data Akun 40px.
+        assert.equal(geometry.selectHeight, 40, 'select height');
+        assert.equal(geometry.passwordHeight, 40, 'password height');
         assert.deepEqual(errors, [], 'browser page errors');
 
         await page.screenshot({ path: `${output}/show-${name}.png`, fullPage: true });
