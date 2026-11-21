@@ -182,6 +182,12 @@ class TransactionalEmailService
      * - 'digiflazz': serial_number = nomor referensi diagnostik
      *   dari penyedia — "No. Referensi Pengiriman" + "periksa
      *   saldo di dalam game".
+     * - 'voucher' (Digiflazz, produk kategori voucher): serial_number
+     *   dari penyedia adalah kode REDEEMABLE yang ditukarkan sendiri
+     *   oleh pembeli — ditampilkan persis seperti 'stock'
+     *   ("Kode voucher" + petunjuk tukar). Bedanya dari 'stock'
+     *   hanya sumber kodenya: payload Digiflazz menyimpannya di
+     *   serial_number, bukan di code.
      */
     public function queueOrderCompleted(int $orderId, string $deliveryKind): void
     {
@@ -192,11 +198,19 @@ class TransactionalEmailService
 
         $isStock = $deliveryKind === 'stock';
         $isManual = $deliveryKind === 'manual';
+        $isVoucher = $deliveryKind === 'voucher';
+        // 'stock' dan 'voucher' sama-sama kode redeemable yang
+        // ditukarkan sendiri oleh pembeli; payload 'voucher'
+        // (Digiflazz) menyimpan kodenya di serial_number.
+        $isRedeemable = $isStock || $isVoucher;
+        $redeemableCode = $isVoucher
+            ? ($details['delivery_code'] ?? $details['delivery_reference'])
+            : $details['delivery_code'];
 
         $lines = [
             'Halo,',
             '',
-            $isStock
+            $isRedeemable
                 ? 'Pesananmu sudah selesai diproses. Kode produkmu ada di bawah — tukarkan sendiri:'
                 : ($isManual
                     ? 'Pesananmu sudah selesai diproses dan sudah kami kirimkan secara manual:'
@@ -208,9 +222,9 @@ class TransactionalEmailService
         if ($details['destination'] !== null) {
             $lines[] = 'ID Tujuan: '.$details['destination'];
         }
-        if ($isStock) {
-            if ($details['delivery_code'] !== null) {
-                $lines[] = 'Kode voucher: '.$details['delivery_code'];
+        if ($isRedeemable) {
+            if ($redeemableCode !== null) {
+                $lines[] = 'Kode voucher: '.$redeemableCode;
             }
         } elseif ($isManual) {
             if ($details['delivery_code'] !== null) {
@@ -225,7 +239,7 @@ class TransactionalEmailService
         $lines = [...$lines,
             'Total Transaksi: '.$this->rupiah($details['total']),
             '',
-            $isStock
+            $isRedeemable
                 ? 'Simpan kode ini baik-baik — jangan dibagikan ke orang lain. Kode ini yang ditukarkan untuk memakai produkmu; kode tidak terkirim otomatis ke akun game. Kalau kode tidak bisa ditukarkan, sampaikan nomor invoice di atas ke CS kami.'
                 : ($isManual
                     ? 'Pengiriman sudah kami lakukan secara manual. Kalau ada yang belum sesuai, sampaikan nomor invoice di atas ke CS kami.'
@@ -238,7 +252,7 @@ class TransactionalEmailService
 
         $this->queueForOrder(
             $orderId,
-            $isStock
+            $isRedeemable
                 ? 'Pesanan selesai — kode '.$details['package'].' sudah siap ditukarkan'
                 : ($isManual
                     ? 'Pesanan selesai — '.$details['package'].' sudah dikirim'
@@ -247,6 +261,9 @@ class TransactionalEmailService
             'order_completed',
             [
                 ...$details,
+                // Renderer membaca kode redeemable dari delivery_code;
+                // untuk 'voucher' isinya kode dari serial_number.
+                'delivery_code' => $isVoucher ? $redeemableCode : $details['delivery_code'],
                 'delivery_kind' => $deliveryKind,
             ]
         );

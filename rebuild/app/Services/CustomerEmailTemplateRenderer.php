@@ -135,7 +135,7 @@ class CustomerEmailTemplateRenderer
             case 'order_completed':
                 $intro = 'Pesanan kamu sudah terkirim. Berikut rincian hasil pengirimannya.';
                 $kind = (string) ($context['delivery_kind'] ?? 'digiflazz');
-                if ($kind === 'stock') {
+                if ($kind === 'stock' || $kind === 'voucher') {
                     $code = (string) ($context['delivery_code'] ?? $this->field($sourceBody, 'Kode voucher'));
                     if ($code !== '') {
                         $extra[] = ['label' => 'Kode voucher', 'value' => $code];
