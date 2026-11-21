@@ -140,11 +140,15 @@ class CustomerEmailTemplateRenderer
                     if ($code !== '') {
                         $extra[] = ['label' => 'Kode voucher', 'value' => $code];
                     }
-                    // Voucher tanpa kode (SN kosong dari provider):
-                    // jangan janjikan penukaran — arahkan ke CS.
-                    $after = $kind === 'voucher' && $code === ''
-                        ? 'Kode voucher untuk pesanan ini belum tersedia dari penyedia. Sampaikan nomor invoice ke CS kami, kode kamu akan kami bantu teruskan.'
-                        : 'Tukarkan sendiri kode voucher di layanan yang sesuai. Kode tidak otomatis masuk ke akun game; simpan dan jangan bagikan kode kepada orang lain.';
+                    if ($kind === 'voucher' && $code === '') {
+                        // Voucher tanpa kode (SN kosong dari provider):
+                        // jangan klaim terkirim atau janjikan penukaran
+                        // — arahkan ke CS, sama seperti email teks.
+                        $intro = 'Pesanan kamu sudah selesai diproses. Berikut rinciannya.';
+                        $after = 'Kode voucher untuk pesanan ini belum tersedia dari penyedia. Sampaikan nomor invoice ke CS kami, kode kamu akan kami bantu teruskan.';
+                    } else {
+                        $after = 'Tukarkan sendiri kode voucher di layanan yang sesuai. Kode tidak otomatis masuk ke akun game; simpan dan jangan bagikan kode kepada orang lain.';
+                    }
                 } elseif ($kind === 'manual') {
                     $proof = (string) ($context['delivery_code'] ?? $this->field($sourceBody, 'Bukti pengiriman'));
                     $note = (string) ($context['delivery_note'] ?? $this->field($sourceBody, 'Catatan'));

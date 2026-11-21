@@ -138,6 +138,8 @@ class CustomerHtmlEmailTest extends TestCase
         ]);
         $this->assertStringNotContainsString('Tukarkan sendiri', $voucherNoCode['html']);
         $this->assertStringContainsString('belum tersedia dari penyedia', $voucherNoCode['html']);
+        $this->assertStringNotContainsString('sudah terkirim', $voucherNoCode['html']);
+        $this->assertStringContainsString('sudah selesai diproses', $voucherNoCode['html']);
 
         $manual = $renderer->render('order_completed', 'Selesai', '', 'guest@example.test', [
             ...$this->orderContext(), 'delivery_kind' => 'manual', 'delivery_code' => 'Bukti foto dikirim',
