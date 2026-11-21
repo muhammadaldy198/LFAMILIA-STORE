@@ -438,6 +438,14 @@ jobs:
           path: rebuild/catalog-fields-visual-results
           if-no-files-found: warn
 
+      - name: Upload step number and Data Akun field width screenshots
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: catalog-steps-field-width-desktop-mobile
+          path: rebuild/catalog-steps-visual-results
+          if-no-files-found: warn
+
       - name: Upload checkout visual comparison
         if: always()
         uses: actions/upload-artifact@v6
