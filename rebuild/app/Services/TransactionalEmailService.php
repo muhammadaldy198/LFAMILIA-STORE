@@ -182,6 +182,12 @@ class TransactionalEmailService
      * - 'digiflazz': serial_number = nomor referensi diagnostik
      *   dari penyedia — "No. Referensi Pengiriman" + "periksa
      *   saldo di dalam game".
+     * - 'voucher' (Digiflazz, produk kategori voucher): serial_number
+     *   dari penyedia adalah kode REDEEMABLE yang ditukarkan sendiri
+     *   oleh pembeli — ditampilkan persis seperti 'stock'
+     *   ("Kode voucher" + petunjuk tukar). Bedanya dari 'stock'
+     *   hanya sumber kodenya: payload Digiflazz menyimpannya di
+     *   serial_number, bukan di code.
      */
     public function queueOrderCompleted(int $orderId, string $deliveryKind): void
     {
@@ -190,17 +196,19 @@ class TransactionalEmailService
             return;
         }
 
-        $isStock = $deliveryKind === 'stock';
-        $isManual = $deliveryKind === 'manual';
+        // Bunyi (subjek/pembuka/penutup/kode) diputuskan
+        // CompletedOrderWording — di sini tinggal merakit baris.
+        $wording = CompletedOrderWording::resolve(
+            $deliveryKind,
+            $details['delivery_code'],
+            $details['delivery_reference'],
+            $details['package']
+        );
 
         $lines = [
             'Halo,',
             '',
-            $isStock
-                ? 'Pesananmu sudah selesai diproses. Kode produkmu ada di bawah — tukarkan sendiri:'
-                : ($isManual
-                    ? 'Pesananmu sudah selesai diproses dan sudah kami kirimkan secara manual:'
-                    : 'Pesananmu sudah selesai diproses dan item sudah terkirim ke akun tujuan:'),
+            $wording->intro,
             '',
             'Nomor Invoice: '.$details['invoice'],
             'Produk: '.$details['product'].' — '.$details['package'],
@@ -208,28 +216,24 @@ class TransactionalEmailService
         if ($details['destination'] !== null) {
             $lines[] = 'ID Tujuan: '.$details['destination'];
         }
-        if ($isStock) {
-            if ($details['delivery_code'] !== null) {
-                $lines[] = 'Kode voucher: '.$details['delivery_code'];
+        if ($wording->mode === CompletedOrderWording::MODE_REDEEM) {
+            if ($wording->code !== null) {
+                $lines[] = 'Kode voucher: '.$wording->code;
             }
-        } elseif ($isManual) {
+        } elseif ($wording->mode === CompletedOrderWording::MODE_MANUAL) {
             if ($details['delivery_code'] !== null) {
                 $lines[] = 'Bukti pengiriman: '.$details['delivery_code'];
             }
             if ($details['delivery_note'] !== null) {
                 $lines[] = 'Catatan: '.$details['delivery_note'];
             }
-        } elseif ($details['delivery_reference'] !== null) {
+        } elseif ($wording->mode === CompletedOrderWording::MODE_REFERENCE && $details['delivery_reference'] !== null) {
             $lines[] = 'No. Referensi Pengiriman: '.$details['delivery_reference'];
         }
         $lines = [...$lines,
             'Total Transaksi: '.$this->rupiah($details['total']),
             '',
-            $isStock
-                ? 'Simpan kode ini baik-baik — jangan dibagikan ke orang lain. Kode ini yang ditukarkan untuk memakai produkmu; kode tidak terkirim otomatis ke akun game. Kalau kode tidak bisa ditukarkan, sampaikan nomor invoice di atas ke CS kami.'
-                : ($isManual
-                    ? 'Pengiriman sudah kami lakukan secara manual. Kalau ada yang belum sesuai, sampaikan nomor invoice di atas ke CS kami.'
-                    : 'Silakan periksa saldo di dalam game. Kalau belum masuk setelah beberapa menit, sampaikan nomor invoice dan nomor referensi di atas ke CS kami.'),
+            $wording->closing,
             '',
             'Lihat detail pesanan: '.$this->trackingUrl(),
             '',
@@ -238,15 +242,14 @@ class TransactionalEmailService
 
         $this->queueForOrder(
             $orderId,
-            $isStock
-                ? 'Pesanan selesai — kode '.$details['package'].' sudah siap ditukarkan'
-                : ($isManual
-                    ? 'Pesanan selesai — '.$details['package'].' sudah dikirim'
-                    : 'Pesanan selesai — '.$details['package'].' sudah masuk ke akunmu'),
+            $wording->subject,
             implode("\n", $lines),
             'order_completed',
             [
                 ...$details,
+                // Renderer membaca kode redeemable dari delivery_code;
+                // untuk 'voucher' isinya kode dari serial_number.
+                'delivery_code' => $deliveryKind === 'voucher' ? $wording->code : $details['delivery_code'],
                 'delivery_kind' => $deliveryKind,
             ]
         );

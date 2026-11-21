@@ -302,7 +302,21 @@ class FulfillmentResultService
                     $order->id
                 );
                 $this->cashback->earnAfterCommit((int) $order->id);
-                $this->emails->queueOrderCompleted((int) $order->id, 'digiflazz');
+                // Jenis email mengikuti slug kategori produk SAAT
+                // ORDER DIBUAT (snapshot) — tanpa lookup kategori saat
+                // ini sama sekali: admin bisa memindah produk,
+                // mengganti slug, atau menghapus kategori selagi order
+                // berjalan, dan email harus tetap mengikuti produk
+                // yang dibeli pembeli. Produk kategori voucher: SN
+                // Digiflazz adalah kode redeemable yang ditukarkan
+                // sendiri oleh pembeli — tampilkan sebagai kode
+                // voucher, bukan nomor referensi pengiriman top up.
+                // Snapshot lama tanpa category_slug jatuh ke
+                // 'digiflazz' (perilaku sebelum fitur ini).
+                $snapshot = $this->support->json($order->snapshot);
+                $deliveryKind = ($snapshot['product']['category_slug'] ?? null) === 'voucher'
+                    ? 'voucher' : 'digiflazz';
+                $this->emails->queueOrderCompleted((int) $order->id, $deliveryKind);
 
                 return false;
             }

@@ -41,9 +41,9 @@ class CustomerEmailMomentsTest extends TestCase
     /**
      * @return array{product:Product,package_id:int,mapping_id:int}
      */
-    private function catalog(): array
+    private function catalog(string $categorySlug = 'game'): array
     {
-        $category = Category::where('slug', 'game')->firstOrFail();
+        $category = Category::where('slug', $categorySlug)->firstOrFail();
         DB::table('providers')->where('code', 'DIGIFLAZZ')->update(['is_active' => true]);
         $providerId = DB::table('providers')->where('code', 'DIGIFLAZZ')->value('id');
 
@@ -362,7 +362,7 @@ class CustomerEmailMomentsTest extends TestCase
             'currency' => 'IDR',
             'customer_input' => json_encode(['user_id' => '123456', 'zone_id' => '7890'], JSON_THROW_ON_ERROR),
             'snapshot' => json_encode([
-                'product' => ['id' => $catalog['product']->id, 'name' => $catalog['product']->name, 'fulfillment_mode' => 'AUTO_PROVIDER'],
+                'product' => ['id' => $catalog['product']->id, 'name' => $catalog['product']->name, 'category_id' => $catalog['product']->category_id, 'category_slug' => $catalog['product']->category->slug, 'fulfillment_mode' => 'AUTO_PROVIDER'],
                 'package' => ['id' => $catalog['package_id'], 'name' => '100 Diamonds'],
                 'provider' => ['mapping_id' => $catalog['mapping_id'], 'code' => 'DIGIFLAZZ', 'sku' => 'EML-SKU', 'cost_idr' => 10000, 'max_price_idr' => 12000],
                 'pricing' => ['cost_idr' => 10000, 'total_idr' => 11000],
@@ -409,6 +409,9 @@ class CustomerEmailMomentsTest extends TestCase
                 && str_contains($job->text, '100 Diamonds')
                 && str_contains($job->text, '123456')
                 && str_contains($job->text, 'SERIAL-123')
+                && str_contains($job->text, 'No. Referensi Pengiriman: SERIAL-123')
+                && str_contains($job->text, 'periksa saldo di dalam game')
+                && ! str_contains($job->text, 'Kode voucher')
                 && str_contains($job->text, 'Rp 11.000')
                 && str_contains($job->text, '/orders/check')
                 && str_contains($job->text, 'support@lfamilia.com');
@@ -570,7 +573,7 @@ class CustomerEmailMomentsTest extends TestCase
             'currency' => 'IDR',
             'customer_input' => json_encode(['user_id' => '123456', 'zone_id' => '7890'], JSON_THROW_ON_ERROR),
             'snapshot' => json_encode([
-                'product' => ['id' => $catalog['product']->id, 'name' => $catalog['product']->name, 'fulfillment_mode' => 'AUTO_PROVIDER'],
+                'product' => ['id' => $catalog['product']->id, 'name' => $catalog['product']->name, 'category_id' => $catalog['product']->category_id, 'category_slug' => $catalog['product']->category->slug, 'fulfillment_mode' => 'AUTO_PROVIDER'],
                 'package' => ['id' => $catalog['package_id'], 'name' => '100 Diamonds'],
                 'provider' => ['mapping_id' => $catalog['mapping_id'], 'code' => 'DIGIFLAZZ', 'sku' => 'EML-SKU', 'cost_idr' => 10000, 'max_price_idr' => 12000],
                 'customer_input' => ['user_id' => '123456', 'zone_id' => '7890'],
@@ -642,7 +645,7 @@ class CustomerEmailMomentsTest extends TestCase
             'currency' => 'IDR',
             'customer_input' => json_encode(['user_id' => '123456', 'zone_id' => '7890'], JSON_THROW_ON_ERROR),
             'snapshot' => json_encode([
-                'product' => ['id' => $catalog['product']->id, 'name' => $catalog['product']->name, 'fulfillment_mode' => 'AUTO_PROVIDER'],
+                'product' => ['id' => $catalog['product']->id, 'name' => $catalog['product']->name, 'category_id' => $catalog['product']->category_id, 'category_slug' => $catalog['product']->category->slug, 'fulfillment_mode' => 'AUTO_PROVIDER'],
                 'package' => ['id' => $catalog['package_id'], 'name' => '100 Diamonds'],
                 'provider' => ['mapping_id' => $catalog['mapping_id'], 'code' => 'DIGIFLAZZ', 'sku' => 'EML-SKU', 'cost_idr' => 10000, 'max_price_idr' => 12000],
                 'customer_input' => ['user_id' => '123456', 'zone_id' => '7890'],

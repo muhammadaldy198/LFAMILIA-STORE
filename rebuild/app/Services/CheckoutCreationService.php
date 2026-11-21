@@ -166,6 +166,7 @@ class CheckoutCreationService
                         'slug' => $price['product_slug'],
                         'category_id' => $price['category_id'],
                         'category_name' => $price['category_name'],
+                        'category_slug' => $price['category_slug'],
                         'fulfillment_mode' => $price['fulfillment_mode'],
                     ],
                     'package' => [
