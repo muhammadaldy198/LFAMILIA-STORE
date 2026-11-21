@@ -483,3 +483,5 @@
 .lfx .lfx-password-field input{min-height:44px;height:44px;padding-right:102px;font-size:16px}
 .lfx .lfx-password-field button{position:absolute;right:4px;top:0;height:44px;min-width:88px;border:0;border-radius:7px;background:transparent;color:#c8d9ff;font-size:12px;font-weight:700;padding:0 9px}
 .lfx .lfx-password-field button:focus-visible{outline:2px solid #719aff;outline-offset:-2px}
+/* Data Akun: lebar kolom grid sudah sama (minmax(0,1fr)); yang timpang adalah tinggi. Input teks 40px (36px di HP) di samping select/password 44px membuat kotak select terlihat lebih besar. Semua kontrol grid Data Akun disamakan 44px, target sentuh yang sudah dipakai select dan password. Detail Kontak tidak disentuh. */
+.lfx #lfx-account .lfx-field-grid input{height:44px;min-height:44px}
