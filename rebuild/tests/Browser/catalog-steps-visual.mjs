@@ -1,5 +1,5 @@
 // Bukti tampilan halaman produk: nomor langkah mengikuti panel yang tampil,
-// dan field Data Akun dalam satu baris grid sama lebar (dan sama tinggi).
+// dan field Data Akun dalam satu baris grid sama lebar dan semuanya 40px tinggi.
 // Semua halaman diukur dan difoto dulu, baru diperiksa, supaya laporan dan
 // screenshot tetap tersedia sebagai bukti walau ada pemeriksaan yang gagal.
 import assert from 'node:assert/strict';
@@ -111,6 +111,10 @@ for (const entry of report) {
 
     if (!entry.account) continue;
     const fields = entry.account.fields;
+    // Keputusan pemilik PR #417: setiap kontrol grid Data Akun tepat 40px.
+    for (const field of fields) {
+        check(Math.abs(field.controlHeight - 40) <= 0.5, `${where}: ${field.control} height ${field.controlHeight}, expected 40`);
+    }
     if (fields.length === 1) {
         check(entry.account.single, `${where}: one field must keep the full-width .single grid`);
         continue;
