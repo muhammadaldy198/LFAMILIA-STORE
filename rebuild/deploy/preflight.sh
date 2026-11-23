@@ -22,6 +22,46 @@ APP_DIR="${REPO_DIR%/}/${APP_SUBDIR}"
 ENV_FILE="${APP_DIR}/.env"
 [[ -d "${APP_DIR}" ]] || { echo "APP_DIR not found: ${APP_DIR}" >&2; exit 1; }
 [[ -r "${ENV_FILE}" ]] || { echo "Production .env is missing" >&2; exit 1; }
+
+# Laravel 13 changed the default cache/redis/session names. deploy.sh uses the
+# live .env as is, so these pins must exist there or existing cache entries,
+# Redis sessions and queued jobs are orphaned at deploy time.
+check_env_pin() {
+  local key="$1" expected="$2" count rest value
+  local assign_re="^[[:space:]]*(export[[:space:]]+)?${key}[[:space:]]*="
+  local bare_re='^([^[:space:]#"'"'"']*)([[:space:]]+#.*|[[:space:]]*)$'
+  local dq_re='^"([^"]*)"[[:space:]]*(#.*)?$'
+  local sq_re="^'([^']*)'[[:space:]]*(#.*)?\$"
+  count="$(grep -c -E "${assign_re}" "${ENV_FILE}" || true)"
+  [[ "${count}" -ge 1 ]] || { echo "Production .env is missing ${key} (expected ${expected})" >&2; exit 1; }
+  # dotenv applies the later duplicate, so a single assignment is required.
+  [[ "${count}" -eq 1 ]] || { echo "Production .env assigns ${key} more than once" >&2; exit 1; }
+  rest="$(grep -E "${assign_re}" "${ENV_FILE}")"
+  rest="${rest#*=}"
+  rest="${rest#"${rest%%[![:space:]]*}"}"
+  if [[ "${rest}" =~ ${dq_re} || "${rest}" =~ ${sq_re} ]]; then
+    value="${BASH_REMATCH[1]}"
+  elif [[ "${rest}" =~ ${bare_re} ]]; then
+    value="${BASH_REMATCH[1]}"
+  else
+    echo "Production .env has a non-canonical ${key} value" >&2; exit 1
+  fi
+  [[ "${value}" == "${expected}" ]] || { echo "Production .env has wrong ${key} (expected ${expected})" >&2; exit 1; }
+}
+# A value exported into the process environment (ops.env) overrides .env.
+check_env_override() {
+  local key="$1" expected="$2"
+  if [[ -n "${!key+x}" && "${!key}" != "${expected}" ]]; then
+    echo "Environment variable ${key} overrides the .env pin (expected ${expected})" >&2
+    exit 1
+  fi
+}
+check_env_pin CACHE_PREFIX lfamilia_store_cache_
+check_env_pin REDIS_PREFIX lfamilia_store_database_
+check_env_pin SESSION_COOKIE lfamilia_store_session
+check_env_override CACHE_PREFIX lfamilia_store_cache_
+check_env_override REDIS_PREFIX lfamilia_store_database_
+check_env_override SESSION_COOKIE lfamilia_store_session
 [[ -r "${MYSQL_DEFAULTS_FILE}" ]] || { echo "MySQL backup defaults file is not readable" >&2; exit 1; }
 [[ -r "${MYSQL_ADMIN_DEFAULTS_FILE}" ]] || { echo "MySQL admin defaults file is not readable" >&2; exit 1; }
 [[ -r "${BACKUP_PASSPHRASE_FILE}" ]] || { echo "Backup passphrase file is not readable" >&2; exit 1; }
@@ -36,8 +76,8 @@ done
 systemctl cat "${PHP_FPM_SERVICE}" >/dev/null 2>&1 \
   || { echo "PHP-FPM service not found: ${PHP_FPM_SERVICE}" >&2; exit 1; }
 
-"${PHP_BIN}" -r 'exit(version_compare(PHP_VERSION, "8.4.0", ">=") ? 0 : 1);' \
-  || { echo "PHP 8.4+ is required" >&2; exit 1; }
+"${PHP_BIN}" -r 'exit(version_compare(PHP_VERSION, "8.6.0", ">=") ? 0 : 1);' \
+  || { echo "PHP 8.6+ is required" >&2; exit 1; }
 
 for ext in pdo_mysql redis mbstring openssl; do
   "${PHP_BIN}" -r "exit(extension_loaded('${ext}') ? 0 : 1);" \

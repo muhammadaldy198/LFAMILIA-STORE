@@ -1,6 +1,6 @@
 # Production deployment & operations
 
-Runtime production adalah Laravel 12 / PHP 8.4 / MySQL 8 / Redis di VPS dengan Nginx (tanpa panel; CloudPanel dihapus 19 Nov 2026). Production source ref adalah `main`.
+Runtime production adalah Laravel 13 / PHP 8.6 / MySQL 8 / Redis di VPS dengan Nginx (tanpa panel; CloudPanel dihapus 19 Nov 2026). Production source ref adalah `main`.
 
 ## Server-only configuration
 
@@ -116,7 +116,7 @@ bagian lain. Jangan ubah data historis untuk menyamarkan masalah timezone.
 
 ## Preflight
 
-`deploy/preflight.sh` memverifikasi file ops/env, executable yang diperlukan, PHP 8.4+, PHP extensions, production Laravel settings, Composer config, MySQL connectivity/version, Redis localhost connectivity, backup prerequisites, dan service PHP-FPM.
+`deploy/preflight.sh` memverifikasi file ops/env, executable yang diperlukan, PHP 8.6+, PHP extensions, production Laravel settings, Composer config, MySQL connectivity/version, Redis localhost connectivity, backup prerequisites, dan service PHP-FPM.
 
 MariaDB ditolak; target runtime adalah MySQL 8.
 
