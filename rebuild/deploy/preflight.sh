@@ -37,29 +37,60 @@ env_dq_closes() {
   done
   return 1
 }
-# Print each logical .env entry that assigns the key. A double-quoted value may
-# span several lines, and the lines inside it are never entry starts, so
-# pin-like text there is not counted. Only double-quoted values are treated as
-# multiline here (single-quoted multiline values are not modelled).
-env_pin_entries() {
-  local key="$1" line value inside_double_quotes=0
-  local assign_re="^[[:space:]]*(export[[:space:]]+)?${key}[[:space:]]*="
-  local any_assign_re='^[[:space:]]*(export[[:space:]]+)?[A-Za-z_][A-Za-z0-9_.]*[[:space:]]*=(.*)$'
+# Print the number of unescaped double quotes in $1. A backslash escapes the
+# next character, as in phpdotenv's multiline detection.
+env_dq_count() {
+  local text="$1" index char count=0
+  for ((index = 0; index < ${#text}; index++)); do
+    char="${text:index:1}"
+    if [[ "${char}" == "\\" ]]; then
+      index=$((index + 1))
+    elif [[ "${char}" == '"' ]]; then
+      count=$((count + 1))
+    fi
+  done
+  printf '%s' "${count}"
+}
+
+# True when $1 starts a multiline double-quoted value, using phpdotenv's own
+# rule (Parser/Lines): the line contains a literal =" with no # before it, and
+# the value does not close on the same line (more than one unescaped quote).
+env_dq_starts_multiline() {
+  local line="$1" prefix
+  [[ "${line}" == *'="'* ]] || return 1
+  prefix="${line%%'="'*}"
+  [[ "${prefix}" == *'#'* ]] && return 1
+  [[ "$(env_dq_count "${line}")" -gt 1 ]] && return 1
+  return 0
+}
+
+# Print each logical .env entry line. A double-quoted value may span several
+# lines, and the lines inside it are never entry starts, so assignment-like
+# text there is not an entry. With $1, print only the entries assigning that
+# key. Only double-quoted values are multiline in phpdotenv (a single-quoted
+# value never starts one), so no other quoting is modelled here.
+env_entry_lines() {
+  local key="${1:-}" line inside_double_quotes=0
+  local assign_re=""
+  local any_assign_re='^[[:space:]]*(export[[:space:]]+)?[A-Za-z_][A-Za-z0-9_.]*[[:space:]]*='
+  if [[ -n "${key}" ]]; then
+    assign_re="^[[:space:]]*(export[[:space:]]+)?${key}[[:space:]]*="
+  fi
   while IFS= read -r line || [[ -n "${line}" ]]; do
     if [[ "${inside_double_quotes}" -eq 1 ]]; then
       if env_dq_closes "${line}"; then inside_double_quotes=0; fi
       continue
     fi
+    if env_dq_starts_multiline "${line}"; then inside_double_quotes=1; fi
     [[ "${line}" =~ ${any_assign_re} ]] || continue
-    value="${BASH_REMATCH[2]}"
-    value="${value#"${value%%[![:space:]]*}"}"
-    if [[ "${line}" =~ ${assign_re} ]]; then
+    if [[ -z "${key}" || "${line}" =~ ${assign_re} ]]; then
       printf '%s\n' "${line}"
     fi
-    if [[ "${value}" == \"* ]] && ! env_dq_closes "${value:1}"; then
-      inside_double_quotes=1
-    fi
   done < "${ENV_FILE}"
+}
+
+env_pin_entries() {
+  env_entry_lines "$1"
 }
 # Laravel 13 changed the default cache/redis/session names. deploy.sh uses the
 # live .env as is, so these pins must exist there or existing cache entries,
@@ -125,6 +156,12 @@ if [[ "${fpm_exec_start}" =~ path=([^[:space:];]+) ]]; then
 elif [[ "${fpm_exec_start}" =~ ^[[:space:]]*[@+!-]*([^[:space:];]+) ]]; then
   fpm_binary="${BASH_REMATCH[1]}"
 fi
+# systemd resolves a bare command name through its own executable search
+# path; do the same before testing the resolved path.
+if [[ -n "${fpm_binary}" && "${fpm_binary}" != */* ]]; then
+  resolved_binary="$(command -v "${fpm_binary}" 2>/dev/null || true)"
+  if [[ -n "${resolved_binary}" ]]; then fpm_binary="${resolved_binary}"; fi
+fi
 fpm_version_line=""
 if [[ -n "${fpm_binary}" && -x "${fpm_binary}" && ! -d "${fpm_binary}" ]]; then
   fpm_version_line="$("${fpm_binary}" -v 2>/dev/null | head -n 1 || true)"
@@ -183,7 +220,50 @@ if ($envContents === false) {
 if (str_starts_with($envContents, "\xEF\xBB\xBF")) {
     $envContents = substr($envContents, 3);
 }
-foreach (explode("\n", $envContents) as $line) {
+// Join multiline double-quoted values into single logical entries first,
+// exactly as the phpdotenv Lines parser does (a value starts multiline when
+// its line contains a literal =" with no # before it and does not close on
+// the same line), so assignment-like lines inside a quoted value are never
+// mistaken for entries.
+$rawLines = explode("\n", $envContents);
+$lines = [];
+$buffer = [];
+$inMultiline = false;
+foreach ($rawLines as $rawLine) {
+    $startsHere = false;
+    if (! $inMultiline) {
+        $eqPos = strpos($rawLine, "=\"");
+        if ($eqPos !== false) {
+            $hashPos = strpos($rawLine, "#");
+            if ($hashPos === false || $hashPos >= $eqPos) {
+                $stripped = str_replace("\\\\", "", $rawLine);
+                if (preg_match_all("/(?<!\\\\)\"/", $stripped) <= 1) {
+                    $startsHere = true;
+                }
+            }
+        }
+    }
+    if ($startsHere) {
+        $inMultiline = true;
+        $buffer = [$rawLine];
+        continue;
+    }
+    if ($inMultiline) {
+        $buffer[] = $rawLine;
+        $stripped = str_replace("\\\\", "", $rawLine);
+        if (preg_match_all("/(?<!\\\\)\"/", $stripped) >= 1) {
+            $lines[] = implode("\n", $buffer);
+            $buffer = [];
+            $inMultiline = false;
+        }
+        continue;
+    }
+    $lines[] = $rawLine;
+}
+if ($inMultiline) {
+    $lines[] = implode("\n", $buffer);
+}
+foreach ($lines as $line) {
     $line = trim($line);
     if ($line === "" || $line[0] === "#" || ! str_contains($line, "=")) {
         continue;
@@ -319,13 +399,13 @@ for pair in \
   'SESSION_DRIVER=redis' \
   'SESSION_ENCRYPT=true' \
   'SESSION_SECURE_COOKIE=true'; do
-  grep -Fqx "${pair}" "${ENV_FILE}" || { echo "Required setting missing: ${pair}" >&2; exit 1; }
+  env_entry_lines | grep -Fqx "${pair}" || { echo "Required setting missing: ${pair}" >&2; exit 1; }
 done
 
-grep -Eq '^APP_KEY=base64:.+$' "${ENV_FILE}" || { echo "APP_KEY must be generated server-side" >&2; exit 1; }
-grep -Eq '^APP_URL=https://' "${ENV_FILE}" || { echo "APP_URL must use HTTPS" >&2; exit 1; }
-grep -Eq '^APP_TRUSTED_HOSTS=.+$' "${ENV_FILE}" || { echo "APP_TRUSTED_HOSTS is required" >&2; exit 1; }
-grep -Eq '^[[:space:]]*(export[[:space:]]+)?TRUSTED_PROXIES[[:space:]]*=.+$' "${ENV_FILE}" || { echo "TRUSTED_PROXIES is required" >&2; exit 1; }
+env_entry_lines | grep -Eq '^APP_KEY=base64:.+$'  || { echo "APP_KEY must be generated server-side" >&2; exit 1; }
+env_entry_lines | grep -Eq '^APP_URL=https://'  || { echo "APP_URL must use HTTPS" >&2; exit 1; }
+env_entry_lines | grep -Eq '^APP_TRUSTED_HOSTS=.+$'  || { echo "APP_TRUSTED_HOSTS is required" >&2; exit 1; }
+env_entry_lines | grep -Eq '^[[:space:]]*(export[[:space:]]+)?TRUSTED_PROXIES[[:space:]]*=.+$'  || { echo "TRUSTED_PROXIES is required" >&2; exit 1; }
 while IFS= read -r proxies_line; do
   proxies_raw="${proxies_line#*TRUSTED_PROXIES}"
   proxies_raw="${proxies_raw#"${proxies_raw%%[![:space:]]*}"}"
@@ -432,7 +512,7 @@ while IFS= read -r proxies_line; do
     echo "TRUSTED_PROXIES must name at least one proxy in production; an empty value is not allowed" >&2
     exit 1
   fi
-done < <(grep -E '^[[:space:]]*(export[[:space:]]+)?TRUSTED_PROXIES[[:space:]]*=' "${ENV_FILE}" || true)
+done < <(env_entry_lines | grep -E '^[[:space:]]*(export[[:space:]]+)?TRUSTED_PROXIES[[:space:]]*=' || true)
 
 # The running application reads the frozen configuration cache, not the
 # .env file, once bootstrap/cache/config.php exists. A cache built while
