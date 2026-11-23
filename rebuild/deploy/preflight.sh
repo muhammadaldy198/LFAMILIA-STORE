@@ -186,8 +186,16 @@ if [[ -n "${fpm_binary}" && "${fpm_binary}" != */* ]]; then
         env_file="${env_file#-}"
         if [[ -f "${env_file}" ]]; then
           while IFS= read -r env_file_line || [[ -n "${env_file_line}" ]]; do
+            env_file_line="${env_file_line%$'\r'}"
+            env_file_line="${env_file_line#"${env_file_line%%[![:space:]]*}"}"
             case "${env_file_line}" in
-              PATH=*|export\ PATH=*) file_path="${env_file_line##*PATH=}" ;;
+              PATH=*|export\ PATH=*)
+                file_path="${env_file_line##*PATH=}"
+                file_path="${file_path%"${file_path##*[![:space:]]}"}"
+                if [[ "${file_path}" == \"*\" || "${file_path}" == \'*\' ]]; then
+                  file_path="${file_path:1:-1}"
+                fi
+                ;;
             esac
           done < "${env_file}"
         fi
