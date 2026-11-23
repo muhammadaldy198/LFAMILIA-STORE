@@ -157,9 +157,22 @@ elif [[ "${fpm_exec_start}" =~ ^[[:space:]]*[@+!-]*([^[:space:];]+) ]]; then
   fpm_binary="${BASH_REMATCH[1]}"
 fi
 # systemd resolves a bare command name through its own executable search
-# path; do the same before testing the resolved path.
+# path, not the deploy shell's PATH. Try the shell first, then the unit's
+# ExecSearchPath, then systemd's documented default search path.
 if [[ -n "${fpm_binary}" && "${fpm_binary}" != */* ]]; then
   resolved_binary="$(command -v "${fpm_binary}" 2>/dev/null || true)"
+  if [[ -z "${resolved_binary}" ]]; then
+    search_path="$(systemctl show -p ExecSearchPath --value "${PHP_FPM_SERVICE}" 2>/dev/null || true)"
+    if [[ -z "${search_path}" ]]; then
+      search_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    fi
+    for search_dir in ${search_path//:/ }; do
+      if [[ -x "${search_dir}/${fpm_binary}" && ! -d "${search_dir}/${fpm_binary}" ]]; then
+        resolved_binary="${search_dir}/${fpm_binary}"
+        break
+      fi
+    done
+  fi
   if [[ -n "${resolved_binary}" ]]; then fpm_binary="${resolved_binary}"; fi
 fi
 fpm_version_line=""
@@ -406,6 +419,10 @@ env_entry_lines | grep -Eq '^APP_KEY=base64:.+$'  || { echo "APP_KEY must be gen
 env_entry_lines | grep -Eq '^APP_URL=https://'  || { echo "APP_URL must use HTTPS" >&2; exit 1; }
 env_entry_lines | grep -Eq '^APP_TRUSTED_HOSTS=.+$'  || { echo "APP_TRUSTED_HOSTS is required" >&2; exit 1; }
 env_entry_lines | grep -Eq '^[[:space:]]*(export[[:space:]]+)?TRUSTED_PROXIES[[:space:]]*=.+$'  || { echo "TRUSTED_PROXIES is required" >&2; exit 1; }
+# This loop stays grep-based on purpose: it rejects on ANY bad entry, so an
+# extra assignment-like line inside a multiline value can only cause a false
+# rejection, never hide a real wildcard. It is also extracted standalone by
+# the test suite, so it must not depend on helpers defined elsewhere here.
 while IFS= read -r proxies_line; do
   proxies_raw="${proxies_line#*TRUSTED_PROXIES}"
   proxies_raw="${proxies_raw#"${proxies_raw%%[![:space:]]*}"}"
@@ -512,7 +529,7 @@ while IFS= read -r proxies_line; do
     echo "TRUSTED_PROXIES must name at least one proxy in production; an empty value is not allowed" >&2
     exit 1
   fi
-done < <(env_entry_lines | grep -E '^[[:space:]]*(export[[:space:]]+)?TRUSTED_PROXIES[[:space:]]*=' || true)
+done < <(grep -E '^[[:space:]]*(export[[:space:]]+)?TRUSTED_PROXIES[[:space:]]*=' "${ENV_FILE}" || true)
 
 # The running application reads the frozen configuration cache, not the
 # .env file, once bootstrap/cache/config.php exists. A cache built while
