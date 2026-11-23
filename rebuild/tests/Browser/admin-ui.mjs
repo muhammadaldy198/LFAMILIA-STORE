@@ -89,7 +89,7 @@ try {
     const login = await evaluate(`(async () => { const token = document.querySelector('meta[name="csrf-token"]').content; const r = await fetch('/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': token }, body: JSON.stringify({ email: 'browser-admin@example.test', password: 'Browser-admin-test-password-123' }) }); return r.status; })()`);
     if (![200, 204].includes(login)) throw Error('Admin fixture login failed: ' + login);
 
-    const propsOf = async path => { await navigate(path); return evaluate(`JSON.parse(document.getElementById('app').dataset.page).props`); };
+    const propsOf = async path => { await navigate(path); return evaluate(`JSON.parse(document.querySelector('script[data-page="app"]').textContent).props`); };
     const orders = await propsOf('/admin/orders');
     const customers = await propsOf('/admin/customers');
     const support = await propsOf('/admin/support');
@@ -199,7 +199,7 @@ try {
         await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
         await navigate('/admin/catalog');
         // Each imported SKU carries a separate nominal markup.
-        const stored = await evaluate(`JSON.parse(document.getElementById('app').dataset.page).props.products
+        const stored = await evaluate(`JSON.parse(document.querySelector('script[data-page="app"]').textContent).props.products
             .flatMap(p => (p.packages || []).map(k => ({
                 sku: (k.mappings || []).map(m => m.external_sku).join(','),
                 cost: Number((k.mappings || [])[0]?.cost_idr ?? 0),
