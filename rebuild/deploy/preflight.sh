@@ -159,22 +159,25 @@ fi
 # systemd resolves a bare command name like this (systemd.exec(5), PATHS): a
 # PATH the unit itself supplies wins; otherwise ExecSearchPath; otherwise
 # the documented default search path. The deploy shell's PATH never
-# applies. Replay the unit file (systemctl cat prints unit + drop-ins in
-# order) to collect the unit-supplied PATH: Environment= assignments, files
-# named by EnvironmentFile=, and PassEnvironment=PATH (value from the
-# manager environment). The last assignment wins, matching systemd; once a
-# unit PATH is supplied there is no fallback to ExecSearchPath or default.
+# applies. The unit-supplied PATH is collected from the unit file and its
+# drop-ins (systemctl cat) using systemd's source precedence, which does
+# not follow directive order: variables passed from the manager
+# (PassEnvironment=) apply first, then Environment= assignments, then
+# EnvironmentFile= contents last; within one source the last value wins.
+# Once a unit PATH is supplied there is no fallback to ExecSearchPath.
 if [[ -n "${fpm_binary}" && "${fpm_binary}" != */* ]]; then
-  unit_path=""
+  passed_path=""
+  assigned_path=""
+  file_path=""
   manager_path="$(systemctl show-environment 2>/dev/null | sed -n 's/^PATH=//p' || true)"
-  while IFS= read -r unit_line; do
+  while IFS= read -r unit_line || [[ -n "${unit_line}" ]]; do
     case "${unit_line}" in
       Environment=*)
         env_value="${unit_line#Environment=}"
         env_value="${env_value//\"/}"
         for assignment in ${env_value}; do
           case "${assignment}" in
-            PATH=*) unit_path="${assignment#PATH=}" ;;
+            PATH=*) assigned_path="${assignment#PATH=}" ;;
           esac
         done
         ;;
@@ -182,9 +185,9 @@ if [[ -n "${fpm_binary}" && "${fpm_binary}" != */* ]]; then
         env_file="${unit_line#EnvironmentFile=}"
         env_file="${env_file#-}"
         if [[ -f "${env_file}" ]]; then
-          while IFS= read -r env_file_line; do
+          while IFS= read -r env_file_line || [[ -n "${env_file_line}" ]]; do
             case "${env_file_line}" in
-              PATH=*|export\ PATH=*) unit_path="${env_file_line##*PATH=}" ;;
+              PATH=*|export\ PATH=*) file_path="${env_file_line##*PATH=}" ;;
             esac
           done < "${env_file}"
         fi
@@ -192,11 +195,12 @@ if [[ -n "${fpm_binary}" && "${fpm_binary}" != */* ]]; then
       PassEnvironment=*)
         pass_value="${unit_line#PassEnvironment=}"
         for pass_name in ${pass_value}; do
-          if [[ "${pass_name}" == "PATH" && -n "${manager_path}" ]]; then unit_path="${manager_path}"; fi
+          if [[ "${pass_name}" == "PATH" && -n "${manager_path}" ]]; then passed_path="${manager_path}"; fi
         done
         ;;
     esac
   done < <(systemctl cat "${PHP_FPM_SERVICE}" 2>/dev/null || true)
+  unit_path="${file_path:-${assigned_path:-${passed_path}}}"
   if [[ -n "${unit_path}" ]]; then
     search_path="${unit_path}"
   else
