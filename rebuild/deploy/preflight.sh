@@ -23,20 +23,59 @@ ENV_FILE="${APP_DIR}/.env"
 [[ -d "${APP_DIR}" ]] || { echo "APP_DIR not found: ${APP_DIR}" >&2; exit 1; }
 [[ -r "${ENV_FILE}" ]] || { echo "Production .env is missing" >&2; exit 1; }
 
+# True when the text (the part after an opening double quote) contains the
+# closing double quote. A backslash escapes the next character, as in dotenv.
+env_dq_closes() {
+  local text="$1" index char
+  for ((index = 0; index < ${#text}; index++)); do
+    char="${text:index:1}"
+    if [[ "${char}" == "\\" ]]; then
+      index=$((index + 1))
+    elif [[ "${char}" == '"' ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+# Print each logical .env entry that assigns the key. A double-quoted value may
+# span several lines, and the lines inside it are never entry starts, so
+# pin-like text there is not counted. Only double-quoted values are treated as
+# multiline here (single-quoted multiline values are not modelled).
+env_pin_entries() {
+  local key="$1" line value inside_double_quotes=0
+  local assign_re="^[[:space:]]*(export[[:space:]]+)?${key}[[:space:]]*="
+  local any_assign_re='^[[:space:]]*(export[[:space:]]+)?[A-Za-z_][A-Za-z0-9_.]*[[:space:]]*=(.*)$'
+  while IFS= read -r line || [[ -n "${line}" ]]; do
+    if [[ "${inside_double_quotes}" -eq 1 ]]; then
+      if env_dq_closes "${line}"; then inside_double_quotes=0; fi
+      continue
+    fi
+    [[ "${line}" =~ ${any_assign_re} ]] || continue
+    value="${BASH_REMATCH[2]}"
+    value="${value#"${value%%[![:space:]]*}"}"
+    if [[ "${line}" =~ ${assign_re} ]]; then
+      printf '%s\n' "${line}"
+    fi
+    if [[ "${value}" == \"* ]] && ! env_dq_closes "${value:1}"; then
+      inside_double_quotes=1
+    fi
+  done < "${ENV_FILE}"
+}
 # Laravel 13 changed the default cache/redis/session names. deploy.sh uses the
 # live .env as is, so these pins must exist there or existing cache entries,
 # Redis sessions and queued jobs are orphaned at deploy time.
 check_env_pin() {
-  local key="$1" expected="$2" count rest value
+  local key="$1" expected="$2" count rest value entries
   local assign_re="^[[:space:]]*(export[[:space:]]+)?${key}[[:space:]]*="
   local bare_re='^([^[:space:]#"'"'"']*)([[:space:]]+#.*|[[:space:]]*)$'
   local dq_re='^"([^"]*)"[[:space:]]*(#.*)?$'
   local sq_re="^'([^']*)'[[:space:]]*(#.*)?\$"
-  count="$(grep -c -E "${assign_re}" "${ENV_FILE}" || true)"
+  entries="$(env_pin_entries "${key}")"
+  if [[ -z "${entries}" ]]; then count=0; else count="$(printf '%s\n' "${entries}" | wc -l)"; fi
   [[ "${count}" -ge 1 ]] || { echo "Production .env is missing ${key} (expected ${expected})" >&2; exit 1; }
   # dotenv applies the later duplicate, so a single assignment is required.
   [[ "${count}" -eq 1 ]] || { echo "Production .env assigns ${key} more than once" >&2; exit 1; }
-  rest="$(grep -E "${assign_re}" "${ENV_FILE}")"
+  rest="${entries}"
   rest="${rest#*=}"
   rest="${rest#"${rest%%[![:space:]]*}"}"
   if [[ "${rest}" =~ ${dq_re} || "${rest}" =~ ${sq_re} ]]; then
@@ -75,6 +114,30 @@ done
 
 systemctl cat "${PHP_FPM_SERVICE}" >/dev/null 2>&1 \
   || { echo "PHP-FPM service not found: ${PHP_FPM_SERVICE}" >&2; exit 1; }
+
+# The FPM service serves the requests, so the binary its unit actually runs
+# must be PHP 8.6+ too, not only the CLI PHP_BIN. systemctl show prints
+# "{ path=BIN ; argv[]=BIN ARGS ; ... }"; a plain "[@-+!]BIN ARGS" is accepted too.
+fpm_exec_start="$(systemctl show -p ExecStart --value "${PHP_FPM_SERVICE}" 2>/dev/null || true)"
+fpm_binary=""
+if [[ "${fpm_exec_start}" =~ path=([^[:space:];]+) ]]; then
+  fpm_binary="${BASH_REMATCH[1]}"
+elif [[ "${fpm_exec_start}" =~ ^[[:space:]]*[@+!-]*([^[:space:];]+) ]]; then
+  fpm_binary="${BASH_REMATCH[1]}"
+fi
+fpm_version_line=""
+if [[ -n "${fpm_binary}" && -x "${fpm_binary}" && ! -d "${fpm_binary}" ]]; then
+  fpm_version_line="$("${fpm_binary}" -v 2>/dev/null | head -n 1 || true)"
+fi
+if [[ ! "${fpm_version_line}" =~ ^PHP[[:space:]]+([0-9]+)\.([0-9]+)\.([0-9]+)[[:space:]] ]]; then
+  echo "Cannot determine the PHP version of the ${PHP_FPM_SERVICE} binary (resolved: ${fpm_binary:-none})" >&2
+  exit 1
+fi
+fpm_major=$((10#${BASH_REMATCH[1]})) fpm_minor=$((10#${BASH_REMATCH[2]}))
+if (( fpm_major < 8 || (fpm_major == 8 && fpm_minor < 6) )); then
+  echo "PHP-FPM binary ${fpm_binary} runs PHP ${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.${BASH_REMATCH[3]}; 8.6.0+ is required" >&2
+  exit 1
+fi
 
 "${PHP_BIN}" -r 'exit(version_compare(PHP_VERSION, "8.6.0", ">=") ? 0 : 1);' \
   || { echo "PHP 8.6+ is required" >&2; exit 1; }
@@ -411,6 +474,13 @@ GIT_CONFIG_COUNT=1 \
 GIT_CONFIG_KEY_0=safe.directory \
 GIT_CONFIG_VALUE_0="${REPO_DIR}" \
 "${COMPOSER_BIN}" validate --strict
+# Composer's own interpreter must satisfy the lock (deploy.sh runs Composer).
+COMPOSER_ALLOW_SUPERUSER=1 \
+GIT_CONFIG_COUNT=1 \
+GIT_CONFIG_KEY_0=safe.directory \
+GIT_CONFIG_VALUE_0="${REPO_DIR}" \
+"${COMPOSER_BIN}" check-platform-reqs --lock --no-dev \
+  || { echo "Composer check-platform-reqs failed: the platform does not satisfy composer.lock" >&2; exit 1; }
 "${NPM_BIN}" --version >/dev/null
 
 mysql --defaults-extra-file="${MYSQL_DEFAULTS_FILE}" "${BACKUP_DATABASE_NAME}" \
