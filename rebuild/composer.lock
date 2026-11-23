@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "e3bc87e1dd35a70042236832f35e3fc9",
+    "content-hash": "6164f62990f4580087b09d3694ede8af",
     "packages": [
         {
             "name": "bacon/bacon-qr-code",
@@ -1033,7 +1033,7 @@
                     "homepage": "https://github.com/Nyholm"
                 },
                 {
-                    "name": "M\u00e1rk S\u00e1gi-Kaz\u00e1r",
+                    "name": "Márk Sági-Kazár",
                     "email": "mark.sagikazar@gmail.com",
                     "homepage": "https://github.com/sagikazarmark"
                 },
@@ -1234,7 +1234,7 @@
                     "homepage": "https://github.com/Nyholm"
                 },
                 {
-                    "name": "M\u00e1rk S\u00e1gi-Kaz\u00e1r",
+                    "name": "Márk Sági-Kazár",
                     "email": "mark.sagikazar@gmail.com",
                     "homepage": "https://github.com/sagikazarmark"
                 },
@@ -1244,7 +1244,7 @@
                     "homepage": "https://github.com/Tobion"
                 },
                 {
-                    "name": "M\u00e1rk S\u00e1gi-Kaz\u00e1r",
+                    "name": "Márk Sági-Kazár",
                     "email": "mark.sagikazar@gmail.com",
                     "homepage": "https://sagikazarmark.hu"
                 }
@@ -2744,7 +2744,7 @@
                     "email": "pabs@pablotron.org"
                 },
                 {
-                    "name": "Jonatan M\u00e4nnchen",
+                    "name": "Jonatan Männchen",
                     "email": "jonatan@maennchen.ch"
                 },
                 {
@@ -2752,7 +2752,7 @@
                     "email": "donatj@gmail.com"
                 },
                 {
-                    "name": "Andr\u00e1s Koles\u00e1r",
+                    "name": "András Kolesár",
                     "email": "kolesar@kolesar.hu"
                 }
             ],
@@ -3035,7 +3035,7 @@
                     "homepage": "https://davidgrudl.com"
                 }
             ],
-            "description": "\ud83d\udcd0 Nette Schema: validates and normalizes data such as configuration or API input against a schema described in a few readable lines of PHP, with precise error messages.",
+            "description": "📐 Nette Schema: validates and normalizes data such as configuration or API input against a schema described in a few readable lines of PHP, with precise error messages.",
             "homepage": "https://doc.nette.org/schema",
             "keywords": [
                 "configuration",
@@ -3118,7 +3118,7 @@
                     "homepage": "https://nette.org/contributors"
                 }
             ],
-            "description": "\ud83d\udee0  Nette Utils: lightweight utilities for string & array manipulation, image handling, safe JSON encoding/decoding, validation, slug or strong password generating etc.",
+            "description": "🛠  Nette Utils: lightweight utilities for string & array manipulation, image handling, safe JSON encoding/decoding, validation, slug or strong password generating etc.",
             "homepage": "https://nette.org",
             "keywords": [
                 "array",
@@ -3614,7 +3614,7 @@
                     "role": "Developer"
                 },
                 {
-                    "name": "Hans-J\u00fcrgen Petrich",
+                    "name": "Hans-Jürgen Petrich",
                     "email": "petrich@tronic-media.com",
                     "role": "Developer"
                 },
@@ -5103,7 +5103,7 @@
                     "email": "fabien@symfony.com"
                 },
                 {
-                    "name": "Jean-Fran\u00e7ois Simon",
+                    "name": "Jean-François Simon",
                     "email": "jeanfrancois.simon@sensiolabs.com"
                 },
                 {
@@ -6827,7 +6827,7 @@
                     "email": "nyamsprod@gmail.com"
                 },
                 {
-                    "name": "Tim D\u00fcsterhus",
+                    "name": "Tim Düsterhus",
                     "email": "tim@tideways-gmbh.com"
                 },
                 {
@@ -6912,7 +6912,7 @@
             ],
             "authors": [
                 {
-                    "name": "Gr\u00e9goire Pineau",
+                    "name": "Grégoire Pineau",
                     "email": "lyrixx@lyrixx.info"
                 },
                 {
@@ -7142,7 +7142,7 @@
             ],
             "authors": [
                 {
-                    "name": "K\u00e9vin Dunglas",
+                    "name": "Kévin Dunglas",
                     "email": "dunglas@gmail.com"
                 },
                 {
@@ -7832,7 +7832,7 @@
             ],
             "authors": [
                 {
-                    "name": "Gr\u00e9goire Pineau",
+                    "name": "Grégoire Pineau",
                     "email": "lyrixx@lyrixx.info"
                 },
                 {
@@ -8569,7 +8569,7 @@
             ],
             "authors": [
                 {
-                    "name": "P\u00e1draic Brady",
+                    "name": "Pádraic Brady",
                     "email": "padraic.brady@gmail.com",
                     "homepage": "https://github.com/padraic",
                     "role": "Author"
