@@ -156,14 +156,54 @@ if [[ "${fpm_exec_start}" =~ path=([^[:space:];]+) ]]; then
 elif [[ "${fpm_exec_start}" =~ ^[[:space:]]*[@+!-]*([^[:space:];]+) ]]; then
   fpm_binary="${BASH_REMATCH[1]}"
 fi
-# systemd resolves a bare command name through the unit's executable search
-# path (ExecSearchPath, or the documented default when the unit leaves it
-# unset), never through the deploy shell's PATH, so resolve the name exactly
-# the same way; the shell's PATH must not substitute a different binary.
+# systemd resolves a bare command name like this (systemd.exec(5), PATHS): a
+# PATH the unit itself supplies wins; otherwise ExecSearchPath; otherwise
+# the documented default search path. The deploy shell's PATH never
+# applies. Replay the unit file (systemctl cat prints unit + drop-ins in
+# order) to collect the unit-supplied PATH: Environment= assignments, files
+# named by EnvironmentFile=, and PassEnvironment=PATH (value from the
+# manager environment). The last assignment wins, matching systemd; once a
+# unit PATH is supplied there is no fallback to ExecSearchPath or default.
 if [[ -n "${fpm_binary}" && "${fpm_binary}" != */* ]]; then
-  search_path="$(systemctl show -p ExecSearchPath --value "${PHP_FPM_SERVICE}" 2>/dev/null || true)"
-  if [[ -z "${search_path}" ]]; then
-    search_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+  unit_path=""
+  manager_path="$(systemctl show-environment 2>/dev/null | sed -n 's/^PATH=//p' || true)"
+  while IFS= read -r unit_line; do
+    case "${unit_line}" in
+      Environment=*)
+        env_value="${unit_line#Environment=}"
+        env_value="${env_value//\"/}"
+        for assignment in ${env_value}; do
+          case "${assignment}" in
+            PATH=*) unit_path="${assignment#PATH=}" ;;
+          esac
+        done
+        ;;
+      EnvironmentFile=*)
+        env_file="${unit_line#EnvironmentFile=}"
+        env_file="${env_file#-}"
+        if [[ -f "${env_file}" ]]; then
+          while IFS= read -r env_file_line; do
+            case "${env_file_line}" in
+              PATH=*|export\ PATH=*) unit_path="${env_file_line##*PATH=}" ;;
+            esac
+          done < "${env_file}"
+        fi
+        ;;
+      PassEnvironment=*)
+        pass_value="${unit_line#PassEnvironment=}"
+        for pass_name in ${pass_value}; do
+          if [[ "${pass_name}" == "PATH" && -n "${manager_path}" ]]; then unit_path="${manager_path}"; fi
+        done
+        ;;
+    esac
+  done < <(systemctl cat "${PHP_FPM_SERVICE}" 2>/dev/null || true)
+  if [[ -n "${unit_path}" ]]; then
+    search_path="${unit_path}"
+  else
+    search_path="$(systemctl show -p ExecSearchPath --value "${PHP_FPM_SERVICE}" 2>/dev/null || true)"
+    if [[ -z "${search_path}" ]]; then
+      search_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    fi
   fi
   resolved_binary=""
   for search_dir in ${search_path//:/ }; do
