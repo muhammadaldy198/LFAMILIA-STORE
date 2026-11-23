@@ -23,20 +23,90 @@ ENV_FILE="${APP_DIR}/.env"
 [[ -d "${APP_DIR}" ]] || { echo "APP_DIR not found: ${APP_DIR}" >&2; exit 1; }
 [[ -r "${ENV_FILE}" ]] || { echo "Production .env is missing" >&2; exit 1; }
 
+# True when the text (the part after an opening double quote) contains the
+# closing double quote. A backslash escapes the next character, as in dotenv.
+env_dq_closes() {
+  local text="$1" index char
+  for ((index = 0; index < ${#text}; index++)); do
+    char="${text:index:1}"
+    if [[ "${char}" == "\\" ]]; then
+      index=$((index + 1))
+    elif [[ "${char}" == '"' ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+# Print the number of unescaped double quotes in $1. A backslash escapes the
+# next character, as in phpdotenv's multiline detection.
+env_dq_count() {
+  local text="$1" index char count=0
+  for ((index = 0; index < ${#text}; index++)); do
+    char="${text:index:1}"
+    if [[ "${char}" == "\\" ]]; then
+      index=$((index + 1))
+    elif [[ "${char}" == '"' ]]; then
+      count=$((count + 1))
+    fi
+  done
+  printf '%s' "${count}"
+}
+
+# True when $1 starts a multiline double-quoted value, using phpdotenv's own
+# rule (Parser/Lines): the line contains a literal =" with no # before it, and
+# the value does not close on the same line (more than one unescaped quote).
+env_dq_starts_multiline() {
+  local line="$1" prefix
+  [[ "${line}" == *'="'* ]] || return 1
+  prefix="${line%%'="'*}"
+  [[ "${prefix}" == *'#'* ]] && return 1
+  [[ "$(env_dq_count "${line}")" -gt 1 ]] && return 1
+  return 0
+}
+
+# Print each logical .env entry line. A double-quoted value may span several
+# lines, and the lines inside it are never entry starts, so assignment-like
+# text there is not an entry. With $1, print only the entries assigning that
+# key. Only double-quoted values are multiline in phpdotenv (a single-quoted
+# value never starts one), so no other quoting is modelled here.
+env_entry_lines() {
+  local key="${1:-}" line inside_double_quotes=0
+  local assign_re=""
+  local any_assign_re='^[[:space:]]*(export[[:space:]]+)?[A-Za-z_][A-Za-z0-9_.]*[[:space:]]*='
+  if [[ -n "${key}" ]]; then
+    assign_re="^[[:space:]]*(export[[:space:]]+)?${key}[[:space:]]*="
+  fi
+  while IFS= read -r line || [[ -n "${line}" ]]; do
+    if [[ "${inside_double_quotes}" -eq 1 ]]; then
+      if env_dq_closes "${line}"; then inside_double_quotes=0; fi
+      continue
+    fi
+    if env_dq_starts_multiline "${line}"; then inside_double_quotes=1; fi
+    [[ "${line}" =~ ${any_assign_re} ]] || continue
+    if [[ -z "${key}" || "${line}" =~ ${assign_re} ]]; then
+      printf '%s\n' "${line}"
+    fi
+  done < "${ENV_FILE}"
+}
+
+env_pin_entries() {
+  env_entry_lines "$1"
+}
 # Laravel 13 changed the default cache/redis/session names. deploy.sh uses the
 # live .env as is, so these pins must exist there or existing cache entries,
 # Redis sessions and queued jobs are orphaned at deploy time.
 check_env_pin() {
-  local key="$1" expected="$2" count rest value
+  local key="$1" expected="$2" count rest value entries
   local assign_re="^[[:space:]]*(export[[:space:]]+)?${key}[[:space:]]*="
   local bare_re='^([^[:space:]#"'"'"']*)([[:space:]]+#.*|[[:space:]]*)$'
   local dq_re='^"([^"]*)"[[:space:]]*(#.*)?$'
   local sq_re="^'([^']*)'[[:space:]]*(#.*)?\$"
-  count="$(grep -c -E "${assign_re}" "${ENV_FILE}" || true)"
+  entries="$(env_pin_entries "${key}")"
+  if [[ -z "${entries}" ]]; then count=0; else count="$(printf '%s\n' "${entries}" | wc -l)"; fi
   [[ "${count}" -ge 1 ]] || { echo "Production .env is missing ${key} (expected ${expected})" >&2; exit 1; }
   # dotenv applies the later duplicate, so a single assignment is required.
   [[ "${count}" -eq 1 ]] || { echo "Production .env assigns ${key} more than once" >&2; exit 1; }
-  rest="$(grep -E "${assign_re}" "${ENV_FILE}")"
+  rest="${entries}"
   rest="${rest#*=}"
   rest="${rest#"${rest%%[![:space:]]*}"}"
   if [[ "${rest}" =~ ${dq_re} || "${rest}" =~ ${sq_re} ]]; then
@@ -75,6 +145,163 @@ done
 
 systemctl cat "${PHP_FPM_SERVICE}" >/dev/null 2>&1 \
   || { echo "PHP-FPM service not found: ${PHP_FPM_SERVICE}" >&2; exit 1; }
+
+# The FPM service serves the requests, so the binary its unit actually runs
+# must be PHP 8.6+ too, not only the CLI PHP_BIN. systemctl show prints
+# "{ path=BIN ; argv[]=BIN ARGS ; ... }"; a plain "[@-+!]BIN ARGS" is accepted too.
+fpm_exec_start="$(systemctl show -p ExecStart --value "${PHP_FPM_SERVICE}" 2>/dev/null || true)"
+fpm_binary=""
+if [[ "${fpm_exec_start}" =~ path=([^[:space:];]+) ]]; then
+  fpm_binary="${BASH_REMATCH[1]}"
+elif [[ "${fpm_exec_start}" =~ ^[[:space:]]*[@+!-]*([^[:space:];]+) ]]; then
+  fpm_binary="${BASH_REMATCH[1]}"
+fi
+# Apply one logical EnvironmentFile line: systemd joins a double- or
+# single-quoted value that spans several physical lines into one value, so
+# a line inside such a value must never be read as an assignment of its own.
+env_file_apply_line() {
+  local env_file_line="${1}"
+  env_file_line="${env_file_line%$'\r'}"
+  env_file_line="${env_file_line#"${env_file_line%%[![:space:]]*}"}"
+  case "${env_file_line}" in
+    PATH=*|export\ PATH=*)
+      file_path="${env_file_line##*PATH=}"
+      file_path="${file_path%"${file_path##*[![:space:]]}"}"
+      if [[ "${file_path}" == \"*\" || "${file_path}" == \'*\' ]]; then
+        file_path="${file_path:1:-1}"
+      fi
+      ;;
+  esac
+}
+
+# systemd resolves a bare command name like this (systemd.exec(5), PATHS): a
+# PATH the unit itself supplies wins; otherwise ExecSearchPath; otherwise
+# the documented default search path. The deploy shell's PATH never
+# applies. The unit-supplied PATH is collected from the unit file and its
+# drop-ins (systemctl cat) using systemd's source precedence, which does
+# not follow directive order: variables passed from the manager
+# (PassEnvironment=) apply first, then Environment= assignments, then
+# EnvironmentFile= contents last; within one source the last value wins.
+# Once a unit PATH is supplied there is no fallback to ExecSearchPath.
+if [[ -n "${fpm_binary}" && "${fpm_binary}" != */* ]]; then
+  passed_path=""
+  assigned_path=""
+  file_path=""
+  manager_path="$(systemctl show-environment 2>/dev/null | sed -n 's/^PATH=//p' || true)"
+  while IFS= read -r unit_line || [[ -n "${unit_line}" ]]; do
+    case "${unit_line}" in
+      Environment=*)
+        env_value="${unit_line#Environment=}"
+        env_stripped="${env_value//[[:space:]]/}"
+        env_stripped="${env_stripped//\"/}"
+        env_stripped="${env_stripped//\'/}"
+        if [[ -z "${env_stripped}" ]]; then assigned_path=""; fi
+        env_assignments=()
+        env_token=""
+        env_quote=""
+        i=0
+        while (( i < ${#env_value} )); do
+          ch="${env_value:i:1}"
+          if [[ -n "${env_quote}" ]]; then
+            if [[ "${ch}" == "\\" && "${env_quote}" == '"' ]]; then
+              nxt="${env_value:i+1:1}"
+              if [[ "${nxt}" == '"' || "${nxt}" == '\' ]]; then env_token+="${nxt}"; i=$((i+1)); else env_token+="${ch}"; fi
+            elif [[ "${ch}" == "${env_quote}" ]]; then
+              env_quote=""
+            else
+              env_token+="${ch}"
+            fi
+          else
+            case "${ch}" in
+              '"'|"'") env_quote="${ch}" ;;
+              \\) nxt="${env_value:i+1:1}"; if [[ -n "${nxt}" ]]; then env_token+="${nxt}"; i=$((i+1)); else env_token+="${ch}"; fi ;;
+              ' '|$'\t') if [[ -n "${env_token}" ]]; then env_assignments+=("${env_token}"); env_token=""; fi ;;
+              *) env_token+="${ch}" ;;
+            esac
+          fi
+          i=$((i+1))
+        done
+        if [[ -n "${env_token}" ]]; then env_assignments+=("${env_token}"); fi
+        for assignment in "${env_assignments[@]}"; do
+          case "${assignment}" in
+            PATH=*) assigned_path="${assignment#PATH=}" ;;
+          esac
+        done
+        ;;
+      EnvironmentFile=*)
+        env_file="${unit_line#EnvironmentFile=}"
+        env_file="${env_file#-}"
+        if [[ -z "${env_file}" ]]; then file_path=""; fi
+        env_file_list=()
+        if [[ "${env_file}" == *[*?[]* ]]; then
+          shopt -s nullglob
+          env_file_list=( ${env_file} )
+          shopt -u nullglob
+        elif [[ -f "${env_file}" ]]; then
+          env_file_list=( "${env_file}" )
+        fi
+        for env_file in "${env_file_list[@]}"; do
+          env_content="$(< "${env_file}")"
+          env_logical=""; env_q=""; env_esc=false
+          for (( k=0; k<${#env_content}; k++ )); do
+            env_c="${env_content:k:1}"
+            if [[ "${env_esc}" == true ]]; then env_logical+="${env_c}"; env_esc=false; continue; fi
+            if [[ "${env_c}" == '\' && "${env_q}" == '"' ]]; then env_esc=true; env_logical+="${env_c}"; continue; fi
+            if [[ -n "${env_q}" ]]; then
+              if [[ "${env_c}" == "${env_q}" ]]; then env_q=""; fi
+              env_logical+="${env_c}"
+              continue
+            fi
+            case "${env_c}" in
+              '"'|"'") env_q="${env_c}"; env_logical+="${env_c}" ;;
+              $'\n') env_file_apply_line "${env_logical}"; env_logical="" ;;
+              *) env_logical+="${env_c}" ;;
+            esac
+          done
+          if [[ -n "${env_logical}" ]]; then env_file_apply_line "${env_logical}"; fi
+        done
+        ;;
+      PassEnvironment=*)
+        pass_value="${unit_line#PassEnvironment=}"
+        if [[ -z "${pass_value//[[:space:]]/}" ]]; then passed_path=""; fi
+        for pass_name in ${pass_value}; do
+          if [[ "${pass_name}" == "PATH" && -n "${manager_path}" ]]; then passed_path="${manager_path}"; fi
+        done
+        ;;
+    esac
+  done < <(systemctl cat "${PHP_FPM_SERVICE}" 2>/dev/null || true)
+  unit_path="${file_path:-${assigned_path:-${passed_path}}}"
+  if [[ -n "${unit_path}" ]]; then
+    search_path="${unit_path}"
+  else
+    search_path="$(systemctl show -p ExecSearchPath --value "${PHP_FPM_SERVICE}" 2>/dev/null || true)"
+    if [[ -z "${search_path}" ]]; then
+      search_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    fi
+  fi
+  resolved_binary=""
+  IFS=':' read -ra search_dirs <<< "${search_path}"
+  for search_dir in "${search_dirs[@]}"; do
+    if [[ -n "${search_dir}" && -x "${search_dir}/${fpm_binary}" && ! -d "${search_dir}/${fpm_binary}" ]]; then
+      resolved_binary="${search_dir}/${fpm_binary}"
+      break
+    fi
+  done
+  if [[ -n "${resolved_binary}" ]]; then fpm_binary="${resolved_binary}"; fi
+fi
+fpm_version_line=""
+if [[ -n "${fpm_binary}" && -x "${fpm_binary}" && ! -d "${fpm_binary}" ]]; then
+  fpm_version_line="$("${fpm_binary}" -v 2>/dev/null | head -n 1 || true)"
+fi
+if [[ ! "${fpm_version_line}" =~ ^PHP[[:space:]]+([0-9]+)\.([0-9]+)\.([0-9]+)[[:space:]] ]]; then
+  echo "Cannot determine the PHP version of the ${PHP_FPM_SERVICE} binary (resolved: ${fpm_binary:-none})" >&2
+  exit 1
+fi
+fpm_major=$((10#${BASH_REMATCH[1]})) fpm_minor=$((10#${BASH_REMATCH[2]}))
+if (( fpm_major < 8 || (fpm_major == 8 && fpm_minor < 6) )); then
+  echo "PHP-FPM binary ${fpm_binary} runs PHP ${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.${BASH_REMATCH[3]}; 8.6.0+ is required" >&2
+  exit 1
+fi
 
 "${PHP_BIN}" -r 'exit(version_compare(PHP_VERSION, "8.6.0", ">=") ? 0 : 1);' \
   || { echo "PHP 8.6+ is required" >&2; exit 1; }
@@ -120,7 +347,50 @@ if ($envContents === false) {
 if (str_starts_with($envContents, "\xEF\xBB\xBF")) {
     $envContents = substr($envContents, 3);
 }
-foreach (explode("\n", $envContents) as $line) {
+// Join multiline double-quoted values into single logical entries first,
+// exactly as the phpdotenv Lines parser does (a value starts multiline when
+// its line contains a literal =" with no # before it and does not close on
+// the same line), so assignment-like lines inside a quoted value are never
+// mistaken for entries.
+$rawLines = explode("\n", $envContents);
+$lines = [];
+$buffer = [];
+$inMultiline = false;
+foreach ($rawLines as $rawLine) {
+    $startsHere = false;
+    if (! $inMultiline) {
+        $eqPos = strpos($rawLine, "=\"");
+        if ($eqPos !== false) {
+            $hashPos = strpos($rawLine, "#");
+            if ($hashPos === false || $hashPos >= $eqPos) {
+                $stripped = str_replace("\\\\", "", $rawLine);
+                if (preg_match_all("/(?<!\\\\)\"/", $stripped) <= 1) {
+                    $startsHere = true;
+                }
+            }
+        }
+    }
+    if ($startsHere) {
+        $inMultiline = true;
+        $buffer = [$rawLine];
+        continue;
+    }
+    if ($inMultiline) {
+        $buffer[] = $rawLine;
+        $stripped = str_replace("\\\\", "", $rawLine);
+        if (preg_match_all("/(?<!\\\\)\"/", $stripped) >= 1) {
+            $lines[] = implode("\n", $buffer);
+            $buffer = [];
+            $inMultiline = false;
+        }
+        continue;
+    }
+    $lines[] = $rawLine;
+}
+if ($inMultiline) {
+    $lines[] = implode("\n", $buffer);
+}
+foreach ($lines as $line) {
     $line = trim($line);
     if ($line === "" || $line[0] === "#" || ! str_contains($line, "=")) {
         continue;
@@ -256,13 +526,17 @@ for pair in \
   'SESSION_DRIVER=redis' \
   'SESSION_ENCRYPT=true' \
   'SESSION_SECURE_COOKIE=true'; do
-  grep -Fqx "${pair}" "${ENV_FILE}" || { echo "Required setting missing: ${pair}" >&2; exit 1; }
+  env_entry_lines | grep -Fx "${pair}" >/dev/null || { echo "Required setting missing: ${pair}" >&2; exit 1; }
 done
 
-grep -Eq '^APP_KEY=base64:.+$' "${ENV_FILE}" || { echo "APP_KEY must be generated server-side" >&2; exit 1; }
-grep -Eq '^APP_URL=https://' "${ENV_FILE}" || { echo "APP_URL must use HTTPS" >&2; exit 1; }
-grep -Eq '^APP_TRUSTED_HOSTS=.+$' "${ENV_FILE}" || { echo "APP_TRUSTED_HOSTS is required" >&2; exit 1; }
-grep -Eq '^[[:space:]]*(export[[:space:]]+)?TRUSTED_PROXIES[[:space:]]*=.+$' "${ENV_FILE}" || { echo "TRUSTED_PROXIES is required" >&2; exit 1; }
+env_entry_lines | grep -E '^APP_KEY=base64:.+$' >/dev/null|| { echo "APP_KEY must be generated server-side" >&2; exit 1; }
+env_entry_lines | grep -E '^APP_URL=https://' >/dev/null|| { echo "APP_URL must use HTTPS" >&2; exit 1; }
+env_entry_lines | grep -E '^APP_TRUSTED_HOSTS=.+$' >/dev/null|| { echo "APP_TRUSTED_HOSTS is required" >&2; exit 1; }
+env_entry_lines | grep -E '^[[:space:]]*(export[[:space:]]+)?TRUSTED_PROXIES[[:space:]]*=.+$' >/dev/null|| { echo "TRUSTED_PROXIES is required" >&2; exit 1; }
+# This loop stays grep-based on purpose: it rejects on ANY bad entry, so an
+# extra assignment-like line inside a multiline value can only cause a false
+# rejection, never hide a real wildcard. It is also extracted standalone by
+# the test suite, so it must not depend on helpers defined elsewhere here.
 while IFS= read -r proxies_line; do
   proxies_raw="${proxies_line#*TRUSTED_PROXIES}"
   proxies_raw="${proxies_raw#"${proxies_raw%%[![:space:]]*}"}"
@@ -411,6 +685,13 @@ GIT_CONFIG_COUNT=1 \
 GIT_CONFIG_KEY_0=safe.directory \
 GIT_CONFIG_VALUE_0="${REPO_DIR}" \
 "${COMPOSER_BIN}" validate --strict
+# Composer's own interpreter must satisfy the lock (deploy.sh runs Composer).
+COMPOSER_ALLOW_SUPERUSER=1 \
+GIT_CONFIG_COUNT=1 \
+GIT_CONFIG_KEY_0=safe.directory \
+GIT_CONFIG_VALUE_0="${REPO_DIR}" \
+"${COMPOSER_BIN}" check-platform-reqs --lock --no-dev \
+  || { echo "Composer check-platform-reqs failed: the platform does not satisfy composer.lock" >&2; exit 1; }
 "${NPM_BIN}" --version >/dev/null
 
 mysql --defaults-extra-file="${MYSQL_DEFAULTS_FILE}" "${BACKUP_DATABASE_NAME}" \
