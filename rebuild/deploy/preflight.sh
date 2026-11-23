@@ -156,6 +156,24 @@ if [[ "${fpm_exec_start}" =~ path=([^[:space:];]+) ]]; then
 elif [[ "${fpm_exec_start}" =~ ^[[:space:]]*[@+!-]*([^[:space:];]+) ]]; then
   fpm_binary="${BASH_REMATCH[1]}"
 fi
+# Apply one logical EnvironmentFile line: systemd joins a double- or
+# single-quoted value that spans several physical lines into one value, so
+# a line inside such a value must never be read as an assignment of its own.
+env_file_apply_line() {
+  local env_file_line="${1}"
+  env_file_line="${env_file_line%$'\r'}"
+  env_file_line="${env_file_line#"${env_file_line%%[![:space:]]*}"}"
+  case "${env_file_line}" in
+    PATH=*|export\ PATH=*)
+      file_path="${env_file_line##*PATH=}"
+      file_path="${file_path%"${file_path##*[![:space:]]}"}"
+      if [[ "${file_path}" == \"*\" || "${file_path}" == \'*\' ]]; then
+        file_path="${file_path:1:-1}"
+      fi
+      ;;
+  esac
+}
+
 # systemd resolves a bare command name like this (systemd.exec(5), PATHS): a
 # PATH the unit itself supplies wins; otherwise ExecSearchPath; otherwise
 # the documented default search path. The deploy shell's PATH never
@@ -214,21 +232,34 @@ if [[ -n "${fpm_binary}" && "${fpm_binary}" != */* ]]; then
         env_file="${unit_line#EnvironmentFile=}"
         env_file="${env_file#-}"
         if [[ -z "${env_file}" ]]; then file_path=""; fi
-        if [[ -f "${env_file}" ]]; then
-          while IFS= read -r env_file_line || [[ -n "${env_file_line}" ]]; do
-            env_file_line="${env_file_line%$'\r'}"
-            env_file_line="${env_file_line#"${env_file_line%%[![:space:]]*}"}"
-            case "${env_file_line}" in
-              PATH=*|export\ PATH=*)
-                file_path="${env_file_line##*PATH=}"
-                file_path="${file_path%"${file_path##*[![:space:]]}"}"
-                if [[ "${file_path}" == \"*\" || "${file_path}" == \'*\' ]]; then
-                  file_path="${file_path:1:-1}"
-                fi
-                ;;
-            esac
-          done < "${env_file}"
+        env_file_list=()
+        if [[ "${env_file}" == *[*?[]* ]]; then
+          shopt -s nullglob
+          env_file_list=( ${env_file} )
+          shopt -u nullglob
+        elif [[ -f "${env_file}" ]]; then
+          env_file_list=( "${env_file}" )
         fi
+        for env_file in "${env_file_list[@]}"; do
+          env_content="$(< "${env_file}")"
+          env_logical=""; env_q=""; env_esc=false
+          for (( k=0; k<${#env_content}; k++ )); do
+            env_c="${env_content:k:1}"
+            if [[ "${env_esc}" == true ]]; then env_logical+="${env_c}"; env_esc=false; continue; fi
+            if [[ "${env_c}" == '\' && "${env_q}" == '"' ]]; then env_esc=true; env_logical+="${env_c}"; continue; fi
+            if [[ -n "${env_q}" ]]; then
+              if [[ "${env_c}" == "${env_q}" ]]; then env_q=""; fi
+              env_logical+="${env_c}"
+              continue
+            fi
+            case "${env_c}" in
+              '"'|"'") env_q="${env_c}"; env_logical+="${env_c}" ;;
+              $'\n') env_file_apply_line "${env_logical}"; env_logical="" ;;
+              *) env_logical+="${env_c}" ;;
+            esac
+          done
+          if [[ -n "${env_logical}" ]]; then env_file_apply_line "${env_logical}"; fi
+        done
         ;;
       PassEnvironment=*)
         pass_value="${unit_line#PassEnvironment=}"
