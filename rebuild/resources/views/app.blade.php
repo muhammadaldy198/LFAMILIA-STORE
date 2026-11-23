@@ -15,24 +15,24 @@
     @endphp
     @if ($seo)
         {{-- Inertia v2 adopts these keyed tags during hydration. --}}
-        <title inertia>{{ $seo['title'] }}</title>
-        <meta inertia="seo-robots" name="robots" content="index,follow">
-        <meta inertia="seo-description" name="description" content="{{ $seo['description'] }}">
-        <link inertia="seo-canonical" rel="canonical" href="{{ $seo['canonical'] }}">
-        <meta inertia="seo-site" property="og:site_name" content="{{ $seo['siteName'] }}">
-        <meta inertia="seo-locale" property="og:locale" content="id_ID">
-        <meta inertia="seo-type" property="og:type" content="{{ $seo['type'] }}">
-        <meta inertia="seo-og-title" property="og:title" content="{{ $seo['title'] }}">
-        <meta inertia="seo-og-description" property="og:description" content="{{ $seo['description'] }}">
-        <meta inertia="seo-og-url" property="og:url" content="{{ $seo['canonical'] }}">
+        <title data-inertia>{{ $seo['title'] }}</title>
+        <meta data-inertia="seo-robots" name="robots" content="index,follow">
+        <meta data-inertia="seo-description" name="description" content="{{ $seo['description'] }}">
+        <link data-inertia="seo-canonical" rel="canonical" href="{{ $seo['canonical'] }}">
+        <meta data-inertia="seo-site" property="og:site_name" content="{{ $seo['siteName'] }}">
+        <meta data-inertia="seo-locale" property="og:locale" content="id_ID">
+        <meta data-inertia="seo-type" property="og:type" content="{{ $seo['type'] }}">
+        <meta data-inertia="seo-og-title" property="og:title" content="{{ $seo['title'] }}">
+        <meta data-inertia="seo-og-description" property="og:description" content="{{ $seo['description'] }}">
+        <meta data-inertia="seo-og-url" property="og:url" content="{{ $seo['canonical'] }}">
         @if ($seo['image'])
-            <meta inertia="seo-og-image" property="og:image" content="{{ $seo['image'] }}">
+            <meta data-inertia="seo-og-image" property="og:image" content="{{ $seo['image'] }}">
         @endif
-        <meta inertia="seo-twitter-card" name="twitter:card" content="{{ $seo['image'] ? 'summary_large_image' : 'summary' }}">
-        <meta inertia="seo-twitter-title" name="twitter:title" content="{{ $seo['title'] }}">
-        <meta inertia="seo-twitter-description" name="twitter:description" content="{{ $seo['description'] }}">
+        <meta data-inertia="seo-twitter-card" name="twitter:card" content="{{ $seo['image'] ? 'summary_large_image' : 'summary' }}">
+        <meta data-inertia="seo-twitter-title" name="twitter:title" content="{{ $seo['title'] }}">
+        <meta data-inertia="seo-twitter-description" name="twitter:description" content="{{ $seo['description'] }}">
         @if ($seo['structuredData'])
-            <script inertia="seo-jsonld" type="application/ld+json">@json($seo['structuredData'])</script>
+            <script data-inertia="seo-jsonld" type="application/ld+json">@json($seo['structuredData'])</script>
         @endif
     @else
         <meta name="robots" content="noindex,nofollow">

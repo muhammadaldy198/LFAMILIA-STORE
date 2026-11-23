@@ -13,7 +13,7 @@
     "test:hooks": "node scripts/hooks/smoke.mjs"
   },
   "dependencies": {
-    "@inertiajs/vue3": "^2.0.0",
+    "@inertiajs/vue3": "^3.0.0",
     "@lucide/vue": "^1.49.0",
     "@vueuse/core": "^15.0.0",
     "class-variance-authority": "^0.7.1",

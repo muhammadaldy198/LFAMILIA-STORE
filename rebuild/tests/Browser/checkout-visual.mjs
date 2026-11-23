@@ -90,7 +90,7 @@ try{
  await page.locator('#lfx-bottom-pay').click();await page.locator('.lfx-agreement').waitFor();
  await page.screenshot({path:`${output}/confirmation-real-quote.png`});
  const quote=await page.evaluate(async()=>{
-  const props=JSON.parse(document.querySelector('#app').dataset.page).props;
+  const props=JSON.parse(document.querySelector('script[data-page="app"]').textContent).props;
   const channel=props.paymentChannels.find(x=>x.available!==false);
   const response=await fetch('/checkout/quote',{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json','X-CSRF-TOKEN':document.querySelector('meta[name=csrf-token]').content},body:JSON.stringify({package_id:props.packages[0].id,payment_channel_code:channel.code,include_channel_totals:true})});
   return {status:response.status,body:await response.json()};
