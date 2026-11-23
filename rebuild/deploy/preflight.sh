@@ -36,8 +36,8 @@ done
 systemctl cat "${PHP_FPM_SERVICE}" >/dev/null 2>&1 \
   || { echo "PHP-FPM service not found: ${PHP_FPM_SERVICE}" >&2; exit 1; }
 
-"${PHP_BIN}" -r 'exit(version_compare(PHP_VERSION, "8.4.0", ">=") ? 0 : 1);' \
-  || { echo "PHP 8.4+ is required" >&2; exit 1; }
+"${PHP_BIN}" -r 'exit(version_compare(PHP_VERSION, "8.6.0", ">=") ? 0 : 1);' \
+  || { echo "PHP 8.6+ is required" >&2; exit 1; }
 
 for ext in pdo_mysql redis mbstring openssl; do
   "${PHP_BIN}" -r "exit(extension_loaded('${ext}') ? 0 : 1);" \
