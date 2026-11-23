@@ -107,7 +107,7 @@ class AdminReportRestorationTest extends TestCase
         ]);
     }
 
-    private function attempt(array $catalog, int $orderId, string $status, $createdAt): void
+    private function seedAttempt(array $catalog, int $orderId, string $status, $createdAt): void
     {
         DB::table('fulfillment_attempts')->insert([
             'order_id' => $orderId,
@@ -128,8 +128,8 @@ class AdminReportRestorationTest extends TestCase
         $catalog = $this->catalog('MAIN');
         $success = $this->order($catalog, 'SUCCESS', 'SUCCESS', now()->subDay(), true);
         $failed = $this->order($catalog, 'FAILED', 'FAILED', now()->subDay(), false);
-        $this->attempt($catalog, $success, 'SUCCESS', now()->subDay());
-        $this->attempt($catalog, $failed, 'FAILED_CONFIRMED', now()->subDay());
+        $this->seedAttempt($catalog, $success, 'SUCCESS', now()->subDay());
+        $this->seedAttempt($catalog, $failed, 'FAILED_CONFIRMED', now()->subDay());
 
         DB::table('payment_transactions')->insert([
             'order_id' => $success,

@@ -12,7 +12,7 @@ use App\Models\User;
 use App\Services\CheckoutPricing;
 use App\Services\PaymentRoutingService;
 use Illuminate\Cookie\CookieValuePrefix;
-use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Crypt;
@@ -521,7 +521,7 @@ class StorefrontParityTest extends TestCase
 
         // Laravel skips CSRF checks in test mode by default; explicitly restore
         // validation so the 419 regression cannot silently pass.
-        $this->app->bind(ValidateCsrfToken::class, StrictCsrfValidationMiddleware::class);
+        $this->app->bind(PreventRequestForgery::class, StrictCsrfValidationMiddleware::class);
         $this->withCredentials();
 
         $loginPage = $this->get('/login')->assertOk();
@@ -694,7 +694,7 @@ class StorefrontParityTest extends TestCase
 /**
  * Exercise real CSRF enforcement; Laravel otherwise bypasses it in testing.
  */
-class StrictCsrfValidationMiddleware extends ValidateCsrfToken
+class StrictCsrfValidationMiddleware extends PreventRequestForgery
 {
     protected function runningUnitTests(): bool
     {
