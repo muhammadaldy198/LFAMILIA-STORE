@@ -175,6 +175,7 @@ if [[ -n "${fpm_binary}" && "${fpm_binary}" != */* ]]; then
       Environment=*)
         env_value="${unit_line#Environment=}"
         env_value="${env_value//\"/}"
+        if [[ -z "${env_value//[[:space:]]/}" ]]; then assigned_path=""; fi
         for assignment in ${env_value}; do
           case "${assignment}" in
             PATH=*) assigned_path="${assignment#PATH=}" ;;
@@ -184,6 +185,7 @@ if [[ -n "${fpm_binary}" && "${fpm_binary}" != */* ]]; then
       EnvironmentFile=*)
         env_file="${unit_line#EnvironmentFile=}"
         env_file="${env_file#-}"
+        if [[ -z "${env_file}" ]]; then file_path=""; fi
         if [[ -f "${env_file}" ]]; then
           while IFS= read -r env_file_line || [[ -n "${env_file_line}" ]]; do
             env_file_line="${env_file_line%$'\r'}"
@@ -202,6 +204,7 @@ if [[ -n "${fpm_binary}" && "${fpm_binary}" != */* ]]; then
         ;;
       PassEnvironment=*)
         pass_value="${unit_line#PassEnvironment=}"
+        if [[ -z "${pass_value//[[:space:]]/}" ]]; then passed_path=""; fi
         for pass_name in ${pass_value}; do
           if [[ "${pass_name}" == "PATH" && -n "${manager_path}" ]]; then passed_path="${manager_path}"; fi
         done
@@ -218,8 +221,9 @@ if [[ -n "${fpm_binary}" && "${fpm_binary}" != */* ]]; then
     fi
   fi
   resolved_binary=""
-  for search_dir in ${search_path//:/ }; do
-    if [[ -x "${search_dir}/${fpm_binary}" && ! -d "${search_dir}/${fpm_binary}" ]]; then
+  IFS=':' read -ra search_dirs <<< "${search_path}"
+  for search_dir in "${search_dirs[@]}"; do
+    if [[ -n "${search_dir}" && -x "${search_dir}/${fpm_binary}" && ! -d "${search_dir}/${fpm_binary}" ]]; then
       resolved_binary="${search_dir}/${fpm_binary}"
       break
     fi
