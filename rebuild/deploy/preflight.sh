@@ -411,13 +411,13 @@ for pair in \
   'SESSION_DRIVER=redis' \
   'SESSION_ENCRYPT=true' \
   'SESSION_SECURE_COOKIE=true'; do
-  env_entry_lines | grep -Fqx "${pair}" || { echo "Required setting missing: ${pair}" >&2; exit 1; }
+  env_entry_lines | grep -Fx "${pair}" >/dev/null || { echo "Required setting missing: ${pair}" >&2; exit 1; }
 done
 
-env_entry_lines | grep -Eq '^APP_KEY=base64:.+$'  || { echo "APP_KEY must be generated server-side" >&2; exit 1; }
-env_entry_lines | grep -Eq '^APP_URL=https://'  || { echo "APP_URL must use HTTPS" >&2; exit 1; }
-env_entry_lines | grep -Eq '^APP_TRUSTED_HOSTS=.+$'  || { echo "APP_TRUSTED_HOSTS is required" >&2; exit 1; }
-env_entry_lines | grep -Eq '^[[:space:]]*(export[[:space:]]+)?TRUSTED_PROXIES[[:space:]]*=.+$'  || { echo "TRUSTED_PROXIES is required" >&2; exit 1; }
+env_entry_lines | grep -E '^APP_KEY=base64:.+$' >/dev/null|| { echo "APP_KEY must be generated server-side" >&2; exit 1; }
+env_entry_lines | grep -E '^APP_URL=https://' >/dev/null|| { echo "APP_URL must use HTTPS" >&2; exit 1; }
+env_entry_lines | grep -E '^APP_TRUSTED_HOSTS=.+$' >/dev/null|| { echo "APP_TRUSTED_HOSTS is required" >&2; exit 1; }
+env_entry_lines | grep -E '^[[:space:]]*(export[[:space:]]+)?TRUSTED_PROXIES[[:space:]]*=.+$' >/dev/null|| { echo "TRUSTED_PROXIES is required" >&2; exit 1; }
 # This loop stays grep-based on purpose: it rejects on ANY bad entry, so an
 # extra assignment-like line inside a multiline value can only cause a false
 # rejection, never hide a real wildcard. It is also extracted standalone by
