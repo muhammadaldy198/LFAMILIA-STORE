@@ -22,6 +22,25 @@ APP_DIR="${REPO_DIR%/}/${APP_SUBDIR}"
 ENV_FILE="${APP_DIR}/.env"
 [[ -d "${APP_DIR}" ]] || { echo "APP_DIR not found: ${APP_DIR}" >&2; exit 1; }
 [[ -r "${ENV_FILE}" ]] || { echo "Production .env is missing" >&2; exit 1; }
+
+# Laravel 13 changed the default cache/redis/session names. deploy.sh uses the
+# live .env as is, so these pins must exist there or existing cache entries,
+# Redis sessions and queued jobs are orphaned at deploy time.
+check_env_pin() {
+  local key="$1" expected="$2" line value
+  line="$(grep -m1 -E "^[[:space:]]*(export[[:space:]]+)?${key}[[:space:]]*=" "${ENV_FILE}" || true)"
+  [[ -n "${line}" ]] || { echo "Production .env is missing ${key} (expected ${expected})" >&2; exit 1; }
+  value="${line#*=}"
+  value="${value%%#*}"
+  value="${value#"${value%%[![:space:]]*}"}"
+  value="${value%"${value##*[![:space:]]}"}"
+  value="${value#[\"\']}"
+  value="${value%[\"\']}"
+  [[ "${value}" == "${expected}" ]] || { echo "Production .env has wrong ${key} (expected ${expected})" >&2; exit 1; }
+}
+check_env_pin CACHE_PREFIX lfamilia_store_cache_
+check_env_pin REDIS_PREFIX lfamilia_store_database_
+check_env_pin SESSION_COOKIE lfamilia_store_session
 [[ -r "${MYSQL_DEFAULTS_FILE}" ]] || { echo "MySQL backup defaults file is not readable" >&2; exit 1; }
 [[ -r "${MYSQL_ADMIN_DEFAULTS_FILE}" ]] || { echo "MySQL admin defaults file is not readable" >&2; exit 1; }
 [[ -r "${BACKUP_PASSPHRASE_FILE}" ]] || { echo "Backup passphrase file is not readable" >&2; exit 1; }
