@@ -156,23 +156,22 @@ if [[ "${fpm_exec_start}" =~ path=([^[:space:];]+) ]]; then
 elif [[ "${fpm_exec_start}" =~ ^[[:space:]]*[@+!-]*([^[:space:];]+) ]]; then
   fpm_binary="${BASH_REMATCH[1]}"
 fi
-# systemd resolves a bare command name through its own executable search
-# path, not the deploy shell's PATH. Try the shell first, then the unit's
-# ExecSearchPath, then systemd's documented default search path.
+# systemd resolves a bare command name through the unit's executable search
+# path (ExecSearchPath, or the documented default when the unit leaves it
+# unset), never through the deploy shell's PATH, so resolve the name exactly
+# the same way; the shell's PATH must not substitute a different binary.
 if [[ -n "${fpm_binary}" && "${fpm_binary}" != */* ]]; then
-  resolved_binary="$(command -v "${fpm_binary}" 2>/dev/null || true)"
-  if [[ -z "${resolved_binary}" ]]; then
-    search_path="$(systemctl show -p ExecSearchPath --value "${PHP_FPM_SERVICE}" 2>/dev/null || true)"
-    if [[ -z "${search_path}" ]]; then
-      search_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-    fi
-    for search_dir in ${search_path//:/ }; do
-      if [[ -x "${search_dir}/${fpm_binary}" && ! -d "${search_dir}/${fpm_binary}" ]]; then
-        resolved_binary="${search_dir}/${fpm_binary}"
-        break
-      fi
-    done
+  search_path="$(systemctl show -p ExecSearchPath --value "${PHP_FPM_SERVICE}" 2>/dev/null || true)"
+  if [[ -z "${search_path}" ]]; then
+    search_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
   fi
+  resolved_binary=""
+  for search_dir in ${search_path//:/ }; do
+    if [[ -x "${search_dir}/${fpm_binary}" && ! -d "${search_dir}/${fpm_binary}" ]]; then
+      resolved_binary="${search_dir}/${fpm_binary}"
+      break
+    fi
+  done
   if [[ -n "${resolved_binary}" ]]; then fpm_binary="${resolved_binary}"; fi
 fi
 fpm_version_line=""
