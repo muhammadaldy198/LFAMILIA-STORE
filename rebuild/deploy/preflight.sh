@@ -174,9 +174,37 @@ if [[ -n "${fpm_binary}" && "${fpm_binary}" != */* ]]; then
     case "${unit_line}" in
       Environment=*)
         env_value="${unit_line#Environment=}"
-        env_value="${env_value//\"/}"
-        if [[ -z "${env_value//[[:space:]]/}" ]]; then assigned_path=""; fi
-        for assignment in ${env_value}; do
+        env_stripped="${env_value//[[:space:]]/}"
+        env_stripped="${env_stripped//\"/}"
+        env_stripped="${env_stripped//\'/}"
+        if [[ -z "${env_stripped}" ]]; then assigned_path=""; fi
+        env_assignments=()
+        env_token=""
+        env_quote=""
+        i=0
+        while (( i < ${#env_value} )); do
+          ch="${env_value:i:1}"
+          if [[ -n "${env_quote}" ]]; then
+            if [[ "${ch}" == "\\" && "${env_quote}" == '"' ]]; then
+              nxt="${env_value:i+1:1}"
+              if [[ "${nxt}" == '"' || "${nxt}" == '\' ]]; then env_token+="${nxt}"; i=$((i+1)); else env_token+="${ch}"; fi
+            elif [[ "${ch}" == "${env_quote}" ]]; then
+              env_quote=""
+            else
+              env_token+="${ch}"
+            fi
+          else
+            case "${ch}" in
+              '"'|"'") env_quote="${ch}" ;;
+              \\) nxt="${env_value:i+1:1}"; if [[ -n "${nxt}" ]]; then env_token+="${nxt}"; i=$((i+1)); else env_token+="${ch}"; fi ;;
+              ' '|$'\t') if [[ -n "${env_token}" ]]; then env_assignments+=("${env_token}"); env_token=""; fi ;;
+              *) env_token+="${ch}" ;;
+            esac
+          fi
+          i=$((i+1))
+        done
+        if [[ -n "${env_token}" ]]; then env_assignments+=("${env_token}"); fi
+        for assignment in "${env_assignments[@]}"; do
           case "${assignment}" in
             PATH=*) assigned_path="${assignment#PATH=}" ;;
           esac
